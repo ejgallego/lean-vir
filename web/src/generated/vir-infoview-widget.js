@@ -4414,548 +4414,6 @@ function isRpcRefObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) && (typeof value.__rpcref === "number" || typeof value.p === "number");
 }
 
-// web/src/vir-host-bindings.js
-function createCommonHostBindings(state = createHostResourceState()) {
-  return {
-    ...createJsValueHostBindings(state),
-    ...createJsCollectionHostBindings(state),
-    "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
-    "common.addNat": (lhs, rhs) => state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat"))
-  };
-}
-function createConsoleHostBindings(state = createHostResourceState()) {
-  return {
-    "browser.console.log": (message) => {
-      console.log(state.resolveResource(message, "JsString"));
-      return void 0;
-    }
-  };
-}
-function createBrowserDocumentHostBindings(state = createHostResourceState()) {
-  return {
-    "browser.document.getTitle": () => state.resourceForValue(browserDocument().title),
-    "browser.document.setTitle": (title) => {
-      browserDocument().title = state.resolveResource(title, "JsString");
-      return void 0;
-    },
-    "browser.document.querySelector": (selector) => adoptResourceForValue(state, createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
-    "browser.document.querySelectorAll": (selector) => state.resourceForValue(queryDocumentElements(state.resolveResource(selector, "JsString"))),
-    "browser.document.createElement": (tagName) => state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString")))
-  };
-}
-function createBrowserEventHostBindings(state = createHostResourceState()) {
-  return {
-    "browser.event.target": (event) => adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").target)),
-    "browser.event.currentTarget": (event) => adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
-    "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(state.resolveResource(event, "Event"));
-      return void 0;
-    },
-    "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(state.resolveResource(event, "Event"));
-      return void 0;
-    },
-    "browser.event.key": (event) => {
-      const key = state.resolveResource(event, "Event")?.key;
-      return state.resourceForValue(typeof key === "string" ? key : "");
-    },
-    "browser.event.formValue": (event) => adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
-  };
-}
-function createBrowserElementHostBindings(state = createHostResourceState()) {
-  return {
-    ...createElementResourceHostBindings(state, {
-      querySelector: (target, selector) => target.querySelector(selector),
-      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
-      getInnerHTML: (target) => target.innerHTML ?? "",
-      setInnerHTML: (target, html) => {
-        target.innerHTML = html;
-      },
-      getTextContent: (target) => target.textContent ?? "",
-      setTextContent: (target, text) => {
-        target.textContent = text;
-      },
-      getAttribute: (target, name) => target.getAttribute(name) ?? null,
-      setAttribute: (target, name, value) => target.setAttribute(name, value),
-      createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
-    }),
-    "browser.element.appendChild": (parent, child) => {
-      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
-      return void 0;
-    },
-    "browser.element.remove": (element) => {
-      state.resolveResource(element, "Element").remove();
-      return void 0;
-    },
-    "browser.element.classList.add": (element, className) => {
-      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
-      return void 0;
-    },
-    "browser.element.classList.remove": (element, className) => {
-      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
-      return void 0;
-    },
-    "browser.element.classList.toggle": (element, className) => state.resourceForValue(
-      state.resolveResource(element, "Element").classList.toggle(
-        state.resolveResource(className, "JsString")
-      )
-    ),
-    "browser.element.style.setProperty": (element, name, value) => {
-      state.resolveResource(element, "Element").style.setProperty(
-        state.resolveResource(name, "JsString"),
-        state.resolveResource(value, "JsString")
-      );
-      return void 0;
-    }
-  };
-}
-function createBrowserCanvasHostBindings(state = createHostResourceState()) {
-  const value = (resource, label) => state.resolveResource(resource, label);
-  return {
-    "browser.htmlCanvasElement.fromElement": (element) => {
-      const candidate = value(element, "Element");
-      const canvas = isCanvasElement(candidate) ? candidate : null;
-      return adoptResourceForValue(state, createNullableValue(canvas));
-    },
-    "browser.htmlCanvasElement.getWidth": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
-    "browser.htmlCanvasElement.setWidth": (canvas, width) => {
-      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
-      return void 0;
-    },
-    "browser.htmlCanvasElement.getHeight": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
-    "browser.htmlCanvasElement.setHeight": (canvas, height) => {
-      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
-      return void 0;
-    },
-    "browser.htmlCanvasElement.getContext2D": (canvas) => adoptResourceForValue(state, createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
-    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
-    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").fillRect(...args)),
-    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").strokeRect(...args)),
-    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
-    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
-    "browser.canvas2d.moveTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
-    "browser.canvas2d.lineTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
-    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) => value(ctx, "CanvasRenderingContext2D").arc(...args)),
-    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
-    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
-    "browser.canvas2d.setFillStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
-      value(ctx, "CanvasRenderingContext2D").fillStyle = resolvedStyle;
-      return void 0;
-    }),
-    "browser.canvas2d.setStrokeStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
-      value(ctx, "CanvasRenderingContext2D").strokeStyle = resolvedStyle;
-      return void 0;
-    }),
-    "browser.canvas2d.setLineWidth": (ctx, width) => withCanvasNumbers(state, [width], (resolvedWidth) => {
-      value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
-      return void 0;
-    }),
-    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
-    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
-    "browser.canvas2d.translate": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").translate(...args)),
-    "browser.canvas2d.rotate": (ctx, angle) => withCanvasNumbers(state, [angle], (resolvedAngle) => value(ctx, "CanvasRenderingContext2D").rotate(resolvedAngle))
-  };
-}
-function withCanvasNumbers(state, resources, run) {
-  return withConsumedResources(
-    state,
-    resources.map((resource) => [resource, "JsFloat"]),
-    run
-  );
-}
-function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
-  return createHtmlInputElementResourceHostBindings(state, {
-    fromElement: (element) => isInputElement(element) ? element : null
-  });
-}
-function createBrowserTimerHostBindings(state = createHostResourceState()) {
-  return createTimerResourceHostBindings(state);
-}
-function createBrowserAnimationHostBindings(state = createHostResourceState()) {
-  const requestFrame = typeof globalThis.requestAnimationFrame === "function" ? globalThis.requestAnimationFrame.bind(globalThis) : (callback) => globalThis.setTimeout(() => callback(performanceNow()), 16);
-  const cancelFrame = typeof globalThis.cancelAnimationFrame === "function" ? globalThis.cancelAnimationFrame.bind(globalThis) : globalThis.clearTimeout.bind(globalThis);
-  return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
-}
-function createInfoviewHostBindings({ resources = createHostResourceState(), commandDispatcher = null } = {}) {
-  return {
-    "infoview.documentPosition": (uri, fileName, line, character, label) => resources.resourceForValue({
-      uri: resources.resolveResource(uri, "JsString"),
-      fileName: resources.resolveResource(fileName, "JsString"),
-      line: resources.resolveResource(line, "JsNat"),
-      character: resources.resolveResource(character, "JsNat"),
-      label: resources.resolveResource(label, "JsString")
-    }),
-    "infoview.clipboard.writeText": (text) => resources.resourceForValue(writeTextToHostClipboard(resources.resolveResource(text, "JsString"))),
-    "infoview.command.revealPosition": (position) => resources.resourceForValue(revealInfoviewPosition(
-      commandDispatcher,
-      resources.resolveResource(position, "DocumentPosition")
-    )),
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => resources.resourceForValue({
-      id: resources.resolveResource(id, "JsString"),
-      label: resources.resolveResource(label, "JsString"),
-      typeName: resources.resolveResource(typeName, "JsString"),
-      summary: resources.resolveResource(summary, "JsString"),
-      expression: resources.resolveResource(expression, "JsString"),
-      typeText: "",
-      context: ""
-    }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => resources.resourceForValue({
-      ...resources.resolveResource(ref, "RpcRef"),
-      typeText: resources.resolveResource(typeText, "JsString"),
-      context: resources.resolveResource(context, "JsString"),
-      ...nullableField(resources, serverRef, "serverRef")
-    }),
-    "js.value.proofwidgets.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
-    "proofwidgets.rpc.inspectRef": (ref) => resources.resourceForValue(inspectProofWidgetsRpcRef(
-      commandDispatcher,
-      resources.resolveResource(ref, "RpcRef")
-    )),
-    "proofwidgets.rpc.resolveRef": (ref, callback) => resources.resourceForValue(resolveProofWidgetsRpcRef(
-      resources,
-      commandDispatcher,
-      resources.resolveResource(ref, "RpcRef"),
-      callback
-    ))
-  };
-}
-function createBrowserHostBindings({
-  resources = createHostResourceState(),
-  infoviewCommandDispatcher = null,
-  reactHostBindings = null
-} = {}) {
-  const state = resources;
-  const reactBindingsSource = typeof reactHostBindings === "function" ? reactHostBindings(state, { querySelector: queryDocumentElement }) : reactHostBindings;
-  const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
-  return {
-    ...createCommonHostBindings(state),
-    ...createConsoleHostBindings(state),
-    ...createBrowserDocumentHostBindings(state),
-    ...createBrowserEventHostBindings(state),
-    ...createBrowserElementHostBindings(state),
-    ...createBrowserHtmlInputElementHostBindings(state),
-    ...createBrowserCanvasHostBindings(state),
-    ...createBrowserTimerHostBindings(state),
-    ...createBrowserAnimationHostBindings(state),
-    ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
-    ...reactBindings,
-    [VIR_HOST_DISPOSE]: () => state.dispose()
-  };
-}
-function normalizeOptionalHostBindingMap(value, label) {
-  if (value === null || value === void 0) return {};
-  if (typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be a host binding object`);
-  }
-  return value;
-}
-function browserDocument() {
-  if (!globalThis.document) {
-    throw new Error(
-      "browser.document host binding requires globalThis.document; use vir-runtime-node.js or pass hostBindings in non-browser runtimes"
-    );
-  }
-  return globalThis.document;
-}
-function queryDocumentElement(selector) {
-  return browserDocument().querySelector(selector);
-}
-function queryDocumentElements(selector) {
-  return browserDocument().querySelectorAll(selector);
-}
-function isCanvasElement(value) {
-  const Canvas = globalThis.HTMLCanvasElement;
-  return typeof Canvas === "function" ? value instanceof Canvas : value !== null && typeof value === "object" && typeof value.getContext === "function";
-}
-function writeTextToHostClipboard(text) {
-  const copiedSynchronously = copyTextWithExecCommand(text);
-  if (copiedSynchronously) {
-    return true;
-  }
-  const clipboard = globalThis.navigator?.clipboard;
-  if (clipboard !== null && typeof clipboard === "object" && typeof clipboard.writeText === "function") {
-    try {
-      clipboard.writeText(text).catch((error) => {
-        reportEventHandlerError(error);
-      });
-      return true;
-    } catch (error) {
-      reportEventHandlerError(error);
-      return false;
-    }
-  }
-  return false;
-}
-function revealInfoviewPosition(commandDispatcher, position) {
-  const normalized = normalizeInfoviewDocumentPosition(position);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
-}
-function nullableField(resources, value, name) {
-  const payload = nullablePayload(resources, value);
-  return payload === null ? {} : { [name]: payload };
-}
-function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
-}
-function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null || typeof callback !== "function") {
-    releaseCallback(callback);
-    return false;
-  }
-  const handler = infoviewCommandHandler(commandDispatcher, "proofwidgetsRpcResolveRef");
-  if (handler === null) {
-    releaseCallback(callback);
-    return false;
-  }
-  let result;
-  try {
-    result = handler(normalized);
-  } catch (error) {
-    reportEventHandlerError(error);
-    releaseCallback(callback);
-    return false;
-  }
-  if (result === false) {
-    releaseCallback(callback);
-    return false;
-  }
-  if (result !== null && typeof result === "object" && typeof result.then === "function") {
-    const ownedCallback = takeCallbackLease(callback, "proofwidgets.rpc.resolveRef callback");
-    try {
-      result.then((info) => {
-        callAndReleaseCallback(ownedCallback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
-      }).catch((error) => {
-        reportEventHandlerError(error);
-        releaseCallback(ownedCallback);
-      });
-    } catch (error) {
-      releaseCallback(ownedCallback);
-      throw error;
-    }
-  } else {
-    callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
-  }
-  return true;
-}
-function normalizeInfoviewDocumentPosition(position) {
-  if (position === null || typeof position !== "object") {
-    return null;
-  }
-  const uri = typeof position.uri === "string" ? position.uri : "";
-  if (uri.length === 0) {
-    return null;
-  }
-  const line = nonNegativeInteger(position.line);
-  const character = nonNegativeInteger(position.character);
-  if (line === null || character === null) {
-    return null;
-  }
-  return { uri, line, character };
-}
-function nonNegativeInteger(value) {
-  if (typeof value === "bigint") {
-    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
-  }
-  if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value >= 0 ? value : null;
-  }
-  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : null;
-  }
-  return null;
-}
-function dispatchInfoviewCommand(commandDispatcher, name, payload) {
-  const handler = infoviewCommandHandler(commandDispatcher, name);
-  if (handler === null) {
-    return false;
-  }
-  try {
-    const result = handler(payload);
-    if (result !== null && typeof result === "object" && typeof result.then === "function") {
-      result.catch((error) => {
-        reportEventHandlerError(error);
-      });
-      return true;
-    }
-    return result !== false;
-  } catch (error) {
-    reportEventHandlerError(error);
-    return false;
-  }
-}
-function infoviewCommandHandler(commandDispatcher, name) {
-  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
-  if (typeof dispatcher === "function") {
-    return (value) => dispatcher(name, value);
-  }
-  if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
-    return (value) => dispatcher[name](value);
-  }
-  return null;
-}
-function callAndReleaseCallback(callback, value) {
-  try {
-    callback(value);
-  } catch (error) {
-    reportEventHandlerError(error);
-  } finally {
-    releaseCallback(callback);
-  }
-}
-function releaseCallback(callback) {
-  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
-    callback.release();
-  }
-}
-function copyTextWithExecCommand(text) {
-  const document = globalThis.document;
-  if (document === null || typeof document !== "object" || typeof document.execCommand !== "function") {
-    return false;
-  }
-  const body = document.body;
-  if (body === null || typeof body !== "object") {
-    return false;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-1000px";
-  textarea.style.left = "-1000px";
-  textarea.style.opacity = "0";
-  body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
-  try {
-    return document.execCommand("copy") === true;
-  } catch {
-    return false;
-  } finally {
-    textarea.remove();
-  }
-}
-function createBrowserEventListenerResource(resources, target, eventName, callback) {
-  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
-  const handler = (event) => callLeanEventCallback(resources, event, ownedCallback);
-  try {
-    target.addEventListener(eventName, handler);
-  } catch (error) {
-    const errors = [error];
-    collectCleanupError(errors, () => ownedCallback.release());
-    throwCollectedErrors(errors, "browser event listener registration failed during callback cleanup");
-  }
-  const listener = {
-    remove: once(() => {
-      const errors = [];
-      resources.removeDisposable(listener);
-      collectCleanupError(errors, () => target.removeEventListener(eventName, handler));
-      collectCleanupError(errors, () => ownedCallback.release());
-      throwCollectedErrors(errors, "browser event listener removal failed");
-    })
-  };
-  return listener;
-}
-function isInputElement(value) {
-  return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
-}
-function isTextAreaElement(value) {
-  return typeof globalThis.HTMLTextAreaElement === "function" && value instanceof globalThis.HTMLTextAreaElement;
-}
-function isSelectElement(value) {
-  return typeof globalThis.HTMLSelectElement === "function" && value instanceof globalThis.HTMLSelectElement;
-}
-function isElement(value) {
-  return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
-}
-function nullableElementTarget(value) {
-  return createNullableValue(isElement(value) ? value : null);
-}
-function adoptResourceForValue(state, value) {
-  if (typeof state.adoptResourceForValue === "function") {
-    return state.adoptResourceForValue(value);
-  }
-  return state.resourceForValue(value);
-}
-function formControlEventValue(event) {
-  const currentValue = formControlValue(event?.currentTarget);
-  if (currentValue !== null) return currentValue;
-  return formControlValue(event?.target);
-}
-function formControlValue(value) {
-  if (!isInputElement(value) && !isTextAreaElement(value) && !isSelectElement(value)) {
-    return null;
-  }
-  return String(value.value ?? "");
-}
-
-// web/src/vir-react-host-bindings.js
-import * as React from "react";
-
-// infoview-react-dom-client:vir-react-dom-client
-import { createRoot } from "react-dom";
-
-// web/src/vir-react-host-bindings.js
-function createBrowserReactHostBindings(state = createHostResourceState(), {
-  querySelector = queryBrowserElement
-} = {}) {
-  if (!hasHostResourceFinalizationSupport()) {
-    throw new Error("browser React host bindings require FinalizationRegistry and WeakRef support");
-  }
-  const hookRuntime = createBrowserReactHookRuntime(state, React);
-  const hooks = {
-    ...createReactHostHooks({
-      resources: state,
-      reportError: (error) => state.recordGcFinalizerError(error)
-    }),
-    hookRuntime
-  };
-  return {
-    ...createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React, hooks), {
-      querySelector,
-      createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
-      createNodeElementResource: (elementType, props, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, elementType, props, children),
-      createNodeFragmentResource: (props, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children)
-    }),
-    ...createReactJsValueHostBindings(state),
-    ...createReactStateHostBindings(state, hookRuntime)
-  };
-}
-function createBrowserReactRootResource2(state, root, React3, hooks) {
-  return createBrowserReactRootResource(state, root, React3, hooks);
-}
-function queryBrowserElement(selector) {
-  if (!globalThis.document) {
-    throw new Error("React selector host bindings require globalThis.document");
-  }
-  return globalThis.document.querySelector(selector);
-}
-
-// web/src/runtime/interface-effects.js
-var EFFECT_LABELS = /* @__PURE__ */ new Set(["pure", "runtime", "io", "dom", "react"]);
-function isInterfaceEffectLabel(effect) {
-  return EFFECT_LABELS.has(effect);
-}
-function requireInterfaceEffect(effect, label) {
-  if (!isInterfaceEffectLabel(effect)) {
-    throw new Error(`${label} must be one of pure, runtime, io, dom, or react`);
-  }
-  return effect;
-}
-function isEffectfulInterfaceEffect(effect) {
-  return requireInterfaceEffect(effect, "effect") !== "pure";
-}
-function interfaceEffectRuntimeTag(effect) {
-  return isEffectfulInterfaceEffect(effect) ? 1 : 0;
-}
-
 // web/src/runtime/interface-tags.js
 var INTERFACE_TAG = Object.freeze({
   NAT: 0,
@@ -4983,7 +4441,8 @@ var INTERFACE_TAG = Object.freeze({
   FUNCTION: 24,
   CUSTOM_INDUCTIVE: 25,
   RECURSIVE_SELF: 26,
-  LEAN_OBJECT: 27
+  LEAN_OBJECT: 27,
+  JSON: 28
 });
 var SUPPORTED_INTERFACE_TAGS = new Set(Object.values(INTERFACE_TAG));
 var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
@@ -4994,498 +4453,27 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
   INTERFACE_TAG.PROD,
   INTERFACE_TAG.STRUCTURE,
   INTERFACE_TAG.TAGGED_UNION,
-  INTERFACE_TAG.CUSTOM_INDUCTIVE
+  INTERFACE_TAG.CUSTOM_INDUCTIVE,
+  INTERFACE_TAG.JSON
 ]);
 
-// web/src/runtime/interface-manifest.js
-var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 7;
-var MIN_INTERFACE_MANIFEST_VERSION = 6;
-var HOST_IMPORT_BOUNDARY = Object.freeze({
-  HOST_RESOURCE: "hostResource",
-  EXPLICIT_CONVERSION: "explicitConversion",
-  OBJECT_HANDLE: "objectHandle"
-});
-var INTERFACE_MANIFEST_SHAPE_ERROR = `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+// web/src/runtime/interface-effects.js
+var EFFECT_LABELS = /* @__PURE__ */ new Set(["pure", "runtime", "io", "dom", "react"]);
+function isInterfaceEffectLabel(effect) {
+  return EFFECT_LABELS.has(effect);
 }
-function requireString(value, label) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`${label} must be a non-empty string`);
+function requireInterfaceEffect(effect, label) {
+  if (!isInterfaceEffectLabel(effect)) {
+    throw new Error(`${label} must be one of pure, runtime, io, dom, or react`);
   }
+  return effect;
 }
-function requireOptionalString(value, label) {
-  if (value !== void 0 && typeof value !== "string") {
-    throw new Error(`${label} must be a string`);
-  }
+function isEffectfulInterfaceEffect(effect) {
+  return requireInterfaceEffect(effect, "effect") !== "pure";
 }
-function requireNonNegativeInteger(value, label) {
-  if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
-    throw new Error(`${label} must be a non-negative 32-bit integer`);
-  }
+function interfaceEffectRuntimeTag(effect) {
+  return isEffectfulInterfaceEffect(effect) ? 1 : 0;
 }
-function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || !Number.isInteger(manifest.version) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
-    throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
-  }
-  if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
-    throw new Error(`embedded interface manifest artifact must be ${INTERFACE_MANIFEST_ARTIFACT}`);
-  }
-  if (manifest.diagnostics !== void 0 && !Array.isArray(manifest.diagnostics)) {
-    throw new Error("embedded interface manifest diagnostics must be an array");
-  }
-  if (manifest.hostImports !== void 0 && !Array.isArray(manifest.hostImports)) {
-    throw new Error("embedded interface manifest hostImports must be an array");
-  }
-  validateManifestExports(manifest.exports, manifest.version);
-  validateManifestHostImports(manifest.hostImports ?? []);
-  return manifest;
-}
-function validateManifestExports(exports, manifestVersion) {
-  const entries = /* @__PURE__ */ new Set();
-  const ids = /* @__PURE__ */ new Set();
-  const jsNames = /* @__PURE__ */ new Set();
-  exports.forEach((entry, index) => {
-    const label = `embedded interface manifest exports[${index}]`;
-    if (!isRecord(entry)) {
-      throw new Error(`${label} must be an object`);
-    }
-    requireString(entry.entry, `${label}.entry`);
-    requireOptionalString(entry.id, `${label}.id`);
-    requireOptionalString(entry.jsName, `${label}.jsName`);
-    requireOptionalString(entry.source, `${label}.source`);
-    requireInterfaceEffect(entry.effect, `${label}.effect`);
-    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
-      throw new Error(`${label}.startup must be a boolean`);
-    }
-    if (manifestVersion < 7) {
-      if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
-        throw new Error(`${label}.startup must be a boolean`);
-      }
-      entry.startup ??= false;
-    }
-    requireUnique(entries, entry.entry, `${label}.entry`);
-    if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
-    if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
-    if (!Array.isArray(entry.args)) {
-      throw new Error(`${label}.args must be an array`);
-    }
-    entry.args.forEach((arg, argIndex) => {
-      const argLabel = `${label}.args[${argIndex}]`;
-      if (!isRecord(arg)) {
-        throw new Error(`${argLabel} must be an object`);
-      }
-      requireString(arg.name, `${argLabel}.name`);
-      validateInterfaceRootType(arg.type, `${argLabel}.type`);
-    });
-    validateInterfaceRootType(entry.result, `${label}.result`);
-  });
-}
-function validateManifestHostImports(hostImports) {
-  hostImports.forEach((entry, index) => {
-    const label = `embedded interface manifest hostImports[${index}]`;
-    if (!isRecord(entry)) {
-      throw new Error(`${label} must be an object`);
-    }
-    requireInterfaceEffect(entry.effect, `${label}.effect`);
-    requireHostImportBoundary(entry.boundary, `${label}.boundary`);
-  });
-}
-function requireHostImportBoundary(value, label) {
-  if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
-  }
-}
-function requireUnique(seen, value, label, owner = "interface export") {
-  if (seen.has(value)) {
-    throw new Error(`${label} duplicates another ${owner}`);
-  }
-  seen.add(value);
-}
-function validateInterfaceType(type, label = "interface type") {
-  if (!isRecord(type)) {
-    throw new Error(`${label} must be an object`);
-  }
-  requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
-    throw new Error(`${label}.interfaceTag is not supported`);
-  }
-  switch (type.interfaceTag) {
-    case INTERFACE_TAG.SIMPLE_ENUM:
-      validateSimpleEnumType(type, label);
-      break;
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateInterfaceType(type.element, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateInterfaceType(type.fst, `${label}.fst`);
-      validateInterfaceType(type.snd, `${label}.snd`);
-      break;
-    case INTERFACE_TAG.STRUCTURE:
-      validateStructureType(type, label);
-      break;
-    case INTERFACE_TAG.TAGGED_UNION:
-      validateTaggedUnionType(type, label);
-      break;
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      validateCustomInductiveType(type, label);
-      break;
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      validateRecursiveSelfType(type, label);
-      break;
-    case INTERFACE_TAG.RESOURCE:
-      validateResourceType(type, label);
-      break;
-    case INTERFACE_TAG.FUNCTION:
-      validateFunctionType(type, label);
-      break;
-    case INTERFACE_TAG.LEAN_OBJECT:
-      validateLeanObjectType(type, label);
-      break;
-    default:
-      break;
-  }
-  return type;
-}
-function validateInterfaceRootType(type, label) {
-  validateInterfaceType(type, label);
-  validateNoDanglingRecursiveSelf(type, label);
-}
-function validateSimpleEnumType(type, label) {
-  if (type.kind !== "simpleEnum") {
-    throw new Error(`${label}.kind must be simpleEnum`);
-  }
-  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
-    throw new Error(`${label}.constructors must be a non-empty array`);
-  }
-  const names = /* @__PURE__ */ new Set();
-  const jsNames = /* @__PURE__ */ new Set();
-  type.constructors.forEach((ctor, index) => {
-    validateConstructorHeader(ctor, index, label, names, jsNames);
-  });
-}
-function validateStructureType(type, label) {
-  if (type.kind !== "structure") {
-    throw new Error(`${label}.kind must be structure`);
-  }
-  requireString(type.name, `${label}.name`);
-  validateRuntimeCounts(type, label);
-  if (!Array.isArray(type.fields) || type.fields.length === 0) {
-    throw new Error(`${label}.fields must be a non-empty array`);
-  }
-  if (type.trivialFieldIndex !== void 0) {
-    if (!Number.isInteger(type.trivialFieldIndex) || type.trivialFieldIndex < 0 || type.trivialFieldIndex >= type.fields.length) {
-      throw new Error(`${label}.trivialFieldIndex is out of range`);
-    }
-  }
-  const names = /* @__PURE__ */ new Set();
-  type.fields.forEach((field, index) => {
-    const fieldLabel = `${label}.fields[${index}]`;
-    validateInterfaceField(field, fieldLabel, names, type, type.name);
-    if (field.subobject !== void 0 && typeof field.subobject !== "boolean") {
-      throw new Error(`${fieldLabel}.subobject must be a boolean`);
-    }
-    if (field.subobject === true) {
-      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
-        throw new Error(`${fieldLabel}.subobject field type must be a structure`);
-      }
-      if (field.layout?.kind !== "object") {
-        throw new Error(`${fieldLabel}.subobject field layout must be object`);
-      }
-    }
-  });
-  validateFlattenedStructureFields(type, label);
-}
-function validateStructureFieldLayout(layout, structureType, label) {
-  if (!isRecord(layout)) {
-    throw new Error(`${label} must be an object`);
-  }
-  switch (layout.kind) {
-    case "object":
-      requireNonNegativeInteger(layout.index, `${label}.index`);
-      if (layout.index >= structureType.objectFieldCount) {
-        throw new Error(`${label}.index is outside objectFieldCount`);
-      }
-      break;
-    case "usize":
-      requireNonNegativeInteger(layout.index, `${label}.index`);
-      if (layout.index < structureType.objectFieldCount || layout.index >= structureType.objectFieldCount + structureType.usizeFieldCount) {
-        throw new Error(`${label}.index is outside usize slot range`);
-      }
-      break;
-    case "scalar":
-      requireNonNegativeInteger(layout.size, `${label}.size`);
-      requireNonNegativeInteger(layout.offset, `${label}.offset`);
-      if (layout.size === 0 || layout.offset + layout.size > structureType.scalarByteSize) {
-        throw new Error(`${label} is outside scalarByteSize`);
-      }
-      break;
-    default:
-      throw new Error(`${label}.kind is not supported`);
-  }
-}
-function validateTaggedUnionType(type, label) {
-  if (type.kind !== "taggedUnion") {
-    throw new Error(`${label}.kind must be taggedUnion`);
-  }
-  requireString(type.name, `${label}.name`);
-  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
-    throw new Error(`${label}.constructors must be a non-empty array`);
-  }
-  const names = /* @__PURE__ */ new Set();
-  const jsNames = /* @__PURE__ */ new Set();
-  type.constructors.forEach((ctor, index) => {
-    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
-    validateRuntimeCounts(ctor, ctorLabel);
-    validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
-    validateInterfaceType(ctor.type, `${ctorLabel}.type`);
-  });
-}
-function validateCustomInductiveType(type, label) {
-  if (type.kind !== "customInductive") {
-    throw new Error(`${label}.kind must be customInductive`);
-  }
-  requireString(type.name, `${label}.name`);
-  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
-    throw new Error(`${label}.constructors must be a non-empty array`);
-  }
-  const names = /* @__PURE__ */ new Set();
-  const jsNames = /* @__PURE__ */ new Set();
-  type.constructors.forEach((ctor, index) => {
-    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
-    validateRuntimeCounts(ctor, ctorLabel);
-    if (!Array.isArray(ctor.fields)) {
-      throw new Error(`${ctorLabel}.fields must be an array`);
-    }
-    if (ctor.fields.length === 0 && (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
-      throw new Error(`${ctorLabel} with no fields must have zero runtime field counts`);
-    }
-    const fieldNames = /* @__PURE__ */ new Set();
-    ctor.fields.forEach((field, fieldIndex) => {
-      const fieldLabel = `${ctorLabel}.fields[${fieldIndex}]`;
-      validateInterfaceField(field, fieldLabel, fieldNames, ctor, type.name);
-    });
-  });
-}
-function validateConstructorHeader(ctor, index, label, names, jsNames) {
-  const ctorLabel = `${label}.constructors[${index}]`;
-  if (!isRecord(ctor)) {
-    throw new Error(`${ctorLabel} must be an object`);
-  }
-  requireString(ctor.name, `${ctorLabel}.name`);
-  requireString(ctor.jsName, `${ctorLabel}.jsName`);
-  if (ctor.tag !== index) {
-    throw new Error(`${ctorLabel}.tag must be ${index}`);
-  }
-  requireUnique(names, ctor.name, `${ctorLabel}.name`, "constructor");
-  requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`, "constructor");
-  return ctorLabel;
-}
-function validateRuntimeCounts(type, label) {
-  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
-  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
-  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
-}
-function validateInterfaceField(field, fieldLabel, names, layoutOwner, recursiveOwnerName) {
-  if (!isRecord(field)) {
-    throw new Error(`${fieldLabel} must be an object`);
-  }
-  requireString(field.name, `${fieldLabel}.name`);
-  requireUnique(names, field.name, `${fieldLabel}.name`, "field");
-  validateStructureFieldLayout(field.layout, layoutOwner, `${fieldLabel}.layout`);
-  validateInterfaceType(field.type, `${fieldLabel}.type`);
-  validateRecursiveSelfOwner(field.type, recursiveOwnerName, `${fieldLabel}.type`);
-}
-function validateRecursiveSelfType(type, label) {
-  if (type.kind !== "recursiveSelf") {
-    throw new Error(`${label}.kind must be recursiveSelf`);
-  }
-  requireString(type.name, `${label}.name`);
-}
-function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      if (type.name !== ownerName) {
-        throw new Error(`${label}.name must match ${ownerName}`);
-      }
-      break;
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
-      validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
-      break;
-    case INTERFACE_TAG.STRUCTURE:
-      break;
-    case INTERFACE_TAG.TAGGED_UNION:
-      for (const ctor of type.constructors ?? []) {
-        validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
-      }
-      break;
-    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-      break;
-    case INTERFACE_TAG.FUNCTION:
-      for (const arg of type.args ?? []) {
-        validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
-      }
-      validateRecursiveSelfOwner(type.result, ownerName, `${label}.result`);
-      break;
-    default:
-      break;
-  }
-}
-function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.interfaceTag) {
-    case INTERFACE_TAG.RECURSIVE_SELF:
-      throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
-    case INTERFACE_TAG.ARRAY:
-    case INTERFACE_TAG.LIST:
-    case INTERFACE_TAG.OPTION:
-      validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
-      break;
-    case INTERFACE_TAG.PROD:
-      validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
-      validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
-      break;
-    case INTERFACE_TAG.TAGGED_UNION:
-      for (const ctor of type.constructors ?? []) {
-        validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
-      }
-      break;
-    case INTERFACE_TAG.FUNCTION:
-      for (const arg of type.args ?? []) {
-        validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
-      }
-      validateNoDanglingRecursiveSelf(type.result, `${label}.result`);
-      break;
-    default:
-      break;
-  }
-}
-function validateResourceType(type, label) {
-  if (type.kind !== "resource") {
-    throw new Error(`${label}.kind must be resource`);
-  }
-  requireString(type.name, `${label}.name`);
-}
-function validateLeanObjectType(type, label) {
-  if (type.kind !== "leanObject") {
-    throw new Error(`${label}.kind must be leanObject`);
-  }
-}
-function validateFunctionType(type, label) {
-  if (type.kind !== "function") {
-    throw new Error(`${label}.kind must be function`);
-  }
-  requireInterfaceEffect(type.effect, `${label}.effect`);
-  if (!Array.isArray(type.args)) {
-    throw new Error(`${label}.args must be an array`);
-  }
-  type.args.forEach((arg, index) => {
-    const argLabel = `${label}.args[${index}]`;
-    if (!isRecord(arg)) {
-      throw new Error(`${argLabel} must be an object`);
-    }
-    requireString(arg.name, `${argLabel}.name`);
-    validateInterfaceType(arg.type, `${argLabel}.type`);
-  });
-  validateInterfaceType(type.result, `${label}.result`);
-}
-function validateFlattenedStructureFields(type, label) {
-  const names = /* @__PURE__ */ new Set();
-  type.fields.forEach((field, index) => {
-    const fieldLabel = `${label}.fields[${index}]`;
-    if (field.subobject === true) {
-      for (const name of flattenedStructureFieldNames(field.type)) {
-        requireUniqueStructureField(names, name, `${fieldLabel}.subobject.${name}`);
-      }
-    } else {
-      requireUniqueStructureField(names, field.name, `${fieldLabel}.name`);
-    }
-  });
-}
-function flattenedStructureFieldNames(type) {
-  const names = [];
-  for (const field of type?.fields ?? []) {
-    if (field.subobject === true) {
-      names.push(...flattenedStructureFieldNames(field.type));
-    } else {
-      names.push(field.name);
-    }
-  }
-  return names;
-}
-function requireUniqueStructureField(seen, value, label) {
-  if (seen.has(value)) {
-    throw new Error(`${label} duplicates another flattened structure field`);
-  }
-  seen.add(value);
-}
-
-// web/src/runtime/call-timing.js
-function defaultNow() {
-  return globalThis.performance?.now?.() ?? Date.now();
-}
-function elapsed(now, started) {
-  return Math.max(0, now() - started);
-}
-var RuntimeCallTiming = class {
-  constructor(now = defaultNow) {
-    if (typeof now !== "function") throw new TypeError("runtime call clock must be a function");
-    this.now = now;
-    this.started = now();
-    this.marshalMs = 0;
-    this.executeMs = 0;
-    this.decodeMs = 0;
-    this.hostMs = 0;
-    this.hostDepth = 0;
-    this.finished = false;
-  }
-  beginPhase() {
-    if (this.finished) throw new Error("runtime call timing is already finished");
-    return this.now();
-  }
-  endMarshal(started) {
-    this.endPhase("marshalMs", started);
-  }
-  endExecute(started) {
-    this.endPhase("executeMs", started);
-  }
-  endDecode(started) {
-    this.endPhase("decodeMs", started);
-  }
-  beginHost() {
-    const started = this.hostDepth === 0 ? this.now() : null;
-    this.hostDepth++;
-    return started;
-  }
-  endHost(started) {
-    if (this.hostDepth === 0) throw new Error("runtime host call timing is inconsistent");
-    this.hostDepth--;
-    if (started !== null) this.hostMs += elapsed(this.now, started);
-  }
-  endPhase(name, started) {
-    this[name] += elapsed(this.now, started);
-  }
-  finish() {
-    if (this.finished) throw new Error("runtime call timing is already finished");
-    if (this.hostDepth !== 0) throw new Error("runtime call timing has an active host import");
-    this.finished = true;
-    return {
-      marshalMs: this.marshalMs,
-      executeMs: this.executeMs,
-      decodeMs: this.decodeMs,
-      hostMs: this.hostMs,
-      totalMs: elapsed(this.now, this.started)
-    };
-  }
-};
 
 // web/src/runtime/vir-codec.js
 function asBytes(bytes, label) {
@@ -6052,6 +5040,7 @@ function objectArgumentSupported(type, selfType = null) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.JSON:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
     case INTERFACE_TAG.ARRAY:
@@ -6091,6 +5080,7 @@ function objectResultSupported(type, selfType = null) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.JSON:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
     case INTERFACE_TAG.ARRAY:
@@ -6478,6 +5468,1370 @@ function readScalarUnsigned(view, offset, size, label) {
   }
 }
 
+// web/src/runtime/json-values.js
+var JSON_MAX_DEPTH = 256;
+var BOOL_TYPE = Object.freeze({ interfaceTag: INTERFACE_TAG.BOOL });
+var FLOAT_TYPE = Object.freeze({ interfaceTag: INTERFACE_TAG.FLOAT });
+var BOOL_LAYOUT = Object.freeze({ kind: "scalar", size: 1, offset: 0 });
+var FLOAT_LAYOUT = Object.freeze({ kind: "scalar", size: 8, offset: 0 });
+var hasOwn2 = Function.call.bind(Object.prototype.hasOwnProperty);
+var propertyIsEnumerable = Function.call.bind(Object.prototype.propertyIsEnumerable);
+function makeJsonObjectValue(runtime, value, label) {
+  return lowerJson(runtime, value, label, 0, /* @__PURE__ */ new Set());
+}
+function lowerJson(runtime, value, label, depth, ancestors) {
+  requireJsonDepth(depth, label);
+  if (value === null) return runtime.makeObjectScalar(0, label);
+  switch (typeof value) {
+    case "boolean":
+      return makeScalarConstructor(runtime, 1, BOOL_TYPE, BOOL_LAYOUT, value, label);
+    case "number":
+      requireJsonNumber(value, label);
+      return makeScalarConstructor(runtime, 2, FLOAT_TYPE, FLOAT_LAYOUT, value, label);
+    case "string": {
+      const fields = [runtime.makeObjectString(value, label)];
+      try {
+        return runtime.makeObjectCtorFromOwnedFields(3, fields, label);
+      } finally {
+        runtime.releaseOwnedObjects(fields);
+      }
+    }
+    case "object":
+      return withJsonContainer(value, label, ancestors, () => Array.isArray(value) ? lowerJsonArray(runtime, value, label, depth, ancestors) : lowerJsonObject(runtime, value, label, depth, ancestors));
+    default:
+      throw new TypeError(`${label} must be an ordinary JSON value; found ${typeof value}`);
+  }
+}
+function lowerJsonArray(runtime, value, label, depth, ancestors) {
+  const elements = [];
+  try {
+    for (let index = 0; index < value.length; index++) {
+      if (!hasOwn2(value, index)) {
+        throw new TypeError(`${label}[${index}] is an array hole, not a JSON value`);
+      }
+      elements.push(lowerJson(runtime, value[index], `${label}[${index}]`, depth + 1, ancestors));
+    }
+    const array = runtime.makeObjectArrayFromOwnedElements(elements, label);
+    const fields = [array];
+    try {
+      return runtime.makeObjectCtorFromOwnedFields(4, fields, label);
+    } finally {
+      runtime.releaseOwnedObjects(fields);
+    }
+  } finally {
+    runtime.releaseOwnedObjects(elements);
+  }
+}
+function lowerJsonObject(runtime, value, label, depth, ancestors) {
+  requirePlainJsonObject(value, label);
+  const entries = [];
+  try {
+    for (const key of Object.keys(value)) {
+      const fields2 = [];
+      try {
+        fields2.push(runtime.makeObjectString(key, `${label}.${key} key`));
+        fields2.push(lowerJson(runtime, value[key], `${label}.${key}`, depth + 1, ancestors));
+        entries.push(runtime.makeObjectCtorFromOwnedFields(0, fields2, `${label}.${key} entry`));
+      } finally {
+        runtime.releaseOwnedObjects(fields2);
+      }
+    }
+    const array = runtime.makeObjectArrayFromOwnedElements(entries, label);
+    const fields = [array];
+    try {
+      return runtime.makeObjectCtorFromOwnedFields(5, fields, label);
+    } finally {
+      runtime.releaseOwnedObjects(fields);
+    }
+  } finally {
+    runtime.releaseOwnedObjects(entries);
+  }
+}
+function makeScalarConstructor(runtime, tag, type, layout, value, label) {
+  const scalarBytes = new Uint8Array(layout.size);
+  writeObjectScalarField(scalarBytes, type, layout, value, label);
+  return runtime.makeObjectCtorFromOwnedLayout(tag, {
+    objectFields: [],
+    usizeFields: [],
+    scalarBytes
+  }, label);
+}
+function withJsonContainer(value, label, ancestors, run) {
+  if (ancestors.has(value)) {
+    throw new TypeError(`${label} contains a JSON cycle`);
+  }
+  ancestors.add(value);
+  try {
+    return run();
+  } finally {
+    ancestors.delete(value);
+  }
+}
+function liftJsonObjectValue(runtime, obj, label) {
+  return liftJson(runtime, obj, label, 0);
+}
+function liftJson(runtime, obj, label, depth) {
+  requireJsonDepth(depth, label);
+  if (runtime.exports.vir_obj_is_scalar(obj) !== 0) {
+    const tag2 = runtime.exports.vir_obj_scalar_value(obj) >>> 0;
+    if (tag2 === 0) return null;
+    throw new Error(`${label} has unsupported Lean.Vir.Json scalar tag ${tag2}`);
+  }
+  const tag = runtime.exports.vir_obj_tag(obj) >>> 0;
+  switch (tag) {
+    case 1:
+      return readJsonScalar(runtime, obj, BOOL_TYPE, BOOL_LAYOUT, label);
+    case 2: {
+      const value = readJsonScalar(runtime, obj, FLOAT_TYPE, FLOAT_LAYOUT, label);
+      requireJsonNumber(value, label);
+      return value;
+    }
+    case 3:
+      return runtime.withOwnedObjectField(obj, 0, label, (field) => runtime.readObjectString(field));
+    case 4:
+      return runtime.withOwnedObjectField(obj, 0, label, (field) => liftJsonArray(runtime, field, label, depth));
+    case 5:
+      return runtime.withOwnedObjectField(obj, 0, label, (field) => liftJsonObject(runtime, field, label, depth));
+    default:
+      throw new Error(`${label} has unsupported Lean.Vir.Json constructor tag ${tag}`);
+  }
+}
+function readJsonScalar(runtime, obj, type, layout, label) {
+  const data = runtime.exports.vir_obj_ctor_scalar_data(obj, 0);
+  if (data === 0) {
+    throw new Error(`${label} JSON scalar payload is unavailable`);
+  }
+  return readObjectScalarField(
+    new DataView(runtime.exports.memory.buffer, data, layout.size),
+    type,
+    layout,
+    label
+  );
+}
+function liftJsonArray(runtime, array, label, depth) {
+  const length = runtime.exports.vir_obj_array_size(array);
+  const values = [];
+  for (let index = 0; index < length; index++) {
+    const element = runtime.exports.vir_obj_array_get(array, index);
+    if (element === 0) throw new Error(`${label}[${index}] is unavailable`);
+    try {
+      values.push(liftJson(runtime, element, `${label}[${index}]`, depth + 1));
+    } finally {
+      runtime.exports.vir_obj_dec(element);
+    }
+  }
+  return values;
+}
+function liftJsonObject(runtime, entries, label, depth) {
+  const length = runtime.exports.vir_obj_array_size(entries);
+  const value = {};
+  for (let index = 0; index < length; index++) {
+    const entry = runtime.exports.vir_obj_array_get(entries, index);
+    if (entry === 0) throw new Error(`${label} entry ${index} is unavailable`);
+    try {
+      runtime.withOwnedObjectFields(entry, [0, 1], `${label} entry ${index}`, ([keyObj, valueObj]) => {
+        const key = runtime.readObjectString(keyObj);
+        if (hasOwn2(value, key)) {
+          throw new Error(`${label} contains duplicate JSON object key ${JSON.stringify(key)}`);
+        }
+        Object.defineProperty(value, key, {
+          configurable: true,
+          enumerable: true,
+          value: liftJson(runtime, valueObj, `${label}.${key}`, depth + 1),
+          writable: true
+        });
+      });
+    } finally {
+      runtime.exports.vir_obj_dec(entry);
+    }
+  }
+  return value;
+}
+function requireJsonNumber(value, label) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite JSON number`);
+  }
+  return value;
+}
+function requirePlainJsonObject(value, label) {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(`${label} must be a plain JSON object`);
+  }
+  for (const symbol of Object.getOwnPropertySymbols(value)) {
+    if (propertyIsEnumerable(value, symbol)) {
+      throw new TypeError(`${label} has an enumerable symbol property, which JSON cannot represent`);
+    }
+  }
+  return value;
+}
+function requireJsonDepth(depth, label) {
+  if (depth > JSON_MAX_DEPTH) {
+    throw new RangeError(`${label} exceeds the maximum JSON depth ${JSON_MAX_DEPTH}`);
+  }
+}
+
+// web/src/host/vir-json-bindings.js
+var VIR_JSON_BORROW = /* @__PURE__ */ Symbol.for("lean-vir.jsonBorrow");
+var VIR_JSON_VALUE = /* @__PURE__ */ Symbol.for("lean-vir.jsonValue");
+var JSON_HANDLE_BRAND = /* @__PURE__ */ Symbol("lean-vir.jsonHandle");
+var hasOwn3 = Function.call.bind(Object.prototype.hasOwnProperty);
+function createJsonHostBindings(resources) {
+  const borrow = (value2) => createJsonHandleResource(resources, value2, null, "borrowed JSON");
+  const value = (resource) => jsonHandlePayload(resources, resource, "JSON handle").value;
+  return {
+    "js.json.handle": borrow,
+    "js.json.value": value,
+    "js.json.inspect": (resource) => inspectJsonHandle(resources, resource),
+    "js.json.array": (items) => buildJsonArray(resources, items),
+    "js.json.object": (entries) => buildJsonObject(resources, entries),
+    [VIR_JSON_BORROW]: borrow,
+    [VIR_JSON_VALUE]: value
+  };
+}
+function buildJsonArray(resources, items) {
+  if (!Array.isArray(items)) throw new TypeError("JSON handle array builder requires an array");
+  return createJsonHandleResource(
+    resources,
+    items.map((item, index) => jsonHandlePayload(resources, item, `JSON array item ${index}`).value),
+    null,
+    "JSON handle array"
+  );
+}
+function buildJsonObject(resources, entries) {
+  if (!Array.isArray(entries)) throw new TypeError("JSON handle object builder requires an array");
+  const value = {};
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (entry === null || typeof entry !== "object" || typeof entry.fst !== "string") {
+      throw new TypeError(`JSON object entry ${index} must be a string/handle pair`);
+    }
+    if (hasOwn3(value, entry.fst)) {
+      throw new TypeError(`JSON object builder contains duplicate key ${JSON.stringify(entry.fst)}`);
+    }
+    Object.defineProperty(value, entry.fst, {
+      configurable: true,
+      enumerable: true,
+      value: jsonHandlePayload(resources, entry.snd, `JSON object entry ${index}`).value,
+      writable: true
+    });
+  }
+  return createJsonHandleResource(resources, value, null, "JSON handle object");
+}
+function createJsonHandleResource(resources, value, parent, label) {
+  return resources.ownedResourceForValue(createJsonHandlePayload(value, parent, label), {
+    label: "JsonHandle"
+  });
+}
+function createJsonHandlePayload(value, parent, label) {
+  const depth = parent === null ? 0 : parent.depth + 1;
+  requireJsonDepth(depth, label);
+  requireShallowJsonValue(value, label);
+  if (value !== null && typeof value === "object") {
+    for (let ancestor = parent; ancestor !== null; ancestor = ancestor.parent) {
+      if (ancestor.value === value) {
+        throw new TypeError(`${label} contains a JSON cycle`);
+      }
+    }
+  }
+  return Object.freeze({
+    [JSON_HANDLE_BRAND]: true,
+    depth,
+    parent,
+    value
+  });
+}
+function jsonHandlePayload(resources, resource, label) {
+  const payload = resources.resolveResource(resource, label);
+  if (payload?.[JSON_HANDLE_BRAND] !== true) {
+    throw new TypeError(`${label} must contain a VIR borrowed JSON value`);
+  }
+  return payload;
+}
+function inspectJsonHandle(resources, resource) {
+  const payload = jsonHandlePayload(resources, resource, "JSON handle");
+  const value = payload.value;
+  if (value === null) return { kind: "null" };
+  switch (typeof value) {
+    case "boolean":
+      return { kind: "bool", value };
+    case "number":
+      return { kind: "number", value: requireJsonNumber(value, "JSON handle number") };
+    case "string":
+      return { kind: "string", value };
+    case "object":
+      return Array.isArray(value) ? inspectJsonArray(resources, value, payload) : inspectJsonObject(resources, value, payload);
+    default:
+      throw new TypeError(`JSON handle contains unsupported ${typeof value} value`);
+  }
+}
+function inspectJsonArray(resources, value, parent) {
+  const owned = [];
+  try {
+    for (let index = 0; index < value.length; index++) {
+      if (!hasOwn3(value, index)) {
+        throw new TypeError(`JSON handle[${index}] is an array hole, not a JSON value`);
+      }
+      owned.push(createJsonHandleResource(resources, value[index], parent, `JSON handle[${index}]`));
+    }
+    return { kind: "array", value: owned };
+  } catch (error) {
+    releaseJsonHandleResources(owned);
+    throw error;
+  }
+}
+function inspectJsonObject(resources, value, parent) {
+  requirePlainJsonObject(value, "JSON handle");
+  const owned = [];
+  try {
+    const entries = Object.keys(value).map((key) => {
+      const child = createJsonHandleResource(resources, value[key], parent, `JSON handle.${key}`);
+      owned.push(child);
+      return { fst: key, snd: child };
+    });
+    return { kind: "object", value: entries };
+  } catch (error) {
+    releaseJsonHandleResources(owned);
+    throw error;
+  }
+}
+function releaseJsonHandleResources(resources) {
+  const errors = [];
+  for (const resource of resources) {
+    try {
+      releaseHostResource(resource);
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    throw new AggregateError(errors, "borrowed JSON child cleanup failed");
+  }
+}
+function requireShallowJsonValue(value, label) {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
+  if (typeof value === "number") return requireJsonNumber(value, label);
+  if (Array.isArray(value)) return value;
+  if (value !== null && typeof value === "object") return requirePlainJsonObject(value, label);
+  throw new TypeError(`${label} must be an ordinary JSON value; found ${typeof value}`);
+}
+
+// web/src/vir-host-bindings.js
+function createCommonHostBindings(state = createHostResourceState()) {
+  return {
+    ...createJsValueHostBindings(state),
+    ...createJsCollectionHostBindings(state),
+    ...createJsonHostBindings(state),
+    "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
+    "common.addNat": (lhs, rhs) => state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat"))
+  };
+}
+function createConsoleHostBindings(state = createHostResourceState()) {
+  return {
+    "browser.console.log": (message) => {
+      console.log(state.resolveResource(message, "JsString"));
+      return void 0;
+    }
+  };
+}
+function createBrowserDocumentHostBindings(state = createHostResourceState()) {
+  return {
+    "browser.document.getTitle": () => state.resourceForValue(browserDocument().title),
+    "browser.document.setTitle": (title) => {
+      browserDocument().title = state.resolveResource(title, "JsString");
+      return void 0;
+    },
+    "browser.document.querySelector": (selector) => adoptResourceForValue(state, createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+    "browser.document.querySelectorAll": (selector) => state.resourceForValue(queryDocumentElements(state.resolveResource(selector, "JsString"))),
+    "browser.document.createElement": (tagName) => state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString")))
+  };
+}
+function createBrowserEventHostBindings(state = createHostResourceState()) {
+  return {
+    "browser.event.target": (event) => adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").target)),
+    "browser.event.currentTarget": (event) => adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
+    "browser.event.preventDefault": (event) => {
+      preventDefaultOnEvent(state.resolveResource(event, "Event"));
+      return void 0;
+    },
+    "browser.event.stopPropagation": (event) => {
+      stopPropagationOnEvent(state.resolveResource(event, "Event"));
+      return void 0;
+    },
+    "browser.event.key": (event) => {
+      const key = state.resolveResource(event, "Event")?.key;
+      return state.resourceForValue(typeof key === "string" ? key : "");
+    },
+    "browser.event.formValue": (event) => adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
+  };
+}
+function createBrowserElementHostBindings(state = createHostResourceState()) {
+  return {
+    ...createElementResourceHostBindings(state, {
+      querySelector: (target, selector) => target.querySelector(selector),
+      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
+      getInnerHTML: (target) => target.innerHTML ?? "",
+      setInnerHTML: (target, html) => {
+        target.innerHTML = html;
+      },
+      getTextContent: (target) => target.textContent ?? "",
+      setTextContent: (target, text) => {
+        target.textContent = text;
+      },
+      getAttribute: (target, name) => target.getAttribute(name) ?? null,
+      setAttribute: (target, name, value) => target.setAttribute(name, value),
+      createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
+    }),
+    "browser.element.appendChild": (parent, child) => {
+      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
+      return void 0;
+    },
+    "browser.element.remove": (element) => {
+      state.resolveResource(element, "Element").remove();
+      return void 0;
+    },
+    "browser.element.classList.add": (element, className) => {
+      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.remove": (element, className) => {
+      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.toggle": (element, className) => state.resourceForValue(
+      state.resolveResource(element, "Element").classList.toggle(
+        state.resolveResource(className, "JsString")
+      )
+    ),
+    "browser.element.style.setProperty": (element, name, value) => {
+      state.resolveResource(element, "Element").style.setProperty(
+        state.resolveResource(name, "JsString"),
+        state.resolveResource(value, "JsString")
+      );
+      return void 0;
+    }
+  };
+}
+function createBrowserCanvasHostBindings(state = createHostResourceState()) {
+  const value = (resource, label) => state.resolveResource(resource, label);
+  return {
+    "browser.htmlCanvasElement.fromElement": (element) => {
+      const candidate = value(element, "Element");
+      const canvas = isCanvasElement(candidate) ? candidate : null;
+      return adoptResourceForValue(state, createNullableValue(canvas));
+    },
+    "browser.htmlCanvasElement.getWidth": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
+    "browser.htmlCanvasElement.setWidth": (canvas, width) => {
+      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getHeight": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
+    "browser.htmlCanvasElement.setHeight": (canvas, height) => {
+      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getContext2D": (canvas) => adoptResourceForValue(state, createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
+    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").fillRect(...args)),
+    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").strokeRect(...args)),
+    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
+    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
+    "browser.canvas2d.moveTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
+    "browser.canvas2d.lineTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
+    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) => value(ctx, "CanvasRenderingContext2D").arc(...args)),
+    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
+    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
+    "browser.canvas2d.setFillStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = resolvedStyle;
+      return void 0;
+    }),
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = resolvedStyle;
+      return void 0;
+    }),
+    "browser.canvas2d.setLineWidth": (ctx, width) => withCanvasNumbers(state, [width], (resolvedWidth) => {
+      value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
+      return void 0;
+    }),
+    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
+    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
+    "browser.canvas2d.translate": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").translate(...args)),
+    "browser.canvas2d.rotate": (ctx, angle) => withCanvasNumbers(state, [angle], (resolvedAngle) => value(ctx, "CanvasRenderingContext2D").rotate(resolvedAngle))
+  };
+}
+function withCanvasNumbers(state, resources, run) {
+  return withConsumedResources(
+    state,
+    resources.map((resource) => [resource, "JsFloat"]),
+    run
+  );
+}
+function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
+  return createHtmlInputElementResourceHostBindings(state, {
+    fromElement: (element) => isInputElement(element) ? element : null
+  });
+}
+function createBrowserTimerHostBindings(state = createHostResourceState()) {
+  return createTimerResourceHostBindings(state);
+}
+function createBrowserAnimationHostBindings(state = createHostResourceState()) {
+  const requestFrame = typeof globalThis.requestAnimationFrame === "function" ? globalThis.requestAnimationFrame.bind(globalThis) : (callback) => globalThis.setTimeout(() => callback(performanceNow()), 16);
+  const cancelFrame = typeof globalThis.cancelAnimationFrame === "function" ? globalThis.cancelAnimationFrame.bind(globalThis) : globalThis.clearTimeout.bind(globalThis);
+  return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
+}
+function createInfoviewHostBindings({ resources = createHostResourceState(), commandDispatcher = null } = {}) {
+  return {
+    "infoview.documentPosition": (uri, fileName, line, character, label) => resources.resourceForValue({
+      uri: resources.resolveResource(uri, "JsString"),
+      fileName: resources.resolveResource(fileName, "JsString"),
+      line: resources.resolveResource(line, "JsNat"),
+      character: resources.resolveResource(character, "JsNat"),
+      label: resources.resolveResource(label, "JsString")
+    }),
+    "infoview.clipboard.writeText": (text) => resources.resourceForValue(writeTextToHostClipboard(resources.resolveResource(text, "JsString"))),
+    "infoview.command.revealPosition": (position) => resources.resourceForValue(revealInfoviewPosition(
+      commandDispatcher,
+      resources.resolveResource(position, "DocumentPosition")
+    )),
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => resources.resourceForValue({
+      id: resources.resolveResource(id, "JsString"),
+      label: resources.resolveResource(label, "JsString"),
+      typeName: resources.resolveResource(typeName, "JsString"),
+      summary: resources.resolveResource(summary, "JsString"),
+      expression: resources.resolveResource(expression, "JsString"),
+      typeText: "",
+      context: ""
+    }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => resources.resourceForValue({
+      ...resources.resolveResource(ref, "RpcRef"),
+      typeText: resources.resolveResource(typeText, "JsString"),
+      context: resources.resolveResource(context, "JsString"),
+      ...nullableField(resources, serverRef, "serverRef")
+    }),
+    "js.value.proofwidgets.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+    "proofwidgets.rpc.inspectRef": (ref) => resources.resourceForValue(inspectProofWidgetsRpcRef(
+      commandDispatcher,
+      resources.resolveResource(ref, "RpcRef")
+    )),
+    "proofwidgets.rpc.resolveRef": (ref, callback) => resources.resourceForValue(resolveProofWidgetsRpcRef(
+      resources,
+      commandDispatcher,
+      resources.resolveResource(ref, "RpcRef"),
+      callback
+    ))
+  };
+}
+function createBrowserHostBindings({
+  resources = createHostResourceState(),
+  infoviewCommandDispatcher = null,
+  reactHostBindings = null
+} = {}) {
+  const state = resources;
+  const reactBindingsSource = typeof reactHostBindings === "function" ? reactHostBindings(state, { querySelector: queryDocumentElement }) : reactHostBindings;
+  const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
+  return {
+    ...createCommonHostBindings(state),
+    ...createConsoleHostBindings(state),
+    ...createBrowserDocumentHostBindings(state),
+    ...createBrowserEventHostBindings(state),
+    ...createBrowserElementHostBindings(state),
+    ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserCanvasHostBindings(state),
+    ...createBrowserTimerHostBindings(state),
+    ...createBrowserAnimationHostBindings(state),
+    ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
+    ...reactBindings,
+    [VIR_HOST_DISPOSE]: () => state.dispose()
+  };
+}
+function normalizeOptionalHostBindingMap(value, label) {
+  if (value === null || value === void 0) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be a host binding object`);
+  }
+  return value;
+}
+function browserDocument() {
+  if (!globalThis.document) {
+    throw new Error(
+      "browser.document host binding requires globalThis.document; use vir-runtime-node.js or pass hostBindings in non-browser runtimes"
+    );
+  }
+  return globalThis.document;
+}
+function queryDocumentElement(selector) {
+  return browserDocument().querySelector(selector);
+}
+function queryDocumentElements(selector) {
+  return browserDocument().querySelectorAll(selector);
+}
+function isCanvasElement(value) {
+  const Canvas = globalThis.HTMLCanvasElement;
+  return typeof Canvas === "function" ? value instanceof Canvas : value !== null && typeof value === "object" && typeof value.getContext === "function";
+}
+function writeTextToHostClipboard(text) {
+  const copiedSynchronously = copyTextWithExecCommand(text);
+  if (copiedSynchronously) {
+    return true;
+  }
+  const clipboard = globalThis.navigator?.clipboard;
+  if (clipboard !== null && typeof clipboard === "object" && typeof clipboard.writeText === "function") {
+    try {
+      clipboard.writeText(text).catch((error) => {
+        reportEventHandlerError(error);
+      });
+      return true;
+    } catch (error) {
+      reportEventHandlerError(error);
+      return false;
+    }
+  }
+  return false;
+}
+function revealInfoviewPosition(commandDispatcher, position) {
+  const normalized = normalizeInfoviewDocumentPosition(position);
+  if (normalized === null) {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+function nullableField(resources, value, name) {
+  const payload = nullablePayload(resources, value);
+  return payload === null ? {} : { [name]: payload };
+}
+function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
+}
+function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null || typeof callback !== "function") {
+    releaseCallback(callback);
+    return false;
+  }
+  const handler = infoviewCommandHandler(commandDispatcher, "proofwidgetsRpcResolveRef");
+  if (handler === null) {
+    releaseCallback(callback);
+    return false;
+  }
+  let result;
+  try {
+    result = handler(normalized);
+  } catch (error) {
+    reportEventHandlerError(error);
+    releaseCallback(callback);
+    return false;
+  }
+  if (result === false) {
+    releaseCallback(callback);
+    return false;
+  }
+  if (result !== null && typeof result === "object" && typeof result.then === "function") {
+    const ownedCallback = takeCallbackLease(callback, "proofwidgets.rpc.resolveRef callback");
+    try {
+      result.then((info) => {
+        callAndReleaseCallback(ownedCallback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
+      }).catch((error) => {
+        reportEventHandlerError(error);
+        releaseCallback(ownedCallback);
+      });
+    } catch (error) {
+      releaseCallback(ownedCallback);
+      throw error;
+    }
+  } else {
+    callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
+  }
+  return true;
+}
+function normalizeInfoviewDocumentPosition(position) {
+  if (position === null || typeof position !== "object") {
+    return null;
+  }
+  const uri = typeof position.uri === "string" ? position.uri : "";
+  if (uri.length === 0) {
+    return null;
+  }
+  const line = nonNegativeInteger(position.line);
+  const character = nonNegativeInteger(position.character);
+  if (line === null || character === null) {
+    return null;
+  }
+  return { uri, line, character };
+}
+function nonNegativeInteger(value) {
+  if (typeof value === "bigint") {
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  }
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : null;
+  }
+  return null;
+}
+function dispatchInfoviewCommand(commandDispatcher, name, payload) {
+  const handler = infoviewCommandHandler(commandDispatcher, name);
+  if (handler === null) {
+    return false;
+  }
+  try {
+    const result = handler(payload);
+    if (result !== null && typeof result === "object" && typeof result.then === "function") {
+      result.catch((error) => {
+        reportEventHandlerError(error);
+      });
+      return true;
+    }
+    return result !== false;
+  } catch (error) {
+    reportEventHandlerError(error);
+    return false;
+  }
+}
+function infoviewCommandHandler(commandDispatcher, name) {
+  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
+  if (typeof dispatcher === "function") {
+    return (value) => dispatcher(name, value);
+  }
+  if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
+    return (value) => dispatcher[name](value);
+  }
+  return null;
+}
+function callAndReleaseCallback(callback, value) {
+  try {
+    callback(value);
+  } catch (error) {
+    reportEventHandlerError(error);
+  } finally {
+    releaseCallback(callback);
+  }
+}
+function releaseCallback(callback) {
+  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
+    callback.release();
+  }
+}
+function copyTextWithExecCommand(text) {
+  const document = globalThis.document;
+  if (document === null || typeof document !== "object" || typeof document.execCommand !== "function") {
+    return false;
+  }
+  const body = document.body;
+  if (body === null || typeof body !== "object") {
+    return false;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.left = "-1000px";
+  textarea.style.opacity = "0";
+  body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  try {
+    return document.execCommand("copy") === true;
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
+}
+function createBrowserEventListenerResource(resources, target, eventName, callback) {
+  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
+  const handler = (event) => callLeanEventCallback(resources, event, ownedCallback);
+  try {
+    target.addEventListener(eventName, handler);
+  } catch (error) {
+    const errors = [error];
+    collectCleanupError(errors, () => ownedCallback.release());
+    throwCollectedErrors(errors, "browser event listener registration failed during callback cleanup");
+  }
+  const listener = {
+    remove: once(() => {
+      const errors = [];
+      resources.removeDisposable(listener);
+      collectCleanupError(errors, () => target.removeEventListener(eventName, handler));
+      collectCleanupError(errors, () => ownedCallback.release());
+      throwCollectedErrors(errors, "browser event listener removal failed");
+    })
+  };
+  return listener;
+}
+function isInputElement(value) {
+  return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
+}
+function isTextAreaElement(value) {
+  return typeof globalThis.HTMLTextAreaElement === "function" && value instanceof globalThis.HTMLTextAreaElement;
+}
+function isSelectElement(value) {
+  return typeof globalThis.HTMLSelectElement === "function" && value instanceof globalThis.HTMLSelectElement;
+}
+function isElement(value) {
+  return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
+}
+function nullableElementTarget(value) {
+  return createNullableValue(isElement(value) ? value : null);
+}
+function adoptResourceForValue(state, value) {
+  if (typeof state.adoptResourceForValue === "function") {
+    return state.adoptResourceForValue(value);
+  }
+  return state.resourceForValue(value);
+}
+function formControlEventValue(event) {
+  const currentValue = formControlValue(event?.currentTarget);
+  if (currentValue !== null) return currentValue;
+  return formControlValue(event?.target);
+}
+function formControlValue(value) {
+  if (!isInputElement(value) && !isTextAreaElement(value) && !isSelectElement(value)) {
+    return null;
+  }
+  return String(value.value ?? "");
+}
+
+// web/src/vir-react-host-bindings.js
+import * as React from "react";
+
+// infoview-react-dom-client:vir-react-dom-client
+import { createRoot } from "react-dom";
+
+// web/src/vir-react-host-bindings.js
+function createBrowserReactHostBindings(state = createHostResourceState(), {
+  querySelector = queryBrowserElement
+} = {}) {
+  if (!hasHostResourceFinalizationSupport()) {
+    throw new Error("browser React host bindings require FinalizationRegistry and WeakRef support");
+  }
+  const hookRuntime = createBrowserReactHookRuntime(state, React);
+  const hooks = {
+    ...createReactHostHooks({
+      resources: state,
+      reportError: (error) => state.recordGcFinalizerError(error)
+    }),
+    hookRuntime
+  };
+  return {
+    ...createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React, hooks), {
+      querySelector,
+      createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
+      createNodeElementResource: (elementType, props, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, elementType, props, children),
+      createNodeFragmentResource: (props, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children)
+    }),
+    ...createReactJsValueHostBindings(state),
+    ...createReactStateHostBindings(state, hookRuntime)
+  };
+}
+function createBrowserReactRootResource2(state, root, React3, hooks) {
+  return createBrowserReactRootResource(state, root, React3, hooks);
+}
+function queryBrowserElement(selector) {
+  if (!globalThis.document) {
+    throw new Error("React selector host bindings require globalThis.document");
+  }
+  return globalThis.document.querySelector(selector);
+}
+
+// web/src/runtime/interface-manifest.js
+var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
+var INTERFACE_MANIFEST_VERSION = 8;
+var MIN_INTERFACE_MANIFEST_VERSION = 6;
+var HOST_IMPORT_BOUNDARY = Object.freeze({
+  HOST_RESOURCE: "hostResource",
+  EXPLICIT_CONVERSION: "explicitConversion",
+  OBJECT_HANDLE: "objectHandle"
+});
+var INTERFACE_MANIFEST_SHAPE_ERROR = `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function requireString(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+}
+function requireOptionalString(value, label) {
+  if (value !== void 0 && typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+}
+function requireNonNegativeInteger(value, label) {
+  if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
+    throw new Error(`${label} must be a non-negative 32-bit integer`);
+  }
+}
+function validateInterfaceManifest(manifest) {
+  if (!isRecord(manifest) || !Number.isInteger(manifest.version) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+    throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
+  }
+  if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
+    throw new Error(`embedded interface manifest artifact must be ${INTERFACE_MANIFEST_ARTIFACT}`);
+  }
+  if (manifest.diagnostics !== void 0 && !Array.isArray(manifest.diagnostics)) {
+    throw new Error("embedded interface manifest diagnostics must be an array");
+  }
+  if (manifest.hostImports !== void 0 && !Array.isArray(manifest.hostImports)) {
+    throw new Error("embedded interface manifest hostImports must be an array");
+  }
+  validateManifestExports(manifest.exports, manifest.version);
+  validateManifestHostImports(manifest.hostImports ?? []);
+  return manifest;
+}
+function validateManifestExports(exports, manifestVersion) {
+  const entries = /* @__PURE__ */ new Set();
+  const ids = /* @__PURE__ */ new Set();
+  const jsNames = /* @__PURE__ */ new Set();
+  exports.forEach((entry, index) => {
+    const label = `embedded interface manifest exports[${index}]`;
+    if (!isRecord(entry)) {
+      throw new Error(`${label} must be an object`);
+    }
+    requireString(entry.entry, `${label}.entry`);
+    requireOptionalString(entry.id, `${label}.id`);
+    requireOptionalString(entry.jsName, `${label}.jsName`);
+    requireOptionalString(entry.source, `${label}.source`);
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
+    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
+      throw new Error(`${label}.startup must be a boolean`);
+    }
+    if (manifestVersion < 7) {
+      if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
+        throw new Error(`${label}.startup must be a boolean`);
+      }
+      entry.startup ??= false;
+    }
+    requireUnique(entries, entry.entry, `${label}.entry`);
+    if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
+    if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
+    if (!Array.isArray(entry.args)) {
+      throw new Error(`${label}.args must be an array`);
+    }
+    entry.args.forEach((arg, argIndex) => {
+      const argLabel = `${label}.args[${argIndex}]`;
+      if (!isRecord(arg)) {
+        throw new Error(`${argLabel} must be an object`);
+      }
+      requireString(arg.name, `${argLabel}.name`);
+      validateInterfaceRootType(arg.type, `${argLabel}.type`);
+    });
+    validateInterfaceRootType(entry.result, `${label}.result`);
+  });
+}
+function validateManifestHostImports(hostImports) {
+  hostImports.forEach((entry, index) => {
+    const label = `embedded interface manifest hostImports[${index}]`;
+    if (!isRecord(entry)) {
+      throw new Error(`${label} must be an object`);
+    }
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
+    requireHostImportBoundary(entry.boundary, `${label}.boundary`);
+  });
+}
+function requireHostImportBoundary(value, label) {
+  if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
+    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
+  }
+}
+function requireUnique(seen, value, label, owner = "interface export") {
+  if (seen.has(value)) {
+    throw new Error(`${label} duplicates another ${owner}`);
+  }
+  seen.add(value);
+}
+function validateInterfaceType(type, label = "interface type") {
+  if (!isRecord(type)) {
+    throw new Error(`${label} must be an object`);
+  }
+  requireString(type.type, `${label}.type`);
+  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+    throw new Error(`${label}.interfaceTag is not supported`);
+  }
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.SIMPLE_ENUM:
+      validateSimpleEnumType(type, label);
+      break;
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      validateInterfaceType(type.element, `${label}.element`);
+      break;
+    case INTERFACE_TAG.PROD:
+      validateInterfaceType(type.fst, `${label}.fst`);
+      validateInterfaceType(type.snd, `${label}.snd`);
+      break;
+    case INTERFACE_TAG.STRUCTURE:
+      validateStructureType(type, label);
+      break;
+    case INTERFACE_TAG.TAGGED_UNION:
+      validateTaggedUnionType(type, label);
+      break;
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+      validateCustomInductiveType(type, label);
+      break;
+    case INTERFACE_TAG.RECURSIVE_SELF:
+      validateRecursiveSelfType(type, label);
+      break;
+    case INTERFACE_TAG.RESOURCE:
+      validateResourceType(type, label);
+      break;
+    case INTERFACE_TAG.FUNCTION:
+      validateFunctionType(type, label);
+      break;
+    case INTERFACE_TAG.LEAN_OBJECT:
+      validateLeanObjectType(type, label);
+      break;
+    default:
+      break;
+  }
+  return type;
+}
+function validateInterfaceRootType(type, label) {
+  validateInterfaceType(type, label);
+  validateNoDanglingRecursiveSelf(type, label);
+}
+function validateSimpleEnumType(type, label) {
+  if (type.kind !== "simpleEnum") {
+    throw new Error(`${label}.kind must be simpleEnum`);
+  }
+  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label}.constructors must be a non-empty array`);
+  }
+  const names = /* @__PURE__ */ new Set();
+  const jsNames = /* @__PURE__ */ new Set();
+  type.constructors.forEach((ctor, index) => {
+    validateConstructorHeader(ctor, index, label, names, jsNames);
+  });
+}
+function validateStructureType(type, label) {
+  if (type.kind !== "structure") {
+    throw new Error(`${label}.kind must be structure`);
+  }
+  requireString(type.name, `${label}.name`);
+  validateRuntimeCounts(type, label);
+  if (!Array.isArray(type.fields) || type.fields.length === 0) {
+    throw new Error(`${label}.fields must be a non-empty array`);
+  }
+  if (type.trivialFieldIndex !== void 0) {
+    if (!Number.isInteger(type.trivialFieldIndex) || type.trivialFieldIndex < 0 || type.trivialFieldIndex >= type.fields.length) {
+      throw new Error(`${label}.trivialFieldIndex is out of range`);
+    }
+  }
+  const names = /* @__PURE__ */ new Set();
+  type.fields.forEach((field, index) => {
+    const fieldLabel = `${label}.fields[${index}]`;
+    validateInterfaceField(field, fieldLabel, names, type, type.name);
+    if (field.subobject !== void 0 && typeof field.subobject !== "boolean") {
+      throw new Error(`${fieldLabel}.subobject must be a boolean`);
+    }
+    if (field.subobject === true) {
+      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
+        throw new Error(`${fieldLabel}.subobject field type must be a structure`);
+      }
+      if (field.layout?.kind !== "object") {
+        throw new Error(`${fieldLabel}.subobject field layout must be object`);
+      }
+    }
+  });
+  validateFlattenedStructureFields(type, label);
+}
+function validateStructureFieldLayout(layout, structureType, label) {
+  if (!isRecord(layout)) {
+    throw new Error(`${label} must be an object`);
+  }
+  switch (layout.kind) {
+    case "object":
+      requireNonNegativeInteger(layout.index, `${label}.index`);
+      if (layout.index >= structureType.objectFieldCount) {
+        throw new Error(`${label}.index is outside objectFieldCount`);
+      }
+      break;
+    case "usize":
+      requireNonNegativeInteger(layout.index, `${label}.index`);
+      if (layout.index < structureType.objectFieldCount || layout.index >= structureType.objectFieldCount + structureType.usizeFieldCount) {
+        throw new Error(`${label}.index is outside usize slot range`);
+      }
+      break;
+    case "scalar":
+      requireNonNegativeInteger(layout.size, `${label}.size`);
+      requireNonNegativeInteger(layout.offset, `${label}.offset`);
+      if (layout.size === 0 || layout.offset + layout.size > structureType.scalarByteSize) {
+        throw new Error(`${label} is outside scalarByteSize`);
+      }
+      break;
+    default:
+      throw new Error(`${label}.kind is not supported`);
+  }
+}
+function validateTaggedUnionType(type, label) {
+  if (type.kind !== "taggedUnion") {
+    throw new Error(`${label}.kind must be taggedUnion`);
+  }
+  requireString(type.name, `${label}.name`);
+  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label}.constructors must be a non-empty array`);
+  }
+  const names = /* @__PURE__ */ new Set();
+  const jsNames = /* @__PURE__ */ new Set();
+  type.constructors.forEach((ctor, index) => {
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
+    validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
+    validateInterfaceType(ctor.type, `${ctorLabel}.type`);
+  });
+}
+function validateCustomInductiveType(type, label) {
+  if (type.kind !== "customInductive") {
+    throw new Error(`${label}.kind must be customInductive`);
+  }
+  requireString(type.name, `${label}.name`);
+  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label}.constructors must be a non-empty array`);
+  }
+  const names = /* @__PURE__ */ new Set();
+  const jsNames = /* @__PURE__ */ new Set();
+  type.constructors.forEach((ctor, index) => {
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
+    if (!Array.isArray(ctor.fields)) {
+      throw new Error(`${ctorLabel}.fields must be an array`);
+    }
+    if (ctor.fields.length === 0 && (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
+      throw new Error(`${ctorLabel} with no fields must have zero runtime field counts`);
+    }
+    const fieldNames = /* @__PURE__ */ new Set();
+    ctor.fields.forEach((field, fieldIndex) => {
+      const fieldLabel = `${ctorLabel}.fields[${fieldIndex}]`;
+      validateInterfaceField(field, fieldLabel, fieldNames, ctor, type.name);
+    });
+  });
+}
+function validateConstructorHeader(ctor, index, label, names, jsNames) {
+  const ctorLabel = `${label}.constructors[${index}]`;
+  if (!isRecord(ctor)) {
+    throw new Error(`${ctorLabel} must be an object`);
+  }
+  requireString(ctor.name, `${ctorLabel}.name`);
+  requireString(ctor.jsName, `${ctorLabel}.jsName`);
+  if (ctor.tag !== index) {
+    throw new Error(`${ctorLabel}.tag must be ${index}`);
+  }
+  requireUnique(names, ctor.name, `${ctorLabel}.name`, "constructor");
+  requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`, "constructor");
+  return ctorLabel;
+}
+function validateRuntimeCounts(type, label) {
+  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
+  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
+  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
+}
+function validateInterfaceField(field, fieldLabel, names, layoutOwner, recursiveOwnerName) {
+  if (!isRecord(field)) {
+    throw new Error(`${fieldLabel} must be an object`);
+  }
+  requireString(field.name, `${fieldLabel}.name`);
+  requireUnique(names, field.name, `${fieldLabel}.name`, "field");
+  validateStructureFieldLayout(field.layout, layoutOwner, `${fieldLabel}.layout`);
+  validateInterfaceType(field.type, `${fieldLabel}.type`);
+  validateRecursiveSelfOwner(field.type, recursiveOwnerName, `${fieldLabel}.type`);
+}
+function validateRecursiveSelfType(type, label) {
+  if (type.kind !== "recursiveSelf") {
+    throw new Error(`${label}.kind must be recursiveSelf`);
+  }
+  requireString(type.name, `${label}.name`);
+}
+function validateRecursiveSelfOwner(type, ownerName, label) {
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
+      if (type.name !== ownerName) {
+        throw new Error(`${label}.name must match ${ownerName}`);
+      }
+      break;
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
+      break;
+    case INTERFACE_TAG.PROD:
+      validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
+      validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
+      break;
+    case INTERFACE_TAG.STRUCTURE:
+      break;
+    case INTERFACE_TAG.TAGGED_UNION:
+      for (const ctor of type.constructors ?? []) {
+        validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
+      }
+      break;
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+      break;
+    case INTERFACE_TAG.FUNCTION:
+      for (const arg of type.args ?? []) {
+        validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
+      }
+      validateRecursiveSelfOwner(type.result, ownerName, `${label}.result`);
+      break;
+    default:
+      break;
+  }
+}
+function validateNoDanglingRecursiveSelf(type, label) {
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
+      throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
+      break;
+    case INTERFACE_TAG.PROD:
+      validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
+      validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
+      break;
+    case INTERFACE_TAG.TAGGED_UNION:
+      for (const ctor of type.constructors ?? []) {
+        validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
+      }
+      break;
+    case INTERFACE_TAG.FUNCTION:
+      for (const arg of type.args ?? []) {
+        validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
+      }
+      validateNoDanglingRecursiveSelf(type.result, `${label}.result`);
+      break;
+    default:
+      break;
+  }
+}
+function validateResourceType(type, label) {
+  if (type.kind !== "resource") {
+    throw new Error(`${label}.kind must be resource`);
+  }
+  requireString(type.name, `${label}.name`);
+}
+function validateLeanObjectType(type, label) {
+  if (type.kind !== "leanObject") {
+    throw new Error(`${label}.kind must be leanObject`);
+  }
+}
+function validateFunctionType(type, label) {
+  if (type.kind !== "function") {
+    throw new Error(`${label}.kind must be function`);
+  }
+  requireInterfaceEffect(type.effect, `${label}.effect`);
+  if (!Array.isArray(type.args)) {
+    throw new Error(`${label}.args must be an array`);
+  }
+  type.args.forEach((arg, index) => {
+    const argLabel = `${label}.args[${index}]`;
+    if (!isRecord(arg)) {
+      throw new Error(`${argLabel} must be an object`);
+    }
+    requireString(arg.name, `${argLabel}.name`);
+    validateInterfaceType(arg.type, `${argLabel}.type`);
+  });
+  validateInterfaceType(type.result, `${label}.result`);
+}
+function validateFlattenedStructureFields(type, label) {
+  const names = /* @__PURE__ */ new Set();
+  type.fields.forEach((field, index) => {
+    const fieldLabel = `${label}.fields[${index}]`;
+    if (field.subobject === true) {
+      for (const name of flattenedStructureFieldNames(field.type)) {
+        requireUniqueStructureField(names, name, `${fieldLabel}.subobject.${name}`);
+      }
+    } else {
+      requireUniqueStructureField(names, field.name, `${fieldLabel}.name`);
+    }
+  });
+}
+function flattenedStructureFieldNames(type) {
+  const names = [];
+  for (const field of type?.fields ?? []) {
+    if (field.subobject === true) {
+      names.push(...flattenedStructureFieldNames(field.type));
+    } else {
+      names.push(field.name);
+    }
+  }
+  return names;
+}
+function requireUniqueStructureField(seen, value, label) {
+  if (seen.has(value)) {
+    throw new Error(`${label} duplicates another flattened structure field`);
+  }
+  seen.add(value);
+}
+
+// web/src/runtime/call-timing.js
+function defaultNow() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+function elapsed(now, started) {
+  return Math.max(0, now() - started);
+}
+var RuntimeCallTiming = class {
+  constructor(now = defaultNow) {
+    if (typeof now !== "function") throw new TypeError("runtime call clock must be a function");
+    this.now = now;
+    this.started = now();
+    this.marshalMs = 0;
+    this.executeMs = 0;
+    this.decodeMs = 0;
+    this.hostMs = 0;
+    this.hostDepth = 0;
+    this.finished = false;
+  }
+  beginPhase() {
+    if (this.finished) throw new Error("runtime call timing is already finished");
+    return this.now();
+  }
+  endMarshal(started) {
+    this.endPhase("marshalMs", started);
+  }
+  endExecute(started) {
+    this.endPhase("executeMs", started);
+  }
+  endDecode(started) {
+    this.endPhase("decodeMs", started);
+  }
+  beginHost() {
+    const started = this.hostDepth === 0 ? this.now() : null;
+    this.hostDepth++;
+    return started;
+  }
+  endHost(started) {
+    if (this.hostDepth === 0) throw new Error("runtime host call timing is inconsistent");
+    this.hostDepth--;
+    if (started !== null) this.hostMs += elapsed(this.now, started);
+  }
+  endPhase(name, started) {
+    this[name] += elapsed(this.now, started);
+  }
+  finish() {
+    if (this.finished) throw new Error("runtime call timing is already finished");
+    if (this.hostDepth !== 0) throw new Error("runtime call timing has an active host import");
+    this.finished = true;
+    return {
+      marshalMs: this.marshalMs,
+      executeMs: this.executeMs,
+      decodeMs: this.decodeMs,
+      hostMs: this.hostMs,
+      totalMs: elapsed(this.now, this.started)
+    };
+  }
+};
+
 // web/src/runtime/object-values.js
 var textEncoder = new TextEncoder();
 var MAX_UINT642 = 0xffffffffffffffffn;
@@ -6656,6 +7010,8 @@ var ObjectValueRuntime = class {
         return this.makeObjectFloat32(value, label);
       case INTERFACE_TAG.EXPR:
         return this.makeObjectExpr(value, label);
+      case INTERFACE_TAG.JSON:
+        return makeJsonObjectValue(this, value, label);
       case INTERFACE_TAG.ARRAY:
       case INTERFACE_TAG.LIST:
         return this.makeObjectSequenceValue(type, value, label, selfType, ownResources);
@@ -7607,6 +7963,8 @@ var ObjectValueRuntime = class {
         return Math.fround(this.exports.vir_obj_float32_value(obj));
       case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
+      case INTERFACE_TAG.JSON:
+        return liftJsonObjectValue(this, obj, label);
       case INTERFACE_TAG.ARRAY:
         return this.liftObjectArrayValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.LIST:
@@ -8171,6 +8529,18 @@ var VirRuntime = class extends ObjectValueRuntime {
     }
     return this.callEntry(entry, args);
   }
+  /** Retains an ordinary JavaScript JSON value for the borrowed handle lane. */
+  borrowJson(value) {
+    this.requireLiveRuntime();
+    if (this.hostState === null) throw new Error("borrowed JSON requires an attached host state");
+    return this.hostState.borrowJson(value);
+  }
+  /** Reads the ordinary JavaScript value behind a live borrowed JSON result handle. */
+  jsonValue(resource) {
+    this.requireLiveRuntime();
+    if (this.hostState === null) throw new Error("borrowed JSON requires an attached host state");
+    return this.hostState.jsonValue(resource);
+  }
   callTimed(name, ...args) {
     const timing = new RuntimeCallTiming();
     const entry = this.findManifestEntry(name);
@@ -8472,6 +8842,18 @@ var VirHostState = class {
   setManifest(manifest) {
     this.manifest = manifest;
     this.hostImports = manifest?.hostImports ?? [];
+  }
+  borrowJson(value) {
+    return this.callRuntimeBinding(VIR_JSON_BORROW, value, "borrowed JSON support");
+  }
+  jsonValue(resource) {
+    return this.callRuntimeBinding(VIR_JSON_VALUE, resource, "borrowed JSON support");
+  }
+  callRuntimeBinding(target, value, label) {
+    if (this.disposed) throw new Error("Vir host state has been disposed");
+    const binding = lookupHostBinding(target, this.userBindings, this.defaultBindings);
+    if (typeof binding !== "function") throw new Error(`${label} is unavailable`);
+    return binding(value);
   }
   clearCallError() {
     this.callError = null;

@@ -269,6 +269,20 @@ export class VirRuntime extends ObjectValueRuntime {
     return this.callEntry(entry, args);
   }
 
+  /** Retains an ordinary JavaScript JSON value for the borrowed handle lane. */
+  borrowJson(value) {
+    this.requireLiveRuntime();
+    if (this.hostState === null) throw new Error("borrowed JSON requires an attached host state");
+    return this.hostState.borrowJson(value);
+  }
+
+  /** Reads the ordinary JavaScript value behind a live borrowed JSON result handle. */
+  jsonValue(resource) {
+    this.requireLiveRuntime();
+    if (this.hostState === null) throw new Error("borrowed JSON requires an attached host state");
+    return this.hostState.jsonValue(resource);
+  }
+
   callTimed(name, ...args) {
     const timing = new RuntimeCallTiming();
     const entry = this.findManifestEntry(name);

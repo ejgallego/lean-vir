@@ -47,6 +47,7 @@ export function objectArgumentSupported(type, selfType = null) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.JSON:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
     case INTERFACE_TAG.ARRAY:
@@ -88,6 +89,7 @@ export function objectResultSupported(type, selfType = null) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.JSON:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
     case INTERFACE_TAG.ARRAY:

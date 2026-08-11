@@ -9,6 +9,7 @@ import Vir.Attributes
 import Vir.Host
 import Vir.Runtime
 import Vir.Js
+import Vir.Json
 import Vir.Common
 import Vir.Browser
 import Vir.React

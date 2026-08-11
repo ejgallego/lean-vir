@@ -8,7 +8,7 @@ import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 7;
+export const INTERFACE_MANIFEST_VERSION = 8;
 export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",

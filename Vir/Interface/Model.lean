@@ -79,6 +79,7 @@ inductive InterfaceType where
   | resource (name : Name) (label : String)
   | function (args : Array (String × InterfaceType)) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
+  | json
   | leanObject
   deriving BEq, Repr
 
@@ -108,6 +109,7 @@ def InterfaceType.label : InterfaceType → String
   | .resource _ label => label
   | .function .. => "Function"
   | .expr => "Lean.Expr"
+  | .json => "Lean.Vir.Json"
   | .leanObject => "LeanObject"
 
 /-- The JavaScript-facing constructor name relative to its inductive type. -/

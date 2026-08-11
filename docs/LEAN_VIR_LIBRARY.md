@@ -246,6 +246,23 @@ their Lean representation.
   independent lifetime, so it remains usable after the source collection is
   no longer reachable.
 
+`Vir.Json` provides the complementary generic JSON boundaries:
+
+- `Lean.Vir.Json` is an owned ordered tree that exported functions receive
+  from and return to ordinary JavaScript JSON in one structural boundary
+  operation.
+- `Lean.Vir.Json.Handle` retains an ordinary JavaScript JSON value as a runtime
+  resource.
+- `Lean.Vir.Json.Handle.inspect` returns one scalar or one ordered batch of
+  immediate array items/object members while keeping children as handles.
+- `Lean.Vir.Json.Handle.array` and `object` batch borrowed result construction
+  while retaining child JavaScript identity.
+- `Lean.Vir.Json.Handle.ofJson` and `toJson` make an explicit transition
+  between the owned and borrowed lanes.
+
+The complete contract, validation rules, depth limit, ownership examples, and
+lane-selection guidance are in [JSON_LANES.md](JSON_LANES.md).
+
 `Lean.Vir.LeanRef.toJSL`, `Lean.Vir.LeanRef.fromJSL`,
 `Lean.Vir.LeanRef.retainJSL`, and `Lean.Vir.LeanRef.releaseJSL` are the generic
 handle lane for Lean-owned values that JavaScript should store or route without

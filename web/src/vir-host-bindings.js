@@ -30,6 +30,7 @@ import {
   nullablePayload,
 } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
+import { createJsonHostBindings } from "./host/vir-json-bindings.js";
 import { VIR_HOST_DISPOSE, hostResourceOwnerPhase } from "./host-resource.js";
 import { takeCallbackLease } from "./runtime/callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
@@ -60,6 +61,7 @@ export function createCommonHostBindings(state = createHostResourceState()) {
   return {
     ...createJsValueHostBindings(state),
     ...createJsCollectionHostBindings(state),
+    ...createJsonHostBindings(state),
     "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
     "common.addNat": (lhs, rhs) =>
       state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat")),

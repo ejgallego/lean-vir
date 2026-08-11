@@ -90,6 +90,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/cleanup.js` | Cleanup error collection with deterministic single-error and aggregate reporting. |
 | `runtime/core.js` | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
 | `runtime/object-values.js` | Object ABI lowering and lifting between JavaScript values and owned Lean objects. |
+| `runtime/json-values.js` | Ordered structural JSON lowering/lifting and JSON validation limits. |
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
 | `runtime/host-state.js` | Host import dispatch state, externref roots, host-binding lookup, and disposal. |
 | `runtime/object-abi.js` | Object ABI support checks, layout planning, scalar packing, and unpacking helpers. |
@@ -98,6 +99,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
 | `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
+| `host/vir-json-bindings.js` | Borrowed JSON handle creation, one-level inspection, and owned/borrowed conversions. |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |
 | `react/vir-react-node.js` | React Node tree validation, conversion, callback release, and virtual text helpers. |
 | `react/vir-react-hooks.js` | Shared React component hook runtime and typed state setter host bindings. |
@@ -173,6 +175,25 @@ console.log(leanVir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
 runtime directly and prints sample calls.
+
+## JSON Values And Handles
+
+Exports typed as `Lean.Vir.Json` accept and return ordinary JavaScript JSON.
+For a `Lean.Vir.Json.Handle` argument, retain the input explicitly:
+
+```js
+const input = vir.borrowJson(payload);
+try {
+  const output = vir.call("inspectPayload", input);
+} finally {
+  releaseHostResource(input);
+}
+```
+
+When a Lean export returns `Lean.Vir.Json.Handle`, the JavaScript result is an
+owned host resource. `vir.jsonValue(output)` reads its ordinary JSON value but
+does not consume the handle; call `releaseHostResource(output)` when done.
+See [JSON_LANES.md](JSON_LANES.md) for the Lean API and validation rules.
 
 ## Module Package Sets
 
