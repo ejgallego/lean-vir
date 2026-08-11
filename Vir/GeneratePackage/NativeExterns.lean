@@ -123,7 +123,7 @@ private def primitiveCompletionExternSpecs : Array NativeExternSpec :=
     "log2", "ofBitVec", "toBitVec", "toFloat", "toFloat32", "toUSize"
   ] ++ boxedExternSpecs `UInt64 #["log2", "toBitVec", "toFloat32", "toUInt16"] ++
   boxedExternSpecs `UInt8 #[
-    "log2", "ofBitVec", "ofNat", "ofNatLT", "toBitVec", "toFloat", "toFloat32", "toUInt16",
+    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt16",
     "toUInt64", "toUSize"
   ] ++ boxedExternSpecs `USize #[
     "complement", "div", "log2", "lor", "mod", "neg", "ofBitVec", "toBitVec",

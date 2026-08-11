@@ -1,12 +1,13 @@
 # lean-zip raw-DEFLATE feasibility probe
 
-Date: 2026-08-10
+Date: 2026-08-11
 
 This probe evaluates whether lean-zip's production raw-DEFLATE entry point can
 be packaged as Lean IR for the shared Vir interpreter. It now includes the
 implementation that closes the fixed level-1 and full dispatcher boundaries,
-plus runtime and native-output checks. It is not yet an acceptance result for
-all levels 0 through 10 or the high-entropy routing threshold corpus.
+plus runtime and native-output checks across levels 0 through 10 and the
+high-entropy routing threshold. It remains a scoped acceptance result for the
+checked corpus, not a claim over every possible input.
 
 ## Result
 
@@ -17,12 +18,17 @@ transparent `@[extern] def`s. The lean-zip wrappers use it for their seven
 project accelerators; the native compiler remains unchanged.
 
 The fallback expansion exposed one additional core dependency,
-`ByteArray.set`, which now uses its canonical runtime provider. The generic
-native catalog also registers `UInt8.ofNatLT` and an audited WASI-libm
-`Float.log2` provider. The strict Wasm link has zero unresolved symbols. Fixed
-level 1 and full levels 1 and 6 execute through the shared runtime, raw-inflate
-back to the input, and produce exactly the same bytes as native lean-zip for
-the checked 81-byte corpus.
+`ByteArray.set`, which now uses its canonical runtime provider. The full wrapper
+also opts into the Lean body of `UInt8.ofNatLT`; its proof-erased call shape is
+not compatible with Lean's ordinary native wrapper. `Float.log2` uses an audited
+WASI-libm provider. The strict Wasm link has zero unresolved symbols.
+
+The checked-in acceptance harness compares 89 native/VIR compression vectors.
+It covers levels 0 through 10 over empty, short, repetitive, byte-cycle, and
+deterministic-noise inputs, plus a 1 MiB high-entropy level-6 route. Every output
+is byte-identical to native lean-zip and independently raw-inflates to its input.
+Nine 1 MiB prescan vectors also produce identical native/VIR decisions around
+the entropy threshold.
 
 ## Exact revisions and source compatibility
 
@@ -60,14 +66,14 @@ declarations.
 | Root | Lean IR declarations | Registered native externs | Missing native externs | Package-set bytes | Status |
 | --- | ---: | ---: | ---: | ---: | --- |
 | level 0 stored | 6 | 14 | 0 | 5,769 | runnable |
-| fixed level 1 | 306 | 105 | 0 | 294,047 | runnable |
-| full `deflateRaw` | 665 | 136 | 0 | 1,175,981 | runnable |
+| fixed level 1 | 306 | 105 | 0 | 294,135 | runnable |
+| full `deflateRaw` | 667 | 136 | 0 | 1,176,305 | runnable |
 
 The stored row retains its original direct-package measurement. Its public
 facet split the closure into a 2,262-byte root and a 4,201-byte dependency
-member. The fixed package set has 24 members, a 15,758-byte root, 294,047 bytes
+member. The fixed package set has 24 members, a 15,846-byte root, 294,135 bytes
 across members, and a 2,701-byte descriptor. The full set has 36 members, a
-17,065-byte root, 1,175,981 bytes across members, and a 4,279-byte descriptor.
+17,389-byte root, 1,176,305 bytes across members, and a 4,279-byte descriptor.
 
 ### Level-0 native inventory
 
@@ -117,10 +123,15 @@ The full root reaches all six level-1 fallbacks and additionally:
 ```text
 UInt32.log2Clz       -- explicit Lean reference-body fallback
 Float.log2           -- audited standard WASI-libm provider
-UInt8.ofNatLT        -- canonical standard primitive provider
+UInt8.ofNatLT        -- explicit Lean reference-body fallback
 ```
 
-No further ByteArray operation or initializer is missing.
+`UInt8.ofNatLT` initially appeared suitable for the generic native catalog, but
+the levels matrix reached an indirect-call signature mismatch at level 7. Its
+proof argument remains present in the interpreted call shape while Lean's
+ordinary boxed wrapper uses a different erased ABI. Removing that registration
+and selecting its transparent Lean body fixes the path without weakening native
+lookup. No further ByteArray operation or initializer is missing.
 
 ## Project-local extern strategy
 
@@ -155,11 +166,15 @@ not guaranteed to produce identical last bits. Since lean-zip compares the
 computed entropy with a route-selection threshold, exact route equality for
 every possible input cannot be claimed from the API contract alone.
 
-Before accepting the full dispatcher, compare both the prescan decision and
-compressed bytes against native lean-zip on high-entropy inputs around the
-threshold. If exact cross-platform routing is required rather than empirical
-agreement on the supported corpus, the prescan needs a deterministic
-implementation shared by native and interpreted builds.
+The acceptance corpus exercises alphabet distributions on both sides of the
+threshold. Native and VIR both classify alphabets 200, 203, 204, and 205 as
+compressible, and 206, 207, 208, 224, and 256 as incompressible. The clear
+1 MiB alphabet-256 case also produces byte-identical level-6 stored output.
+This establishes routing agreement for the current native platform and WASI
+SDK, including the observed 205/206 boundary. If exact cross-platform routing
+is required rather than empirical agreement on supported platforms, the
+prescan still needs a deterministic implementation shared by native and
+interpreted builds.
 
 ## Runtime evidence and performance gate
 
@@ -168,25 +183,33 @@ with all generic providers and zero strict unresolved symbols. The original
 stored smoke still covers empty, four-byte, 257-byte, and 65,536-byte inputs,
 including byte-for-byte RFC stored-block layout and repeated calls.
 
-The fixed and full package sets were then loaded through the current Node
-runtime. On the 81-byte repeated-text input, fixed level 1 and full level 1 both
-produced 50 bytes; full level 6 produced 47 bytes. All three independently
-round-tripped through `node:zlib.inflateRawSync`. A linked native lean-zip
-executable produced byte-identical output for all three cases. The three-runtime
-Node process completed in 6.8 seconds; this includes package loading and process
-startup and is not a per-call benchmark.
+The maintained command is:
+
+```bash
+npm run accept:lean-zip -- /path/to/lean-zip
+```
+
+It builds a native oracle through a temporary Lake overlay without editing the
+lean-zip checkout, generates one direct VIR package from the checked-in export
+fixture, and runs every vector in one shared interpreter. Successful runs
+checked 89 compression vectors and nine prescan vectors in 29.87–49.19
+seconds. Compression calls represented 1,103,268 input bytes and 1,100,737
+output bytes; the prescan set additionally scanned nine 1 MiB inputs. Wasm
+memory grew from 145 to 339 pages in both runs. These figures include lifting,
+lowering, assertions, and large-input scans and are acceptance telemetry, not a
+compression throughput benchmark.
 
 Vir still does not expose interpreter fuel or per-declaration sampling through
-the public runtime. The next performance gate is repeated fixed/full calls in
-one interpreter instance with wall time, Wasm memory growth, and explicit hot
-declaration instrumentation. High-entropy inputs around the `Float.log2`
-prescan threshold remain required for route-fidelity acceptance.
+the public runtime. The next performance gate is repeated matrix passes in one
+interpreter to verify memory stabilization, followed by explicit hot-declaration
+instrumentation. The current page growth is bounded process telemetry, not yet
+a steady-state memory result.
 
 ## Smallest next green slice
 
-The fixed level-1 and full dispatcher slices are now green for package closure
-and the checked runtime corpus. The next smallest acceptance slice is a shared
-runtime loop over levels 0 through 10 with native byte comparison and memory
-tracking, followed by the high-entropy threshold corpus for `Float.log2` route
-fidelity. Until those checks land, the result establishes that lean-zip can run
-through VIR, not that every compression level is fully accepted.
+The level matrix and current-platform entropy boundary are green. The next
+smallest slice is to repeat the matrix in one runtime and assert that Wasm memory
+reaches a stable high-water mark, then add a few larger compressible inputs that
+exercise split and optimal parsing rather than the high-entropy stored fast
+path. Broader corpus and cross-platform CI remain necessary before treating the
+integration as universal acceptance.
