@@ -8,7 +8,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SURFACE_FORMAT = "lean-vir-library-surface";
+import { validateSurfaceReport } from "./surface-report-schema.mjs";
+
 const DELTA_FORMAT = "lean-vir-library-surface-delta";
 const DELTA_VERSION = 1;
 
@@ -151,18 +152,30 @@ export function renderSurfaceDeltaMarkdown(delta) {
 
 function validateComparableReports(control, candidate) {
   for (const [label, report] of [["control", control], ["candidate", candidate]]) {
-    if (report?.format !== SURFACE_FORMAT) {
-      throw new Error(`${label} is not a ${SURFACE_FORMAT} report`);
-    }
-    for (const field of ["selectedModules", "modules", "declarations", "externs"]) {
-      if (!Array.isArray(report[field])) throw new Error(`${label}.${field} must be an array`);
-    }
+    validateSurfaceReport(report, { label });
+    if (!Array.isArray(report.externs)) throw new Error(`${label}.externs must be an array`);
   }
   requireEqual("report version", control.version, candidate.version);
   requireEqual("Lean toolchain", control.lean?.toolchain, candidate.lean?.toolchain);
   requireEqual("Lean git hash", control.lean?.githash, candidate.lean?.githash);
   requireEqual("surface definition", JSON.stringify(control.definition), JSON.stringify(candidate.definition));
   requireEqual("selected modules", JSON.stringify(control.selectedModules), JSON.stringify(candidate.selectedModules));
+  requireEqual(
+    "selected declarations",
+    JSON.stringify(control.selectedDeclarations ?? []),
+    JSON.stringify(candidate.selectedDeclarations ?? []),
+  );
+  if (control.capture || candidate.capture) {
+    requireEqual("capture mode", control.capture?.mode, candidate.capture?.mode);
+    requireEqual("capture module", control.capture?.module, candidate.capture?.module);
+    requireEqual(
+      "captured source SHA-256",
+      control.capture?.sourceSha256,
+      candidate.capture?.sourceSha256,
+    );
+    requireEqual("capture graph format", control.capture?.graphFormat, candidate.capture?.graphFormat);
+    requireEqual("capture graph version", control.capture?.graphVersion, candidate.capture?.graphVersion);
+  }
   requireEqual("declaration count", control.declarations.length, candidate.declarations.length);
 }
 
@@ -430,7 +443,7 @@ function appendBoundaryTable(lines, title, boundaries) {
 }
 
 function appendTransitionTable(lines, transitions) {
-  lines.push("## Newly Exposed Blockers", "");
+  lines.push("## Nearest Blocker Transitions", "");
   if (transitions.length === 0) {
     lines.push("None.", "");
     return;

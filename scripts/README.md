@@ -32,21 +32,20 @@ map lives in `docs/HARNESS.md`.
   are measured in isolation; use `--plan` for directly priced clusters and
   `--surface-links` to attach primary-blocker pressure hints. The runner skips
   browser package generation and restores the byte-identical baseline artifact.
+- `npm run analyze:surface -- REPORT.json REPORT.md [--module MODULE] [--root NAME]`
+  Analyze installed libraries or a focused function set with VIR's pinned Lean
+  toolchain.
+- `npm run analyze:target-surface -- --project PROJECT --source FILE --module MODULE --root NAME --output-prefix PREFIX`
+  Capture a complete blocker frontier with the target project's pinned Lean,
+  then apply VIR's current runtime policy.
+- `npm run render:surface -- REPORT.json OUTPUT_DIR [--frontier-costs COSTS.json] [--collection]`
+  Build the static boundary explorer, including function/extern signatures and
+  docstrings. Use `render:target-surface-index` for a collection landing page.
 - `npm run build:size-site`
   Render the release/debug Wasm artifacts and strict linker map as the static
-  interactive section/subsystem/object/symbol treemap deployed under `/size/`.
-  It also maps the current boundary into the installed Lean native runtime
-  archives using exact source provenance, separates compiled Lean program code,
-  and exposes retained-code, primary-blocker-pressure, and combined overlap
-  color modes. Missing externs are joined to the complete installed-archive
-  function catalog rather than only to objects retained in Wasm; the report
-  states how many of the total boundaries have providers in the displayed
-  slice. It reports total native-support coverage, makes overlap functions
-  directly explorable, morphs the largest visible exact correspondences during
-  scope changes, and adds function-level highlights to runtime-member details.
-  Animation is skipped when reduced motion is requested. `npm run build:site`
-  supplies the surface-report symbol bridge; the standalone command remains
-  usable without that optional cross-link data.
+  size explorer deployed under `/size/`. With surface-link data it also shows
+  native provider coverage, blocker pressure, and links back to declarations.
+  The standalone command works without those optional joins.
 - `npm run build:analysis-site`
   Build the complete runnable-surface report, price the tracked candidates in
   `scripts/frontier-size-plan.json`, rerender the surface UI with those costs,

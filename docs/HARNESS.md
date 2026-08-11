@@ -123,8 +123,11 @@ npm run check:native-externs
 npm run check:client-native-externs
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
+npm run analyze:surface -- /tmp/entry.json /tmp/entry.md --module Lean.Meta.Basic --root Lean.Meta.mkFreshExprMVar
+npm run analyze:target-surface -- --project /path/to/project --source Library/Entry.lean --module Library.Entry --root Library.Entry.main --output-prefix build/vir-surface/library-entry
 npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
 npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
+npm run render:target-surface-index -- build/vir-surface/targets demo "Demo target" build/vir-surface/demo.json
 npm run compare:surface -- control.json candidate.json delta.json delta.md
 ```
 
@@ -146,6 +149,7 @@ Tests:
 ```bash
 npm run test:bench
 npm run test:surface
+npm run test:surface:browser
 npm run test:package-ir-builders
 npm run test:upstream
 npm run test:upstream:no-build
@@ -187,7 +191,10 @@ changes.
   `npm run test:surface`; use `npm run analyze:surface -- <report.json>
   <report.md>` for a complete installed-library report, then
   `npm run render:surface -- <report.json> <html-directory>` for the interactive
-  folder/module/function browser
+  folder/module/function browser. For a project pinned to another Lean release,
+  use `npm run analyze:target-surface -- ...` after building its imports; see
+  `docs/SURFACE_ANALYSIS.md`. For report navigation or responsive-layout
+  changes, also run `CHROMIUM=/path/to/chromium npm run test:surface:browser`.
 - Native extern declaration changes:
   `npm run check:native-externs`; add
   `npm run check:client-native-externs` when client manifest selection,
@@ -336,33 +343,12 @@ SDK.
 
 The Pages workflow runs the same `npm run build:site` entry point. Its static
 artifact includes a fresh complete Lean-library surface scan under
-`web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer under
-`web/dist/size/`. The reports cross-link exact extern backend symbols. The size
-explorer separates the retained-Wasm map from a wider installed-Lean runtime
-context: the former measures linked Wasm bytes, while the latter measures native
-archive-member bytes from `libleanrt.a` and `libleancpp.a`, organized by archive
-and exact Lean source path. A generally available, per-view depth slider shows
-the requested number of local levels below the current breadcrumb and stays at
-that setting while zooming. The runtime context has up to seven levels—execution
-layer, archive, source-root directory, nested source directories, member, and
-sized native function. Remaining archive bytes are divided into other
-executable code, runtime data, exception tables, relocations, symbol/name
-tables, debug information, and ELF metadata/alignment, so child areas add up
-exactly. Zero-fill memory is reported separately because it has no archive-byte
-area. The generated `libLeanIR.a` member is shown separately as compiled
-`LeanIR.lean` program code and is excluded from the native-support denominator.
-Retained-code coloring matches native function aliases to exact retained Wasm
-linker symbols. Frontier-pressure coloring independently joins missing externs
-to provider functions in the displayed archives. The combined mode shows both
-signals and their overlap. Parent colors remain byte-weighted, and blocker
-pressure is a prioritization hint rather than a predicted unlock count. Runtime
-member details and the compact coverage strip expose the underlying function,
-byte, and blocker measurements. See `docs/SURFACE_ANALYSIS.md` for the report's
-accounting rules, cross-report joins, and interaction design.
-The Pages build also runs the tracked native-frontier plan against the current
-release artifact. Both reports display exact isolated and directly measured
-cluster raw/gzip deltas, while keeping those costs distinct from blocker
-pressure and exact A/B runnable-surface gains.
+`web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer
+under `web/dist/size/`. The reports cross-link declarations, native providers,
+and retained symbols. The tracked native-frontier plan adds exact isolated and
+cluster raw/gzip measurements; blocker pressure remains a ranking hint, and
+only an A/B surface comparison gives exact unlocks. See
+`docs/SURFACE_ANALYSIS.md` for accounting and local reproduction.
 They are deployed at
 `https://ejgallego.github.io/lean-vir/surface/` and
 `https://ejgallego.github.io/lean-vir/size/` alongside the demo.

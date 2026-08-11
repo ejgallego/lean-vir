@@ -16,7 +16,7 @@ const eqv = { kind: "missingExtern", name: "Lean.Expr.eqv" };
 const dbg = { kind: "missingExtern", name: "Lean.Expr.dbgToString" };
 const trim = { kind: "missingExtern", name: "String.Internal.trim" };
 
-test("surface comparison reports exact unlocks, regressions, and newly exposed blockers", () => {
+test("surface comparison reports exact unlocks, regressions, and nearest blocker transitions", () => {
   const control = report([
     blocked("A.pubUnlock", "Lean.A", "publicConstant", eqv),
     blocked("A.privateReveal", "Lean.A", "privateConstant", eqv),
@@ -78,7 +78,7 @@ test("surface comparison reports exact unlocks, regressions, and newly exposed b
   const markdown = renderSurfaceDeltaMarkdown(delta);
   assert.match(markdown, /Public constants \| 2 \/ 3 \(66\.7%\) \| 2 \/ 3 \(66\.7%\) \| 1 \| 1/);
   assert.match(markdown, /`Lean\.Expr\.eqv` \| `lean_Lean_Expr_eqv`/);
-  assert.match(markdown, /Newly Exposed Blockers/);
+  assert.match(markdown, /Nearest Blocker Transitions/);
   assert.match(markdown, /Exact Declaration Sets/);
 });
 
@@ -91,6 +91,59 @@ test("surface comparison rejects a different Lean build", () => {
     /Lean git hash differs/,
   );
 });
+
+test("exact-target comparison rejects a different captured source", () => {
+  const declarations = [blocked("A.entry", "Lean.A", "publicConstant", eqv)];
+  const control = exactTargetReport(declarations, "a".repeat(64));
+  const candidate = exactTargetReport(declarations, "b".repeat(64));
+  assert.throws(
+    () => compareSurfaceReports(control, candidate),
+    /captured source SHA-256 differs/,
+  );
+});
+
+function exactTargetReport(declarations, sourceSha256) {
+  const value = report(declarations);
+  value.version = 3;
+  value.capture = {
+    mode: "targetToolchainSource",
+    source: "Library/Entry.lean",
+    sourceSha256,
+    graphSha256: "c".repeat(64),
+    module: "Library.Entry",
+    graphFormat: "lean-ir-surface-graph",
+    graphVersion: 2,
+  };
+  value.definition = {
+    headline: "static transitive IR closure completeness",
+    encodingIsGate: false,
+    interfaceCallabilityIsGate: false,
+    dynamicValidationIsGate: false,
+    primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
+    completeBlockerFrontier: true,
+    blockerCoverage: "complete terminal frontier per selected root",
+    externScope: "extern declarations reached from selected roots",
+    hostProvisioningVerified: false,
+    missingNodeKind: "namespace heuristic",
+  };
+  value.selectedModules = ["Library.Entry"];
+  value.selectedDeclarations = declarations.map((declaration) => declaration.name);
+  value.closure = {
+    selectedRoots: declarations.length,
+    capturedNodes: declarations.length,
+    rootReachableNodes: declarations.length,
+    supportOnlyNodes: 0,
+  };
+  value.runtimeCapabilities.primitiveNamespaces = ["Lean"];
+  value.reachableBlockers = [];
+  value.declarations = declarations.map((declaration) => ({
+    ...declaration,
+    blockers: declaration.blocker
+      ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
+      : [],
+  }));
+  return value;
+}
 
 function report(declarations, nativeNames = [], statusOverrides = {}) {
   const counts = countDeclarations(declarations);
@@ -121,12 +174,16 @@ function report(declarations, nativeNames = [], statusOverrides = {}) {
       encodingIsGate: false,
     },
     selectedModules: ["Lean.A", "Std.B"],
+    selectedDeclarations: [],
+    loadedModules: 2,
     counts,
     runtimeCapabilities: {
       nativeExternCount: nativeExterns.length,
       nativeExterns,
     },
+    libraries: [],
     modules,
+    primaryBlockers: [],
     externs: [
       extern("Lean.Expr.eqv", "Lean.A", statusOverrides["Lean.Expr.eqv"] ?? "missing", "lean_expr_eqv"),
       extern("Lean.Expr.dbgToString", "Lean.A", "missing", "lean_expr_dbg_to_string"),
