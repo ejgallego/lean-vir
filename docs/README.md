@@ -97,8 +97,8 @@ ownership diagrams.
   definition, full-library scan and interactive HTML workflows, report
   interpretation, and runtime control/candidate comparison rules.
 - [LEAN_ZIP_DEFLATE_PROBE.md](LEAN_ZIP_DEFLATE_PROBE.md): exact-toolchain
-  compatibility, closure inventory, and native-frontier findings for
-  lean-zip's raw-DEFLATE entry point.
+  compatibility, package boundary, acceptance coverage, and performance
+  findings for lean-zip's raw-DEFLATE entry point.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 

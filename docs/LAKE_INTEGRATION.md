@@ -117,7 +117,8 @@ def portableEntry (input : ByteArray) : ByteArray :=
 ```
 
 The command accepts only `@[extern] def`s with transparent kernel bodies. It
-rejects opaque, bodyless, duplicate, and directly recursive fallbacks. Lean's
+rejects bodyless or opaque declarations, duplicate requests, non-externs, and
+directly recursive fallbacks. Lean's
 ordinary native compiler continues to use the extern; the command compiles a
 private reference-body clone only for VIR closure resolution. Package
 generation emits an adapter at the original name and preserves the extern's

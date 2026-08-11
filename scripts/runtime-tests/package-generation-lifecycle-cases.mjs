@@ -119,5 +119,11 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
   const fallbackRuntime = await createVirRuntimeFactory({ wasmBytes })
     .createRuntime({ irPackageSetBytes: [await readFile(fallbackPackage)] });
   assert.equal(fallbackRuntime.call("callExternIncrement", 41), "42");
+  const fallbackBytes = new Uint8Array([0, 1, 2, 255]);
+  assert.deepEqual(
+    fallbackRuntime.call("callExternBorrowedIdentity", fallbackBytes),
+    fallbackBytes,
+  );
+  assert.equal(fallbackRuntime.call("callExternOwnedSize", fallbackBytes), "4");
   fallbackRuntime.dispose();
 }

@@ -19,7 +19,6 @@ import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = join(repoRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
-const oracleSourceRoot = fixtureRoot;
 const generator = join(repoRoot, ".lake", "build", "bin", "vir_irpkg");
 
 const { values, positionals } = parseArgs({
@@ -126,10 +125,6 @@ const packagePath = join(workDir, "lean-zip-acceptance.irpkg");
 const reportPath = join(workDir, "lean-zip-acceptance.report.md");
 const overlayLakefile = join(workDir, "lakefile.lean");
 
-function leanString(value) {
-  return JSON.stringify(value);
-}
-
 async function writeOracleLakefile() {
   const source = await readFile(lakefile, "utf8");
   await writeFile(
@@ -137,7 +132,7 @@ async function writeOracleLakefile() {
     `${source.trimEnd()}\n\n` +
       "lean_exe virLeanZipAcceptanceOracle where\n" +
       "  root := `VirLeanZipAcceptance.NativeOracle\n" +
-      `  srcDir := ${leanString(oracleSourceRoot)}\n`,
+      `  srcDir := ${JSON.stringify(fixtureRoot)}\n`,
   );
 }
 
@@ -268,24 +263,15 @@ async function runAcceptance() {
   });
   const wasmPages = () => runtime.exports.memory.buffer.byteLength / 65536;
   const initialPages = wasmPages();
-  const inputs = new Map();
-  const nativeOutputs = new Map();
-  const input = async (file) => {
-    if (!inputs.has(file))
-      inputs.set(
-        file,
-        new Uint8Array(await readFile(join(oracleOutput, file))),
-      );
-    return inputs.get(file);
-  };
-  const nativeOutput = async (file) => {
-    if (!nativeOutputs.has(file)) {
-      nativeOutputs.set(
+  const oracleFiles = new Map();
+  const oracleFile = async (file) => {
+    if (!oracleFiles.has(file)) {
+      oracleFiles.set(
         file,
         new Uint8Array(await readFile(join(oracleOutput, file))),
       );
     }
-    return nativeOutputs.get(file);
+    return oracleFiles.get(file);
   };
 
   let compressedInputBytes = 0;
@@ -300,8 +286,8 @@ async function runAcceptance() {
       requireSmaller,
       profileTarget = null,
     ) => {
-      const source = await input(vector.inputFile);
-      const native = await nativeOutput(vector.outputFile);
+      const source = await oracleFile(vector.inputFile);
+      const native = await oracleFile(vector.outputFile);
       if (requireSmaller) {
         assert.ok(
           native.byteLength < source.byteLength,
@@ -407,8 +393,8 @@ async function runAcceptance() {
 
       const profileTokens = new Map();
       for (const vector of manifest.profileMatches) {
-        const source = await input(vector.inputFile);
-        const native = await nativeOutput(vector.tokensFile);
+        const source = await oracleFile(vector.inputFile);
+        const native = await oracleFile(vector.tokensFile);
         const { value: vir, timings } = runtime.callTimed(
           "VirLeanZipAcceptance.profileMatchTokens",
           source,
@@ -435,7 +421,7 @@ async function runAcceptance() {
       }
 
       for (const vector of manifest.profileBases) {
-        const source = await input(vector.inputFile);
+        const source = await oracleFile(vector.inputFile);
         const tokens = profileTokens.get(vector.tokensFile);
         assert.ok(
           tokens instanceof Uint8Array,
@@ -488,8 +474,8 @@ async function runAcceptance() {
           target !== undefined,
           `${vector.corpus}: unknown optimal profile kind ${vector.kind}`,
         );
-        const source = await input(vector.inputFile);
-        const native = await nativeOutput(vector.outputFile);
+        const source = await oracleFile(vector.inputFile);
+        const native = await oracleFile(vector.outputFile);
         const { value: vir, timings } = runtime.callTimed(
           target.exportName,
           source,
@@ -528,7 +514,7 @@ async function runAcceptance() {
     }
 
     for (const vector of manifest.prescan) {
-      const source = await input(vector.inputFile);
+      const source = await oracleFile(vector.inputFile);
       let vir;
       try {
         vir = runtime.call(

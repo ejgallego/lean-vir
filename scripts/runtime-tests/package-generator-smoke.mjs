@@ -32,6 +32,15 @@ function combinedOutput(result) {
 }
 
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
+
+async function assertExternFallbackRejected(fileName, lines, message, pattern) {
+  const source = join(freshDir, fileName);
+  await writeFile(source, lines.join("\n"));
+  const checked = checkLeanSource(source);
+  assert.notEqual(checked.status, 0, message);
+  assert.match(combinedOutput(checked), pattern);
+}
+
 try {
   ensureVirIrpkgBuilt();
 
@@ -207,27 +216,70 @@ try {
     0,
     inspectedExternFallback.stderr || inspectedExternFallback.stdout,
   );
-  manifestEntry(JSON.parse(inspectedExternFallback.stdout).manifest, "callExternIncrement");
+  const externFallbackManifest = JSON.parse(inspectedExternFallback.stdout).manifest;
+  for (const entry of [
+    "callExternIncrement",
+    "callExternBorrowedIdentity",
+    "callExternOwnedSize",
+  ]) {
+    manifestEntry(externFallbackManifest, entry);
+  }
 
-  const bodylessExternFallbackSource = join(freshDir, "BodylessExternFallback.lean");
-  await writeFile(bodylessExternFallbackSource, [
-    "import Vir",
-    "",
-    "@[extern \"vir_test_bodyless\"]",
-    "opaque bodylessExtern (n : Nat) : Nat",
-    "",
-    "vir_extern_fallback bodylessExtern",
-    "",
-  ].join("\n"));
-  const checkedBodylessExternFallback = checkLeanSource(bodylessExternFallbackSource);
-  assert.notEqual(
-    checkedBodylessExternFallback.status,
-    0,
+  await assertExternFallbackRejected(
+    "BodylessExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_bodyless\"]",
+      "opaque bodylessExtern (n : Nat) : Nat",
+      "",
+      "vir_extern_fallback bodylessExtern",
+      "",
+    ],
     "a bodyless extern unexpectedly accepted a VIR reference-body fallback",
-  );
-  assert.match(
-    combinedOutput(checkedBodylessExternFallback),
     /extern `bodylessExtern` has no transparent Lean definition body/,
+  );
+  await assertExternFallbackRejected(
+    "OrdinaryExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "def ordinaryDefinition (n : Nat) : Nat := n + 1",
+      "",
+      "vir_extern_fallback ordinaryDefinition",
+      "",
+    ],
+    "a non-extern definition unexpectedly accepted a VIR reference-body fallback",
+    /`ordinaryDefinition` is not an `@\[extern\]` declaration/,
+  );
+  await assertExternFallbackRejected(
+    "DuplicateExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_duplicate\"]",
+      "def duplicateExtern (n : Nat) : Nat := n + 1",
+      "",
+      "vir_extern_fallback duplicateExtern",
+      "vir_extern_fallback duplicateExtern",
+      "",
+    ],
+    "a duplicate VIR reference-body fallback unexpectedly elaborated",
+    /extern `duplicateExtern` already has a VIR reference-body fallback/,
+  );
+  await assertExternFallbackRejected(
+    "RecursiveExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_recursive\"]",
+      "unsafe def recursiveExtern (n : Nat) : Nat := recursiveExtern n",
+      "",
+      "vir_extern_fallback recursiveExtern",
+      "",
+    ],
+    "a directly recursive extern unexpectedly accepted a VIR reference-body fallback",
+    /extern `recursiveExtern` has a recursive reference body/,
   );
 
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");

@@ -117,12 +117,14 @@ map lives in `docs/HARNESS.md`.
   inputs, and large-input incompressible-prescan decisions. The default three
   matrix passes also assert that Wasm memory stabilizes after the first pass;
   pass `--passes 1` for a quicker diagnostic without that assertion. Requires
-  an existing `web/public/vir-upstream.wasm`; pass `--keep` to retain temporary
-  artifacts. Add `--profile` to time direct levels 5 through 10 paths for the
-  larger corpora through the opt-in runtime phase timer; these single samples
-  are diagnostic attribution rather than benchmark evidence. The same mode
-  native-checks and times the heterogeneous level-9/10 packed matcher,
-  base-candidate preparation, and fast/exact optimal candidate separately.
+  an existing `web/public/vir-upstream.wasm`; use `--wasm path` to select a
+  different build and `--keep` to retain temporary artifacts. The checkout may
+  instead be supplied through `LEAN_ZIP_CHECKOUT`. Add `--profile` to time
+  direct levels 5 through 10 paths for the larger corpora through the opt-in
+  runtime phase timer; these single samples are diagnostic attribution rather
+  than benchmark evidence. The same mode native-checks and times the
+  heterogeneous level-9/10 packed matcher, base-candidate preparation, and
+  fast/exact optimal candidate separately.
 - `npm run test:site`
   Build the Vite site, runnable-surface and Wasm-size reports, local archive,
   SDK archive, and check the generated `web/dist` artifact shape.
