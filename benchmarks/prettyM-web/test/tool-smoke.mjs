@@ -64,6 +64,10 @@ const exampleList = spawnSync(
 assert.equal(exampleList.status, 0, exampleList.stderr);
 assert.match(exampleList.stdout, /^illuminate\trehearsal\tIlluminate player$/m);
 assert.match(exampleList.stdout, /^prettyM\tactive\tStd\.Format\.prettyM$/m);
+assert.match(
+  exampleList.stdout,
+  /^verso-search-json\tcandidate\tVerso search JSON lanes$/m,
+);
 
 const examplePlan = spawnSync(
   process.execPath,
@@ -84,6 +88,32 @@ assert.match(
 );
 assert.match(examplePlan.stdout, /^benchmark: suite \(not measured\)$/m);
 assert.match(examplePlan.stdout, /^sources: materialize catalogued revisions$/m);
+
+for (const [variant, build, backend] of [
+  ["default", "verso-search-json-owned", "owned"],
+  ["borrowed", "verso-search-json-borrowed", "borrowed"],
+]) {
+  const plan = spawnSync(
+    process.execPath,
+    [
+      "scripts/run-example.mjs",
+      "verso-search-json",
+      variant,
+      "--plan",
+    ],
+    { cwd: appRoot, encoding: "utf8" },
+  );
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.match(plan.stdout, new RegExp(`^build: ${build}$`, "m"));
+  assert.match(
+    plan.stdout,
+    new RegExp(
+      `^test: real-xref-parity · smoke · js, ${backend} · oracle js$`,
+      "m",
+    ),
+  );
+  assert.match(plan.stdout, /^benchmark: benchmark \(not measured\)$/m);
+}
 
 const contradictoryExample = spawnSync(
   process.execPath,
@@ -109,6 +139,14 @@ const buildList = spawnSync(
 );
 assert.equal(buildList.status, 0, buildList.stderr);
 assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0002$/m);
+assert.match(
+  buildList.stdout,
+  /^verso-search-json-owned\tverso-search-json-owned-set-0001$/m,
+);
+assert.match(
+  buildList.stdout,
+  /^verso-search-json-borrowed\tverso-search-json-borrowed-set-0001$/m,
+);
 
 const sourcePlan = spawnSync(
   process.execPath,
@@ -147,6 +185,16 @@ assert.equal(candidateMatrix.status, 0, candidateMatrix.stderr);
 assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   include: [
     { example: "prettyM", variant: "default", build: "prettyM" },
+    {
+      example: "verso-search-json",
+      variant: "default",
+      build: "verso-search-json-owned",
+    },
+    {
+      example: "verso-search-json",
+      variant: "borrowed",
+      build: "verso-search-json-borrowed",
+    },
   ],
 });
 

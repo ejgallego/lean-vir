@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -19,6 +21,7 @@ test("discovers compact example manifests", async () => {
     catalog.examples.map(({ id, lifecycle }) => ({ id, lifecycle })),
     [
       { id: "prettyM", lifecycle: "active" },
+      { id: "verso-search-json", lifecycle: "candidate" },
       { id: "illuminate", lifecycle: "rehearsal" },
     ],
   );
@@ -39,13 +42,57 @@ test("discovers compact example manifests", async () => {
 
 test("materializes the uniform VIR package into the artifact build", async () => {
   const catalog = await discoverExampleCatalog(appRoot);
-  const example = catalog.examples.find(({ id }) => id === "prettyM");
-  const packageSpec = example.packages.find(({ id }) => id === "prettyM");
   const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
-  const workload = database.builds.prettyM.components.vir.artifact.workload;
-  assert.equal(workload.packageRef, packageSpec.id);
-  assert.equal(workload.source.file, packageSpec.target);
-  assert.deepEqual(workload.exports, packageSpec.exports);
+  for (const { exampleId, packageId, buildId } of [
+    { exampleId: "prettyM", packageId: "prettyM", buildId: "prettyM" },
+    {
+      exampleId: "verso-search-json",
+      packageId: "owned",
+      buildId: "verso-search-json-owned",
+    },
+    {
+      exampleId: "verso-search-json",
+      packageId: "borrowed",
+      buildId: "verso-search-json-borrowed",
+    },
+  ]) {
+    const example = catalog.examples.find(({ id }) => id === exampleId);
+    const packageSpec = example.packages.find(({ id }) => id === packageId);
+    const workload =
+      database.builds[buildId].components.vir.artifact.workload;
+    assert.equal(workload.packageRef, packageSpec.id);
+    assert.equal(workload.source.file, packageSpec.target);
+    assert.deepEqual(workload.exports, packageSpec.exports);
+  }
+});
+
+test("pins the generated Verso xref fixtures and JavaScript oracles", async () => {
+  const tests = JSON.parse(
+    await readFile(
+      join(appRoot, "examples/verso-search-json/tests.json"),
+      "utf8",
+    ),
+  );
+  const fixtures = tests.variants[0].tests[0].data.fixtures;
+  assert.deepEqual(
+    fixtures.map(({ id, searchables }) => ({ id, searchables })),
+    [
+      { id: "manual", searchables: 295 },
+      { id: "literate", searchables: 28 },
+    ],
+  );
+  for (const fixture of fixtures) {
+    for (const [pathKey, hashKey] of [
+      ["xref", "xrefSha256"],
+      ["mapper", "mapperSha256"],
+    ]) {
+      const bytes = await readFile(join(appRoot, fixture[pathKey]));
+      assert.equal(
+        createHash("sha256").update(bytes).digest("hex"),
+        fixture[hashKey],
+      );
+    }
+  }
 });
 
 test("rejects unsafe or command-shaped example declarations", () => {
