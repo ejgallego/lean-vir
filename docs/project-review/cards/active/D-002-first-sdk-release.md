@@ -1,4 +1,4 @@
-# D-002 — Publish and consume the first SDK release
+# D-002 — Publish and consume the first supported SDK
 
 Type: Deliver
 Status: Proposed
@@ -13,7 +13,8 @@ Related: [roadmap](../../ROADMAP.md), [product boundary](../../../PRODUCT.md),
 
 A tagged `v0.1.0` SDK can be installed and used by a clean downstream Lean and
 browser project without a neighboring VIR checkout or authenticated
-commit-artifact path.
+commit-artifact path, and its support, trust, compatibility, ownership, and
+failure-reporting contract ships with it.
 
 ## Why Now
 
@@ -29,6 +30,11 @@ that decision rather than force it prematurely.
 - Resolve release-relevant development dependency advisories.
 - Freeze the supported, experimental, and non-goal contract selected by that
   gate.
+- State the trusted project-generated package boundary, one-active-package-set
+  model, synchronous host-import limit, supported value types, and exact-match
+  compatibility policy prominently.
+- Name release ownership, response expectations, escalation contacts, and the
+  minimum useful bug report.
 - Run the release validation on the tag commit.
 - Publish the existing SDK artifact and consume it from the downstream
   example.
@@ -43,12 +49,19 @@ that decision rather than force it prematurely.
 - Release evidence records checksums, Wasm/package sizes, Lean version, full
   tests, site validation, and a real-browser result.
 - Release notes state the trusted-package and compatibility boundaries.
+- A pilot-facing support matrix distinguishes supported, experimental, and
+  out-of-scope behavior; a report template requests Lean and SDK identity,
+  package report, browser, reproduction, and minimal source.
+- The named pilot owner reviews the contract before integration begins.
 - `PRODUCT.md` and `MAINTENANCE.md` reflect the released contract.
 
 ## Dependencies
 
 - [L-003](L-003-binding-lifecycle-semantics.md)
-- [D-004](D-004-pilot-support-contract.md)
+- [C-001](C-001-productization-ownership.md)
+- [L-004](L-004-js-vir-fir-comparison.md) defines the release comparison and
+  size snapshot; the pilot can begin before its final campaign, but the release
+  evidence must use its artifact accounting rules.
 
 ## Evidence
 
@@ -56,7 +69,9 @@ The 2026-07-30 review validated the downstream flow from an authenticated
 commit artifact. Current `main` adds exact-commit SDK verification, modular
 packages, green browser CI, and a complete downstream client path, but still
 has no tag or release. Release timing was explicitly placed after the
-binding/lifecycle semantics gate on 2026-08-10.
+binding/lifecycle semantics gate on 2026-08-10. On 2026-08-11 the separate
+pilot-support card was consolidated here so the shipped artifact and its
+support claims have one completion test.
 
 ## Closure
 

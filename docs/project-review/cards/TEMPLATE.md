@@ -1,7 +1,7 @@
 # TYPE-NNN — Outcome-oriented title
 
 Type: Deliver | Learn | Coordinate
-Status: Proposed
+Status: Proposed | Ready | In progress | Blocked | Done | Superseded
 Owner: Unassigned
 Contributors: None
 Milestone:

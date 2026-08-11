@@ -2,7 +2,7 @@
 
 Status: Living
 Owner: VIR maintainers
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-13
 
 This log records durable product and architecture choices. Action cards record
 the work that implements or tests a decision; they do not replace the current
@@ -83,7 +83,8 @@ boundary, and trade-off model.
 
 Consequence: The existing deck and runbook require revision before the
 meeting; this is tracked by
-[D-001](project-review/cards/active/D-001-recenter-all-hands.md).
+[D-001](project-review/cards/archive/2026/D-001-recenter-all-hands.md). The
+presentation is now complete; DEC-008 records its main follow-up.
 
 ## DEC-006 — Use action cards as the execution layer
 
@@ -125,3 +126,42 @@ tracked by
 The first tagged release follows that decision rather than setting it. The
 Lake/browser pilot may use commit-matched artifacts for learning, but must not
 be presented as validation of a frozen public API.
+
+## DEC-008 — Compare JS, VIR, and FIR with a multidimensional contract
+
+Status: Accepted direction
+Recorded: 2026-08-11
+
+Decision: Use semantic parity, time to first correct result, warm execution,
+deployable size, memory, integration cost, and update behavior as separate
+dimensions for the core JavaScript/VIR/FIR comparison. Freeze artifact and
+environment identity, and report VIR's first-workload and incremental-package
+costs separately. Do not produce one universal ranking.
+
+Reason: The all-hands identified comparison quality as the most important
+follow-up. Existing benchmark machinery is broad, but load, speed, size, and
+shared-runtime amortization answer different product questions. A single
+headline timing or byte count would hide those differences.
+
+Consequence: Controlled comparison evidence is now a product-decision gate,
+tracked by
+[L-004](project-review/cards/active/L-004-js-vir-fir-comparison.md). The
+Lake/browser pilot uses the same contract against the user's actual fallback,
+and release evidence adopts its artifact-accounting rules.
+
+## DEC-009 — Ship the support contract with the first SDK
+
+Status: Accepted direction
+Recorded: 2026-08-11
+
+Decision: Treat the first SDK artifact and its supported/experimental/out-of-
+scope matrix, trust boundary, ownership, escalation path, and failure-reporting
+requirements as one deliverable.
+
+Reason: Separate release and support cards could complete at different times
+and allow the artifact to imply a broader promise than the organization has
+agreed to maintain.
+
+Consequence: D-004 is superseded and its remaining outcome is consolidated
+into
+[D-002](project-review/cards/active/D-002-first-sdk-release.md).

@@ -42,7 +42,9 @@ policy, and cross-entry cache work separate.
 
 ## Dependencies
 
-- [D-001](D-001-recenter-all-hands.md) provides a concise technical framing.
+- The completed
+  [D-001](../archive/2026/D-001-recenter-all-hands.md) provides a concise
+  technical framing.
 - ULC-0001 is ready to present. A provider request no longer depends on the
   Lake/browser pilot, although a second consumer would strengthen adoption
   evidence.

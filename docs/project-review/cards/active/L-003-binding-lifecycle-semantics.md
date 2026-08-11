@@ -8,7 +8,7 @@ Milestone: Pre-release semantics
 Created: 2026-08-10
 Related: [product direction](../../../PRODUCT.md),
 [maintenance](../../../MAINTENANCE.md), [roadmap](../../ROADMAP.md),
-[pilot support contract](D-004-pilot-support-contract.md)
+[first supported SDK](D-002-first-sdk-release.md)
 
 ## Outcome Sought
 
@@ -35,8 +35,9 @@ would turn unresolved semantics into accidental compatibility promises.
   detached, and terminal states.
 - Validate a representative scalar host call, DOM resource, event callback,
   timer or animation cancellation, and React replay/abandonment case.
-- Evaluate PR #103 and PR #101 against the contract; neither draft defines the
-  contract merely by existing.
+- Treat merged PR #103 as implementation evidence and evaluate PR #101 and PR
+  #124 against the same contract; no patch defines the public contract merely
+  by existing.
 - Record callback escape or generative-borrow limitations that remain outside
   the first supported surface.
 - Do not expand broad DOM, React, or application-specific binding parity in
@@ -51,8 +52,9 @@ would turn unresolved semantics into accidental compatibility promises.
   replay, and abandoned render.
 - Virtual-host and real-browser tests assert balanced resources for creation,
   rollback, cancellation, reload, and disposal.
-- PR #103 is either reduced and landed with independent review or its surface
-  is explicitly excluded from the first release.
+- The merged PR #103 surface has an independent contract review; any behavior
+  that cannot be explained by the accepted model is explicitly excluded from
+  the first release.
 - PR #101's animation-frame cancellation case passes before any corresponding
   stateful API is accepted.
 - `PRODUCT.md`, `MAINTENANCE.md`, and the binding/lifecycle owner documentation
@@ -66,11 +68,15 @@ would turn unresolved semantics into accidental compatibility promises.
 
 ## Evidence
 
-- 2026-08-09: PR #103 head `031b2e79c65fc52b3930f82848d53dd37dbde8b3`
-  passed all CI jobs but remained a nine-commit draft spanning 46 files.
+- 2026-08-10: PR #103 merged as `607ef30`, adding compositional foreign-resource
+  lifetime handling and extensive virtual-host and real-browser coverage. This
+  materially reduces implementation risk, but the support vocabulary and
+  authoritative binding-definition path remain to be consolidated.
 - 2026-08-09: PR #101 head `b8214b07b89428a4e053e43b3f9a4b8c2f9d701d`
   failed real-browser smoke because a pending animation frame was not
   cancelled.
+- 2026-08-10: draft PR #124 added a green browser regression for React Strict
+  Mode callback replay, strengthening evidence for the same lifecycle model.
 - Current `main` supports Illuminate browser operations and passes the
   repository lifecycle tests; these establish implementation breadth, not a
   frozen ownership contract.

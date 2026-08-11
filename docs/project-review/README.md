@@ -7,9 +7,9 @@ repository facts from user hypotheses that still need validation.
 The current conclusion is:
 
 > VIR is a mature internal pilot platform with measured runtime boundaries and
-> a real downstream workflow. The next product gate is coherent browser
-> binding and lifecycle semantics, followed by the smallest supportable SDK
-> release.
+> a real downstream workflow. The next product gates are coherent browser
+> binding/lifecycle semantics and an authoritative JS/VIR/FIR comparison,
+> followed by the smallest supportable SDK release.
 
 ## Pack
 
@@ -40,14 +40,14 @@ Durable direction lives outside this dated evidence pack:
 
 ## Review Configuration
 
-- Current snapshot date: 2026-08-10.
-- Repository baseline: `062fc8f4c24c1f35c43d92c38beb0782976c7e03`.
+- Current snapshot date: 2026-08-13.
+- Repository baseline: `15a4c5d3512e5bacebb845654422b72214b5c584`.
 - Original comparison baseline: `b528eddb94a46e16f649b290958e4bd2bd1df08a`.
 - Lean toolchain: `leanprover/lean4:v4.33.0-rc2`.
 - Meeting length: 20 minutes.
-- Meeting goals: explain what VIR does and how it is used, compare it with
-  alternatives, make upstreaming risks explicit, and close with the sponsored
-  productization path.
+- Meeting result: the technical presentation was delivered. The main recorded
+  feedback is to make JS/VIR/FIR load, speed, size, and related trade-offs
+  directly and fairly comparable.
 - Roadmap horizon: six months with evidence gates.
 - User evidence: repository and downstream-client evidence, the maintainer's
   use cases, and one key-user interview.
@@ -63,21 +63,21 @@ artifact-management decisions, not as shipped capability.
 
 ## How To Use The Pack
 
-1. Complete the maintainer workshop and key-user interview in
+1. Assign and run
+   [L-004](cards/active/L-004-js-vir-fir-comparison.md), beginning with the
+   frozen comparison contract and the existing artifact-catalog work.
+2. Complete the maintainer workshop and key-user interview in
    [User Needs](USER_NEEDS.md).
-2. Recheck time-sensitive repository and CI facts immediately before the talk.
 3. Complete
-   [D-001](cards/active/D-001-recenter-all-hands.md) and send the resulting
-   pre-read two business days before the meeting.
-4. Rehearse the all-hands runbook twice and record the demo fallback.
-5. Capture raw feedback in [All-Hands Notes](ALL_HANDS_NOTES.md).
-6. Complete
    [C-001](cards/active/C-001-productization-ownership.md) by confirming the
-   maintainer, backup, and Lake/browser pilot owners.
-7. Assign and run
+   maintainer, backup, Lake/browser pilot owners, lifecycle reviewer, and
+   comparison-evidence owner.
+4. Assign and run
    [L-003](cards/active/L-003-binding-lifecycle-semantics.md) before freezing
    the first supported SDK surface.
-8. Promote durable outcomes to the living documents and leave no more than
+5. Prepare the commit-matched Lake/browser pilot without representing it as a
+   frozen compatibility promise.
+6. Promote durable outcomes to the living documents and leave no more than
    eight owned active cards.
 
 The review does not introduce a new harness, backport policy, or branch-policy

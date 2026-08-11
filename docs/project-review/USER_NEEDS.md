@@ -18,6 +18,11 @@ Use one of these labels on every need:
 The current downstream `lean-vir-examples` repository is valuable dogfood. It
 is not independent adoption because it has the same primary maintainer.
 
+The 2026-08-11 post-presentation feedback adds an **interview signal**: internal
+technical users need a credible way to choose among JavaScript, VIR, and FIR,
+especially on load latency, execution speed, and deployable size. The exact
+thresholds and representative environments remain unvalidated.
+
 ## Provisional User Segments
 
 ### Lean library or application author
@@ -138,6 +143,32 @@ Repository evidence:
   runnable-surface and retained-size reports, package reports, and the Lean
   4.33.0-rc2 upgrade.
 
+### Technical product or architecture decision maker
+
+Job:
+
+> Decide whether a browser workload should stay in JavaScript, run through
+> VIR, or compile through FIR without relying on an architecture-only argument
+> or a misleading single microbenchmark.
+
+Likely needs:
+
+- exact semantic parity before performance claims;
+- time to first correct result split from warm execution;
+- raw, compressed, first-workload, and incremental/amortized size;
+- representative workload scaling and memory behavior;
+- exact source, toolchain, artifact, browser, and machine identity;
+- integration and update-cost evidence from a real user workflow; and
+- a conditional scorecard rather than a universal winner.
+
+Evidence:
+
+- all-hands feedback explicitly requested the comparison;
+- the shared `prettyM`/Illuminate application already supplies most raw
+  instrumentation;
+- accepted thresholds, controlled environments, and independent review remain
+  open and are tracked by L-004.
+
 ## Seeded Use-Case Portfolio
 
 These are starting hypotheses for the maintainer workshop, not final roadmap
@@ -150,6 +181,7 @@ priorities.
 | Build a live Lean-authored infoview panel | Strong repository proof | Key-user validation, commands, and real-project scale | **Pilot candidate** |
 | Port a real ProofWidget | Partial compatibility proof | Choose one port and implement only its critical gaps | **Pilot candidate** |
 | Ship reusable Lean components such as formatting or parsing | Technical proofs plus five-backend `prettyM` application | A user who needs the component and accepts the runtime/package trade-off | **Explore through interview** |
+| Choose JS, VIR, or FIR for a browser workload | All-hands interview signal plus broad benchmark machinery | Frozen comparison protocol, controlled campaigns, accepted user thresholds | **Learn now through L-004** |
 | Load arbitrary remote `.irpkg` files | Documentation identifies the gap | Worker recovery, limits, Wasm layout validation | **Defer without a named use case** |
 | Await Promise-returning JavaScript APIs from Lean | Roadmap research only | JSPI/task semantics and rejection recovery | **Defer without a named use case** |
 | Run a complete Lean environment in the browser | Contrary to current selected-package architecture | Module/environment loading and much larger runtime scope | **Explicit non-goal for this roadmap** |

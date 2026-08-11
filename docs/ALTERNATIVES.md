@@ -2,7 +2,7 @@
 
 Status: Living
 Owner: VIR maintainers
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-13
 Decision context: execute or reuse Lean-authored behavior in a web product
 
 VIR should be selected because its trade-offs fit a concrete use case, not
@@ -58,6 +58,42 @@ theoretical weakest alternative. It should record:
 The comparison should be revised when direct Lean-to-Wasm tooling or other
 relevant alternatives materially change.
 
+## Comparison Contract
+
+The all-hands confirmed that comparison quality is now a product requirement.
+The core comparison is JavaScript versus VIR versus FIR-native over the same
+semantic input and output. LLVM/Emscripten and VIR's JSON/typed interfaces are
+useful diagnostic variants, but should not obscure that central choice.
+
+Every accepted scorecard must separate these questions:
+
+| Dimension | Primary measure | Fairness rule |
+| --- | --- | --- |
+| Correctness | Exact semantic parity over the same corpus or trace | A backend that fails parity is not ranked on performance |
+| First use | Time to first correct result | Split transfer, fetch, compile/instantiate, initialization, boundary setup, and first call where applicable |
+| Warm use | Execute and end-to-end latency distributions plus scaling | Use the same input, warm-up, sample, process, and ordering protocol |
+| Size | Raw and deterministic compressed deployable bytes | Report complete first-app cost and workload-incremental cost separately |
+| Memory | Peak, retained, or isolated bytes with method stated | Do not compare browser proxies as if they were equivalent measurements |
+| Integration | Implementation, binding, build, and deployment effort | Record through the real pilot, not a synthetic timing loop |
+| Updates | Cost to change or replace the workload | Distinguish JS rebuild, FIR application rebuild, and VIR package replacement |
+
+VIR size needs two views. The first application pays for the shared interpreter
+runtime and its package. A later application may reuse that runtime and pay
+mostly an incremental `.irpkg` cost. FIR and JavaScript artifacts may have a
+different sharing boundary. Therefore report at least:
+
+1. one-workload deployable total;
+2. incremental cost of a second workload; and
+3. amortized total for a declared set of workloads.
+
+Likewise, local resource-load timing is not a substitute for real network
+latency. Accepted reports record deterministic compressed bytes and cache
+state. Any throttled or real-network measurement names its network profile
+separately.
+
+Do not collapse the dimensions into a single score or universal winner. The
+result should state the conditions under which each approach is favored.
+
 ## Current Comparative Evidence
 
 VIR now contains a standalone browser benchmark application for comparing
@@ -66,9 +102,15 @@ LLVM/Emscripten implementations under one semantic and artifact-identity
 contract. Illuminate is available as a peer browser workload. This is a major
 improvement over comparing architectural sketches alone.
 
-The harness should not yet be read as a universal performance ranking. Some
-Illuminate runs remain explicitly non-authoritative rehearsals, and workload,
-startup, boundary conversion, steady-state execution, memory, and artifact
-size answer different questions. The all-hands should use the application to
-show that the alternatives are directly comparable, while keeping any numeric
-claim tied to its exact frozen artifact set and workload.
+The harness should not yet be read as an authoritative performance ranking.
+The generic artifact candidate now builds, packs, re-imports, and validates on
+`main`, but some Illuminate runs remain explicitly non-authoritative
+rehearsals and no controlled-machine JS/VIR/FIR scorecard has been accepted.
+Workload, cold startup, boundary conversion, steady-state execution, memory,
+and artifact size answer different questions.
+
+The next evidence step is tracked by
+[L-004](project-review/cards/active/L-004-js-vir-fir-comparison.md): freeze the
+protocol and artifacts, refresh the measurements after persistent interpreter
+caches, run controlled `prettyM` and Illuminate campaigns, and publish a
+conditional scorecard.

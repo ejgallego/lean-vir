@@ -48,9 +48,11 @@ contracts. It is the agreed first pilot after the all-hands.
 ## Dependencies
 
 - [C-001](C-001-productization-ownership.md)
-- [D-004](D-004-pilot-support-contract.md)
-- Early integration may start before
-  [D-002](D-002-first-sdk-release.md); tagged repeat use depends on it.
+- [D-002](D-002-first-sdk-release.md) owns the tagged support contract; early
+  commit-matched integration may begin before it.
+- [L-004](L-004-js-vir-fir-comparison.md) supplies the comparison protocol for
+  the user's actual fallback and the evidence used at the pilot decision gate.
+- Tagged repeat use depends on D-002.
 - Any lifecycle-sensitive surface depends on
   [L-003](L-003-binding-lifecycle-semantics.md).
 

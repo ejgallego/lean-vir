@@ -1,13 +1,13 @@
 # D-004 — Define the pilot support contract
 
 Type: Deliver
-Status: Proposed
+Status: Archived (superseded)
 Owner: Unassigned
 Contributors: None
 Milestone: Pilot readiness
 Created: 2026-08-04
-Related: [product boundary](../../../PRODUCT.md),
-[maintenance](../../../MAINTENANCE.md), [roadmap](../../ROADMAP.md)
+Related: [product boundary](../../../../PRODUCT.md),
+[maintenance](../../../../MAINTENANCE.md), [roadmap](../../../ROADMAP.md)
 
 ## Outcome Sought
 
@@ -42,9 +42,10 @@ productization makes an explicit support contract more important, not less.
 
 ## Dependencies
 
-- [C-001](C-001-productization-ownership.md)
-- [L-003](L-003-binding-lifecycle-semantics.md) supplies the binding and
-  lifecycle boundary before a release contract is finalized.
+- The outcome is now owned by
+  [D-002](../../active/D-002-first-sdk-release.md), with
+  [C-001](../../active/C-001-productization-ownership.md) and
+  [L-003](../../active/L-003-binding-lifecycle-semantics.md) as prerequisites.
 
 ## Evidence
 
@@ -53,8 +54,12 @@ not establish safe execution of untrusted IR packages.
 
 ## Closure
 
-Completed: Not yet
-Result: Not yet recorded
-Unexpected findings: None recorded
-Follow-up cards: None
-Durable documents updated: None
+Completed: Not completed independently; superseded 2026-08-11
+Result: Consolidated into D-002. A release is only supportable if its trust,
+compatibility, ownership, failure-reporting, and escalation contract ships with
+the artifact, so maintaining two deliverables would create avoidable drift.
+Unexpected findings: None. This is a board-scope decision, not evidence that
+the support contract already exists.
+Follow-up cards: [D-002](../../active/D-002-first-sdk-release.md)
+Durable documents updated: `docs/MAINTENANCE.md`,
+`docs/project-review/ROADMAP.md`

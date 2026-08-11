@@ -1,4 +1,4 @@
-# L-001 — Establish setup and release baselines
+# L-001 — Measure fresh setup resource cost
 
 Type: Learn
 Status: Proposed
@@ -11,25 +11,22 @@ Related: [technical evidence](../../TECHNICAL_APPENDIX.md),
 
 ## Outcome Sought
 
-Determine whether fresh setup resource use and the callback-heavy React
-benchmark represent productization blockers, and establish reproducible
-release evidence for future comparisons.
+Determine whether fresh setup resource use is a productization or contributor
+onboarding blocker, identify its dominant phase, and document a usable
+lower-resource path.
 
 ## Why Now
 
-The clean review setup peaked near 15.8 GB RSS. The stock React callback row
-also mixes steady-state rendering with deferred cleanup accumulation. Both
-measurements need clearer interpretation before becoming product claims or
-optimization projects.
+The clean review setup peaked near 15.8 GB RSS and a later Lean upgrade rebuild
+reached roughly 16.1 GB. This is a distinct maintenance and contributor-cost
+question. Cross-backend runtime evidence now belongs to L-004, while callback
+and React cleanup semantics belong to L-003.
 
 ## Scope
 
 - Reproduce fresh setup on a second machine and identify the dominant phase.
 - Measure a lower-parallelism path.
-- Split the React callback benchmark into cleanup-flushed steady state and an
-  intentional synchronous retention stress case.
-- Store comparable benchmark JSON, size reports, command metadata, and
-  checksums.
+- Record wall time, peak RSS, disk use, command metadata, and machine context.
 - Do not optimize unmeasured components as part of this card.
 
 ## Done When
@@ -38,12 +35,8 @@ optimization projects.
   dominant phase.
 - A documented lower-resource command either materially reduces the peak or
   the result records why it does not.
-- React steady-state samples no longer inherit deferred cleanup from earlier
-  samples.
-- The stress row remains explicit and asserts cleanup after yielding or
-  disposal.
-- `docs/PERFORMANCE.md` and `MAINTENANCE.md` state the resulting baseline and
-  review rule.
+- `docs/HARNESS.md` and `MAINTENANCE.md` state the resulting baseline,
+  lower-resource command, and review rule.
 
 ## Dependencies
 
@@ -62,9 +55,9 @@ but again reached approximately 16.1 GB peak RSS. Since then, repository-owned
 paired benchmarks, timed call phases, artifact identities, custom-inductive
 normalization measurements, and a standalone browser campaign application
 have substantially improved performance evidence. The second-machine and
-lower-resource setup results remain open. Lifecycle semantics and resource
-counts now belong to L-003; this card retains setup cost and comparable release
-baselines.
+lower-resource setup results remain open. On 2026-08-11 the cross-backend
+release evidence moved to L-004, and lifecycle/resource-count questions
+remained with L-003.
 
 ## Closure
 

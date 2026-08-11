@@ -2,7 +2,7 @@
 
 Status: Living
 Owner: VIR maintainers
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-13
 Validated baseline: Lean 4.33.0-rc2 at the
 [2026 project review](project-review/PROJECT_REVIEW.md)
 
@@ -84,14 +84,15 @@ The detailed API inventories remain in
 
 ## First Productization Pilot
 
-The first pilot, after the internal all-hands, remains the Lake/browser path.
+The first pilot, following the completed internal all-hands, remains the
+Lake/browser path.
 It is a learning pilot, not a declaration that the current binding API is
 stable. A real downstream project should:
 
 1. mark selected declarations;
 2. build a package through `:vir`;
 3. install an exact commit-matched SDK initially, and exercise a tagged SDK
-   once the binding/lifecycle gate permits the first release;
+  once the binding/lifecycle gate permits the first release;
 4. call one explicit export and execute one startup hook;
 5. deploy the result as a static browser application; and
 6. repeat the workflow after changing the package or SDK.
@@ -99,6 +100,12 @@ stable. A real downstream project should:
 The pilot is successful only if the user can repeat the workflow without the
 original guided session and if VIR has a clear advantage over the best
 available alternative at an acceptable support cost.
+
+The comparison against that alternative follows the multidimensional contract
+in [ALTERNATIVES.md](ALTERNATIVES.md): semantic parity, time to first correct
+result, warm execution, deployable size, memory, integration effort, and
+update behavior remain separate observations. The pilot does not inherit a
+universal winner from a microbenchmark.
 
 Execution is tracked by
 [L-002](project-review/cards/active/L-002-lake-browser-pilot.md). The product
@@ -119,6 +126,11 @@ Before the first release, an additional product signal is required: one
 coherent ownership and lifecycle contract should cover the representative DOM,
 callback, cancellation, reload, disposal, and React cases that the release
 claims to support.
+
+The all-hands added a second evidence requirement: accepted JS/VIR/FIR claims
+must come from frozen artifacts and a controlled, reproducible comparison
+protocol. That work is tracked by
+[L-004](project-review/cards/active/L-004-js-vir-fir-comparison.md).
 
 Repository demos, test breadth, and technical feasibility are necessary
 evidence, but they do not substitute for repeated user use.

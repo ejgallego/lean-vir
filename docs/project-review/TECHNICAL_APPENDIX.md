@@ -2,10 +2,80 @@
 
 This appendix records the evidence behind
 [the project review](PROJECT_REVIEW.md). Measurements are dated evidence, not
-performance promises. The 2026-08-10 refresh is current; the original
-2026-07-30 baseline remains below so that the review's evolution is auditable.
+performance promises. The 2026-08-13 landing reassessment is current; the
+2026-08-11, 2026-08-10, and original 2026-07-30 evidence remain below so that
+the review's evolution is auditable.
 
-## 2026-08-10 Current Refresh
+## 2026-08-13 Landing Reassessment
+
+| Item | Result |
+| --- | --- |
+| Commit | `15a4c5d3512e5bacebb845654422b72214b5c584` |
+| Delta from 2026-08-11 reassessment | 4 commits; 128 files; +11,354/-3,682 |
+| Differential fixture manifest | 101 entries |
+| Runtime test registry | 20 tests |
+| Native extern catalog | 477 entries: 466 Lean-derived symbols and 11 VIR overrides |
+| Runnable surface | 322,526/398,519 all IR; 29,354/36,887 public constants |
+| Main CI | [Passed](https://github.com/ejgallego/lean-vir/actions/runs/31591589285) |
+| Pages | [Passed](https://github.com/ejgallego/lean-vir/actions/runs/31591589169) |
+| Tags / GitHub releases | 0 / 0 |
+
+Four additional changes materially improve the review's recommended path:
+
+- PR #120 merged the generic example catalog and green source/build/pack/
+  import/parity candidate workflow. Reproducible artifact production is no
+  longer the comparison blocker.
+- PR #127 added project-owned native extern manifests while preserving static,
+  explicit lookup policy.
+- PR #131 retained interpreter constant and symbol caches across calls in one
+  package generation. This aligns execution with stateful Lean semantics and
+  makes pre-cache fresh-interpreter timings historical rather than current
+  browser baselines.
+- PR #126 generalized the runtime-boundary explorer and its schema/tests,
+  improving the auditability of built-in and client-specific native choices.
+
+The comparison priority therefore remains open but is narrower: approve the
+protocol, freeze post-cache artifacts and environment identity, run controlled
+campaigns, and publish a conditional scorecard. Draft PRs #129 and #130 may add
+useful JSON/Verso breadth; they do not gate the first accepted `prettyM`
+campaign. Draft PR #128 may publish the benchmark on Pages, but controlled
+evidence remains a separate acceptance condition.
+
+## 2026-08-11 Post-Presentation Reassessment
+
+| Item | Result |
+| --- | --- |
+| Commit | `9f69f1348da15274090d9074bbeded1eafc6b27a` |
+| Delta from 2026-08-10 refresh | 4 commits; 72 files; +8,949/-1,423 |
+| Differential fixture manifest | 101 entries |
+| Runtime test registry | 19 tests |
+| Native extern catalog | 474 entries: 464 Lean-derived symbols and 10 VIR overrides |
+| Main CI | [Passed](https://github.com/ejgallego/lean-vir/actions/runs/31504307194) |
+| Pages | [Passed](https://github.com/ejgallego/lean-vir/actions/runs/31504307101) |
+| Releases | None |
+
+The four merged changes add Float geometry externs, `ByteArray` runtime
+bindings, foreign-JavaScript resource lifetime hardening, and lean-zip deflate
+packages. PR #103 is therefore no longer a draft implementation dependency;
+its merged behavior is evidence for L-003's still-open public contract review.
+
+The all-hands' main feedback is an authoritative JavaScript/VIR/FIR comparison
+covering load latency, speed, size, and related operating costs. Existing main
+already captures semantic parity, cold startup, resource-load wall time,
+artifact bytes, execution phases, scaling, memory, and repeated calls. At this
+checkpoint, draft PR #120 extended exact example and artifact production. Its
+first candidate job built and validated the backend packages, then exposed an
+undefined `readJson` in the packer. The 2026-08-13 reassessment above records
+the corrected, merged, green path.
+
+The technical gap is therefore not basic instrumentation. It is a frozen
+method that distinguishes time to first correct result from warm execution,
+raw from deterministic compressed size, and VIR first-workload cost from its
+incremental-package and multi-workload amortized cost. L-004 owns that evidence
+contract. The 2026-08-10 Wasm size remains a historical baseline and must be
+refreshed under the new accounting rules before a release claim.
+
+## 2026-08-10 Previous Refresh
 
 Environment and repository:
 
@@ -89,7 +159,7 @@ native policy, initialization policy, and cross-entry cache state stay out of
 that first proposal. See
 [ULC-0001](../roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md).
 
-### Current draft disposition
+### Draft disposition at this checkpoint
 
 | PR | Current state | Review disposition |
 | --- | --- | --- |

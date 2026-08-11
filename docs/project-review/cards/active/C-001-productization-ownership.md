@@ -4,7 +4,7 @@ Type: Coordinate
 Status: Proposed
 Owner: Unassigned
 Contributors: None
-Milestone: All-hands
+Milestone: Pilot readiness
 Created: 2026-08-04
 Related: [maintenance](../../../MAINTENANCE.md), [roadmap](../../ROADMAP.md),
 [all-hands notes](../../ALL_HANDS_NOTES.md)
@@ -25,6 +25,9 @@ capacity, backup ownership, and support expectations remain unresolved.
 - Name one accountable VIR maintainer and one backup maintainer.
 - Name one user owner and one VIR owner for the Lake/browser pilot.
 - Name one reviewer for the binding and lifecycle contract.
+- Name one owner for the cross-backend comparison protocol and controlled
+  campaigns; record whether this is the same person as the benchmark-app
+  maintainer.
 - Agree on protected capacity for release, CI, support-contract, and pilot
   work.
 - Agree on escalation and six-week review points.
@@ -32,8 +35,8 @@ capacity, backup ownership, and support expectations remain unresolved.
 
 ## Done When
 
-- The maintainer, backup, pilot owners, and binding/lifecycle reviewer are
-  named, with overlaps made explicit.
+- The maintainer, backup, pilot owners, binding/lifecycle reviewer, and
+  comparison-evidence owner are named, with overlaps made explicit.
 - Each person accepts the responsibility and expected time window.
 - The release and pilot cards have accountable owners.
 - The maintenance document records the operating agreement.

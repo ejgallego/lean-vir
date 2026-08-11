@@ -1,14 +1,14 @@
 # D-001 — Recenter the all-hands message
 
 Type: Deliver
-Status: Proposed
+Status: Archived
 Owner: Unassigned
 Contributors: None
-Milestone: All-hands
+Milestone: All-hands (completed)
 Created: 2026-08-04
-Related: [project review](../../PROJECT_REVIEW.md),
-[alternatives](../../../ALTERNATIVES.md),
-[upstreaming](../../../UPSTREAMING.md)
+Related: [project review](../../../PROJECT_REVIEW.md),
+[alternatives](../../../../ALTERNATIVES.md),
+[upstreaming](../../../../UPSTREAMING.md)
 
 ## Outcome Sought
 
@@ -43,7 +43,7 @@ maintenance, and the pilot should support that story rather than dominate it.
 
 ## Dependencies
 
-- Confirm the meeting date and presenter.
+- None remaining.
 
 ## Evidence
 
@@ -51,13 +51,23 @@ The slide source and runbook were redrafted on 2026-08-04 around the agreed
 problem, usage, alternatives, upstreaming, and productization narrative. On
 2026-08-10 they were refreshed to the current 98-fixture/18-runtime baseline,
 real-browser CI, measured native frontier, five-backend comparison app,
-Illuminate workload, and real-environment provider experiment. They still
-require an accountable owner, timed rehearsals, and final meeting links.
+Illuminate workload, and real-environment provider experiment.
+
+The presentation was delivered before the 2026-08-11 reassessment. The main
+recorded audience feedback was the need for a clear, fair comparison of the
+JavaScript, VIR, and FIR implementations across load latency, execution speed,
+deployable size, and related operating costs.
 
 ## Closure
 
-Completed: Not yet
-Result: Not yet recorded
-Unexpected findings: None recorded
-Follow-up cards: None
-Durable documents updated: None
+Completed: 2026-08-11 (recorded; exact meeting date not captured)
+Result: The presentation established the shared architecture and alternatives
+model. Its strongest actionable feedback was to turn the existing benchmark
+machinery into an authoritative JS/VIR/FIR comparison contract.
+Unexpected findings: The audience's next question was not whether the three
+paths can run the same workload, but whether their cold-load, steady-state,
+size, and amortization trade-offs can be compared fairly.
+Follow-up cards:
+[L-004](../../active/L-004-js-vir-fir-comparison.md)
+Durable documents updated: `docs/ALTERNATIVES.md`, `docs/DECISIONS.md`,
+`docs/project-review/ALL_HANDS_NOTES.md`

@@ -2,7 +2,7 @@
 
 Status: Living
 Owner: VIR maintainers
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-13
 Technical source: [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md)
 
 ## Principle
