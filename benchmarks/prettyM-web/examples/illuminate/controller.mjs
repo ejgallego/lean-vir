@@ -7,8 +7,6 @@ export const view = {
   progress: "Preparing rehearsal artifacts…",
   artifacts: {
     root: "artifacts/illuminate",
-    tone: "rehearsal",
-    heading: "Local integration rehearsal",
     copy:
       "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
   },

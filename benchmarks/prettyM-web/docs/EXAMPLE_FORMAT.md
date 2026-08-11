@@ -59,6 +59,10 @@ is unchanged. FIR, LLVM, or other comparison artifacts use the common
 `browser-benchmarks/source-package/v1` output contract; their internal compiler
 commands remain producer-owned.
 
+Every packed payload path begins with `<example-id>/`, and the browser stages
+it under `artifacts/<example-id>/`. The shared stager replaces only that
+directory, so refreshing one client cannot delete another client's artifacts.
+
 ## Controller boundary
 
 `controller.mjs` is ordinary JavaScript. TypeScript may be used by a client,

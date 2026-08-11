@@ -6,11 +6,9 @@ export const view = {
     "Compare correctness, pipeline timings, scaling, and retained memory across five independently versioned implementations.",
   progress: "Preparing bounded artifact set…",
   artifacts: {
-    root: "artifacts",
-    tone: "verified",
-    heading: "Canonical bounded artifact set",
+    root: "artifacts/prettyM",
     copy:
-      "Reports remain tied to one verified, immutable set of independently versioned runtimes and workload packages.",
+      "When present, the manifest ties reports to one immutable set of independently versioned runtimes and workload packages.",
   },
   backendDescription:
     "Choose which implementations participate in the next run. Report views have their own non-destructive backend filter.",

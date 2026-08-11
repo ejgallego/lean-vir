@@ -30,6 +30,7 @@ import {
   validateSeed,
 } from "./artifact-set-lib.mjs";
 import {
+  checkoutReceipt,
   parsePathAssignment,
   readToolchainConfig,
   resolveBuildCheckoutPaths,
@@ -540,7 +541,7 @@ async function main() {
   await replaceSeed(nextSeed, seed);
 
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "browser-benchmarks/source-build-receipt",
     build: options.buildId,
     artifactSet: build.artifactSet.setId,
@@ -553,18 +554,26 @@ async function main() {
       file: relative(appRoot, examplePath),
       sha256: sha256(exampleBytes),
     },
-    toolchainConfig: toolchainConfig.path,
+    checkoutResolution: {
+      configUsed: toolchainConfig.path !== null,
+      checkoutOverrides: [...options.checkouts.keys()].sort(),
+      toolchainOverrides: [...options.toolchains.keys()].sort(),
+    },
     toolchains: Object.fromEntries(
       [...toolchainRoles].map(([name, checkoutId]) => [
         name,
         {
           checkout: checkoutId,
-          path: resolvedCheckouts[checkoutId].path,
-          revision: resolvedCheckouts[checkoutId].revision,
+          ...checkoutReceipt(resolvedCheckouts[checkoutId]),
         },
       ]),
     ),
-    sources: resolvedCheckouts,
+    sources: Object.fromEntries(
+      Object.entries(resolvedCheckouts).map(([checkoutId, checkout]) => [
+        checkoutId,
+        checkoutReceipt(checkout),
+      ]),
+    ),
     components: Object.fromEntries(
       order.map((componentId) => [
         componentId,

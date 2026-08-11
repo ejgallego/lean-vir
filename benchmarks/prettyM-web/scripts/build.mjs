@@ -12,7 +12,9 @@ const artifacts = join(appRoot, "artifacts");
 try {
   if (!(await stat(artifacts)).isDirectory()) throw new Error();
 } catch {
-  throw new Error("missing staged artifacts; run npm run stage first");
+  throw new Error(
+    "missing staged artifacts; run npm run artifacts:fetch or npm run stage -- SET first",
+  );
 }
 
 const catalog = await discoverExampleCatalog(appRoot);

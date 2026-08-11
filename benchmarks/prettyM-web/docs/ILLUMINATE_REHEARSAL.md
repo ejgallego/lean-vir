@@ -81,19 +81,20 @@ The catalog and artifact-set formats can now describe this workload without
 `prettyM`-specific paths or component names. FIR's full-action v3 producer now
 has the required caller-owned output contract. The remaining producer work is
 an equivalent selection-v4 export and an Illuminate/VIR module-set entry point
-that accepts controlled checkout roots plus a fresh output path. The latter is
-tracked in [`illuminate#44`](https://github.com/leanprover/illuminate/issues/44).
+that accepts controlled checkout roots plus a fresh output path. These inputs
+are not yet represented by a clean canonical build record.
 
 FIR's newer prepared HitScene handoff is not part of this artifact set. It is
 compiler-admission evidence only: it deliberately provides no Wasm binary,
 JavaScript adapter, input layout, or ownership contract.
 
-The application-side `illuminate` staging adapter is complete. It verifies the
-generic set, requires both FIR v3 and v4 plus all browser inputs below the
-`illuminate/` namespace, copies only manifest-declared files, preserves
-`ARTIFACT_SET.json` for report provenance, and replaces the staged directory
-atomically. The existing local rehearsal remains supported until the remaining
-producer request lands.
+The application now uses the same generic set stager for every example. It
+verifies the complete set, requires all members below the manifest's
+`illuminate/` namespace, copies only declared files, preserves
+`ARTIFACT_SET.json`, and atomically replaces only `artifacts/illuminate/`.
+Required client files belong in the future Illuminate catalog record rather
+than in application-side special cases. The existing local rehearsal remains
+supported until those producer entry points are catalogued.
 
 After those entry points land, add the `illuminate` record to
 `artifact-builds.json`, build it through `_sources/`, and replace this local

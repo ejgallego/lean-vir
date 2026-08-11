@@ -23,6 +23,7 @@ const selectedModule = selected
   : null;
 const view = selectedModule?.view ?? null;
 let controller = null;
+let artifactStatus = null;
 
 function element(id) {
   const found = document.querySelector(`#${id}`);
@@ -51,9 +52,11 @@ function requireView(example, value) {
   if (
     !value.artifacts ||
     typeof value.artifacts.root !== "string" ||
-    !value.artifacts.root.startsWith("artifacts")
+    value.artifacts.root !== `artifacts/${example.id}`
   ) {
-    throw new Error(`${example.id} view has no artifact root`);
+    throw new Error(
+      `${example.id} view artifact root must be artifacts/${example.id}`,
+    );
   }
   if (!Array.isArray(value.controls) || !Array.isArray(value.studies)) {
     throw new Error(`${example.id} view has no controls or studies`);
@@ -114,6 +117,54 @@ function renderStudies(selectedView) {
   }
 }
 
+function showArtifactStatus(status) {
+  const container = element("artifact-status");
+  container.dataset.tone = status.tone;
+  container.dataset.verified = String(status.verified);
+  element("artifact-status-heading").textContent = status.heading;
+  element("artifact-status-copy").textContent = status.copy;
+}
+
+async function inspectArtifactStatus(example, selectedView) {
+  const root = selectedView.artifacts.root.replace(/\/+$/, "");
+  const url = new URL(`../${root}/ARTIFACT_SET.json`, import.meta.url);
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const manifest = await response.json();
+    if (
+      manifest?.schemaVersion !== 2 ||
+      manifest?.kind !== "browser-benchmarks/artifact-set" ||
+      manifest?.example?.id !== example.id ||
+      typeof manifest?.setId !== "string"
+    ) {
+      throw new Error("manifest does not match the selected example");
+    }
+    return {
+      verified: true,
+      tone: "verified",
+      heading: `Verified artifact set · ${manifest.setId}`,
+      copy: selectedView.artifacts.copy,
+      setId: manifest.setId,
+      manifest,
+    };
+  } catch (error) {
+    const rehearsal = example.lifecycle === "rehearsal";
+    return {
+      verified: false,
+      tone: rehearsal ? "rehearsal" : "unverified",
+      heading: rehearsal
+        ? "Local integration rehearsal"
+        : "Unverified local artifacts",
+      copy: rehearsal
+        ? selectedView.artifacts.copy
+        : `${selectedView.artifacts.copy} No verified artifact-set manifest is staged.`,
+      setId: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function renderShell() {
   renderNavigation();
   if (!selected) {
@@ -139,9 +190,12 @@ function renderShell() {
   element("example-title").textContent = selected.title;
   element("example-intro").textContent = selectedView.intro;
   element("app-progress").textContent = selectedView.progress;
-  element("artifact-status").dataset.tone = selectedView.artifacts.tone;
-  element("artifact-status-heading").textContent = selectedView.artifacts.heading;
-  element("artifact-status-copy").textContent = selectedView.artifacts.copy;
+  showArtifactStatus({
+    verified: false,
+    tone: "checking",
+    heading: "Checking artifact manifest",
+    copy: selectedView.artifacts.copy,
+  });
   element("backend-description").textContent = selectedView.backendDescription;
   element("protocol-description").textContent = selectedView.protocolDescription;
   element("study-description").textContent = selectedView.studyDescription;
@@ -168,6 +222,8 @@ function loadScript(url) {
 async function boot() {
   if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
   const selectedView = requireView(selected, view);
+  artifactStatus = await inspectArtifactStatus(selected, selectedView);
+  showArtifactStatus(artifactStatus);
   for (const path of selectedView.bootstrap.externalScripts) {
     await loadScript(new URL(`../${path}`, import.meta.url).href);
   }
@@ -193,4 +249,5 @@ globalThis.__benchmarkApp = {
   examples: examples.map(({ id, title }) => ({ id, label: title })),
   ready: boot(),
   getController: () => controller,
+  getArtifactStatus: () => artifactStatus,
 };

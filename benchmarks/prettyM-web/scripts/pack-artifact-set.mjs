@@ -11,7 +11,12 @@ import {
   validateSeed,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
-import { artifactSetConfig, readBuildDatabase } from "./artifact-build-lib.mjs";
+import {
+  artifactSetConfig,
+  checkoutSources,
+  readBuildDatabase,
+} from "./artifact-build-lib.mjs";
+import { verifySourceBuildReceipt } from "./source-build-receipt-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -22,6 +27,7 @@ function parseArgs(argv) {
     build: null,
     outputDir: "_artifacts/releases",
     lock: null,
+    receipt: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -30,6 +36,7 @@ function parseArgs(argv) {
     else if (argument === "--build") options.build = argv[++index];
     else if (argument === "--output-dir") options.outputDir = argv[++index];
     else if (argument === "--lock") options.lock = argv[++index];
+    else if (argument === "--receipt") options.receipt = argv[++index];
     else if (argument === "--help" || argument === "-h") {
       console.log(`Usage: node scripts/pack-artifact-set.mjs [options]
 
@@ -40,7 +47,8 @@ Every input and output path must remain inside this application directory.
   --database PATH      canonical source/build database
   --build ID           database build to pack (required)
   --output-dir PATH    ignored release directory
-  --lock PATH          lockfile to write (default: catalogued build lock)`);
+  --lock PATH          lockfile to write (default: ignored release lock)
+  --receipt PATH       source receipt (default: build receipt)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
   }
@@ -65,14 +73,35 @@ async function main() {
   const outputDir = inside(appRoot, options.outputDir, "write release");
   const database = await readBuildDatabase(databasePath);
   const config = artifactSetConfig(database, options.build);
+  const receiptPath = inside(
+    appRoot,
+    options.receipt ?? `_artifacts/builds/${options.build}/BUILD.json`,
+    "read source-build receipt",
+  );
   const lockPath = inside(
     appRoot,
-    options.lock ?? config.lock,
+    options.lock ?? `_artifacts/releases/${config.setId}.lock.json`,
     "write lockfile",
   );
   if (config.schemaVersion !== 2) {
     throw new Error("unsupported artifact-set config or unsafe set ID");
   }
+
+  await verifySourceBuildReceipt({
+    receiptPath,
+    databasePath,
+    examplePath: inside(
+      appRoot,
+      `examples/${config.example.id}/example.json`,
+      "read example manifest",
+    ),
+    exampleId: config.example.id,
+    buildId: options.build,
+    setId: config.setId,
+    sources: checkoutSources(database, options.build),
+    components: database.builds[options.build].components,
+    seed,
+  });
 
   const metadata = await validateSeed(seed, config);
   const components = config.components;
@@ -147,7 +176,7 @@ async function main() {
 
   const componentManifestPaths = [];
   for (const [componentId, component] of Object.entries(components)) {
-    const path = `components/${componentId}.json`;
+    const path = `${config.example.id}/components/${componentId}.json`;
     const componentFiles = await fileRecords(
       assembly,
       Object.values(component.files),

@@ -257,6 +257,12 @@ html[data-active-example="catalog"] .example-nav a {
   border-color: color-mix(in srgb, #d7c45c 48%, #454e5e);
 }
 
+.artifact-status[data-tone="checking"],
+.artifact-status[data-tone="unverified"] {
+  background: color-mix(in srgb, #d87979 9%, #191d24);
+  border-color: color-mix(in srgb, #d87979 44%, #454e5e);
+}
+
 .artifact-status h2,
 .artifact-status p {
   margin-bottom: 0;
@@ -264,6 +270,10 @@ html[data-active-example="catalog"] .example-nav a {
 
 .artifact-status[data-tone="rehearsal"] h2 {
   color: #f4dc77;
+}
+
+.artifact-status[data-tone="unverified"] h2 {
+  color: #f09a9a;
 }
 
 .build-notes {

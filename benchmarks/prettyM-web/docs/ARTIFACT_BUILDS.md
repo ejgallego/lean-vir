@@ -3,8 +3,9 @@
 `examples/<id>/example.json` is the canonical declaration of each example's
 VIR targets and exports. `artifact-builds.json` selects exact Git sources, local
 checkout roles, producer dependencies, expected package files, artifact-set
-locks, and the provenance consumed by the packer. A VIR component names a
-`packageRef`; the driver resolves its target and exports from the example
+identity, and the provenance consumed by the packer. Accepted locks are
+separate consumer state. A VIR component names a `packageRef`; the driver
+resolves its target and exports from the example
 descriptor before validating or building it. `prettyM` is the first record; it
 is not a default baked into the catalog tools.
 
@@ -126,38 +127,39 @@ checksums, and copies only the declared regular files into the seed. It does not
 rewrite producer bytes. FIR LLVM depends on FIR native because its producer
 validates exact output equivalence against that package.
 
-The generated `_artifacts/builds/<build-id>/BUILD.json` is a local receipt. It
-records both the build-catalog and example-manifest digests, resolved checkout
-commits, adapters, and staged file hashes. It is evidence about one invocation,
-not a second source of build configuration and not part of the published
-artifact set.
+The generated `_artifacts/builds/<build-id>/BUILD.json` is a portable receipt.
+It records both the build-catalog and example-manifest digests, resolved source
+commits, adapters, and staged file hashes. Machine-local checkout and config
+paths are deliberately omitted because the receipt is included in the CI
+candidate payload. It is evidence about one invocation, not a second source of
+build configuration and not part of the published artifact set.
 
 ## Assemble the immutable set
 
 Serving and testing an accepted set does not invoke FIR or rebuild its Wasm.
-`artifact-set.lock.json` selects an immutable archive containing the FIR native
-and LLVM packages alongside the VIR package. `artifacts:fetch` verifies that
-archive and stages its declared members. `--toolchain` is only a source-build
-input used to produce a new seed or candidate. The current `local-prototype`
-lock has no download URL, so it still needs an explicit local `--archive`;
-publishing the CI archive and recording its immutable URL will remove that
-manual retrieval input.
+The accepted lock selects an immutable archive containing the FIR native and
+LLVM packages alongside the VIR package. `artifacts:fetch` verifies that
+archive and stages its declared example namespace. `--toolchain` is only a
+source-build input used to produce a new seed or candidate. Historical set
+0001 remains in `artifact-set.lock.json`; the refreshed catalog targets set
+0002 so changing FIR source does not redefine an existing set.
 
 The packer reads the same catalog record, so source provenance is no longer
-duplicated in a separate artifact-set config:
+duplicated in a separate artifact-set config. It also requires the corresponding
+source-build receipt before accepting `_artifacts/seed`:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
 npm run artifacts:fetch -- \
-  --lock artifact-set.lock.json \
+  --lock _artifacts/releases/prettyM-bounded-set-0002.lock.json \
   --archive _artifacts/releases/<archive>.tar
 npm test
 ```
 
 Building and packing remain separate. A newly generated producer byte changes
-the archive digest; it must be reviewed and validated before replacing a lock
-or benchmark report. Performance measurement is never part of this source
-build command.
+the archive digest; exactly one reviewed digest can be promoted for a new set
+ID. A published set ID is never reused for changed bytes. Performance
+measurement is never part of this source build command.
 
 The source-package v1 contract guarantees exact source identity and validated
 package output; it does not yet promise byte-for-byte reproducibility of every

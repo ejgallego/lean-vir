@@ -12,6 +12,7 @@ import {
   fileRecord,
   legacyPrettyMArtifactFiles,
   safeArchivePath,
+  sha256,
   sha256File,
   verifyArtifactSet,
 } from "../scripts/artifact-set-lib.mjs";
@@ -23,6 +24,7 @@ import {
   readBuildDatabase,
   validateBuildDatabase,
 } from "../scripts/artifact-build-lib.mjs";
+import { verifySourceBuildReceipt } from "../scripts/source-build-receipt-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const scratch = join(appRoot, "test-results", "artifact-set-unit");
@@ -35,7 +37,7 @@ test("the prettyM source build is complete and materializes pack provenance", as
   assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
   assert.deepEqual(
     artifactFiles(build),
-    [...legacyPrettyMArtifactFiles].sort(),
+    legacyPrettyMArtifactFiles.map((path) => `prettyM/${path}`).sort(),
   );
 
   const sources = checkoutSources(database, "prettyM");
@@ -54,11 +56,13 @@ test("the prettyM source build is complete and materializes pack provenance", as
 
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);
-  assert.deepEqual(config.example, {
-    id: "prettyM",
-    stageAdapter: "prettyM",
-  });
-  assert.equal(config.setId, "prettyM-bounded-set-0001");
+  assert.deepEqual(config.example, { id: "prettyM" });
+  assert.equal(config.setId, "prettyM-bounded-set-0002");
+  const acceptedLock = JSON.parse(
+    await readFile(join(appRoot, "artifact-set.lock.json"), "utf8"),
+  );
+  assert.equal(acceptedLock.setId, "prettyM-bounded-set-0001");
+  assert.notEqual(acceptedLock.setId, config.setId);
   assert.equal(
     config.components.vir.runtime.repository,
     "https://github.com/ejgallego/lean-vir",
@@ -80,9 +84,16 @@ test("catalog build identity and artifact paths are example-neutral", async () =
     join(appRoot, "artifact-builds.json"),
   );
   const alternate = structuredClone(database.builds.prettyM);
-  alternate.example = { id: "illuminate", stageAdapter: "illuminate" };
+  alternate.example = { id: "illuminate" };
   alternate.artifactSet.setId = "illuminate-player-set-0001";
-  alternate.artifactSet.lock = "illuminate-artifact-set.lock.json";
+  for (const component of Object.values(alternate.components)) {
+    component.producer.files = Object.fromEntries(
+      Object.entries(component.producer.files).map(([source, destination]) => [
+        source,
+        destination.replace(/^prettyM\//, "illuminate/"),
+      ]),
+    );
+  }
   alternate.components.vir.artifact.workload.file = "player.irpkg";
   alternate.components.vir.producer.files["player.irpkg"] =
     "illuminate/player.irpkg";
@@ -140,14 +151,111 @@ test("canonical JSON is independent of object insertion order", () => {
   );
 });
 
+test("source receipts bind portable provenance to staged bytes", async () => {
+  const directory = join(scratch, "source-receipt");
+  const seed = join(directory, "seed");
+  const databasePath = join(directory, "artifact-builds.json");
+  const examplePath = join(directory, "example.json");
+  const receiptPath = join(directory, "BUILD.json");
+  const artifactPath = "prettyM/runtime.wasm";
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(join(seed, "prettyM"), { recursive: true });
+  await writeFile(join(seed, artifactPath), "wasm\n");
+  await writeFile(databasePath, '{"catalog":true}\n');
+  await writeFile(examplePath, '{"example":true}\n');
+  const files = {
+    [artifactPath]: await fileRecord(join(seed, artifactPath)),
+  };
+  const sources = {
+    fir: {
+      id: "fir-pin",
+      repository: "https://example.test/fir",
+      revision: "a".repeat(40),
+    },
+  };
+  const components = {
+    native: {
+      producer: {
+        adapter: "fir-native",
+        files: { "runtime.wasm": artifactPath },
+      },
+    },
+  };
+  const receipt = {
+    schemaVersion: 2,
+    kind: "browser-benchmarks/source-build-receipt",
+    build: "prettyM",
+    artifactSet: "prettyM-bounded-set-0002",
+    database: {
+      file: "artifact-builds.json",
+      sha256: sha256(await readFile(databasePath)),
+    },
+    example: {
+      id: "prettyM",
+      file: "examples/prettyM/example.json",
+      sha256: sha256(await readFile(examplePath)),
+    },
+    checkoutResolution: {
+      configUsed: true,
+      checkoutOverrides: [],
+      toolchainOverrides: [],
+    },
+    toolchains: {},
+    sources: {
+      fir: {
+        sourceId: "fir-pin",
+        repository: "https://example.test/fir",
+        revision: "a".repeat(40),
+      },
+    },
+    components: {
+      native: { adapter: "fir-native", files },
+    },
+  };
+  await writeFile(receiptPath, canonicalJson(receipt));
+  assert.doesNotMatch(JSON.stringify(receipt), /\/home\//);
+  await assert.doesNotReject(() =>
+    verifySourceBuildReceipt({
+      receiptPath,
+      databasePath,
+      examplePath,
+      exampleId: "prettyM",
+      buildId: "prettyM",
+      setId: "prettyM-bounded-set-0002",
+      sources,
+      components,
+      seed,
+    }),
+  );
+  await writeFile(join(seed, artifactPath), "changed\n");
+  await assert.rejects(
+    () =>
+      verifySourceBuildReceipt({
+        receiptPath,
+        databasePath,
+        examplePath,
+        exampleId: "prettyM",
+        buildId: "prettyM",
+        setId: "prettyM-bounded-set-0002",
+        sources,
+        components,
+        seed,
+      }),
+    /file changed after validation/,
+  );
+});
+
 test("verifies an example-neutral artifact-set manifest", async () => {
   const directory = join(scratch, "generic-manifest");
   await rm(directory, { recursive: true, force: true });
-  await mkdir(join(directory, "payload"), { recursive: true });
-  await writeFile(join(directory, "payload", "player.wasm"), "wasm\n");
+  await mkdir(join(directory, "illuminate/payload"), { recursive: true });
+  await writeFile(
+    join(directory, "illuminate/payload/player.wasm"),
+    "wasm\n",
+  );
   const files = {
-    "payload/player.wasm": await fileRecord(
-      join(directory, "payload", "player.wasm"),
+    "illuminate/payload/player.wasm": await fileRecord(
+      join(directory, "illuminate/payload/player.wasm"),
     ),
   };
   await writeFile(
@@ -155,7 +263,7 @@ test("verifies an example-neutral artifact-set manifest", async () => {
     canonicalJson({
       schemaVersion: 2,
       kind: "browser-benchmarks/artifact-set",
-      example: { id: "illuminate", stageAdapter: "illuminate" },
+      example: { id: "illuminate" },
       setId: "illuminate-player-set-0001",
       components: {},
       files,
@@ -176,11 +284,16 @@ test("verifies an example-neutral artifact-set manifest", async () => {
   assert.equal(manifest.example.id, "illuminate");
 });
 
-test("stages a verified Illuminate artifact namespace atomically", async () => {
+test("stages a verified example namespace without replacing siblings", async () => {
   const directory = join(scratch, "illuminate-set");
-  const destination = join(scratch, "illuminate-staged");
+  const artifactsDir = join(scratch, "staged-examples");
+  const destination = join(artifactsDir, "illuminate");
   await rm(directory, { recursive: true, force: true });
-  await rm(destination, { recursive: true, force: true });
+  await rm(artifactsDir, { recursive: true, force: true });
+  await mkdir(join(artifactsDir, "prettyM"), { recursive: true });
+  await writeFile(join(artifactsDir, "prettyM/keep.txt"), "sibling\n");
+  await mkdir(destination, { recursive: true });
+  await writeFile(join(destination, "old.txt"), "old\n");
   const paths = [
     "illuminate/workload/anim_core.js",
     "illuminate/workload/vir-player-trace.mjs",
@@ -215,7 +328,7 @@ test("stages a verified Illuminate artifact namespace atomically", async () => {
     canonicalJson({
       schemaVersion: 2,
       kind: "browser-benchmarks/artifact-set",
-      example: { id: "illuminate", stageAdapter: "illuminate" },
+      example: { id: "illuminate" },
       setId: "illuminate-test-set",
       components: {},
       files,
@@ -236,10 +349,10 @@ test("stages a verified Illuminate artifact namespace atomically", async () => {
   const result = spawnSync(
     process.execPath,
     [
-      "scripts/stage-illuminate-artifacts.mjs",
+      "scripts/stage-artifact-set.mjs",
       relative(appRoot, directory),
-      "--destination",
-      relative(appRoot, destination),
+      "--artifacts-dir",
+      relative(appRoot, artifactsDir),
     ],
     { cwd: appRoot, encoding: "utf8" },
   );
@@ -253,6 +366,11 @@ test("stages a verified Illuminate artifact namespace atomically", async () => {
       .setId,
     "illuminate-test-set",
   );
+  assert.equal(
+    await readFile(join(artifactsDir, "prettyM/keep.txt"), "utf8"),
+    "sibling\n",
+  );
+  await assert.rejects(() => readFile(join(destination, "old.txt")), /ENOENT/);
 });
 
 test("rejects undeclared artifact-set members", async () => {

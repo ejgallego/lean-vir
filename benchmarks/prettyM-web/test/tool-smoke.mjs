@@ -12,7 +12,7 @@ const commands = [
   [process.execPath, ["scripts/build-artifact-candidate.mjs", "--help"]],
   [process.execPath, ["scripts/pack-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/fetch-artifact-set.mjs", "--help"]],
-  [process.execPath, ["scripts/stage-illuminate-artifacts.mjs", "--help"]],
+  [process.execPath, ["scripts/stage-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
   ["python3", ["scripts/run-campaign.py", "--help"]],
   ["python3", ["scripts/generate-observation-cards.py", "--help"]],
@@ -51,7 +51,7 @@ const buildList = spawnSync(
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(buildList.status, 0, buildList.stderr);
-assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0001$/m);
+assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0002$/m);
 
 const sourcePlan = spawnSync(
   process.execPath,

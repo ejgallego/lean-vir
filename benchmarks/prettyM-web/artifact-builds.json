@@ -21,12 +21,10 @@
   "builds": {
     "prettyM": {
       "example": {
-        "id": "prettyM",
-        "stageAdapter": "prettyM"
+        "id": "prettyM"
       },
       "artifactSet": {
-        "setId": "prettyM-bounded-set-0001",
-        "lock": "artifact-set.lock.json",
+        "setId": "prettyM-bounded-set-0002",
         "benchmarkContract": {
           "id": "prettyM-web/artifacts/v1",
           "input": "prettyM-compact-format/v1",
@@ -73,9 +71,9 @@
               "workload": "workload"
             },
             "files": {
-              "prettyM-vir.irpkg": "prettyM-vir.irpkg",
-              "lean-vir/js/vir-runtime.js": "lean-vir/js/vir-runtime.js",
-              "lean-vir/wasm/vir-upstream.wasm": "lean-vir/wasm/vir-upstream.wasm"
+              "prettyM-vir.irpkg": "prettyM/prettyM-vir.irpkg",
+              "lean-vir/js/vir-runtime.js": "prettyM/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "prettyM/lean-vir/wasm/vir-upstream.wasm"
             }
           }
         },
@@ -96,10 +94,10 @@
             "entrypoint": "integration/talos/artifact/package-pretty-format.sh",
             "manifest": "BUILD.json",
             "files": {
-              "BUILD.json": "lean-native/BUILD.json",
-              "prettyM-browser-adapter.mjs": "lean-native/prettyM-browser-adapter.mjs",
-              "prettyM.wasm": "lean-native/prettyM.wasm",
-              "prettyM.wasm.json": "lean-native/prettyM.wasm.json"
+              "BUILD.json": "prettyM/lean-native/BUILD.json",
+              "prettyM-browser-adapter.mjs": "prettyM/lean-native/prettyM-browser-adapter.mjs",
+              "prettyM.wasm": "prettyM/lean-native/prettyM.wasm",
+              "prettyM.wasm.json": "prettyM/lean-native/prettyM.wasm.json"
             }
           }
         },
@@ -128,13 +126,13 @@
             "entrypoint": "integration/lcnf-c-wasm/package-prettyM-emscripten.sh",
             "manifest": "prettyM.manifest.json",
             "files": {
-              "README.md": "lean-llvm/README.md",
-              "SHA256SUMS": "lean-llvm/SHA256SUMS",
-              "emscripten-loader.mjs": "lean-llvm/emscripten-loader.mjs",
-              "prettyM-emscripten-adapter.mjs": "lean-llvm/prettyM-emscripten-adapter.mjs",
-              "prettyM.manifest.json": "lean-llvm/prettyM.manifest.json",
-              "prettyM.mjs": "lean-llvm/prettyM.mjs",
-              "prettyM.wasm": "lean-llvm/prettyM.wasm"
+              "README.md": "prettyM/lean-llvm/README.md",
+              "SHA256SUMS": "prettyM/lean-llvm/SHA256SUMS",
+              "emscripten-loader.mjs": "prettyM/lean-llvm/emscripten-loader.mjs",
+              "prettyM-emscripten-adapter.mjs": "prettyM/lean-llvm/prettyM-emscripten-adapter.mjs",
+              "prettyM.manifest.json": "prettyM/lean-llvm/prettyM.manifest.json",
+              "prettyM.mjs": "prettyM/lean-llvm/prettyM.mjs",
+              "prettyM.wasm": "prettyM/lean-llvm/prettyM.wasm"
             }
           }
         }

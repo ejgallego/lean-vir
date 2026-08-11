@@ -41,9 +41,10 @@ slide DOM state.
 
 The example descriptors are canonical for VIR targets and exports. The
 committed `artifact-builds.json` supplies exact producer and workload Git
-revisions, producer dependencies, expected package files, lock paths, and
-artifact-set provenance. The build driver resolves each `packageRef` through
-the example descriptor before invoking the uniform VIR compiler. Local
+revisions, producer dependencies, expected package files, and artifact-set
+provenance. The accepted lock is separate consumer state. The build driver
+resolves each `packageRef` through the example descriptor before invoking the
+uniform VIR compiler. Local
 checkout paths are supplied on the command line and are never committed. See
 `docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
@@ -62,13 +63,15 @@ application or an artifact archive:
 npm run artifacts:sources -- prettyM
 ```
 
-The committed `artifact-set.lock.json` selects one immutable, compatible set.
-Binary artifacts and downloaded release archives remain ignored by Git. The
-current prototype lock has no public URL yet; assemble and consume it locally:
+The committed `artifact-set.lock.json` preserves historical set 0001. The
+refreshed FIR closure in the build catalog deliberately targets set 0002 rather
+than changing set 0001's meaning. Binary artifacts and downloaded release
+archives remain ignored by Git. Build and import a set-0002 candidate locally:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
 npm run artifacts:fetch -- \
+  --lock _artifacts/releases/prettyM-bounded-set-0002.lock.json \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
@@ -76,21 +79,23 @@ npm run artifacts:fetch -- \
 `artifacts:pack` consumes it with this layout:
 
 ```text
-lean-vir/js/vir-runtime.js
-lean-vir/wasm/vir-upstream.wasm
-prettyM-vir.irpkg
-lean-native/{BUILD.json,prettyM-browser-adapter.mjs,prettyM.wasm,prettyM.wasm.json}
-lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
-           prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
-           prettyM.mjs,prettyM.wasm}
+prettyM/lean-vir/js/vir-runtime.js
+prettyM/lean-vir/wasm/vir-upstream.wasm
+prettyM/prettyM-vir.irpkg
+prettyM/lean-native/{BUILD.json,prettyM-browser-adapter.mjs,
+                     prettyM.wasm,prettyM.wasm.json}
+prettyM/lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
+                   prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
+                   prettyM.mjs,prettyM.wasm}
 ```
 
 It writes a deterministic normalized tar, member checksums, an
 `ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
-`_artifacts/sets/`, and stages it. Every input, cache, set, and output path is
-restricted to this application directory.
+`_artifacts/sets/`, and atomically stages only `artifacts/<example-id>/`.
+Staging one example preserves every sibling. Every input, cache, set, and
+output path is restricted to this application directory.
 Source compilation caches remain in the explicitly selected producer
 checkouts; only declared package bytes cross into this application.
 
@@ -108,10 +113,9 @@ It never edits `artifact-set.lock.json` or publishes a release asset.
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
 workload. The browser only observes the common semantic input/output and timing
-contract. Set 0001 intentionally combines a VIR runtime and workload built with
-Lean 4.33.0-rc2 at the exact PR #104 head (`64e3078`) with native and LLVM
-bounded runtimes built with Lean 4.32. Five-backend parity is the compatibility
-gate; no cross-backend Lean heap values are exchanged.
+contract. Historical set 0001 remains immutable. Proposed set 0002 retains its
+VIR and workload pins while selecting merged FIR `298682a`. Five-backend parity
+is the compatibility gate; no cross-backend Lean heap values are exchanged.
 
 The current VIR package retains the historical
 `VersoSlides.Pretty.*ForVir` export names. They are declared in `src/config.js`
@@ -123,7 +127,9 @@ artifact refresh without changing the benchmark or dashboard APIs.
 
 ```sh
 npm install
-npm run artifacts:fetch
+npm run artifacts:fetch -- \
+  --lock /path/inside/this/app/to/set-0002.lock.json \
+  --archive /path/inside/this/app/to/set-0002.tar
 npm run build
 npm run dev
 ```
@@ -139,6 +145,8 @@ either format.
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction
 views, while downloaded JSON always retains every backend in the source report.
+Exported runtime profiles retain artifact pathnames and hashes but omit URL
+origins and query strings. They intentionally retain browser user-agent data.
 
 Run the browser regression with:
 
@@ -225,9 +233,11 @@ The complete local refresh is:
 npm run refresh
 ```
 
-It stages the installed locked set (or the validated in-tree seed), builds and serves the app,
-collects a report, refreshes cards, and runs a three-process campaign. It never
-publishes or reads artifact directories outside this application.
+It reuses the currently staged examples, builds and serves the app, collects a
+report, refreshes cards, and runs a three-process campaign. Pass
+`--artifact-set _artifacts/sets/<set-id>` to atomically stage one verified v2
+set first. It never publishes or reads artifact directories outside this
+application.
 
 ## Spin-off boundary
 

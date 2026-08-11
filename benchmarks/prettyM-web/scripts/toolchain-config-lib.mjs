@@ -60,6 +60,14 @@ export function toolchainForAdapter(adapter) {
   return null;
 }
 
+export function checkoutReceipt(checkout) {
+  return {
+    sourceId: checkout.sourceId,
+    repository: checkout.repository,
+    revision: checkout.revision,
+  };
+}
+
 export function producerToolchainRoles(build) {
   const roles = new Map();
   for (const component of Object.values(build.components)) {

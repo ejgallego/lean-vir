@@ -82,6 +82,13 @@ try {
     () => window.__illuminateBenchApp.ready,
   );
   assert.deepEqual(readiness, { readyCount: 3, backendCount: 3 });
+  assert.deepEqual(
+    await page.evaluate(() => {
+      const status = window.__benchmarkApp.getArtifactStatus();
+      return { verified: status.verified, tone: status.tone, setId: status.setId };
+    }),
+    { verified: false, tone: "rehearsal", setId: null },
+  );
   const backends = await page.evaluate(() =>
     window.__illuminateBenchApp.getBackends(),
   );

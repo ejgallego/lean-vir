@@ -136,33 +136,9 @@ async function main() {
   }
 
   if (options.stage) {
-    const stageAdapter =
-      manifest.kind === "prettyM-artifact-set"
-        ? "prettyM"
-        : manifest.example?.stageAdapter;
-    const stageAdapters = new Map([
-      [
-        "prettyM",
-        {
-          command: "bash",
-          script: resolve(appRoot, "scripts/stage-artifacts.sh"),
-        },
-      ],
-      [
-        "illuminate",
-        {
-          command: process.execPath,
-          script: resolve(appRoot, "scripts/stage-illuminate-artifacts.mjs"),
-        },
-      ],
-    ]);
-    const selected = stageAdapters.get(stageAdapter);
-    if (!selected) {
-      throw new Error(`unsupported artifact staging adapter: ${stageAdapter}`);
-    }
     const result = spawnSync(
-      selected.command,
-      [selected.script, destination],
+      process.execPath,
+      [resolve(appRoot, "scripts/stage-artifact-set.mjs"), destination],
       { cwd: appRoot, stdio: "inherit" },
     );
     if (result.status !== 0) {

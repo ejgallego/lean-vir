@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const hasVerifiedPrettyM = existsSync(
+  join(appRoot, "artifacts/prettyM/ARTIFACT_SET.json"),
+);
 const port = Number(process.env.BENCH_PORT ?? "18334");
 const url = `http://127.0.0.1:${port}`;
 const server = spawn(
@@ -108,6 +111,14 @@ try {
   );
   const readiness = await page.evaluate(() => window.__prettyBenchApp.ready);
   assert.deepEqual(readiness, { readyCount: 5, backendCount: 5 });
+  const artifactStatus = await page.evaluate(() =>
+    window.__benchmarkApp.getArtifactStatus(),
+  );
+  assert.equal(artifactStatus.verified, hasVerifiedPrettyM);
+  assert.equal(
+    await page.locator("#artifact-status").getAttribute("data-verified"),
+    String(hasVerifiedPrettyM),
+  );
   assert.equal(await page.evaluate(() => typeof window.Reveal), "undefined");
   assert.deepEqual(
     await page.evaluate(() => ({
@@ -144,16 +155,29 @@ try {
   assert.equal(report.passed, true);
   assert.equal(report.parityCount, 1);
   assert.equal(report.scenarioCount, 1);
-  assert.equal(
-    report.runtimeProfile.artifactSet.manifest.setId,
-    "prettyM-bounded-set-0001",
-  );
-  assert.equal(
-    report.runtimeProfile.artifactSet.manifest.components.vir.runtime
-      .sourceCommit,
-    "64e30784da16957cca92951344d776f895b30491",
-  );
+  if (hasVerifiedPrettyM) {
+    assert.equal(artifactStatus.setId, "prettyM-bounded-set-0002");
+    assert.equal(
+      report.runtimeProfile.artifactSet.manifest.setId,
+      "prettyM-bounded-set-0002",
+    );
+    assert.equal(
+      report.runtimeProfile.artifactSet.manifest.components.vir.runtime
+        .sourceCommit,
+      "64e30784da16957cca92951344d776f895b30491",
+    );
+  } else {
+    assert.equal(artifactStatus.tone, "unverified");
+    assert.equal(artifactStatus.setId, null);
+    assert.match(report.runtimeProfile.artifactSet.manifest.error, /HTTP 404/);
+  }
   assert.ok(report.runtimeProfile.backends.js.assetBytes > 0);
+  for (const profile of Object.values(report.runtimeProfile.backends)) {
+    for (const asset of profile.assets) {
+      assert.equal(Object.hasOwn(asset, "url"), false);
+      assert.equal(typeof asset.path, "string");
+    }
+  }
   assert.equal(await page.locator(".report-card").count(), 1);
   assert.equal(await page.locator("#open-dashboard").isEnabled(), true);
   await page.locator("#open-dashboard").click();

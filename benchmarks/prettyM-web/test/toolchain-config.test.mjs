@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
+  checkoutReceipt,
   parsePathAssignment,
   readToolchainConfig,
   resolveBuildCheckoutPaths,
@@ -51,6 +52,22 @@ test("parses default and named toolchain paths", () => {
       label: "--toolchain",
     }),
     { name: "vir", path: resolve("/controlled/vir") },
+  );
+});
+
+test("build receipts omit machine-local checkout paths", () => {
+  assert.deepEqual(
+    checkoutReceipt({
+      path: "/home/runner/private-checkout",
+      sourceId: "fir-prettyM",
+      repository: "https://github.com/ejgallego/lean-fir",
+      revision: "298682a766d80e90053d3e76ee2f3e4af78a52aa",
+    }),
+    {
+      sourceId: "fir-prettyM",
+      repository: "https://github.com/ejgallego/lean-fir",
+      revision: "298682a766d80e90053d3e76ee2f3e4af78a52aa",
+    },
   );
 });
 

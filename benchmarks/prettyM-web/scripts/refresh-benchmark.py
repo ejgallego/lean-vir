@@ -36,9 +36,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--campaign-runs", type=int, default=3)
     parser.add_argument("--port", type=int, default=18336)
     parser.add_argument(
-        "--skip-stage",
-        action="store_true",
-        help="reuse the current staged artifacts before rebuilding the app",
+        "--artifact-set",
+        type=Path,
+        help="verified namespaced set directory to stage before rebuilding",
     )
     parser.add_argument("--skip-campaign", action="store_true")
     return parser.parse_args()
@@ -142,8 +142,11 @@ def main() -> int:
         baseline_path = run_dir / "baseline.json"
         shutil.copyfile(report_path, baseline_path)
 
-    if not args.skip_stage:
-        run(["npm", "run", "stage"])
+    if args.artifact_set:
+        artifact_set = workspace_path(args.artifact_set, "read")
+        if not artifact_set.is_dir():
+            raise SystemExit(f"artifact set is not a directory: {artifact_set}")
+        run(["npm", "run", "stage", "--", relative(artifact_set)])
     run(["npm", "run", "build"])
 
     server_log = run_dir / "server.log"

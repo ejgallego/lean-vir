@@ -42,7 +42,8 @@ _artifacts/
   releases/             deterministic tar and inspection files
   downloads/            verified download cache
   sets/<set-id>/        verified extracted immutable sets
-artifacts/               currently staged browser inputs
+artifacts/
+  <example-id>/          one independently staged example
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
@@ -55,8 +56,12 @@ source-build catalog and its selected lockfiles are committed.
    `_sources/` layout with `artifacts:sources`, or select existing FIR/VIR
    producer checkouts with `--toolchain [NAME=]PATH` or a toolchain config.
    Run the source builder for the selected `BUILD`; see `ARTIFACT_BUILDS.md`.
-2. Review the source-build receipt and validated `_artifacts/seed/`.
-3. Run `npm run artifacts:pack -- --build BUILD`.
+2. Review the portable source-build receipt and validated `_artifacts/seed/`.
+   The packer refuses a seed whose catalog, example, source pins, adapters, or
+   file hashes differ from that receipt.
+3. Run `npm run artifacts:pack -- --build BUILD`. By default its candidate
+   lock is written below ignored `_artifacts/releases/`; writing a tracked lock
+   always requires an explicit `--lock`.
 4. Review the generated manifest under `_artifacts/releases/`.
 5. Import the generated tar through the same consumer path:
 
@@ -92,8 +97,8 @@ Upload these three files to a prerelease owned by the benchmark project:
 Never replace those assets and never point the lockfile at a mutable `latest`
 URL. After upload:
 
-1. Set `archive.url` in the build's catalogued lockfile to the exact HTTPS
-   release asset URL.
+1. Copy the reviewed candidate lock to the application's accepted lock and set
+   `archive.url` to the exact HTTPS release asset URL.
 2. Change `status` to `published`; do not change any digest or byte count.
 3. Open a lockfile PR. CI runs `npm run artifacts:fetch` and `npm test` from a
    clean clone.
@@ -114,8 +119,14 @@ checksums, and truncated members. It then rejects undeclared files, verifies
 the manifest digest, recomputes `SHA256SUMS`, and verifies every member size and
 digest before atomically installing the set.
 
-The staged top-level manifest is copied into the built site. Reports should
-record its set ID and digest in addition to the browser-observed asset hashes.
+The generic stager requires every payload member to live below the manifest's
+`<example-id>/` namespace. It replaces only `artifacts/<example-id>/`, copies
+the verified manifest into that directory, and preserves sibling examples.
+The browser derives stage-time verification status from this copied manifest;
+it does not independently rehash the whole set on page load. Missing manifests
+are shown as rehearsal or unverified local state. Example reports retain the
+manifest provenance; prettyM runtime profiles additionally hash the manifest
+and every browser-observed runtime asset.
 
 ## Set 0001
 
@@ -125,3 +136,13 @@ interpreter and `prettyM` IR package use Lean 4.33.0-rc2 and the exact prototype
 commit `64e30784da16957cca92951344d776f895b30491`, built with WASI SDK 33. Native
 FIR and LLVM/Emscripten each carry Lean 4.32. Their isolation is explicit in
 the component-local `lean`, `runtime`, and `workload` manifest fields.
+
+Set 0001 is historical and must not be regenerated or assigned new source
+bytes. Its committed lock remains `local-prototype` and has no public URL.
+
+## Proposed set 0002
+
+`prettyM-bounded-set-0002` is the candidate identity for the refreshed source
+closure. It retains VIR `64e3078` and the Verso Slides workload `c16a6f8`, uses
+merged FIR `298682a`, and places every payload below `prettyM/`. Only one
+reviewed candidate digest may be promoted under this identity.

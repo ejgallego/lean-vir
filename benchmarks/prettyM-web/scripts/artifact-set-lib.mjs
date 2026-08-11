@@ -297,11 +297,19 @@ export async function verifyArtifactSet(directory, lock = null) {
         throw new Error(`manifest omits required file: ${path}`);
     }
   } else if (
-    !manifest.example?.id ||
-    !manifest.example?.stageAdapter ||
+    typeof manifest.example?.id !== "string" ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifest.example.id) ||
     Object.keys(manifest.files ?? {}).length === 0
   ) {
     throw new Error("artifact-set manifest omits its example or files");
+  } else if (
+    Object.keys(manifest.files).some(
+      (path) => !path.startsWith(`${manifest.example.id}/`),
+    )
+  ) {
+    throw new Error(
+      `artifact-set files must use the ${manifest.example.id}/ namespace`,
+    );
   }
 
   const checksummedPaths = [

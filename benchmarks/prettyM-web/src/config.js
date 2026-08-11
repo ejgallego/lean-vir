@@ -4,7 +4,7 @@
 
   var params = new URLSearchParams(window.location.search);
   var artifactBase = new URL(
-    params.get("artifacts") || "artifacts/",
+    params.get("artifacts") || "artifacts/prettyM/",
     window.location.href,
   );
   var fetchCache = params.get("cache") === "default" ? "default" : "no-store";

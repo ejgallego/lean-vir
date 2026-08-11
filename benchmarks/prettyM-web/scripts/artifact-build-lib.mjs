@@ -148,14 +148,15 @@ export function validateBuildDatabase(database) {
     identifier(buildId, "build ID");
     object(build, `build ${buildId}`);
     const example = object(build.example, `build ${buildId} example`);
-    identifier(example.id, `build ${buildId} example ID`);
-    identifier(example.stageAdapter, `build ${buildId} stage adapter`);
+    if (
+      Object.keys(example).length !== 1 ||
+      !Object.hasOwn(example, "id")
+    ) {
+      throw new Error(`build ${buildId} example must contain only its ID`);
+    }
+    const exampleId = identifier(example.id, `build ${buildId} example ID`);
     object(build.artifactSet, `build ${buildId} artifactSet`);
     identifier(build.artifactSet.setId, `build ${buildId} artifact set ID`);
-    safeArchivePath(build.artifactSet.lock);
-    if (!build.artifactSet.lock.endsWith(".json")) {
-      throw new Error(`build ${buildId} has an unsafe artifact lock path`);
-    }
     object(
       build.artifactSet.benchmarkContract,
       `build ${buildId} benchmark contract`,
@@ -207,6 +208,11 @@ export function validateBuildDatabase(database) {
       for (const [packagePath, destination] of Object.entries(producer.files)) {
         safeArchivePath(packagePath);
         safeArchivePath(destination);
+        if (!destination.startsWith(`${exampleId}/`)) {
+          throw new Error(
+            `component ${componentId} output must use the ${exampleId}/ namespace`,
+          );
+        }
         if (destinations.has(destination)) {
           throw new Error(`multiple producers provide ${destination}`);
         }
@@ -287,7 +293,6 @@ export function artifactSetConfig(database, buildId) {
     schemaVersion: 2,
     example: structuredClone(build.example),
     setId: build.artifactSet.setId,
-    lock: build.artifactSet.lock,
     benchmarkContract: structuredClone(build.artifactSet.benchmarkContract),
     components: Object.fromEntries(
       Object.entries(build.components).map(([componentId, component]) => [

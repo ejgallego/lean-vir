@@ -1897,9 +1897,10 @@ async function collectPrettyRuntimeProfile(backendIds) {
         return response.arrayBuffer();
       })
       .then(async function (bytes) {
+        var parsed = new URL(url);
         return {
-          url: url,
-          file: new URL(url).pathname.split("/").pop() || url,
+          path: parsed.pathname,
+          file: parsed.pathname.split("/").pop() || parsed.pathname,
           byteLength: bytes.byteLength,
           sha256: await prettySha256(bytes),
           wasm: new URL(url).pathname.endsWith(".wasm"),
@@ -1916,9 +1917,10 @@ async function collectPrettyRuntimeProfile(backendIds) {
         };
       })
       .catch(function (error) {
+        var parsed = new URL(url);
         return {
-          url: url,
-          file: new URL(url).pathname.split("/").pop() || url,
+          path: parsed.pathname,
+          file: parsed.pathname.split("/").pop() || parsed.pathname,
           error: error instanceof Error ? error.message : String(error),
         };
       });
