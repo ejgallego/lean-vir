@@ -7,7 +7,10 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateSurfaceReport } from "./surface-report-schema.mjs";
+import {
+  aggregateSurfaceDeclarations,
+  validateSurfaceReport,
+} from "./surface-report-schema.mjs";
 import {
   emptySurfaceReportV3,
   nativeExternFixture,
@@ -84,6 +87,16 @@ test("surface schema rejects incomplete target provenance", () => {
   assert.throws(() => validateSurfaceReport(report), /invalid rootGraphSha256/);
 });
 
+test("surface schema rejects module and library aggregate drift", () => {
+  const badModule = singleDeclarationReport();
+  badModule.modules[0].counts.runnable = 2;
+  assert.throws(() => validateSurfaceReport(badModule), /module aggregates/);
+
+  const badLibrary = singleDeclarationReport();
+  badLibrary.libraries[0].modulesWithFunctions = 2;
+  assert.throws(() => validateSurfaceReport(badLibrary), /library aggregates/);
+});
+
 function singleDeclarationReport(blocked = false) {
   const name = "Smoke.entry";
   const blocker = { kind: "missingExtern", name: "IO.test" };
@@ -102,6 +115,18 @@ function singleDeclarationReport(blocked = false) {
     exampleRoot: name,
     examplePath: path,
   };
+  const declarations = [{
+    name,
+    module: "Smoke",
+    kind: "publicConstant",
+    runnable: !blocked,
+    blocker: blocked ? blocker : null,
+    blockerPath: blocked ? path : [],
+    type: null,
+    doc: null,
+    ...(blocked ? { blockers: [{ blocker, path }] } : {}),
+  }];
+  const { modules, libraries } = aggregateSurfaceDeclarations(declarations);
   return emptySurfaceReportV3({
     definition: surfaceDefinition(blocked),
     selectedModules: ["Smoke"],
@@ -110,17 +135,9 @@ function singleDeclarationReport(blocked = false) {
     counts,
     primaryBlockers: blocked ? [summary] : [],
     ...(blocked ? { reachableBlockers: [summary] } : {}),
-    declarations: [{
-      name,
-      module: "Smoke",
-      kind: "publicConstant",
-      runnable: !blocked,
-      blocker: blocked ? blocker : null,
-      blockerPath: blocked ? path : [],
-      type: null,
-      doc: null,
-      ...(blocked ? { blockers: [{ blocker, path }] } : {}),
-    }],
+    modules,
+    libraries,
+    declarations,
   });
 }
 

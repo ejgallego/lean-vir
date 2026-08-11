@@ -21,6 +21,56 @@ const BLOCKER_KINDS = new Set([
 const EXTERN_STATUSES = new Set(["native", "host", "missing", "incompatible"]);
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
+export function isSha256(value) {
+  return typeof value === "string" && SHA256_PATTERN.test(value);
+}
+
+export function isSurfaceAbi(abi) {
+  return abi && Array.isArray(abi.params)
+    && abi.params.every((param) => typeof param?.borrow === "boolean"
+      && typeof param.type === "string" && param.type.length > 0)
+    && typeof abi.resultType === "string"
+    && abi.resultType.length > 0;
+}
+
+export function surfaceAbiMatchesCapability(abi, capability) {
+  return isSurfaceAbi(abi)
+    && abi.resultType === capability?.resultType
+    && Array.isArray(capability?.params)
+    && abi.params.length === capability.params.length
+    && abi.params.every((param, index) => param.borrow === capability.params[index].borrow
+      && param.type === capability.params[index].type);
+}
+
+export function aggregateSurfaceDeclarations(declarations) {
+  const counts = emptyCounts();
+  const byModule = new Map();
+  for (const declaration of declarations) {
+    addDeclarationCount(counts, declaration);
+    const moduleCounts = byModule.get(declaration.module) ?? emptyCounts();
+    addDeclarationCount(moduleCounts, declaration);
+    byModule.set(declaration.module, moduleCounts);
+  }
+  const modules = [...byModule]
+    .map(([name, moduleCounts]) => ({ name, counts: moduleCounts }))
+    .sort((lhs, rhs) => compareText(lhs.name, rhs.name));
+  const byLibrary = new Map();
+  for (const module of modules) {
+    const name = module.name.split(".", 1)[0];
+    const library = byLibrary.get(name) ?? {
+      name,
+      modulesWithFunctions: 0,
+      counts: emptyCounts(),
+    };
+    library.modulesWithFunctions += 1;
+    addCounts(library.counts, module.counts);
+    byLibrary.set(name, library);
+  }
+  const libraries = [...byLibrary.values()]
+    .sort((lhs, rhs) => compareText(lhs.name, rhs.name));
+  return { counts, modules, libraries };
+}
+
 export function hasCompleteBlockerFrontier(report) {
   return report?.definition?.completeBlockerFrontier === true
     && Array.isArray(report.reachableBlockers);
@@ -91,7 +141,7 @@ export function validateSurfaceReport(
     validateUniqueStrings(value.selectedDeclarations, `${label}: selected declarations`);
     validateUniqueStrings(primitiveNamespaces, `${label}: primitive namespaces`);
     validateNativeExterns(nativeExterns, label);
-    if (value.capture !== undefined) validateCapture(value.capture, label);
+    if (value.capture !== undefined) validateCapture(value.capture, nativeExterns, label);
   }
   if (value.closure !== undefined) {
     const { selectedRoots, capturedNodes, rootReachableNodes, supportOnlyNodes } = value.closure;
@@ -142,6 +192,7 @@ export function validateSurfaceReport(
       );
     }
     validateExterns(value.externs, value.runtimeCapabilities.nativeExterns, label);
+    validateAggregateRecords(value, label);
   }
   return value;
 }
@@ -191,7 +242,6 @@ function validateDeclarations(declarations, completeFrontier, expectedCounts, la
   const declarationNames = new Set();
   const primaryBlockers = new Map();
   const reachableBlockers = new Map();
-  const actualCounts = Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0]));
   for (const declaration of declarations) {
     if (typeof declaration?.name !== "string" || declaration.name.length === 0
         || typeof declaration.module !== "string" || declaration.module.length === 0
@@ -206,16 +256,11 @@ function validateDeclarations(declarations, completeFrontier, expectedCounts, la
       throw new Error(`${label}: declaration names must be unique`);
     }
     declarationNames.add(declaration.name);
-    actualCounts.total += 1;
-    actualCounts[declarationKindCount(declaration.kind)] += 1;
     if (declaration.runnable) {
-      actualCounts.runnable += 1;
-      if (declaration.kind === "publicConstant") actualCounts.publicRunnable += 1;
       if (declaration.blocker !== null || declaration.blockerPath.length !== 0) {
         throw new Error(`${label}: declaration ${JSON.stringify(declaration.name)} has inconsistent runnable status`);
       }
     } else {
-      actualCounts.blocked += 1;
       validateBlockerPath(declaration.blocker, declaration.blockerPath, declaration.name, label);
       incrementBlockerCount(primaryBlockers, declaration.blocker, declaration.kind);
     }
@@ -246,7 +291,8 @@ function validateDeclarations(declarations, completeFrontier, expectedCounts, la
       }
     }
   }
-  if (COUNT_FIELDS.some((field) => actualCounts[field] !== expectedCounts[field])) {
+  const actualCounts = aggregateSurfaceDeclarations(declarations).counts;
+  if (!sameCounts(actualCounts, expectedCounts)) {
     throw new Error(`${label}: declaration records do not match aggregate counts`);
   }
   return { declarationNames, primaryBlockers, reachableBlockers };
@@ -266,9 +312,8 @@ function validateExterns(externs, nativeExterns, label) {
         || !nullableString(entry.doc)
         || capabilityStatus !== Boolean(capability)
         || (entry.status === "incompatible"
-          && (!validComparedAbi(entry.targetAbi)
-            || !validComparedAbi(entry.capabilityAbi)
-            || !sameCapabilityAbi(entry.capabilityAbi, capability)))) {
+          && (!isSurfaceAbi(entry.targetAbi)
+            || !surfaceAbiMatchesCapability(entry.capabilityAbi, capability)))) {
       throw new Error(`${label}: invalid extern record ${JSON.stringify(entry.name)}`);
     }
   }
@@ -319,21 +364,6 @@ function validPath(path, root, blocker) {
     && path.at(-1) === blocker;
 }
 
-function validComparedAbi(abi) {
-  return abi && Array.isArray(abi.params)
-    && abi.params.every((param) => typeof param?.borrow === "boolean"
-      && typeof param.type === "string" && param.type.length > 0)
-    && typeof abi.resultType === "string"
-    && abi.resultType.length > 0;
-}
-
-function sameCapabilityAbi(abi, capability) {
-  return abi.resultType === capability.resultType
-    && abi.params.length === capability.params.length
-    && abi.params.every((param, index) => param.borrow === capability.params[index].borrow
-      && param.type === capability.params[index].type);
-}
-
 function validExternTarget(target) {
   if (target?.kind === "standard" || target?.kind === "inline") {
     return typeof target.backend === "string" && target.backend.length > 0
@@ -350,15 +380,6 @@ function nullableString(value) {
   return value === null || typeof value === "string";
 }
 
-function declarationKindCount(kind) {
-  return {
-    publicConstant: "publicTotal",
-    privateConstant: "privateTotal",
-    boxed: "boxedTotal",
-    generated: "generatedTotal",
-  }[kind];
-}
-
 function incrementBlockerCount(counts, blocker, declarationKind) {
   const key = blockerKey(blocker);
   const current = counts.get(key) ?? { roots: 0, publicRoots: 0 };
@@ -371,7 +392,7 @@ function blockerKey(blocker) {
   return `${blocker?.kind}\u0000${blocker?.name}`;
 }
 
-function validateCapture(capture, label) {
+function validateCapture(capture, nativeExterns, label) {
   if (capture?.mode !== "targetToolchainSource") {
     throw new Error(`${label}: unsupported capture mode ${JSON.stringify(capture?.mode)}`);
   }
@@ -381,7 +402,7 @@ function validateCapture(capture, label) {
     }
   }
   for (const field of ["sourceSha256", "graphSha256", "rootGraphSha256"]) {
-    if (typeof capture[field] !== "string" || !SHA256_PATTERN.test(capture[field])) {
+    if (!isSha256(capture[field])) {
       throw new Error(`${label}: target capture has invalid ${field}`);
     }
   }
@@ -391,6 +412,72 @@ function validateCapture(capture, label) {
     throw new Error(`${label}: target capture has invalid graph metadata`);
   }
   validateUniqueStrings(capture.supportRoots, `${label}: capture support roots`);
+  if (capture.clientNativeExternManifest !== undefined) {
+    const profile = capture.clientNativeExternManifest;
+    if (typeof profile?.source !== "string" || profile.source.length === 0
+        || !isSha256(profile.sha256)
+        || !Array.isArray(profile.externs)) {
+      throw new Error(`${label}: invalid client-native extern manifest provenance`);
+    }
+    validateUniqueStrings(profile.externs, `${label}: client-native extern manifest`);
+    const capabilities = new Map(nativeExterns.map((entry) => [entry.name, entry]));
+    if (profile.externs.length === 0 || profile.externs.some((name) =>
+      capabilities.get(name)?.generateBoxedWrapper !== true)) {
+      throw new Error(`${label}: client-native extern manifest does not match capabilities`);
+    }
+  }
+}
+
+function validateAggregateRecords(report, label) {
+  const expected = aggregateSurfaceDeclarations(report.declarations);
+  validateNamedCounts(report.modules, expected.modules, "module", label);
+  validateNamedCounts(report.libraries, expected.libraries, "library", label, true);
+}
+
+function validateNamedCounts(actual, expected, kind, label, libraries = false) {
+  validateUniqueStrings(actual.map((entry) => entry?.name), `${label}: ${kind} names`);
+  const expectedByName = new Map(expected.map((entry) => [entry.name, entry]));
+  if (actual.length !== expected.length || actual.some((entry) => {
+    const expectedEntry = expectedByName.get(entry.name);
+    return !entry?.counts || !expectedEntry || !sameCounts(entry.counts, expectedEntry.counts)
+      || (libraries && entry.modulesWithFunctions !== expectedEntry.modulesWithFunctions);
+  })) {
+    throw new Error(`${label}: ${kind} aggregates do not match declaration records`);
+  }
+}
+
+function emptyCounts() {
+  return Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0]));
+}
+
+function addDeclarationCount(counts, declaration) {
+  counts.total += 1;
+  if (declaration.runnable) {
+    counts.runnable += 1;
+  } else {
+    counts.blocked += 1;
+  }
+  const field = {
+    publicConstant: "publicTotal",
+    privateConstant: "privateTotal",
+    boxed: "boxedTotal",
+    generated: "generatedTotal",
+  }[declaration.kind];
+  if (field === undefined) throw new Error(`unknown declaration kind ${JSON.stringify(declaration.kind)}`);
+  counts[field] += 1;
+  if (declaration.runnable && declaration.kind === "publicConstant") counts.publicRunnable += 1;
+}
+
+function addCounts(target, source) {
+  for (const field of COUNT_FIELDS) target[field] += source[field];
+}
+
+function sameCounts(lhs, rhs) {
+  return COUNT_FIELDS.every((field) => lhs[field] === rhs[field]);
+}
+
+function compareText(lhs, rhs) {
+  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }
 
 function versionList(versions) {

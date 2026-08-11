@@ -11,6 +11,10 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { fileURLToPath } from "node:url";
 
 import { analyzeSurfaceGraph, renderTargetSurfaceMarkdown } from "./analyze-surface-graph.mjs";
+import {
+  addClientNativeSurfaceCapabilities,
+  parseClientNativeSurfaceProfile,
+} from "./client-native-surface-profile.mjs";
 import { runAsync } from "./process-utils.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -23,9 +27,21 @@ const outputPrefix = resolve(options.outputPrefix);
 const graphPath = `${outputPrefix}.graph.json`;
 const jsonPath = `${outputPrefix}.json`;
 const markdownPath = `${outputPrefix}.md`;
+const manifestOption = options.nativeExternManifest ?? process.env.VIR_NATIVE_EXTERN_MANIFEST;
+if (manifestOption === "") throw new Error("VIR_NATIVE_EXTERN_MANIFEST must not be empty");
+const manifestPath = manifestOption
+  ? isAbsolute(manifestOption) ? manifestOption : resolve(project, manifestOption)
+  : null;
 const temporary = await mkdtemp(join(tmpdir(), "vir-target-surface-"));
 
 try {
+  const manifestBytes = manifestPath ? await readFile(manifestPath) : null;
+  const clientNativeProfile = manifestBytes
+    ? parseClientNativeSurfaceProfile(
+      JSON.parse(manifestBytes.toString("utf8")),
+      portableSourceLabel(project, manifestPath),
+    )
+    : null;
   const capabilitiesPath = join(temporary, "capabilities.json");
   const capabilityMarkdownPath = join(temporary, "capabilities.md");
   await runChecked(
@@ -38,9 +54,10 @@ try {
     ],
     repoRoot,
   );
-  const capabilities = JSON.parse(await readFile(capabilitiesPath, "utf8"));
+  let capabilities = JSON.parse(await readFile(capabilitiesPath, "utf8"));
   const supportRoots = [...new Set(
-    capabilities.runtimeCapabilities.nativeExterns.flatMap((entry) => entry.deps ?? []),
+    capabilities.runtimeCapabilities.nativeExterns.flatMap((entry) => entry.deps ?? [])
+      .concat(clientNativeProfile?.externs ?? []),
   )].sort(compareText);
   await mkdir(dirname(graphPath), { recursive: true });
   const exporterArgs = [
@@ -59,7 +76,19 @@ try {
   await writeFile(graphPath, graphBytes);
   const graphSha256 = createHash("sha256").update(graphBytes).digest("hex");
   const sourceSha256 = createHash("sha256").update(await readFile(sourcePath)).digest("hex");
-  const report = analyzeSurfaceGraph(graph, capabilities, { graphSha256, sourceSha256 });
+  const clientNativeExternManifest = clientNativeProfile ? {
+    source: portableSourceLabel(project, manifestPath),
+    sha256: createHash("sha256").update(manifestBytes).digest("hex"),
+    externs: clientNativeProfile.externs,
+  } : null;
+  if (clientNativeProfile) {
+    capabilities = addClientNativeSurfaceCapabilities(capabilities, graph, clientNativeProfile);
+  }
+  const report = analyzeSurfaceGraph(graph, capabilities, {
+    graphSha256,
+    sourceSha256,
+    ...(clientNativeExternManifest ? { clientNativeExternManifest } : {}),
+  });
   await Promise.all([
     writeFile(jsonPath, `${JSON.stringify(report)}\n`),
     writeFile(markdownPath, renderTargetSurfaceMarkdown(report)),
@@ -77,7 +106,10 @@ function parseArgs(args) {
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     const value = args[index + 1];
-    if (["--project", "--source", "--module", "--root", "--output-prefix"].includes(argument)) {
+    if ([
+      "--project", "--source", "--module", "--root", "--output-prefix",
+      "--native-extern-manifest",
+    ].includes(argument)) {
       if (!value) usage(`missing value for ${argument}`);
       index += 1;
       if (argument === "--root") options.roots.push(value);
@@ -97,7 +129,8 @@ function usage(error) {
   if (error) console.error(error);
   console.error(
     "usage: capture-target-surface.mjs --project <lake-project> --source <file.lean> "
-      + "--module <Lean.Module> --root <Lean.Name>... --output-prefix <path>",
+      + "--module <Lean.Module> --root <Lean.Name>... --output-prefix <path> "
+      + "[--native-extern-manifest <lean-vir-native-externs.json>]",
   );
   process.exit(2);
 }

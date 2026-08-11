@@ -24,6 +24,9 @@ const sourceJsonPath = join(outputDir, "source-surface.json");
 const sourceMarkdownPath = join(outputDir, "source-surface.md");
 const sourceHtmlDir = join(outputDir, "source-html");
 const targetOutputPrefix = join(outputDir, "target-surface");
+const nativeManifestPath = join(outputDir, "lean-vir-native-externs.json");
+const nativeProviderPath = join(outputDir, "surface_smoke_native.c");
+const nativeTargetOutputPrefix = join(outputDir, "target-surface-native");
 const invalidReportPath = join(outputDir, "invalid-surface.json");
 const legacyReportPath = join(outputDir, "legacy-surface.json");
 const legacyHtmlDir = join(outputDir, "legacy-html");
@@ -182,6 +185,14 @@ try {
     "end SurfaceSmoke",
     "",
   ].join("\n"));
+  await writeFile(nativeProviderPath, "/* Surface analysis does not compile providers. */\n");
+  await writeFile(nativeManifestPath, `${JSON.stringify({
+    format: "lean-vir-client-native-externs",
+    version: 1,
+    modules: ["SurfaceSmoke"],
+    externs: ["SurfaceSmoke.boundary"],
+    providerSources: ["surface_smoke_native.c"],
+  })}\n`);
   runSync(
     ".lake/build/bin/vir_surface",
     [
@@ -242,6 +253,34 @@ try {
     targetReport.externs.map((declaration) => [declaration.name, declaration.status]),
     sourceReport.externs.map((declaration) => [declaration.name, declaration.status]),
   );
+
+  runSync(
+    process.execPath,
+    [
+      "scripts/capture-target-surface.mjs",
+      "--project", repoRoot,
+      "--source", sourcePath,
+      "--module", "SurfaceSmoke",
+      "--root", "SurfaceSmoke.entry",
+      "--output-prefix", nativeTargetOutputPrefix,
+      "--native-extern-manifest", nativeManifestPath,
+    ],
+    { cwd: repoRoot, capture: true },
+  );
+  const nativeTargetReport = JSON.parse(
+    await readFile(`${nativeTargetOutputPrefix}.json`, "utf8"),
+  );
+  assert.equal(nativeTargetReport.counts.runnable, 1);
+  assert.equal(
+    nativeTargetReport.externs.find((entry) => entry.name === "SurfaceSmoke.boundary").status,
+    "native",
+  );
+  assert.deepEqual(nativeTargetReport.capture.clientNativeExternManifest, {
+    source: "lean-vir-native-externs.json",
+    sha256: nativeTargetReport.capture.clientNativeExternManifest.sha256,
+    externs: ["SurfaceSmoke.boundary"],
+  });
+  assert.equal(nativeTargetReport.capture.clientNativeExternManifest.sha256.length, 64);
 
   await writeFile(frontierCostsPath, `${JSON.stringify({
     format: "lean-vir-frontier-size-costs",

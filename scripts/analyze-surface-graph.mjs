@@ -7,8 +7,12 @@ Author: Emilio J. Gallego Arias
 import { createHash } from "node:crypto";
 
 import {
+  aggregateSurfaceDeclarations,
   CURRENT_SURFACE_REPORT_VERSION,
+  isSha256,
+  isSurfaceAbi,
   SURFACE_REPORT_FORMAT,
+  surfaceAbiMatchesCapability,
   validateSurfaceReport,
 } from "./surface-report-schema.mjs";
 
@@ -64,9 +68,7 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance) {
       };
     })
     .sort(compareByModuleAndName);
-  const counts = countDeclarations(declarations);
-  const modules = aggregateModules(declarations);
-  const libraries = aggregateLibraries(modules);
+  const { counts, modules, libraries } = aggregateSurfaceDeclarations(declarations);
   const runtimeCapabilities = {
     ...capabilityReport.runtimeCapabilities,
     lean: capabilityReport.lean,
@@ -85,6 +87,9 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance) {
       supportRoots: graph.capture.supportRoots,
       graphFormat: graph.format,
       graphVersion: graph.version,
+      ...(provenance.clientNativeExternManifest
+        ? { clientNativeExternManifest: provenance.clientNativeExternManifest }
+        : {}),
     },
     definition: {
       headline: "static transitive IR closure completeness",
@@ -217,13 +222,7 @@ function classifyNode(name, nodes, capabilities, primitiveNamespaces) {
 
 function nativeAbiMatches(targetAbi, capability) {
   if (targetAbi === undefined || targetAbi === null) return true;
-  const capabilityAbi = nativeCapabilityAbi(capability);
-  return targetAbi.resultType === capabilityAbi.resultType
-    && Array.isArray(targetAbi.params)
-    && targetAbi.params.length === capabilityAbi.params.length
-    && targetAbi.params.every((param, index) =>
-      param?.borrow === capabilityAbi.params[index].borrow
-        && param?.type === capabilityAbi.params[index].type);
+  return surfaceAbiMatchesCapability(targetAbi, capability);
 }
 
 function nativeCapabilityAbi(capability) {
@@ -235,54 +234,6 @@ function nativeCapabilityAbi(capability) {
 
 function isNativeExternCandidate(name, primitiveNamespaces) {
   return primitiveNamespaces.has(name.split(".", 1)[0]);
-}
-
-function countDeclarations(declarations) {
-  const counts = {
-    total: declarations.length,
-    runnable: 0,
-    blocked: 0,
-    publicTotal: 0,
-    publicRunnable: 0,
-    privateTotal: 0,
-    boxedTotal: 0,
-    generatedTotal: 0,
-  };
-  for (const declaration of declarations) {
-    if (declaration.runnable) counts.runnable += 1;
-    if (declaration.kind === "publicConstant") {
-      counts.publicTotal += 1;
-      if (declaration.runnable) counts.publicRunnable += 1;
-    } else if (declaration.kind === "privateConstant") counts.privateTotal += 1;
-    else if (declaration.kind === "boxed") counts.boxedTotal += 1;
-    else counts.generatedTotal += 1;
-  }
-  counts.blocked = counts.total - counts.runnable;
-  return counts;
-}
-
-function aggregateModules(declarations) {
-  const grouped = new Map();
-  for (const declaration of declarations) {
-    const group = grouped.get(declaration.module) ?? [];
-    group.push(declaration);
-    grouped.set(declaration.module, group);
-  }
-  return [...grouped]
-    .map(([name, entries]) => ({ name, counts: countDeclarations(entries) }))
-    .sort((lhs, rhs) => compareText(lhs.name, rhs.name));
-}
-
-function aggregateLibraries(modules) {
-  const grouped = new Map();
-  for (const module of modules) {
-    const name = module.name.split(".", 1)[0];
-    const previous = grouped.get(name) ?? { name, modulesWithFunctions: 0, counts: emptyCounts() };
-    previous.modulesWithFunctions += 1;
-    addCounts(previous.counts, module.counts);
-    grouped.set(name, previous);
-  }
-  return [...grouped.values()].sort((lhs, rhs) => compareText(lhs.name, rhs.name));
 }
 
 function summarizeBlockers(declarations, all) {
@@ -316,17 +267,6 @@ function summarizeBlockers(declarations, all) {
       || compareText(lhs.blocker.name, rhs.blocker.name));
 }
 
-function emptyCounts() {
-  return {
-    total: 0, runnable: 0, blocked: 0, publicTotal: 0, publicRunnable: 0,
-    privateTotal: 0, boxedTotal: 0, generatedTotal: 0,
-  };
-}
-
-function addCounts(target, source) {
-  for (const key of Object.keys(target)) target[key] += source[key] ?? 0;
-}
-
 function validateInputs(graph, capabilityReport, provenance) {
   if (graph?.format !== GRAPH_FORMAT || ![1, 2, 3].includes(graph.version)
       || !Array.isArray(graph.nodes)) {
@@ -335,13 +275,13 @@ function validateInputs(graph, capabilityReport, provenance) {
   if (!Array.isArray(graph.capture?.roots) || graph.capture.roots.length === 0) {
     throw new Error("surface graph has no selected roots");
   }
-  if (!provenance || !validSha256(provenance.sourceSha256)
-      || !validSha256(provenance.graphSha256)) {
+  if (!provenance || !isSha256(provenance.sourceSha256)
+      || !isSha256(provenance.graphSha256)) {
     throw new Error("surface graph analysis requires source and graph SHA-256 provenance");
   }
   if (graph.version >= 3) {
     for (const node of graph.nodes) {
-      if ((node?.kind === "function" || node?.kind === "extern") && !validGraphAbi(node.abi)) {
+      if ((node?.kind === "function" || node?.kind === "extern") && !isSurfaceAbi(node.abi)) {
         throw new Error(`surface graph node ${JSON.stringify(node?.name)} has invalid ABI metadata`);
       }
     }
@@ -350,17 +290,6 @@ function validateInputs(graph, capabilityReport, provenance) {
     label: "capability input",
     versions: [CURRENT_SURFACE_REPORT_VERSION],
   });
-}
-
-function validSha256(value) {
-  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
-}
-
-function validGraphAbi(abi) {
-  return abi && Array.isArray(abi.params)
-    && abi.params.every((param) => typeof param?.borrow === "boolean"
-      && typeof param.type === "string")
-    && typeof abi.resultType === "string";
 }
 
 export function renderTargetSurfaceMarkdown(report) {
@@ -372,6 +301,10 @@ export function renderTargetSurfaceMarkdown(report) {
     `- Target: \`${report.selectedDeclarations.join("`, `")}\``,
     `- Captured with Lean: \`${targetLean.version}\` (\`${targetLean.githash}\`)`,
     `- VIR capability policy: Lean \`${policyLean.version}\` (\`${policyLean.githash}\`)`,
+    ...(report.capture.clientNativeExternManifest ? [
+      `- Client-native profile: \`${report.capture.clientNativeExternManifest.source}\` `
+        + `(${report.capture.clientNativeExternManifest.externs.length} externs)`,
+    ] : []),
     `- Static closure: **${report.counts.blocked === 0 ? "complete" : "blocked"}**`,
     `- Root-reachable graph nodes: ${report.closure.rootReachableNodes} / ${report.closure.capturedNodes} captured`,
     `- Capability-support-only nodes: ${report.closure.supportOnlyNodes}`,

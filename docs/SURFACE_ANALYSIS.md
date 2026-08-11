@@ -123,6 +123,24 @@ the project) so reports and graph hashes do not expose checkout locations.
 The browser's **Analysis method** panel shows these identities and short
 fingerprints so the rendered result can be matched to its JSON artifact.
 
+If the runtime uses a client-native extern manifest, analyze the same profile:
+
+```bash
+VIR_NATIVE_EXTERN_MANIFEST=/path/to/project/lean-vir-native-externs.json \
+  npm run analyze:target-surface -- \
+  --project /path/to/project \
+  --source Library/Entry.lean \
+  --module Library.Entry \
+  --root Library.Entry.main \
+  --output-prefix build/vir-surface/library-entry
+```
+
+`--native-extern-manifest FILE` is the explicit equivalent. Selected externs
+count as capabilities using the ABI and C symbol captured by the target
+toolchain. The report records the manifest name, hash, and selection. This
+static analysis does not compile or link its providers; package and runtime
+validation remain separate.
+
 The target exporter intentionally imports only Lean. It duplicates a small
 amount of metadata and IR-reference extraction because VIR oleans built by one
 Lean version cannot be loaded by another; the parity smoke test keeps the two

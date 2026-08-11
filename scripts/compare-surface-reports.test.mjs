@@ -16,6 +16,7 @@ import {
   surfaceDefinition,
   targetCaptureFixture,
 } from "./surface-report-test-fixtures.mjs";
+import { aggregateSurfaceDeclarations } from "./surface-report-schema.mjs";
 
 const eqv = { kind: "missingExtern", name: "Lean.Expr.eqv" };
 const dbg = { kind: "missingExtern", name: "Lean.Expr.dbgToString" };
@@ -152,6 +153,10 @@ function exactTargetReport(
       ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
       : [],
   }));
+  const aggregates = aggregateSurfaceDeclarations(value.declarations);
+  value.counts = aggregates.counts;
+  value.modules = aggregates.modules;
+  value.libraries = aggregates.libraries;
   value.primaryBlockers = summarizeBlockers(value.declarations, false);
   value.reachableBlockers = summarizeBlockers(value.declarations, true);
   return value;

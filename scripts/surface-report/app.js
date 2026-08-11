@@ -325,6 +325,13 @@ Author: Emilio J. Gallego Arias
         `Missing-node classification uses ${definition.missingNodeKind}; names and paths come from the dependency graph.`,
       ));
     }
+    if (capture?.clientNativeExternManifest) {
+      assumptions.append(element(
+        "li",
+        "",
+        "Manifest-selected native externs count as capabilities; provider compilation and linking are not tested here.",
+      ));
+    }
     assumptions.append(element(
       "li",
       "",
@@ -353,6 +360,15 @@ Author: Emilio J. Gallego Arias
       appendFact(provenance, "Source SHA-256", shortFingerprint(capture.sourceSha256));
       appendFact(provenance, "Root graph SHA-256", shortFingerprint(capture.rootGraphSha256));
       appendFact(provenance, "Complete graph SHA-256", shortFingerprint(capture.graphSha256));
+      if (capture.clientNativeExternManifest) {
+        const profile = capture.clientNativeExternManifest;
+        appendFact(
+          provenance,
+          "Client-native profile",
+          `${profile.source} (${number.format(profile.externs.length)} externs)`,
+        );
+        appendFact(provenance, "Manifest SHA-256", shortFingerprint(profile.sha256));
+      }
       contents.push(provenance);
     }
     contents.push(assumptions);

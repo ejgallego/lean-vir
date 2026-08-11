@@ -166,6 +166,7 @@ private def irTypeLabel : IRType → String
 
 private def declarationAbiJson (decl : Decl) : Json := Json.mkObj [
   ("params", .arr (decl.params.map fun param => Json.mkObj [
+    ("index", param.x.idx),
     ("borrow", param.borrow),
     ("type", irTypeLabel param.ty)
   ])),

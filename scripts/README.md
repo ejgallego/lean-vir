@@ -35,9 +35,10 @@ map lives in `docs/HARNESS.md`.
 - `npm run analyze:surface -- REPORT.json REPORT.md [--module MODULE] [--root NAME]`
   Analyze installed libraries or a focused function set with VIR's pinned Lean
   toolchain.
-- `npm run analyze:target-surface -- --project PROJECT --source FILE --module MODULE --root NAME --output-prefix PREFIX`
+- `npm run analyze:target-surface -- --project PROJECT --source FILE --module MODULE --root NAME --output-prefix PREFIX [--native-extern-manifest FILE]`
   Capture a complete blocker frontier with the target project's pinned Lean,
-  then apply VIR's current runtime policy.
+  then apply VIR's current runtime policy. The optional manifest, or
+  `VIR_NATIVE_EXTERN_MANIFEST`, adds the matching client-native profile.
 - `npm run render:surface -- REPORT.json OUTPUT_DIR [--frontier-costs COSTS.json] [--collection]`
   Build the static boundary explorer, including function/extern signatures and
   docstrings. Use `render:target-surface-index` for a collection landing page.

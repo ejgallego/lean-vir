@@ -83,7 +83,7 @@
     "test:bench": "node --test scripts/bench-artifact-cache.test.mjs scripts/bench-differential.test.mjs scripts/bench-env-lookup.test.mjs scripts/bench-paired.test.mjs scripts/bench-utils.test.mjs scripts/std-format-values.test.mjs",
     "test:package-ir-builders": "bash scripts/test-package-ir-builders.sh",
     "test:env-lookup:wasm-pair": "npm run bench:env-lookup:wasm-pair -- --check --warmups 0 --samples 1 --iterations 1 --load-iterations 1 web/public/vir-upstream.wasm web/public/vir-upstream.wasm",
-    "test:surface": "node scripts/surface-report-smoke.mjs && node --test scripts/analyze-surface-graph.test.mjs scripts/compare-surface-reports.test.mjs scripts/frontier-size-costs.test.mjs scripts/render-target-surface-index.test.mjs scripts/surface-boundary-family.test.mjs scripts/surface-report-schema.test.mjs",
+    "test:surface": "node scripts/surface-report-smoke.mjs && node --test scripts/analyze-surface-graph.test.mjs scripts/client-native-surface-profile.test.mjs scripts/compare-surface-reports.test.mjs scripts/frontier-size-costs.test.mjs scripts/render-target-surface-index.test.mjs scripts/surface-boundary-family.test.mjs scripts/surface-report-schema.test.mjs",
     "test:surface:browser": "node scripts/surface-report-browser-smoke.mjs",
     "test:lake": "bash scripts/test-lake-facets.sh",
     "test:fixtures": "node scripts/run-fixtures.mjs",

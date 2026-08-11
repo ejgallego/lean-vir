@@ -115,6 +115,9 @@ try {
   assert.match(initial.method, /Smoke\/Target\.lean/);
   assert.match(initial.method, /aaaaaaaaaaaa/);
   assert.match(initial.method, /cccccccccccc/);
+  assert.match(initial.method, /lean-vir-native-externs\.json \(1 externs\)/);
+  assert.match(initial.method, /Manifest SHA-256bbbbbbbbbbbb/);
+  assert.match(initial.method, /provider compilation and linking are not tested/);
   assert.match(initial.method, /Boundary families are name-based navigation groups/);
   assert.match(initial.reachableNodes, /5 \/ 6/);
   assert.equal(initial.blockerSetsVisible, true);
@@ -338,7 +341,16 @@ function focusedReportFixture() {
     format: "lean-vir-library-surface",
     version: 3,
     lean: { version: "4.32.0", toolchain: "leanprover/lean4:4.32.0", githash: "target" },
-    capture: targetCaptureFixture({ source: "Smoke/Target.lean", module: "Smoke.Target" }),
+    capture: targetCaptureFixture({
+      source: "Smoke/Target.lean",
+      module: "Smoke.Target",
+      supportRoots: ["Client.Native.call"],
+      clientNativeExternManifest: {
+        source: "lean-vir-native-externs.json",
+        sha256: "b".repeat(64),
+        externs: ["Client.Native.call"],
+      },
+    }),
     definition: surfaceDefinition(true),
     selectedModules: ["Smoke.Target"],
     selectedDeclarations: ["Smoke.Target.main"],
@@ -346,10 +358,12 @@ function focusedReportFixture() {
     closure: { selectedRoots: 1, capturedNodes: 6, rootReachableNodes: 5, supportOnlyNodes: 1 },
     runtimeCapabilities: {
       lean: { version: "4.33.0-rc2", githash: "policy" },
-      nativeExternCount: 1,
+      nativeExternCount: 2,
       primitiveNamespaces: ["ByteArray", "IO"],
       nativeExterns: [nativeExternFixture("ByteArray.data", {
         params: [{ index: 1, borrow: false, type: "object" }],
+      }), nativeExternFixture("Client.Native.call", {
+        generateBoxedWrapper: true,
       })],
     },
     counts,

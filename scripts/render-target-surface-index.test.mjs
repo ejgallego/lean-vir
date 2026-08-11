@@ -121,8 +121,12 @@ function reportFixture(moduleName, completeFrontier, blockers) {
       nativeExterns: [],
     },
     counts,
-    libraries: [{ name: moduleName, modulesWithFunctions: 1, counts }],
-    modules: [{ name: moduleName, counts }],
+    libraries: selectedDeclarations.length === 0 ? [] : [{
+      name: moduleName.split(".", 1)[0],
+      modulesWithFunctions: 1,
+      counts,
+    }],
+    modules: selectedDeclarations.length === 0 ? [] : [{ name: moduleName, counts }],
     primaryBlockers: summaries.slice(0, 1),
     ...(completeFrontier ? { reachableBlockers: summaries } : {}),
     externs: blockers.map((name) => ({

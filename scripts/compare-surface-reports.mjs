@@ -8,7 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { validateSurfaceReport } from "./surface-report-schema.mjs";
+import { isSha256, validateSurfaceReport } from "./surface-report-schema.mjs";
 
 const DELTA_FORMAT = "lean-vir-library-surface-delta";
 const DELTA_VERSION = 1;
@@ -191,7 +191,7 @@ function validateComparableReports(control, candidate) {
 }
 
 function requireCaptureHash(label, capture, field) {
-  if (typeof capture?.[field] !== "string" || !/^[0-9a-f]{64}$/.test(capture[field])) {
+  if (!isSha256(capture?.[field])) {
     throw new Error(`${label} capture is missing ${field}`);
   }
 }
