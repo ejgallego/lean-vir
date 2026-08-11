@@ -140,11 +140,9 @@ millisecond p95 for the isolated VIR callback, with no callback exceeding the
 16.7 millisecond frame budget. These values establish the post-index path, not
 a replacement baseline.
 
-The repeated-resolution cluster is enough signal for one bounded experiment,
-not for an API conclusion. ULC-0002 therefore requires exact hit/miss and
-lifetime counters plus unprofiled focused and Illuminate timing before a
-caller-owned, provider-revision-scoped resolution cache is considered for
-upstream.
+The later lean-zip investigation superseded the resolution-only direction:
+evaluated nullary constants also needed to survive public calls, so VIR now
+retains the complete interpreter session for one package generation.
 
 ## Accepted Local Design
 
@@ -195,11 +193,6 @@ records the completed real-environment experiment and the resulting
 explicit-provider request to transfer upstream. The experiment found that a
 valid environment pulls in a disproportionate compiler-initialization closure
 for VIR's declaration-only runtime.
-[ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
-records the now-superseded proposal to share only immutable resolution metadata
-across fresh asynchronous interpreter entries. The later package-scoped
-interpreter session also preserves evaluated nullary constants, which the
-resolution-only proposal explicitly excluded.
 
 ## Rejected or Superseded Experiments
 
@@ -214,10 +207,7 @@ resolution-only proposal explicitly excluded.
 - A format-11 precomputed sorted-index section was abandoned. Compatibility
   was not a constraint, but measurements no longer justified the format and
   decoder complexity.
-- Decoder-wide name interning remains unjustified. The revision-scoped
-  resolution-metadata proposal was superseded after lean-zip exposed a separate
-  need to retain evaluated nullary constants; package-scoped interpreter
-  persistence now addresses both caches behind an explicit reset boundary.
+- Decoder-wide name interning remains unjustified.
 
 ## Validation and Follow-up
 
@@ -231,7 +221,4 @@ The representative Illuminate acceptance gate has passed: the focused result
 reproduced, sustained callback mean and CPU were halved, the original sampled
 hotspots moved, and DOM output remained identical. The environment/provider
 decision is recorded by the completed ULC-0001 experiment: keep VIR's indexed
-provider and propose a narrow upstream declaration-provider API. The new
-post-index profile selects the instrumented ULC-0002 cache experiment as the
-next performance question; it does not call for expanding this accepted lookup
-patch.
+provider and propose a narrow upstream declaration-provider API.

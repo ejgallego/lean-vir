@@ -100,9 +100,7 @@ timings are marked diagnostic and are not before/after evidence. See
 baseline and final profiles, measured representation experiments, and accepted
 local design.
 [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
-owns the environment/provider API decision;
-[ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
-owns the measurement-gated cross-entry resolution-cache experiment.
+owns the remaining environment/provider API decision.
 
 When the intervention is a Wasm build mode rather than a source-checkout
 change, compare two frozen artifacts in one process:

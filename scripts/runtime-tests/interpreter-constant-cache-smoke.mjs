@@ -26,6 +26,7 @@ const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-constant-cache-"));
 const source = join(freshDir, "InterpreterConstantCache.lean");
 const packagePath = join(freshDir, "interpreter-constant-cache.irpkg");
 const reportPath = join(freshDir, "interpreter-constant-cache.report.md");
+let runtime = null;
 
 function liveObjectPayload(resource, label) {
   const payload = hostResourceValue(resource);
@@ -63,7 +64,7 @@ try {
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   const packageBytes = await readFile(packagePath);
-  const runtime = await createVirRuntimeFactory({ wasmBytes })
+  runtime = await createVirRuntimeFactory({ wasmBytes })
     .createRuntime({ irPackageSetBytes: [packageBytes] });
 
   const first = runtime.callTimed("Vir.Fixtures.InterpreterConstantCache.denseTableHandle");
@@ -92,7 +93,6 @@ try {
   assertWarmCache(replacementFirst, replacementSecond, "replacement package");
   releaseHostResource(replacementFirst.value);
   releaseHostResource(replacementSecond.value);
-  runtime.dispose();
 
   console.log(
     "interpreter constant cache smoke ok: " +
@@ -101,5 +101,9 @@ try {
       `${replacementSecond.timings.executeMs.toFixed(3)}ms`,
   );
 } finally {
-  await rm(freshDir, { recursive: true, force: true });
+  try {
+    runtime?.dispose();
+  } finally {
+    await rm(freshDir, { recursive: true, force: true });
+  }
 }
