@@ -125,7 +125,14 @@ function reportFixture(moduleName, completeFrontier, blockers) {
     modules: [{ name: moduleName, counts }],
     primaryBlockers: summaries.slice(0, 1),
     ...(completeFrontier ? { reachableBlockers: summaries } : {}),
-    externs: blockers.map((name) => ({ name, module: moduleName, status: "missing" })),
+    externs: blockers.map((name) => ({
+      name,
+      module: moduleName,
+      status: "missing",
+      targets: [],
+      type: null,
+      doc: null,
+    })),
     declarations: selectedDeclarations.map((name) => ({
       name,
       module: moduleName,
@@ -133,6 +140,8 @@ function reportFixture(moduleName, completeFrontier, blockers) {
       runnable: false,
       blocker: summaries[0]?.blocker ?? null,
       blockerPath: summaries[0]?.examplePath ?? [],
+      type: null,
+      doc: null,
       blockers: summaries.map((summary) => ({
         blocker: summary.blocker,
         path: summary.examplePath,

@@ -12,6 +12,13 @@ const COUNT_FIELDS = [
   "total", "runnable", "blocked", "publicTotal", "publicRunnable",
   "privateTotal", "boxedTotal", "generatedTotal",
 ];
+const DECLARATION_KINDS = new Set([
+  "publicConstant", "privateConstant", "boxed", "generated",
+]);
+const BLOCKER_KINDS = new Set([
+  "missingExtern", "incompatibleExtern", "missingDecl", "unsupportedInitGlobal",
+]);
+const EXTERN_STATUSES = new Set(["native", "host", "missing", "incompatible"]);
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 export function hasCompleteBlockerFrontier(report) {
@@ -80,6 +87,7 @@ export function validateSurfaceReport(
         || nativeExternCount !== nativeExterns.length) {
       throw new Error(`${label}: version 3 is missing runtime-capability policy`);
     }
+    validateUniqueStrings(value.selectedModules, `${label}: selected modules`);
     validateUniqueStrings(value.selectedDeclarations, `${label}: selected declarations`);
     validateUniqueStrings(primitiveNamespaces, `${label}: primitive namespaces`);
     validateNativeExterns(nativeExterns, label);
@@ -99,37 +107,41 @@ export function validateSurfaceReport(
   if (completeFrontier !== Array.isArray(value.reachableBlockers)) {
     throw new Error(`${label}: complete-frontier semantics do not match reachable blockers`);
   }
-  if (completeFrontier) {
-    const declarationByName = new Map(
-      value.declarations.map((declaration) => [declaration.name, declaration]),
-    );
-    if (value.selectedDeclarations.length !== value.counts.total) {
-      throw new Error(`${label}: complete frontier does not cover every selected declaration`);
-    }
-    if (declarationByName.size !== value.declarations.length) {
-      throw new Error(`${label}: declaration names must be unique`);
-    }
-    for (const name of value.selectedDeclarations ?? []) {
-      const declaration = declarationByName.get(name);
-      if (!declaration) {
-        throw new Error(`${label}: selected declaration ${JSON.stringify(name)} is missing`);
-      }
-      if (!Array.isArray(declaration.blockers)) {
-        throw new Error(
-          `${label}: selected declaration ${JSON.stringify(name)} is missing its complete blocker set`,
-        );
-      }
-      if (declaration.runnable !== (declaration.blockers.length === 0)) {
-        throw new Error(
-          `${label}: selected declaration ${JSON.stringify(name)} has inconsistent blocker status`,
-        );
-      }
-    }
-  }
   if (value.counts.total !== value.declarations.length) {
     throw new Error(
       `${label}: ${value.counts.total} counted functions but ${value.declarations.length} records`,
     );
+  }
+  if (value.version >= 3) {
+    const { declarationNames, primaryBlockers, reachableBlockers } = validateDeclarations(
+      value.declarations,
+      completeFrontier,
+      value.counts,
+      label,
+    );
+    if (value.selectedDeclarations.length > 0) {
+      if (value.selectedDeclarations.length !== value.counts.total) {
+        throw new Error(`${label}: selected declarations do not cover every declaration record`);
+      }
+      for (const name of value.selectedDeclarations) {
+        if (!declarationNames.has(name)) {
+          throw new Error(`${label}: selected declaration ${JSON.stringify(name)} is missing`);
+        }
+      }
+    }
+    if (completeFrontier && value.selectedDeclarations.length !== value.counts.total) {
+      throw new Error(`${label}: complete frontier does not cover every selected declaration`);
+    }
+    validateBlockerSummaries(value.primaryBlockers, primaryBlockers, "primary blockers", label);
+    if (completeFrontier) {
+      validateBlockerSummaries(
+        value.reachableBlockers,
+        reachableBlockers,
+        "reachable blockers",
+        label,
+      );
+    }
+    validateExterns(value.externs, value.runtimeCapabilities.nativeExterns, label);
   }
   return value;
 }
@@ -155,18 +167,208 @@ function validateUniqueStrings(values, label) {
 function validateNativeExterns(nativeExterns, label) {
   validateUniqueStrings(nativeExterns.map((entry) => entry?.name), `${label}: native extern names`);
   for (const entry of nativeExterns) {
-    if (typeof entry.symbol !== "string"
+    const paramIndices = Array.isArray(entry.params)
+      ? entry.params.map((param) => param?.index)
+      : [];
+    if (typeof entry.symbol !== "string" || entry.symbol.length === 0
         || typeof entry.generateBoxedWrapper !== "boolean"
         || !Array.isArray(entry.params)
-        || entry.params.some((param) => !Number.isInteger(param?.index)
+        || entry.params.some((param) => !Number.isInteger(param?.index) || param.index < 0
           || typeof param.borrow !== "boolean"
-          || typeof param.type !== "string")
-        || typeof entry.resultType !== "string"
+          || typeof param.type !== "string" || param.type.length === 0)
+        || new Set(paramIndices).size !== paramIndices.length
+        || typeof entry.resultType !== "string" || entry.resultType.length === 0
         || !Array.isArray(entry.deps)
-        || entry.deps.some((dependency) => typeof dependency !== "string")) {
+        || entry.deps.some((dependency) => typeof dependency !== "string"
+          || dependency.length === 0)
+        || new Set(entry.deps).size !== entry.deps.length) {
       throw new Error(`${label}: native extern ${JSON.stringify(entry.name)} has invalid ABI metadata`);
     }
   }
+}
+
+function validateDeclarations(declarations, completeFrontier, expectedCounts, label) {
+  const declarationNames = new Set();
+  const primaryBlockers = new Map();
+  const reachableBlockers = new Map();
+  const actualCounts = Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0]));
+  for (const declaration of declarations) {
+    if (typeof declaration?.name !== "string" || declaration.name.length === 0
+        || typeof declaration.module !== "string" || declaration.module.length === 0
+        || !DECLARATION_KINDS.has(declaration.kind)
+        || typeof declaration.runnable !== "boolean"
+        || !Array.isArray(declaration.blockerPath)
+        || !nullableString(declaration.type)
+        || !nullableString(declaration.doc)) {
+      throw new Error(`${label}: invalid declaration record ${JSON.stringify(declaration?.name)}`);
+    }
+    if (declarationNames.has(declaration.name)) {
+      throw new Error(`${label}: declaration names must be unique`);
+    }
+    declarationNames.add(declaration.name);
+    actualCounts.total += 1;
+    actualCounts[declarationKindCount(declaration.kind)] += 1;
+    if (declaration.runnable) {
+      actualCounts.runnable += 1;
+      if (declaration.kind === "publicConstant") actualCounts.publicRunnable += 1;
+      if (declaration.blocker !== null || declaration.blockerPath.length !== 0) {
+        throw new Error(`${label}: declaration ${JSON.stringify(declaration.name)} has inconsistent runnable status`);
+      }
+    } else {
+      actualCounts.blocked += 1;
+      validateBlockerPath(declaration.blocker, declaration.blockerPath, declaration.name, label);
+      incrementBlockerCount(primaryBlockers, declaration.blocker, declaration.kind);
+    }
+    if (completeFrontier) {
+      if (!Array.isArray(declaration.blockers)) {
+        throw new Error(
+          `${label}: selected declaration ${JSON.stringify(declaration.name)} is missing its complete blocker set`,
+        );
+      }
+      if (declaration.runnable !== (declaration.blockers.length === 0)) {
+        throw new Error(
+          `${label}: selected declaration ${JSON.stringify(declaration.name)} has inconsistent blocker status`,
+        );
+      }
+      const seen = new Set();
+      for (const entry of declaration.blockers) {
+        validateBlockerPath(entry?.blocker, entry?.path, declaration.name, label);
+        const key = blockerKey(entry.blocker);
+        if (seen.has(key)) {
+          throw new Error(`${label}: declaration ${JSON.stringify(declaration.name)} repeats a blocker`);
+        }
+        seen.add(key);
+        incrementBlockerCount(reachableBlockers, entry.blocker, declaration.kind);
+      }
+      if (!declaration.runnable
+          && blockerKey(declaration.blocker) !== blockerKey(declaration.blockers[0]?.blocker)) {
+        throw new Error(`${label}: declaration ${JSON.stringify(declaration.name)} has inconsistent primary blocker`);
+      }
+    }
+  }
+  if (COUNT_FIELDS.some((field) => actualCounts[field] !== expectedCounts[field])) {
+    throw new Error(`${label}: declaration records do not match aggregate counts`);
+  }
+  return { declarationNames, primaryBlockers, reachableBlockers };
+}
+
+function validateExterns(externs, nativeExterns, label) {
+  validateUniqueStrings(externs.map((entry) => entry?.name), `${label}: extern names`);
+  const nativeByName = new Map(nativeExterns.map((entry) => [entry.name, entry]));
+  for (const entry of externs) {
+    const capability = nativeByName.get(entry.name);
+    const capabilityStatus = entry.status === "native" || entry.status === "incompatible";
+    if (typeof entry.module !== "string" || entry.module.length === 0
+        || !EXTERN_STATUSES.has(entry.status)
+        || !Array.isArray(entry.targets)
+        || entry.targets.some((target) => !validExternTarget(target))
+        || !nullableString(entry.type)
+        || !nullableString(entry.doc)
+        || capabilityStatus !== Boolean(capability)
+        || (entry.status === "incompatible"
+          && (!validComparedAbi(entry.targetAbi)
+            || !validComparedAbi(entry.capabilityAbi)
+            || !sameCapabilityAbi(entry.capabilityAbi, capability)))) {
+      throw new Error(`${label}: invalid extern record ${JSON.stringify(entry.name)}`);
+    }
+  }
+}
+
+function validateBlockerSummaries(summaries, expected, description, label) {
+  const seen = new Set();
+  for (const summary of summaries) {
+    const blocker = summary?.blocker;
+    const key = blockerKey(blocker);
+    if (!validBlocker(blocker)
+        || seen.has(key)
+        || !Number.isInteger(summary.roots) || summary.roots <= 0
+        || !Number.isInteger(summary.publicRoots) || summary.publicRoots < 0
+        || summary.publicRoots > summary.roots
+        || typeof summary.exampleRoot !== "string" || summary.exampleRoot.length === 0
+        || !validPath(summary.examplePath, summary.exampleRoot, blocker.name)) {
+      throw new Error(`${label}: invalid ${description} summary`);
+    }
+    seen.add(key);
+    const counts = expected.get(key);
+    if (!counts || counts.roots !== summary.roots || counts.publicRoots !== summary.publicRoots) {
+      throw new Error(`${label}: ${description} do not match declaration records`);
+    }
+  }
+  if (seen.size !== expected.size) {
+    throw new Error(`${label}: ${description} do not cover every declaration blocker`);
+  }
+}
+
+function validateBlockerPath(blocker, path, root, label) {
+  if (!validBlocker(blocker) || !validPath(path, root, blocker.name)) {
+    throw new Error(`${label}: declaration ${JSON.stringify(root)} has an invalid blocker path`);
+  }
+}
+
+function validBlocker(blocker) {
+  return BLOCKER_KINDS.has(blocker?.kind)
+    && typeof blocker.name === "string"
+    && blocker.name.length > 0;
+}
+
+function validPath(path, root, blocker) {
+  return Array.isArray(path)
+    && path.length > 0
+    && path.every((name) => typeof name === "string" && name.length > 0)
+    && path[0] === root
+    && path.at(-1) === blocker;
+}
+
+function validComparedAbi(abi) {
+  return abi && Array.isArray(abi.params)
+    && abi.params.every((param) => typeof param?.borrow === "boolean"
+      && typeof param.type === "string" && param.type.length > 0)
+    && typeof abi.resultType === "string"
+    && abi.resultType.length > 0;
+}
+
+function sameCapabilityAbi(abi, capability) {
+  return abi.resultType === capability.resultType
+    && abi.params.length === capability.params.length
+    && abi.params.every((param, index) => param.borrow === capability.params[index].borrow
+      && param.type === capability.params[index].type);
+}
+
+function validExternTarget(target) {
+  if (target?.kind === "standard" || target?.kind === "inline") {
+    return typeof target.backend === "string" && target.backend.length > 0
+      && typeof target.value === "string" && target.value.length > 0;
+  }
+  if (target?.kind === "adhoc") {
+    return typeof target.backend === "string" && target.backend.length > 0
+      && target.value === null;
+  }
+  return target?.kind === "opaque" && target.backend === null && target.value === null;
+}
+
+function nullableString(value) {
+  return value === null || typeof value === "string";
+}
+
+function declarationKindCount(kind) {
+  return {
+    publicConstant: "publicTotal",
+    privateConstant: "privateTotal",
+    boxed: "boxedTotal",
+    generated: "generatedTotal",
+  }[kind];
+}
+
+function incrementBlockerCount(counts, blocker, declarationKind) {
+  const key = blockerKey(blocker);
+  const current = counts.get(key) ?? { roots: 0, publicRoots: 0 };
+  current.roots += 1;
+  if (declarationKind === "publicConstant") current.publicRoots += 1;
+  counts.set(key, current);
+}
+
+function blockerKey(blocker) {
+  return `${blocker?.kind}\u0000${blocker?.name}`;
 }
 
 function validateCapture(capture, label) {

@@ -51,9 +51,8 @@ for (let index = 0; index < reportArgs.length; index += 3) {
   });
 }
 
-const comparisonReports = reports.filter((entry) =>
+const compared = reports.filter((entry) =>
   entry.completeFrontier && (entry.report.selectedDeclarations ?? []).length > 0);
-const compared = comparisonReports;
 const allFamilies = [...new Set(compared.flatMap((entry) => [...entry.families.keys()]))]
   .sort((lhs, rhs) => {
     const lhsCount = compared.reduce((sum, entry) => sum + (entry.families.get(lhs) ?? 0), 0);

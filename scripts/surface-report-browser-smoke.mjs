@@ -19,6 +19,7 @@ import {
   openCdp,
 } from "./browser-smoke-harness.mjs";
 import {
+  nativeExternFixture,
   surfaceCounts,
   surfaceDefinition,
   targetCaptureFixture,
@@ -215,7 +216,7 @@ try {
   })()`);
   assert.equal(incompatibleExtern.rows, 1);
   assert.match(incompatibleExtern.detail, /Incompatible native ABI/);
-  assert.match(incompatibleExtern.detail, /Target IR ABI.*ByteArray.*→ object/);
+  assert.match(incompatibleExtern.detail, /Target IR ABI.*@& object.*→ object/);
   assert.match(incompatibleExtern.detail, /VIR capability ABI.*object.*→ object/);
   await evaluate(cdp, `document.querySelector(".boundary-drawer-close").click()`);
   await waitFor(cdp, `document.querySelector(".boundary-drawer") === null`);
@@ -345,9 +346,11 @@ function focusedReportFixture() {
     closure: { selectedRoots: 1, capturedNodes: 6, rootReachableNodes: 5, supportOnlyNodes: 1 },
     runtimeCapabilities: {
       lean: { version: "4.33.0-rc2", githash: "policy" },
-      nativeExternCount: 0,
+      nativeExternCount: 1,
       primitiveNamespaces: ["ByteArray", "IO"],
-      nativeExterns: [],
+      nativeExterns: [nativeExternFixture("ByteArray.data", {
+        params: [{ index: 1, borrow: false, type: "object" }],
+      })],
     },
     counts,
     libraries: [{ name: "Smoke", modulesWithFunctions: 1, counts }],
@@ -457,7 +460,7 @@ function blocker(name, module, target, steps, status = "missing") {
       targets: [{ kind: "standard", backend: "all", value: target }],
       ...(status === "incompatible" ? {
         targetAbi: {
-          params: [{ borrow: false, type: "ByteArray" }],
+          params: [{ borrow: true, type: "object" }],
           resultType: "object",
         },
         capabilityAbi: {

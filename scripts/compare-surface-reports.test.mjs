@@ -138,14 +138,48 @@ function exactTargetReport(
     supportOnlyNodes: 0,
   };
   value.runtimeCapabilities.primitiveNamespaces = ["Lean"];
+  value.externs = value.externs.map((declaration) => ({
+    ...declaration,
+    type: null,
+    doc: null,
+  }));
   value.reachableBlockers = [];
   value.declarations = declarations.map((declaration) => ({
     ...declaration,
+    type: null,
+    doc: null,
     blockers: declaration.blocker
       ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
       : [],
   }));
+  value.primaryBlockers = summarizeBlockers(value.declarations, false);
+  value.reachableBlockers = summarizeBlockers(value.declarations, true);
   return value;
+}
+
+function summarizeBlockers(declarations, all) {
+  const summaries = new Map();
+  for (const declaration of declarations) {
+    const blockers = all
+      ? declaration.blockers
+      : declaration.blocker
+        ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
+        : [];
+    for (const entry of blockers) {
+      const key = `${entry.blocker.kind}\u0000${entry.blocker.name}`;
+      const summary = summaries.get(key) ?? {
+        blocker: entry.blocker,
+        roots: 0,
+        publicRoots: 0,
+        exampleRoot: declaration.name,
+        examplePath: entry.path,
+      };
+      summary.roots += 1;
+      if (declaration.kind === "publicConstant") summary.publicRoots += 1;
+      summaries.set(key, summary);
+    }
+  }
+  return [...summaries.values()];
 }
 
 function report(declarations, nativeNames = [], statusOverrides = {}) {

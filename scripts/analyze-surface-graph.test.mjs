@@ -31,7 +31,9 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
     nodes: [
       node("Library.main", "function", ["Library.helper", "Library.native", "Other.opaque"]),
       node("Library.helper", "function", ["IO.unsupported"]),
-      node("Library.native", "extern"),
+      node("Library.native", "extern", [], {
+        abi: { params: [{ borrow: false, type: "object" }], resultType: "object" },
+      }),
       node("Library.capabilityDependency", "function"),
       node("Library.unusedCapabilityDependency", "function"),
       node("IO.unsupported", "extern"),
@@ -39,7 +41,10 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
     ],
   };
   const capabilities = capabilityReport([
-    nativeExternFixture("Library.native", { deps: ["Library.capabilityDependency"] }),
+    nativeExternFixture("Library.native", {
+      deps: ["Library.capabilityDependency"],
+      params: [{ index: 1, borrow: false, type: "object" }],
+    }),
     nativeExternFixture("Library.unused", { deps: ["Library.unusedCapabilityDependency"] }),
   ], ["IO"]);
   const report = analyzeSurfaceGraph(graph, capabilities, provenance);
@@ -88,23 +93,34 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
   );
   assert.notEqual(reportWithChangedDependency.capture.rootGraphSha256, report.capture.rootGraphSha256);
 
-  const graphWithAbiDrift = structuredClone(graph);
-  graphWithAbiDrift.nodes.find((entry) => entry.name === "Library.native").abi.params.push({
-    borrow: false,
-    type: "object",
-  });
-  const reportWithAbiDrift = analyzeSurfaceGraph(graphWithAbiDrift, capabilities, provenance);
-  assert.equal(reportWithAbiDrift.declarations[0].blockers[0].blocker.kind, "incompatibleExtern");
-  assert.equal(
-    reportWithAbiDrift.externs.find((entry) => entry.name === "Library.native").status,
-    "incompatible",
-  );
+  const abiDrifts = [
+    (abi) => abi.params.push({ borrow: false, type: "object" }),
+    (abi) => { abi.params[0].borrow = true; },
+    (abi) => { abi.resultType = "tobject"; },
+  ];
+  for (const introduceDrift of abiDrifts) {
+    const graphWithAbiDrift = structuredClone(graph);
+    introduceDrift(graphWithAbiDrift.nodes.find((entry) => entry.name === "Library.native").abi);
+    const reportWithAbiDrift = analyzeSurfaceGraph(graphWithAbiDrift, capabilities, provenance);
+    assert.ok(reportWithAbiDrift.declarations[0].blockers.some(
+      (entry) => entry.blocker.kind === "incompatibleExtern",
+    ));
+    assert.equal(
+      reportWithAbiDrift.externs.find((entry) => entry.name === "Library.native").status,
+      "incompatible",
+    );
+  }
 
   const graphWithoutAbi = structuredClone(graph);
   delete graphWithoutAbi.nodes.find((entry) => entry.name === "Library.native").abi;
   assert.throws(
     () => analyzeSurfaceGraph(graphWithoutAbi, capabilities, provenance),
     /has invalid ABI metadata/,
+  );
+
+  assert.throws(
+    () => analyzeSurfaceGraph(graph, capabilities),
+    /requires source and graph SHA-256 provenance/,
   );
 });
 
@@ -148,7 +164,7 @@ test("target graph analysis aggregates complete blocker membership across severa
   assert.equal(report.primaryBlockers.reduce((sum, summary) => sum + summary.roots, 0), 2);
 });
 
-function node(name, kind, deps = []) {
+function node(name, kind, deps = [], overrides = {}) {
   return {
     name,
     module: name.split(".").slice(0, -1).join("."),
@@ -163,6 +179,7 @@ function node(name, kind, deps = []) {
       : null,
     type: name === "Library.main" ? "IO Unit" : null,
     doc: name === "Library.main" ? "Runs the library entry point." : null,
+    ...overrides,
   };
 }
 

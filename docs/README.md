@@ -102,7 +102,7 @@ ownership diagrams.
   definition, full-library scan and interactive HTML workflows, report
   interpretation, and runtime control/candidate comparison rules.
 - [SURFACE_EXPERIMENTS.md](SURFACE_EXPERIMENTS.md): historical frontier
-  measurements and accepted or rejected runtime decisions.
+  findings and accepted or rejected runtime decisions.
 - [LEAN_ZIP_DEFLATE_PROBE.md](LEAN_ZIP_DEFLATE_PROBE.md): exact-toolchain
   compatibility, package boundary, acceptance coverage, and performance
   findings for lean-zip's raw-DEFLATE entry point.

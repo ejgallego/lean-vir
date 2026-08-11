@@ -14,8 +14,8 @@ import {
 
 const GRAPH_FORMAT = "lean-ir-surface-graph";
 
-export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
-  validateInputs(graph, capabilityReport);
+export function analyzeSurfaceGraph(graph, capabilityReport, provenance) {
+  validateInputs(graph, capabilityReport, provenance);
   const nodes = new Map(graph.nodes.map((node) => [node.name, node]));
   const capabilities = new Map(
     capabilityReport.runtimeCapabilities.nativeExterns.map((entry) => [entry.name, entry]),
@@ -78,8 +78,8 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
     capture: {
       mode: "targetToolchainSource",
       source: graph.capture.source,
-      sourceSha256: provenance.sourceSha256 ?? null,
-      graphSha256: provenance.graphSha256 ?? null,
+      sourceSha256: provenance.sourceSha256,
+      graphSha256: provenance.graphSha256,
       rootGraphSha256: rootReachableGraphSha256(graph),
       module: graph.capture.module,
       supportRoots: graph.capture.supportRoots,
@@ -327,13 +327,17 @@ function addCounts(target, source) {
   for (const key of Object.keys(target)) target[key] += source[key] ?? 0;
 }
 
-function validateInputs(graph, capabilityReport) {
+function validateInputs(graph, capabilityReport, provenance) {
   if (graph?.format !== GRAPH_FORMAT || ![1, 2, 3].includes(graph.version)
       || !Array.isArray(graph.nodes)) {
     throw new Error(`expected ${GRAPH_FORMAT} version 1, 2, or 3 input`);
   }
   if (!Array.isArray(graph.capture?.roots) || graph.capture.roots.length === 0) {
     throw new Error("surface graph has no selected roots");
+  }
+  if (!provenance || !validSha256(provenance.sourceSha256)
+      || !validSha256(provenance.graphSha256)) {
+    throw new Error("surface graph analysis requires source and graph SHA-256 provenance");
   }
   if (graph.version >= 3) {
     for (const node of graph.nodes) {
@@ -346,6 +350,10 @@ function validateInputs(graph, capabilityReport) {
     label: "capability input",
     versions: [CURRENT_SURFACE_REPORT_VERSION],
   });
+}
+
+function validSha256(value) {
+  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }
 
 function validGraphAbi(abi) {

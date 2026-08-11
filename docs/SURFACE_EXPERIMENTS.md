@@ -43,14 +43,12 @@ operations (`Float.abs`, `sqrt`, `sin`, `cos`, `acos`, and `atan2`) had modest
 library-wide gains but were justified by Illuminate's concrete hit-testing
 closure. Later `cbrt` and `floor` additions were likewise consumer-driven.
 
-Two tempting registration-only groups initially failed runtime validation.
+Several tempting registration-only groups initially failed runtime validation.
 `UInt8.ofNatLT` was later enabled with a distinct compiler-generated lookup
-stem because its raw symbol is shared with `UInt8.ofNat`; its dynamic fixture
-now passes. `Char.ofNatAux` still has an indirect-call signature mismatch with
-its ordinary boxed wrapper. `Thunk.mk`/`Thunk.get` remain blocked because the
-native thunk runtime attempts to invoke a VIR interpreter closure through a
-compiled function pointer. Those remaining cases require explicit runtime
-design, not merely native-catalog entries.
+stem because its raw symbol is shared with `UInt8.ofNat`. Other rejected groups
+exposed proof-erased ABI or interpreter-closure problems rather than missing
+catalog entries. See [Native Boxed Wrappers](UPSTREAM_BOUNDARY.md#native-boxed-wrappers)
+for their current status and runtime rationale.
 
 For current analysis and reproduction commands, see
 [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md).
