@@ -48,6 +48,7 @@ function lowerJson(runtime, value, label, depth, ancestors) {
 }
 
 function lowerJsonArray(runtime, value, label, depth, ancestors) {
+  requireNoEnumerableSymbolProperties(value, label);
   const elements = [];
   try {
     for (let index = 0; index < value.length; index++) {
@@ -73,11 +74,12 @@ function lowerJsonObject(runtime, value, label, depth, ancestors) {
   const entries = [];
   try {
     for (const key of Object.keys(value)) {
+      const childLabel = jsonObjectPath(label, key);
       const fields = [];
       try {
-        fields.push(runtime.makeObjectString(key, `${label}.${key} key`));
-        fields.push(lowerJson(runtime, value[key], `${label}.${key}`, depth + 1, ancestors));
-        entries.push(runtime.makeObjectCtorFromOwnedFields(0, fields, `${label}.${key} entry`));
+        fields.push(runtime.makeObjectString(key, `${childLabel} key`));
+        fields.push(lowerJson(runtime, value[key], childLabel, depth + 1, ancestors));
+        entries.push(runtime.makeObjectCtorFromOwnedFields(0, fields, `${childLabel} entry`));
       } finally {
         runtime.releaseOwnedObjects(fields);
       }
@@ -192,7 +194,7 @@ function liftJsonObject(runtime, entries, label, depth) {
         Object.defineProperty(value, key, {
           configurable: true,
           enumerable: true,
-          value: liftJson(runtime, valueObj, `${label}.${key}`, depth + 1),
+          value: liftJson(runtime, valueObj, jsonObjectPath(label, key), depth + 1),
           writable: true,
         });
       });
@@ -215,12 +217,25 @@ export function requirePlainJsonObject(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new TypeError(`${label} must be a plain JSON object`);
   }
+  requireNoEnumerableSymbolProperties(value, label);
+  return value;
+}
+
+export function requireNoEnumerableSymbolProperties(value, label) {
   for (const symbol of Object.getOwnPropertySymbols(value)) {
     if (propertyIsEnumerable(value, symbol)) {
       throw new TypeError(`${label} has an enumerable symbol property, which JSON cannot represent`);
     }
   }
   return value;
+}
+
+export function jsonArrayPath(label, index) {
+  return `${label}[${index}]`;
+}
+
+export function jsonObjectPath(label, key) {
+  return `${label}[${JSON.stringify(key)}]`;
 }
 
 export function requireJsonDepth(depth, label) {

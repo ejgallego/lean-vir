@@ -45,6 +45,15 @@ def borrowedPickWanted (value : Lean.Vir.Json.Handle) :
       | none => pure .null
   | _ => pure .null
 
+def borrowedPickWantedHandle (value : Lean.Vir.Json.Handle) :
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  match ← Lean.Vir.Json.Handle.inspect value with
+  | .object entries =>
+      match entries.findSome? fun (key, item) => if key == "wanted" then some item else none with
+      | some item => pure item
+      | none => Lean.Vir.Json.Handle.ofJson .null
+  | _ => Lean.Vir.Json.Handle.ofJson .null
+
 def borrowedToOwned (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json :=
   Lean.Vir.Json.Handle.toJson value
 

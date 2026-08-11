@@ -5503,6 +5503,7 @@ function lowerJson(runtime, value, label, depth, ancestors) {
   }
 }
 function lowerJsonArray(runtime, value, label, depth, ancestors) {
+  requireNoEnumerableSymbolProperties(value, label);
   const elements = [];
   try {
     for (let index = 0; index < value.length; index++) {
@@ -5527,11 +5528,12 @@ function lowerJsonObject(runtime, value, label, depth, ancestors) {
   const entries = [];
   try {
     for (const key of Object.keys(value)) {
+      const childLabel = jsonObjectPath(label, key);
       const fields2 = [];
       try {
-        fields2.push(runtime.makeObjectString(key, `${label}.${key} key`));
-        fields2.push(lowerJson(runtime, value[key], `${label}.${key}`, depth + 1, ancestors));
-        entries.push(runtime.makeObjectCtorFromOwnedFields(0, fields2, `${label}.${key} entry`));
+        fields2.push(runtime.makeObjectString(key, `${childLabel} key`));
+        fields2.push(lowerJson(runtime, value[key], childLabel, depth + 1, ancestors));
+        entries.push(runtime.makeObjectCtorFromOwnedFields(0, fields2, `${childLabel} entry`));
       } finally {
         runtime.releaseOwnedObjects(fields2);
       }
@@ -5637,7 +5639,7 @@ function liftJsonObject(runtime, entries, label, depth) {
         Object.defineProperty(value, key, {
           configurable: true,
           enumerable: true,
-          value: liftJson(runtime, valueObj, `${label}.${key}`, depth + 1),
+          value: liftJson(runtime, valueObj, jsonObjectPath(label, key), depth + 1),
           writable: true
         });
       });
@@ -5658,12 +5660,22 @@ function requirePlainJsonObject(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new TypeError(`${label} must be a plain JSON object`);
   }
+  requireNoEnumerableSymbolProperties(value, label);
+  return value;
+}
+function requireNoEnumerableSymbolProperties(value, label) {
   for (const symbol of Object.getOwnPropertySymbols(value)) {
     if (propertyIsEnumerable(value, symbol)) {
       throw new TypeError(`${label} has an enumerable symbol property, which JSON cannot represent`);
     }
   }
   return value;
+}
+function jsonArrayPath(label, index) {
+  return `${label}[${index}]`;
+}
+function jsonObjectPath(label, key) {
+  return `${label}[${JSON.stringify(key)}]`;
 }
 function requireJsonDepth(depth, label) {
   if (depth > JSON_MAX_DEPTH) {
@@ -5738,6 +5750,7 @@ function createJsonHandlePayload(value, parent, label) {
     [JSON_HANDLE_BRAND]: true,
     depth,
     parent,
+    path: label,
     value
   });
 }
@@ -5756,23 +5769,25 @@ function inspectJsonHandle(resources, resource) {
     case "boolean":
       return { kind: "bool", value };
     case "number":
-      return { kind: "number", value: requireJsonNumber(value, "JSON handle number") };
+      return { kind: "number", value: requireJsonNumber(value, payload.path) };
     case "string":
       return { kind: "string", value };
     case "object":
       return Array.isArray(value) ? inspectJsonArray(resources, value, payload) : inspectJsonObject(resources, value, payload);
     default:
-      throw new TypeError(`JSON handle contains unsupported ${typeof value} value`);
+      throw new TypeError(`${payload.path} contains unsupported ${typeof value} value`);
   }
 }
 function inspectJsonArray(resources, value, parent) {
+  requireNoEnumerableSymbolProperties(value, parent.path);
   const owned = [];
   try {
     for (let index = 0; index < value.length; index++) {
+      const childPath = jsonArrayPath(parent.path, index);
       if (!hasOwn3(value, index)) {
-        throw new TypeError(`JSON handle[${index}] is an array hole, not a JSON value`);
+        throw new TypeError(`${childPath} is an array hole, not a JSON value`);
       }
-      owned.push(createJsonHandleResource(resources, value[index], parent, `JSON handle[${index}]`));
+      owned.push(createJsonHandleResource(resources, value[index], parent, childPath));
     }
     return { kind: "array", value: owned };
   } catch (error) {
@@ -5781,11 +5796,11 @@ function inspectJsonArray(resources, value, parent) {
   }
 }
 function inspectJsonObject(resources, value, parent) {
-  requirePlainJsonObject(value, "JSON handle");
+  requirePlainJsonObject(value, parent.path);
   const owned = [];
   try {
     const entries = Object.keys(value).map((key) => {
-      const child = createJsonHandleResource(resources, value[key], parent, `JSON handle.${key}`);
+      const child = createJsonHandleResource(resources, value[key], parent, jsonObjectPath(parent.path, key));
       owned.push(child);
       return { fst: key, snd: child };
     });
@@ -5812,7 +5827,7 @@ function releaseJsonHandleResources(resources) {
 function requireShallowJsonValue(value, label) {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "number") return requireJsonNumber(value, label);
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) return requireNoEnumerableSymbolProperties(value, label);
   if (value !== null && typeof value === "object") return requirePlainJsonObject(value, label);
   throw new TypeError(`${label} must be an ordinary JSON value; found ${typeof value}`);
 }

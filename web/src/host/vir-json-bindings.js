@@ -7,6 +7,9 @@ Author: Emilio J. Gallego Arias
 import { hostResourceValue, releaseHostResource } from "../host-resource.js";
 import {
   JSON_MAX_DEPTH,
+  jsonArrayPath,
+  jsonObjectPath,
+  requireNoEnumerableSymbolProperties,
   requireJsonDepth,
   requireJsonNumber,
   requirePlainJsonObject,
@@ -96,6 +99,7 @@ function createJsonHandlePayload(value, parent, label) {
     [JSON_HANDLE_BRAND]: true,
     depth,
     parent,
+    path: label,
     value,
   });
 }
@@ -116,7 +120,7 @@ function inspectJsonHandle(resources, resource) {
     case "boolean":
       return { kind: "bool", value };
     case "number":
-      return { kind: "number", value: requireJsonNumber(value, "JSON handle number") };
+      return { kind: "number", value: requireJsonNumber(value, payload.path) };
     case "string":
       return { kind: "string", value };
     case "object":
@@ -124,18 +128,20 @@ function inspectJsonHandle(resources, resource) {
         ? inspectJsonArray(resources, value, payload)
         : inspectJsonObject(resources, value, payload);
     default:
-      throw new TypeError(`JSON handle contains unsupported ${typeof value} value`);
+      throw new TypeError(`${payload.path} contains unsupported ${typeof value} value`);
   }
 }
 
 function inspectJsonArray(resources, value, parent) {
+  requireNoEnumerableSymbolProperties(value, parent.path);
   const owned = [];
   try {
     for (let index = 0; index < value.length; index++) {
+      const childPath = jsonArrayPath(parent.path, index);
       if (!hasOwn(value, index)) {
-        throw new TypeError(`JSON handle[${index}] is an array hole, not a JSON value`);
+        throw new TypeError(`${childPath} is an array hole, not a JSON value`);
       }
-      owned.push(createJsonHandleResource(resources, value[index], parent, `JSON handle[${index}]`));
+      owned.push(createJsonHandleResource(resources, value[index], parent, childPath));
     }
     return { kind: "array", value: owned };
   } catch (error) {
@@ -145,11 +151,11 @@ function inspectJsonArray(resources, value, parent) {
 }
 
 function inspectJsonObject(resources, value, parent) {
-  requirePlainJsonObject(value, "JSON handle");
+  requirePlainJsonObject(value, parent.path);
   const owned = [];
   try {
     const entries = Object.keys(value).map((key) => {
-      const child = createJsonHandleResource(resources, value[key], parent, `JSON handle.${key}`);
+      const child = createJsonHandleResource(resources, value[key], parent, jsonObjectPath(parent.path, key));
       owned.push(child);
       return { fst: key, snd: child };
     });
@@ -178,7 +184,7 @@ function releaseJsonHandleResources(resources) {
 function requireShallowJsonValue(value, label) {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "number") return requireJsonNumber(value, label);
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) return requireNoEnumerableSymbolProperties(value, label);
   if (value !== null && typeof value === "object") return requirePlainJsonObject(value, label);
   throw new TypeError(`${label} must be an ordinary JSON value; found ${typeof value}`);
 }

@@ -213,6 +213,18 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     () => jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedRoundTrip", symbolObject),
     /enumerable symbol property/,
   );
+  const symbolArray = [];
+  Object.defineProperty(symbolArray, Symbol("bad"), { enumerable: true, value: 1 });
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedRoundTrip", symbolArray),
+    /enumerable symbol property/,
+  );
+  assert.throws(() => jsonRuntime.borrowJson(symbolArray), /enumerable symbol property/);
+  const nestedMalformed = { "outer.key": [undefined] };
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedRoundTrip", nestedMalformed),
+    /argument value\["outer\.key"\]\[0\]/,
+  );
   assert.throws(
     () => jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedDuplicate"),
     /duplicate JSON object key "same"/,
@@ -245,6 +257,12 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", borrowedInput),
     { ref: { opaque: ["same", 17] }, title: "picked" },
   );
+  const wantedRef = jsonRuntime.jsonValue(borrowedInput).wanted;
+  const borrowedChild = jsonRuntime.call(
+    "Vir.Fixtures.JsonLanes.borrowedPickWantedHandle",
+    borrowedInput,
+  );
+  assert.equal(jsonRuntime.jsonValue(borrowedChild), wantedRef);
   const borrowedOutput = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedInput);
   assert.deepEqual(jsonRuntime.jsonValue(borrowedOutput), {
     skipped: { large: [1, 2, 3] },
@@ -257,8 +275,10 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     "Vir.Fixtures.JsonLanes.borrowedEmbedWanted",
     borrowedInput,
   );
-  const wantedRef = jsonRuntime.jsonValue(borrowedInput).wanted;
   releaseHostResource(borrowedInput);
+  assert.equal(jsonRuntime.jsonValue(borrowedChild), wantedRef);
+  releaseHostResource(borrowedChild);
+  assert.throws(() => jsonRuntime.jsonValue(borrowedChild), /live|resource/);
   const embeddedValue = jsonRuntime.jsonValue(embeddedOutput);
   assert.equal(embeddedValue.ref, wantedRef);
   assert.equal(embeddedValue.values[0], embeddedValue.ref);
@@ -276,10 +296,10 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   );
   releaseHostResource(borrowedCycle);
   assert.throws(() => jsonRuntime.borrowJson(Symbol("bad")), /ordinary JSON value/);
-  const borrowedMalformed = jsonRuntime.borrowJson({ nested: undefined });
+  const borrowedMalformed = jsonRuntime.borrowJson(nestedMalformed);
   assert.throws(
     () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedMalformed),
-    /unsupported undefined value|ordinary JSON value/,
+    /borrowed JSON\["outer\.key"\]\[0\]/,
   );
   releaseHostResource(borrowedMalformed);
   const borrowedDeep = jsonRuntime.borrowJson(deep);
