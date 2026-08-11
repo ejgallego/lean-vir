@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example-tests",
+  "example": "illuminate",
+  "variants": [
+    {
+      "id": "default",
+      "title": "Player trace replay",
+      "build": null,
+      "tests": [
+        {
+          "id": "quick-parity",
+          "study": "quick",
+          "oracle": "js",
+          "backends": ["js", "vir", "native"],
+          "data": {
+            "workloads": [
+              {
+                "id": "small",
+                "title": "Pause-driven slide show",
+                "eventCounts": [0, 1, 10]
+              },
+              {
+                "id": "parameter-heavy",
+                "title": "Morphing arrows and final loop",
+                "eventCounts": [0, 1, 10]
+              }
+            ]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "scaling",
+        "data": {
+          "workloads": [
+            {
+              "id": "small",
+              "title": "Pause-driven slide show",
+              "eventCounts": [0, 1, 10, 30, 60, 120]
+            },
+            {
+              "id": "parameter-heavy",
+              "title": "Morphing arrows and final loop",
+              "eventCounts": [0, 1, 10, 30]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

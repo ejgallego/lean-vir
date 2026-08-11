@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const lifecycles = new Set([
@@ -68,6 +69,7 @@ export function validateExampleManifest(manifest, { directory = null } = {}) {
       "lifecycle",
       "packages",
       "controller",
+      "testPackage",
     ]),
     "example manifest",
   );
@@ -87,8 +89,19 @@ export function validateExampleManifest(manifest, { directory = null } = {}) {
   string(manifest.title, `example ${id} title`);
   string(manifest.summary, `example ${id} summary`);
   const controller = webPath(manifest.controller, `example ${id} controller`);
-  if (!controller.endsWith(".mjs")) {
-    throw new Error(`example ${id} controller must be an ES module`);
+  if (controller !== `examples/${id}/controller.mjs`) {
+    throw new Error(
+      `example ${id} controller must be examples/${id}/controller.mjs`,
+    );
+  }
+  const testPackage = webPath(
+    manifest.testPackage,
+    `example ${id} test package`,
+  );
+  if (testPackage !== `examples/${id}/tests.json`) {
+    throw new Error(
+      `example ${id} test package must be examples/${id}/tests.json`,
+    );
   }
   if (!Array.isArray(manifest.packages) || manifest.packages.length === 0) {
     throw new Error(`example ${id} must declare at least one VIR package`);
@@ -128,6 +141,106 @@ export function validateExampleManifest(manifest, { directory = null } = {}) {
   return manifest;
 }
 
+export function validateExampleTestPackage(value, exampleId) {
+  const testPackage = object(value, `example ${exampleId} test package`);
+  exactProperties(
+    testPackage,
+    new Set(["schemaVersion", "kind", "example", "variants"]),
+    `example ${exampleId} test package`,
+  );
+  if (
+    testPackage.schemaVersion !== 1 ||
+    testPackage.kind !== "browser-benchmarks/example-tests" ||
+    testPackage.example !== exampleId
+  ) {
+    throw new Error(`unsupported test package for example ${exampleId}`);
+  }
+  if (!Array.isArray(testPackage.variants) || testPackage.variants.length === 0) {
+    throw new Error(`example ${exampleId} must declare a test variant`);
+  }
+  const variantIds = new Set();
+  for (const [variantIndex, item] of testPackage.variants.entries()) {
+    const label = `example ${exampleId} variants[${variantIndex}]`;
+    const variant = object(item, label);
+    exactProperties(
+      variant,
+      new Set(["id", "title", "build", "tests", "benchmark"]),
+      label,
+    );
+    const variantId = identifier(variant.id, `${label} ID`);
+    if (variantIds.has(variantId)) {
+      throw new Error(`example ${exampleId} repeats variant ${variantId}`);
+    }
+    variantIds.add(variantId);
+    string(variant.title, `${label} title`);
+    if (variant.build !== null) identifier(variant.build, `${label} build`);
+    if (!Array.isArray(variant.tests) || variant.tests.length === 0) {
+      throw new Error(`${label} must declare a differential test`);
+    }
+    const testIds = new Set();
+    for (const [testIndex, testItem] of variant.tests.entries()) {
+      const testLabel = `${label} tests[${testIndex}]`;
+      const test = object(testItem, testLabel);
+      exactProperties(
+        test,
+        new Set(["id", "study", "oracle", "backends", "data"]),
+        testLabel,
+      );
+      const testId = identifier(test.id, `${testLabel} ID`);
+      if (testIds.has(testId)) {
+        throw new Error(`${label} repeats test ${testId}`);
+      }
+      testIds.add(testId);
+      identifier(test.study, `${testLabel} study`);
+      if (!Array.isArray(test.backends) || test.backends.length < 2) {
+        throw new Error(`${testLabel} must require at least two backends`);
+      }
+      const backends = new Set();
+      for (const [backendIndex, backend] of test.backends.entries()) {
+        const backendId = identifier(
+          backend,
+          `${testLabel} backends[${backendIndex}]`,
+        );
+        if (backends.has(backendId)) {
+          throw new Error(`${testLabel} repeats backend ${backendId}`);
+        }
+        backends.add(backendId);
+      }
+      if (test.oracle !== null) {
+        const oracle = identifier(test.oracle, `${testLabel} oracle`);
+        if (!backends.has(oracle)) {
+          throw new Error(`${testLabel} oracle is not a required backend`);
+        }
+      }
+      object(test.data, `${testLabel} data`);
+    }
+    const benchmark = object(variant.benchmark, `${label} benchmark`);
+    exactProperties(
+      benchmark,
+      new Set(["study", "data"]),
+      `${label} benchmark`,
+    );
+    identifier(benchmark.study, `${label} benchmark study`);
+    object(benchmark.data, `${label} benchmark data`);
+  }
+  if (testPackage.variants[0].id !== "default") {
+    throw new Error(`example ${exampleId} must declare default as its first variant`);
+  }
+  return testPackage;
+}
+
+export async function readExampleTestPackage(appRoot, example) {
+  const path = resolve(appRoot, example.testPackage);
+  const info = await stat(path).catch(() => null);
+  if (!info?.isFile()) {
+    throw new Error(`example ${example.id} test package is missing: ${example.testPackage}`);
+  }
+  return validateExampleTestPackage(
+    JSON.parse(await readFile(path, "utf8")),
+    example.id,
+  );
+}
+
 export async function discoverExampleCatalog(appRoot) {
   const examplesRoot = join(appRoot, "examples");
   const entries = await readdir(examplesRoot, { withFileTypes: true });
@@ -143,6 +256,25 @@ export async function discoverExampleCatalog(appRoot) {
     const controllerPath = resolve(appRoot, manifest.controller);
     if (!(await stat(controllerPath).catch(() => null))?.isFile()) {
       throw new Error(`example ${manifest.id} controller is missing: ${manifest.controller}`);
+    }
+    const testPackage = await readExampleTestPackage(appRoot, manifest);
+    const controller = await import(pathToFileURL(controllerPath).href);
+    const studies = new Set(
+      (controller.view?.studies ?? []).map((study) => study?.id),
+    );
+    for (const variant of testPackage.variants) {
+      for (const test of variant.tests) {
+        if (!studies.has(test.study)) {
+          throw new Error(
+            `example ${manifest.id} variant ${variant.id} references unknown study ${test.study}`,
+          );
+        }
+      }
+      if (!studies.has(variant.benchmark.study)) {
+        throw new Error(
+          `example ${manifest.id} variant ${variant.id} references unknown benchmark ${variant.benchmark.study}`,
+        );
+      }
     }
     examples.push(manifest);
   }

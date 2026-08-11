@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "browser-benchmarks/example-tests/v1",
+  "title": "Lean browser benchmark test package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "example", "variants"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "browser-benchmarks/example-tests" },
+    "example": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "build", "tests", "benchmark"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "build": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+              }
+            ]
+          },
+          "tests": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "study", "oracle", "backends", "data"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                },
+                "study": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                },
+                "oracle": {
+                  "oneOf": [
+                    { "type": "null" },
+                    {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                    }
+                  ]
+                },
+                "backends": {
+                  "type": "array",
+                  "minItems": 2,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                  }
+                },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "benchmark": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["study", "data"],
+            "properties": {
+              "study": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+              },
+              "data": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

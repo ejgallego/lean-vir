@@ -12,7 +12,8 @@
     "summary",
     "lifecycle",
     "packages",
-    "controller"
+    "controller",
+    "testPackage"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
@@ -29,6 +30,10 @@
     "controller": {
       "type": "string",
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*\\\\).+\\.mjs$"
+    },
+    "testPackage": {
+      "type": "string",
+      "pattern": "^examples/[a-zA-Z0-9][a-zA-Z0-9._-]*/tests\\.json$"
     },
     "packages": {
       "type": "array",

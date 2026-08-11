@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { safeArchivePath } from "./artifact-set-lib.mjs";
-import { discoverExampleCatalog } from "./example-catalog-lib.mjs";
+import {
+  discoverExampleCatalog,
+  readExampleTestPackage,
+} from "./example-catalog-lib.mjs";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
@@ -116,11 +119,46 @@ function materializeExamplePackages(database, catalog) {
   }
 }
 
+async function validateBuildVariants(database, catalog, appRoot) {
+  for (const example of catalog.examples) {
+    const testPackage = await readExampleTestPackage(appRoot, example);
+    for (const variant of testPackage.variants) {
+      if (variant.build === null) continue;
+      const build = database.builds[variant.build];
+      if (
+        !build ||
+        build.example.id !== example.id ||
+        build.example.variant !== variant.id
+      ) {
+        throw new Error(
+          `example variant ${example.id}/${variant.id} references invalid build ${variant.build}`,
+        );
+      }
+    }
+  }
+  for (const [buildId, build] of Object.entries(database.builds)) {
+    const example = catalog.examples.find(({ id }) => id === build.example.id);
+    const testPackage = example
+      ? await readExampleTestPackage(appRoot, example)
+      : null;
+    const variant = testPackage?.variants.find(
+      ({ id }) => id === build.example.variant,
+    );
+    if (!variant || variant.build !== buildId) {
+      throw new Error(
+        `build ${buildId} is not selected by example variant ${build.example.id}/${build.example.variant}`,
+      );
+    }
+  }
+}
+
 export async function readBuildDatabase(path) {
   const database = JSON.parse(await readFile(path, "utf8"));
-  const catalog = await discoverExampleCatalog(resolve(dirname(path)));
+  const appRoot = resolve(dirname(path));
+  const catalog = await discoverExampleCatalog(appRoot);
   materializeExamplePackages(database, catalog);
   validateBuildDatabase(database);
+  await validateBuildVariants(database, catalog, appRoot);
   return database;
 }
 
@@ -169,12 +207,16 @@ export function validateBuildDatabase(database) {
     );
     const example = object(build.example, `build ${buildId} example`);
     if (
-      Object.keys(example).length !== 1 ||
-      !Object.hasOwn(example, "id")
+      Object.keys(example).length !== 2 ||
+      !Object.hasOwn(example, "id") ||
+      !Object.hasOwn(example, "variant")
     ) {
-      throw new Error(`build ${buildId} example must contain only its ID`);
+      throw new Error(
+        `build ${buildId} example must contain only its ID and variant`,
+      );
     }
     const exampleId = identifier(example.id, `build ${buildId} example ID`);
+    identifier(example.variant, `build ${buildId} example variant`);
     exactObject(
       build.artifactSet,
       ["setId", "benchmarkContract"],

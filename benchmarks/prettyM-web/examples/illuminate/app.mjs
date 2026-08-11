@@ -1,6 +1,6 @@
 // @ts-check
 
-const artifactBase = new URL("../artifacts/illuminate/", import.meta.url);
+const artifactBase = new URL("../../artifacts/illuminate/", import.meta.url);
 const typedVirEntry = "Illuminate.Animation.Vir.replayTraceTyped";
 const backendColors = {
   js: "#74a9ff",
@@ -713,15 +713,19 @@ async function samplePoint(
   };
 }
 
-async function runComparison(kind) {
-  const selectedIds = selectedBackendIds();
+async function runComparison(kind, options = {}) {
+  const selectedIds = Array.isArray(options.backends)
+    ? options.backends.slice()
+    : selectedBackendIds();
   if (selectedIds.length < 2) {
     throw new Error("select at least two ready backends for comparison");
   }
   const selected = selectedIds.map(backend);
   const warmup = readCount("warmup", 0, 20);
   const samples = readCount("samples", 1, 100);
-  const workloadSpecs = [
+  const workloadSpecs = Array.isArray(options.data?.workloads)
+    ? options.data.workloads
+    : [
     {
       id: "small",
       title: "Pause-driven slide show",
@@ -732,7 +736,7 @@ async function runComparison(kind) {
       title: "Morphing arrows and final loop",
       eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30],
     },
-  ];
+      ];
   const workloads = workloadSpecs.map((spec) => {
     const example = examples.find(
       (candidate) => candidate.title === spec.title,
@@ -906,12 +910,42 @@ function setRunning(value) {
   renderBackends();
 }
 
-async function execute(kind) {
+function studySelection(kind, options) {
+  if (options?.test || options?.benchmark) return options;
+  const variant = globalThis.__benchmarkExampleContext?.variant;
+  const test = variant?.tests?.find((candidate) => candidate.study === kind);
+  if (test) return { test };
+  if (variant?.benchmark?.study === kind) {
+    return { benchmark: variant.benchmark };
+  }
+  return options ?? {};
+}
+
+function recordExampleSelection(report, options) {
+  const context = globalThis.__benchmarkExampleContext;
+  if (!context) return report;
+  report.examplePackage = {
+    example: context.example.id,
+    variant: context.variant.id,
+    testPackage: context.testPackageIdentity,
+    test: options.test?.id ?? null,
+    benchmark: options.benchmark?.study ?? null,
+  };
+  return report;
+}
+
+async function execute(kind, suppliedOptions) {
   if (running) return;
   setRunning(true);
   setState("Running", "running", "Preparing Illuminate traces…");
   try {
-    latestReport = await runComparison(kind);
+    const options = studySelection(kind, suppliedOptions);
+    const specification = options.test ?? options.benchmark ?? {};
+    latestReport = await runComparison(kind, {
+      backends: options.test?.backends,
+      data: specification.data,
+    });
+    recordExampleSelection(latestReport, options);
     globalThis.PrettyBenchDashboard.load(latestReport);
     renderReport(latestReport);
     setState(

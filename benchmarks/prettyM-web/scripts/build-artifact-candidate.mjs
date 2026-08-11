@@ -195,7 +195,17 @@ async function main() {
     relative(appRoot, resolve(candidateRoot, "sets")),
   ]);
 
-  run("npm", ["test"]);
+  const exampleTestReport = resolve(candidateRoot, "EXAMPLE_TEST.json");
+  run("npm", ["run", "test:unit"]);
+  run("npm", [
+    "run",
+    "test:example",
+    "--",
+    build.example.id,
+    build.example.variant,
+    "--output",
+    relative(appRoot, exampleTestReport),
+  ]);
 
   const receipt = inside(
     appRoot,
@@ -205,7 +215,14 @@ async function main() {
   const checksum = `${archive}.sha256`;
   const manifest = resolve(releaseDir, `${lock.setId}.manifest.json`);
   await mkdir(uploadDir, { recursive: true });
-  for (const source of [archive, checksum, manifest, receipt, candidateLock]) {
+  for (const source of [
+    archive,
+    checksum,
+    manifest,
+    receipt,
+    candidateLock,
+    exampleTestReport,
+  ]) {
     const destination =
       source === receipt
         ? "BUILD.json"
@@ -220,15 +237,18 @@ async function main() {
   });
   const commit = run("git", ["rev-parse", "HEAD"], { capture: true });
   const dirty = run("git", ["status", "--porcelain"], { capture: true });
-  const [archiveRecord, receiptRecord, manifestRecord] = await Promise.all([
+  const [archiveRecord, receiptRecord, manifestRecord, testReportRecord] =
+    await Promise.all([
     fileRecord(archive),
     fileRecord(receipt),
     fileRecord(manifest),
+    fileRecord(exampleTestReport),
   ]);
   const candidate = {
     schemaVersion: 1,
     kind: "browser-benchmarks/artifact-candidate",
     build: options.buildId,
+    example: structuredClone(build.example),
     artifactSet: lock.setId,
     orchestrator: {
       repository,
@@ -247,10 +267,15 @@ async function main() {
       file: "BUILD.json",
       ...receiptRecord,
     },
+    exampleTestReport: {
+      file: "EXAMPLE_TEST.json",
+      ...testReportRecord,
+    },
     validation: {
       sourcePackages: "passed",
       archiveImport: "passed",
-      applicationTests: "passed",
+      applicationUnitTests: "passed",
+      exampleDifferential: "passed",
     },
     promotion: {
       published: false,

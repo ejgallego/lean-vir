@@ -26,7 +26,8 @@
   "builds": {
     "prettyM": {
       "example": {
-        "id": "prettyM"
+        "id": "prettyM",
+        "variant": "default"
       },
       "artifactSet": {
         "setId": "prettyM-bounded-set-0002",

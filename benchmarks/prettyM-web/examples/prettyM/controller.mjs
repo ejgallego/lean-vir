@@ -35,13 +35,13 @@ export const view = {
   bootstrap: {
     externalScripts: [],
     classicScripts: [
-      "src/config.js",
-      "src/benchmark-core.js",
-      "src/backends/pretty-vir.js",
-      "src/backends/pretty-native.js",
-      "src/backends/pretty-llvm.js",
+      "examples/prettyM/config.js",
+      "examples/prettyM/benchmark-core.js",
+      "examples/prettyM/backends/pretty-vir.js",
+      "examples/prettyM/backends/pretty-native.js",
+      "examples/prettyM/backends/pretty-llvm.js",
       "src/dashboard.js",
-      "src/app.js",
+      "examples/prettyM/app.js",
     ],
   },
 };

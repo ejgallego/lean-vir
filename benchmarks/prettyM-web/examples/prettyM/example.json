@@ -15,5 +15,6 @@
       ]
     }
   ],
-  "controller": "examples/prettyM/controller.mjs"
+  "controller": "examples/prettyM/controller.mjs",
+  "testPackage": "examples/prettyM/tests.json"
 }

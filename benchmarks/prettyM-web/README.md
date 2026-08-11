@@ -12,11 +12,25 @@ The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
 this package.
 
-Client examples use the compact `browser-benchmarks/example` v1 descriptor
-under `examples/<id>/example.json`. It declares only identity, lifecycle, Lean
-targets and exports, and a browser controller. Run `npm run examples:check` to
-validate the catalog. See [`docs/EXAMPLE_FORMAT.md`](docs/EXAMPLE_FORMAT.md)
-for the contribution and uniform VIR compilation contract.
+Client examples use one self-contained directory under `examples/<id>/`. Its
+compact descriptor declares identity, lifecycle, Lean targets and exports, a
+browser controller, and a `tests.json` package containing selectable variants,
+differential inputs, JavaScript-oracle availability, required backends, and the
+benchmark entry point. Run `npm run examples:check` to validate the catalog.
+See [`docs/EXAMPLE_FORMAT.md`](docs/EXAMPLE_FORMAT.md) for the contribution and
+uniform VIR compilation contract.
+
+Select the complete build-and-test unit by example and variant:
+
+```sh
+npm run example -- prettyM default --plan
+npm run example -- prettyM default --test-only
+# Builds, packs, imports, validates, then runs the declared differential tests:
+npm run example -- prettyM default --toolchain /path/to/lean-fir
+```
+
+The benchmark suite is part of the package but is not measured by these
+commands. Performance collection remains an explicit controlled-machine step.
 
 ## Responsibilities
 
@@ -118,9 +132,10 @@ VIR and workload pins while selecting merged FIR `298682a`. Five-backend parity
 is the compatibility gate; no cross-backend Lean heap values are exchanged.
 
 The current VIR package retains the historical
-`VersoSlides.Pretty.*ForVir` export names. They are declared in `src/config.js`
-as artifact compatibility data; the application itself does not load Verso or
-depend on slide sources. Renaming those two exports can accompany a later
+`VersoSlides.Pretty.*ForVir` export names. They are declared in
+`examples/prettyM/config.js` as artifact compatibility data; the application
+itself does not load Verso or depend on slide sources. Renaming those two
+exports can accompany a later
 artifact refresh without changing the benchmark or dashboard APIs.
 
 ## Develop and test

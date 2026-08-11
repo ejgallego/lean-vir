@@ -69,16 +69,16 @@ source-build catalog and the accepted lock are committed.
    npm run artifacts:fetch -- \
      --lock LOCK \
      --archive _artifacts/releases/<archive>.tar
-   npm test
+   npm run test:unit
+   npm run test:example -- EXAMPLE VARIANT
    ```
 
-6. Run at least one real differential report. Performance campaigns remain a
+6. Review the differential report. Performance campaigns remain a
    controlled-machine operation rather than a hosted-runner gate.
 
-CI implements steps 1–5 as a candidate build and uploads the resulting archive
-and source receipt as a short-lived Actions artifact. It deliberately omits
-step 6: hosted runners establish correctness and package integrity, not a
-performance conclusion.
+CI implements these correctness steps as a candidate build and uploads the
+resulting archive and source receipt as a short-lived Actions artifact. Hosted
+runners establish parity and package integrity, not a performance conclusion.
 
 Packing is deterministic: members are sorted, regular-file-only, mode 0644,
 UID/GID zero, and timestamp zero. Repacking unchanged inputs must reproduce the
@@ -127,8 +127,9 @@ the verified manifest into that directory, and preserves sibling examples.
 The browser derives stage-time verification status from this copied manifest;
 it does not independently rehash the whole set on page load. Missing manifests
 are shown as rehearsal or unverified local state. Example reports retain the
-manifest provenance; prettyM runtime profiles additionally hash the manifest
-and every browser-observed runtime asset.
+manifest provenance and selected example/variant test-package digest; newly
+packed manifests bind that digest as well. prettyM runtime profiles additionally
+hash the manifest and every browser-observed runtime asset.
 
 ## Set 0001
 

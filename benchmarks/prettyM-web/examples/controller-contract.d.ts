@@ -12,13 +12,16 @@ export interface BenchmarkReadiness {
 export interface BenchmarkController {
   ready: Promise<BenchmarkReadiness>;
   getBackends(): BenchmarkBackend[];
-  runStudy(studyId: string): Promise<unknown>;
+  runStudy(studyId: string, options?: Record<string, unknown>): Promise<unknown>;
   dispose?(): void;
 }
 
 export interface ExampleContext {
   example: Record<string, unknown> & { id: string };
   artifactBaseUrl: URL;
+  testPackage: Record<string, unknown>;
+  testPackageIdentity: { file: string; bytes: number; sha256: string };
+  variant: Record<string, unknown> & { id: string };
 }
 
 export declare function requireController(

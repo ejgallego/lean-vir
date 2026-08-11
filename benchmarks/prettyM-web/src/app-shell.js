@@ -123,7 +123,12 @@ function showArtifactStatus(status) {
   element("artifact-status-copy").textContent = status.copy;
 }
 
-async function inspectArtifactStatus(example, selectedView) {
+async function inspectArtifactStatus(
+  example,
+  variant,
+  selectedView,
+  testPackageIdentity,
+) {
   const root = `artifacts/${example.id}`;
   const url = new URL(`../${root}/ARTIFACT_SET.json`, import.meta.url);
   try {
@@ -134,9 +139,19 @@ async function inspectArtifactStatus(example, selectedView) {
       manifest?.schemaVersion !== 2 ||
       manifest?.kind !== "browser-benchmarks/artifact-set" ||
       manifest?.example?.id !== example.id ||
+      (manifest?.example?.variant !== undefined &&
+        manifest.example.variant !== variant.id) ||
       typeof manifest?.setId !== "string"
     ) {
       throw new Error("manifest does not match the selected example");
+    }
+    if (
+      manifest.testPackage &&
+      (manifest.testPackage.file !== testPackageIdentity.file ||
+        manifest.testPackage.bytes !== testPackageIdentity.bytes ||
+        manifest.testPackage.sha256 !== testPackageIdentity.sha256)
+    ) {
+      throw new Error("manifest test package does not match the selected example");
     }
     return {
       verified: true,
@@ -161,6 +176,13 @@ async function inspectArtifactStatus(example, selectedView) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function sha256(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 function renderShell() {
@@ -220,7 +242,48 @@ function loadScript(url) {
 async function boot() {
   if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
   const selectedView = requireView(selected, view);
-  artifactStatus = await inspectArtifactStatus(selected, selectedView);
+  const testPackageUrl = new URL(`../${selected.testPackage}`, import.meta.url);
+  const testPackageResponse = await fetch(testPackageUrl, { cache: "no-store" });
+  if (!testPackageResponse.ok) {
+    throw new Error(
+      `${selected.id} test package failed to load: HTTP ${testPackageResponse.status}`,
+    );
+  }
+  const testPackageBytes = await testPackageResponse.arrayBuffer();
+  const testPackage = JSON.parse(new TextDecoder().decode(testPackageBytes));
+  if (
+    testPackage?.schemaVersion !== 1 ||
+    testPackage?.kind !== "browser-benchmarks/example-tests" ||
+    testPackage?.example !== selected.id ||
+    !Array.isArray(testPackage.variants) ||
+    testPackage.variants.length === 0
+  ) {
+    throw new Error(`${selected.id} has an unsupported test package`);
+  }
+  const variantId = new URL(location.href).searchParams.get("variant");
+  const variant = variantId
+    ? testPackage.variants.find((candidate) => candidate.id === variantId)
+    : testPackage.variants[0];
+  if (!variant) {
+    throw new Error(`${selected.id} has no test variant ${variantId}`);
+  }
+  const testPackageIdentity = {
+    file: selected.testPackage,
+    bytes: testPackageBytes.byteLength,
+    sha256: await sha256(testPackageBytes),
+  };
+  globalThis.__benchmarkExampleContext = {
+    example: selected,
+    testPackage,
+    testPackageIdentity,
+    variant,
+  };
+  artifactStatus = await inspectArtifactStatus(
+    selected,
+    variant,
+    selectedView,
+    testPackageIdentity,
+  );
   showArtifactStatus(artifactStatus);
   for (const path of selectedView.bootstrap.externalScripts) {
     await loadScript(new URL(`../${path}`, import.meta.url).href);
@@ -234,6 +297,9 @@ async function boot() {
   controller = await selectedModule.loadExample({
     example: selected,
     artifactBaseUrl: new URL(`../artifacts/${selected.id}/`, import.meta.url),
+    testPackage,
+    testPackageIdentity,
+    variant,
   });
   const readiness = await controller.ready;
   return { example: selected.id, ...readiness };
@@ -247,4 +313,5 @@ globalThis.__benchmarkApp = {
   ready: boot(),
   getController: () => controller,
   getArtifactStatus: () => artifactStatus,
+  getVariant: () => globalThis.__benchmarkExampleContext?.variant ?? null,
 };

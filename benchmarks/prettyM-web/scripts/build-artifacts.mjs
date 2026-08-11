@@ -6,6 +6,7 @@ import {
   readFile,
   realpath,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import {
@@ -477,6 +478,13 @@ async function main() {
     "read example manifest",
   );
   const exampleBytes = await readFile(examplePath);
+  const exampleManifest = JSON.parse(exampleBytes);
+  const testPackagePath = inside(
+    appRoot,
+    exampleManifest.testPackage,
+    "read example test package",
+  );
+  const testPackageBytes = await readFile(testPackagePath);
   const sources = checkoutSources(database, options.buildId);
   const sourcesDir = inside(
     appRoot,
@@ -594,8 +602,13 @@ async function main() {
     },
     example: {
       id: build.example.id,
+      variant: build.example.variant,
       file: relative(appRoot, examplePath),
       sha256: sha256(exampleBytes),
+      testPackage: {
+        file: relative(appRoot, testPackagePath),
+        sha256: sha256(testPackageBytes),
+      },
     },
     checkoutResolution: {
       configUsed: toolchainConfig.path !== null,

@@ -15,5 +15,6 @@
       ]
     }
   ],
-  "controller": "examples/illuminate/controller.mjs"
+  "controller": "examples/illuminate/controller.mjs",
+  "testPackage": "examples/illuminate/tests.json"
 }

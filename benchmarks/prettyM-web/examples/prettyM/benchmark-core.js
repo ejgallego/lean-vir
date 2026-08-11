@@ -1861,7 +1861,7 @@ async function collectPrettyRuntimeProfile(backendIds) {
       var pathname = new URL(script.src).pathname;
       return (
         pathname.endsWith("/lib/pretty.js") ||
-        pathname.endsWith("/src/benchmark-core.js")
+        pathname.endsWith("/examples/prettyM/benchmark-core.js")
       );
     } catch (_error) {
       return false;

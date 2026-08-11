@@ -4,11 +4,12 @@
 VIR targets and exports. `artifact-builds.json` selects exact Git sources,
 including the Lean runtime source consumed by VIR, local checkout roles,
 producer dependencies, expected package files, artifact-set identity, and the
-provenance consumed by the packer. Accepted locks are
-separate consumer state. A VIR component names a `packageRef`; the driver
-resolves its target and exports from the example
-descriptor before validating or building it. `prettyM` is the first record; it
-is not a default baked into the catalog tools.
+provenance consumed by the packer. Accepted locks are separate consumer state.
+A VIR component names a `packageRef`, and every build binds an `example.id`
+plus `example.variant`. The driver resolves the package target and exports from
+the example descriptor and verifies that `tests.json` selects the same build
+before validating or building it. `prettyM/default` is the first record; it is
+not a default baked into the catalog tools.
 
 Machine-specific paths are deliberately absent from the catalog. The usual
 local flow materializes the catalogued sources, then optionally replaces the
@@ -139,10 +140,11 @@ validates exact output equivalence against that package.
 
 The generated `_artifacts/builds/<build-id>/BUILD.json` is a portable receipt.
 It records both the build-catalog and example-manifest digests, resolved source
-commits, adapters, and staged file hashes. Machine-local checkout and config
-paths are deliberately omitted because the receipt is included in the CI
-candidate payload. It is evidence about one invocation, not a second source of
-build configuration and not part of the published artifact set.
+commits, adapters, staged file hashes, selected variant, and the digest of its
+self-contained `tests.json`. Machine-local checkout and config paths are
+deliberately omitted because the receipt is included in the CI candidate
+payload. It is evidence about one invocation, not a second source of build
+configuration and not part of the published artifact set.
 
 ## Assemble the immutable set
 
@@ -190,11 +192,13 @@ npm run artifacts:candidate -- prettyM \
 ```
 
 The candidate command runs the source builder, packs with a separate ignored
-lock, imports the generated archive through `artifacts:fetch`, runs `npm test`,
-and collects the upload payload under
+lock, imports the generated archive through `artifacts:fetch`, runs the shared
+unit tests and every differential test declared by the build's example
+variant, and collects the upload payload under
 `_artifacts/candidates/prettyM/upload/`. The payload contains the immutable tar,
 its checksum, the artifact-set manifest, the source `BUILD.json` receipt, the
-candidate-only lock, and a `CANDIDATE.json` validation statement.
+candidate-only lock, the hash-identified `EXAMPLE_TEST.json` differential
+report, and a `CANDIDATE.json` validation statement.
 
 `.github/workflows/prettyM-candidate.yml` runs the same commands on relevant
 pull requests and `main` updates and supports explicit dispatch. The workflow

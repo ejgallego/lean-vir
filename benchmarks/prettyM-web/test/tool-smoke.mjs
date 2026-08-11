@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
   [process.execPath, ["scripts/check-example-catalog.mjs", "--help"]],
+  [process.execPath, ["scripts/run-example.mjs", "--help"]],
   [process.execPath, ["scripts/checkout-artifact-sources.mjs", "--help"]],
   [process.execPath, ["scripts/build-artifacts.mjs", "--help"]],
   [process.execPath, ["scripts/build-artifact-candidate.mjs", "--help"]],
@@ -45,6 +46,19 @@ assert.equal(exampleList.status, 0, exampleList.stderr);
 assert.match(exampleList.stdout, /^illuminate\trehearsal\tIlluminate player$/m);
 assert.match(exampleList.stdout, /^prettyM\tactive\tStd\.Format\.prettyM$/m);
 
+const examplePlan = spawnSync(
+  process.execPath,
+  ["scripts/run-example.mjs", "prettyM", "default", "--plan"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(examplePlan.status, 0, examplePlan.stderr);
+assert.match(examplePlan.stdout, /^build: prettyM$/m);
+assert.match(
+  examplePlan.stdout,
+  /^test: smoke-parity · smoke · js, vir, vir-format, native, llvm · oracle js$/m,
+);
+assert.match(examplePlan.stdout, /^benchmark: suite \(not measured\)$/m);
+
 const buildList = spawnSync(
   process.execPath,
   ["scripts/build-artifacts.mjs", "--list"],
@@ -80,6 +94,15 @@ assert.match(
   /candidate output: _artifacts\/candidates\/prettyM\/upload/,
 );
 assert.match(candidatePlan.stdout, /toolchain fir: .*\/_sources\/fir/);
+
+const buildPlan = spawnSync(
+  process.execPath,
+  ["scripts/build-artifacts.mjs", "prettyM", "--plan"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(buildPlan.status, 0, buildPlan.stderr);
+assert.match(buildPlan.stdout, /^artifact set: prettyM-bounded-set-0002$/m);
+assert.match(buildPlan.stdout, /^components: vir -> native -> llvm$/m);
 
 const escapedOutput = spawnSync(
   process.execPath,

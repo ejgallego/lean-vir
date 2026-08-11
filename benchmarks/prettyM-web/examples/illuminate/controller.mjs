@@ -36,6 +36,6 @@ export async function loadExample(context) {
   if (context.example.id !== "illuminate") {
     throw new Error(`Illuminate controller received example ${context.example.id}`);
   }
-  await import("../../src/illuminate-app.js");
+  await import("./app.mjs");
   return requireController(globalThis.__illuminateBenchApp, context.example.id);
 }

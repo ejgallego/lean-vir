@@ -60,7 +60,7 @@ test("the prettyM source build is complete and materializes pack provenance", as
 
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);
-  assert.deepEqual(config.example, { id: "prettyM" });
+  assert.deepEqual(config.example, { id: "prettyM", variant: "default" });
   assert.equal(config.setId, "prettyM-bounded-set-0002");
   const acceptedLock = JSON.parse(
     await readFile(join(appRoot, "artifact-set.lock.json"), "utf8"),
@@ -89,6 +89,7 @@ test("catalog build identity and artifact paths are example-neutral", async () =
   );
   const alternate = structuredClone(database.builds.prettyM);
   alternate.example = { id: "illuminate" };
+  alternate.example.variant = "default";
   alternate.artifactSet.setId = "illuminate-player-set-0001";
   for (const component of Object.values(alternate.components)) {
     component.producer.files = Object.fromEntries(
@@ -197,6 +198,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
   const seed = join(directory, "seed");
   const databasePath = join(directory, "artifact-builds.json");
   const examplePath = join(directory, "example.json");
+  const testPackagePath = join(directory, "tests.json");
   const receiptPath = join(directory, "BUILD.json");
   const artifactPath = "prettyM/runtime.wasm";
   await rm(directory, { recursive: true, force: true });
@@ -204,6 +206,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
   await writeFile(join(seed, artifactPath), "wasm\n");
   await writeFile(databasePath, '{"catalog":true}\n');
   await writeFile(examplePath, '{"example":true}\n');
+  await writeFile(testPackagePath, '{"tests":true}\n');
   const files = {
     [artifactPath]: await fileRecord(join(seed, artifactPath)),
   };
@@ -233,8 +236,13 @@ test("source receipts bind portable provenance to staged bytes", async () => {
     },
     example: {
       id: "prettyM",
+      variant: "default",
       file: "examples/prettyM/example.json",
       sha256: sha256(await readFile(examplePath)),
+      testPackage: {
+        file: "examples/prettyM/tests.json",
+        sha256: sha256(await readFile(testPackagePath)),
+      },
     },
     checkoutResolution: {
       configUsed: true,
@@ -260,7 +268,9 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       receiptPath,
       databasePath,
       examplePath,
+      testPackagePath,
       exampleId: "prettyM",
+      variantId: "default",
       buildId: "prettyM",
       setId: "prettyM-bounded-set-0002",
       sources,
@@ -268,6 +278,25 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       seed,
     }),
   );
+  await writeFile(testPackagePath, '{"tests":"changed"}\n');
+  await assert.rejects(
+    () =>
+      verifySourceBuildReceipt({
+        receiptPath,
+        databasePath,
+        examplePath,
+        testPackagePath,
+        exampleId: "prettyM",
+        variantId: "default",
+        buildId: "prettyM",
+        setId: "prettyM-bounded-set-0002",
+        sources,
+        components,
+        seed,
+      }),
+    /inputs do not match/,
+  );
+  await writeFile(testPackagePath, '{"tests":true}\n');
   await writeFile(join(seed, artifactPath), "changed\n");
   await assert.rejects(
     () =>
@@ -275,7 +304,9 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         receiptPath,
         databasePath,
         examplePath,
+        testPackagePath,
         exampleId: "prettyM",
+        variantId: "default",
         buildId: "prettyM",
         setId: "prettyM-bounded-set-0002",
         sources,

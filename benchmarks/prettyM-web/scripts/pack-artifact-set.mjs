@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   canonicalJson,
   createTar,
+  fileRecord,
   fileRecords,
   inside,
   sha256,
@@ -73,6 +74,18 @@ async function main() {
   const outputDir = inside(appRoot, options.outputDir, "write release");
   const database = await readBuildDatabase(databasePath);
   const config = artifactSetConfig(database, options.build);
+  const examplePath = inside(
+    appRoot,
+    `examples/${config.example.id}/example.json`,
+    "read example manifest",
+  );
+  const exampleManifest = await readJson(examplePath);
+  const testPackagePath = inside(
+    appRoot,
+    exampleManifest.testPackage,
+    "read example test package",
+  );
+  const testPackageRecord = await fileRecord(testPackagePath);
   const receiptPath = inside(
     appRoot,
     options.receipt ?? `_artifacts/builds/${options.build}/BUILD.json`,
@@ -90,12 +103,10 @@ async function main() {
   await verifySourceBuildReceipt({
     receiptPath,
     databasePath,
-    examplePath: inside(
-      appRoot,
-      `examples/${config.example.id}/example.json`,
-      "read example manifest",
-    ),
+    examplePath,
+    testPackagePath,
     exampleId: config.example.id,
+    variantId: config.example.variant,
     buildId: options.build,
     setId: config.setId,
     sources: checkoutSources(database, options.build),
@@ -202,6 +213,10 @@ async function main() {
     schemaVersion: 2,
     kind: "browser-benchmarks/artifact-set",
     example: config.example,
+    testPackage: {
+      file: exampleManifest.testPackage,
+      ...testPackageRecord,
+    },
     setId: config.setId,
     benchmarkContract: config.benchmarkContract,
     components: packedComponents,

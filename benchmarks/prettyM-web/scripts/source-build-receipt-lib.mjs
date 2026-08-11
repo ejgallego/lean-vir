@@ -17,17 +17,20 @@ export async function verifySourceBuildReceipt({
   receiptPath,
   databasePath,
   examplePath,
+  testPackagePath,
   exampleId,
+  variantId,
   buildId,
   setId,
   sources,
   components,
   seed,
 }) {
-  const [receiptBytes, databaseBytes, exampleBytes] = await Promise.all([
+  const [receiptBytes, databaseBytes, exampleBytes, testPackageBytes] = await Promise.all([
     readFile(receiptPath),
     readFile(databasePath),
     readFile(examplePath),
+    readFile(testPackagePath),
   ]);
   const receipt = JSON.parse(receiptBytes);
   if (
@@ -41,7 +44,9 @@ export async function verifySourceBuildReceipt({
   if (
     receipt.database?.sha256 !== sha256(databaseBytes) ||
     receipt.example?.id !== exampleId ||
-    receipt.example?.sha256 !== sha256(exampleBytes)
+    receipt.example?.variant !== variantId ||
+    receipt.example?.sha256 !== sha256(exampleBytes) ||
+    receipt.example?.testPackage?.sha256 !== sha256(testPackageBytes)
   ) {
     throw new Error("source-build receipt inputs do not match the catalog");
   }

@@ -9,7 +9,15 @@ catalog.
 examples/<id>/
   example.json
   controller.mjs
+  tests.json
+  app.*                 workload-specific runner
+  backends/             optional workload-specific adapters
 ```
+
+An example may add modules and compact fixtures below its own directory. The
+application-level `src/` directory contains only the shared catalog shell and
+report dashboard; workload engines and JavaScript oracles belong to their
+example package.
 
 The manifest contract is `browser-benchmarks/example` schema version 1:
 
@@ -28,7 +36,8 @@ The manifest contract is `browser-benchmarks/example` schema version 1:
       "exports": ["Client.Benchmark.run"]
     }
   ],
-  "controller": "examples/client-example/controller.mjs"
+  "controller": "examples/client-example/controller.mjs",
+  "testPackage": "examples/client-example/tests.json"
 }
 ```
 
@@ -38,8 +47,66 @@ The repository validator is:
 npm run examples:check
 ```
 
-`examples/example.schema.json` is provided for editor integration. The Node
-validator is authoritative and also verifies that the controller exists.
+`examples/example.schema.json` and `examples/tests.schema.json` are provided
+for editor integration. The Node validator is authoritative. It also verifies
+that the controller and test package exist and that every declared test and
+benchmark study is exported by the controller.
+
+## Self-contained tests and variants
+
+`tests.json` owns the inputs and coverage contract for every selectable
+variant. A compact package looks like:
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example-tests",
+  "example": "client-example",
+  "variants": [
+    {
+      "id": "default",
+      "title": "Default renderer",
+      "build": "client-example",
+      "tests": [
+        {
+          "id": "quick-parity",
+          "study": "smoke",
+          "oracle": "js",
+          "backends": ["js", "vir", "native"],
+          "data": { "cases": [] }
+        }
+      ],
+      "benchmark": {
+        "study": "suite",
+        "data": { "studies": ["differential", "scaling"] }
+      }
+    }
+  ]
+}
+```
+
+The first variant is named `default`. Its `build` selects a catalog record bound
+to the same example and variant. Additional variants, such as an HTML generator,
+carry their own build selection, differential inputs, backend set, and
+benchmark suite without changing the generic runner. `oracle: "js"`
+records that the JavaScript backend supplies the semantic reference. Use
+`null` when a test relies on fixture output or pairwise comparison instead.
+
+Run or inspect one complete selection with:
+
+```sh
+npm run example -- client-example default --plan
+npm run example -- client-example default
+npm run example -- client-example default --test-only
+```
+
+The full command builds and imports the variant's catalogued candidate and then
+runs every declared differential test. `--test-only` uses already-staged
+artifacts. Neither command treats benchmark timings as evidence; the benchmark
+entry point is registered for explicit controlled-machine runs. Candidate
+bundles retain the complete `EXAMPLE_TEST.json` run, including test-package
+identity, oracle, exercised backends, inputs echoed by the workload report, and
+artifact provenance.
 
 ## Uniform VIR compilation
 
@@ -81,6 +148,9 @@ export async function loadExample(context) { /* return controller */ }
 `context.artifactBaseUrl` is the URL of its derived
 `artifacts/<example-id>/` directory. It is available to controllers that load
 staged payloads directly, so they do not need to declare another artifact root.
+`context.testPackage` and `context.variant` contain the selected self-contained
+test data. The same selection is available to classic-script controllers as
+`globalThis.__benchmarkExampleContext`.
 
 The returned controller implements `browser-benchmarks/controller/v1`:
 

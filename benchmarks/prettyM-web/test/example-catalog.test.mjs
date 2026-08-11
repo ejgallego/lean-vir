@@ -7,6 +7,7 @@ import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
 import {
   discoverExampleCatalog,
   validateExampleManifest,
+  validateExampleTestPackage,
 } from "../scripts/example-catalog-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -30,6 +31,7 @@ test("discovers compact example manifests", async () => {
       "packages",
       "schemaVersion",
       "summary",
+      "testPackage",
       "title",
     ]);
   }
@@ -58,6 +60,7 @@ test("rejects unsafe or command-shaped example declarations", () => {
       { id: "main", target: "Small.lean", exports: ["Small.run"] },
     ],
     controller: "examples/small/controller.mjs",
+    testPackage: "examples/small/tests.json",
   };
   assert.doesNotThrow(() => validateExampleManifest(base));
   assert.throws(
@@ -72,6 +75,44 @@ test("rejects unsafe or command-shaped example declarations", () => {
   );
   assert.throws(
     () => validateExampleManifest({ ...base, command: "lake build" }),
+    /unknown property command/,
+  );
+});
+
+test("validates self-contained test variants and JavaScript oracles", () => {
+  const base = {
+    schemaVersion: 1,
+    kind: "browser-benchmarks/example-tests",
+    example: "small",
+    variants: [
+      {
+        id: "default",
+        title: "Default",
+        build: "small",
+        tests: [
+          {
+            id: "parity",
+            study: "smoke",
+            oracle: "js",
+            backends: ["js", "vir", "fir"],
+            data: { cases: [{ input: 1 }] },
+          },
+        ],
+        benchmark: { study: "suite", data: { studies: ["scaling"] } },
+      },
+    ],
+  };
+  assert.doesNotThrow(() => validateExampleTestPackage(base, "small"));
+  const missingOracle = structuredClone(base);
+  missingOracle.variants[0].tests[0].backends = ["vir", "fir"];
+  assert.throws(
+    () => validateExampleTestPackage(missingOracle, "small"),
+    /oracle is not a required backend/,
+  );
+  const commandShaped = structuredClone(base);
+  commandShaped.variants[0].command = "npm test";
+  assert.throws(
+    () => validateExampleTestPackage(commandShaped, "small"),
     /unknown property command/,
   );
 });
