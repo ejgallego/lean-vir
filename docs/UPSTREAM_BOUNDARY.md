@@ -154,7 +154,10 @@ native-support module.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `interpreter/interpreter_bridge.cpp` owns upstream interpreter lifecycle,
+- `interpreter/persistent_ir_interpreter.cpp` compiles the untouched pinned
+  upstream implementation and retains one interpreter session for the loaded
+  package set.
+- `interpreter/interpreter_bridge.cpp` owns interpreter initialization,
   `lean_ir_find_env_decl` hooks, and boxed function execution.
 - `abi/call_abi.cpp` owns the package call surface exposed to JavaScript.
 - `abi/closure_abi.cpp` owns Lean closure roots and callback calls used when
@@ -409,12 +412,26 @@ diagnostic flow.
 
 ## Package Instance Lifecycle
 
-The upstream interpreter caches native-symbol results and initialized globals
-for its process lifetime. The local provider can clear decoded declarations,
-but it cannot prove a complete reset of those upstream caches without changing
-`third_party/lean4-src/src/library/ir_interpreter.cpp`. Public package
-replacement therefore uses a fresh `WebAssembly.Instance` while reusing the
-already-compiled `WebAssembly.Module`.
+The upstream interpreter has process-lifetime native-symbol and initialized-
+global caches, plus per-interpreter declaration and evaluated-nullary caches.
+Public package replacement uses a fresh `WebAssembly.Instance` while reusing
+the already-compiled `WebAssembly.Module`, so no process-lifetime entry or
+Wasm pointer crosses package generations.
+
+Within one loaded package set, VIR retains one upstream interpreter session.
+This preserves upstream's lazy nullary semantics while allowing an evaluated
+object constant to survive later public calls. `vir_begin_ir_package_set` and
+all package-clear paths destroy the session before releasing its package-owned
+declarations; a failed evaluation also discards the session rather than reusing
+possibly unwound private stacks. The session adapter includes and compiles the
+pinned `ir_interpreter.cpp` unchanged because upstream keeps the interpreter
+class implementation-private.
+
+No package metadata is added for this cache. In particular, declarations
+selected through `@[implemented_by]` use their ordinary packaged IR closure;
+nullary loads reached through that implementation enter the same lazy cache.
+Initializer globals retain their existing explicit package metadata and
+`lean_run_init` path.
 
 When `VirRuntime.loadIrPackageSetBytes` replaces an active package set, it first
 instantiates and fully loads a candidate. A candidate failure disposes only

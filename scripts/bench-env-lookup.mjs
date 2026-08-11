@@ -165,7 +165,7 @@ function printUsage() {
     "usage: npm run bench:env-lookup -- [options]",
     "",
     "options:",
-    "  --iterations N                 fresh interpreter entries per timed batch (default: 200)",
+    "  --iterations N                 public interpreter calls per timed batch (default: 200)",
     "  --warmups N                    unreported warmup batches (default: 1)",
     "  --samples N                    measured batches (default: 7)",
     "  --load-iterations N            package reloads per startup batch (default: 1)",
@@ -281,11 +281,11 @@ function callRawResolvedObjects(runtime, entry, callSlot) {
   }
 }
 
-function benchmarkFreshEntries(runtime, entry, callSlot) {
+function benchmarkPublicCalls(runtime, entry, callSlot) {
   const sampled = sampleBenchmarkCandidates({
     candidates: [{
-      id: "freshInterpreterEntry",
-      label: "fresh-interpreter-entry",
+      id: "publicInterpreterCall",
+      label: "public-interpreter-call",
       run: () => {
         let checksum = 0;
         for (let index = 0; index < args.iterations; index += 1) {
@@ -301,7 +301,7 @@ function benchmarkFreshEntries(runtime, entry, callSlot) {
     warmupRounds: args.warmupRounds,
     sampleRounds: args.sampleRounds,
   });
-  const sample = sampled.candidates.freshInterpreterEntry;
+  const sample = sampled.candidates.publicInterpreterCall;
   if (!sampled.passed) {
     throw new Error(
       `environment lookup benchmark failed: checksum=${sample.checksum}, stable=${sample.stable}, ` +
@@ -434,7 +434,7 @@ try {
     ? null
     : await startCpuProfile(args.profileIntervalUs);
   try {
-    sample = benchmarkFreshEntries(runtime, entry, callSlot);
+    sample = benchmarkPublicCalls(runtime, entry, callSlot);
   } finally {
     if (profileSession !== null) {
       profile = await stopCpuProfile(profileSession);
@@ -454,7 +454,7 @@ const perCallMs = sample.medianMs / args.iterations;
 const perLoadMs = loadSample.medianMs / args.loadIterations;
 const executionBenchmark = {
   name: "environment-lookup",
-  title: `${benchmarkEntryName} fresh interpreter entry x ${args.iterations}`,
+  title: `${benchmarkEntryName} public interpreter call x ${args.iterations}`,
   wasm: {
     label: sample.label,
     iterations: args.iterations,
@@ -490,7 +490,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   command: [process.execPath, ...process.execArgv, ...process.argv.slice(1)],
   comparisonIdentity: {
-    workload: "environment-lookup-v1",
+    workload: "environment-lookup-v2",
     entry: benchmarkEntryName,
     expectedResult,
     warmupRounds: args.warmupRounds,
@@ -569,7 +569,7 @@ console.log("# Lean VIR environment lookup benchmark");
 console.log(`entry:        ${benchmarkEntryName}`);
 console.log(`package:      ${leanPackageFile} (${packageInfo.package.declarationCount} declarations)`);
 console.log(`run policy:   ${args.warmupRounds} warmup(s), ${args.sampleRounds} sample(s), ${args.iterations} calls/sample`);
-console.log(`fresh entry:  ${formatMs(perCallMs)} / call (median)`);
+console.log(`public call:  ${formatMs(perCallMs)} / call (median)`);
 console.log(`raw batches:  ${sample.samples.map((value) => formatMs(value)).join(", ")}`);
 console.log(`checksum:     ${sample.checksum}`);
 console.log(

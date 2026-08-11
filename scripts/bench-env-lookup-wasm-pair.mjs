@@ -182,7 +182,7 @@ if (args.check) {
 } else {
   console.log("# Lean VIR paired environment lookup benchmark");
   console.log(`package: ${leanPackageFile} (${packageInfo.package.declarationCount} declarations)`);
-  printSummary("fresh entry", report.execution);
+  printSummary("public call", report.execution);
   printSummary("package load", report.packageLoad);
 }
 if (args.jsonPath !== null) console.log(`wrote benchmark report: ${args.jsonPath}`);

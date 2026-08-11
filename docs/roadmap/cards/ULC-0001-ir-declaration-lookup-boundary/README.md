@@ -38,8 +38,8 @@ decoded IR declarations.
 The original local lookup problem is solved: correct `Name` hashes plus a
 package-owned `lean::name_hash_map` made fresh entry 6.6x faster in the
 independent acceptance run and halved sustained Illuminate callback time. This
-card owns architectural cleanup. The later post-index resolution-cache
-experiment is tracked separately in ULC-0002.
+card owns architectural cleanup. Package-scoped interpreter persistence is
+implemented separately and does not change this provider API decision.
 
 ## Roadmap Decision
 
@@ -56,25 +56,23 @@ environment-extension closure merely to provide already-decoded
 environment-backed entry point as Lean's default and add a caller-owned
 declaration-provider path.
 
-Do not bundle cross-invocation symbol-cache state or provider revision into
-this decision. The post-index profile selects that as a separately
-instrumented experiment in
-[ULC-0002](../ULC-0002-cross-entry-symbol-resolution-cache/README.md); its
-profitability and API shape are not yet established.
+Do not bundle package-scoped interpreter lifetime into this decision. It is a
+local runtime policy, not part of the proposed declaration-provider API.
 
 ## Reproduction Status
 
 The current boundary is directly observable in
-`wasm/upstream_shim/interpreter/interpreter_bridge.cpp`: it constructs
-`elab_environment(lean_box(0))`, calls upstream `run_boxed`, and supplies both
-declaration lookup symbols itself.
+`wasm/upstream_shim/interpreter/persistent_ir_interpreter.cpp`, which owns the
+dummy environment and package-scoped interpreter session, and
+`wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, which supplies both
+declaration lookup symbols.
 
 The pinned upstream lookup implementations are exported from
 `Lean/Compiler/IR/CompilerM.lean`. They inspect `Lean.Environment` module
 ownership and `Lean.IR.declMapExt`; they are not plain C++ map helpers. VIR's
 minimal Wasm link does not include those generated Lean implementations.
 
-Repository coverage includes 88 package fixtures and 18 runtime smoke tests.
+Repository coverage includes package fixtures and runtime smoke tests.
 The focused benchmark and the external Illuminate acceptance run both reproduce
 the expected post-change profile movement.
 
@@ -235,8 +233,8 @@ This card does not own:
 
 - loading `.olean` or Lean's raw `.ir` module format in the browser;
 - full kernel, elaborator, or metaprogramming environment fidelity;
-- persistent interpreter state or resolved-symbol caches, which belong to
-  ULC-0002;
+- package-scoped interpreter lifetime, documented in
+  [Upstream Boundary](../../../UPSTREAM_BOUNDARY.md#package-instance-lifecycle);
 - a package-format change without separate measured evidence; or
 - further declaration-lookup optimization after the accepted hash-map result.
 

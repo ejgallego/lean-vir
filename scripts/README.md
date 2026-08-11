@@ -76,7 +76,7 @@ map lives in `docs/HARNESS.md`.
   Run the dependency-free artifact-cache, benchmark sampler, focused-identity,
   and paired-runner contract tests.
 - `npm run bench:env-lookup`
-  Measure repeated fresh interpreter entries through a large package, with an
+  Measure repeated public interpreter calls through a large package, with an
   optional execution-window V8 CPU profile. See `docs/PERFORMANCE.md`.
 - `npm run bench:env-lookup:wasm-pair -- CONTROL_WASM CANDIDATE_WASM`
   Compare two frozen Wasm build modes in one process with alternating order,

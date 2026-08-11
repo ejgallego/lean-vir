@@ -14,6 +14,7 @@ namespace lean::vir {
 
 void ensure_ir_interpreter_initialized();
 object * run_interpreter_function(object * fn_obj, size_t argc, object ** args);
+object * run_package_interpreter_function(object * fn_obj, size_t argc, object ** args);
+void reset_package_interpreter();
 
 }
-

@@ -344,11 +344,40 @@ level-10 whole; each clearly outweighs its matcher and base-preparation calls.
 This supports targeting the optimal parser/emitter family while rejecting a
 precise additive allocation from this run.
 
+#### Package-scoped nullary cache
+
+A later focused probe found that the base/frequency path was not spending most
+of its time in token iteration. `distCodeWord` reaches the nullary
+`distCodeWordBytes` object through its `@[implemented_by]` implementation. That
+object constructs a dense 32,769-byte table. Upstream caches the value inside
+one interpreter, but VIR previously constructed a fresh interpreter for every
+public call, so the table was rebuilt on every call.
+
+VIR now retains one upstream interpreter session for the loaded package set and
+destroys it before package replacement. A maintained runtime fixture checks
+object identity across two calls, a large cold/warm timing gap, and fresh
+construction followed by reuse after replacement. It also checks that an
+`@[implemented_by]` lookup selects the packaged implementation; no new package
+metadata is required.
+
+On the lean-zip distance-code probe, one synthetic reference measured 679.92 ms
+on the cold call and 0.051 ms on the following call in the same runtime. A
+client-native one-pass acceptance run then kept all 101 compression outputs and
+9 prescan decisions identical to native lean-zip and completed in 41.76
+seconds. These are diagnostic timings, not stable throughput results.
+
+The earlier per-stage samples each used separate public calls and therefore
+included their own cold table construction where reached. They remain useful
+for functional attribution, but their elapsed values should not drive the next
+optimization until profile mode is rerun with an explicit runtime warmup.
+
 ## Smallest next green slice
 
 The level matrix, current-platform entropy boundary, larger compressible cases,
-repeated-pass memory check, and upper-level attribution are green. The next
-smallest slice is to separate `lz77OptimalFastIter` / `lz77OptimalIter` parsing
-from `emitSharedBlocks` encoding inside the now-dominant optimal candidate.
-Broader corpus and cross-platform CI remain necessary before treating the
-integration as universal acceptance.
+repeated-pass memory check, client-native extern boundary, and nullary-cache
+regression are green. No additional VIR compatibility primitive is currently
+known to be required by lean-zip. The next measurement should rerun the staged
+profile after warming the loaded package; only then should remaining parser or
+emitter work be assigned to VIR versus lean-zip. Broader corpus and
+cross-platform CI remain necessary before treating the integration as universal
+acceptance.

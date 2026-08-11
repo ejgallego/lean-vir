@@ -44,6 +44,10 @@ static bool g_initializers_ran = false;
 static uint32_t g_package_format_version = 0;
 
 static void clear_loaded_package_state() {
+    // The interpreter caches package declaration objects and evaluated nullary
+    // values. Release those references before releasing the package that owns
+    // their declarations.
+    reset_package_interpreter();
     delete g_decl_index;
     delete g_boxed_decl_index;
     g_decl_index = nullptr;
