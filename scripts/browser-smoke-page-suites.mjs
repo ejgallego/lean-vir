@@ -227,7 +227,7 @@ export async function smokeSurfaceExplorer(cdp, origin) {
   })`);
   assert.equal(blockers.hash, "#view=blockers");
   assert.equal(blockers.selected, true);
-  assert.equal(blockers.title, "Top blockers");
+  assert.equal(blockers.title, "Primary blockers");
 }
 
 export async function smokeWasmSizeExplorer(cdp, origin) {
