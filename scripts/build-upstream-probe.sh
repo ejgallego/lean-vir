@@ -55,6 +55,7 @@ wasm_profile="${VIR_WASM_PROFILE:-dev}"
 wasm_initial_memory="${VIR_WASM_INITIAL_MEMORY:-4194304}"
 wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
 upstream="$src/src/library/ir_interpreter.cpp"
+upstream_session="wasm/upstream_shim/interpreter/persistent_ir_interpreter.cpp"
 overlay_include="$out/include"
 obj_dir="$out/obj"
 generated_dir="$out/generated"
@@ -394,7 +395,8 @@ compiled_count=0
 compile_start=$SECONDS
 upstream_obj="$obj_dir/ir_interpreter.o"
 object_files=("$upstream_obj")
-compile_one "$upstream" "$upstream_obj"
+compile_one "$upstream_session" "$upstream_obj" "$upstream" \
+  "wasm/upstream_shim/interpreter/interpreter_bridge.h"
 
 for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]}"; do
   object="$(object_for_source "$source")"
@@ -880,8 +882,10 @@ report_start=$SECONDS
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/interpreter/interpreter_bridge.cpp\` supplies upstream"
-  echo "interpreter lifecycle and declaration lookup hooks. \`abi/call_abi.cpp\`"
+  echo "\`wasm/upstream_shim/interpreter/persistent_ir_interpreter.cpp\` compiles the"
+  echo "untouched pinned interpreter with a package-scoped session."
+  echo "\`wasm/upstream_shim/interpreter/interpreter_bridge.cpp\` supplies interpreter"
+  echo "initialization and declaration lookup hooks. \`abi/call_abi.cpp\`"
   echo "supplies the package call surface. \`abi/closure_abi.cpp\` supplies Lean"
   echo "closure roots and callback calls. \`package/host_import_trampolines.cpp\` supplies the"
   echo "package-scoped JavaScript host-import trampoline grid."

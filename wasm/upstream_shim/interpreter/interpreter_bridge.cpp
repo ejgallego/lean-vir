@@ -12,7 +12,6 @@ Author: Emilio J. Gallego Arias
 #include <stddef.h>
 #include <stdint.h>
 
-#include "library/elab_environment.h"
 #include "library/ir_interpreter.h"
 #include "runtime/object.h"
 
@@ -44,16 +43,9 @@ void ensure_ir_interpreter_initialized() {
     }
 }
 
-static object * run_interpreter_function(name const & fn, size_t argc, object ** args) {
-    ensure_ir_interpreter_initialized();
-    elab_environment env(lean_box(0));
-    options opts(lean_box(0));
-    return ir::run_boxed(env, opts, fn, argc, args);
-}
-
 object * run_interpreter_function(object * fn_obj, size_t argc, object ** args) {
-    name fn(fn_obj, true);
-    return run_interpreter_function(fn, argc, args);
+    ensure_ir_interpreter_initialized();
+    return run_package_interpreter_function(fn_obj, argc, args);
 }
 
 } // namespace vir
