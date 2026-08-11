@@ -91,7 +91,7 @@ ownership diagrams.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
 - [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
-  fresh-interpreter lookup evidence, measured alternatives, and accepted local
+  environment-lookup evidence, measured alternatives, and accepted local
   provider-index design.
 - [OBJECT_CONVERSION_PERFORMANCE.md](OBJECT_CONVERSION_PERFORMANCE.md): cached
   custom-inductive normalization plans and repository-owned `Std.Format`

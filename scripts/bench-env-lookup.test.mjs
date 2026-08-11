@@ -58,7 +58,7 @@ test("environment lookup identity covers package content but ignores generation 
   );
 
   const report = (packageIdentity) => ({
-    report: { comparisonIdentity: { workload: "environment-lookup-v1", package: packageIdentity } },
+    report: { comparisonIdentity: { workload: "environment-lookup-v2", package: packageIdentity } },
   });
   assert.throws(() => assertComparableBenchmarkReportIdentities([
     { label: "before", report: report(identity) },

@@ -62,10 +62,12 @@ npm run bench:env-lookup -- \
   --json build/perf/env-lookup/current.json
 ```
 
-It repeatedly enters a fresh interpreter through
-`Vir.Fixtures.ExprPrinter.exprCoverageScore` in `fixtures-lean.irpkg`; the
-recorded 2026-08-05 measurements used 1,546 declarations, and the default
-workload rejects packages with fewer than 1,000. The headline execution row
+It repeatedly calls `Vir.Fixtures.ExprPrinter.exprCoverageScore` in
+`fixtures-lean.irpkg` through one package-scoped interpreter session. Workload
+identity `environment-lookup-v2` names this lifecycle explicitly; the recorded
+2026-08-05 `v1` measurements instead constructed a fresh interpreter for every
+call and must not be compared directly with `v2` reports. The default workload
+rejects packages with fewer than 1,000 declarations. The headline execution row
 excludes package loading, initializer execution, and export-slot resolution. A
 separate package-load row uses a fresh Wasm instance for each load; Wasm
 instantiation and disposal are outside that row's timed window. Reports preserve

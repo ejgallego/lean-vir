@@ -39,8 +39,9 @@ entries without depending on Illuminate:
 - the package used for the recorded measurements contained 1,546 declarations;
 - `Vir.Fixtures.ExprPrinter.exprCoverageScore` is deterministic and returns
   `1232`;
-- every timed call enters a fresh upstream interpreter, matching a callback
-  after the previous browser-to-Lean call has returned;
+- for the recorded `environment-lookup-v1` results, every timed call entered a
+  fresh upstream interpreter, matching a callback after the previous
+  browser-to-Lean call had returned;
 - the execution row excludes package loading, initializer execution, and
   export-slot resolution;
 - the package-load row times decode, initializer execution, and manifest
@@ -195,10 +196,10 @@ explicit-provider request to transfer upstream. The experiment found that a
 valid environment pulls in a disproportionate compiler-initialization closure
 for VIR's declaration-only runtime.
 [ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
-owns the separate measured experiment for sharing immutable resolution
-metadata across fresh asynchronous interpreter entries. It explicitly does not
-persist a whole interpreter or assume that a new upstream cache API is already
-justified.
+records the now-superseded proposal to share only immutable resolution metadata
+across fresh asynchronous interpreter entries. The later package-scoped
+interpreter session also preserves evaluated nullary constants, which the
+resolution-only proposal explicitly excluded.
 
 ## Rejected or Superseded Experiments
 
@@ -213,10 +214,10 @@ justified.
 - A format-11 precomputed sorted-index section was abandoned. Compatibility
   was not a constraint, but measurements no longer justified the format and
   decoder complexity.
-- Decoder-wide name interning and whole-interpreter persistence remain
-  unjustified. A revision-scoped resolution-metadata cache and application
-  batching are separate measured experiments; neither belongs in the accepted
-  declaration-index patch.
+- Decoder-wide name interning remains unjustified. The revision-scoped
+  resolution-metadata proposal was superseded after lean-zip exposed a separate
+  need to retain evaluated nullary constants; package-scoped interpreter
+  persistence now addresses both caches behind an explicit reset boundary.
 
 ## Validation and Follow-up
 

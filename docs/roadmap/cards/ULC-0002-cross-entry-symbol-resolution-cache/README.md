@@ -1,15 +1,28 @@
 # ULC-0002 Cross-entry Symbol Resolution Cache
 
-Status: candidate
+Status: superseded
 Kind: upstream-api experiment
 Priority: medium
 Origin: Illuminate post-index profile
-Last reviewed: 2026-08-05
+Last reviewed: 2026-08-12
 Owner: none
 Issue: none linked
 Lean PR: none linked
 Upstream timing: only after a successful VIR prototype
-Removal target: any VIR-local interpreter patch used by the prototype
+Superseded by: package-scoped interpreter session
+
+## Supersession
+
+The package-scoped interpreter session described in
+[Upstream Boundary](../../../UPSTREAM_BOUNDARY.md#package-instance-lifecycle)
+supersedes this resolution-only proposal. A lean-zip workload showed that
+evaluated nullary constants, deliberately excluded below, also need to survive
+successive public calls. VIR now retains both upstream caches for one immutable
+package generation and resets the session before releasing package-owned
+declarations or after a failed evaluation.
+
+The remaining sections preserve the earlier proposal and its evidence as a
+historical record; they are not current implementation guidance.
 
 ## Summary
 
