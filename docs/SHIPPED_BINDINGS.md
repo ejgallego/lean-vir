@@ -8,11 +8,16 @@ one searchable page.
 The current report covers 119 ordinary `@[vir_js]` declarations and 13
 `@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
 shipped provider; there are no missing providers and no provider-only targets.
-The first complete upstream-surface analysis expands TypeScript's `Document`
-inheritance graph to 271 properties and methods. Four members map to VIR's five
-shipped Document targets; the remaining 267 are explicit coverage gaps rather
-than invisible omissions. All five mapped operations pass their reviewed
-type-translation checks.
+Generation indexes the complete configured TypeScript surface for 20 API
+groups before presenting the report. The reviewed `Document` analysis expands
+its inheritance graph to 271 properties and methods: four members map to VIR's
+five shipped Document targets, and all five mappings pass their reviewed
+type-translation checks. The other 19 groups begin with automatic
+correspondence suggestions, not reviewed fidelity claims. Across those 20
+groups the explorer currently shows four reviewed members, 58 suggested
+members, one ambiguous member, and 2,003 upstream entries with no shipped
+target. Two local APIs still need a machine-readable upstream contract, and the
+React DOM root retains its narrower curated comparison.
 
 ## Fidelity Contract
 
@@ -51,17 +56,19 @@ The explorer reports independent facts for each API group:
 
 - **runtime coverage** counts shipped targets with providers;
 - **upstream analysis** says whether the complete upstream surface has been
-  analyzed, a curated subset was compared, analysis is in progress, analysis
-  has not run, or no upstream contract applies;
+  reviewed, automatically indexed, compared as a curated subset, needs a local
+  contract as input, or has no upstream contract;
 - **mapping coverage** counts upstream members associated with VIR targets;
 - **type fidelity** classifies reviewed mappings as exact, compatible, weak, or
   missing;
 - **findings** contain only concrete runtime, coverage, or type-fidelity
-  problems. Analysis not run is a state, not a finding.
+  problems. An automatic suggestion is evidence for review, not a fidelity
+  verdict.
 
-Therefore visible bindings and “upstream analysis not run” are not
-contradictory: the former proves that VIR ships the runtime path, while the
-latter says its correspondence with the upstream API has not been evaluated.
+Therefore a green provided target proves that VIR ships the runtime path, while
+an automatic correspondence only proposes which upstream declaration to
+review. `Complete surface analysis` is reserved for API groups whose mappings
+and type translations have been reviewed.
 
 ## Library Configuration
 
@@ -102,8 +109,11 @@ compiler targets + provider targets
   -> strict reconciliation JSON
   -> configured API groups
 
-TypeScript declarations + reviewed API-group intent
+TypeScript declarations + configured API-group entry points
   -> generated upstream surface inventory
+  -> automatic target/member correspondence suggestions
+
+reviewed API-group intent + focused type-anchor comparisons
   -> semantic comparison results
 
 reconciled targets + API groups + comparisons
@@ -128,14 +138,23 @@ The Lean compiler inventory is an ignored intermediate under
 `docs/bindings/report.json`; the primary human report is
 `docs/bindings/index.html`.
 
-The explorer supports library, upstream-analysis, and finding filters; deep links;
-generated upstream TypeScript declarations; inherited-member provenance; Lean
-and TypeScript source context; exact elaborated boundary types; side-by-side
-semantic descriptors; and light/dark themes. API groups with authored member
-mappings show the complete upstream surface and distinguish compatible mapped
-members from missing coverage. A `provided` target proves
-the representation policy and runtime dispatch path without implying that an
-upstream analysis has run.
+The explorer supports library, upstream-analysis, and finding filters; deep
+links; generated upstream TypeScript declarations; inherited-member
+provenance; Lean and TypeScript source context; exact elaborated boundary
+types; side-by-side semantic descriptors; and light/dark themes. Generation
+expands every configured TypeScript API group before rendering. Authored
+mappings distinguish reviewed compatible members from missing coverage;
+automatic groups distinguish unique suggestions, ambiguous suggestions, and
+unmapped upstream entries.
+
+Use **Upstream libraries** to start from a library contract and inspect VIR's
+coverage. Use **VIR targets** for the reverse direction: all 132 low-level
+shipped targets, their providers and boundary declarations, and any reviewed or
+suggested upstream correspondence. This reverse view is an exhaustive inventory
+of the JavaScript boundary, not yet an inventory of public Lean wrappers.
+Deriving public-wrapper-to-target reachability requires an additional
+compiler-backed call-graph edge; the explorer deliberately does not infer that
+edge from source text.
 
 `docs/bindings/shipped-v1.coverage.json` and
 `docs/bindings/shipped-v1.dashboard.html` remain lower-level reconciliation

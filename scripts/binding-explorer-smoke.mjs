@@ -23,14 +23,23 @@ assert.deepEqual(report.summary, {
     externalGroups: 23,
     complete: 1,
     inProgress: 0,
+    automatic: 19,
     curated: 1,
-    notRun: 21,
+    needsInput: 2,
+    notRun: 0,
     notApplicable: 6,
   },
   semantic: { exact: 0, compatible: 7, weak: 2, missing: 3 },
-  upstreamSymbols: 321,
-  coverage: { groups: 1, members: 271, mapped: 4, missing: 267 },
-  issues: { error: 0, warning: 2, gap: 4 },
+  upstreamSymbols: 2104,
+  coverage: {
+    groups: 20,
+    members: 2066,
+    reviewed: 4,
+    suggested: 58,
+    ambiguous: 1,
+    missing: 2003,
+  },
+  issues: { error: 0, warning: 2, gap: 19 },
 });
 
 const roots = report.libraries.flatMap((library) =>
@@ -75,11 +84,47 @@ assert.equal(documentQuerySelector?.status, "compatible");
 const canvasElement = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");
 assert.deepEqual(canvasElement?.analysis, {
-  status: "not-run",
-  scope: "identified-upstream-entry-points",
+  status: "automatic",
+  scope: "complete-upstream-surface",
 });
-assert.equal(canvasElement?.findingStatus, "none");
-assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 0 });
+assert.equal(canvasElement?.findingStatus, "gap");
+assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 1 });
+assert.deepEqual(canvasElement?.coverage.summary, {
+  exact: 0,
+  compatible: 0,
+  weak: 0,
+  missing: 330,
+  unreviewed: 3,
+  suggested: 3,
+  ambiguous: 0,
+  mappedTargets: 5,
+  ambiguousTargets: 0,
+  unmatchedTargets: 1,
+});
+const canvasContext = canvasElement?.coverage.targetMappings.find(
+  (mapping) => mapping.target === "browser.htmlCanvasElement.getContext2D",
+);
+assert.equal(canvasContext?.status, "suggested");
+assert.deepEqual(canvasContext?.candidates, [
+  {
+    typescript: "HTMLCanvasElement.getContext",
+    score: 80,
+    reason: "shared member-name prefix on matching owner",
+  },
+]);
+assert.equal(
+  canvasElement?.coverage.targetMappings.find(
+    (mapping) => mapping.target === "browser.htmlCanvasElement.fromElement",
+  )?.status,
+  "unmatched",
+);
+
+const localCommands = roots.find((root) =>
+  root.library === "infoview" && root.id === "commands");
+assert.deepEqual(localCommands?.analysis, {
+  status: "needs-input",
+  scope: "local-upstream-contract-missing",
+});
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
@@ -102,8 +147,11 @@ assert.match(html, /<h1>Binding explorer<\/h1>/u);
 assert.match(html, /id="provided-metric">132\/132</u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Complete surface analysis/u);
-assert.match(html, /Upstream analysis not run/u);
+assert.match(html, /Automatic analysis/u);
+assert.match(html, /Upstream contract needs input/u);
 assert.match(html, /runtime coverage and API fidelity/u);
+assert.match(html, /Upstream libraries/u);
+assert.match(html, /VIR targets/u);
 assert.match(html, /Type fidelity comparisons/u);
 assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
@@ -113,4 +161,4 @@ const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
 assert.ok(scripts.length >= 2, "explorer should include data and interaction scripts");
 Function(scripts.at(-1)[1]);
 
-console.log("binding explorer smoke ok: 6 libraries, 29 API groups, 321 upstream symbols, 132 unique targets");
+console.log("binding explorer smoke ok: 6 libraries, 29 API groups, 2104 upstream symbols, 132 unique targets");

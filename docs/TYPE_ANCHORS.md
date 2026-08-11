@@ -79,9 +79,12 @@ TypeScript's `lib.dom.d.ts` and `@types/react`. Interface properties, methods,
 and accessors are indexed, inherited members are expanded onto requested entry-point
 interfaces with their declaring-interface provenance, and overloads are
 retained as alternative callable shapes. The consolidated explorer expands
-members only for API groups with authored mappings and groups entry points that share a
-declaration source, so a large ambient library is parsed once per generation
-group rather than once per configured API group.
+members for every configured TypeScript API group and groups entry points that
+share a declaration source, so a large ambient library is parsed once per
+generation group rather than once per configured API group. Where reviewed
+mappings do not yet exist, it proposes candidates from owner, member, and
+accessor names. These candidates make the audit queue visible; they do not
+claim that the Lean and TypeScript types are faithful.
 
 ## Artifact Ownership
 
