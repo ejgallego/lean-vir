@@ -1,4 +1,4 @@
-name: prettyM candidate artifact
+name: example candidate artifacts
 
 on:
   workflow_dispatch:
@@ -6,8 +6,9 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/prettyM-candidate.yml"
+      - ".github/workflows/example-candidate.yml"
       - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/examples/**"
       - "benchmarks/prettyM-web/package-lock.json"
       - "benchmarks/prettyM-web/package.json"
       - "benchmarks/prettyM-web/index.html"
@@ -18,8 +19,9 @@ on:
       - "benchmarks/prettyM-web/test/**"
   pull_request:
     paths:
-      - ".github/workflows/prettyM-candidate.yml"
+      - ".github/workflows/example-candidate.yml"
       - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/examples/**"
       - "benchmarks/prettyM-web/package-lock.json"
       - "benchmarks/prettyM-web/package.json"
       - "benchmarks/prettyM-web/index.html"
@@ -37,9 +39,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - id: matrix
+        name: Select catalogued example variants
+        working-directory: benchmarks/prettyM-web
+        run: echo "matrix=$(node scripts/example-candidate-matrix.mjs)" >> "$GITHUB_OUTPUT"
+
   build-candidate:
+    needs: catalog
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -61,28 +85,28 @@ jobs:
         run: npm --prefix benchmarks/prettyM-web ci
 
       - name: Materialize catalogued sources
-        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- prettyM
+        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- ${{ matrix.build }}
 
       - name: Cache producer toolchains
         uses: actions/cache@v4
         with:
           path: |
             benchmarks/prettyM-web/_artifacts/npm-cache
-            benchmarks/prettyM-web/_sources/vir/.tools/cache
-            benchmarks/prettyM-web/_sources/vir/third_party/lean4-src
-            benchmarks/prettyM-web/_sources/fir/.deps/lcnf-c-wasm
-          key: ${{ runner.os }}-${{ runner.arch }}-prettyM-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+            benchmarks/prettyM-web/_sources/**/.lake
+            benchmarks/prettyM-web/_sources/**/.tools/cache
+            benchmarks/prettyM-web/_sources/**/.deps
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.build }}-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
 
       - name: Install Chromium
         run: npm --prefix benchmarks/prettyM-web run playwright:install
 
       - name: Build and validate candidate
-        run: npm --prefix benchmarks/prettyM-web run artifacts:candidate -- prettyM --prepare
+        run: npm --prefix benchmarks/prettyM-web run example -- ${{ matrix.example }} ${{ matrix.variant }} --prepare
 
       - name: Upload candidate archive and receipt
         uses: actions/upload-artifact@v4
         with:
-          name: prettyM-candidate-${{ github.event.pull_request.head.sha || github.sha }}
-          path: benchmarks/prettyM-web/_artifacts/candidates/prettyM/upload
+          name: ${{ matrix.example }}-${{ matrix.variant }}-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: benchmarks/prettyM-web/_artifacts/candidates/${{ matrix.build }}/upload
           if-no-files-found: error
           retention-days: 14

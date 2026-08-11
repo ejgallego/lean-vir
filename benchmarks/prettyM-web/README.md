@@ -12,6 +12,29 @@ The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
 this package.
 
+Client examples use one self-contained directory under `examples/<id>/`. Its
+compact descriptor declares identity, lifecycle, Lean targets and exports, a
+browser controller, and a `tests.json` package containing selectable variants,
+differential inputs, JavaScript-oracle availability, required backends, and the
+benchmark entry point. Run `npm run examples:check` to validate the catalog.
+See [`docs/EXAMPLE_FORMAT.md`](docs/EXAMPLE_FORMAT.md) for the contribution and
+uniform VIR compilation contract.
+
+Select the complete build-and-test unit by example and variant:
+
+```sh
+npm run example -- prettyM default --plan
+npm run example -- prettyM default --test-only
+# From a clean checkout, materializes exact sources, prepares producers, builds,
+# packs, imports, validates, then runs the declared differential tests:
+npm run example -- prettyM default --materialize --prepare
+# Existing FIR/VIR checkouts may instead be selected explicitly:
+npm run example -- prettyM default --prepare --toolchain /path/to/lean-fir
+```
+
+The benchmark suite is part of the package but is not measured by these
+commands. Performance collection remains an explicit controlled-machine step.
+
 ## Responsibilities
 
 - load the JavaScript, VIR JSON, VIR typed-Format, native FIR Wasm, and
@@ -20,10 +43,8 @@ this package.
 - collect marshal, execute, decode, and total timings;
 - run corpus, scaling, interaction, retained-memory, and repeated-call studies;
 - collect cold-start and isolated-runtime observations in fresh browser contexts;
-- aggregate multiple fresh browser processes and generate forwardable cards;
-- import a stable external attribution summary without embedding profiler code;
-- display reports and campaigns with a shared, non-destructive backend filter;
-  and
+- aggregate multiple fresh browser processes into campaign reports;
+- display reports and campaigns with a shared, non-destructive backend filter; and
 - import/export the complete JSON representation independently of the active
   presentation filter.
 
@@ -33,29 +54,38 @@ slide DOM state.
 
 ## Artifact contract
 
-The committed `artifact-builds.json` is the canonical source database for
-rebuilding benchmark artifacts. It defines the exact VIR, FIR, and workload
-Git revisions, producer entry points and dependencies, expected package files,
-and artifact-set provenance. Local checkout paths are supplied on the command
-line and are never committed. See `docs/ARTIFACT_BUILDS.md` for the source-build
-contract and driver.
+The example descriptors are canonical for VIR targets and exports. The
+committed `artifact-builds.json` supplies exact producer and workload Git
+revisions, producer dependencies, expected package files, and artifact-set
+provenance. The accepted lock is separate consumer state. The build driver
+resolves each `packageRef` through the example descriptor before invoking the
+uniform VIR compiler. Local checkout paths are supplied on the command line
+and are never committed. See
+`docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
+
+FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
+`toolchains.local.json`, or `--toolchain-config`. Every selected checkout must
+still match the exact catalogued commit. These settings control generation;
+normal serving consumes already-built FIR packages selected and staged through
+an explicit v2 artifact-set lock.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
-`_sources/{vir,fir,workload}` directory; no producer source is copied into this
-application or an artifact archive:
+`_sources/{vir,fir,lean,workload}` directory; no producer source is copied into
+this application or an artifact archive:
 
 ```sh
 npm run artifacts:sources -- prettyM
 ```
 
-The committed `artifact-set.lock.json` selects one immutable, compatible set.
-Binary artifacts and downloaded release archives remain ignored by Git. The
-current prototype lock has no public URL yet; assemble and consume it locally:
+The repository does not retain obsolete prototype locks. Binary artifacts,
+candidate locks, and downloaded release archives remain ignored by Git. Build
+and import the current prettyM candidate locally:
 
 ```sh
-npm run artifacts:pack
+npm run artifacts:pack -- --build prettyM
 npm run artifacts:fetch -- \
+  --lock _artifacts/releases/prettyM-bounded-set-0002.lock.json \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
@@ -63,62 +93,69 @@ npm run artifacts:fetch -- \
 `artifacts:pack` consumes it with this layout:
 
 ```text
-lean-vir/js/vir-runtime.js
-lean-vir/wasm/vir-upstream.wasm
-prettyM-vir.irpkg
-lean-native/{BUILD.json,prettyM-browser-adapter.mjs,prettyM.wasm,prettyM.wasm.json}
-lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
-           prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
-           prettyM.mjs,prettyM.wasm}
+prettyM/lean-vir/js/vir-runtime.js
+prettyM/lean-vir/wasm/vir-upstream.wasm
+prettyM/prettyM-vir.irpkg
+prettyM/lean-native/{BUILD.json,prettyM-browser-adapter.mjs,
+                     prettyM.wasm,prettyM.wasm.json}
+prettyM/lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
+                   prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
+                   prettyM.mjs,prettyM.wasm}
 ```
 
 It writes a deterministic normalized tar, member checksums, an
 `ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
-`_artifacts/sets/`, and stages it. Every input, cache, set, and output path is
-restricted to this application directory.
+`_artifacts/sets/`, and atomically stages only `artifacts/<example-id>/`.
+Staging one example preserves every sibling. Artifact inputs and outputs plus
+orchestrator-owned caches are restricted to this application directory.
 Source compilation caches remain in the explicitly selected producer
 checkouts; only declared package bytes cross into this application.
 
 Once the archive is uploaded as an immutable release asset, set its exact HTTPS
 URL in the lockfile and change the status from `local-prototype` to `published`.
-Clean clones can then use `npm run artifacts:fetch` without an override. See
+If that lock is accepted into the repository, clean clones can use
+`npm run artifacts:fetch -- --lock artifact-set.lock.json`. See
 `docs/ARTIFACT_SETS.md` for producer, promotion, and publication details.
 
 The candidate workflow stops before that publication boundary. It builds from
 the catalogued sources, packs to a separate candidate lock, re-imports the
 archive, runs the application tests, and uploads the archive, checksums,
 manifest, source receipt, and `CANDIDATE.json` as a short-lived CI artifact.
-It never edits `artifact-set.lock.json` or publishes a release asset.
+It never edits an accepted lock or publishes a release asset.
 
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
 workload. The browser only observes the common semantic input/output and timing
-contract. Set 0001 intentionally combines a VIR runtime and workload built with
-Lean 4.33.0-rc2 at the exact PR #104 head (`64e3078`) with native and LLVM
-bounded runtimes built with Lean 4.32. Five-backend parity is the compatibility
-gate; no cross-backend Lean heap values are exchanged.
+contract. The current candidate retains the VIR and workload pins while
+selecting merged FIR `298682a`. Five-backend parity is the compatibility gate;
+no cross-backend Lean heap values are exchanged.
 
-The current VIR package retains the historical
-`VersoSlides.Pretty.*ForVir` export names. They are declared in `src/config.js`
-as artifact compatibility data; the application itself does not load Verso or
-depend on slide sources. Renaming those two exports can accompany a later
+The current VIR package uses the producer-facing
+`VersoSlides.Pretty.*ForVir` export names. They are declared in
+`examples/prettyM/config.js` as artifact compatibility data; the application
+itself does not load Verso or depend on slide sources. Renaming those two
+exports can accompany a later
 artifact refresh without changing the benchmark or dashboard APIs.
 
 ## Develop and test
 
 ```sh
 npm install
-npm run artifacts:fetch
+npm run artifacts:fetch -- \
+  --lock /path/inside/this/app/to/set-0002.lock.json \
+  --archive /path/inside/this/app/to/set-0002.tar
 npm run build
 npm run dev
 ```
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
 not load or privilege either workload. Select an example there or use the
-direct links `?example=prettyM` and `?example=illuminate`. The included server
-supplies the cross-origin isolation headers required by threaded LLVM Wasm.
+direct links `?example=prettyM&variant=default` and
+`?example=illuminate&variant=default`. Example variants are selected in the
+shared header rather than by workload-specific UI. The included server supplies
+the cross-origin isolation headers required by threaded LLVM Wasm.
 `_headers` and `.htaccess` files are included at the root of `dist/` for static
 hosts; configure equivalent headers when the hosting platform does not consume
 either format.
@@ -126,6 +163,8 @@ either format.
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction
 views, while downloaded JSON always retains every backend in the source report.
+Exported runtime profiles retain artifact pathnames and hashes but omit URL
+origins and query strings. They intentionally retain browser user-agent data.
 
 Run the browser regression with:
 
@@ -140,25 +179,36 @@ Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
 The `Illuminate player` example in the common application compares the legacy
 JavaScript, typed VIR, and FIR-native implementations. It has the same
 artifact-status, backend, protocol, study, and result sections as `prettyM`.
-Until it moves into the canonical artifact database, stage its inputs as a
+Until it gets its own canonical artifact-catalog record, stage its inputs as a
 local rehearsal:
 
 ```sh
 npm run stage:illuminate -- \
   --source /path/to/illuminate \
   --native-package /path/to/illuminate-player-package \
+  --selection-package /path/to/illuminate-selection-player-package \
   --vir-sdk /path/to/extracted/lean-vir-sdk
 npm run test:illuminate
 ```
 
 `--vir-sdk` can point directly at an extracted `lean-vir-sdk` CI artifact; when
 omitted, it defaults to the SDK under the Illuminate checkout. The stager
-verifies its manifest and file digests before copying it.
+verifies its manifest and file digests before copying it. The selection package
+is optional for older rehearsals; when present, the application prefers FIR's
+selection-v4 API, uses its bit-exact scalar tick entry, and materializes patch
+rows from the original host-owned animation. The full-action v3 package remains
+the producer-side semantic oracle.
 
-The application and downloaded report display the exact staged build identities and
-mark all timings as non-authoritative. See
+The canonical consumer-side adapter requires both accepted FIR packages. Once
+an Illuminate catalog record can be built, `artifacts:fetch` selects it from
+the artifact-set manifest and atomically stages only verified `illuminate/`
+members. The app uses selection v4 and loads that set manifest as provenance,
+while retaining `REHEARSAL.json` and v3-only compatibility for local rehearsals.
+
+The application and downloaded report display the exact staged build
+identities and mark all timings as non-authoritative. See
 `docs/ILLUMINATE_REHEARSAL.md` for refreshed build hashes, correctness status,
-and the remaining semantic stop condition.
+and the remaining producer integration.
 
 ## Reproducible reports
 
@@ -176,34 +226,15 @@ repeated-call traces for the two VIR entry points. The earlier independent JSON
 round-trip control is intentionally no longer collected; the two VIR backends
 still preserve the useful string-ABI versus direct-Format comparison.
 
-For process-to-process variability and owner-ready summaries:
+For process-to-process variability:
 
 ```sh
 npm run campaign
-npm run cards
 ```
 
 `campaign` launches the Node collector in fresh processes and writes both JSON
-and Markdown. `cards` turns the default report into VIR-001 through VIR-003.
-Both Python scripts use only the standard library; browser automation continues
-to use this package's Playwright dependency.
-
-VIR-002 also reads the committed
-`evidence/vir-pr104-runtime-call-profile.json`. This is a bounded, hash-identified
-summary of two external diagnostic captures against the locked VIR package; raw
-profiles and profiler machinery remain in the VIR producer worktree. Card
-generation rejects the attribution when its Lean version or bounded runtime JS,
-Wasm, and IR-package identities do not match the benchmark report.
-
-The complete local refresh is:
-
-```sh
-npm run refresh
-```
-
-It stages the installed locked set (or the validated in-tree seed), builds and serves the app,
-collects a report, refreshes cards, and runs a three-process campaign. It never
-publishes or reads artifact directories outside this application.
+and Markdown. The Python driver uses only the standard library; browser
+automation continues to use this package's Playwright dependency.
 
 ## Spin-off boundary
 

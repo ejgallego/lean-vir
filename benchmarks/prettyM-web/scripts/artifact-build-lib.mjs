@@ -1,16 +1,30 @@
 import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
-import { requiredArtifactFiles, safeArchivePath } from "./artifact-set-lib.mjs";
+import { safeArchivePath } from "./artifact-set-lib.mjs";
+import {
+  discoverExampleCatalog,
+  readExampleTestPackage,
+} from "./example-catalog-lib.mjs";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
-const producerProtocol = "prettyM-web/source-package/v1";
+const producerProtocol = "browser-benchmarks/source-package/v1";
+const artifactBoundary = "browser-benchmarks/bounded-runtime/v1";
 const adapters = new Set(["vir", "fir-native", "fir-llvm"]);
 
 function object(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
+  return value;
+}
+
+function exactObject(value, properties, label) {
+  object(value, label);
+  const allowed = new Set(properties);
+  const unknown = Object.keys(value).find((property) => !allowed.has(property));
+  if (unknown) throw new Error(`${label} has unknown property ${unknown}`);
   return value;
 }
 
@@ -45,9 +59,9 @@ function materializeSource(database, value, label) {
   };
 }
 
-function materializeComponent(database, component, componentId) {
+function materializeComponent(database, component) {
   const artifact = structuredClone(component.artifact);
-  if (componentId !== "vir") return artifact;
+  if (component.producer.adapter !== "vir") return artifact;
   const runtimeSource = source(
     database,
     identifier(artifact.runtime.sourceRef, "vir runtime sourceRef"),
@@ -64,20 +78,99 @@ function materializeComponent(database, component, componentId) {
     artifact.workload.source,
     "vir workload source",
   );
+  delete artifact.workload.packageRef;
   return artifact;
+}
+
+function materializeExamplePackages(database, catalog) {
+  const examples = new Map(
+    catalog.examples.map((example) => [example.id, example]),
+  );
+  for (const [buildId, build] of Object.entries(database.builds ?? {})) {
+    const exampleId = build?.example?.id;
+    const example = examples.get(exampleId);
+    if (!example) {
+      throw new Error(
+        `build ${buildId} references unknown example ${exampleId}`,
+      );
+    }
+    for (const [componentId, component] of Object.entries(
+      build.components ?? {},
+    )) {
+      if (component?.producer?.adapter !== "vir") continue;
+      const workload = component?.artifact?.workload;
+      if (!workload?.packageRef) continue;
+      const packageSpec = example.packages.find(
+        (item) => item.id === workload.packageRef,
+      );
+      if (!packageSpec) {
+        throw new Error(
+          `component ${componentId} references unknown ${exampleId} package ${workload.packageRef}`,
+        );
+      }
+      if (workload.source?.file || workload.exports) {
+        throw new Error(
+          `component ${componentId} duplicates target or exports from example package ${workload.packageRef}`,
+        );
+      }
+      workload.source.file = packageSpec.target;
+      workload.exports = structuredClone(packageSpec.exports);
+    }
+  }
+}
+
+async function validateBuildVariants(database, catalog, appRoot) {
+  for (const example of catalog.examples) {
+    const testPackage = await readExampleTestPackage(appRoot, example);
+    for (const variant of testPackage.variants) {
+      if (variant.build === null) continue;
+      const build = database.builds[variant.build];
+      if (
+        !build ||
+        build.example.id !== example.id ||
+        build.example.variant !== variant.id
+      ) {
+        throw new Error(
+          `example variant ${example.id}/${variant.id} references invalid build ${variant.build}`,
+        );
+      }
+    }
+  }
+  for (const [buildId, build] of Object.entries(database.builds)) {
+    const example = catalog.examples.find(({ id }) => id === build.example.id);
+    const testPackage = example
+      ? await readExampleTestPackage(appRoot, example)
+      : null;
+    const variant = testPackage?.variants.find(
+      ({ id }) => id === build.example.variant,
+    );
+    if (!variant || variant.build !== buildId) {
+      throw new Error(
+        `build ${buildId} is not selected by example variant ${build.example.id}/${build.example.variant}`,
+      );
+    }
+  }
 }
 
 export async function readBuildDatabase(path) {
   const database = JSON.parse(await readFile(path, "utf8"));
+  const appRoot = resolve(dirname(path));
+  const catalog = await discoverExampleCatalog(appRoot);
+  materializeExamplePackages(database, catalog);
   validateBuildDatabase(database);
+  await validateBuildVariants(database, catalog, appRoot);
   return database;
 }
 
 export function validateBuildDatabase(database) {
-  object(database, "artifact build database");
+  exactObject(
+    database,
+    ["schemaVersion", "kind", "sources", "builds"],
+    "artifact build database",
+  );
   if (
-    database.schemaVersion !== 1 ||
-    database.kind !== "prettyM-web/artifact-build-database"
+    database.schemaVersion !== 2 ||
+    database.kind !== "browser-benchmarks/artifact-build-catalog"
   ) {
     throw new Error("unsupported artifact build database");
   }
@@ -86,7 +179,11 @@ export function validateBuildDatabase(database) {
 
   for (const [sourceId, value] of Object.entries(database.sources)) {
     identifier(sourceId, "source ID");
-    object(value, `source ${sourceId}`);
+    exactObject(
+      value,
+      ["kind", "repository", "revision"],
+      `source ${sourceId}`,
+    );
     if (value.kind !== "git")
       throw new Error(`source ${sourceId} is not a Git source`);
     const repository = string(
@@ -103,11 +200,29 @@ export function validateBuildDatabase(database) {
 
   for (const [buildId, build] of Object.entries(database.builds)) {
     identifier(buildId, "build ID");
-    object(build, `build ${buildId}`);
-    object(build.artifactSet, `build ${buildId} artifactSet`);
-    if (!/^prettyM-[a-zA-Z0-9.-]+$/.test(build.artifactSet.setId ?? "")) {
-      throw new Error(`build ${buildId} has an unsafe artifact set ID`);
+    exactObject(
+      build,
+      ["example", "artifactSet", "checkouts", "components"],
+      `build ${buildId}`,
+    );
+    const example = object(build.example, `build ${buildId} example`);
+    if (
+      Object.keys(example).length !== 2 ||
+      !Object.hasOwn(example, "id") ||
+      !Object.hasOwn(example, "variant")
+    ) {
+      throw new Error(
+        `build ${buildId} example must contain only its ID and variant`,
+      );
     }
+    const exampleId = identifier(example.id, `build ${buildId} example ID`);
+    identifier(example.variant, `build ${buildId} example variant`);
+    exactObject(
+      build.artifactSet,
+      ["setId", "benchmarkContract"],
+      `build ${buildId} artifactSet`,
+    );
+    identifier(build.artifactSet.setId, `build ${buildId} artifact set ID`);
     object(
       build.artifactSet.benchmarkContract,
       `build ${buildId} benchmark contract`,
@@ -127,8 +242,13 @@ export function validateBuildDatabase(database) {
     const destinations = new Set();
     for (const [componentId, component] of Object.entries(build.components)) {
       identifier(componentId, `build ${buildId} component ID`);
+      exactObject(
+        component,
+        ["dependencies", "artifact", "producer"],
+        `component ${componentId}`,
+      );
       object(component.artifact, `component ${componentId} artifact`);
-      if (component.artifact.boundary !== "prettyM-web/bounded-runtime/v1") {
+      if (component.artifact.boundary !== artifactBoundary) {
         throw new Error(
           `component ${componentId} has an unsupported artifact boundary`,
         );
@@ -143,6 +263,21 @@ export function validateBuildDatabase(database) {
       ) {
         throw new Error(`component ${componentId} has an unsupported producer`);
       }
+      const producerProperties = [
+        "protocol",
+        "adapter",
+        "checkouts",
+        "files",
+        "setup",
+      ];
+      if (producer.adapter !== "vir") {
+        producerProperties.push("entrypoint", "manifest");
+      }
+      exactObject(
+        producer,
+        producerProperties,
+        `component ${componentId} producer`,
+      );
       object(producer.checkouts, `component ${componentId} producer checkouts`);
       for (const [role, checkoutId] of Object.entries(producer.checkouts)) {
         identifier(role, `component ${componentId} checkout role`);
@@ -153,50 +288,58 @@ export function validateBuildDatabase(database) {
         }
       }
       object(producer.files, `component ${componentId} producer files`);
+      if (Object.keys(producer.files).length === 0) {
+        throw new Error(`component ${componentId} does not produce any files`);
+      }
       for (const [packagePath, destination] of Object.entries(producer.files)) {
         safeArchivePath(packagePath);
         safeArchivePath(destination);
+        if (!destination.startsWith(`${exampleId}/`)) {
+          throw new Error(
+            `component ${componentId} output must use the ${exampleId}/ namespace`,
+          );
+        }
         if (destinations.has(destination)) {
           throw new Error(`multiple producers provide ${destination}`);
         }
         destinations.add(destination);
       }
       if (producer.adapter === "vir") {
+        string(
+          component.artifact.runtime?.wasiSdk,
+          "VIR runtime WASI SDK version",
+        );
+        identifier(
+          component.artifact.workload.packageRef,
+          "VIR workload example package",
+        );
         const runtimeSource = build.checkouts[producer.checkouts.producer];
+        const leanSource = build.checkouts[producer.checkouts.runtime];
         const workloadSource = build.checkouts[producer.checkouts.workload];
         if (
           component.artifact.runtime?.sourceRef !== runtimeSource ||
+          component.artifact.lean?.commit !==
+            database.sources[leanSource]?.revision ||
           component.artifact.workload?.source?.sourceRef !== workloadSource
         ) {
           throw new Error(
             "VIR producer checkouts and artifact provenance must use the same sources",
           );
         }
-        const entrypoints = object(
-          producer.entrypoints,
-          "VIR producer entrypoints",
-        );
-        for (const name of ["runtimeBuild", "package"]) {
-          const entrypoint = object(
-            entrypoints[name],
-            `VIR ${name} entrypoint`,
-          );
-          string(entrypoint.command, `VIR ${name} command`);
-          if (
-            !Array.isArray(entrypoint.args) ||
-            entrypoint.args.some((arg) => typeof arg !== "string")
-          ) {
-            throw new Error(`VIR ${name} args must be strings`);
-          }
-        }
-        safeArchivePath(entrypoints.runtimeBundler);
-        const inputs = object(producer.inputs, "VIR producer inputs");
-        for (const name of ["runtimeSource", "releaseWasm", "debugWasm"]) {
-          safeArchivePath(inputs[name]);
-        }
         safeArchivePath(component.artifact.workload.source.file);
+        if (!Object.hasOwn(producer.files, component.artifact.workload.file)) {
+          throw new Error(
+            `component ${componentId} workload is not a declared package file`,
+          );
+        }
       } else {
         safeArchivePath(producer.entrypoint);
+        safeArchivePath(producer.manifest);
+        if (!Object.hasOwn(producer.files, producer.manifest)) {
+          throw new Error(
+            `component ${componentId} manifest is not a declared package file`,
+          );
+        }
       }
       for (const dependency of component.dependencies ?? []) {
         if (!build.components[dependency]) {
@@ -206,7 +349,11 @@ export function validateBuildDatabase(database) {
         }
       }
       for (const setup of producer.setup ?? []) {
-        object(setup, `component ${componentId} setup command`);
+        exactObject(
+          setup,
+          ["checkout", "command", "args"],
+          `component ${componentId} setup command`,
+        );
         if (!producer.checkouts[setup.checkout]) {
           throw new Error(
             `component ${componentId} setup uses unknown checkout role`,
@@ -224,13 +371,6 @@ export function validateBuildDatabase(database) {
       }
     }
 
-    const expected = [...requiredArtifactFiles].sort();
-    const actual = [...destinations].sort();
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      throw new Error(
-        `build ${buildId} does not produce the complete artifact seed`,
-      );
-    }
     componentOrder(build);
     artifactSetConfig(database, buildId);
   }
@@ -247,16 +387,28 @@ export function selectBuild(database, buildId) {
 export function artifactSetConfig(database, buildId) {
   const build = selectBuild(database, buildId);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    example: structuredClone(build.example),
     setId: build.artifactSet.setId,
     benchmarkContract: structuredClone(build.artifactSet.benchmarkContract),
     components: Object.fromEntries(
       Object.entries(build.components).map(([componentId, component]) => [
         componentId,
-        materializeComponent(database, component, componentId),
+        {
+          ...materializeComponent(database, component),
+          adapter: component.producer.adapter,
+          files: structuredClone(component.producer.files),
+          producerManifest: component.producer.manifest ?? null,
+        },
       ]),
     ),
   };
+}
+
+export function artifactFiles(build) {
+  return Object.values(build.components)
+    .flatMap((component) => Object.values(component.producer.files))
+    .sort();
 }
 
 export function checkoutSources(database, buildId) {

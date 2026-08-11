@@ -78,23 +78,56 @@ try {
       .getAttribute("aria-current"),
     "page",
   );
+  assert.equal(await page.locator("#variant-picker").isVisible(), true);
+  assert.equal(await page.locator("#variant-select").inputValue(), "default");
+  assert.equal(
+    await page.evaluate(
+      () => window.__benchmarkExampleContext.artifactBaseUrl.href,
+    ),
+    `http://127.0.0.1:${port}/artifacts/illuminate/`,
+  );
+  assert.equal(
+    await page.locator("#variant-select option:checked").textContent(),
+    "Player trace replay",
+  );
   const readiness = await page.evaluate(
     () => window.__illuminateBenchApp.ready,
   );
   assert.deepEqual(readiness, { readyCount: 3, backendCount: 3 });
   assert.deepEqual(
-    await page.evaluate(() => window.__illuminateBenchApp.getBackends()),
+    await page.evaluate(() => {
+      const status = window.__benchmarkApp.getArtifactStatus();
+      return { verified: status.verified, tone: status.tone, setId: status.setId };
+    }),
+    { verified: false, tone: "rehearsal", setId: null },
+  );
+  const backends = await page.evaluate(() =>
+    window.__illuminateBenchApp.getBackends(),
+  );
+  assert.deepEqual(
+    backends.map(({ id, status }) => ({ id, status })),
     [
-      { id: "js", label: "JavaScript oracle", status: "ready" },
-      { id: "vir", label: "Lean · VIR typed", status: "ready" },
-      { id: "native", label: "Lean · FIR native", status: "ready" },
+      { id: "js", status: "ready" },
+      { id: "vir", status: "ready" },
+      { id: "native", status: "ready" },
     ],
   );
+  assert.equal(backends[0].label, "JavaScript oracle");
+  assert.equal(backends[1].label, "Lean · VIR typed");
+  assert.ok(
+    ["Lean · FIR native", "Lean · FIR selection"].includes(backends[2].label),
+  );
+  const usesSelection = backends[2].label === "Lean · FIR selection";
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Illuminate b233ce7c/);
-  assert.match(buildNotes, /VIR 84146bbe/);
-  assert.match(buildNotes, /FIR 9dab5f3c/);
-  assert.match(buildNotes, /fir\.illuminate-player\.browser\/v3/);
+  assert.match(buildNotes, /Illuminate [0-9a-f]{8}/);
+  assert.match(buildNotes, /VIR [0-9a-f]{8}/);
+  assert.match(buildNotes, /FIR(?: selection)? [0-9a-f]{8}/);
+  assert.match(
+    buildNotes,
+    usesSelection
+      ? /fir\.illuminate-player\.browser\/v4/
+      : /fir\.illuminate-player\.browser\/v3/,
+  );
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
   const report = await page.evaluate(() =>

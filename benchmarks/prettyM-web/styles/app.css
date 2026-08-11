@@ -196,6 +196,41 @@ html[data-active-example="catalog"] .example-nav a {
   border-color: color-mix(in srgb, #8cbbea 55%, #454e5e);
 }
 
+.variant-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(32rem, 100%);
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  color: #aeb7c4;
+  background: #181d24;
+  border: 1px solid #363f4d;
+  border-radius: 0.4rem;
+}
+
+.variant-picker span,
+.variant-picker strong,
+.variant-picker small {
+  display: block;
+}
+
+.variant-picker small {
+  color: #8f99a7;
+  font-size: 0.7rem;
+}
+
+.variant-picker select {
+  min-width: min(16rem, 48vw);
+  min-height: 2.35rem;
+  padding: 0.4rem 0.55rem;
+  color: #e9edf1;
+  background: #11151b;
+  border: 1px solid #424b59;
+  border-radius: 0.35rem;
+}
+
 .bench-section-heading > p {
   max-width: 37rem;
   margin-bottom: 0;
@@ -257,6 +292,12 @@ html[data-active-example="catalog"] .example-nav a {
   border-color: color-mix(in srgb, #d7c45c 48%, #454e5e);
 }
 
+.artifact-status[data-tone="checking"],
+.artifact-status[data-tone="unverified"] {
+  background: color-mix(in srgb, #d87979 9%, #191d24);
+  border-color: color-mix(in srgb, #d87979 44%, #454e5e);
+}
+
 .artifact-status h2,
 .artifact-status p {
   margin-bottom: 0;
@@ -264,6 +305,10 @@ html[data-active-example="catalog"] .example-nav a {
 
 .artifact-status[data-tone="rehearsal"] h2 {
   color: #f4dc77;
+}
+
+.artifact-status[data-tone="unverified"] h2 {
+  color: #f09a9a;
 }
 
 .build-notes {
@@ -454,5 +499,14 @@ footer {
   .protocol-grid,
   .report-grid {
     grid-template-columns: 1fr;
+  }
+
+  .variant-picker {
+    display: grid;
+  }
+
+  .variant-picker select {
+    width: 100%;
+    min-width: 0;
   }
 }

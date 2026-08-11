@@ -8,6 +8,7 @@ import {
   readBuildDatabase,
 } from "./artifact-build-lib.mjs";
 import { inside } from "./artifact-set-lib.mjs";
+import { verifyGitCheckout } from "./git-checkout-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -64,54 +65,9 @@ function run(command, args, { cwd, capture = false } = {}) {
   return capture ? result.stdout.trim() : "";
 }
 
-function normalizedRepository(repository) {
-  const trimmed = repository.replace(/\/+$/, "").replace(/\.git$/, "");
-  const githubScp = /^git@github\.com:(.+)$/.exec(trimmed);
-  if (githubScp) return `https://github.com/${githubScp[1]}`;
-  const githubSsh = /^ssh:\/\/git@github\.com\/(.+)$/.exec(trimmed);
-  if (githubSsh) return `https://github.com/${githubSsh[1]}`;
-  return trimmed;
-}
-
-async function verifyCheckout(checkoutId, path, source) {
-  if (!(await stat(path).catch(() => null))?.isDirectory()) {
-    throw new Error(`source checkout ${checkoutId} is missing: ${path}`);
-  }
-  const root = resolve(
-    run("git", ["-C", path, "rev-parse", "--show-toplevel"], {
-      capture: true,
-    }),
-  );
-  if (root !== path) {
-    throw new Error(`source checkout ${checkoutId} is not a Git root: ${path}`);
-  }
-  const origin = run("git", ["-C", path, "remote", "get-url", "origin"], {
-    capture: true,
-  });
-  if (normalizedRepository(origin) !== normalizedRepository(source.repository)) {
-    throw new Error(
-      `source checkout ${checkoutId} origin mismatch: expected ${source.repository}, got ${origin}`,
-    );
-  }
-  const revision = run("git", ["-C", path, "rev-parse", "HEAD"], {
-    capture: true,
-  });
-  if (revision !== source.revision) {
-    throw new Error(
-      `source checkout ${checkoutId} revision mismatch: expected ${source.revision}, got ${revision}`,
-    );
-  }
-  const dirty = run("git", ["-C", path, "status", "--porcelain"], {
-    capture: true,
-  });
-  if (dirty !== "") {
-    throw new Error(`source checkout ${checkoutId} is dirty: ${path}`);
-  }
-}
-
 async function materializeCheckout(checkoutId, destination, source) {
   if (await stat(destination).catch(() => null)) {
-    await verifyCheckout(checkoutId, destination, source);
+    await verifyGitCheckout(checkoutId, destination, source);
     console.log(
       `reused ${checkoutId}: ${relative(appRoot, destination)} @ ${source.revision}`,
     );
@@ -135,7 +91,7 @@ async function materializeCheckout(checkoutId, destination, source) {
       source.revision,
     ]);
     run("git", ["-C", temporary, "checkout", "--detach", "FETCH_HEAD"]);
-    await verifyCheckout(checkoutId, temporary, source);
+    await verifyGitCheckout(checkoutId, temporary, source);
     await rename(temporary, destination);
   } catch (error) {
     await rm(temporary, { recursive: true, force: true });

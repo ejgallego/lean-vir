@@ -1,10 +1,8 @@
-import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   cp,
   mkdir,
   readFile,
-  rename,
   rm,
   stat,
   writeFile,
@@ -12,7 +10,11 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalJson } from "./artifact-set-lib.mjs";
+import {
+  canonicalJson,
+  replaceDirectoryAtomically,
+  sha256,
+} from "./artifact-set-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -24,17 +26,22 @@ PATH must be the root of a prepared Illuminate checkout containing test_output.
 The staged files remain inside this application's ignored artifacts directory.
 
   --native-package PATH  tested FIR package (default: PATH/test_output/native)
+  --selection-package PATH
+                         tested FIR selection-v4 package (optional)
   --vir-sdk PATH         tested VIR SDK (default: PATH/test_output/vir/sdk)`);
 }
 
 function parseArgs(argv) {
   let source = null;
   let nativePackage = null;
+  let selectionPackage = null;
   let virSdk = null;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--source") source = argv[++index];
     else if (argument === "--native-package") nativePackage = argv[++index];
+    else if (argument === "--selection-package")
+      selectionPackage = argv[++index];
     else if (argument === "--vir-sdk") virSdk = argv[++index];
     else if (argument === "--help" || argument === "-h") {
       usage();
@@ -48,6 +55,7 @@ function parseArgs(argv) {
     nativePackage: resolve(
       nativePackage || join(sourceRoot, "test_output/native"),
     ),
+    selectionPackage: selectionPackage ? resolve(selectionPackage) : null,
     virSdk: resolve(virSdk || join(sourceRoot, "test_output/vir/sdk")),
   };
 }
@@ -66,10 +74,6 @@ function gitOptional(source, args) {
   }
 }
 
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
 async function requireFile(path) {
   if (!(await stat(path).catch(() => null))?.isFile()) {
     throw new Error(`missing Illuminate rehearsal input: ${path}`);
@@ -80,6 +84,18 @@ async function copyFile(source, destination) {
   await requireFile(source);
   await mkdir(dirname(destination), { recursive: true });
   await cp(source, destination);
+}
+
+async function verifyPackage(directory, files) {
+  await Promise.all(
+    ["BUILD.json", "SHA256SUMS", ...files].map((path) =>
+      requireFile(join(directory, path)),
+    ),
+  );
+  execFileSync("sha256sum", ["--check", "SHA256SUMS"], {
+    cwd: directory,
+    stdio: "inherit",
+  });
 }
 
 async function verifyVirSdk(virSdk) {
@@ -129,6 +145,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const source = options.source;
   const nativePackage = options.nativePackage;
+  const selectionPackage = options.selectionPackage;
   const virSdk = options.virSdk;
   const expected = [
     "player_js/anim_core.js",
@@ -139,20 +156,18 @@ async function main() {
   await Promise.all(expected.map((path) => requireFile(join(source, path))));
   const { artifact: virArtifact, artifactBytes: virArtifactBytes } =
     await verifyVirSdk(virSdk);
-  await Promise.all(
-    [
-      "BUILD.json",
-      "SHA256SUMS",
-      "illuminate-player-browser-adapter.mjs",
-      "illuminate-player.wasm",
-      "illuminate-player.wasm.json",
-    ].map((path) => requireFile(join(nativePackage, path))),
-  );
-
-  execFileSync("sha256sum", ["--check", "SHA256SUMS"], {
-    cwd: nativePackage,
-    stdio: "inherit",
-  });
+  await verifyPackage(nativePackage, [
+    "illuminate-player-browser-adapter.mjs",
+    "illuminate-player.wasm",
+    "illuminate-player.wasm.json",
+  ]);
+  if (selectionPackage) {
+    await verifyPackage(selectionPackage, [
+      "illuminate-selection-player-browser-adapter.mjs",
+      "illuminate-selection-player.wasm",
+      "illuminate-selection-player.wasm.json",
+    ]);
+  }
 
   const destination = join(appRoot, "artifacts/illuminate");
   const next = join(appRoot, "artifacts/illuminate.next");
@@ -170,6 +185,11 @@ async function main() {
   await cp(nativePackage, join(next, "native"), {
     recursive: true,
   });
+  if (selectionPackage) {
+    await cp(selectionPackage, join(next, "selection"), {
+      recursive: true,
+    });
+  }
   await cp(virSdk, join(next, "vir/sdk"), {
     recursive: true,
   });
@@ -198,6 +218,12 @@ async function main() {
 
   const nativeBuildBytes = await readFile(join(nativePackage, "BUILD.json"));
   const nativeBuild = JSON.parse(nativeBuildBytes);
+  const selectionBuildBytes = selectionPackage
+    ? await readFile(join(selectionPackage, "BUILD.json"))
+    : null;
+  const selectionBuild = selectionBuildBytes
+    ? JSON.parse(selectionBuildBytes)
+    : null;
   const sourceBranch = gitOptional(source, ["symbolic-ref", "--short", "HEAD"]);
   const configuredRemote = sourceBranch
     ? gitOptional(source, ["config", `branch.${sourceBranch}.remote`])
@@ -230,6 +256,17 @@ async function main() {
         wasm: nativeBuild.wasm,
         browserAdapter: nativeBuild.capabilities?.browserAdapter,
       },
+      selection: selectionBuild
+        ? {
+            buildSha256: sha256(selectionBuildBytes),
+            schemaVersion: selectionBuild.schemaVersion,
+            fir: selectionBuild.sources?.fir,
+            illuminate: selectionBuild.sources?.illuminate,
+            wasm: selectionBuild.wasm,
+            browserAdapter: selectionBuild.capabilities?.browserAdapter,
+            hotEvent: selectionBuild.capabilities?.hotEvent,
+          }
+        : null,
       vir: {
         artifactSha256: sha256(virArtifactBytes),
         sourceCommit: virArtifact.gitCommit,
@@ -243,20 +280,7 @@ async function main() {
   };
   await writeFile(join(next, "REHEARSAL.json"), canonicalJson(receipt));
 
-  const previous = `${destination}.previous`;
-  await rm(previous, { recursive: true, force: true });
-  if (await stat(destination).catch(() => null)) {
-    await rename(destination, previous);
-  }
-  try {
-    await rename(next, destination);
-  } catch (error) {
-    if (await stat(previous).catch(() => null)) {
-      await rename(previous, destination);
-    }
-    throw error;
-  }
-  await rm(previous, { recursive: true, force: true });
+  await replaceDirectoryAtomically(next, destination);
   console.log(
     `staged Illuminate rehearsal: ${relative(appRoot, destination)} (${examples.length} examples)`,
   );

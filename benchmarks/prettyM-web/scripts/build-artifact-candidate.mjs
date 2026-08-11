@@ -14,6 +14,11 @@ import {
   inside,
   readJson,
 } from "./artifact-set-lib.mjs";
+import {
+  parsePathAssignment,
+  readToolchainConfig,
+  resolveBuildCheckoutPaths,
+} from "./toolchain-config-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -21,10 +26,15 @@ function usage() {
   console.log(`Usage: node scripts/build-artifact-candidate.mjs [options] BUILD
 
 Build, pack, re-import, test, and collect a non-publishing artifact candidate.
-Source checkouts must already exist below the controlled source directory.
+Fallback source checkouts must already exist below the controlled source
+directory.
 
   --database PATH     build database (default: artifact-builds.json)
   --sources-dir PATH  checkout root (default: _sources)
+  --toolchain [NAME=]PATH
+                      select FIR by default, or a named FIR/VIR toolchain
+  --toolchain-config PATH
+                      read toolchains and checkout paths from JSON
   --prepare           run catalogued producer setup before building
   --plan              print inputs and outputs without building
   -h, --help          show this help`);
@@ -34,6 +44,8 @@ function parseArgs(argv) {
   const options = {
     database: "artifact-builds.json",
     sourcesDir: "_sources",
+    toolchains: new Map(),
+    toolchainConfig: null,
     prepare: false,
     plan: false,
     buildId: null,
@@ -43,7 +55,17 @@ function parseArgs(argv) {
     if (argument === "--database") options.database = argv[++index];
     else if (argument === "--sources-dir")
       options.sourcesDir = argv[++index];
-    else if (argument === "--prepare") options.prepare = true;
+    else if (argument === "--toolchain") {
+      const { name, path } = parsePathAssignment(argv[++index], {
+        defaultName: "fir",
+        label: "--toolchain",
+      });
+      if (options.toolchains.has(name))
+        throw new Error(`duplicate toolchain: ${name}`);
+      options.toolchains.set(name, path);
+    } else if (argument === "--toolchain-config") {
+      options.toolchainConfig = argv[++index];
+    } else if (argument === "--prepare") options.prepare = true;
     else if (argument === "--plan") options.plan = true;
     else if (argument === "--help" || argument === "-h") {
       usage();
@@ -88,6 +110,15 @@ async function main() {
   const database = await readBuildDatabase(databasePath);
   const build = selectBuild(database, options.buildId);
   const sources = checkoutSources(database, options.buildId);
+  const toolchainConfig = await readToolchainConfig(
+    appRoot,
+    options.toolchainConfig,
+  );
+  const checkoutSelection = resolveBuildCheckoutPaths(build, sources, {
+    sourcesDir,
+    toolchains: options.toolchains,
+    config: toolchainConfig,
+  });
   const candidateRoot = inside(
     appRoot,
     `_artifacts/candidates/${options.buildId}`,
@@ -100,11 +131,19 @@ async function main() {
   for (const [checkoutId, source] of Object.entries(sources)) {
     const destination = relative(
       appRoot,
-      resolve(sourcesDir, checkoutId),
+      checkoutSelection.paths.get(checkoutId),
     );
     console.log(
       `source ${checkoutId}: ${source.repository} @ ${source.revision} -> ${destination}`,
     );
+  }
+  for (const [name, checkoutId] of checkoutSelection.toolchainRoles) {
+    console.log(
+      `toolchain ${name}: ${checkoutSelection.paths.get(checkoutId)}`,
+    );
+  }
+  if (toolchainConfig.path) {
+    console.log(`toolchain config: ${toolchainConfig.path}`);
   }
   console.log(`candidate output: ${relative(appRoot, uploadDir)}`);
   if (options.plan) return;
@@ -117,12 +156,14 @@ async function main() {
     options.buildId,
     "--database",
     relative(appRoot, databasePath),
+    "--sources-dir",
+    relative(appRoot, sourcesDir),
   ];
-  for (const checkoutId of Object.keys(sources)) {
-    buildArgs.push(
-      "--checkout",
-      `${checkoutId}=${resolve(sourcesDir, checkoutId)}`,
-    );
+  for (const [name, path] of options.toolchains) {
+    buildArgs.push("--toolchain", `${name}=${path}`);
+  }
+  if (options.toolchainConfig) {
+    buildArgs.push("--toolchain-config", options.toolchainConfig);
   }
   if (options.prepare) buildArgs.push("--prepare");
   run(process.execPath, buildArgs);
@@ -154,7 +195,17 @@ async function main() {
     relative(appRoot, resolve(candidateRoot, "sets")),
   ]);
 
-  run("npm", ["test"]);
+  const exampleTestReport = resolve(candidateRoot, "EXAMPLE_TEST.json");
+  run("npm", ["run", "test:unit"]);
+  run("npm", [
+    "run",
+    "test:example",
+    "--",
+    build.example.id,
+    build.example.variant,
+    "--output",
+    relative(appRoot, exampleTestReport),
+  ]);
 
   const receipt = inside(
     appRoot,
@@ -164,7 +215,14 @@ async function main() {
   const checksum = `${archive}.sha256`;
   const manifest = resolve(releaseDir, `${lock.setId}.manifest.json`);
   await mkdir(uploadDir, { recursive: true });
-  for (const source of [archive, checksum, manifest, receipt, candidateLock]) {
+  for (const source of [
+    archive,
+    checksum,
+    manifest,
+    receipt,
+    candidateLock,
+    exampleTestReport,
+  ]) {
     const destination =
       source === receipt
         ? "BUILD.json"
@@ -179,15 +237,18 @@ async function main() {
   });
   const commit = run("git", ["rev-parse", "HEAD"], { capture: true });
   const dirty = run("git", ["status", "--porcelain"], { capture: true });
-  const [archiveRecord, receiptRecord, manifestRecord] = await Promise.all([
+  const [archiveRecord, receiptRecord, manifestRecord, testReportRecord] =
+    await Promise.all([
     fileRecord(archive),
     fileRecord(receipt),
     fileRecord(manifest),
+    fileRecord(exampleTestReport),
   ]);
   const candidate = {
     schemaVersion: 1,
-    kind: "prettyM-web/artifact-candidate",
+    kind: "browser-benchmarks/artifact-candidate",
     build: options.buildId,
+    example: structuredClone(build.example),
     artifactSet: lock.setId,
     orchestrator: {
       repository,
@@ -206,10 +267,15 @@ async function main() {
       file: "BUILD.json",
       ...receiptRecord,
     },
+    exampleTestReport: {
+      file: "EXAMPLE_TEST.json",
+      ...testReportRecord,
+    },
     validation: {
       sourcePackages: "passed",
       archiveImport: "passed",
-      applicationTests: "passed",
+      applicationUnitTests: "passed",
+      exampleDifferential: "passed",
     },
     promotion: {
       published: false,

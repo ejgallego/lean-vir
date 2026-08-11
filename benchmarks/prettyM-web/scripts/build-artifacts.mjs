@@ -5,15 +5,24 @@ import {
   mkdir,
   readFile,
   realpath,
-  rename,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  artifactFiles,
+  artifactSetConfig,
   checkoutSources,
   componentOrder,
   readBuildDatabase,
@@ -24,16 +33,31 @@ import {
   fileRecord,
   fileRecords,
   inside,
-  requiredArtifactFiles,
+  replaceDirectoryAtomically,
   sha256,
   validateSeed,
 } from "./artifact-set-lib.mjs";
+import { verifyGitCheckout } from "./git-checkout-lib.mjs";
+import {
+  checkoutReceipt,
+  parsePathAssignment,
+  readToolchainConfig,
+  resolveBuildCheckoutPaths,
+} from "./toolchain-config-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildEnvironment = {
   ...process.env,
   NPM_CONFIG_CACHE:
     process.env.NPM_CONFIG_CACHE ?? join(appRoot, "_artifacts/npm-cache"),
+};
+const virCompiler = {
+  runtimeBuild: ["npm", ["run", "build:demo:release"]],
+  packageBuild: ["lake", ["exe", "vir_irpkg"]],
+  runtimeBundler: "node_modules/.bin/esbuild",
+  runtimeSource: "web/src/vir-runtime.js",
+  releaseWasm: "web/public/vir-upstream.wasm",
+  debugWasm: "web/public/vir-upstream.dev.wasm",
 };
 
 function usage() {
@@ -43,7 +67,12 @@ Build every component of a catalogued artifact from exact local Git checkouts,
 validate the producer packages, and atomically assemble _artifacts/seed.
 
   --database PATH       build database (default: artifact-builds.json)
-  --checkout NAME=PATH resolve one catalog checkout; repeat for every checkout
+  --checkout NAME=PATH override one catalog checkout; repeat as needed
+  --toolchain [NAME=]PATH
+                        select FIR by default, or a named FIR/VIR toolchain
+  --toolchain-config PATH
+                        read toolchains and checkout paths from JSON
+  --sources-dir PATH    fallback checkout root (default: _sources)
   --prepare             run catalogued producer setup before building
   --plan                verify checkouts and print the plan without building
   --list                list catalogued builds
@@ -54,6 +83,9 @@ function parseArgs(argv) {
   const options = {
     database: "artifact-builds.json",
     checkouts: new Map(),
+    toolchains: new Map(),
+    toolchainConfig: null,
+    sourcesDir: "_sources",
     prepare: false,
     plan: false,
     list: false,
@@ -63,15 +95,24 @@ function parseArgs(argv) {
     const argument = argv[index];
     if (argument === "--database") options.database = argv[++index];
     else if (argument === "--checkout") {
-      const value = argv[++index] ?? "";
-      const separator = value.indexOf("=");
-      if (separator < 1 || separator === value.length - 1) {
-        throw new Error("--checkout must have the form NAME=PATH");
-      }
-      const name = value.slice(0, separator);
+      const { name, path } = parsePathAssignment(argv[++index], {
+        label: "--checkout",
+      });
       if (options.checkouts.has(name))
         throw new Error(`duplicate checkout: ${name}`);
-      options.checkouts.set(name, resolve(value.slice(separator + 1)));
+      options.checkouts.set(name, path);
+    } else if (argument === "--toolchain") {
+      const { name, path } = parsePathAssignment(argv[++index], {
+        defaultName: "fir",
+        label: "--toolchain",
+      });
+      if (options.toolchains.has(name))
+        throw new Error(`duplicate toolchain: ${name}`);
+      options.toolchains.set(name, path);
+    } else if (argument === "--toolchain-config") {
+      options.toolchainConfig = argv[++index];
+    } else if (argument === "--sources-dir") {
+      options.sourcesDir = argv[++index];
     } else if (argument === "--prepare") options.prepare = true;
     else if (argument === "--plan") options.plan = true;
     else if (argument === "--list") options.list = true;
@@ -107,37 +148,6 @@ function run(
   return capture ? result.stdout.trim() : "";
 }
 
-async function verifyCheckout(checkoutId, path, selectedSource) {
-  if (!(await stat(path).catch(() => null))?.isDirectory()) {
-    throw new Error(`checkout ${checkoutId} is not a directory: ${path}`);
-  }
-  const root = resolve(
-    run("git", ["-C", path, "rev-parse", "--show-toplevel"], { capture: true }),
-  );
-  if (root !== path)
-    throw new Error(
-      `checkout ${checkoutId} must point at its Git root: ${root}`,
-    );
-  const revision = run("git", ["-C", path, "rev-parse", "HEAD"], {
-    capture: true,
-  });
-  if (revision !== selectedSource.revision) {
-    throw new Error(
-      `checkout ${checkoutId} revision mismatch: expected ${selectedSource.revision}, got ${revision}`,
-    );
-  }
-  const dirty = run("git", ["-C", path, "status", "--porcelain"], {
-    capture: true,
-  });
-  if (dirty !== "") throw new Error(`checkout ${checkoutId} is dirty: ${path}`);
-  return {
-    path,
-    revision,
-    sourceId: selectedSource.id,
-    repository: selectedSource.repository,
-  };
-}
-
 function checkoutFor(component, role, resolvedCheckouts) {
   const checkoutId = component.producer.checkouts[role];
   const checkout = resolvedCheckouts[checkoutId];
@@ -151,19 +161,70 @@ async function resetOutput(output) {
   await mkdir(dirname(output), { recursive: true });
 }
 
+async function resolveVirEsbuild(vir) {
+  const lock = JSON.parse(
+    await readFile(join(vir, "package-lock.json"), "utf8"),
+  );
+  const expectedVersion = lock.packages?.["node_modules/esbuild"]?.version;
+  if (typeof expectedVersion !== "string") {
+    throw new Error("VIR package lock does not pin esbuild");
+  }
+  const selected = process.env.VIR_ESBUILD
+    ? resolve(process.env.VIR_ESBUILD)
+    : join(vir, virCompiler.runtimeBundler);
+  if (!(await stat(selected).catch(() => null))?.isFile()) {
+    throw new Error(
+      `VIR esbuild is missing; rerun with --prepare or set VIR_ESBUILD: ${selected}`,
+    );
+  }
+  const actualVersion = run(selected, ["--version"], { capture: true });
+  if (actualVersion !== expectedVersion) {
+    throw new Error(
+      `VIR esbuild version mismatch: expected ${expectedVersion}, got ${actualVersion}`,
+    );
+  }
+  return selected;
+}
+
+async function resolveVirWasiSdk(component, vir) {
+  const selected = resolve(
+    process.env.WASI_SDK_PATH ?? join(vir, ".tools/wasi-sdk"),
+  );
+  if (!(await stat(join(selected, "bin/clang++")).catch(() => null))?.isFile()) {
+    throw new Error(
+      `VIR WASI SDK is missing; rerun with --prepare or set WASI_SDK_PATH: ${selected}`,
+    );
+  }
+  const expectedVersion = component.artifact.runtime.wasiSdk;
+  const installed = basename(await realpath(selected));
+  if (!installed.startsWith(`wasi-sdk-${expectedVersion}-`)) {
+    throw new Error(
+      `VIR WASI SDK version mismatch: expected ${expectedVersion}, got ${installed}`,
+    );
+  }
+  return selected;
+}
+
 async function buildVir(component, output, resolvedCheckouts) {
   const vir = checkoutFor(component, "producer", resolvedCheckouts);
+  const lean = checkoutFor(component, "runtime", resolvedCheckouts);
   const workload = checkoutFor(component, "workload", resolvedCheckouts);
+  const esbuild = await resolveVirEsbuild(vir);
+  const wasiSdk = await resolveVirWasiSdk(component, vir);
   await resetOutput(output);
   await mkdir(join(output, "lean-vir/js"), { recursive: true });
   await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
 
-  const entrypoints = component.producer.entrypoints;
-  run(entrypoints.runtimeBuild.command, entrypoints.runtimeBuild.args, {
+  run(virCompiler.runtimeBuild[0], virCompiler.runtimeBuild[1], {
     cwd: vir,
+    env: {
+      ...buildEnvironment,
+      LEAN4_SRC: lean,
+      WASI_SDK_PATH: wasiSdk,
+    },
   });
-  const releaseWasm = join(vir, component.producer.inputs.releaseWasm);
-  const debugWasm = join(vir, component.producer.inputs.debugWasm);
+  const releaseWasm = join(vir, virCompiler.releaseWasm);
+  const debugWasm = join(vir, virCompiler.debugWasm);
   const [releaseRecord, debugRecord] = await Promise.all([
     fileRecord(releaseWasm),
     fileRecord(debugWasm),
@@ -180,9 +241,9 @@ async function buildVir(component, output, resolvedCheckouts) {
     : `${workloadConfig.file}.report.md`;
   const reportPath = join(output, reportName);
   run(
-    entrypoints.package.command,
+    virCompiler.packageBuild[0],
     [
-      ...entrypoints.package.args,
+      ...virCompiler.packageBuild[1],
       packagePath,
       reportPath,
       "--target",
@@ -191,14 +252,10 @@ async function buildVir(component, output, resolvedCheckouts) {
     ],
     { cwd: vir },
   );
-  const esbuild = join(vir, entrypoints.runtimeBundler);
-  if (!(await stat(esbuild).catch(() => null))?.isFile()) {
-    throw new Error(`VIR esbuild is missing; rerun with --prepare: ${esbuild}`);
-  }
   run(
     esbuild,
     [
-      join(vir, component.producer.inputs.runtimeSource),
+      join(vir, virCompiler.runtimeSource),
       "--bundle",
       "--format=esm",
       "--platform=browser",
@@ -224,7 +281,7 @@ async function buildFirLlvm(component, output, resolvedCheckouts, packages) {
     cwd: fir,
     env: {
       ...buildEnvironment,
-      FIR_PRETTY_M_NATIVE_PACKAGE: packages.native,
+      FIR_PRETTY_M_NATIVE_PACKAGE: packages[component.dependencies?.[0]],
     },
   });
 }
@@ -293,7 +350,9 @@ async function validateVir(component, output, resolvedCheckouts) {
 }
 
 async function validateNative(component, output, resolvedCheckouts) {
-  const build = JSON.parse(await readFile(join(output, "BUILD.json"), "utf8"));
+  const build = JSON.parse(
+    await readFile(join(output, component.producer.manifest), "utf8"),
+  );
   const sourceId = component.producer.checkouts.producer;
   if (
     build.sourceCommit !== resolvedCheckouts[sourceId].revision ||
@@ -317,7 +376,7 @@ async function validateNative(component, output, resolvedCheckouts) {
 
 async function validateLlvm(component, output) {
   const manifest = JSON.parse(
-    await readFile(join(output, "prettyM.manifest.json"), "utf8"),
+    await readFile(join(output, component.producer.manifest), "utf8"),
   );
   if (
     manifest.toolchain?.lean?.version !== component.artifact.lean.version ||
@@ -344,20 +403,6 @@ async function validatePackage(
   }
 }
 
-async function replaceSeed(next, seed) {
-  const previous = `${seed}.previous`;
-  await rm(previous, { recursive: true, force: true });
-  const existing = await stat(seed).catch(() => null);
-  if (existing) await rename(seed, previous);
-  try {
-    await rename(next, seed);
-  } catch (error) {
-    if (existing) await rename(previous, seed);
-    throw error;
-  }
-  await rm(previous, { recursive: true, force: true });
-}
-
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const databasePath = inside(
@@ -376,18 +421,41 @@ async function main() {
   if (!options.buildId) throw new Error("select a build ID or pass --list");
 
   const build = selectBuild(database, options.buildId);
+  const examplePath = inside(
+    appRoot,
+    `examples/${build.example.id}/example.json`,
+    "read example manifest",
+  );
+  const exampleBytes = await readFile(examplePath);
+  const exampleManifest = JSON.parse(exampleBytes);
+  const testPackagePath = inside(
+    appRoot,
+    exampleManifest.testPackage,
+    "read example test package",
+  );
+  const testPackageBytes = await readFile(testPackagePath);
   const sources = checkoutSources(database, options.buildId);
-  for (const checkoutId of options.checkouts.keys()) {
-    if (!sources[checkoutId])
-      throw new Error(`build ${options.buildId} has no checkout ${checkoutId}`);
-  }
+  const sourcesDir = inside(
+    appRoot,
+    options.sourcesDir,
+    "read artifact sources",
+  );
+  const toolchainConfig = await readToolchainConfig(
+    appRoot,
+    options.toolchainConfig,
+  );
+  const checkoutSelection = resolveBuildCheckoutPaths(build, sources, {
+    sourcesDir,
+    checkouts: options.checkouts,
+    toolchains: options.toolchains,
+    config: toolchainConfig,
+  });
+  const toolchainRoles = checkoutSelection.toolchainRoles;
   const resolvedCheckouts = {};
   for (const [checkoutId, selectedSource] of Object.entries(sources)) {
-    const path = options.checkouts.get(checkoutId);
-    if (!path) throw new Error(`missing --checkout ${checkoutId}=PATH`);
-    resolvedCheckouts[checkoutId] = await verifyCheckout(
+    resolvedCheckouts[checkoutId] = await verifyGitCheckout(
       checkoutId,
-      path,
+      checkoutSelection.paths.get(checkoutId),
       selectedSource,
     );
   }
@@ -395,6 +463,12 @@ async function main() {
   const order = componentOrder(build);
   console.log(`build: ${options.buildId}`);
   console.log(`artifact set: ${build.artifactSet.setId}`);
+  if (toolchainConfig.path) {
+    console.log(`toolchain config: ${toolchainConfig.path}`);
+  }
+  for (const [name, checkoutId] of toolchainRoles) {
+    console.log(`toolchain ${name}: ${resolvedCheckouts[checkoutId].path}`);
+  }
   for (const [checkoutId, checkout] of Object.entries(resolvedCheckouts)) {
     console.log(
       `checkout ${checkoutId}: ${checkout.path} @ ${checkout.revision}`,
@@ -412,9 +486,19 @@ async function main() {
   for (const componentId of order) {
     const component = build.components[componentId];
     if (options.prepare) {
-      for (const setup of component.producer.setup ?? []) {
-        const path = checkoutFor(component, setup.checkout, resolvedCheckouts);
-        run(setup.command, setup.args, { cwd: path });
+      if (component.producer.adapter === "vir") {
+        const path = checkoutFor(component, "producer", resolvedCheckouts);
+        run("npm", ["install"], { cwd: path });
+        run("npm", ["run", "install:wasi"], { cwd: path });
+      } else {
+        for (const setup of component.producer.setup ?? []) {
+          const path = checkoutFor(
+            component,
+            setup.checkout,
+            resolvedCheckouts,
+          );
+          run(setup.command, setup.args, { cwd: path });
+        }
       }
     }
     const output = join(buildRoot, "packages", componentId);
@@ -431,7 +515,7 @@ async function main() {
   }
 
   for (const [checkoutId, selectedSource] of Object.entries(sources)) {
-    await verifyCheckout(
+    await verifyGitCheckout(
       checkoutId,
       resolvedCheckouts[checkoutId].path,
       selectedSource,
@@ -451,21 +535,50 @@ async function main() {
       await cp(join(packages[componentId], packagePath), target);
     }
   }
-  await validateSeed(nextSeed);
-  const records = await fileRecords(nextSeed, requiredArtifactFiles);
+  await validateSeed(nextSeed, artifactSetConfig(database, options.buildId));
+  const records = await fileRecords(nextSeed, artifactFiles(build));
   const seed = inside(appRoot, "_artifacts/seed", "replace artifact seed");
-  await replaceSeed(nextSeed, seed);
+  await replaceDirectoryAtomically(nextSeed, seed);
 
   const receipt = {
-    schemaVersion: 1,
-    kind: "prettyM-web/source-build-receipt",
+    schemaVersion: 2,
+    kind: "browser-benchmarks/source-build-receipt",
     build: options.buildId,
     artifactSet: build.artifactSet.setId,
     database: {
       file: relative(appRoot, databasePath),
       sha256: sha256(databaseBytes),
     },
-    sources: resolvedCheckouts,
+    example: {
+      id: build.example.id,
+      variant: build.example.variant,
+      file: relative(appRoot, examplePath),
+      sha256: sha256(exampleBytes),
+      testPackage: {
+        file: relative(appRoot, testPackagePath),
+        sha256: sha256(testPackageBytes),
+      },
+    },
+    checkoutResolution: {
+      configUsed: toolchainConfig.path !== null,
+      checkoutOverrides: [...options.checkouts.keys()].sort(),
+      toolchainOverrides: [...options.toolchains.keys()].sort(),
+    },
+    toolchains: Object.fromEntries(
+      [...toolchainRoles].map(([name, checkoutId]) => [
+        name,
+        {
+          checkout: checkoutId,
+          ...checkoutReceipt(resolvedCheckouts[checkoutId]),
+        },
+      ]),
+    ),
+    sources: Object.fromEntries(
+      Object.entries(resolvedCheckouts).map(([checkoutId, checkout]) => [
+        checkoutId,
+        checkoutReceipt(checkout),
+      ]),
+    ),
     components: Object.fromEntries(
       order.map((componentId) => [
         componentId,

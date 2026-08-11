@@ -142,23 +142,24 @@ can later become an independent repository by moving that directory intact.
 From the VIR root, use the thin convenience commands:
 
 ```bash
-npm run bench:pretty:web:stage
-npm run bench:pretty:web:artifacts:pack
-npm run bench:pretty:web:artifacts:fetch
+npm run bench:pretty:web:stage -- _artifacts/sets/<set-id>
+npm run bench:pretty:web:example -- prettyM default --plan
+npm run bench:pretty:web:examples:check
+npm run bench:pretty:web:artifacts:pack -- --build prettyM
+npm run bench:pretty:web:artifacts:fetch -- --lock <lock> --archive <tar>
 npm run bench:pretty:web:build
 npm run bench:pretty:web:test
 npm run bench:pretty:web:dev
 npm run bench:pretty:web:report
 npm run bench:pretty:web:campaign
-npm run bench:pretty:web:cards
-npm run bench:pretty:web:refresh
 ```
 
-The report command collects cold-start, per-phase, scaling, interaction,
+The generic stage command derives the example from a verified namespaced set
+and replaces only that example's artifacts. The report command collects
+cold-start, per-phase, scaling, interaction,
 retained and isolated memory, and repeated-call data. Campaigns launch the
-collector in fresh processes, cards render the forwardable VIR observations,
-and refresh performs the complete stage/build/serve/report/campaign/card flow
-without publishing. See `benchmarks/prettyM-web/README.md` for the ignored
+collector in fresh processes without publishing. See
+`benchmarks/prettyM-web/README.md` for the ignored
 artifact and result layouts and the commands that work directly from the
 application directory.
 

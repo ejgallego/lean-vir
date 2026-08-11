@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example-tests",
+  "example": "prettyM",
+  "variants": [
+    {
+      "id": "default",
+      "title": "Compact Format to styled segments",
+      "build": "prettyM",
+      "tests": [
+        {
+          "id": "smoke-parity",
+          "study": "smoke",
+          "oracle": "js",
+          "backends": ["js", "vir", "vir-format", "native", "llvm"],
+          "data": {
+            "scenarios": [
+              {
+                "case": {
+                  "id": "webapp-smoke",
+                  "label": "Webapp smoke",
+                  "format": [5, [4, "hello", [4, 1, "world"]]],
+                  "origin": "example-package"
+                },
+                "width": 8
+              }
+            ]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "suite",
+        "data": {
+          "studies": [
+            "differential",
+            "scaling",
+            "memory-retained",
+            "interactions",
+            "repeated"
+          ]
+        }
+      }
+    }
+  ]
+}

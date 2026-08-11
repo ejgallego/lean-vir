@@ -1,6 +1,9 @@
 // @ts-check
 
-const artifactBase = new URL("../artifacts/illuminate/", import.meta.url);
+const artifactBase = globalThis.__benchmarkExampleContext?.artifactBaseUrl;
+if (!(artifactBase instanceof URL)) {
+  throw new Error("Illuminate requires the benchmark example context");
+}
 const typedVirEntry = "Illuminate.Animation.Vir.replayTraceTyped";
 const backendColors = {
   js: "#74a9ff",
@@ -52,14 +55,14 @@ const backends = [
 
 let latestReport = null;
 let running = false;
-let rehearsal = null;
+let artifactProvenance = null;
 let examples = [];
 
 function renderBuildNotes(receipt) {
   const notes = /** @type {HTMLElement} */ (
     document.querySelector("#build-notes")
   );
-  const native = receipt.inputs.native;
+  const native = receipt.inputs.selection ?? receipt.inputs.native;
   const vir = receipt.inputs.vir;
   const source = receipt.source;
   notes.replaceChildren();
@@ -70,7 +73,7 @@ function renderBuildNotes(receipt) {
     `VIR ${vir.sourceCommit.slice(0, 8)}${
       vir.sourceDirty ? " · manifest records dirty" : ""
     }`,
-    `FIR ${native.fir.commit.slice(0, 8)} · ${
+    `FIR${receipt.inputs.selection ? " selection" : ""} ${native.fir.commit.slice(0, 8)} · ${
       native.browserAdapter.apiVersion
     } · ${native.wasm.byteLength.toLocaleString()} Wasm bytes`,
   ].forEach((value) => {
@@ -78,6 +81,47 @@ function renderBuildNotes(receipt) {
     item.textContent = value;
     notes.appendChild(item);
   });
+}
+
+function renderArtifactSetNotes(manifest) {
+  const notes = /** @type {HTMLElement} */ (
+    document.querySelector("#build-notes")
+  );
+  notes.replaceChildren();
+  const values = [
+    `Artifact set ${manifest.setId}`,
+    ...Object.entries(manifest.components ?? {}).map(
+      ([id, component]) =>
+        `${id} · Lean ${component.lean?.version ?? "not recorded"}`,
+    ),
+  ];
+  values.forEach((value) => {
+    const item = document.createElement("li");
+    item.textContent = value;
+    notes.appendChild(item);
+  });
+}
+
+async function loadArtifactProvenance() {
+  const setResponse = await fetch(new URL("ARTIFACT_SET.json", artifactBase));
+  if (setResponse.ok) {
+    const manifest = await setResponse.json();
+    if (
+      manifest.schemaVersion !== 2 ||
+      manifest.kind !== "browser-benchmarks/artifact-set" ||
+      manifest.example?.id !== "illuminate"
+    ) {
+      throw new Error("unsupported Illuminate artifact-set manifest");
+    }
+    return manifest;
+  }
+  const rehearsalResponse = await fetch(
+    new URL("REHEARSAL.json", artifactBase),
+  );
+  if (!rehearsalResponse.ok) {
+    throw new Error("failed to load Illuminate artifact provenance");
+  }
+  return rehearsalResponse.json();
 }
 
 function setState(label, state, detail) {
@@ -201,6 +245,50 @@ function makeEvents(animation, count) {
       timestamp: 0.125 + index * (1000 / 60),
     })),
   ];
+}
+
+function materializeSelectionAction(animation, action) {
+  const segment = animation.segments[action.segment];
+  if (!segment) {
+    throw new Error(`FIR selected unknown segment ${action.segment}`);
+  }
+  const values = segment.params[action.localFrame] ?? [];
+  return {
+    ...action,
+    updates: segment.pmap.flatMap((binding, index) =>
+      values[index] === undefined
+        ? []
+        : [{ e: binding.e, a: binding.a, v: values[index] }],
+    ),
+  };
+}
+
+function replaySelectionTrace(adapter, animation, events) {
+  const created = adapter.createPlayer(animation);
+  if (!created.ok) return created;
+  const actions = [materializeSelectionAction(animation, created.action)];
+  const dispatches = [];
+  try {
+    for (const event of events) {
+      const dispatched =
+        event.kind === "tick"
+          ? adapter.dispatchTick(created.player, event.timestamp)
+          : adapter.dispatch(created.player, event);
+      dispatches.push(dispatched);
+      if (!dispatched.ok) return dispatched;
+      actions.push(materializeSelectionAction(animation, dispatched.action));
+    }
+    return {
+      ok: true,
+      actions,
+      timings: {
+        creation: created.timings,
+        dispatches: dispatches.map((dispatch) => dispatch.timings),
+      },
+    };
+  } finally {
+    adapter.disposePlayer(created.player);
+  }
 }
 
 // Adapted from Illuminate's Apache-2.0 `scripts/test-player-traces.mjs` oracle.
@@ -490,7 +578,7 @@ function normalizeNativeTimings(result, totalMs) {
       prepareMs:
         Number(creation.instantiateMs || 0) +
         Number(creation.projectMs || 0) +
-        Number(creation.animationEncodeMs || 0) +
+        Number(creation.animationEncodeMs || creation.selectionEncodeMs || 0) +
         Number(creation.stateSlotMs || 0) +
         dispatches.reduce(
           (sum, timing) => sum + Number(timing.encodeMs || 0),
@@ -628,15 +716,19 @@ async function samplePoint(
   };
 }
 
-async function runComparison(kind) {
-  const selectedIds = selectedBackendIds();
+async function runComparison(kind, options = {}) {
+  const selectedIds = Array.isArray(options.backends)
+    ? options.backends.slice()
+    : selectedBackendIds();
   if (selectedIds.length < 2) {
     throw new Error("select at least two ready backends for comparison");
   }
   const selected = selectedIds.map(backend);
   const warmup = readCount("warmup", 0, 20);
   const samples = readCount("samples", 1, 100);
-  const workloadSpecs = [
+  const workloadSpecs = Array.isArray(options.data?.workloads)
+    ? options.data.workloads
+    : [
     {
       id: "small",
       title: "Pause-driven slide show",
@@ -647,7 +739,7 @@ async function runComparison(kind) {
       title: "Morphing arrows and final loop",
       eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30],
     },
-  ];
+      ];
   const workloads = workloadSpecs.map((spec) => {
     const example = examples.find(
       (candidate) => candidate.title === spec.title,
@@ -763,7 +855,14 @@ async function runComparison(kind) {
     ),
     dimensions,
     provenance: {
-      rehearsal,
+      artifactSet:
+        artifactProvenance.kind === "browser-benchmarks/artifact-set"
+          ? artifactProvenance
+          : null,
+      rehearsal:
+        artifactProvenance.kind === "illuminate-player/local-rehearsal"
+          ? artifactProvenance
+          : null,
       acceptedMeasurement: false,
     },
   };
@@ -814,12 +913,42 @@ function setRunning(value) {
   renderBackends();
 }
 
-async function execute(kind) {
+function studySelection(kind, options) {
+  if (options?.test || options?.benchmark) return options;
+  const variant = globalThis.__benchmarkExampleContext?.variant;
+  const test = variant?.tests?.find((candidate) => candidate.study === kind);
+  if (test) return { test };
+  if (variant?.benchmark?.study === kind) {
+    return { benchmark: variant.benchmark };
+  }
+  return options ?? {};
+}
+
+function recordExampleSelection(report, options) {
+  const context = globalThis.__benchmarkExampleContext;
+  if (!context) return report;
+  report.examplePackage = {
+    example: context.example.id,
+    variant: context.variant.id,
+    testPackage: context.testPackageIdentity,
+    test: options.test?.id ?? null,
+    benchmark: options.benchmark?.study ?? null,
+  };
+  return report;
+}
+
+async function execute(kind, suppliedOptions) {
   if (running) return;
   setRunning(true);
   setState("Running", "running", "Preparing Illuminate traces…");
   try {
-    latestReport = await runComparison(kind);
+    const options = studySelection(kind, suppliedOptions);
+    const specification = options.test ?? options.benchmark ?? {};
+    latestReport = await runComparison(kind, {
+      backends: options.test?.backends,
+      data: specification.data,
+    });
+    recordExampleSelection(latestReport, options);
     globalThis.PrettyBenchDashboard.load(latestReport);
     renderReport(latestReport);
     setState(
@@ -842,13 +971,9 @@ async function execute(kind) {
 
 async function boot() {
   renderBackends();
-  const [runtimeModule, nativeModule, traceModule, examplesResponse, receipt] =
+  const [runtimeModule, traceModule, examplesResponse, receipt] =
     await Promise.all([
       import(new URL("vir/sdk/js/vir-runtime.js", artifactBase).href),
-      import(
-        new URL("native/illuminate-player-browser-adapter.mjs", artifactBase)
-          .href
-      ),
       import(new URL("workload/vir-player-trace.mjs", artifactBase).href),
       fetch(new URL("workload/examples.json", artifactBase)).then(
         (response) => {
@@ -857,14 +982,31 @@ async function boot() {
           return response.json();
         },
       ),
-      fetch(new URL("REHEARSAL.json", artifactBase)).then((response) => {
-        if (!response.ok) throw new Error("failed to load rehearsal receipt");
-        return response.json();
-      }),
+      loadArtifactProvenance(),
     ]);
+  const selectionAvailable =
+    receipt.kind === "browser-benchmarks/artifact-set"
+      ? Boolean(
+          receipt.files?.[
+            "illuminate/selection/illuminate-selection-player-browser-adapter.mjs"
+          ],
+        )
+      : Boolean(receipt.inputs?.selection);
+  const nativeModule = await import(
+    new URL(
+      selectionAvailable
+        ? "selection/illuminate-selection-player-browser-adapter.mjs"
+        : "native/illuminate-player-browser-adapter.mjs",
+      artifactBase,
+    ).href
+  );
   examples = examplesResponse;
-  rehearsal = receipt;
-  renderBuildNotes(receipt);
+  artifactProvenance = receipt;
+  if (receipt.kind === "browser-benchmarks/artifact-set") {
+    renderArtifactSetNotes(receipt);
+  } else {
+    renderBuildNotes(receipt);
+  }
 
   backend("js").invoke = invokeJavaScript;
   try {
@@ -906,12 +1048,19 @@ async function boot() {
   }
 
   try {
-    const native = await nativeModule.fetchIlluminatePlayerAdapter(
-      new URL("native/illuminate-player.wasm", artifactBase),
-    );
+    const native = selectionAvailable
+      ? await nativeModule.fetchIlluminateSelectionPlayerAdapter(
+          new URL("selection/illuminate-selection-player.wasm", artifactBase),
+        )
+      : await nativeModule.fetchIlluminatePlayerAdapter(
+          new URL("native/illuminate-player.wasm", artifactBase),
+        );
+    if (selectionAvailable) backend("native").label = "Lean · FIR selection";
     backend("native").invoke = (animation, events) => {
       const totalStarted = performance.now();
-      const result = native.replayTrace(animation, events);
+      const result = selectionAvailable
+        ? replaySelectionTrace(native, animation, events)
+        : native.replayTrace(animation, events);
       const totalMs = performance.now() - totalStarted;
       return {
         value: result.ok

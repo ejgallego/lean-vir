@@ -137,8 +137,27 @@
     };
   }
 
-  function baseOptions(prefix) {
-    var backendIds = selectedBackendIds();
+  function studySelection(kind, options) {
+    if (options && (options.test || options.benchmark)) return options;
+    var variant = globalThis.__benchmarkExampleContext
+      ? globalThis.__benchmarkExampleContext.variant
+      : null;
+    if (!variant) return options || {};
+    var test = (variant.tests || []).find(function (candidate) {
+      return candidate.study === kind;
+    });
+    if (test) return { test: test };
+    if (variant.benchmark && variant.benchmark.study === kind) {
+      return { benchmark: variant.benchmark };
+    }
+    return options || {};
+  }
+
+  function baseOptions(prefix, options) {
+    var backendIds =
+      options && options.test && Array.isArray(options.test.backends)
+        ? options.test.backends.slice()
+        : selectedBackendIds();
     if (backendIds.length === 0) throw new Error("select at least one backend");
     return {
       backendIds: backendIds,
@@ -150,45 +169,45 @@
     };
   }
 
-  async function executeStudy(kind) {
+  async function executeStudy(kind, suppliedOptions) {
+    var options = studySelection(kind, suppliedOptions);
     if (kind === "smoke") {
+      var scenarios =
+        options.test &&
+        options.test.data &&
+        Array.isArray(options.test.data.scenarios)
+          ? options.test.data.scenarios
+          : null;
       return runPrettyDifferentialCorpus({
-        backendIds: selectedBackendIds(),
+        backendIds:
+          options.test && Array.isArray(options.test.backends)
+            ? options.test.backends.slice()
+            : selectedBackendIds(),
         warmup: 0,
         samples: 1,
         batchTargetMs: 0,
         maxBatchIterations: 1,
         profile: true,
-        scenarios: [
-          {
-            case: {
-              id: "webapp-smoke",
-              label: "Webapp smoke",
-              format: [5, [4, "hello", [4, 1, "world"]]],
-              origin: "webapp",
-            },
-            width: 8,
-          },
-        ],
+        scenarios: scenarios,
         onProgress: onProgress("Quick check"),
       });
     }
     if (kind === "differential") {
-      return runPrettyDifferentialCorpus(baseOptions("Corpus"));
+      return runPrettyDifferentialCorpus(baseOptions("Corpus", options));
     }
     if (kind === "scaling") {
-      return runPrettyScalingStudy(baseOptions("Scaling"));
+      return runPrettyScalingStudy(baseOptions("Scaling", options));
     }
     if (kind === "memory-retained") {
-      return runPrettyMemoryScalingStudy(baseOptions("Memory"));
+      return runPrettyMemoryScalingStudy(baseOptions("Memory", options));
     }
     if (kind === "interactions") {
-      return runPrettyInteractionStudy(baseOptions("Interactions"));
+      return runPrettyInteractionStudy(baseOptions("Interactions", options));
     }
     if (kind === "repeated") {
-      var options = baseOptions("Repeated calls");
-      options.cycles = readNumber("repeat-cycles", 1, 10000);
-      return runPrettyRepeatedCallStudy(options);
+      var repeatedOptions = baseOptions("Repeated calls", options);
+      repeatedOptions.cycles = readNumber("repeat-cycles", 1, 10000);
+      return runPrettyRepeatedCallStudy(repeatedOptions);
     }
     throw new Error("unknown benchmark study " + kind);
   }
@@ -214,6 +233,20 @@
       return report.totalBackendCalls + " backend calls";
     }
     return report.passed === false ? "Study failed" : "Report loaded";
+  }
+
+  function recordExampleSelection(report, options) {
+    var context = globalThis.__benchmarkExampleContext;
+    if (!context) return report;
+    report.examplePackage = {
+      example: context.example.id,
+      variant: context.variant.id,
+      testPackage: context.testPackageIdentity,
+      test: options && options.test ? options.test.id : null,
+      benchmark:
+        options && options.benchmark ? options.benchmark.study : null,
+    };
+    return report;
   }
 
   function renderReports() {
@@ -261,17 +294,34 @@
     renderReports();
   }
 
-  async function runSuite() {
-    var corpus = await executeStudy("differential");
-    storeReport(corpus);
-    var scaling = await executeStudy("scaling");
-    storeReport(scaling);
-    var memory = await executeStudy("memory-retained");
-    storeReport(memory);
-    var interactions = await executeStudy("interactions");
-    storeReport(interactions);
-    var repeated = await executeStudy("repeated");
-    storeReport(repeated);
+  async function runSuite(options) {
+    var studies =
+      options &&
+      options.benchmark &&
+      options.benchmark.data &&
+      Array.isArray(options.benchmark.data.studies)
+        ? options.benchmark.data.studies
+        : [
+            "differential",
+            "scaling",
+            "memory-retained",
+            "interactions",
+            "repeated",
+          ];
+    var reportsByStudy = {};
+    for (var index = 0; index < studies.length; index++) {
+      var study = studies[index];
+      reportsByStudy[study] = await executeStudy(study);
+      storeReport(reportsByStudy[study]);
+    }
+    var corpus = reportsByStudy.differential;
+    var scaling = reportsByStudy.scaling;
+    var memory = reportsByStudy["memory-retained"];
+    var interactions = reportsByStudy.interactions;
+    var repeated = reportsByStudy.repeated;
+    if (!corpus || !scaling || !memory || !interactions || !repeated) {
+      throw new Error("benchmark suite omits a required prettyM study");
+    }
     corpus.scaling = scaling;
     corpus.memory = memory;
     corpus.interactions = interactions;
@@ -285,7 +335,7 @@
     return corpus;
   }
 
-  async function runStudy(kind) {
+  async function runStudy(kind, suppliedOptions) {
     if (running) throw new Error("a benchmark is already running");
     setRunning(true);
     setState(
@@ -294,8 +344,12 @@
       kind === "suite" ? "Starting full suite…" : kind,
     );
     try {
+      var options = studySelection(kind, suppliedOptions);
       var report =
-        kind === "suite" ? await runSuite() : await executeStudy(kind);
+        kind === "suite"
+          ? await runSuite(options)
+          : await executeStudy(kind, options);
+      recordExampleSelection(report, options);
       if (kind !== "suite") storeReport(report);
       setState(
         report.passed === false ? "Mismatch" : "Complete",
