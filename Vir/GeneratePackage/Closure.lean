@@ -28,6 +28,10 @@ def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
 def DeclIndex.resolveNativeExtern? (index : DeclIndex) (spec : NativeExternSpec) : Option NativeExtern :=
   index.envs.findSome? fun (_, env) => spec.resolve env |>.toOption
 
+private def DeclIndex.selectedNativeExternSpec?
+    (index : DeclIndex) (name : Name) : Option NativeExternSpec :=
+  nativeExternSpec? name <|> index.clientNativeExternSpecs.find? (·.name == name)
+
 partial def collectName
     (index : DeclIndex)
     (name : Name)
@@ -37,7 +41,7 @@ partial def collectName
     state
   else
     let state := { state with seen := state.seen.insert name }
-    match nativeExternSpec? name with
+    match index.selectedNativeExternSpec? name with
     | some spec =>
         match index.resolveNativeExtern? spec with
         | some ext =>

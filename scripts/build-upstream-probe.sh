@@ -60,6 +60,8 @@ obj_dir="$out/obj"
 generated_dir="$out/generated"
 generated_native_wrappers="$generated_dir/native_wrappers.cpp"
 generated_native_registry="$generated_dir/native_wrappers_registry.inc"
+generated_native_provider_sources="$generated_dir/native-provider-sources.txt"
+generated_native_provider_symbols="$generated_dir/native-provider-symbols.tsv"
 wasm="$out/ir_interpreter.allow-undefined.wasm"
 strict_wasm="$out/ir_interpreter.strict.wasm"
 demo_wasm="web/public/vir-upstream.wasm"
@@ -139,7 +141,42 @@ package_seconds=$((SECONDS - package_start))
 wrapper_generation_start=$SECONDS
 lake build vir_native_wrappers
 native_extern_extras_file="${VIR_NATIVE_EXTERN_EXTRAS_FILE:-}"
-if [ -n "$native_extern_extras_file" ]; then
+client_native_extern_manifest="${VIR_NATIVE_EXTERN_MANIFEST:-}"
+if [ -n "$native_extern_extras_file" ] && [ -n "$client_native_extern_manifest" ]; then
+  echo "error: VIR_NATIVE_EXTERN_EXTRAS_FILE and VIR_NATIVE_EXTERN_MANIFEST are mutually exclusive" >&2
+  exit 1
+fi
+client_native_provider_sources=()
+client_native_provider_names=()
+client_native_provider_symbols=()
+: > "$generated_native_provider_sources"
+: > "$generated_native_provider_symbols"
+if [ -n "$client_native_extern_manifest" ]; then
+  if [ ! -f "$client_native_extern_manifest" ]; then
+    echo "error: client-native extern manifest not found: $client_native_extern_manifest" >&2
+    exit 1
+  fi
+  client_native_extern_manifest="$(realpath "$client_native_extern_manifest")"
+  client_native_project="$(dirname "$client_native_extern_manifest")"
+  client_native_lean_path="$(lake -d "$client_native_project" env printenv LEAN_PATH)"
+  vir_lean_path="$PWD/.lake/build/lib/lean"
+  LEAN_PATH="$vir_lean_path${client_native_lean_path:+:$client_native_lean_path}" \
+    .lake/build/bin/vir_native_wrappers \
+    --manifest "$client_native_extern_manifest" \
+    "$generated_native_wrappers" \
+    "$generated_native_registry" \
+    "$generated_native_provider_sources" \
+    "$generated_native_provider_symbols"
+  mapfile -t client_native_provider_sources < "$generated_native_provider_sources"
+  while IFS=$'\t' read -r lean_name symbol; do
+    if [ -z "$lean_name" ] || [ -z "$symbol" ]; then
+      echo "error: malformed generated client-native provider symbol row" >&2
+      exit 1
+    fi
+    client_native_provider_names+=("$lean_name")
+    client_native_provider_symbols+=("$symbol")
+  done < "$generated_native_provider_symbols"
+elif [ -n "$native_extern_extras_file" ]; then
   lake env .lake/build/bin/vir_native_wrappers \
     --extras "$native_extern_extras_file" \
     "$generated_native_wrappers" \
@@ -273,7 +310,6 @@ native_symbol_lookup_deps=(
 
 common_flags=(
   "--target=$target"
-  -std=c++20
   -DNDEBUG
   -DLEAN_BUILD_TYPE=Release
   -DVIR_USE_UPSTREAM_KERNEL_EXPR_DATA=1
@@ -299,6 +335,8 @@ compile_stamp_tmp="$compile_stamp.tmp"
   cat "$wasm_build_identity"
   printf 'wasi_target=%s\n' "$target"
   printf 'opt_level=%s\n' "$wasm_opt_level"
+  printf 'cpp_standard=%s\n' c++20
+  printf 'client_c_standard=%s\n' c11
   printf 'flag=%s\n' "${common_flags[@]}"
 } > "$compile_stamp_tmp"
 if ! cmp -s "$compile_stamp_tmp" "$compile_stamp"; then
@@ -330,9 +368,20 @@ compile_one() {
     done
   fi
   if [ "$needs_compile" = "1" ]; then
-    local language_flags=()
+    local language_flags=(-std=c++20)
     if [[ "$source" == *.c ]]; then
-      language_flags=(-x c++)
+      local is_client_provider=0
+      for provider_source in "${client_native_provider_sources[@]}"; do
+        if [ "$source" = "$provider_source" ]; then
+          is_client_provider=1
+          break
+        fi
+      done
+      if [ "$is_client_provider" = "1" ]; then
+        language_flags=(-x c -std=c11)
+      else
+        language_flags=(-x c++ -std=c++20)
+      fi
     fi
     mkdir -p "$(dirname "$object")"
     echo "compile $source"
@@ -360,7 +409,9 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]
 done
 
 native_support_objects=()
-for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" "${lean_stage0_support_sources[@]}"; do
+client_native_provider_objects=()
+for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" \
+    "${client_native_provider_sources[@]}" "${lean_stage0_support_sources[@]}"; do
   object="$(object_for_source "$source")"
   if [[ "$source" == wasm/upstream_shim/* ]]; then
     compile_one "$source" "$object" "${shim_deps[@]}"
@@ -368,7 +419,38 @@ for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" 
     compile_one "$source" "$object"
   fi
   native_support_objects+=("$object")
+  for provider_source in "${client_native_provider_sources[@]}"; do
+    if [ "$source" = "$provider_source" ]; then
+      client_native_provider_objects+=("$object")
+      break
+    fi
+  done
 done
+
+client_native_missing_provider_symbols="$obj_dir/client-native-missing-provider-symbols.txt"
+: > "$client_native_missing_provider_symbols"
+for index in "${!client_native_provider_symbols[@]}"; do
+  symbol="${client_native_provider_symbols[$index]}"
+  found=0
+  for object in "${client_native_provider_objects[@]}"; do
+    if "$llvm_nm" --format=posix --defined-only --extern-only "$object" |
+        awk -v expected="$symbol" 'NF >= 2 && $1 == expected { found = 1 } END { exit !found }'; then
+      found=1
+      break
+    fi
+  done
+  if [ "$found" = "0" ]; then
+    printf '%s\t%s\n' "${client_native_provider_names[$index]}" "$symbol" \
+      >> "$client_native_missing_provider_symbols"
+  fi
+done
+if [ -s "$client_native_missing_provider_symbols" ]; then
+  echo "error: client-native provider sources do not define required raw symbols:" >&2
+  while IFS=$'\t' read -r lean_name symbol; do
+    printf '  - %s (%s)\n' "$lean_name" "$symbol" >&2
+  done < "$client_native_missing_provider_symbols"
+  exit 1
+fi
 
 native_support_duplicate_symbols="$obj_dir/native-support-duplicate-symbols.txt"
 native_support_allowed_duplicates="$obj_dir/native-support-allowed-duplicates.txt"
@@ -644,11 +726,17 @@ report_start=$SECONDS
   else
     echo "- Extra native extern names: none"
   fi
+  if [ -n "$client_native_extern_manifest" ]; then
+    echo "- Client-native extern manifest: \`$client_native_extern_manifest\`"
+  else
+    echo "- Client-native extern manifest: none"
+  fi
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
   echo "- Compiler-generated native wrapper sources linked: $generated_source_count"
   echo "- Pinned Lean stage0 support sources linked: $lean_stage0_support_source_count"
   echo "- Local native support sources linked: $local_native_support_source_count"
+  echo "- Client-native provider sources linked: ${#client_native_provider_sources[@]}"
   echo "- Audited duplicate native support symbols: $native_support_duplicate_count"
   echo "- Local WASI shim sources linked: $shim_source_count"
   echo "- Generated browser IR packages:"
@@ -709,6 +797,16 @@ report_start=$SECONDS
   for path in "${local_native_support_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
+  echo
+  echo "## Linked Client-Native Provider Sources"
+  echo
+  if [ "${#client_native_provider_sources[@]}" = "0" ]; then
+    echo "None."
+  else
+    for path in "${client_native_provider_sources[@]}"; do
+      printf -- '- `%s`\n' "$path"
+    done
+  fi
   echo
   echo "## Audited Native Support Duplicate Symbols"
   echo

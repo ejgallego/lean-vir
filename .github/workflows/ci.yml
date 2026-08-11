@@ -45,6 +45,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-wasi-sdk-${{ hashFiles('scripts/install-wasi-sdk.sh') }}
       - run: npm run fetch:lean
       - run: npm run test:package-ir-builders
+      - run: npm run check:client-native-externs
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:site

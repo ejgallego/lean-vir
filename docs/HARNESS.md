@@ -120,6 +120,7 @@ npm run build:site
 npm run check:api-coverage
 npm run check:ir-codec-tags
 npm run check:native-externs
+npm run check:client-native-externs
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
 npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
@@ -188,7 +189,9 @@ changes.
   `npm run render:surface -- <report.json> <html-directory>` for the interactive
   folder/module/function browser
 - Native extern declaration changes:
-  `npm run check:native-externs`
+  `npm run check:native-externs`; add
+  `npm run check:client-native-externs` when client manifest selection,
+  wrapper imports, or provider handoff changes
 - Shim/native extern registry changes:
   `npm run check:native-externs`,
   `node scripts/check-boundary-registry.mjs --write`, then

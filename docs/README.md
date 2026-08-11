@@ -33,6 +33,7 @@ ownership diagrams.
   `web/src/host/vir-host-resources.js`, and `web/src/react/`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
+  [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md),
   `wasm/upstream_shim/README.md`,
   `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
   `wasm/upstream_shim/abi/call_abi.cpp`.
@@ -60,6 +61,8 @@ ownership diagrams.
   SDK installation, and the all-Lean Slides canvas workflow.
 - [LOCAL_IRPKG.md](LOCAL_IRPKG.md): local `.irpkg` package generation and
   `/dev.html` loading.
+- [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md): project-owned native
+  extern selection and C/C++ provider compilation.
 - [CALL_LEAN_FROM_JS.md](CALL_LEAN_FROM_JS.md): calling exported Lean
   declarations from JavaScript.
 - [JS_API.md](JS_API.md): runtime wrapper API details.

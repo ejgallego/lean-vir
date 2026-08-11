@@ -1,0 +1,7 @@
+{
+  "format": "lean-vir-client-native-externs",
+  "version": 1,
+  "modules": ["ClientNativeFixture"],
+  "externs": ["ClientNativeFixture.increment"],
+  "providerSources": ["client_native_fixture.c"]
+}

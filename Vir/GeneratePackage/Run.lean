@@ -8,6 +8,7 @@ module
 
 public import Vir.GeneratePackage.Emit
 public import Vir.GeneratePackage.Report
+import Vir.ClientNativeExternManifest
 
 public section
 
@@ -67,6 +68,15 @@ structure AnalyzedPackage where
 
 structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
+
+private unsafe def loadRunDeclIndex (targets : Array Target) : IO DeclIndex := do
+  let index ← loadDeclIndex targets
+  let index ← match ← Vir.readClientNativeExternManifestFromEnv with
+    | none => pure index
+    | some manifest =>
+        let specs ← IO.ofExcept <| Vir.ClientNativeExternManifest.specs manifest
+        pure { index with clientNativeExternSpecs := specs }
+  resolveImportedModuleClosure targets index
 
 def hasBlockingDiagnostics (closure : Closure) (manifest : InterfaceManifest) : Bool :=
   !closure.missingDecls.isEmpty ||
@@ -128,7 +138,7 @@ def buildPackageFromIndex
       return .error err
 
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
-  let index ← resolveImportedModuleClosure targets (← loadDeclIndex targets)
+  let index ← loadRunDeclIndex targets
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest
@@ -187,7 +197,7 @@ unsafe def runModuleSet
       IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
       return 1
 
-  let index ← resolveImportedModuleClosure targets (← loadDeclIndex targets)
+  let index ← loadRunDeclIndex targets
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest

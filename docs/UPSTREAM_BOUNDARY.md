@@ -333,6 +333,13 @@ the resolved 223-entry catalog and generated wrapper C were identical. The
 release Wasm was also byte-identical: 657,138 bytes raw, 150,091 bytes with
 deterministic gzip, and the same SHA-256.
 
+Project-owned providers use the same resolver through the closed client-native
+manifest described in `docs/CLIENT_NATIVE_EXTERNS.md`. Its module imports,
+extern selection, and provider source list drive package native-over-fallback
+selection, compiler-generated wrappers, provider-symbol auditing, and the
+strict Wasm link. These entries extend only the generated static registry; they
+do not expose unrestricted dynamic symbol lookup.
+
 This result does not justify a new upstream API for catalog generation: Lean's
 existing environment and extern-name APIs provide the required information at
 generation time. It does not change the runtime declaration-provider boundary.
