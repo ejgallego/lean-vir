@@ -8,6 +8,12 @@ export const SURFACE_REPORT_FORMAT = "lean-vir-library-surface";
 export const CURRENT_SURFACE_REPORT_VERSION = 3;
 export const SUPPORTED_SURFACE_REPORT_VERSIONS = [2, CURRENT_SURFACE_REPORT_VERSION];
 
+const COUNT_FIELDS = [
+  "total", "runnable", "blocked", "publicTotal", "publicRunnable",
+  "privateTotal", "boxedTotal", "generatedTotal",
+];
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
 export function hasCompleteBlockerFrontier(report) {
   return report?.definition?.completeBlockerFrontier === true
     && Array.isArray(report.reachableBlockers);
@@ -42,6 +48,7 @@ export function validateSurfaceReport(
   if (!value.counts || !value.lean || !value.definition || !value.runtimeCapabilities) {
     throw new Error(`${label}: missing counts, Lean identity, definition, or capabilities`);
   }
+  validateCounts(value.counts, label);
   if (value.version >= 3 && value.closure === undefined) {
     throw new Error(`${label}: version 3 is missing closure metadata`);
   }
@@ -65,11 +72,18 @@ export function validateSurfaceReport(
     }
     const primitiveNamespaces = value.runtimeCapabilities.primitiveNamespaces;
     const nativeExterns = value.runtimeCapabilities.nativeExterns;
+    const nativeExternCount = value.runtimeCapabilities.nativeExternCount;
     if (!Array.isArray(primitiveNamespaces)
         || primitiveNamespaces.some((namespace) => typeof namespace !== "string")
-        || !Array.isArray(nativeExterns)) {
+        || !Array.isArray(nativeExterns)
+        || !Number.isInteger(nativeExternCount)
+        || nativeExternCount !== nativeExterns.length) {
       throw new Error(`${label}: version 3 is missing runtime-capability policy`);
     }
+    validateUniqueStrings(value.selectedDeclarations, `${label}: selected declarations`);
+    validateUniqueStrings(primitiveNamespaces, `${label}: primitive namespaces`);
+    validateNativeExterns(nativeExterns, label);
+    if (value.capture !== undefined) validateCapture(value.capture, label);
   }
   if (value.closure !== undefined) {
     const { selectedRoots, capturedNodes, rootReachableNodes, supportOnlyNodes } = value.closure;
@@ -89,6 +103,12 @@ export function validateSurfaceReport(
     const declarationByName = new Map(
       value.declarations.map((declaration) => [declaration.name, declaration]),
     );
+    if (value.selectedDeclarations.length !== value.counts.total) {
+      throw new Error(`${label}: complete frontier does not cover every selected declaration`);
+    }
+    if (declarationByName.size !== value.declarations.length) {
+      throw new Error(`${label}: declaration names must be unique`);
+    }
     for (const name of value.selectedDeclarations ?? []) {
       const declaration = declarationByName.get(name);
       if (!declaration) {
@@ -112,6 +132,63 @@ export function validateSurfaceReport(
     );
   }
   return value;
+}
+
+function validateCounts(counts, label) {
+  if (!COUNT_FIELDS.every((field) => Number.isInteger(counts[field]) && counts[field] >= 0)
+      || counts.runnable + counts.blocked !== counts.total
+      || counts.publicRunnable > counts.publicTotal
+      || counts.publicRunnable > counts.runnable
+      || counts.publicTotal + counts.privateTotal + counts.boxedTotal + counts.generatedTotal
+        !== counts.total) {
+    throw new Error(`${label}: inconsistent declaration counts`);
+  }
+}
+
+function validateUniqueStrings(values, label) {
+  if (values.some((value) => typeof value !== "string" || value.length === 0)
+      || new Set(values).size !== values.length) {
+    throw new Error(`${label} must contain unique non-empty strings`);
+  }
+}
+
+function validateNativeExterns(nativeExterns, label) {
+  validateUniqueStrings(nativeExterns.map((entry) => entry?.name), `${label}: native extern names`);
+  for (const entry of nativeExterns) {
+    if (typeof entry.symbol !== "string"
+        || typeof entry.generateBoxedWrapper !== "boolean"
+        || !Array.isArray(entry.params)
+        || entry.params.some((param) => !Number.isInteger(param?.index)
+          || typeof param.borrow !== "boolean"
+          || typeof param.type !== "string")
+        || typeof entry.resultType !== "string"
+        || !Array.isArray(entry.deps)
+        || entry.deps.some((dependency) => typeof dependency !== "string")) {
+      throw new Error(`${label}: native extern ${JSON.stringify(entry.name)} has invalid ABI metadata`);
+    }
+  }
+}
+
+function validateCapture(capture, label) {
+  if (capture?.mode !== "targetToolchainSource") {
+    throw new Error(`${label}: unsupported capture mode ${JSON.stringify(capture?.mode)}`);
+  }
+  for (const field of ["source", "module", "graphFormat"]) {
+    if (typeof capture[field] !== "string" || capture[field].length === 0) {
+      throw new Error(`${label}: target capture is missing ${field}`);
+    }
+  }
+  for (const field of ["sourceSha256", "graphSha256", "rootGraphSha256"]) {
+    if (typeof capture[field] !== "string" || !SHA256_PATTERN.test(capture[field])) {
+      throw new Error(`${label}: target capture has invalid ${field}`);
+    }
+  }
+  if (!Number.isInteger(capture.graphVersion) || capture.graphVersion <= 0
+      || !Array.isArray(capture.supportRoots)
+      || capture.supportRoots.some((root) => typeof root !== "string")) {
+    throw new Error(`${label}: target capture has invalid graph metadata`);
+  }
+  validateUniqueStrings(capture.supportRoots, `${label}: capture support roots`);
 }
 
 function versionList(versions) {

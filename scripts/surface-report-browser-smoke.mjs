@@ -18,6 +18,11 @@ import {
   navigate,
   openCdp,
 } from "./browser-smoke-harness.mjs";
+import {
+  surfaceCounts,
+  surfaceDefinition,
+  targetCaptureFixture,
+} from "./surface-report-test-fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const temporary = await mkdtemp(join(tmpdir(), "vir-surface-browser-"));
@@ -106,6 +111,9 @@ try {
   assert.match(initial.statusCard, /Blocked/);
   assert.equal(initial.methodOpen, true);
   assert.match(initial.method, /5 of 6 captured nodes are root-reachable/);
+  assert.match(initial.method, /Smoke\/Target\.lean/);
+  assert.match(initial.method, /aaaaaaaaaaaa/);
+  assert.match(initial.method, /cccccccccccc/);
   assert.match(initial.method, /Boundary families are name-based navigation groups/);
   assert.match(initial.reachableNodes, /5 \/ 6/);
   assert.equal(initial.blockerSetsVisible, true);
@@ -194,7 +202,23 @@ try {
     status: document.querySelector(".extern-controls select")?.value,
     rows: document.querySelectorAll(".extern-results tbody tr").length,
   })`);
-  assert.deepEqual(externState, { badge: "2/2", status: "missing", rows: 2 });
+  assert.deepEqual(externState, { badge: "1/2", status: "missing", rows: 1 });
+  const incompatibleExtern = await evaluate(cdp, `(() => {
+    const select = document.querySelector(".extern-controls select");
+    select.value = "incompatible";
+    select.dispatchEvent(new Event("change"));
+    document.querySelector(".extern-results .boundary-link").click();
+    return {
+      rows: document.querySelectorAll(".extern-results tbody tr").length,
+      detail: document.querySelector(".boundary-drawer")?.textContent.replace(/\\s+/g, " ").trim(),
+    };
+  })()`);
+  assert.equal(incompatibleExtern.rows, 1);
+  assert.match(incompatibleExtern.detail, /Incompatible native ABI/);
+  assert.match(incompatibleExtern.detail, /Target IR ABI.*ByteArray.*→ object/);
+  assert.match(incompatibleExtern.detail, /VIR capability ABI.*object.*→ object/);
+  await evaluate(cdp, `document.querySelector(".boundary-drawer-close").click()`);
+  await waitFor(cdp, `document.querySelector(".boundary-drawer") === null`);
   await evaluate(cdp, `document.querySelector("#blockers-view").click()`);
   assert.deepEqual(await currentView(cdp), {
     hash: "#view=blockers",
@@ -302,38 +326,26 @@ async function waitFor(cdp, expression) {
 }
 
 function focusedReportFixture() {
-  const counts = {
+  const counts = surfaceCounts({
     total: 1, runnable: 0, blocked: 1, publicTotal: 1, publicRunnable: 0,
-    privateTotal: 0, boxedTotal: 0, generatedTotal: 0,
-  };
+  });
   const blockers = [
     blocker("IO.monoNanosNow", "Init.System.IO", "lean_io_mono_nanos_now", 2),
-    blocker("ByteArray.data", "Init.Prelude", "lean_sarray_to_array", 3),
+    blocker("ByteArray.data", "Init.Prelude", "lean_sarray_to_array", 3, "incompatible"),
   ];
   return {
     format: "lean-vir-library-surface",
     version: 3,
     lean: { version: "4.32.0", toolchain: "leanprover/lean4:4.32.0", githash: "target" },
-    capture: { mode: "targetToolchainSource", module: "Smoke.Target" },
-    definition: {
-      headline: "static transitive IR closure completeness",
-      encodingIsGate: false,
-      interfaceCallabilityIsGate: false,
-      dynamicValidationIsGate: false,
-      primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
-      completeBlockerFrontier: true,
-      blockerCoverage: "complete terminal frontier per selected root",
-      externScope: "extern declarations reached from selected roots",
-      hostProvisioningVerified: false,
-      missingNodeKind: "namespace heuristic",
-    },
+    capture: targetCaptureFixture({ source: "Smoke/Target.lean", module: "Smoke.Target" }),
+    definition: surfaceDefinition(true),
     selectedModules: ["Smoke.Target"],
     selectedDeclarations: ["Smoke.Target.main"],
     loadedModules: 3,
     closure: { selectedRoots: 1, capturedNodes: 6, rootReachableNodes: 5, supportOnlyNodes: 1 },
     runtimeCapabilities: {
       lean: { version: "4.33.0-rc2", githash: "policy" },
-      nativeExternCount: 1,
+      nativeExternCount: 0,
       primitiveNamespaces: ["ByteArray", "IO"],
       nativeExterns: [],
     },
@@ -366,10 +378,9 @@ function multiFocusedReportFixture() {
   const readyName = "Smoke.Target.ready";
   const secondaryBlocker = report.reachableBlockers[1];
   const secondaryPath = [secondaryName, "Smoke.Target.step", secondaryBlocker.blocker.name];
-  const counts = {
+  const counts = surfaceCounts({
     total: 3, runnable: 1, blocked: 2, publicTotal: 3, publicRunnable: 1,
-    privateTotal: 0, boxedTotal: 0, generatedTotal: 0,
-  };
+  });
   report.selectedDeclarations.push(secondaryName, readyName);
   report.counts = counts;
   report.libraries[0].counts = counts;
@@ -427,13 +438,13 @@ function frontierCostFixture() {
   };
 }
 
-function blocker(name, module, target, steps) {
+function blocker(name, module, target, steps, status = "missing") {
   const path = ["Smoke.Target.main"];
   for (let index = 1; index < steps; index += 1) path.push(`Smoke.Target.step${index}`);
   path.push(name);
   return {
     summary: {
-      blocker: { kind: "missingExtern", name },
+      blocker: { kind: status === "incompatible" ? "incompatibleExtern" : "missingExtern", name },
       roots: 1,
       publicRoots: 1,
       exampleRoot: "Smoke.Target.main",
@@ -442,8 +453,18 @@ function blocker(name, module, target, steps) {
     extern: {
       name,
       module,
-      status: "missing",
+      status,
       targets: [{ kind: "standard", backend: "all", value: target }],
+      ...(status === "incompatible" ? {
+        targetAbi: {
+          params: [{ borrow: false, type: "ByteArray" }],
+          resultType: "object",
+        },
+        capabilityAbi: {
+          params: [{ borrow: false, type: "object" }],
+          resultType: "object",
+        },
+      } : {}),
       type: name === "IO.monoNanosNow" ? "IO Nat" : "ByteArray → Array UInt8",
       doc: name === "IO.monoNanosNow"
         ? "Read the monotonic clock."

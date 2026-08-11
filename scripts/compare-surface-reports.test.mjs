@@ -11,6 +11,11 @@ import {
   compareSurfaceReports,
   renderSurfaceDeltaMarkdown,
 } from "./compare-surface-reports.mjs";
+import {
+  nativeExternFixture,
+  surfaceDefinition,
+  targetCaptureFixture,
+} from "./surface-report-test-fixtures.mjs";
 
 const eqv = { kind: "missingExtern", name: "Lean.Expr.eqv" };
 const dbg = { kind: "missingExtern", name: "Lean.Expr.dbgToString" };
@@ -119,28 +124,11 @@ function exactTargetReport(
 ) {
   const value = report(declarations);
   value.version = 3;
-  value.capture = {
-    mode: "targetToolchainSource",
-    source: "Library/Entry.lean",
+  value.capture = targetCaptureFixture({
     sourceSha256,
-    graphSha256: "c".repeat(64),
     rootGraphSha256,
-    module: "Library.Entry",
-    graphFormat: "lean-ir-surface-graph",
-    graphVersion: 2,
-  };
-  value.definition = {
-    headline: "static transitive IR closure completeness",
-    encodingIsGate: false,
-    interfaceCallabilityIsGate: false,
-    dynamicValidationIsGate: false,
-    primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
-    completeBlockerFrontier: true,
-    blockerCoverage: "complete terminal frontier per selected root",
-    externScope: "extern declarations reached from selected roots",
-    hostProvisioningVerified: false,
-    missingNodeKind: "namespace heuristic",
-  };
+  });
+  value.definition = surfaceDefinition(true);
   value.selectedModules = ["Library.Entry"];
   value.selectedDeclarations = declarations.map((declaration) => declaration.name);
   value.closure = {
@@ -168,14 +156,7 @@ function report(declarations, nativeNames = [], statusOverrides = {}) {
       name,
       counts: countDeclarations(declarations.filter((declaration) => declaration.module === name)),
     }));
-  const nativeExterns = nativeNames.map((name) => ({
-    name,
-    symbol: `lean_${name.replaceAll(".", "_")}`,
-    generateBoxedWrapper: false,
-    params: [],
-    resultType: "object",
-    deps: [],
-  }));
+  const nativeExterns = nativeNames.map((name) => nativeExternFixture(name));
   return {
     format: "lean-vir-library-surface",
     version: 2,

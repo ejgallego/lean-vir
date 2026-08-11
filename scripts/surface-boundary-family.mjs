@@ -4,17 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export const boundaryFamilies = [
-  "IO / filesystem / process",
-  "ByteArray primitives",
-  "Compression FFI",
-  "Lean expression / meta",
-  "Lean compiler runtime",
-  "Numeric / character primitives",
-  "Project FFI",
-  "Other runtime",
-];
-
 export function classifySurfaceBoundary(name, moduleName = "") {
   if (/^(?:BaseIO|IO|Task)\./u.test(name)
       || /^(?:Handle|System\.FilePath)\./u.test(name)

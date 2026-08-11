@@ -73,7 +73,8 @@ const maxFamilyCount = Math.max(
 const reportCards = reports.map((entry) => {
   const selected = entry.report.selectedDeclarations ?? [];
   const focused = selected.length > 0;
-  const missing = (entry.report.externs ?? []).filter((extern) => extern.status === "missing").length;
+  const unmetExterns = (entry.report.externs ?? [])
+    .filter((extern) => extern.status === "missing" || extern.status === "incompatible").length;
   const unique = compared.length >= 2 && compared.includes(entry)
     ? [...entry.blockerNames]
       .filter((name) => compared.every((other) => other === entry || !other.blockerNames.has(name))).length
@@ -81,13 +82,13 @@ const reportCards = reports.map((entry) => {
   const metrics = focused
     ? [
         [entry.completeFrontier ? "Current blockers" : "Primary blockers", entry.blockers.length],
-        ["Missing externs", missing],
+        ["Unmet externs", unmetExterns],
         ["Reachable nodes", entry.report.closure?.rootReachableNodes ?? "—"],
         ["Unique here", unique],
       ]
     : [
         ["Blocked functions", entry.report.counts.blocked],
-        ["Missing externs", missing],
+        ["Unmet externs", unmetExterns],
         ["Modules", entry.report.selectedModules.length],
       ];
   return `
@@ -115,7 +116,7 @@ const familyRows = allFamilies.map((family) => `
 const sharedSummary = compared.length < 2
   ? "Add another selected-target analysis with a complete frontier to compare boundary families."
   : `${formatNumber(shared.length)} blocker${shared.length === 1 ? " is" : "s are"} shared by every target. `
-    + "Family counts make the largest reusable runtime gaps visible at a glance.";
+    + "Distinct-boundary counts make the largest reusable runtime gaps visible at a glance.";
 
 const html = `<!doctype html>
 <html lang="en">
@@ -158,7 +159,7 @@ const html = `<!doctype html>
       <section class="comparison">
         <div class="comparison-heading"><h2>Where runtime work overlaps</h2><p>${escapeHtml(sharedSummary)} Families are name-based navigation groups, not analysis inputs.</p></div>
         <div class="table-wrap"><table>
-          <thead><tr><th scope="col">Boundary family (name-based)</th>${compared.map((entry) => `<th scope="col">${escapeHtml(entry.label)}</th>`).join("")}</tr></thead>
+          <thead><tr><th scope="col">Boundary family (distinct boundaries)</th>${compared.map((entry) => `<th scope="col">${escapeHtml(entry.label)}</th>`).join("")}</tr></thead>
           <tbody>${familyRows}</tbody>
         </table></div>
       </section>

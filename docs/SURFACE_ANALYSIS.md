@@ -14,12 +14,16 @@ Starting from each selected function, the analyzer follows transitive IR
 references until every path is satisfied or reaches a terminal blocker:
 
 - `missingExtern`: an extern is absent from VIR's native capability table;
+- `incompatibleExtern`: a same-named VIR capability has a different target IR ABI;
 - `missingDecl`: referenced IR is absent from the captured environment; or
 - `unsupportedInitGlobal`: an initializer-backed global is unsupported.
 
 Registered native externs are graph nodes and may contribute further Lean
-dependencies. A `@[vir_js]` extern is accepted as a host boundary, but this
-static analysis does not verify that a particular browser host provides it.
+dependencies. Exact-target capture compares their ordered parameter ownership
+and IR types plus result type with VIR's capability table; capability symbols
+may still differ intentionally. A `@[vir_js]` extern is accepted as a host
+boundary, but this static analysis does not verify that a particular browser
+host provides it.
 
 The headline deliberately does not test package encoding, JavaScript-callable
 types, linking, or browser execution. Those are separate checks. A
@@ -40,7 +44,7 @@ each selected function.
 
 | Stage | Information collected or derived |
 | --- | --- |
-| 1. Lean capture | Function names, modules, IR dependencies, extern targets, types, and docstrings. |
+| 1. Lean capture | Function names, modules, IR dependencies, extern targets and ABIs, types, and docstrings. |
 | 2. VIR policy | Native externs, their Lean dependencies, and canonical primitive namespaces. |
 | 3. Closure walk | Reachable nodes, terminal blockers, and one representative path to each blocker. |
 | 4. Aggregation | Runnable totals, module/library rollups, primary blockers, extern status, and—when available—complete blocker membership. |
@@ -116,6 +120,8 @@ support captured only for VIR capabilities, so policy experiments remain
 comparable while changes in imported target dependencies are rejected.
 Source labels are project-relative (or reduced to a basename for files outside
 the project) so reports and graph hashes do not expose checkout locations.
+The browser's **Analysis method** panel shows these identities and short
+fingerprints so the rendered result can be matched to its JSON artifact.
 
 The target exporter intentionally imports only Lean. It duplicates a small
 amount of metadata and IR-reference extraction because VIR oleans built by one
@@ -209,7 +215,7 @@ In a focused explorer:
 - **Target** shows closure progress, signatures, docstrings, and paths;
 - **All blockers** shows the complete terminal frontier;
 - **Blocker sets** shows boundary membership across every selected function;
-- **Externs** shows reached native, host, and missing externs.
+- **Externs** shows reached native, host, missing, and ABI-incompatible externs.
 
 Selecting a function opens its complete blocker set. Selecting a boundary
 opens its metadata and representative path without losing that function

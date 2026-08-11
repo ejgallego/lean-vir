@@ -1,8 +1,8 @@
 # Historical Surface Experiments
 
-This page preserves decision context from early VIR runtime-frontier studies.
-The figures are snapshots from the stated control artifacts, not estimates for
-the current checkout. Rerun the surface and size tools before making a current
+This page preserves qualitative decision context from early VIR
+runtime-frontier studies. The original artifacts were not retained with stable
+identities, so rerun the surface and size tools before making a current
 decision.
 
 ## What the studies established
@@ -18,36 +18,24 @@ decision.
 
 ## Representative checkpoints
 
-These experiments used the same Lean library universe within each comparison
-and reported zero regressions:
+The original reports were not retained with stable commit and toolchain
+identities, so their exact byte and unlock totals are intentionally omitted.
+The durable conclusions were:
 
-| Experiment | Raw Wasm delta | Gzip delta | Newly runnable all IR | Newly runnable public |
-| --- | ---: | ---: | ---: | ---: |
-| `Lean.Expr.eqv` | +6,717 B | +2,336 B | +3,604 | +240 |
-| Four small boundaries | +740 B | +204 B | +2,920 | +257 |
-| Six already-linked primitives | +7,154 B | +786 B | +2,933 | +525 |
-| String frontier chain | +6,228 B | +1,988 B | +2,612 | +307 |
-| Integer division | +2,435 B | +635 B | +852 | +380 |
-| Scalar and string completion | +57,385 B | +11,511 B | +3,796 | +841 |
-| ByteArray five-binding frontier | +1,304 B | +383 B | +339 | +97 |
-
-The first `Lean.Expr.eqv` study is the clearest example of pressure versus
-benefit: 9,803 functions had it as their primary blocker, but 3,604 became
-runnable. The rest advanced to another terminal boundary.
-
-The four-boundary follow-up (`USize.toUInt64`, `Bool.toUInt64`, `Void.mk`, and
-`Lean.Level.beq`) was unusually efficient because most implementations were
-already linked. `Void.mk` alone had substantial primary pressure but unlocked
-only six functions, again demonstrating why an A/B comparison is required.
+- `Lean.Expr.eqv` had much greater primary-blocker pressure than exact unlocks;
+- small groups such as `USize.toUInt64`, `Bool.toUInt64`, `Void.mk`, and
+  `Lean.Level.beq` were cheap when their implementations were already linked;
+- string, integer-division, scalar, and ByteArray groups became useful only
+  after measuring the complete candidate against one fixed baseline; and
+- every accepted comparison reported zero regressions in its selected library
+  universe.
 
 ## Rejected and consumer-specific work
 
 An early string-alias chain through `String.Internal.getUTF8Byte` and raw
-substring helpers cost +8,734 raw and +2,154 gzip bytes for only 14 all-IR
-functions and no public constants. That cluster was rejected. A later, narrower
-`String.Internal.getUTF8Byte` measurement became productive after downstream
-string boundaries had changed; this is why historical rankings must not be
-carried forward.
+substring helpers had poor cost-to-unlock behavior and was rejected. A later,
+narrower measurement became productive after downstream string boundaries had
+changed; this is why historical rankings must not be carried forward.
 
 The broad Float survey was split into smaller groups. Cheap arithmetic/model
 operations were accepted independently from formatting and libm. Geometry

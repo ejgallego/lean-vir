@@ -5,9 +5,6 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   CURRENT_SURFACE_REPORT_VERSION,
@@ -50,14 +47,22 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
   const externs = [...reached]
     .map((name) => nodes.get(name))
     .filter((node) => node?.kind === "extern")
-    .map((node) => ({
-      name: node.name,
-      module: node.module,
-      status: capabilities.has(node.name) ? "native" : node.host ? "host" : "missing",
-      targets: node.targets,
-      type: node.type ?? null,
-      doc: node.doc ?? null,
-    }))
+    .map((node) => {
+      const capability = capabilities.get(node.name);
+      const incompatible = capability && !nativeAbiMatches(node.abi, capability);
+      return {
+        name: node.name,
+        module: node.module,
+        status: incompatible ? "incompatible" : capability ? "native" : node.host ? "host" : "missing",
+        targets: node.targets,
+        ...(incompatible ? {
+          targetAbi: node.abi,
+          capabilityAbi: nativeCapabilityAbi(capability),
+        } : {}),
+        type: node.type ?? null,
+        doc: node.doc ?? null,
+      };
+    })
     .sort(compareByModuleAndName);
   const counts = countDeclarations(declarations);
   const modules = aggregateModules(declarations);
@@ -185,8 +190,13 @@ function analyzeRoot(root, nodes, capabilities, primitiveNamespaces) {
 
 function classifyNode(name, nodes, capabilities, primitiveNamespaces) {
   const capability = capabilities.get(name);
-  if (capability) return { deps: capability.deps ?? [] };
   const node = nodes.get(name);
+  if (capability) {
+    if (!nativeAbiMatches(node?.abi, capability)) {
+      return { blocker: { kind: "incompatibleExtern", name } };
+    }
+    return { deps: capability.deps ?? [] };
+  }
   if (!node || node.kind === "missing") {
     return {
       blocker: {
@@ -203,6 +213,24 @@ function classifyNode(name, nodes, capabilities, primitiveNamespaces) {
     return { blocker: { kind: "unsupportedInitGlobal", name } };
   }
   return { deps: node.deps ?? [] };
+}
+
+function nativeAbiMatches(targetAbi, capability) {
+  if (targetAbi === undefined || targetAbi === null) return true;
+  const capabilityAbi = nativeCapabilityAbi(capability);
+  return targetAbi.resultType === capabilityAbi.resultType
+    && Array.isArray(targetAbi.params)
+    && targetAbi.params.length === capabilityAbi.params.length
+    && targetAbi.params.every((param, index) =>
+      param?.borrow === capabilityAbi.params[index].borrow
+        && param?.type === capabilityAbi.params[index].type);
+}
+
+function nativeCapabilityAbi(capability) {
+  return {
+    params: capability.params.map(({ borrow, type }) => ({ borrow, type })),
+    resultType: capability.resultType,
+  };
 }
 
 function isNativeExternCandidate(name, primitiveNamespaces) {
@@ -300,16 +328,31 @@ function addCounts(target, source) {
 }
 
 function validateInputs(graph, capabilityReport) {
-  if (graph?.format !== GRAPH_FORMAT || ![1, 2].includes(graph.version) || !Array.isArray(graph.nodes)) {
-    throw new Error(`expected ${GRAPH_FORMAT} version 1 or 2 input`);
+  if (graph?.format !== GRAPH_FORMAT || ![1, 2, 3].includes(graph.version)
+      || !Array.isArray(graph.nodes)) {
+    throw new Error(`expected ${GRAPH_FORMAT} version 1, 2, or 3 input`);
   }
   if (!Array.isArray(graph.capture?.roots) || graph.capture.roots.length === 0) {
     throw new Error("surface graph has no selected roots");
+  }
+  if (graph.version >= 3) {
+    for (const node of graph.nodes) {
+      if ((node?.kind === "function" || node?.kind === "extern") && !validGraphAbi(node.abi)) {
+        throw new Error(`surface graph node ${JSON.stringify(node?.name)} has invalid ABI metadata`);
+      }
+    }
   }
   validateSurfaceReport(capabilityReport, {
     label: "capability input",
     versions: [CURRENT_SURFACE_REPORT_VERSION],
   });
+}
+
+function validGraphAbi(abi) {
+  return abi && Array.isArray(abi.params)
+    && abi.params.every((param) => typeof param?.borrow === "boolean"
+      && typeof param.type === "string")
+    && typeof abi.resultType === "string";
 }
 
 export function renderTargetSurfaceMarkdown(report) {
@@ -326,6 +369,7 @@ export function renderTargetSurfaceMarkdown(report) {
     `- Capability-support-only nodes: ${report.closure.supportOnlyNodes}`,
     `- Reached extern boundaries: ${report.externs.length}`,
     `- Missing extern boundaries: ${report.externs.filter((entry) => entry.status === "missing").length}`,
+    `- ABI-incompatible extern boundaries: ${report.externs.filter((entry) => entry.status === "incompatible").length}`,
     `- All terminal blockers: ${report.reachableBlockers.length}`,
     "",
     "This verdict covers static IR closure only. Package encoding, linking, and browser execution are separate stages.",
@@ -360,35 +404,4 @@ function compareByModuleAndName(lhs, rhs) {
 
 function compareText(lhs, rhs) {
   return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
-}
-
-async function main(args) {
-  if (args.length !== 4) {
-    console.error(
-      "usage: analyze-surface-graph.mjs <graph.json> <capability-surface.json> "
-        + "<surface.json> <surface.md>",
-    );
-    process.exitCode = 2;
-    return;
-  }
-  const [graphArg, capabilityArg, jsonArg, markdownArg] = args.map((arg) => resolve(arg));
-  const graph = JSON.parse(await readFile(graphArg, "utf8"));
-  const capabilities = JSON.parse(await readFile(capabilityArg, "utf8"));
-  const report = analyzeSurfaceGraph(graph, capabilities);
-  await Promise.all([
-    mkdir(dirname(jsonArg), { recursive: true }),
-    mkdir(dirname(markdownArg), { recursive: true }),
-  ]);
-  await Promise.all([
-    writeFile(jsonArg, `${JSON.stringify(report)}\n`),
-    writeFile(markdownArg, renderTargetSurfaceMarkdown(report)),
-  ]);
-  console.log(
-    `analyzed ${report.declarations.length} root(s): ${report.counts.runnable} closure-complete, `
-      + `${report.reachableBlockers.length} terminal blockers`,
-  );
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  await main(process.argv.slice(2));
 }

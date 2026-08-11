@@ -18,7 +18,7 @@ open Lean.IR
 
 def graphFormat : String := "lean-ir-surface-graph"
 
-def graphVersion : Nat := 2
+def graphVersion : Nat := 3
 
 structure Options where
   output : System.FilePath
@@ -140,12 +140,37 @@ private structure GraphNode where
   targets : Array Json := #[]
   host : Bool := false
   unsupportedInitGlobal : Bool := false
+  abi : Option Json := none
   typeSignature : Option String := none
   docString : Option String := none
 
 private def optionalStringJson : Option String → Json
   | some value => .str value
   | none => .null
+
+private def irTypeLabel : IRType → String
+  | .float => "float"
+  | .uint8 => "uint8"
+  | .uint16 => "uint16"
+  | .uint32 => "uint32"
+  | .uint64 => "uint64"
+  | .usize => "usize"
+  | .erased => "erased"
+  | .object => "object"
+  | .tobject => "tobject"
+  | .float32 => "float32"
+  | .struct name _ => s!"struct:{name}"
+  | .union name _ => s!"union:{name}"
+  | .tagged => "tagged"
+  | .void => "void"
+
+private def declarationAbiJson (decl : Decl) : Json := Json.mkObj [
+  ("params", .arr (decl.params.map fun param => Json.mkObj [
+    ("borrow", param.borrow),
+    ("type", irTypeLabel param.ty)
+  ])),
+  ("resultType", irTypeLabel decl.resultType)
+]
 
 private def GraphNode.toJson (node : GraphNode) : Json := Json.mkObj [
   ("name", node.name.toString),
@@ -156,6 +181,7 @@ private def GraphNode.toJson (node : GraphNode) : Json := Json.mkObj [
   ("targets", .arr node.targets),
   ("host", node.host),
   ("unsupportedInitGlobal", node.unsupportedInitGlobal),
+  ("abi", node.abi.getD .null),
   ("type", optionalStringJson node.typeSignature),
   ("doc", optionalStringJson node.docString)
 ]
@@ -191,6 +217,7 @@ private def baseNodeFor (env : Environment) (fallback : Name) (name : Name) : Gr
         declarationClass := declarationClass env name
         deps
         unsupportedInitGlobal := unsupported && deps.isEmpty
+        abi := some (declarationAbiJson decl)
       }
   | some decl@(.extern ..) => {
       name
@@ -199,6 +226,7 @@ private def baseNodeFor (env : Environment) (fallback : Name) (name : Name) : Gr
       declarationClass := "extern"
       targets := externTargets decl
       host := isHostExtern decl
+      abi := some (declarationAbiJson decl)
     }
   | none => {
       name

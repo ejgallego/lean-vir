@@ -11,6 +11,11 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import {
+  surfaceCounts,
+  surfaceDefinition,
+} from "./surface-report-test-fixtures.mjs";
+
 const repoRoot = resolve(import.meta.dirname, "..");
 
 test("target index compares only compatible complete-frontier reports", async () => {
@@ -45,6 +50,7 @@ test("target index compares only compatible complete-frontier reports", async ()
     const twoTargetHtml = await readFile(join(twoTargetOutput, "index.html"), "utf8");
     const twoTargetHead = twoTargetHtml.match(/<thead>[\s\S]*?<\/thead>/u)?.[0] ?? "";
     assert.match(twoTargetHtml, /1 blocker is shared by every target/);
+    assert.match(twoTargetHtml, /Boundary family \(distinct boundaries\)/);
     assert.match(twoTargetHead, /FIR compiler/);
     assert.match(twoTargetHead, /lean-zip operations/);
     assert.doesNotMatch(twoTargetHead, /Lean libraries/);
@@ -88,36 +94,18 @@ function reportFixture(moduleName, completeFrontier, blockers) {
     examplePath: [`${moduleName}.main`, name],
   }));
   const selectedDeclarations = completeFrontier ? [`${moduleName}.main`] : [];
-  const counts = {
+  const counts = surfaceCounts({
     total: selectedDeclarations.length,
     runnable: 0,
     blocked: selectedDeclarations.length,
     publicTotal: selectedDeclarations.length,
     publicRunnable: 0,
-    privateTotal: 0,
-    boxedTotal: 0,
-    generatedTotal: 0,
-  };
+  });
   return {
     format: "lean-vir-library-surface",
     version: 3,
     lean: { version: "4.33.0", githash: "lean" },
-    definition: {
-      headline: "static transitive IR closure completeness",
-      encodingIsGate: false,
-      interfaceCallabilityIsGate: false,
-      dynamicValidationIsGate: false,
-      primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
-      completeBlockerFrontier: completeFrontier,
-      blockerCoverage: completeFrontier
-        ? "complete terminal frontier per selected root"
-        : "one primary terminal blocker per blocked root",
-      externScope: completeFrontier
-        ? "extern declarations reached from selected roots"
-        : "extern declarations owned by selected modules",
-      hostProvisioningVerified: false,
-      missingNodeKind: "namespace heuristic",
-    },
+    definition: surfaceDefinition(completeFrontier),
     selectedModules: [moduleName],
     selectedDeclarations,
     loadedModules: 1,

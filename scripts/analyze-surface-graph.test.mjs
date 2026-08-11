@@ -8,11 +8,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { analyzeSurfaceGraph, renderTargetSurfaceMarkdown } from "./analyze-surface-graph.mjs";
+import {
+  emptySurfaceReportV3,
+  nativeExternFixture,
+  TEST_SHA256,
+} from "./surface-report-test-fixtures.mjs";
+
+const provenance = { graphSha256: "b".repeat(64), sourceSha256: TEST_SHA256 };
 
 test("target graph analysis uses VIR capabilities and keeps every terminal blocker", () => {
   const graph = {
     format: "lean-ir-surface-graph",
-    version: 2,
+    version: 3,
     lean: { version: "4.32.0", toolchain: "leanprover/lean4:4.32.0", githash: "target" },
     capture: {
       source: "Library/Main.lean",
@@ -32,17 +39,13 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
     ],
   };
   const capabilities = capabilityReport([
-    { name: "Library.native", deps: ["Library.capabilityDependency"] },
-    { name: "Library.unused", deps: ["Library.unusedCapabilityDependency"] },
+    nativeExternFixture("Library.native", { deps: ["Library.capabilityDependency"] }),
+    nativeExternFixture("Library.unused", { deps: ["Library.unusedCapabilityDependency"] }),
   ], ["IO"]);
-  const report = analyzeSurfaceGraph(
-    graph,
-    capabilities,
-    { graphSha256: "graph-sha", sourceSha256: "source-sha" },
-  );
+  const report = analyzeSurfaceGraph(graph, capabilities, provenance);
   assert.equal(report.counts.blocked, 1);
-  assert.equal(report.capture.graphSha256, "graph-sha");
-  assert.equal(report.capture.sourceSha256, "source-sha");
+  assert.equal(report.capture.graphSha256, provenance.graphSha256);
+  assert.equal(report.capture.sourceSha256, provenance.sourceSha256);
   assert.match(report.capture.rootGraphSha256, /^[0-9a-f]{64}$/);
   assert.equal(report.runtimeCapabilities.lean.githash, "policy");
   assert.deepEqual(report.closure, {
@@ -70,7 +73,7 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
   const graphWithMoreSupport = structuredClone(graph);
   graphWithMoreSupport.capture.supportRoots.push("Library.anotherUnusedSupport");
   graphWithMoreSupport.nodes.push(node("Library.anotherUnusedSupport", "function"));
-  const reportWithMoreSupport = analyzeSurfaceGraph(graphWithMoreSupport, capabilities);
+  const reportWithMoreSupport = analyzeSurfaceGraph(graphWithMoreSupport, capabilities, provenance);
   assert.equal(reportWithMoreSupport.capture.rootGraphSha256, report.capture.rootGraphSha256);
 
   const graphWithChangedDependency = structuredClone(graph);
@@ -78,14 +81,37 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
     .find((entry) => entry.name === "Library.helper")
     .deps.push("Other.newBoundary");
   graphWithChangedDependency.nodes.push(node("Other.newBoundary", "missing"));
-  const reportWithChangedDependency = analyzeSurfaceGraph(graphWithChangedDependency, capabilities);
+  const reportWithChangedDependency = analyzeSurfaceGraph(
+    graphWithChangedDependency,
+    capabilities,
+    provenance,
+  );
   assert.notEqual(reportWithChangedDependency.capture.rootGraphSha256, report.capture.rootGraphSha256);
+
+  const graphWithAbiDrift = structuredClone(graph);
+  graphWithAbiDrift.nodes.find((entry) => entry.name === "Library.native").abi.params.push({
+    borrow: false,
+    type: "object",
+  });
+  const reportWithAbiDrift = analyzeSurfaceGraph(graphWithAbiDrift, capabilities, provenance);
+  assert.equal(reportWithAbiDrift.declarations[0].blockers[0].blocker.kind, "incompatibleExtern");
+  assert.equal(
+    reportWithAbiDrift.externs.find((entry) => entry.name === "Library.native").status,
+    "incompatible",
+  );
+
+  const graphWithoutAbi = structuredClone(graph);
+  delete graphWithoutAbi.nodes.find((entry) => entry.name === "Library.native").abi;
+  assert.throws(
+    () => analyzeSurfaceGraph(graphWithoutAbi, capabilities, provenance),
+    /has invalid ABI metadata/,
+  );
 });
 
 test("target graph analysis aggregates complete blocker membership across several roots", () => {
   const graph = {
     format: "lean-ir-surface-graph",
-    version: 2,
+    version: 3,
     lean: { version: "4.32.0", toolchain: "leanprover/lean4:4.32.0", githash: "target" },
     capture: {
       source: "Library/Profile.lean",
@@ -105,7 +131,7 @@ test("target graph analysis aggregates complete blocker membership across severa
   };
   const capabilities = capabilityReport([], ["ByteArray", "IO"]);
 
-  const report = analyzeSurfaceGraph(graph, capabilities);
+  const report = analyzeSurfaceGraph(graph, capabilities, provenance);
   assert.deepEqual(
     { total: report.counts.total, runnable: report.counts.runnable, blocked: report.counts.blocked },
     { total: 3, runnable: 1, blocked: 2 },
@@ -132,50 +158,25 @@ function node(name, kind, deps = []) {
     targets: [],
     host: false,
     unsupportedInitGlobal: false,
+    abi: kind === "function" || kind === "extern"
+      ? { params: [], resultType: "object" }
+      : null,
     type: name === "Library.main" ? "IO Unit" : null,
     doc: name === "Library.main" ? "Runs the library entry point." : null,
   };
 }
 
 function capabilityReport(nativeExterns, primitiveNamespaces) {
-  const counts = {
-    total: 0, runnable: 0, blocked: 0, publicTotal: 0, publicRunnable: 0,
-    privateTotal: 0, boxedTotal: 0, generatedTotal: 0,
-  };
-  return {
-    format: "lean-vir-library-surface",
-    version: 3,
+  return emptySurfaceReportV3({
     lean: {
       version: "4.33.0-rc2",
       toolchain: "leanprover/lean4:4.33.0-rc2",
       githash: "policy",
     },
-    definition: {
-      headline: "static transitive IR closure completeness",
-      encodingIsGate: false,
-      interfaceCallabilityIsGate: false,
-      dynamicValidationIsGate: false,
-      primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
-      completeBlockerFrontier: false,
-      blockerCoverage: "one primary terminal blocker per blocked root",
-      externScope: "extern declarations owned by selected modules",
-      hostProvisioningVerified: false,
-      missingNodeKind: "namespace heuristic",
-    },
-    selectedModules: [],
-    selectedDeclarations: [],
-    loadedModules: 0,
-    closure: { selectedRoots: 0, capturedNodes: 0, rootReachableNodes: 0, supportOnlyNodes: 0 },
     runtimeCapabilities: {
       nativeExternCount: nativeExterns.length,
       primitiveNamespaces,
       nativeExterns,
     },
-    counts,
-    libraries: [],
-    modules: [],
-    primaryBlockers: [],
-    externs: [],
-    declarations: [],
-  };
+  });
 }

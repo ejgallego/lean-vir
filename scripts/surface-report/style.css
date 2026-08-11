@@ -110,6 +110,25 @@ h1 {
   margin-bottom: 0.35rem;
 }
 
+.analysis-provenance {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.8rem;
+  margin: 0.65rem 0;
+}
+
+.analysis-provenance dt {
+  color: #aee0d7;
+  font-weight: 700;
+}
+
+.analysis-provenance dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
 .analysis-method-assumptions {
   margin: 0.45rem 0 0;
   padding-left: 1.15rem;

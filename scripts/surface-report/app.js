@@ -15,6 +15,7 @@ Author: Emilio J. Gallego Arias
 
   const number = new Intl.NumberFormat("en-US");
   const definition = report.definition ?? {};
+  const capture = report.capture ?? null;
   const moduleByName = new Map(report.modules.map((module) => [module.name, module]));
   const externs = report.externs ?? [];
   const completeBlockerFrontier = definition.completeBlockerFrontier === true
@@ -232,7 +233,7 @@ Author: Emilio J. Gallego Arias
       ...(focusedReport && selectedDeclarations.length === 1
         ? [selectedDeclarations[0].name]
         : []),
-      `${report.capture ? "Target " : ""}Lean ${report.lean.version}`,
+      `${capture ? "Target " : ""}Lean ${report.lean.version}`,
       shortHash(report.lean.githash),
       ...(report.runtimeCapabilityLean?.githash
           && report.runtimeCapabilityLean.githash !== report.lean.githash
@@ -330,11 +331,32 @@ Author: Emilio J. Gallego Arias
       "Boundary families are name-based navigation groups and do not affect the result.",
     ));
     const headline = definition.headline ?? "static transitive IR closure completeness";
-    body.replaceChildren(
+    const contents = [
       element("p", "", `${capitalize(headline)}. ${blockerScope}`),
       element("p", "", `${graphScope} ${externScope}`),
-      assumptions,
-    );
+    ];
+    if (capture) {
+      const provenance = element("dl", "analysis-provenance");
+      appendFact(provenance, "Captured source", capture.source);
+      appendFact(provenance, "Capture module", capture.module);
+      appendFact(
+        provenance,
+        "Target Lean",
+        `${report.lean.version} (${shortHash(report.lean.githash)})`,
+      );
+      appendFact(
+        provenance,
+        "VIR policy Lean",
+        `${report.runtimeCapabilityLean?.version ?? report.lean.version} `
+          + `(${shortHash(report.runtimeCapabilityLean?.githash ?? report.lean.githash)})`,
+      );
+      appendFact(provenance, "Source SHA-256", shortFingerprint(capture.sourceSha256));
+      appendFact(provenance, "Root graph SHA-256", shortFingerprint(capture.rootGraphSha256));
+      appendFact(provenance, "Complete graph SHA-256", shortFingerprint(capture.graphSha256));
+      contents.push(provenance);
+    }
+    contents.push(assumptions);
+    body.replaceChildren(...contents);
   }
 
   function headerStat(value, label) {
@@ -854,7 +876,9 @@ Author: Emilio J. Gallego Arias
   function renderExternsView() {
     const nativeCount = externs.filter((declaration) => declaration.status === "native").length;
     const hostCount = externs.filter((declaration) => declaration.status === "host").length;
-    const missingCount = externs.length - nativeCount - hostCount;
+    const incompatibleCount = externs
+      .filter((declaration) => declaration.status === "incompatible").length;
+    const missingCount = externs.filter((declaration) => declaration.status === "missing").length;
     const card = sectionCard(
       focusedReport ? "Reached extern boundaries" : "Extern boundaries",
       `${number.format(externs.length)} entries`,
@@ -867,6 +891,7 @@ Author: Emilio J. Gallego Arias
     const status = control("Status", "select", [
       ["all", "All statuses"],
       ["missing", "Missing"],
+      ["incompatible", "ABI incompatible"],
       ["native", "Native"],
       ["host", "Host"],
     ]);
@@ -888,6 +913,7 @@ Author: Emilio J. Gallego Arias
     const stats = element("div", "stat-grid");
     stats.append(
       valueCard("Missing", number.format(missingCount)),
+      valueCard("ABI incompatible", number.format(incompatibleCount)),
       valueCard("Native", number.format(nativeCount)),
       valueCard("Host", number.format(hostCount)),
     );
@@ -1569,6 +1595,10 @@ Author: Emilio J. Gallego Arias
     appendFact(facts, "Class", "extern boundary");
     appendFact(facts, "Family (name-based)", declaration.family ?? "Other runtime");
     appendFact(facts, "Owning module", declaration.module);
+    if (declaration.status === "incompatible") {
+      appendFact(facts, "Target IR ABI", formatNativeAbi(declaration.targetAbi));
+      appendFact(facts, "VIR capability ABI", formatNativeAbi(declaration.capabilityAbi));
+    }
     const impact = blockerByName.get(declaration.name);
     if (impact) {
       appendFact(
@@ -1826,6 +1856,7 @@ Author: Emilio J. Gallego Arias
     return {
       native: { label: "Native boundary", className: "good" },
       host: { label: "Host boundary (assumed)", className: "host" },
+      incompatible: { label: "Incompatible native ABI", className: "bad" },
       missing: { label: "Missing boundary", className: "bad" },
     }[status] ?? { label: status, className: "bad" };
   }
@@ -1833,6 +1864,7 @@ Author: Emilio J. Gallego Arias
   function blockerKindLabel(kind) {
     return {
       missingExtern: "Missing runtime extern",
+      incompatibleExtern: "Incompatible runtime extern ABI",
       missingDecl: "IR declaration unavailable",
       unsupportedInitGlobal: "Unsupported initialized global",
     }[kind] ?? kind ?? "Unknown boundary";
@@ -2049,6 +2081,10 @@ Author: Emilio J. Gallego Arias
     appendFact(facts, "Family (name-based)", declaration.family ?? "Other runtime");
     appendFact(facts, "Owning module", module.name);
     appendFact(facts, "Native target", externTargetsLabel(declaration) || "—");
+    if (declaration.status === "incompatible") {
+      appendFact(facts, "Target IR ABI", formatNativeAbi(declaration.targetAbi));
+      appendFact(facts, "VIR capability ABI", formatNativeAbi(declaration.capabilityAbi));
+    }
     const blocker = blockerByName.get(declaration.name);
     if (blocker) {
       appendFact(facts, "Why it stops", blockerKindLabel(blocker.blocker.kind));
@@ -2187,6 +2223,18 @@ Author: Emilio J. Gallego Arias
 
   function shortHash(hash) {
     return hash ? hash.slice(0, 10) : "unknown build";
+  }
+
+  function shortFingerprint(hash) {
+    return typeof hash === "string" ? hash.slice(0, 12) : "not recorded";
+  }
+
+  function formatNativeAbi(abi) {
+    if (!abi || !Array.isArray(abi.params)) return "not recorded";
+    const params = abi.params
+      .map((param) => `${param.borrow ? "@& " : ""}${param.type}`)
+      .join(", ");
+    return `(${params}) → ${abi.resultType}`;
   }
 
   function kindLabel(kind) {
