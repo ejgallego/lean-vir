@@ -153,7 +153,8 @@
               }
             }
           }
-        }
+        },
+        "extends": []
       }
     },
     {
@@ -235,6 +236,7 @@
       },
       "tsSymbol": {
         "id": "Root.render",
+        "owner": "Root",
         "kind": "method",
         "source": {
           "path": "node_modules/@types/react-dom/client.d.ts",
@@ -326,6 +328,7 @@
       },
       "tsSymbol": {
         "id": "Root.unmount",
+        "owner": "Root",
         "kind": "method",
         "source": {
           "path": "node_modules/@types/react-dom/client.d.ts",
@@ -613,7 +616,8 @@
               }
             }
           }
-        }
+        },
+        "extends": []
       }
     },
     {
@@ -849,7 +853,8 @@
               }
             }
           }
-        }
+        },
+        "extends": []
       }
     }
   ]

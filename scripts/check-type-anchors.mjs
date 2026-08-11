@@ -433,6 +433,54 @@ function applyPortIntent(leanShape, tsSymbol, portIntent) {
   let mismatch = false;
   if (portIntent === undefined) return { lean, ts, diagnostics, mismatch };
 
+  if (typeof portIntent.accessor === "string") {
+    if (tsSymbol.kind !== "property" || !["get", "set"].includes(portIntent.accessor)) {
+      mismatch = true;
+      diagnostics.push(diagnostic(
+        "port_intent_accessor_mismatch",
+        `reviewed ${portIntent.accessor} accessor intent requires a TypeScript property`,
+      ));
+    } else if (portIntent.accessor === "get") {
+      ts = { kind: "function", effect: "pure", args: [], result: ts };
+      diagnostics.push(diagnostic(
+        "reviewed_property_getter",
+        "Lean exposes the TypeScript property getter as a function",
+        "info",
+      ));
+    } else {
+      ts = {
+        kind: "function",
+        effect: "pure",
+        args: [{ name: "value", type: ts }],
+        result: { kind: "primitive", name: "void" },
+      };
+      diagnostics.push(diagnostic(
+        "reviewed_property_setter",
+        "Lean exposes the TypeScript property setter as a function",
+        "info",
+      ));
+    }
+  }
+
+  if (portIntent.overload !== undefined) {
+    if (!Number.isInteger(portIntent.overload) || ts.kind !== "union" ||
+        portIntent.overload < 0 || portIntent.overload >= ts.options.length ||
+        ts.options[portIntent.overload]?.kind !== "function") {
+      mismatch = true;
+      diagnostics.push(diagnostic(
+        "port_intent_overload_mismatch",
+        `reviewed overload ${portIntent.overload} is unavailable`,
+      ));
+    } else {
+      ts = ts.options[portIntent.overload];
+      diagnostics.push(diagnostic(
+        "reviewed_overload",
+        `reviewed port intent selects TypeScript overload ${portIntent.overload}`,
+        "info",
+      ));
+    }
+  }
+
   if (portIntent.representation === "hostResource") {
     if (lean.kind === "resource") {
       ts = { kind: "resource", name: lean.name };
@@ -481,6 +529,35 @@ function applyPortIntent(leanShape, tsSymbol, portIntent) {
         "port_intent_effect_mismatch",
         `reviewed ${portIntent.effect} effect does not match the Lean descriptor`,
       ));
+    }
+  }
+
+  if (Array.isArray(portIntent.resourceArguments)) {
+    if (lean.kind !== "function" || ts.kind !== "function") {
+      mismatch = true;
+      diagnostics.push(diagnostic(
+        "port_intent_resource_argument_mismatch",
+        "reviewed resource arguments require Lean and TypeScript functions",
+      ));
+    } else {
+      const args = [...(ts.args ?? [])];
+      for (const index of portIntent.resourceArguments) {
+        if (!Number.isInteger(index) || lean.args?.[index]?.type?.kind !== "resource" || args[index] === undefined) {
+          mismatch = true;
+          diagnostics.push(diagnostic(
+            "port_intent_resource_argument_mismatch",
+            `reviewed resource argument ${index} has no corresponding Lean resource`,
+          ));
+          continue;
+        }
+        args[index] = { ...args[index], type: { kind: "resource", name: lean.args[index].type.name } };
+        diagnostics.push(diagnostic(
+          "reviewed_resource_argument",
+          `reviewed port intent represents TypeScript argument ${index} as a JavaScript resource`,
+          "info",
+        ));
+      }
+      ts = { ...ts, args };
     }
   }
 

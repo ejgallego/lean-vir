@@ -150,6 +150,7 @@
           }
         }
       },
+      "extends": [],
       "dependency": {
         "kind": "declaration",
         "depth": 1
@@ -345,7 +346,211 @@
             }
           }
         }
-      }
+      },
+      "extends": []
+    },
+    {
+      "id": "HydrationOptions.formState",
+      "owner": "HydrationOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 17,
+        "startColumn": 5,
+        "endLine": 17,
+        "endColumn": 39,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "formState?: ReactFormState | null;",
+      "hover": "",
+      "shape": {
+        "kind": "option",
+        "element": {
+          "kind": "ref",
+          "id": "ReactFormState"
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "HydrationOptions"
+    },
+    {
+      "id": "HydrationOptions.identifierPrefix",
+      "owner": "HydrationOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 21,
+        "startColumn": 5,
+        "endLine": 21,
+        "endColumn": 31,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "identifierPrefix?: string;",
+      "hover": "Prefix for `useId`.",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
+      },
+      "optional": true,
+      "surfaceRoot": "HydrationOptions"
+    },
+    {
+      "id": "HydrationOptions.onCaughtError",
+      "owner": "HydrationOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 26,
+        "startColumn": 5,
+        "endLine": 34,
+        "endColumn": 21,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onCaughtError?:\n        | ((\n            error: unknown,\n            errorInfo: {\n                componentStack?: string | undefined;\n                errorBoundary?: React.Component<unknown> | undefined;\n            },\n        ) => void)\n        | undefined;",
+      "hover": "",
+      "shape": {
+        "kind": "option",
+        "element": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "opaque",
+                "name": "unknown"
+              }
+            },
+            {
+              "name": "errorInfo",
+              "type": {
+                "kind": "record",
+                "fields": {
+                  "componentStack": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "primitive",
+                      "name": "string"
+                    }
+                  },
+                  "errorBoundary": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "ref",
+                      "id": "React.Component",
+                      "args": [
+                        {
+                          "kind": "opaque",
+                          "name": "unknown"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "result": {
+            "kind": "primitive",
+            "name": "void"
+          }
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "HydrationOptions"
+    },
+    {
+      "id": "HydrationOptions.onRecoverableError",
+      "owner": "HydrationOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 25,
+        "startColumn": 5,
+        "endLine": 25,
+        "endColumn": 73,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) => void;",
+      "hover": "",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "error",
+            "type": {
+              "kind": "opaque",
+              "name": "unknown"
+            }
+          },
+          {
+            "name": "errorInfo",
+            "type": {
+              "kind": "ref",
+              "id": "ErrorInfo"
+            }
+          }
+        ],
+        "result": {
+          "kind": "primitive",
+          "name": "void"
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "HydrationOptions"
+    },
+    {
+      "id": "HydrationOptions.onUncaughtError",
+      "owner": "HydrationOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 22,
+        "startColumn": 5,
+        "endLine": 24,
+        "endColumn": 21,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onUncaughtError?:\n        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void)\n        | undefined;",
+      "hover": "",
+      "shape": {
+        "kind": "option",
+        "element": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "opaque",
+                "name": "unknown"
+              }
+            },
+            {
+              "name": "errorInfo",
+              "type": {
+                "kind": "record",
+                "fields": {
+                  "componentStack": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "primitive",
+                      "name": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "result": {
+            "kind": "primitive",
+            "name": "void"
+          }
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "HydrationOptions"
     },
     {
       "id": "React.Component",
@@ -414,6 +619,7 @@
         "kind": "record",
         "fields": {}
       },
+      "extends": [],
       "dependency": {
         "kind": "declaration",
         "depth": 1
@@ -462,10 +668,12 @@
             }
           }
         }
-      }
+      },
+      "extends": []
     },
     {
       "id": "Root.render",
+      "owner": "Root",
       "kind": "method",
       "source": {
         "path": "node_modules/@types/react-dom/client.d.ts",
@@ -497,6 +705,7 @@
     },
     {
       "id": "Root.unmount",
+      "owner": "Root",
       "kind": "method",
       "source": {
         "path": "node_modules/@types/react-dom/client.d.ts",
@@ -646,7 +855,187 @@
             }
           }
         }
-      }
+      },
+      "extends": []
+    },
+    {
+      "id": "RootOptions.identifierPrefix",
+      "owner": "RootOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 41,
+        "startColumn": 5,
+        "endLine": 41,
+        "endColumn": 31,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "identifierPrefix?: string;",
+      "hover": "Prefix for `useId`.",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
+      },
+      "optional": true,
+      "surfaceRoot": "RootOptions"
+    },
+    {
+      "id": "RootOptions.onCaughtError",
+      "owner": "RootOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 46,
+        "startColumn": 5,
+        "endLine": 54,
+        "endColumn": 21,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onCaughtError?:\n        | ((\n            error: unknown,\n            errorInfo: {\n                componentStack?: string | undefined;\n                errorBoundary?: React.Component<unknown> | undefined;\n            },\n        ) => void)\n        | undefined;",
+      "hover": "",
+      "shape": {
+        "kind": "option",
+        "element": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "opaque",
+                "name": "unknown"
+              }
+            },
+            {
+              "name": "errorInfo",
+              "type": {
+                "kind": "record",
+                "fields": {
+                  "componentStack": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "primitive",
+                      "name": "string"
+                    }
+                  },
+                  "errorBoundary": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "ref",
+                      "id": "React.Component",
+                      "args": [
+                        {
+                          "kind": "opaque",
+                          "name": "unknown"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "result": {
+            "kind": "primitive",
+            "name": "void"
+          }
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "RootOptions"
+    },
+    {
+      "id": "RootOptions.onRecoverableError",
+      "owner": "RootOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 45,
+        "startColumn": 5,
+        "endLine": 45,
+        "endColumn": 73,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) => void;",
+      "hover": "",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "error",
+            "type": {
+              "kind": "opaque",
+              "name": "unknown"
+            }
+          },
+          {
+            "name": "errorInfo",
+            "type": {
+              "kind": "ref",
+              "id": "ErrorInfo"
+            }
+          }
+        ],
+        "result": {
+          "kind": "primitive",
+          "name": "void"
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "RootOptions"
+    },
+    {
+      "id": "RootOptions.onUncaughtError",
+      "owner": "RootOptions",
+      "kind": "property",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 42,
+        "startColumn": 5,
+        "endLine": 44,
+        "endColumn": 21,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "onUncaughtError?:\n        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void)\n        | undefined;",
+      "hover": "",
+      "shape": {
+        "kind": "option",
+        "element": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "opaque",
+                "name": "unknown"
+              }
+            },
+            {
+              "name": "errorInfo",
+              "type": {
+                "kind": "record",
+                "fields": {
+                  "componentStack": {
+                    "kind": "option",
+                    "element": {
+                      "kind": "primitive",
+                      "name": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "result": {
+            "kind": "primitive",
+            "name": "void"
+          }
+        }
+      },
+      "optional": true,
+      "surfaceRoot": "RootOptions"
     }
   ],
   "anchors": [

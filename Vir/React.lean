@@ -1358,7 +1358,7 @@ opaque create (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) : Lean.Vir.B
 Creates a React root for the first element matching a CSS selector.
 -/
 def createFromSelector (selector : String) : Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure none
   | some container => some <$> create container
 

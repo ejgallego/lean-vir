@@ -32,7 +32,61 @@
       "title": "Document",
       "targets": ["browser.document.*"],
       "lean": { "public": ["Lean.Vir.Browser.Document"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" }
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" },
+      "comparison": { "report": "docs/type-descriptors/document-v1.report.json" },
+      "mappings": [
+        { "typescript": "Document.title", "targets": ["browser.document.getTitle", "browser.document.setTitle"], "lean": ["Lean.Vir.Browser.Document.getTitle", "Lean.Vir.Browser.Document.setTitle"] },
+        { "typescript": "Document.querySelector", "targets": ["browser.document.querySelector"], "lean": ["Lean.Vir.Browser.Document.querySelector"] },
+        { "typescript": "Document.querySelectorAll", "targets": ["browser.document.querySelectorAll"], "lean": ["Lean.Vir.Browser.Document.querySelectorAll"] },
+        { "typescript": "Document.createElement", "targets": ["browser.document.createElement"], "lean": ["Lean.Vir.Browser.Document.createElement"] }
+      ],
+      "anchors": [
+        {
+          "id": "document.title.get",
+          "category": "Document property",
+          "lean": "Lean.Vir.TypeAnchors.documentGetTitleCall",
+          "ts": "Document.title",
+          "target": "browser.document.getTitle",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "get", "effect": "dom", "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.title.set",
+          "category": "Document property",
+          "lean": "Lean.Vir.TypeAnchors.documentSetTitleCall",
+          "ts": "Document.title",
+          "target": "browser.document.setTitle",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "set", "effect": "dom", "resourceArguments": [0] }
+        },
+        {
+          "id": "document.querySelector",
+          "category": "Document selectors",
+          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+          "ts": "Document.querySelector",
+          "target": "browser.document.querySelector",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 4, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.querySelectorAll",
+          "category": "Document selectors",
+          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+          "ts": "Document.querySelectorAll",
+          "target": "browser.document.querySelectorAll",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 4, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.createElement",
+          "category": "Document creation",
+          "lean": "Lean.Vir.TypeAnchors.documentCreateElementCall",
+          "ts": "Document.createElement",
+          "target": "browser.document.createElement",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 2, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource", "omittedOptionalParameters": ["options"] }
+        }
+      ]
     },
     {
       "id": "element",

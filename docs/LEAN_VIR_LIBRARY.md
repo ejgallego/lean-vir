@@ -79,8 +79,8 @@ above.
    ```lean
    def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
-     Lean.Vir.Browser.Document.setTitle title
-     Lean.Vir.Browser.Document.getTitle
+     Lean.Vir.Browser.Document.setTitleString title
+     Lean.Vir.Browser.Document.getTitleString
    ```
 
 3. Generate a package with that declaration as a root.
@@ -119,7 +119,7 @@ until the listener is removed or the runtime is disposed.
 import Vir.Browser
 
 def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelector "#run" with
+  match ← Lean.Vir.Browser.Document.querySelectorString "#run" with
   | none => pure ()
   | some button =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener
@@ -148,10 +148,12 @@ animation frames, and React roots. It also exports
 `ensureVirtualElementState`, `ensureVirtualElementStates`,
 `findVirtualReactElementById`, and
 `virtualReactElementById` for direct virtual callback tests. Virtual
-`Document.querySelector` matches the DOM by returning `none` for missing
-selectors; call `ensureVirtualElementState(state, selector)` in JS tests when
-the fixture should exist. Use `ensureVirtualElementStates` to seed all results
-returned by virtual `Document.querySelectorAll`.
+`Document.querySelector` returns a nullable JavaScript resource for missing
+selectors; the explicit `Document.querySelectorString` convenience wrapper
+converts that result to `none`. Call
+`ensureVirtualElementState(state, selector)` in JS tests when the fixture
+should exist. Use `ensureVirtualElementStates` to seed all results returned by
+virtual `Document.querySelectorAll`.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -307,11 +309,13 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
   `HTMLCanvasElement`, `CanvasRenderingContext2D`, `Timeout`, and
   `AnimationFrame`
-- `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM String`
-- `Lean.Vir.Browser.Document.setTitle : @& String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Document.querySelector : @& String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
-- `Lean.Vir.Browser.Document.querySelectorAll : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element))`
-- `Lean.Vir.Browser.Document.createElement : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
+- `Lean.Vir.Browser.Document.setTitle : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Document.querySelector : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Document.querySelectorAll : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Document.createElement : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
+- explicit conversion helpers: `Document.getTitleString`, `setTitleString`,
+  `querySelectorString`, `querySelectorAllString`, and `createElementString`
 - `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
@@ -550,8 +554,8 @@ namespace HostInterop
 
 def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitle title
-  Lean.Vir.Browser.Document.getTitle
+  Lean.Vir.Browser.Document.setTitleString title
+  Lean.Vir.Browser.Document.getTitleString
 
 end HostInterop
 ```

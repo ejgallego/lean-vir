@@ -44,4 +44,29 @@ def reactRootUnmountCall
     Lean.Vir.Browser.DomM Unit :=
   Lean.Vir.React.Root.unmount root
 
+def documentGetTitleCall :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
+  Lean.Vir.Browser.Document.getTitle
+
+def documentSetTitleCall
+    (title : Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.Browser.Document.setTitle title
+
+def documentQuerySelectorCall
+    (selector : Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element) :=
+  Lean.Vir.Browser.Document.querySelector selector
+
+def documentQuerySelectorAllCall
+    (selector : Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM
+      (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element)) :=
+  Lean.Vir.Browser.Document.querySelectorAll selector
+
+def documentCreateElementCall
+    (tagName : Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element) :=
+  Lean.Vir.Browser.Document.createElement tagName
+
 end Lean.Vir.TypeAnchors

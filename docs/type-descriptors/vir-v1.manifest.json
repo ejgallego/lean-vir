@@ -19,7 +19,12 @@
           "Lean.Vir.TypeAnchors.reactRootIdentity",
           "Lean.Vir.TypeAnchors.reactRootCreateCall",
           "Lean.Vir.TypeAnchors.reactRootRenderCall",
-          "Lean.Vir.TypeAnchors.reactRootUnmountCall"
+          "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+          "Lean.Vir.TypeAnchors.documentGetTitleCall",
+          "Lean.Vir.TypeAnchors.documentSetTitleCall",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+          "Lean.Vir.TypeAnchors.documentCreateElementCall"
         ],
         "resolvedRoots": [
           "Lean.Vir.TypeAnchors.reactPropertyIdentity",
@@ -33,7 +38,17 @@
           "Lean.Vir.TypeAnchors.reactRootRenderCall",
           "Lean.Vir.TypeAnchors.reactRootRenderCall._boxed",
           "Lean.Vir.TypeAnchors.reactRootUnmountCall",
-          "Lean.Vir.TypeAnchors.reactRootUnmountCall._boxed"
+          "Lean.Vir.TypeAnchors.reactRootUnmountCall._boxed",
+          "Lean.Vir.TypeAnchors.documentGetTitleCall",
+          "Lean.Vir.TypeAnchors.documentGetTitleCall._boxed",
+          "Lean.Vir.TypeAnchors.documentSetTitleCall",
+          "Lean.Vir.TypeAnchors.documentSetTitleCall._boxed",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorCall._boxed",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+          "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall._boxed",
+          "Lean.Vir.TypeAnchors.documentCreateElementCall",
+          "Lean.Vir.TypeAnchors.documentCreateElementCall._boxed"
         ]
       }
     ],
@@ -693,6 +708,119 @@
       },
       "effect": "dom",
       "startup": false
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_documentGetTitleCall",
+      "jsName": "Lean_Vir_TypeAnchors_documentGetTitleCall",
+      "entry": "Lean.Vir.TypeAnchors.documentGetTitleCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom",
+      "startup": false
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_documentSetTitleCall",
+      "jsName": "Lean_Vir_TypeAnchors_documentSetTitleCall",
+      "entry": "Lean.Vir.TypeAnchors.documentSetTitleCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "title",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom",
+      "startup": false
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_documentQuerySelectorCall",
+      "jsName": "Lean_Vir_TypeAnchors_documentQuerySelectorCall",
+      "entry": "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "selector",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom",
+      "startup": false
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_documentQuerySelectorAllCall",
+      "jsName": "Lean_Vir_TypeAnchors_documentQuerySelectorAllCall",
+      "entry": "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "selector",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom",
+      "startup": false
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_documentCreateElementCall",
+      "jsName": "Lean_Vir_TypeAnchors_documentCreateElementCall",
+      "entry": "Lean.Vir.TypeAnchors.documentCreateElementCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "tagName",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Element",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Browser.Element"
+      },
+      "effect": "dom",
+      "startup": false
     }
   ],
   "hostImports": [
@@ -789,6 +917,134 @@
       "result": {
         "type": "Unit",
         "interfaceTag": 22
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 3,
+      "name": "_private.Vir.Browser.0.Lean.Vir.Browser.Document.getTitleJs",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "browser.document.getTitle",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_3_1",
+      "arity": 1,
+      "erasedPrefixArgs": 0,
+      "args": [],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 4,
+      "name": "_private.Vir.Browser.0.Lean.Vir.Browser.Document.setTitleJs",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "browser.document.setTitle",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_4_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "title",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 5,
+      "name": "_private.Vir.Browser.0.Lean.Vir.Browser.Document.querySelectorNullable",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "browser.document.querySelector",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_5_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "selector",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 6,
+      "name": "_private.Vir.Browser.0.Lean.Vir.Browser.Document.querySelectorAllJs",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "browser.document.querySelectorAll",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_6_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "selector",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Js",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Js"
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 7,
+      "name": "_private.Vir.Browser.0.Lean.Vir.Browser.Document.createElementJs",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "browser.document.createElement",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_7_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "tagName",
+          "type": {
+            "type": "Js",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Js"
+          }
+        }
+      ],
+      "result": {
+        "type": "Element",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.Browser.Element"
       },
       "effect": "dom"
     }

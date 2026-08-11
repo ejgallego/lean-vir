@@ -19,12 +19,13 @@ assert.deepEqual(report.summary, {
   provided: 132,
   missingProvider: 0,
   runtimeOnly: 0,
-  auditedRoots: 1,
-  pendingRoots: 22,
+  auditedRoots: 2,
+  pendingRoots: 21,
   internalRoots: 6,
-  semantic: { exact: 0, compatible: 2, weak: 2, missing: 3 },
-  upstreamSymbols: 50,
-  issues: { error: 0, warning: 2, gap: 3, review: 22 },
+  semantic: { exact: 0, compatible: 7, weak: 2, missing: 3 },
+  upstreamSymbols: 321,
+  coverage: { roots: 1, members: 271, mapped: 4, missing: 267 },
+  issues: { error: 0, warning: 2, gap: 4, review: 21 },
 });
 
 const roots = report.libraries.flatMap((library) =>
@@ -33,9 +34,34 @@ const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.t
 assert.equal(new Set(targets).size, 132, "every shipped target should occur exactly once");
 
 const documentRoot = roots.find((root) => root.library === "browser" && root.id === "document");
-assert.equal(documentRoot?.status, "pending");
+assert.equal(documentRoot?.status, "missing");
 assert.deepEqual(documentRoot?.upstream.roots, ["Document"]);
 assert.ok(documentRoot?.bindings.some((binding) => binding.target === "browser.document.getTitle"));
+assert.deepEqual(documentRoot?.comparison.summary, {
+  exact: 0,
+  compatible: 5,
+  weak: 0,
+  missing: 0,
+});
+assert.deepEqual(documentRoot?.coverage.summary, {
+  exact: 0,
+  compatible: 4,
+  weak: 0,
+  missing: 267,
+  unreviewed: 0,
+  mappedTargets: 5,
+});
+const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
+assert.equal(documentTitle?.status, "compatible");
+assert.deepEqual(documentTitle?.mapping.targets, [
+  "browser.document.getTitle",
+  "browser.document.setTitle",
+]);
+const documentQuerySelector = documentRoot?.coverage.members.find(
+  (member) => member.id === "Document.querySelector",
+);
+assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
+assert.equal(documentQuerySelector?.status, "compatible");
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.equal(reactDomRoot?.status, "missing");
@@ -54,6 +80,7 @@ assert.match(html, /<h1>Library explorer<\/h1>/u);
 assert.match(html, /id="provided-metric">132\/132</u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Semantic comparison/u);
+assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
 assert.equal(JSON.parse(dataMatch[1]).summary.targets, 132);
@@ -61,4 +88,4 @@ const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
 assert.ok(scripts.length >= 2, "explorer should include data and interaction scripts");
 Function(scripts.at(-1)[1]);
 
-console.log("binding explorer smoke ok: 6 libraries, 29 roots, 50 upstream symbols, 132 unique targets");
+console.log("binding explorer smoke ok: 6 libraries, 29 roots, 321 upstream symbols, 132 unique targets");

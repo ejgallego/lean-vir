@@ -192,13 +192,16 @@ export async function generateDescriptorFile({
       ...symbol,
       source: { ...symbol.source, url: sourceUrl },
     }));
-  const rootSymbols = symbolFilter.size === 0
+  const requestedRoots = symbolFilter.size === 0
     ? availableSymbols
     : availableSymbols.filter((symbol) => symbolFilter.has(symbol.id));
-  const found = new Set(rootSymbols.map((symbol) => symbol.id));
+  const found = new Set(requestedRoots.map((symbol) => symbol.id));
   for (const id of symbolFilter) {
     if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
   }
+  const rootSymbols = symbolFilter.size === 0
+    ? availableSymbols
+    : expandInterfaceSurfaces(requestedRoots, availableSymbols);
   const policy = dependencyPolicyData !== null
     ? validateDependencyPolicy({ version: 1, symbols: dependencyPolicyData }, "binding root dependency policy")
     : dependencyPolicy === null ? new Map() : await readDependencyPolicy(dependencyPolicy);
@@ -219,7 +222,7 @@ export async function generateDescriptorFile({
   if (dependencyDepth !== 0 || dependencyPolicy !== null) {
     descriptor.dependencies = {
       depth: dependencyDepth,
-      roots: rootSymbols.map((symbol) => symbol.id).sort(),
+      roots: (symbolFilter.size === 0 ? rootSymbols.map((symbol) => symbol.id) : [...symbolFilter]).sort(),
       included: closure.included.sort((left, right) => left.id.localeCompare(right.id)),
       unresolved: [...closure.unresolved].sort(),
     };
@@ -371,6 +374,43 @@ function shapeReferences(shape) {
   }
 }
 
+function expandInterfaceSurfaces(requestedRoots, availableSymbols) {
+  const available = new Map(availableSymbols.map((symbol) => [symbol.id, symbol]));
+  const membersByOwner = new Map();
+  for (const symbol of availableSymbols) {
+    if (symbol.owner === undefined) continue;
+    const members = membersByOwner.get(symbol.owner) ?? [];
+    members.push(symbol);
+    membersByOwner.set(symbol.owner, members);
+  }
+  const selected = new Map(requestedRoots.map((symbol) => [symbol.id, symbol]));
+  for (const surface of requestedRoots.filter((symbol) => symbol.kind === "interface")) {
+    const owners = interfaceHierarchy(surface.id, available, new Set());
+    for (const owner of owners) {
+      for (const member of membersByOwner.get(owner) ?? []) {
+        const memberName = member.id.slice(owner.length + 1);
+        const id = `${surface.id}.${memberName}`;
+        if (selected.has(id)) continue;
+        selected.set(id, {
+          ...member,
+          id,
+          surfaceRoot: surface.id,
+          ...(owner === surface.id ? {} : { inheritedFrom: owner, originalId: member.id }),
+        });
+      }
+    }
+  }
+  return [...selected.values()];
+}
+
+function interfaceHierarchy(id, available, seen) {
+  if (seen.has(id)) return [];
+  seen.add(id);
+  const symbol = available.get(id);
+  if (symbol?.kind !== "interface") return [];
+  return [id, ...(symbol.extends ?? []).flatMap((base) => interfaceHierarchy(base, available, seen))];
+}
+
 function collectStatements(statements, sourceFile, prefix, symbols, symbolsById) {
   for (const statement of statements) {
     const visible = hasExportModifier(statement) || sourceFile.isDeclarationFile;
@@ -414,6 +454,16 @@ function mergeDeclarationSymbols(left, right) {
       shape: { kind: "union", options },
     };
   }
+  if (left.kind === "property" && right.kind === "property") {
+    const sameShape = JSON.stringify(left.shape) === JSON.stringify(right.shape);
+    return {
+      ...left,
+      display: `${left.display}\n${right.display}`,
+      hover: left.hover || right.hover,
+      shape: sameShape ? left.shape : { kind: "union", options: [left.shape, right.shape] },
+      access: left.access === right.access ? left.access : "get-set",
+    };
+  }
   throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
 }
 
@@ -421,14 +471,17 @@ function symbolsForStatement(statement, sourceFile, prefix) {
   const symbol = symbolForStatement(statement, sourceFile, prefix);
   if (symbol === null) return [];
   return ts.isInterfaceDeclaration(statement)
-    ? [symbol, ...interfaceMethodSymbols(statement, sourceFile, prefix)]
+    ? [symbol, ...interfaceMemberSymbols(statement, sourceFile, prefix)]
     : [symbol];
 }
 
 function symbolForStatement(statement, sourceFile, prefix) {
   if (ts.isInterfaceDeclaration(statement)) {
-    return declarationSymbol(statement, sourceFile, prefix, statement.name.text, "interface",
-      interfaceShape(statement, sourceFile, prefix));
+    return {
+      ...declarationSymbol(statement, sourceFile, prefix, statement.name.text, "interface",
+        interfaceShape(statement, sourceFile, prefix)),
+      extends: interfaceHeritage(statement, sourceFile, prefix),
+    };
   }
   if (ts.isTypeAliasDeclaration(statement)) {
     return declarationSymbol(statement, sourceFile, prefix, statement.name.text, "type",
@@ -458,23 +511,75 @@ function declarationSymbol(node, sourceFile, prefix, name, kind, shape) {
   };
 }
 
-function interfaceMethodSymbols(node, sourceFile, prefix) {
+function interfaceMemberSymbols(node, sourceFile, prefix) {
   const owner = [...prefix, node.name.text].join(".");
   const symbols = [];
   for (const member of node.members) {
-    if (!ts.isMethodSignature(member)) continue;
+    if (member.name === undefined) continue;
     const name = propertyNameText(member.name);
     if (name === null) continue;
-    symbols.push({
-      id: `${owner}.${name}`,
-      kind: "method",
-      source: sourceRange(member, sourceFile),
-      display: compactDisplay(member.getText(sourceFile)),
-      hover: jsDocText(member),
-      shape: functionShape(member.parameters, member.type, sourceFile, prefix),
-    });
+    if (ts.isMethodSignature(member)) {
+      symbols.push(memberSymbol(
+        owner,
+        name,
+        "method",
+        member,
+        sourceFile,
+        functionShape(member.parameters, member.type, sourceFile, prefix),
+      ));
+    } else if (ts.isPropertySignature(member) && member.type !== undefined) {
+      symbols.push(memberSymbol(
+        owner,
+        name,
+        "property",
+        member,
+        sourceFile,
+        normalizeTypeNode(member.type, sourceFile, prefix),
+        member.questionToken !== undefined ? { optional: true } : {},
+      ));
+    } else if (ts.isGetAccessorDeclaration(member) && member.type !== undefined) {
+      symbols.push(memberSymbol(
+        owner,
+        name,
+        "property",
+        member,
+        sourceFile,
+        normalizeTypeNode(member.type, sourceFile, prefix),
+        { access: "get" },
+      ));
+    } else if (ts.isSetAccessorDeclaration(member) && member.parameters[0]?.type !== undefined) {
+      symbols.push(memberSymbol(
+        owner,
+        name,
+        "property",
+        member,
+        sourceFile,
+        normalizeTypeNode(member.parameters[0].type, sourceFile, prefix),
+        { access: "set" },
+      ));
+    }
   }
   return symbols;
+}
+
+function memberSymbol(owner, name, kind, node, sourceFile, shape, extra = {}) {
+  return {
+    id: `${owner}.${name}`,
+    owner,
+    kind,
+    source: sourceRange(node, sourceFile),
+    display: compactDisplay(node.getText(sourceFile)),
+    hover: jsDocText(node),
+    shape,
+    ...extra,
+  };
+}
+
+function interfaceHeritage(node, sourceFile, prefix) {
+  return (node.heritageClauses ?? [])
+    .filter((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
+    .flatMap((clause) => clause.types.map((type) =>
+      resolveReferenceId(type.expression.getText(sourceFile), prefix)));
 }
 
 function interfaceShape(node, sourceFile, prefix) {
@@ -488,6 +593,14 @@ function interfaceShape(node, sourceFile, prefix) {
       const name = propertyNameText(member.name);
       if (name === null) continue;
       fields[name] = functionShape(member.parameters, member.type, sourceFile, prefix);
+    } else if (ts.isGetAccessorDeclaration(member) && member.type !== undefined) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = normalizeTypeNode(member.type, sourceFile, prefix);
+    } else if (ts.isSetAccessorDeclaration(member) && member.parameters[0]?.type !== undefined) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = normalizeTypeNode(member.parameters[0].type, sourceFile, prefix);
     }
   }
   if (Object.keys(fields).length === 1 &&

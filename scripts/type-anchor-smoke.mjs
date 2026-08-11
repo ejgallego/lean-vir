@@ -53,7 +53,11 @@ try {
 }
 `);
 
-  await writeFile(ambientTypes, `interface AmbientRoot {
+  await writeFile(ambientTypes, `interface AmbientBase {
+  inherited: boolean;
+}
+
+interface AmbientRoot extends AmbientBase {
   value: string;
   run(value: string): void;
   run(value: number): void;
@@ -212,9 +216,17 @@ declare function schedule(value: number): void;
   const ambientComparison = JSON.parse(await readFile(ambientDescriptors, "utf8"));
   assert.deepEqual(ambientComparison.symbols.map((symbol) => symbol.id), [
     "AmbientRoot",
+    "AmbientRoot.inherited",
     "AmbientRoot.run",
+    "AmbientRoot.value",
     "schedule",
   ]);
+  assert.equal(
+    ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.inherited")?.inheritedFrom,
+    "AmbientBase",
+  );
+  assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.value")?.kind,
+    "property");
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.run")?.shape.kind,
     "union");
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "schedule")?.shape.options.length, 2);

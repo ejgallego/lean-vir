@@ -76,19 +76,21 @@ the public Lean wrappers return ordinary Lean values in `RuntimeM`.
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`.
 
-`Lean.Vir.Browser.Document.getTitle` and `setTitle` map to `document.title`.
-`Document.querySelector` returns an opaque element resource, or `none`/`null`
-when there is no matching element. `Document.querySelectorAll` returns the
-browser's native static `NodeList` as
+`Lean.Vir.Browser.Document.getTitle` and `setTitle` map faithfully to
+`document.title` with `Lean.Vir.Js String` values. `Document.querySelector`
+returns a nullable JavaScript element resource. `Document.querySelectorAll`
+returns the browser's native static `NodeList` as
 `Lean.Vir.Js.NodeList (Lean.Vir.Js Element)`. Lean code can inspect it with
 `Js.NodeList.length` and `item`, copy it on the JavaScript side with
 `Js.NodeList.toArray`, or explicitly materialize a Lean array of independent
 element handles with `Js.NodeList.toLeanArray`. Dropping the list or copied
 array does not invalidate element handles already obtained from it.
 `Document.createElement` creates a browser element resource by tag name.
-The public Lean browser APIs continue to expose ordinary `String`, `Bool`,
-`UInt32`, and `Float` values where appropriate, but their low-level
-`browser.*` host targets use explicit `Lean.Vir.JsValue` scalar resources.
+The `getTitleString`, `setTitleString`, `querySelectorString`,
+`querySelectorAllString`, and `createElementString` helpers provide separately
+named conversions for callers that want native Lean strings or options. Other
+browser API convenience wrappers likewise keep conversions above their
+faithful `browser.*` host targets.
 
 `Lean.Vir.Browser.Element.*` targets query descendants, read and write text
 content, attributes, and `innerHTML`, append and remove elements, update
@@ -225,9 +227,10 @@ const vir = await createVirRuntime({
 });
 ```
 
-Virtual `Document.querySelector` follows DOM semantics and returns `none`/`null`
-for missing selectors. `Document.querySelectorAll` returns a static NodeList;
-use `ensureVirtualElementStates` to seed every match for a selector.
+Virtual `Document.querySelector` follows DOM semantics and returns a nullable
+resource for missing selectors; `Document.querySelectorString` converts it to
+`none`. `Document.querySelectorAll` returns a static NodeList; use
+`ensureVirtualElementStates` to seed every match for a selector.
 Virtual elements accept a `queries` map for descendant
 `Element.querySelector` and `querySelectorAll` results, plus an `innerHTML`
 string. Setting inner HTML clears the descendant query map, mirroring

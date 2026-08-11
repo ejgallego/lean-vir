@@ -461,8 +461,8 @@ Import one of the provided modules:
 import Vir.Browser
 
 def titleRoundtrip (title : String) : Lean.Vir.Browser.DomM String := do
-  Lean.Vir.Browser.Document.setTitle title
-  Lean.Vir.Browser.Document.getTitle
+  Lean.Vir.Browser.Document.setTitleString title
+  Lean.Vir.Browser.Document.getTitleString
 ```
 
 The full Lean-side declaration list is maintained in

@@ -97,6 +97,15 @@ function validateConfig(value, path) {
     if (bindingRoot.anchors !== undefined && !Array.isArray(bindingRoot.anchors)) {
       throw new Error(`${label} root ${bindingRoot.id} anchors must be an array`);
     }
+    if (bindingRoot.mappings !== undefined && !Array.isArray(bindingRoot.mappings)) {
+      throw new Error(`${label} root ${bindingRoot.id} mappings must be an array`);
+    }
+    for (const [mappingIndex, mapping] of (bindingRoot.mappings ?? []).entries()) {
+      if (!nonemptyString(mapping?.typescript) || !Array.isArray(mapping.targets) ||
+          mapping.targets.length === 0 || mapping.targets.some((target) => !nonemptyString(target))) {
+        throw new Error(`${label} root ${bindingRoot.id} mappings[${mappingIndex}] is invalid`);
+      }
+    }
   }
   return { ...value, path: label };
 }
@@ -153,7 +162,9 @@ async function generateTypeScriptSurfaces(configs) {
     for (const { config, bindingRoot } of requests) {
       const rootIds = new Set(bindingRoot.upstream.roots);
       const includeDependencies = requests.length === 1 && descriptor.dependencies !== undefined;
+      const includeMembers = Array.isArray(bindingRoot.mappings);
       const symbols = descriptor.symbols.filter((symbol) => rootIds.has(symbol.id) ||
+        (includeMembers && symbol.surfaceRoot !== undefined && rootIds.has(symbol.surfaceRoot)) ||
         (includeDependencies && symbol.dependency !== undefined)).map(explorerTypeScriptSymbol);
       for (const id of rootIds) {
         if (!symbolsById.has(id)) throw new Error(`${config.id}/${bindingRoot.id} cannot find TypeScript root ${id}`);
@@ -172,7 +183,9 @@ async function generateTypeScriptSurfaces(configs) {
 }
 
 function explorerTypeScriptSymbol({ shape: _shape, ...symbol }) {
-  return symbol;
+  if (symbol.kind !== "interface") return symbol;
+  const header = symbol.display.slice(0, symbol.display.indexOf("{")).trim();
+  return { ...symbol, display: `${header} { … }` };
 }
 
 async function loadComparison(bindingRoot) {
@@ -224,11 +237,67 @@ function semanticIssues(comparison) {
 function rootStatus(bindingRoot, bindings, comparison, issues) {
   if (bindings.some((binding) => binding.status !== "provided")) return "error";
   if (issues.some((entry) => entry.severity === "error")) return "error";
+  if (issues.some((entry) => entry.severity === "gap")) return "missing";
   if (comparison !== null && comparison.summary.missing !== 0) return "missing";
+  if (issues.some((entry) => entry.severity === "warning")) return "weak";
   if (comparison !== null && comparison.summary.weak !== 0) return "weak";
   if (comparison !== null) return "reviewed";
   if (bindingRoot.upstream.kind === "internal") return "internal";
   return "pending";
+}
+
+function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison) {
+  if (!Array.isArray(bindingRoot.mappings)) return null;
+  const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
+  const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
+  const resultsByTypeScript = new Map();
+  for (const result of comparison?.results ?? []) {
+    const results = resultsByTypeScript.get(result.ts) ?? [];
+    results.push(result);
+    resultsByTypeScript.set(result.ts, results);
+  }
+  const mappings = new Map();
+  const mappedTargets = new Set();
+  for (const mapping of bindingRoot.mappings) {
+    if (!symbolsById.has(mapping.typescript)) {
+      throw new Error(`${config.id}/${bindingRoot.id} mapping references missing TypeScript member ${mapping.typescript}`);
+    }
+    if (mappings.has(mapping.typescript)) {
+      throw new Error(`${config.id}/${bindingRoot.id} repeats TypeScript mapping ${mapping.typescript}`);
+    }
+    for (const target of mapping.targets) {
+      if (!bindingsByTarget.has(target)) {
+        throw new Error(`${config.id}/${bindingRoot.id} mapping references target outside its root: ${target}`);
+      }
+      if (mappedTargets.has(target)) throw new Error(`${config.id}/${bindingRoot.id} maps target twice: ${target}`);
+      mappedTargets.add(target);
+    }
+    const results = resultsByTypeScript.get(mapping.typescript) ?? [];
+    const status = results.length === 0
+      ? "unreviewed"
+      : results.reduce((candidate, result) =>
+        semanticStatuses.indexOf(result.status) > semanticStatuses.indexOf(candidate)
+          ? result.status
+          : candidate, "exact");
+    mappings.set(mapping.typescript, { ...mapping, status, anchors: results.map((result) => result.id) });
+  }
+  if (mappedTargets.size !== bindings.length) {
+    const missing = bindings.filter((binding) => !mappedTargets.has(binding.target)).map((binding) => binding.target);
+    throw new Error(`${config.id}/${bindingRoot.id} mappings do not classify targets: ${missing.join(", ")}`);
+  }
+  const members = typeScript.symbols.filter((symbol) => symbol.surfaceRoot !== undefined).map((symbol) => {
+    const mapping = mappings.get(symbol.id);
+    return {
+      id: symbol.id,
+      kind: symbol.kind,
+      ...(symbol.inheritedFrom ? { inheritedFrom: symbol.inheritedFrom } : {}),
+      status: mapping?.status ?? "missing",
+      ...(mapping === undefined ? {} : { mapping }),
+    };
+  });
+  const summary = { exact: 0, compatible: 0, weak: 0, missing: 0, unreviewed: 0 };
+  for (const member of members) summary[member.status] += 1;
+  return { summary: { ...summary, mappedTargets: mappedTargets.size }, members };
 }
 
 async function buildReport(coverage, configs, typeScriptSurfaces) {
@@ -295,6 +364,10 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
     for (const bindingRoot of config.roots) {
       const bindings = assigned.get(config.id).get(bindingRoot.id).sort((left, right) => left.target.localeCompare(right.target));
       const comparison = await loadComparison(bindingRoot);
+      const typescript = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) ?? null;
+      const coverage = typescript === null
+        ? null
+        : buildSurfaceCoverage(config, bindingRoot, typescript, bindings, comparison);
       const issues = [];
       for (const binding of bindings) {
         if (binding.status === "missing-provider") {
@@ -308,6 +381,13 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
           "audit-pending",
           "review",
           `${bindingRoot.title} has an identified ${bindingRoot.upstream.kind} surface but no semantic comparison yet`,
+        ));
+      }
+      if (coverage !== null && coverage.summary.missing !== 0) {
+        issues.push(issue(
+          "upstream-members-missing",
+          "gap",
+          `${coverage.summary.missing} of ${coverage.members.length} upstream members have no shipped VIR binding`,
         ));
       }
       issues.push(...semanticIssues(comparison));
@@ -328,9 +408,8 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
         ...(bindingRoot.description ? { description: bindingRoot.description } : {}),
         lean: bindingRoot.lean ?? { public: [] },
         upstream: bindingRoot.upstream,
-        ...(typeScriptSurfaces.has(`${config.id}/${bindingRoot.id}`)
-          ? { typescript: typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) }
-          : {}),
+        ...(typescript === null ? {} : { typescript }),
+        ...(coverage === null ? {} : { coverage }),
         status: rootStatus(bindingRoot, bindings, comparison, issues),
         summary: {
           bindings: bindings.length,
@@ -359,6 +438,7 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
   }
   libraries.sort((left, right) => left.title.localeCompare(right.title));
   const roots = libraries.flatMap((library) => library.roots);
+  const coveredRoots = roots.filter((entry) => entry.coverage !== undefined);
   const issueCounts = { error: 0, warning: 0, gap: 0, review: 0 };
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
@@ -383,6 +463,13 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
       internalRoots: roots.filter((entry) => entry.status === "internal").length,
       semantic: semanticSummary,
       upstreamSymbols: roots.reduce((sum, entry) => sum + (entry.typescript?.symbols.length ?? 0), 0),
+      coverage: {
+        roots: coveredRoots.length,
+        members: coveredRoots.reduce((sum, entry) => sum + entry.coverage.members.length, 0),
+        mapped: coveredRoots.reduce((sum, entry) =>
+          sum + entry.coverage.members.filter((member) => member.status !== "missing").length, 0),
+        missing: coveredRoots.reduce((sum, entry) => sum + entry.coverage.summary.missing, 0),
+      },
       issues: issueCounts,
     },
     libraries,
@@ -432,7 +519,7 @@ function renderHtml(report) {
   <section class="metrics">
     <article class="metric good"><strong id="provided-metric">${report.summary.provided}/${report.summary.targets}</strong><span>runtime targets provided</span></article>
     <article class="metric"><strong>${report.summary.auditedRoots}/${report.summary.roots}</strong><span>roots semantically audited</span></article>
-    <article class="metric ${report.summary.semantic.weak + report.summary.semantic.missing === 0 ? "good" : "warn"}"><strong>${report.summary.semantic.weak + report.summary.semantic.missing}</strong><span>known fidelity findings</span></article>
+    <article class="metric ${report.summary.semantic.weak + report.summary.semantic.missing + report.summary.coverage.missing === 0 ? "good" : "warn"}"><strong>${report.summary.semantic.weak + report.summary.semantic.missing + report.summary.coverage.missing}</strong><span>member/type findings</span></article>
     <article class="metric ${report.summary.pendingRoots === 0 ? "good" : "warn"}"><strong>${report.summary.pendingRoots}</strong><span>root audits pending</span></article>
   </section>
   <div class="scope"><b>Measured surface:</b> ${report.summary.libraries} libraries · ${report.summary.roots} configured roots · ${report.summary.targets} compiler/runtime targets. An internal root has no external parity contract; a pending root has an identified upstream surface that has not yet been compared.</div>
@@ -455,14 +542,14 @@ function renderHtml(report) {
   if (!byId.has(selected)) selected = roots.find((root) => ["error","missing","weak"].includes(root.status)) ? (roots.find((root) => ["error","missing","weak"].includes(root.status)).library.id + "/" + roots.find((root) => ["error","missing","weak"].includes(root.status)).id) : (roots[0] ? roots[0].library.id + "/" + roots[0].id : "");
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[character]));
   const statusLabel = (value) => ({ reviewed:"reviewed", pending:"audit pending", internal:"internal contract", weak:"weak types", missing:"coverage gaps", error:"error" }[value] || value);
-  function rootText(root) { return [root.library.title,root.title,root.description,...(root.lean.public || []),...(root.upstream.roots || []),...root.bindings.flatMap((binding) => [binding.target,...binding.declarations.flatMap((decl) => [decl.declaration,decl.type])]),...(root.comparison?.results || []).flatMap((item) => [item.lean,item.ts,item.note,...item.notes])].join(" ").toLowerCase(); }
+  function rootText(root) { return [root.library.title,root.title,root.description,...(root.lean.public || []),...(root.upstream.roots || []),...(root.typescript?.symbols || []).flatMap((symbol) => [symbol.id,symbol.display,symbol.hover]),...root.bindings.flatMap((binding) => [binding.target,...binding.declarations.flatMap((decl) => [decl.declaration,decl.type])]),...(root.comparison?.results || []).flatMap((item) => [item.lean,item.ts,item.note,...item.notes])].join(" ").toLowerCase(); }
   function matches(root) { const query=elements.search.value.trim().toLowerCase(); const issue=elements.issue.value; return (!query || rootText(root).includes(query)) && (elements.status.value === "all" || root.status === elements.status.value) && (elements.library.value === "all" || root.library.id === elements.library.value) && (issue === "all" || (issue === "none" ? root.issues.length === 0 : root.issues.some((entry) => entry.severity === issue))); }
   function render() { const visible=roots.filter(matches); elements.count.textContent=visible.length + (visible.length === 1 ? " binding root" : " binding roots"); elements.results.innerHTML=visible.length === 0 ? '<div class="empty">No roots match these filters.</div>' : visible.map((root) => { const id=root.library.id+"/"+root.id; return '<button type="button" class="row '+(id===selected?'active':'')+'" data-id="'+escapeHtml(id)+'"><span><span class="name">'+escapeHtml(root.library.title+" · "+root.title)+'</span><span class="sub">'+root.summary.bindings+' targets · '+root.summary.issues+' findings</span></span><span class="pill '+escapeHtml(root.status)+'">'+escapeHtml(statusLabel(root.status))+'</span></button>'; }).join(""); elements.results.querySelectorAll("[data-id]").forEach((button) => button.addEventListener("click", () => select(button.dataset.id))); renderDetail(byId.get(selected)); }
   function select(id) { selected=id; history.replaceState(null,"","#root="+encodeURIComponent(id)); render(); }
   function badges(values) { return values.map((value) => '<span class="badge">'+escapeHtml(value)+'</span>').join(""); }
   function renderIssues(root) { if (root.issues.length === 0) return '<div class="empty">No findings for this root.</div>'; return root.issues.map((entry) => '<div class="issue '+escapeHtml(entry.severity)+'"><div class="card-head"><span class="card-title">'+escapeHtml(entry.kind)+'</span><span class="pill '+escapeHtml(entry.severity)+'">'+escapeHtml(entry.severity)+'</span></div><p class="note">'+escapeHtml(entry.message)+'</p>'+(entry.target?'<a href="#target-'+escapeHtml(entry.target)+'">'+escapeHtml(entry.target)+'</a>':'')+'</div>').join(""); }
   function renderAnchors(root) { const results=root.comparison?.results || []; if (results.length === 0) return '<div class="empty">No semantic comparison generated yet.</div>'; return results.map((item) => { const ts=item.tsSymbol?.display || JSON.stringify(item.tsSymbol?.shape || {},null,2); const lean=JSON.stringify(item.leanDescriptor?.shape || {},null,2); const diagnostics=(item.diagnostics || []).map((entry) => '<span class="badge '+escapeHtml(entry.severity)+'" title="'+escapeHtml(entry.message)+'">'+escapeHtml(entry.code)+'</span>').join(""); return '<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.lean)+' ↔ '+escapeHtml(item.ts)+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div>'+(item.note?'<p class="note">'+escapeHtml(item.note)+'</p>':'')+'<div class="badges">'+diagnostics+'</div><div class="panes"><div><div class="pane-title">Lean VIR descriptor</div><pre>'+escapeHtml(lean)+'</pre></div><div><div class="pane-title">TypeScript declaration</div><pre>'+escapeHtml(ts)+'</pre></div></div></article>'; }).join(""); }
-  function renderTypeScript(root) { const symbols=root.typescript?.symbols || []; if (symbols.length === 0) return '<div class="empty">This root has no external TypeScript declaration surface.</div>'; return symbols.map((symbol) => { const source=symbol.source?.url?'<a class="source" href="'+escapeHtml(symbol.source.url)+'#L'+symbol.source.startLine+'" target="_blank" rel="noreferrer">source</a>':symbol.source?.path?'<a class="source" href="../../'+escapeHtml(symbol.source.path)+'#L'+symbol.source.startLine+'">source</a>':''; return '<details class="binding"><summary><span class="card-title">'+escapeHtml(symbol.id)+'</span> <span class="badge">'+escapeHtml(symbol.kind)+'</span></summary><div class="card-head"><p class="note">'+escapeHtml(symbol.hover || 'No declaration documentation.')+'</p>'+source+'</div><pre>'+escapeHtml(symbol.display)+'</pre></details>'; }).join(""); }
+  function renderTypeScript(root) { const symbols=root.typescript?.symbols || []; if (symbols.length === 0) return '<div class="empty">This root has no external TypeScript declaration surface.</div>'; const coverage=new Map((root.coverage?.members || []).map((member)=>[member.id,member])); return symbols.map((symbol) => { const source=symbol.source?.url?'<a class="source" href="'+escapeHtml(symbol.source.url)+'#L'+symbol.source.startLine+'" target="_blank" rel="noreferrer">source</a>':symbol.source?.path?'<a class="source" href="../../'+escapeHtml(symbol.source.path)+'#L'+symbol.source.startLine+'">source</a>':''; const member=coverage.get(symbol.id); const status=member?'<span class="pill '+escapeHtml(member.status)+'">'+escapeHtml(member.status)+'</span>':''; const inherited=symbol.inheritedFrom?'<span class="badge">from '+escapeHtml(symbol.inheritedFrom)+'</span>':''; return '<details class="binding"><summary><span class="card-title">'+escapeHtml(symbol.id)+'</span> <span class="badge">'+escapeHtml(symbol.kind)+'</span> '+inherited+' '+status+'</summary><div class="card-head"><p class="note">'+escapeHtml(symbol.hover || 'No declaration documentation.')+'</p>'+source+'</div><pre>'+escapeHtml(symbol.display)+'</pre></details>'; }).join(""); }
   function renderBindings(root) { return root.bindings.map((binding) => { const declarations=binding.declarations.map((decl) => { const source=decl.source?.path?'<a class="source" href="../../'+escapeHtml(decl.source.path)+'#L'+decl.source.startLine+'">'+escapeHtml(decl.module+":"+decl.source.startLine)+'</a>':''; return '<div class="binding"><div class="card-head"><span class="card-title">'+escapeHtml(decl.declaration)+'</span>'+source+'</div><div class="badges">'+badges([decl.marker,decl.boundary,decl.private?'private boundary':'public boundary'])+'</div><pre>'+escapeHtml(decl.type)+'</pre></div>'; }).join(""); return '<details id="target-'+escapeHtml(binding.target)+'"><summary><span class="card-title">'+escapeHtml(binding.target)+'</span> <span class="pill '+escapeHtml(binding.status)+'">'+escapeHtml(binding.status)+'</span></summary><div class="badges">'+badges(binding.providers)+'</div>'+declarations+'</details>'; }).join(""); }
   function renderDetail(root) { if (!root) { elements.detail.innerHTML='<div class="empty">Select a binding root.</div>'; return; } const upstream=[root.upstream.kind,root.upstream.package,root.upstream.version].filter(Boolean); const publicLean=root.lean.public || []; const docs=root.upstream.docs?'<a href="'+escapeHtml(root.upstream.docs)+'" target="_blank" rel="noreferrer">Upstream documentation</a>':''; elements.detail.innerHTML='<span class="pill '+escapeHtml(root.status)+'">'+escapeHtml(statusLabel(root.status))+'</span><h2>'+escapeHtml(root.title)+'</h2><p class="note">'+escapeHtml(root.description || root.library.description)+'</p><div class="badges">'+badges([root.library.title,...upstream])+'</div>'+docs+'<section class="section"><h3>Configured roots</h3><div class="badges">'+badges([...(root.upstream.roots || []),...publicLean])+'</div></section><section class="section"><h3>Findings</h3>'+renderIssues(root)+'</section><section class="section"><h3>Upstream TypeScript surface</h3>'+renderTypeScript(root)+'</section><section class="section"><h3>Semantic comparison</h3>'+renderAnchors(root)+'</section><section class="section"><h3>Shipped targets</h3>'+renderBindings(root)+'</section>'; }
   [elements.search,elements.status,elements.library,elements.issue].forEach((element) => element.addEventListener(element===elements.search?"input":"change",render));
@@ -505,6 +592,7 @@ try {
   console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
   console.log(`  semantic roots: ${report.summary.auditedRoots} audited, ${report.summary.pendingRoots} pending`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
+  console.log(`  member coverage: ${report.summary.coverage.mapped}/${report.summary.coverage.members} mapped`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
   console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);

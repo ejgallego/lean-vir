@@ -75,10 +75,13 @@ resources or very large recursive library types. The generated descriptor
 records every included dependency and any unresolved names.
 
 The descriptor reader also supports ambient declaration libraries such as
-TypeScript's `lib.dom.d.ts` and `@types/react`. Overloaded functions and methods
-are retained as alternative callable shapes. The consolidated explorer groups
-roots that share a declaration source, so a large ambient library is parsed
-once per generation group rather than once per configured root.
+TypeScript's `lib.dom.d.ts` and `@types/react`. Interface properties, methods,
+and accessors are indexed, inherited members are expanded onto requested root
+interfaces with their declaring-interface provenance, and overloads are
+retained as alternative callable shapes. The consolidated explorer expands
+members only for roots with authored mappings and groups roots that share a
+declaration source, so a large ambient library is parsed once per generation
+group rather than once per configured root.
 
 ## Artifact Ownership
 
@@ -89,6 +92,7 @@ Markdown, or HTML output directly.
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
 | Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
+| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `document-v1.json`, `document-v1.report.json` |
 | React DOM root | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
@@ -200,6 +204,22 @@ npm run check:react-dom-root-type-anchors
 The machine-facing output is
 `docs/type-descriptors/react-dom-root-v1.report.json`; the review page is
 `docs/type-descriptors/react-dom-root-v1.anchors.html`.
+
+## DOM Document Audit
+
+The first complete-root audit selects `Document` from TypeScript's pinned
+`lib.dom.d.ts`, expands all inherited interfaces, and reconciles every member
+against the mappings in `Vir/Browser.bindings.json`. Property accessors,
+overload selection, JavaScript-resource arguments/results, and omitted optional
+parameters are explicit reviewed port intent. The current five shipped
+operations compare as compatible; unmapped upstream members remain visible as
+coverage gaps in the consolidated explorer.
+
+```bash
+npm run generate:document-type-descriptors
+npm run compare:document-type-anchors
+npm run check:document-type-anchors
+```
 
 ## Verso Fragment
 

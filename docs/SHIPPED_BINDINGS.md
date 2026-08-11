@@ -8,6 +8,11 @@ one searchable page.
 The current report covers 119 ordinary `@[vir_js]` declarations and 13
 `@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
 shipped provider; there are no missing providers and no provider-only targets.
+The first complete upstream-root audit expands TypeScript's `Document`
+inheritance graph to 271 properties and methods. Four members map to VIR's five
+shipped Document targets; the remaining 267 are explicit coverage gaps rather
+than invisible omissions. All five mapped operations pass their reviewed
+type-translation checks.
 
 ## Fidelity Contract
 
@@ -101,9 +106,11 @@ The Lean compiler inventory is an ignored intermediate under
 `docs/bindings/index.html`.
 
 The explorer supports library, root-status, and finding filters; deep links;
-generated upstream TypeScript declarations; Lean and TypeScript source context;
-exact elaborated boundary types; side-by-side semantic descriptors; and
-light/dark themes. A `provided` target proves
+generated upstream TypeScript declarations; inherited-member provenance; Lean
+and TypeScript source context; exact elaborated boundary types; side-by-side
+semantic descriptors; and light/dark themes. Roots with authored member
+mappings show the complete upstream surface and distinguish compatible mapped
+members from missing coverage. A `provided` target proves
 the representation policy and runtime dispatch path. `reviewed`, `weak`,
 `missing`, and `pending` root states describe upstream semantic coverage.
 

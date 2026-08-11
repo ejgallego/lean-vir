@@ -20,6 +20,25 @@
       "shape": {
         "kind": "resource",
         "name": "LeanVir.Browser.Event"
+      },
+      "extends": []
+    },
+    {
+      "id": "LeanVir.Browser.Event.__resource",
+      "owner": "LeanVir.Browser.Event",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 24,
+        "startColumn": 7,
+        "endLine": 24,
+        "endColumn": 36
+      },
+      "display": "readonly __resource: \"Event\";",
+      "hover": "",
+      "shape": {
+        "kind": "literal",
+        "value": "Event"
       }
     },
     {
@@ -162,6 +181,60 @@
             }
           }
         }
+      },
+      "extends": []
+    },
+    {
+      "id": "LeanVir.React.EventHandler.callback",
+      "owner": "LeanVir.React.EventHandler",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 53,
+        "startColumn": 7,
+        "endLine": 53,
+        "endColumn": 87
+      },
+      "display": "callback: (event: LeanVir.Js<LeanVir.Browser.Event>) => LeanVir.DomEffect<void>;",
+      "hover": "",
+      "shape": {
+        "kind": "function",
+        "effect": "dom",
+        "args": [
+          {
+            "name": "event",
+            "type": {
+              "kind": "resource",
+              "name": "LeanVir.Browser.Event",
+              "value": {
+                "kind": "ref",
+                "id": "LeanVir.Browser.Event"
+              }
+            }
+          }
+        ],
+        "result": {
+          "kind": "primitive",
+          "name": "void"
+        }
+      }
+    },
+    {
+      "id": "LeanVir.React.EventHandler.name",
+      "owner": "LeanVir.React.EventHandler",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 52,
+        "startColumn": 7,
+        "endLine": 52,
+        "endColumn": 20
+      },
+      "display": "name: string;",
+      "hover": "",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
       }
     },
     {
@@ -188,6 +261,43 @@
             "id": "LeanVir.React.PropValue"
           }
         }
+      },
+      "extends": []
+    },
+    {
+      "id": "LeanVir.React.Property.name",
+      "owner": "LeanVir.React.Property",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 46,
+        "startColumn": 7,
+        "endLine": 46,
+        "endColumn": 20
+      },
+      "display": "name: string;",
+      "hover": "",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
+      }
+    },
+    {
+      "id": "LeanVir.React.Property.value",
+      "owner": "LeanVir.React.Property",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 47,
+        "startColumn": 7,
+        "endLine": 47,
+        "endColumn": 38
+      },
+      "display": "value: LeanVir.React.PropValue;",
+      "hover": "",
+      "shape": {
+        "kind": "ref",
+        "id": "LeanVir.React.PropValue"
       }
     },
     {
@@ -316,6 +426,43 @@
             "name": "string"
           }
         }
+      },
+      "extends": []
+    },
+    {
+      "id": "LeanVir.React.StyleProperty.name",
+      "owner": "LeanVir.React.StyleProperty",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 31,
+        "startColumn": 7,
+        "endLine": 31,
+        "endColumn": 20
+      },
+      "display": "name: string;",
+      "hover": "",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
+      }
+    },
+    {
+      "id": "LeanVir.React.StyleProperty.value",
+      "owner": "LeanVir.React.StyleProperty",
+      "kind": "property",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 32,
+        "startColumn": 7,
+        "endLine": 32,
+        "endColumn": 21
+      },
+      "display": "value: string;",
+      "hover": "",
+      "shape": {
+        "kind": "primitive",
+        "name": "string"
       }
     }
   ],

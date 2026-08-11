@@ -32,8 +32,8 @@ def recordNat (value : Nat) : DomM Unit := do
 
 def titleHandshake (label : String) : DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitle title
-  Lean.Vir.Browser.Document.getTitle
+  Lean.Vir.Browser.Document.setTitleString title
+  Lean.Vir.Browser.Document.getTitleString
 
 partial def titleHandshakeLoopAux (remaining acc : Nat) : DomM Nat := do
   match remaining with
@@ -53,23 +53,23 @@ def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   Lean.Vir.JsValue.toFloat jsValue
 
 def querySelectorAllCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
   Lean.Vir.Js.NodeList.length nodes
 
 def querySelectorAllLeanCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
   let elements ← Lean.Vir.Js.NodeList.toLeanArray nodes
   pure elements.size
 
 def querySelectorAllArrayCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
   let jsElements ← Lean.Vir.Js.NodeList.toArray nodes
   let elements ← Lean.Vir.Js.Array.toLeanArray jsElements
   pure elements.size
 
 def querySelectorAllFirstText (selector : String) : DomM String := do
   let element? ← do
-    let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+    let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
     Lean.Vir.Js.NodeList.item nodes 0
   match element? with
   | none => pure ""
@@ -87,14 +87,14 @@ def querySelectorAllCountLoop (selector : String) (count : Nat) : DomM Nat :=
   querySelectorAllCountLoopAux selector count 0
 
 def elementQuerySelectorAllCount (selector childSelector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure 0
   | some element =>
     let nodes ← Lean.Vir.Browser.Element.querySelectorAll element childSelector
     Lean.Vir.Js.NodeList.length nodes
 
 def elementQuerySelectorText (selector childSelector : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure ""
   | some element =>
     match ← Lean.Vir.Browser.Element.querySelector element childSelector with
@@ -102,7 +102,7 @@ def elementQuerySelectorText (selector childSelector : String) : DomM String := 
     | some child => Lean.Vir.Browser.Element.getTextContent child
 
 def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure ""
   | some element =>
     Lean.Vir.Browser.Element.setInnerHTML element html
@@ -126,7 +126,7 @@ def callbackRoundTripLoop (count : Nat) : Lean.Vir.RuntimeM Nat :=
   callbackRoundTripLoopAux count 0
 
 def mountCallbackEvent (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         recordNat 101
@@ -134,7 +134,7 @@ def mountCallbackEvent (selector : String) : DomM Nat := do
   | none => pure 0
 
 def mountAndRemoveCallbackEvent (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         recordNat 102
@@ -153,7 +153,7 @@ def mountAndRemoveCallbackEventLoop (selector : String) (count : Nat) : DomM Nat
   mountAndRemoveCallbackEventLoopAux selector count 0
 
 def mountCallbackText (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         Lean.Vir.Browser.Element.setTextContent element "callback:clicked"
@@ -161,7 +161,7 @@ def mountCallbackText (selector : String) : DomM Nat := do
   | none => pure 0
 
 def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         Lean.Vir.Browser.Element.setTextContent element "callback:removed-fired"
@@ -170,10 +170,10 @@ def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
   | none => pure 0
 
 def mountKeyTitle (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
-        Lean.Vir.Browser.Document.setTitle (← Lean.Vir.Browser.Event.key event)
+        Lean.Vir.Browser.Document.setTitleString (← Lean.Vir.Browser.Event.key event)
       pure 1
   | none => pure 0
 
@@ -184,17 +184,17 @@ def timeoutRecord (value : Nat) : DomM Nat := do
 
 def timeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 0 do
-    Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
+    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
   pure 1
 
 def delayedTimeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 80 do
-    Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
+    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
   pure 1
 
 def clearTimeoutTitle (label : String) : DomM Nat := do
   let timeout ← Lean.Vir.Browser.Timer.setTimeout 20 do
-    Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
+    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
   Lean.Vir.Browser.Timer.clearTimeout timeout
   pure 1
 
@@ -222,12 +222,12 @@ def animationRecord (value : Nat) : DomM Nat := do
 
 def animationTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
-    Lean.Vir.Browser.Document.setTitle ("frame:" ++ label)
+    Lean.Vir.Browser.Document.setTitleString ("frame:" ++ label)
   pure 1
 
 def cancelAnimationTitle (label : String) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
-    Lean.Vir.Browser.Document.setTitle ("frame:" ++ label)
+    Lean.Vir.Browser.Document.setTitleString ("frame:" ++ label)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
   pure 1
 
