@@ -23,8 +23,6 @@ export {
   VIR_HOST_DISPOSE,
   VirCallback,
   JSON_MAX_DEPTH,
-  isJsonHandleResource,
-  jsonHandleValue,
   VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";

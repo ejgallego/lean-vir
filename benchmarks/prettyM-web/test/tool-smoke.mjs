@@ -4,6 +4,12 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  artifactSetConfig,
+  componentOrder,
+  readBuildDatabase,
+} from "../scripts/artifact-build-lib.mjs";
+
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
   [process.execPath, ["scripts/check-example-catalog.mjs", "--help"]],
@@ -144,14 +150,15 @@ assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   ],
 });
 
-const buildPlan = spawnSync(
-  process.execPath,
-  ["scripts/build-artifacts.mjs", "prettyM", "--plan"],
-  { cwd: appRoot, encoding: "utf8" },
+const buildDatabase = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
+assert.equal(
+  artifactSetConfig(buildDatabase, "prettyM").setId,
+  "prettyM-bounded-set-0002",
 );
-assert.equal(buildPlan.status, 0, buildPlan.stderr);
-assert.match(buildPlan.stdout, /^artifact set: prettyM-bounded-set-0002$/m);
-assert.match(buildPlan.stdout, /^components: vir -> native -> llvm$/m);
+assert.deepEqual(
+  componentOrder(buildDatabase.builds.prettyM),
+  ["vir", "native", "llvm"],
+);
 
 const escapedOutput = spawnSync(
   process.execPath,

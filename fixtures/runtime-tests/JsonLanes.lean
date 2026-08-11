@@ -15,6 +15,9 @@ def ownedWrap (value : Lean.Vir.Json) : Lean.Vir.Json :=
 def ownedDuplicate : Lean.Vir.Json :=
   .object #[("same", .null), ("same", .bool true)]
 
+def ownedIntegerKeys : Lean.Vir.Json :=
+  .object #[("10", .string "ten"), ("2", .string "two"), ("alpha", .string "letter")]
+
 partial def materialize (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json := do
   match ← Lean.Vir.Json.Handle.inspect value with
   | .null => pure .null
@@ -40,7 +43,7 @@ def borrowedPickWanted (value : Lean.Vir.Json.Handle) :
     Lean.Vir.RuntimeM Lean.Vir.Json := do
   match ← Lean.Vir.Json.Handle.inspect value with
   | .object entries =>
-      match entries.findSome? fun (key, item) => if key == "wanted" then some item else none with
+      match Lean.Vir.Json.objectFind? entries "wanted" with
       | some item => materialize item
       | none => pure .null
   | _ => pure .null
@@ -49,7 +52,7 @@ def borrowedPickWantedHandle (value : Lean.Vir.Json.Handle) :
     Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
   match ← Lean.Vir.Json.Handle.inspect value with
   | .object entries =>
-      match entries.findSome? fun (key, item) => if key == "wanted" then some item else none with
+      match Lean.Vir.Json.objectFind? entries "wanted" with
       | some item => pure item
       | none => Lean.Vir.Json.Handle.ofJson .null
   | _ => Lean.Vir.Json.Handle.ofJson .null
@@ -57,11 +60,16 @@ def borrowedPickWantedHandle (value : Lean.Vir.Json.Handle) :
 def borrowedToOwned (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json :=
   Lean.Vir.Json.Handle.toJson value
 
+def borrowedDuplicateObject : Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  let first ← Lean.Vir.Json.Handle.ofJson .null
+  let second ← Lean.Vir.Json.Handle.ofJson (.bool true)
+  Lean.Vir.Json.Handle.object #[("same", first), ("same", second)]
+
 def borrowedEmbedWanted (value : Lean.Vir.Json.Handle) :
     Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
   match ← Lean.Vir.Json.Handle.inspect value with
   | .object entries =>
-      match entries.findSome? fun (key, item) => if key == "wanted" then some item else none with
+      match Lean.Vir.Json.objectFind? entries "wanted" with
       | some wanted =>
           let kind ← Lean.Vir.Json.Handle.ofJson (.string "passthrough")
           let values ← Lean.Vir.Json.Handle.array #[wanted, kind]

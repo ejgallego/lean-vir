@@ -193,7 +193,9 @@ try {
 When a Lean export returns `Lean.Vir.Json.Handle`, the JavaScript result is an
 owned host resource. `vir.jsonValue(output)` reads its ordinary JSON value but
 does not consume the handle; call `releaseHostResource(output)` when done.
-See [JSON_LANES.md](JSON_LANES.md) for the Lean API and validation rules.
+`JSON_MAX_DEPTH` exports the shared maximum traversal depth (currently 256).
+See [JSON_LANES.md](JSON_LANES.md) for the Lean API, ordering semantics, and
+validation rules.
 
 ## Module Package Sets
 

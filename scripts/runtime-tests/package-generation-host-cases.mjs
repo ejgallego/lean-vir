@@ -192,6 +192,9 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.deepEqual(Object.keys(wrapped), ["before", "payload", "after"]);
   assert.ok(Object.is(wrapped.after, -0));
   assert.deepEqual(wrapped.payload, { nested: ["ok"] });
+  const integerKeys = jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedIntegerKeys");
+  assert.deepEqual(Object.keys(integerKeys), ["2", "10", "alpha"]);
+  assert.deepEqual(integerKeys, { 2: "two", 10: "ten", alpha: "letter" });
 
   for (const malformed of [
     undefined,
@@ -229,6 +232,10 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     () => jsonRuntime.call("Vir.Fixtures.JsonLanes.ownedDuplicate"),
     /duplicate JSON object key "same"/,
   );
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedDuplicateObject"),
+    /JSON object builder contains duplicate key "same"/,
+  );
   const sparseArray = [];
   sparseArray.length = 1;
   assert.throws(
@@ -256,6 +263,14 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.deepEqual(
     jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", borrowedInput),
     { ref: { opaque: ["same", 17] }, title: "picked" },
+  );
+  assert.deepEqual(
+    jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedToOwned", borrowedInput),
+    {
+      skipped: { large: [1, 2, 3] },
+      wanted: { ref: { opaque: ["same", 17] }, title: "picked" },
+      tail: false,
+    },
   );
   const wantedRef = jsonRuntime.jsonValue(borrowedInput).wanted;
   const borrowedChild = jsonRuntime.call(

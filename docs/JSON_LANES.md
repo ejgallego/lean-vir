@@ -37,8 +37,14 @@ runtime.call("wrapJson", { source: [1, null, "two"] });
 The runtime lowers the complete JavaScript tree directly to the ordered Lean
 representation and lifts it directly back. No `JSON.stringify`, VIR `String`,
 `Lean.Json.parse`, or `JSON.parse` step is involved. Object entries retain
-JavaScript enumeration order. Numbers retain their finite IEEE-754 value,
-including signed zero.
+the order observed from `Object.keys`. Numbers retain their finite IEEE-754
+value, including signed zero.
+
+The reverse boundary creates ordinary JavaScript objects. Their enumeration
+therefore follows ECMAScript rules: array-index keys enumerate in ascending
+numeric order before other string keys, while other string keys retain insertion
+order. An arbitrary Lean object-entry order containing keys such as `"10"` and
+`"2"` is consequently normalized when it becomes a JavaScript object.
 
 `Lean.Vir.Json` is interface tag 28 (`INTERFACE_TAG.JSON`) in manifest schema
 version 8. It is a library-owned type with runtime-specialized lowering, not an
@@ -89,7 +95,10 @@ resource. `Handle.inspect` observes exactly one level in one host call:
   members.
 
 Children stay opaque until Lean inspects them. This makes the handle lane useful
-for sparse reads and passthrough payloads.
+for sparse reads and passthrough payloads. Inspection is sparse by depth and
+subtree, not by immediate width: inspecting a container creates handles for all
+of its immediate children, so its cost is proportional to that container's
+length or member count.
 
 ```lean
 def wanted (input : Lean.Vir.Json.Handle) :
@@ -124,12 +133,19 @@ releases the result handle. `Handle.toJson` materializes a complete borrowed
 tree into the owned representation when a client deliberately wants to switch
 lanes.
 
+A borrowed handle retains a live JavaScript reference, not a snapshot. Mutating
+the referenced array or object between calls changes what a later
+`Handle.inspect` or `Handle.toJson` observes. Hosts should not mutate a borrowed
+tree while a Lean call is inspecting it.
+
 `Handle.array` and `Handle.object` batch construction of borrowed containers.
 Their child values are used by reference, so opaque inputs can be embedded in
 a result without materialization or loss of JavaScript identity. Constructed
 containers are independent result handles; releasing their input handles does
 not rewrite the retained JavaScript references. The object builder preserves
-entry order and rejects duplicate keys.
+the entry order that an ordinary JavaScript object can represent and rejects
+duplicate keys. Array-index keys still follow the ECMAScript enumeration rule
+described above.
 
 The built-in `js.json.handle`, `js.json.value`, `js.json.inspect`,
 `js.json.array`, and `js.json.object` targets are explicit conversions. They

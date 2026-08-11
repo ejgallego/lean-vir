@@ -13,7 +13,8 @@ An ordered, structural JSON value for VIR's owned JSON boundary.
 
 JavaScript objects lower to `object` entries in JavaScript enumeration order.
 Unlike `Lean.Json`, the representation deliberately keeps those entries in an
-array so clients can preserve source order without an intermediate text codec.
+array so clients can preserve the observed order without an intermediate text
+codec.
 Numbers are finite IEEE-754 doubles, matching ordinary JavaScript JSON values.
 -/
 inductive Json where
@@ -28,7 +29,7 @@ inductive Json where
 namespace Json
 
 /-- Returns the first object member named `key`, preserving the stored order. -/
-def objectFind? (entries : Array (String × Json)) (key : String) : Option Json :=
+def objectFind? {α : Type u} (entries : Array (String × α)) (key : String) : Option α :=
   entries.findSome? fun (name, value) => if name == key then some value else none
 
 /-- Phantom marker for an ordinary JavaScript JSON value retained by the runtime. -/

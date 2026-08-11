@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { hostResourceValue, releaseHostResource } from "../host-resource.js";
+import { releaseHostResource } from "../host-resource.js";
 import {
   JSON_MAX_DEPTH,
   jsonArrayPath,
@@ -64,18 +64,6 @@ function buildJsonObject(resources, entries) {
     });
   }
   return createJsonHandleResource(resources, value, null, "JSON handle object");
-}
-
-export function isJsonHandleResource(resource) {
-  return hostResourceValue(resource)?.[JSON_HANDLE_BRAND] === true;
-}
-
-export function jsonHandleValue(resource) {
-  const payload = hostResourceValue(resource);
-  if (payload?.[JSON_HANDLE_BRAND] !== true) {
-    throw new TypeError("value must be a live VIR JSON handle");
-  }
-  return payload.value;
 }
 
 function createJsonHandleResource(resources, value, parent, label) {
