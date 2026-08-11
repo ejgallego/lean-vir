@@ -23,10 +23,13 @@ also opts into the Lean body of `UInt8.ofNatLT`; its proof-erased call shape is
 not compatible with Lean's ordinary native wrapper. `Float.log2` uses an audited
 WASI-libm provider. The strict Wasm link has zero unresolved symbols.
 
-The checked-in acceptance harness compares 89 native/VIR compression vectors.
-It covers levels 0 through 10 over empty, short, repetitive, byte-cycle, and
-deterministic-noise inputs, plus a 1 MiB high-entropy level-6 route. Every output
-is byte-identical to native lean-zip and independently raw-inflates to its input.
+The checked-in acceptance harness compares 89 native/VIR compression vectors
+over three passes in one interpreter. It covers levels 0 through 10 over empty,
+short, repetitive, byte-cycle, and deterministic-noise inputs, plus a 1 MiB
+high-entropy level-6 route. Twelve one-shot vectors add 32 KiB repeated-text and
+64 KiB heterogeneous inputs at levels 5 through 10, crossing the split gate and
+exercising the approximate- and exact-optimal dispatch paths. Every output is
+byte-identical to native lean-zip and independently raw-inflates to its input.
 Nine 1 MiB prescan vectors also produce identical native/VIR decisions around
 the entropy threshold.
 
@@ -191,25 +194,32 @@ npm run accept:lean-zip -- /path/to/lean-zip
 
 It builds a native oracle through a temporary Lake overlay without editing the
 lean-zip checkout, generates one direct VIR package from the checked-in export
-fixture, and runs every vector in one shared interpreter. Successful runs
-checked 89 compression vectors and nine prescan vectors in 29.87–49.19
-seconds. Compression calls represented 1,103,268 input bytes and 1,100,737
-output bytes; the prescan set additionally scanned nine 1 MiB inputs. Wasm
-memory grew from 145 to 339 pages in both runs. These figures include lifting,
-lowering, assertions, and large-input scans and are acceptance telemetry, not a
+fixture, and runs every vector in one shared interpreter. The default three-pass
+run checked 279 compression calls: 89 matrix vectors repeated three times plus
+12 larger one-shot vectors. These calls represented 3,899,628 input bytes and
+3,564,426 output bytes; the prescan set additionally scanned nine 1 MiB inputs.
+The repeated-text outputs were 0.49% of their input size, and heterogeneous
+outputs ranged from 65.51% to 66.95%, depending on level. Two observed runs took
+136.90–156.70 seconds after setup. These figures include lifting, lowering,
+assertions, and large-input scans and are acceptance telemetry, not a
 compression throughput benchmark.
 
+Wasm memory started at 145 pages, reached 318 after the larger compression and
+prescan cases, then read 344 pages after each of the three matrix passes. The
+harness now asserts that every pass after the first retains the first pass's
+page count; `--passes 1` is available for a quicker diagnostic run but does not
+make this steady-state assertion. This is a bounded repeated-pass result, not a
+proof that every corpus has the same high-water mark.
+
 Vir still does not expose interpreter fuel or per-declaration sampling through
-the public runtime. The next performance gate is repeated matrix passes in one
-interpreter to verify memory stabilization, followed by explicit hot-declaration
-instrumentation. The current page growth is bounded process telemetry, not yet
-a steady-state memory result.
+the public runtime. The next performance gate is explicit hot-declaration
+instrumentation, followed by a broader representative corpus and cross-platform
+CI.
 
 ## Smallest next green slice
 
-The level matrix and current-platform entropy boundary are green. The next
-smallest slice is to repeat the matrix in one runtime and assert that Wasm memory
-reaches a stable high-water mark, then add a few larger compressible inputs that
-exercise split and optimal parsing rather than the high-entropy stored fast
-path. Broader corpus and cross-platform CI remain necessary before treating the
-integration as universal acceptance.
+The level matrix, current-platform entropy boundary, larger compressible cases,
+and repeated-pass memory check are green. The next smallest slice is lightweight
+per-declaration timing or sampling around the upper-level paths so future work
+can target measured interpreter hotspots. Broader corpus and cross-platform CI
+remain necessary before treating the integration as universal acceptance.

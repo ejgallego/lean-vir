@@ -27,6 +27,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     keep: { type: "boolean", default: false },
+    passes: { type: "string", default: "3" },
     wasm: { type: "string" },
   },
 });
@@ -34,8 +35,13 @@ const { values, positionals } = parseArgs({
 const leanZipArgument = positionals[0] ?? process.env.LEAN_ZIP_CHECKOUT;
 if (!leanZipArgument || positionals.length > 1) {
   throw new Error(
-    "usage: npm run accept:lean-zip -- /path/to/lean-zip [--wasm path] [--keep]",
+    "usage: npm run accept:lean-zip -- /path/to/lean-zip [--passes count] [--wasm path] [--keep]",
   );
+}
+
+const passes = Number(values.passes);
+if (!Number.isSafeInteger(passes) || passes < 1) {
+  throw new Error("--passes must be an integer greater than zero");
 }
 
 const leanZipRoot = resolve(leanZipArgument);
@@ -137,16 +143,21 @@ function generateVirPackage() {
 
 function parseManifest(source) {
   const compression = [];
+  const largeCompression = [];
   const prescan = [];
   for (const line of source.trim().split("\n")) {
     const fields = line.split("\t");
-    if (fields[0] === "compress" && fields.length === 5) {
-      compression.push({
+    if (
+      (fields[0] === "compress" || fields[0] === "large-compress") &&
+      fields.length === 5
+    ) {
+      const vector = {
         name: fields[1],
         level: Number(fields[2]),
         inputFile: fields[3],
         outputFile: fields[4],
-      });
+      };
+      (fields[0] === "compress" ? compression : largeCompression).push(vector);
     } else if (fields[0] === "prescan" && fields.length === 4) {
       if (fields[3] !== "true" && fields[3] !== "false") {
         throw new Error(
@@ -164,7 +175,7 @@ function parseManifest(source) {
       );
     }
   }
-  return { compression, prescan };
+  return { compression, largeCompression, prescan };
 }
 
 async function runAcceptance() {
@@ -180,8 +191,10 @@ async function runAcceptance() {
     wasmBytes,
     irPackageSetBytes: [packageBytes],
   });
-  const initialPages = runtime.exports.memory.buffer.byteLength / 65536;
+  const wasmPages = () => runtime.exports.memory.buffer.byteLength / 65536;
+  const initialPages = wasmPages();
   const inputs = new Map();
+  const nativeOutputs = new Map();
   const input = async (file) => {
     if (!inputs.has(file))
       inputs.set(
@@ -190,16 +203,30 @@ async function runAcceptance() {
       );
     return inputs.get(file);
   };
+  const nativeOutput = async (file) => {
+    if (!nativeOutputs.has(file)) {
+      nativeOutputs.set(
+        file,
+        new Uint8Array(await readFile(join(oracleOutput, file))),
+      );
+    }
+    return nativeOutputs.get(file);
+  };
 
   let compressedInputBytes = 0;
   let compressedOutputBytes = 0;
+  let compressionCalls = 0;
   const started = performance.now();
   try {
-    for (const vector of manifest.compression) {
+    const runCompressionVector = async (vector, requireSmaller) => {
       const source = await input(vector.inputFile);
-      const native = new Uint8Array(
-        await readFile(join(oracleOutput, vector.outputFile)),
-      );
+      const native = await nativeOutput(vector.outputFile);
+      if (requireSmaller) {
+        assert.ok(
+          native.byteLength < source.byteLength,
+          `${vector.name} level ${vector.level}: large corpus is not compressible`,
+        );
+      }
       let vir;
       try {
         vir = runtime.call(
@@ -229,6 +256,27 @@ async function runAcceptance() {
       );
       compressedInputBytes += source.byteLength;
       compressedOutputBytes += vir.byteLength;
+      compressionCalls += 1;
+      return {
+        inputBytes: source.byteLength,
+        outputBytes: vir.byteLength,
+      };
+    };
+
+    const largeResults = new Map();
+    for (const vector of manifest.largeCompression) {
+      const result = await runCompressionVector(vector, true);
+      const current = largeResults.get(vector.name) ?? {
+        inputBytes: result.inputBytes,
+        outputBytes: [],
+      };
+      assert.equal(
+        current.inputBytes,
+        result.inputBytes,
+        `${vector.name}: inconsistent large-corpus input size`,
+      );
+      current.outputBytes.push(result.outputBytes);
+      largeResults.set(vector.name, current);
     }
 
     for (const vector of manifest.prescan) {
@@ -249,14 +297,31 @@ async function runAcceptance() {
       );
     }
 
+    const setupPages = wasmPages();
+    const passPages = [];
+    for (let pass = 0; pass < passes; pass += 1) {
+      for (const vector of manifest.compression) {
+        await runCompressionVector(vector, false);
+      }
+      passPages.push(wasmPages());
+    }
+    if (passPages.length > 1) {
+      assert.ok(
+        passPages.slice(1).every((pages) => pages === passPages[0]),
+        `Wasm memory did not stabilize after the first matrix pass: ${passPages.join(",")}`,
+      );
+    }
+
     const elapsedMs = performance.now() - started;
-    const finalPages = runtime.exports.memory.buffer.byteLength / 65536;
+    const finalPages = wasmPages();
     const levels = [
       ...new Set(manifest.compression.map(({ level }) => level)),
     ].sort((left, right) => left - right);
     console.log("lean-zip native/VIR acceptance ok");
     console.log(
-      `compression vectors: ${manifest.compression.length}; levels: ${levels.join(",")}`,
+      `compression vectors: ${manifest.compression.length} x ${passes} passes; ` +
+        `large vectors: ${manifest.largeCompression.length}; calls: ${compressionCalls}; ` +
+        `levels: ${levels.join(",")}`,
     );
     console.log(
       `prescan vectors: ${manifest.prescan.length}; decisions: ${manifest.prescan
@@ -267,7 +332,16 @@ async function runAcceptance() {
       `bytes: input=${compressedInputBytes} compressed=${compressedOutputBytes}`,
     );
     console.log(
-      `runtime: ${(elapsedMs / 1000).toFixed(2)}s; Wasm pages: ${initialPages} -> ${finalPages}`,
+      `large ratios: ${[...largeResults]
+        .map(([name, { inputBytes, outputBytes }]) => {
+          const ratios = outputBytes.map((size) => (100 * size) / inputBytes);
+          return `${name}=${Math.min(...ratios).toFixed(2)}-${Math.max(...ratios).toFixed(2)}%`;
+        })
+        .join(", ")}`,
+    );
+    console.log(
+      `runtime: ${(elapsedMs / 1000).toFixed(2)}s; Wasm pages: initial=${initialPages}, ` +
+        `after large/prescan=${setupPages}, passes=${passPages.join(",")}, final=${finalPages}`,
     );
   } finally {
     runtime.dispose();

@@ -113,9 +113,12 @@ map lives in `docs/HARNESS.md`.
   Reuse an existing `web/public/vir-upstream.wasm` for faster fixture iteration.
 - `npm run accept:lean-zip -- /path/to/lean-zip`
   Build the checked-in native oracle against a lean-zip checkout, generate the
-  matching VIR package, and compare levels 0 through 10 plus large-input
-  incompressible-prescan decisions. Requires an existing
-  `web/public/vir-upstream.wasm`; pass `--keep` to retain temporary artifacts.
+  matching VIR package, and compare levels 0 through 10, larger compressible
+  inputs, and large-input incompressible-prescan decisions. The default three
+  matrix passes also assert that Wasm memory stabilizes after the first pass;
+  pass `--passes 1` for a quicker diagnostic without that assertion. Requires
+  an existing `web/public/vir-upstream.wasm`; pass `--keep` to retain temporary
+  artifacts.
 - `npm run test:site`
   Build the Vite site, runnable-surface and Wasm-size reports, local archive,
   SDK archive, and check the generated `web/dist` artifact shape.
