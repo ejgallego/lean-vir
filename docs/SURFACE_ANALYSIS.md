@@ -659,13 +659,16 @@ inequality, unchecked in-bounds indexing, conversion to `Array UInt8`, and
 hashing. All eight predicates return 255 through a strict link with no
 JavaScript imports.
 
-Two initially attractive groups are deliberately not included. Dynamic tests
-of `Char.ofNatAux` and `UInt8.ofNatLT` each found an indirect-call signature
+Two initially attractive groups were deliberately not included in that slice.
+`UInt8.ofNatLT` was later enabled with a distinct compiler-generated lookup stem
+because its raw symbol is shared with the one-argument `UInt8.ofNat`; its dynamic
+fixture now passes. `Char.ofNatAux` still has an indirect-call signature
 mismatch between the current interpreted call shape and Lean's ordinary boxed
 wrapper. A cache test for `Thunk.mk`/`Thunk.get` found a separate boundary: the
 standard native thunk runtime attempts to invoke the thunk's closure through a
 compiled function pointer, while a VIR interpreter closure has no such native
-entry. Both groups need runtime design work rather than registration-only fixes.
+entry. Those remaining groups need runtime design work rather than
+registration-only fixes.
 
 ## Interactive HTML Report
 

@@ -18,6 +18,9 @@ missing-boundary diagnostics for CI and boundary debugging.
 The Lean-dependent runtime smoke also generates temporary packages with
 intentionally unsupported or ambiguous interface exports and asserts that
 package generation fails loudly with package diagnostics.
+It additionally checks successful owned and borrowed `vir_extern_fallback`
+adapters at runtime and rejects bodyless, non-extern, duplicate, and directly
+recursive fallback requests during elaboration.
 Those negative cases cover recursive inherited structures, indexed inductive
 families, mutual recursion, erased proof fields, and implicit arguments. A
 raw-marker fallback case bypasses both marker callbacks and confirms package
@@ -82,8 +85,9 @@ The current fixture surface covers:
   `ByteArray.data`/`ByteArray.hash`, including growing and overlapping slice
   copies, capacity-backed construction, equality, inequality, in-bounds
   indexing, conversion to `Array UInt8`, and content hashing;
-- `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/comparison
-  operations;
+- `UInt8.ofNatLT`, `UInt8`/`UInt16` `toNat`, and UInt8/UInt16
+  arithmetic/bitwise/shift/comparison operations, including a dynamic
+  proof-bearing `UInt8.ofNatLT` call through its distinct native lookup stem;
 - `UInt32` literals, `UInt32.ofNat`/`toNat`/`toUInt8`, and `UInt32`
   arithmetic/bitwise/shift/comparison operations;
 - `UInt64.ofNat`/`ofNatLT`/`toNat`/`toUSize`/`toFloat`, `UInt64`

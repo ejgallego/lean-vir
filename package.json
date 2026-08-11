@@ -38,6 +38,7 @@
     "check:boundary-registry": "node scripts/check-boundary-registry.mjs",
     "check:native-wrappers": "node scripts/inventory-native-wrappers.mjs --check",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
+    "accept:lean-zip": "node scripts/lean-zip-acceptance.mjs",
     "build": "npm run build:demo",
     "build:demo": "bash scripts/build-demo.sh",
     "build:demo:release": "VIR_WASM_PROFILE=release bash scripts/build-demo.sh",

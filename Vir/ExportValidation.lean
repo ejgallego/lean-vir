@@ -8,6 +8,7 @@ module
 
 public import Vir.IRDependencies
 import Lean.Compiler.InitAttr
+import Lean.LabelAttribute
 import Vir.GeneratePackage.NativeExterns
 
 public section
@@ -18,6 +19,39 @@ namespace Vir.ExportValidation
 
 open Lean.IR
 open Vir.GeneratePackage
+
+private def underExternFallbackPrefix : Name → Name
+  | .anonymous => `_virExternFallback
+  | .str pre part => .str (underExternFallbackPrefix pre) part
+  | .num pre part => .num (underExternFallbackPrefix pre) part
+
+/-- Deterministic internal declaration name used for an extern reference-body clone. -/
+def externFallbackCloneName (original : Name) : Name :=
+  underExternFallbackPrefix original
+
+private def externFallbackExtName := `Vir.externFallbackExt
+
+private initialize externFallbackExt : LabelExtension ← do
+  if let some ext := (← labelExtensionMapRef.get)[externFallbackExtName]? then
+    return ext
+  let ext ← mkLabelExt externFallbackExtName
+  labelExtensionMapRef.modify fun extensions => extensions.insert externFallbackExtName ext
+  return ext
+
+/-- Record the clone produced by an explicit `vir_extern_fallback` command. -/
+def registerExternFallback (env : Environment) (clone : Name) : Environment :=
+  externFallbackExt.addEntry env clone
+
+/-- Return the registered compiled reference-body clone for an extern, if present. -/
+def externFallbackClone? (env : Environment) (original : Name) : Option Name := do
+  let clone := externFallbackCloneName original
+  guard <| (externFallbackExt.getState env).contains clone
+  let .fdecl .. ← Lean.IR.findEnvDecl env clone | none
+  return clone
+
+/-- Return whether a declaration is a registered extern reference-body clone. -/
+def isExternFallbackClone (env : Environment) (candidate : Name) : Bool :=
+  (externFallbackExt.getState env).contains candidate
 
 /-!
 # Attribute-time VIR entrypoint validation
@@ -92,11 +126,14 @@ private partial def collectVisibleClosure
     state
   else
     let state := { state with seen := state.seen.insert name }
-    match nativeExternSpec? name with
-    | some spec =>
-        spec.deps.foldl
-          (fun state dep => collectVisibleClosure env dep (path.push dep) state) state
-    | none =>
+    if let some clone := externFallbackClone? env name then
+      collectVisibleClosure env clone (path.push clone) state
+    else
+      match nativeExternSpec? name with
+      | some spec =>
+          spec.deps.foldl
+            (fun state dep => collectVisibleClosure env dep (path.push dep) state) state
+      | none =>
         match Lean.IR.findEnvDecl env name with
         | none =>
             if isNativeExternCandidate name then

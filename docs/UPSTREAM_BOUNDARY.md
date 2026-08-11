@@ -284,10 +284,11 @@ Proof-erased call shapes still require dynamic validation rather than inference
 from a shared raw symbol. Current `.irpkg` call expressions preserve irrelevant
 arguments, so the interpreter and Lean's ordinary three-argument boxed wrapper
 agree for `String.Internal.getUTF8Byte`; a mixed-width UTF-8 differential fixture
-checks all seven raw byte positions. Dynamic checks of `Char.ofNatAux` and
-`UInt8.ofNatLT` instead reach an indirect-call signature mismatch between the
-current interpreted call shape and Lean's ordinary generated boxed wrapper;
-they remain unsupported until those shapes are aligned. Other proof-bearing
+checks all seven raw byte positions. `UInt8.ofNatLT` needs a distinct
+`l_UInt8_ofNatLT` lookup stem because its raw `lean_uint8_of_nat` symbol is shared
+with the one-argument `UInt8.ofNat`; a dynamic fixture checks the two-argument
+proof-bearing call. `Char.ofNatAux` still reaches an indirect-call signature
+mismatch with its ordinary generated boxed wrapper. Other proof-bearing
 declarations such as `Int.divExact`, `Nat.divExact`,
 `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`,
 `String.next'`, `UInt16.ofNatLT`, and `USize.ofNat32` remain unsupported until
@@ -311,14 +312,16 @@ unless the policy entry supplies an override.
 
 The consolidation experiment covered the then-current 223 registered
 declarations. Every ABI was available from Lean's imported environment; 213
-native symbols also matched Lean's standard C-extern resolution. The ten
-deliberate overrides are
+native symbols also matched Lean's standard C-extern resolution. Its ten
+deliberate overrides were
 `Array.mkEmpty`, `Array.emptyWithCapacity`, `ByteArray.empty`,
 `ByteArray.extract`, `String.Pos.Raw.set`, `String.Pos.set`, `String.set`,
-`UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. They select existing
-VIR/runtime aliases or compiler-generated Lean bodies, so they are provider
-policy rather than copied ABI metadata. `npm run check:native-externs` resolves
-the full catalog, rejects missing declarations or symbols, rejects duplicate
+`UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. The current catalog adds
+`UInt8.ofNatLT` as an eleventh override so it does not collide with
+`UInt8.ofNat`'s shared raw symbol. These entries select existing VIR/runtime
+aliases or compiler-generated Lean bodies, so they are provider policy rather
+than copied ABI metadata. `npm run check:native-externs` resolves the full
+catalog, rejects missing declarations or symbols, rejects duplicate
 registrations, and flags overrides that have become redundant upstream.
 
 The wrapper generator exposes the same resolved metadata as a versioned JSON

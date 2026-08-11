@@ -32,6 +32,15 @@ function combinedOutput(result) {
 }
 
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
+
+async function assertExternFallbackRejected(fileName, lines, message, pattern) {
+  const source = join(freshDir, fileName);
+  await writeFile(source, lines.join("\n"));
+  const checked = checkLeanSource(source);
+  assert.notEqual(checked.status, 0, message);
+  assert.match(combinedOutput(checked), pattern);
+}
+
 try {
   ensureVirIrpkgBuilt();
 
@@ -181,6 +190,130 @@ try {
     assert.equal(entry.effect, effect);
   }
   assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedStartup"), false);
+
+  const externFallbackSource = join(freshDir, "ExternFallback.lean");
+  const externFallbackPackage = join(freshDir, "extern-fallback.irpkg");
+  const externFallbackReport = join(freshDir, "extern-fallback.report.md");
+  await writeRuntimeFixture(externFallbackSource, "ExternFallback.lean");
+  const generatedExternFallback = runVirIrpkg([
+    externFallbackPackage,
+    externFallbackReport,
+    "--target-marked",
+    externFallbackSource,
+  ]);
+  assert.equal(
+    generatedExternFallback.status,
+    0,
+    generatedExternFallback.stderr || generatedExternFallback.stdout,
+  );
+  const inspectedExternFallback = spawnSync(
+    "node",
+    ["scripts/inspect-irpkg.mjs", "--json", externFallbackPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    inspectedExternFallback.status,
+    0,
+    inspectedExternFallback.stderr || inspectedExternFallback.stdout,
+  );
+  const externFallbackManifest = JSON.parse(inspectedExternFallback.stdout).manifest;
+  for (const entry of [
+    "callExternIncrement",
+    "callExternBorrowedIdentity",
+    "callExternOwnedSize",
+  ]) {
+    manifestEntry(externFallbackManifest, entry);
+  }
+
+  await assertExternFallbackRejected(
+    "BodylessExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_bodyless\"]",
+      "opaque bodylessExtern (n : Nat) : Nat",
+      "",
+      "vir_extern_fallback bodylessExtern",
+      "",
+    ],
+    "a bodyless extern unexpectedly accepted a VIR reference-body fallback",
+    /extern `bodylessExtern` has no transparent Lean definition body/,
+  );
+  await assertExternFallbackRejected(
+    "OrdinaryExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "def ordinaryDefinition (n : Nat) : Nat := n + 1",
+      "",
+      "vir_extern_fallback ordinaryDefinition",
+      "",
+    ],
+    "a non-extern definition unexpectedly accepted a VIR reference-body fallback",
+    /`ordinaryDefinition` is not an `@\[extern\]` declaration/,
+  );
+  await assertExternFallbackRejected(
+    "DuplicateExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_duplicate\"]",
+      "def duplicateExtern (n : Nat) : Nat := n + 1",
+      "",
+      "vir_extern_fallback duplicateExtern",
+      "vir_extern_fallback duplicateExtern",
+      "",
+    ],
+    "a duplicate VIR reference-body fallback unexpectedly elaborated",
+    /extern `duplicateExtern` already has a VIR reference-body fallback/,
+  );
+  await assertExternFallbackRejected(
+    "RecursiveExternFallback.lean",
+    [
+      "import Vir",
+      "",
+      "@[extern \"vir_test_recursive\"]",
+      "unsafe def recursiveExtern (n : Nat) : Nat := recursiveExtern n",
+      "",
+      "vir_extern_fallback recursiveExtern",
+      "",
+    ],
+    "a directly recursive extern unexpectedly accepted a VIR reference-body fallback",
+    /extern `recursiveExtern` has a recursive reference body/,
+  );
+
+  const spoofedExternFallbackSource = join(freshDir, "SpoofedExternFallback.lean");
+  const spoofedExternFallbackPackage = join(freshDir, "spoofed-extern-fallback.irpkg");
+  const spoofedExternFallbackReport = join(freshDir, "spoofed-extern-fallback.report.md");
+  await writeFile(spoofedExternFallbackSource, [
+    "import Vir",
+    "",
+    "namespace _virExternFallback",
+    "def spoofedExtern (input : String) : String := input",
+    "end _virExternFallback",
+    "",
+    "@[extern \"vir_test_spoofed\"]",
+    "def spoofedExtern (n : Nat) : Nat := n + 1",
+    "",
+    "@[vir_export]",
+    "def callSpoofedExtern (n : Nat) : Nat := spoofedExtern n",
+    "",
+  ].join("\n"));
+  const generatedSpoofedExternFallback = runVirIrpkg([
+    spoofedExternFallbackPackage,
+    spoofedExternFallbackReport,
+    "--target-marked",
+    spoofedExternFallbackSource,
+  ]);
+  assert.equal(
+    generatedSpoofedExternFallback.status,
+    0,
+    generatedSpoofedExternFallback.stderr || generatedSpoofedExternFallback.stdout,
+  );
+  assert.match(
+    await readFile(spoofedExternFallbackReport, "utf8"),
+    /- `spoofedExtern` from/,
+  );
 
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");
   await writeFile(markedUnsupportedSignatureSource, [

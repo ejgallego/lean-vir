@@ -73,7 +73,7 @@ npm run check:native-wrappers
 ```
 
 `NativeExternSpec` stores VIR policy only. Lean supplies each declaration's
-parameter/borrow/result ABI and native symbol except for the ten intentional
+parameter/borrow/result ABI and native symbol except for the eleven intentional
 provider aliases. Keep those aliases in `symbolOverride?`; the metadata check
 rejects an override once it becomes redundant. The JavaScript registry and
 inventory checks consume `vir_native_wrappers --catalog`, not the Lean source

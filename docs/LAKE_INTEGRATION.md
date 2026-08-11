@@ -99,6 +99,37 @@ public def MyModule.value : Nat := 42
 The canvas example below currently uses the legacy-source path because the
 broader browser library has not yet migrated to the module system.
 
+## Opt Into A Lean Extern Reference Body
+
+An imported `@[extern] def` normally remains a native boundary. When its Lean
+definition is the intended portable implementation for a particular VIR
+package, name it explicitly before marking the package entrypoint:
+
+```lean
+import Upstream.AcceleratedModule
+import Vir
+
+vir_extern_fallback Upstream.acceleratedRead, Upstream.acceleratedWrite
+
+@[vir_export]
+def portableEntry (input : ByteArray) : ByteArray :=
+  Upstream.acceleratedWrite (Upstream.acceleratedRead input)
+```
+
+The command accepts only `@[extern] def`s with transparent kernel bodies. It
+rejects bodyless or opaque declarations, duplicate requests, non-externs, and
+directly recursive fallbacks. Lean's
+ordinary native compiler continues to use the extern; the command compiles a
+private reference-body clone only for VIR closure resolution. Package
+generation emits an adapter at the original name and preserves the extern's
+IR parameter ownership while calling the clone. Any dependencies newly exposed
+by the reference body must still have ordinary IR or a registered native
+provider.
+
+Use this only as an explicit package portability decision. It does not add the
+extern symbol to the shared runtime, enable general dynamic lookup, or affect
+other externs.
+
 ## Build The Module
 
 ```bash

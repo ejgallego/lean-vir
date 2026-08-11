@@ -9,6 +9,7 @@ module
 import Lean.Compiler.InitAttr
 import Lean.Elab.Frontend
 import Lean.LabelAttribute
+import Vir.ExportValidation
 public import Vir.GeneratePackage.Basic
 
 public section
@@ -56,6 +57,54 @@ def labelledDecls (env : Environment) (attrName : Name) : IO (Array Name) := do
   | none => return #[]
   | some ext => return ext.getState env
 
+private def originalExternDecl? (index : DeclIndex) (name : Name) : Option Decl :=
+  match index.localDecls.find? name |>.map (·.decl) with
+  | some decl =>
+      match decl with
+      | .extern .. => some decl
+      | _ => findImported
+  | none => findImported
+where
+  findImported := index.envs.findSome? fun (_, env) => do
+      let decl ← findEnvDecl env name
+      match decl with
+      | .extern .. => return decl
+      | _ => none
+
+private def fallbackAdapter?
+    (index : DeclIndex) (original : Name) (fallback : LoadedDecl) : Option LoadedDecl := do
+  let .extern _ originalParams originalResult _ ← originalExternDecl? index original | none
+  let .fdecl clone cloneParams cloneResult _ info := fallback.decl | none
+  if originalParams.size != cloneParams.size || originalResult != cloneResult then
+    none
+  else
+    let pairs := originalParams.zip cloneParams
+    if pairs.any fun pair => pair.1.ty != pair.2.ty then
+      none
+    else
+      let resultIdx := originalParams.foldl (fun next param => max next (param.x.idx + 1)) 0
+      let resultVar : VarId := { idx := resultIdx }
+      let args := originalParams.map fun param =>
+        if param.ty.isErased then .erased else .var param.x
+      let afterCall := pairs.foldr (init := .ret (.var resultVar)) fun pair body =>
+        let (originalParam, cloneParam) := pair
+        if !originalParam.borrow && cloneParam.borrow && originalParam.ty.isPossibleRef then
+          .dec originalParam.x 1 (!originalParam.ty.isDefiniteRef) false body
+        else
+          body
+      let body := pairs.foldr
+          (init := .vdecl resultVar originalResult (.fap clone args) afterCall) fun pair body =>
+        let (originalParam, cloneParam) := pair
+        if originalParam.borrow && !cloneParam.borrow && originalParam.ty.isPossibleRef then
+          .inc originalParam.x 1 (!originalParam.ty.isDefiniteRef) false body
+        else
+          body
+      return {
+        source := s!"Lean reference body for `{original}`"
+        module? := fallback.module?
+        decl := .fdecl original originalParams originalResult body info
+      }
+
 unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   initSearchPath (← getBuildDir)
   let mut index : DeclIndex := {}
@@ -66,7 +115,8 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     for decl in getDecls env do
       if !targetOwnsDecl target env decl.name then
         continue
-      names := names.push decl.name
+      if !Vir.ExportValidation.isExternFallbackClone env decl.name then
+        names := names.push decl.name
       let loaded := {
         source := target.source.toString
         module? := target.markedModule? <|> environmentModuleForDecl? env decl.name
@@ -101,7 +151,8 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
     envs := #[(source, env)]
   }
   for decl in getDecls env do
-    names := names.push decl.name
+    if !Vir.ExportValidation.isExternFallbackClone env decl.name then
+      names := names.push decl.name
     index := {
       index with
       localDecls := index.localDecls.insert decl.name {
@@ -113,9 +164,15 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
   return { index with sourceDecls := #[(source, names)] }
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
-  match index.localDecls.find? name with
-  | some decl => some decl
+  match index.envs.findSome? fun (_, env) => Vir.ExportValidation.externFallbackClone? env name with
+  | some clone =>
+    match index.localDecls.find? clone with
+    | some fallback => fallbackAdapter? index name fallback
+    | none => none
   | none =>
+    match index.localDecls.find? name with
+    | some decl => some decl
+    | none =>
       index.envs.findSome? fun (source, env) => do
         let decl <- findEnvDecl env name
         match decl with

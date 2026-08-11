@@ -13,6 +13,7 @@ import {
   join,
   readFile,
   runVirIrpkg,
+  writeRuntimeFixture,
 } from "./shared.mjs";
 
 const hostInteropSource = new URL("../../examples/HostInterop.lean", import.meta.url).pathname;
@@ -99,4 +100,30 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
     `package replacement should keep active Wasm memory bounded; pages: ${replacementPages.join(", ")}`,
   );
   initializerRuntime.dispose();
+
+  const fallbackSource = join(freshDir, "ExternFallback.lean");
+  const fallbackPackage = join(freshDir, "extern-fallback-runtime.irpkg");
+  const fallbackReport = join(freshDir, "extern-fallback-runtime.report.md");
+  await writeRuntimeFixture(fallbackSource, "ExternFallback.lean");
+  const generatedFallback = runVirIrpkg([
+    fallbackPackage,
+    fallbackReport,
+    "--target-marked",
+    fallbackSource,
+  ]);
+  assert.equal(
+    generatedFallback.status,
+    0,
+    generatedFallback.stderr || generatedFallback.stdout,
+  );
+  const fallbackRuntime = await createVirRuntimeFactory({ wasmBytes })
+    .createRuntime({ irPackageSetBytes: [await readFile(fallbackPackage)] });
+  assert.equal(fallbackRuntime.call("callExternIncrement", 41), "42");
+  const fallbackBytes = new Uint8Array([0, 1, 2, 255]);
+  assert.deepEqual(
+    fallbackRuntime.call("callExternBorrowedIdentity", fallbackBytes),
+    fallbackBytes,
+  );
+  assert.equal(fallbackRuntime.call("callExternOwnedSize", fallbackBytes), "4");
+  fallbackRuntime.dispose();
 }

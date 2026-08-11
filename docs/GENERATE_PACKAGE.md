@@ -66,9 +66,13 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   checks and postponed-compilation handling live with the attributes in
   `Vir.Attributes`; binder and startup policy lives in
   `Vir.InterfaceValidation`.
+- `Vir.ExternFallback`: the explicit `vir_extern_fallback` command, transparent
+  extern-body cloning, and direct-recursion rejection used by portable package
+  sources.
 - `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
-  marker collection, declaration-to-module ownership, on-demand `import all`
-  environments, module filtering, and declaration-name collision diagnostics.
+  marker collection, extern-fallback ownership adapters,
+  declaration-to-module ownership, on-demand `import all` environments, module
+  filtering, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: descriptor tags and descriptor JSON
@@ -121,7 +125,10 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
    generated boxed entrypoints, then walks the IR references needed by the
    package. Module-set generation repeats this walk while newly missing
    declarations identify unloaded owning modules, stopping when the closure is
-   complete or no additional module IR is available.
+   complete or no additional module IR is available. When a source explicitly
+   selected an extern reference-body fallback, frontend lookup supplies an
+   adapter at the original extern name and the closure follows its internal
+   compiled body.
 5. `Interface.collectHostImports` repeats the typed `Vir.HostValidation`
    analysis used when `@[vir_js "..."]` is applied, then performs package-only
    IR arity and slot checks for host imports reached by the closure.
