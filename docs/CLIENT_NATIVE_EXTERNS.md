@@ -11,9 +11,9 @@ def MyProject.increment (value : UInt32) : UInt32 := value + 1
 vir_extern_fallback MyProject.increment
 ```
 
-Without a client-native profile, package generation uses that Lean body. With a
-profile, the same declaration is packaged as a native extern and the runtime
-contains a compiler-generated boxed adapter plus the client provider.
+Without the manifest, package generation uses that Lean body. With the manifest,
+the same declaration is packaged as a native extern and the runtime contains a
+compiler-generated boxed adapter plus the client provider.
 
 The provider implements the raw C ABI named by `@[extern]`; VIR generates only
 the boxed adapter used by the interpreter. For this scalar example, the provider
@@ -85,7 +85,9 @@ mutually exclusive with the experimental `VIR_NATIVE_EXTERN_EXTRAS_FILE`.
 
 The generated boundary report records the manifest and provider sources.
 `build/upstream-probe/generated/native-provider-symbols.tsv` records the raw
-symbols derived from Lean metadata.
+symbols derived from Lean metadata. The generated provider source and symbol
+plans are empty after a generic build, so they never describe a previously
+selected client profile.
 
 ## Validation and boundary
 

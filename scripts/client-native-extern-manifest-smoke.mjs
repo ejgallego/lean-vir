@@ -61,6 +61,7 @@ run("lake", ["-d", fixtureRoot, "build"]);
 
 const tempRoot = await mkdtemp(join(tmpdir(), "vir-client-native-extern-"));
 try {
+  const baseManifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const wrapperPath = join(tempRoot, "wrappers.cpp");
   const registryPath = join(tempRoot, "registry.inc");
   const sourcesPath = join(tempRoot, "sources.txt");
@@ -118,13 +119,6 @@ try {
     /Lean reference body for `ClientNativeFixture\.increment`/,
   );
 
-  const baseManifest = {
-    format: "lean-vir-client-native-externs",
-    version: 1,
-    modules: ["ClientNativeFixture"],
-    externs: ["ClientNativeFixture.increment"],
-    providerSources: ["client_native_fixture.c"],
-  };
   await copyFile(
     join(fixtureRoot, "client_native_fixture.c"),
     join(tempRoot, "client_native_fixture.c"),
@@ -194,6 +188,12 @@ try {
     "missing-provider",
     { ...baseManifest, providerSources: ["missing.c"] },
     /provider source `missing\.c` does not exist/,
+  );
+  await expectManifestFailure(
+    tempRoot,
+    "unsupported-provider-extension",
+    { ...baseManifest, providerSources: ["client_native_fixture.h"] },
+    /must be a C or C\+\+ source file/,
   );
 } finally {
   await rm(tempRoot, { recursive: true, force: true });

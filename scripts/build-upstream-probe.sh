@@ -149,6 +149,8 @@ fi
 client_native_provider_sources=()
 client_native_provider_names=()
 client_native_provider_symbols=()
+: > "$generated_native_provider_sources"
+: > "$generated_native_provider_symbols"
 if [ -n "$client_native_extern_manifest" ]; then
   if [ ! -f "$client_native_extern_manifest" ]; then
     echo "error: client-native extern manifest not found: $client_native_extern_manifest" >&2
