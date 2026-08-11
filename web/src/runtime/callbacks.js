@@ -18,7 +18,15 @@ export class VirCallback {
     if (state.released || state.root.released) {
       throw new Error("Vir callback has been released");
     }
-    return state.root.runtime.callClosure(state.root.rootId, state.root.type, args);
+    return state.root.runtime.callObservedClosure(state.root.rootId, state.root.type, args);
+  }
+
+  callTimed(...args) {
+    const state = requireVirCallbackState(this);
+    if (state.released || state.root.released) {
+      throw new Error("Vir callback has been released");
+    }
+    return state.root.runtime.callClosureTimed(state.root.rootId, state.root.type, args);
   }
 
   retain() {

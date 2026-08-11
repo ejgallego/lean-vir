@@ -54,6 +54,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.disposed = false;
     this.disposing = false;
     this.liveCallbacks = new Set();
+    this.callbackTimingObserver = null;
     this.createReplacementRuntime = createReplacementRuntime;
     this.hostState?.attachRuntime(this);
 
@@ -451,7 +452,31 @@ export class VirRuntime extends ObjectValueRuntime {
     this.liveCallbacks.delete(callback);
   }
 
-  callClosure(rootId, type, args) {
+  setCallbackTimingObserver(observer) {
+    this.requireLiveRuntime();
+    if (observer !== null && typeof observer !== "function") {
+      throw new TypeError("callback timing observer must be a function or null");
+    }
+    this.callbackTimingObserver = observer;
+  }
+
+  callObservedClosure(rootId, type, args) {
+    const observer = this.callbackTimingObserver;
+    if (observer === null) {
+      return this.callClosure(rootId, type, args);
+    }
+    const result = this.callClosureTimed(rootId, type, args);
+    observer(result.timings);
+    return result.value;
+  }
+
+  callClosureTimed(rootId, type, args) {
+    const timing = new RuntimeCallTiming();
+    const value = this.callClosure(rootId, type, args, timing);
+    return { value, timings: timing.finish() };
+  }
+
+  callClosure(rootId, type, args, timing = null) {
     this.requireLiveRuntime();
     this.requireFunction("vir_closure_call_objects");
     const fnArgs = requireFunctionArgs(type, "callback");
@@ -460,30 +485,53 @@ export class VirRuntime extends ObjectValueRuntime {
     }
     const argObjs = [];
     try {
-      fnArgs.forEach((arg, index) => {
-        argObjs.push(this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`));
-      });
-      return this.callClosureObjects(rootId, type, argObjs);
+      const marshalStarted = timing?.beginPhase();
+      try {
+        fnArgs.forEach((arg, index) => {
+          argObjs.push(this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`));
+        });
+      } finally {
+        if (timing !== null) timing.endMarshal(marshalStarted);
+      }
+      return this.callClosureObjects(rootId, type, argObjs, timing);
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
   }
 
-  callClosureObjects(rootId, type, argObjs) {
+  callClosureObjects(rootId, type, argObjs, timing = null) {
     let argvPtr = 0;
     let resultObj = 0;
+    let decodeStarted;
     try {
       this.hostState?.clearCallError();
       if (argObjs.length !== 0) {
-        argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
-        this.writePointerArray(argvPtr, argObjs);
+        const marshalStarted = timing?.beginPhase();
+        try {
+          argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
+          this.writePointerArray(argvPtr, argObjs);
+        } finally {
+          if (timing !== null) timing.endMarshal(marshalStarted);
+        }
       }
-      try {
+
+      if (timing === null) {
         resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
-      } catch (error) {
-        const hostError = this.hostState?.takeCallError();
-        throw hostError ?? error;
+      } else {
+        this.hostState?.beginCallTiming(timing);
+        const executeStarted = timing.beginPhase();
+        try {
+          resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+        } finally {
+          try {
+            timing.endExecute(executeStarted);
+          } finally {
+            this.hostState?.endCallTiming(timing);
+          }
+        }
       }
+
+      decodeStarted = timing?.beginPhase();
       argObjs.length = 0;
       const hostError = this.hostState?.takeCallError();
       if (hostError) {
@@ -493,12 +541,21 @@ export class VirRuntime extends ObjectValueRuntime {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
       return this.liftOwnedObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
+    } catch (error) {
+      if (decodeStarted === undefined) {
+        const hostError = this.hostState?.takeCallError();
+        throw hostError ?? error;
+      }
+      throw error;
     } finally {
       if (argvPtr !== 0) {
         this.freeBytes(argvPtr);
       }
       if (resultObj !== 0) {
         this.exports.vir_obj_dec(resultObj);
+      }
+      if (timing !== null && decodeStarted !== undefined) {
+        timing.endDecode(decodeStarted);
       }
     }
   }
@@ -544,6 +601,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.disposed = true;
     this.disposing = false;
     this.hostState = null;
+    this.callbackTimingObserver = null;
     this.exportsByName = Object.create(null);
   }
 }
