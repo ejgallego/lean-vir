@@ -115,7 +115,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     for decl in getDecls env do
       if !targetOwnsDecl target env decl.name then
         continue
-      if !Vir.ExportValidation.isExternFallbackCloneName decl.name then
+      if !Vir.ExportValidation.isExternFallbackClone env decl.name then
         names := names.push decl.name
       let loaded := {
         source := target.source.toString
@@ -151,7 +151,7 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
     envs := #[(source, env)]
   }
   for decl in getDecls env do
-    if !Vir.ExportValidation.isExternFallbackCloneName decl.name then
+    if !Vir.ExportValidation.isExternFallbackClone env decl.name then
       names := names.push decl.name
     index := {
       index with
@@ -164,9 +164,11 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
   return { index with sourceDecls := #[(source, names)] }
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
-  let clone := Vir.ExportValidation.externFallbackCloneName name
-  match index.localDecls.find? clone with
-  | some fallback => fallbackAdapter? index name fallback
+  match index.envs.findSome? fun (_, env) => Vir.ExportValidation.externFallbackClone? env name with
+  | some clone =>
+    match index.localDecls.find? clone with
+    | some fallback => fallbackAdapter? index name fallback
+    | none => none
   | none =>
     match index.localDecls.find? name with
     | some decl => some decl

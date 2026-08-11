@@ -8,6 +8,7 @@ module
 
 public import Vir.IRDependencies
 import Lean.Compiler.InitAttr
+import Lean.LabelAttribute
 import Vir.GeneratePackage.NativeExterns
 
 public section
@@ -24,22 +25,33 @@ private def underExternFallbackPrefix : Name → Name
   | .str pre part => .str (underExternFallbackPrefix pre) part
   | .num pre part => .num (underExternFallbackPrefix pre) part
 
-/-- Deterministic private declaration name used for an extern reference-body clone. -/
+/-- Deterministic internal declaration name used for an extern reference-body clone. -/
 def externFallbackCloneName (original : Name) : Name :=
   underExternFallbackPrefix original
 
-/-- Return whether a declaration name belongs to the private extern-fallback namespace. -/
-def isExternFallbackCloneName : Name → Bool
-  | `_virExternFallback => true
-  | .str pre _ => isExternFallbackCloneName pre
-  | .num pre _ => isExternFallbackCloneName pre
-  | .anonymous => false
+private def externFallbackExtName := `Vir.externFallbackExt
 
-/-- Return the deterministic compiled reference-body clone for an extern, if present. -/
+private initialize externFallbackExt : LabelExtension ← do
+  if let some ext := (← labelExtensionMapRef.get)[externFallbackExtName]? then
+    return ext
+  let ext ← mkLabelExt externFallbackExtName
+  labelExtensionMapRef.modify fun extensions => extensions.insert externFallbackExtName ext
+  return ext
+
+/-- Record the clone produced by an explicit `vir_extern_fallback` command. -/
+def registerExternFallback (env : Environment) (clone : Name) : Environment :=
+  externFallbackExt.addEntry env clone
+
+/-- Return the registered compiled reference-body clone for an extern, if present. -/
 def externFallbackClone? (env : Environment) (original : Name) : Option Name := do
   let clone := externFallbackCloneName original
+  guard <| (externFallbackExt.getState env).contains clone
   let .fdecl .. ← Lean.IR.findEnvDecl env clone | none
   return clone
+
+/-- Return whether a declaration is a registered extern reference-body clone. -/
+def isExternFallbackClone (env : Environment) (candidate : Name) : Bool :=
+  (externFallbackExt.getState env).contains candidate
 
 /-!
 # Attribute-time VIR entrypoint validation

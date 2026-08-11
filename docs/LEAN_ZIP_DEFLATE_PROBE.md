@@ -1,4 +1,4 @@
-# lean-zip raw-DEFLATE feasibility probe
+# lean-zip raw-DEFLATE integration and acceptance probe
 
 Date: 2026-08-11
 
@@ -44,7 +44,7 @@ the entropy threshold.
 - Initial feasibility source: the same branch at
   `9bc0e7d28691223e669474ffdf4ed1041d2522b5`. The production compression core
   measured below is unchanged in the final consumer commit.
-- Vir source: `feat/lean-zip-deflate-probe` at base
+- Initial Vir base: `feat/lean-zip-deflate-probe` at
   `607ef30cf7e93a8adf732d0907009f1aa6865489`, pinned to
   `leanprover/lean4:v4.33.0-rc2`.
 - Producer and runtime revision used for all reported IR:
@@ -234,6 +234,12 @@ The maintained command is:
 ```bash
 npm run accept:lean-zip -- /path/to/lean-zip
 ```
+
+This external compatibility matrix is not part of ordinary VIR CI because it
+requires the separately pinned lean-zip checkout. CI covers the generic
+fallback generation/runtime cases and the dedicated native `UInt8.ofNatLT`
+fixture; maintainers run this command when changing the lean-zip boundary or
+its acceptance corpus.
 
 It builds a native oracle through a temporary Lake overlay without editing the
 lean-zip checkout, generates one direct VIR package from the checked-in export

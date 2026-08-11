@@ -282,6 +282,39 @@ try {
     /extern `recursiveExtern` has a recursive reference body/,
   );
 
+  const spoofedExternFallbackSource = join(freshDir, "SpoofedExternFallback.lean");
+  const spoofedExternFallbackPackage = join(freshDir, "spoofed-extern-fallback.irpkg");
+  const spoofedExternFallbackReport = join(freshDir, "spoofed-extern-fallback.report.md");
+  await writeFile(spoofedExternFallbackSource, [
+    "import Vir",
+    "",
+    "namespace _virExternFallback",
+    "def spoofedExtern (input : String) : String := input",
+    "end _virExternFallback",
+    "",
+    "@[extern \"vir_test_spoofed\"]",
+    "def spoofedExtern (n : Nat) : Nat := n + 1",
+    "",
+    "@[vir_export]",
+    "def callSpoofedExtern (n : Nat) : Nat := spoofedExtern n",
+    "",
+  ].join("\n"));
+  const generatedSpoofedExternFallback = runVirIrpkg([
+    spoofedExternFallbackPackage,
+    spoofedExternFallbackReport,
+    "--target-marked",
+    spoofedExternFallbackSource,
+  ]);
+  assert.equal(
+    generatedSpoofedExternFallback.status,
+    0,
+    generatedSpoofedExternFallback.stderr || generatedSpoofedExternFallback.stdout,
+  );
+  assert.match(
+    await readFile(spoofedExternFallbackReport, "utf8"),
+    /- `spoofedExtern` from/,
+  );
+
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");
   await writeFile(markedUnsupportedSignatureSource, [
     "import Vir",

@@ -46,6 +46,7 @@ private meta def compileExternFallback (ref : Syntax) (name : Name) : CoreM Name
     name := clone
     all := [clone]
   }
+  modifyEnv fun env => ExportValidation.registerExternFallback env clone
   return clone
 
 /--

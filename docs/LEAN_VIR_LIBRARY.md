@@ -40,6 +40,15 @@ Package generation repeats the checks for raw marker metadata and remains
 authoritative for generated boxed boundaries, package-wide conflicts, and
 unresolved package dependencies.
 
+`Vir.ExternFallback` provides the `vir_extern_fallback` command for an explicit
+package-portability decision. It accepts transparent `@[extern] def`s, compiles
+internal copies of their Lean reference bodies, and lets VIR package closure
+resolution use those copies without changing ordinary native compilation.
+Fallback bodies receive the same closure validation as other packaged Lean IR;
+the command does not register native symbols or enable dynamic lookup. See
+[LAKE_INTEGRATION.md](LAKE_INTEGRATION.md#opt-into-a-lean-extern-reference-body)
+for the downstream syntax, restrictions, and ownership behavior.
+
 After loading the generated package, JavaScript calls ordinary exports with
 `vir.call(...)` and invokes startup hooks with `vir.runStartupEntries()`.
 See [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for the complete downstream Lake
