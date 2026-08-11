@@ -255,6 +255,23 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     /maximum JSON depth 256/,
   );
 
+  const livePayload = { wanted: { title: "before" } };
+  const liveInput = jsonRuntime.borrowJson(livePayload);
+  assert.deepEqual(
+    jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", liveInput),
+    { title: "before" },
+  );
+  livePayload.wanted = { title: "after" };
+  assert.deepEqual(
+    jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", liveInput),
+    { title: "after" },
+  );
+  assert.deepEqual(
+    jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedToOwned", liveInput),
+    livePayload,
+  );
+  releaseHostResource(liveInput);
+
   const borrowedInput = jsonRuntime.borrowJson({
     skipped: { large: [1, 2, 3] },
     wanted: { ref: { opaque: ["same", 17] }, title: "picked" },
