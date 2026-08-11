@@ -739,6 +739,11 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
+    name := `UInt8.ofNatLT,
+    symbolOverride? := some "l_UInt8_ofNatLT",
+    generateBoxedWrapper := true
+  },
+  {
     name := `UInt8.toUInt32,
     generateBoxedWrapper := true
   },

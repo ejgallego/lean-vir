@@ -19,9 +19,10 @@ project accelerators; the native compiler remains unchanged.
 
 The fallback expansion exposed one additional core dependency,
 `ByteArray.set`, which now uses its canonical runtime provider. The full wrapper
-also opts into the Lean body of `UInt8.ofNatLT`; its proof-erased call shape is
-not compatible with Lean's ordinary native wrapper. `Float.log2` uses an audited
-WASI-libm provider. The strict Wasm link has zero unresolved symbols.
+uses a dedicated native registration for `UInt8.ofNatLT`; its shared raw symbol
+with `UInt8.ofNat` requires a distinct compiler-generated lookup stem.
+`Float.log2` uses an audited WASI-libm provider. The strict Wasm link has zero
+unresolved symbols.
 
 The checked-in acceptance harness compares 89 native/VIR compression vectors
 over three passes in one interpreter. It covers levels 0 through 10 over empty,
@@ -144,15 +145,18 @@ The full root reaches all six level-1 fallbacks and additionally:
 ```text
 UInt32.log2Clz       -- explicit Lean reference-body fallback
 Float.log2           -- audited standard WASI-libm provider
-UInt8.ofNatLT        -- explicit Lean reference-body fallback
+UInt8.ofNatLT        -- standard generated wrapper with a distinct lookup stem
 ```
 
-`UInt8.ofNatLT` initially appeared suitable for the generic native catalog, but
-the levels matrix reached an indirect-call signature mismatch at level 7. Its
-proof argument remains present in the interpreted call shape while Lean's
-ordinary boxed wrapper uses a different erased ABI. Removing that registration
-and selecting its transparent Lean body fixes the path without weakening native
-lookup. No further ByteArray operation or initializer is missing.
+`UInt8.ofNatLT` and `UInt8.ofNat` both declare the raw C symbol
+`lean_uint8_of_nat`, but their compiler-generated boxed adapters have different
+arities. The initial registration used the shared raw symbol as the lookup stem,
+so lookup selected the one-argument `UInt8.ofNat` adapter for the two-argument
+proof-bearing call. VIR now registers `UInt8.ofNatLT` under its distinct
+compiler-generated `l_UInt8_ofNatLT` stem, matching the existing UInt32, UInt64,
+and USize policy. The dedicated dynamic fixture and this acceptance matrix both
+exercise the corrected path. No further ByteArray operation or initializer is
+missing.
 
 ## Project-local extern strategy
 
@@ -173,6 +177,27 @@ clone remains in the closure but is excluded from `--target-all` roots.
 Unlisted externs still follow the static declared-symbol allowlist. No dynamic
 lookup or lean-zip-specific runtime registry was added. Package reports identify
 each adapter as a `Lean reference body for <name>`.
+
+The native follow-up for the seven lean-zip accelerators should preserve those
+properties while avoiding a VIR source edit per client. One client-native
+manifest should name the Lean modules that declare the externs, the extern names
+to select, and the C/C++ provider sources. Package generation should use that
+same selection to prefer the original extern declaration over an available
+`vir_extern_fallback`; wrapper generation should import the named modules and
+derive parameter, borrow, result, and symbol metadata from their IR; and the
+WASI build should compile the provider sources and strict-link them with the
+generated adapters. This lets a project keep one portable fallback annotation
+and opt into native execution as a build profile, without handwritten boxed
+wrappers or source changes.
+
+The manifest path must remain a closed extension to native lookup. It should
+reject unknown or duplicate declarations, collisions with the built-in catalog,
+shared lookup stems with incompatible boxed arities, and missing raw provider
+symbols. It must not expose general `dlsym`. The current
+`VIR_NATIVE_EXTERN_EXTRAS_FILE` experiment covers only wrapper selection for
+declarations already imported by VIR and therefore is not yet this client
+contract; the module import, package-selection, and provider-source pieces need
+to land together before the seven accelerators move off fallback.
 
 ## `Float.log2` fidelity
 

@@ -151,6 +151,14 @@ def uint8OperationsScore : Nat :=
   (if (17 : UInt8) = 17 then 30 else 0) +
   (if (21 : UInt8) < 17 then 100 else 5)
 
+@[noinline]
+private def uint8OfNatLTToNat (n : Nat) (h : n < UInt8.size) : Nat :=
+  (UInt8.ofNatLT n h).toNat
+
+/-- Exercises the proof-bearing `UInt8.ofNatLT` native call shape. -/
+def uint8OfNatLTScore : Nat :=
+  uint8OfNatLTToNat 197 (by decide)
+
 def uint16OperationsScore : Nat :=
   let a : UInt16 := 65000
   let b : UInt16 := 1234

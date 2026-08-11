@@ -11,7 +11,7 @@ namespace VirLeanZipAcceptance
 
 vir_extern_fallback ByteArray.pushUInt64LE, ByteArray.ugetUInt32LE,
   ByteArray.ugetUInt64LE, UInt64.ctzFast, ByteArray.usetUInt64LE,
-  ByteArray.usetUInt32LE, UInt32.log2Clz, UInt8.ofNatLT
+  ByteArray.usetUInt32LE, UInt32.log2Clz
 
 @[vir_export]
 def compressRaw (input : ByteArray) (level : UInt8) : ByteArray :=
