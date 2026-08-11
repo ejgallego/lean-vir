@@ -106,6 +106,10 @@ map lives in `docs/HARNESS.md`.
   Resolve every native extern specification from Lean's imported IR and extern
   metadata, reject duplicates and stale symbol overrides, and report the split
   between Lean-derived symbols and VIR provider overrides.
+- `npm run check:client-native-externs`
+  Build the small client project fixture, generate its native wrapper/provider
+  plan, verify native-over-fallback package selection, and reject malformed,
+  duplicate, colliding, and unknown manifest entries.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.

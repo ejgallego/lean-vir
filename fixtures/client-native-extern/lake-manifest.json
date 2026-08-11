@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "lean_vir",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../..",
+   "configFile": "lakefile.lean"}],
+ "name": "client_native_fixture",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

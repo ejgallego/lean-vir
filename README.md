@@ -258,6 +258,8 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   call-flow diagrams, and object ownership.
 - [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
   workflow.
+- [docs/CLIENT_NATIVE_EXTERNS.md](docs/CLIENT_NATIVE_EXTERNS.md) for selecting
+  project-owned native externs and compiling their C/C++ providers into Wasm.
 - [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for marked exports,
   Lake facets, SDK installation, and Lean-authored Slides code.
 - [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported

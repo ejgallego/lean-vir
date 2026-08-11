@@ -178,26 +178,23 @@ Unlisted externs still follow the static declared-symbol allowlist. No dynamic
 lookup or lean-zip-specific runtime registry was added. Package reports identify
 each adapter as a `Lean reference body for <name>`.
 
-The native follow-up for the seven lean-zip accelerators should preserve those
-properties while avoiding a VIR source edit per client. One client-native
-manifest should name the Lean modules that declare the externs, the extern names
-to select, and the C/C++ provider sources. Package generation should use that
-same selection to prefer the original extern declaration over an available
-`vir_extern_fallback`; wrapper generation should import the named modules and
-derive parameter, borrow, result, and symbol metadata from their IR; and the
-WASI build should compile the provider sources and strict-link them with the
-generated adapters. This lets a project keep one portable fallback annotation
-and opt into native execution as a build profile, without handwritten boxed
-wrappers or source changes.
+The first client-native manifest slice established that boundary with
+`ByteArray.ugetUInt32LE`; the same manifest was then expanded to all seven
+accelerators. Package generation selected every original extern over its
+available `vir_extern_fallback`, the wrapper generator imported
+`Zip.Native.Wide`, and the WASI build compiled `c/bytearray_wide_ffi.c`, audited
+all seven `lean_zip_*` symbols, and strict-linked with zero unresolved symbols.
+The three-pass acceptance retained byte-identical results for all 279
+compression calls and 9 prescan decisions; Wasm memory stabilized at 332 pages
+on every pass.
 
-The manifest path must remain a closed extension to native lookup. It should
-reject unknown or duplicate declarations, collisions with the built-in catalog,
-shared lookup stems with incompatible boxed arities, and missing raw provider
-symbols. It must not expose general `dlsym`. The current
-`VIR_NATIVE_EXTERN_EXTRAS_FILE` experiment covers only wrapper selection for
-declarations already imported by VIR and therefore is not yet this client
-contract; the module import, package-selection, and provider-source pieces need
-to land together before the seven accelerators move off fallback.
+The reusable contract is documented in `docs/CLIENT_NATIVE_EXTERNS.md`. It
+rejects unknown or duplicate declarations, built-in collisions, incompatible
+shared lookup stems, and missing raw provider symbols without exposing general
+`dlsym`. `VIR_NATIVE_EXTERN_EXTRAS_FILE` remains only an isolated wrapper-size
+experiment. The lean-zip client can now keep its seven portable fallback
+annotations and select all their native providers through
+`VIR_NATIVE_EXTERN_MANIFEST` without a VIR catalog edit.
 
 ## `Float.log2` fidelity
 

@@ -47,6 +47,7 @@ structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
   envs : Array (String × Environment) := #[]
   sourceDecls : Array (String × Array Name) := #[]
+  clientNativeExternSpecs : Array NativeExternSpec := #[]
   virExports : NameSet := {}
   virStartups : NameSet := {}
   loadedModules : NameSet := {}
