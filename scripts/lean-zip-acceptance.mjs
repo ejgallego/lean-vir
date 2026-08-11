@@ -144,19 +144,17 @@ async function writeOracleLakefile() {
 async function generateNativeOracle() {
   await mkdir(oracleOutput);
   await writeOracleLakefile();
-  runSync(
-    "lake",
-    [
-      "-d",
-      leanZipRoot,
-      "-f",
-      overlayLakefile,
-      "exe",
-      "virLeanZipAcceptanceOracle",
-      oracleOutput,
-    ],
-    { cwd: repoRoot },
-  );
+  const oracleArgs = [
+    "-d",
+    leanZipRoot,
+    "-f",
+    overlayLakefile,
+    "exe",
+    "virLeanZipAcceptanceOracle",
+    oracleOutput,
+  ];
+  if (values.profile) oracleArgs.push("--profile");
+  runSync("lake", oracleArgs, { cwd: repoRoot });
 }
 
 function externalLeanEnv() {
@@ -190,6 +188,9 @@ function parseManifest(source) {
   const compression = [];
   const largeCompression = [];
   const prescan = [];
+  const profileMatches = [];
+  const profileBases = [];
+  const profileOptimals = [];
   for (const line of source.trim().split("\n")) {
     const fields = line.split("\t");
     if (
@@ -214,13 +215,42 @@ function parseManifest(source) {
         inputFile: fields[2],
         decision: fields[3] === "true",
       });
+    } else if (fields[0] === "profile-match" && fields.length === 5) {
+      profileMatches.push({
+        corpus: fields[1],
+        level: Number(fields[2]),
+        inputFile: fields[3],
+        tokensFile: fields[4],
+      });
+    } else if (fields[0] === "profile-base" && fields.length === 6) {
+      profileBases.push({
+        corpus: fields[1],
+        level: Number(fields[2]),
+        inputFile: fields[3],
+        tokensFile: fields[4],
+        outputBytes: Number(fields[5]),
+      });
+    } else if (fields[0] === "profile-optimal" && fields.length === 5) {
+      profileOptimals.push({
+        corpus: fields[1],
+        kind: fields[2],
+        inputFile: fields[3],
+        outputFile: fields[4],
+      });
     } else {
       throw new Error(
         `invalid native oracle manifest row: ${JSON.stringify(line)}`,
       );
     }
   }
-  return { compression, largeCompression, prescan };
+  return {
+    compression,
+    largeCompression,
+    prescan,
+    profileMatches,
+    profileBases,
+    profileOptimals,
+  };
 }
 
 async function runAcceptance() {
@@ -262,6 +292,7 @@ async function runAcceptance() {
   let compressedOutputBytes = 0;
   let compressionCalls = 0;
   const profileResults = [];
+  const stageProfileResults = [];
   const started = performance.now();
   try {
     const runCompressionVector = async (
@@ -357,6 +388,145 @@ async function runAcceptance() {
       }
     }
 
+    if (values.profile) {
+      assert.equal(
+        manifest.profileMatches.length,
+        2,
+        "expected level-9 and level-10 matcher profile rows",
+      );
+      assert.equal(
+        manifest.profileBases.length,
+        2,
+        "expected level-9 and level-10 base-preparation profile rows",
+      );
+      assert.equal(
+        manifest.profileOptimals.length,
+        2,
+        "expected fast and exact optimal profile rows",
+      );
+
+      const profileTokens = new Map();
+      for (const vector of manifest.profileMatches) {
+        const source = await input(vector.inputFile);
+        const native = await nativeOutput(vector.tokensFile);
+        const { value: vir, timings } = runtime.callTimed(
+          "VirLeanZipAcceptance.profileMatchTokens",
+          source,
+          vector.level,
+        );
+        assert.ok(
+          vir instanceof Uint8Array,
+          `${vector.corpus} level ${vector.level}: expected packed matcher ByteArray`,
+        );
+        assert.deepEqual(
+          vir,
+          native,
+          `${vector.corpus} level ${vector.level}: native/VIR packed tokens differ`,
+        );
+        profileTokens.set(vector.tokensFile, vir);
+        stageProfileResults.push({
+          stage: "matcher",
+          corpus: vector.corpus,
+          level: vector.level,
+          inputBytes: source.byteLength,
+          outputBytes: vir.byteLength,
+          timings,
+        });
+      }
+
+      for (const vector of manifest.profileBases) {
+        const source = await input(vector.inputFile);
+        const tokens = profileTokens.get(vector.tokensFile);
+        assert.ok(
+          tokens instanceof Uint8Array,
+          `${vector.corpus} level ${vector.level}: profiled matcher tokens are missing`,
+        );
+        const { value: vir, timings } = runtime.callTimed(
+          "VirLeanZipAcceptance.profileBasePrepSize",
+          source,
+          tokens,
+        );
+        const virOutputBytes = Number(vir);
+        assert.ok(
+          Number.isSafeInteger(virOutputBytes) && virOutputBytes >= 0,
+          `${vector.corpus} level ${vector.level}: invalid VIR base-preparation size`,
+        );
+        assert.equal(
+          virOutputBytes,
+          vector.outputBytes,
+          `${vector.corpus} level ${vector.level}: native/VIR base-preparation size differs`,
+        );
+        stageProfileResults.push({
+          stage: "base-prep",
+          corpus: vector.corpus,
+          level: vector.level,
+          inputBytes: source.byteLength,
+          outputBytes: virOutputBytes,
+          timings,
+        });
+      }
+
+      const optimalTargets = new Map([
+        [
+          "fast",
+          {
+            exportName: "VirLeanZipAcceptance.profileOptimalFast",
+            level: 9,
+          },
+        ],
+        [
+          "exact",
+          {
+            exportName: "VirLeanZipAcceptance.profileOptimalExact",
+            level: 10,
+          },
+        ],
+      ]);
+      for (const vector of manifest.profileOptimals) {
+        const target = optimalTargets.get(vector.kind);
+        assert.ok(
+          target !== undefined,
+          `${vector.corpus}: unknown optimal profile kind ${vector.kind}`,
+        );
+        const source = await input(vector.inputFile);
+        const native = await nativeOutput(vector.outputFile);
+        const { value: vir, timings } = runtime.callTimed(
+          target.exportName,
+          source,
+        );
+        assert.ok(
+          vir instanceof Uint8Array,
+          `${vector.corpus} ${vector.kind}: expected optimal ByteArray`,
+        );
+        assert.deepEqual(
+          vir,
+          native,
+          `${vector.corpus} ${vector.kind}: native/VIR optimal bytes differ`,
+        );
+        assert.deepEqual(
+          new Uint8Array(inflateRawSync(vir)),
+          source,
+          `${vector.corpus} ${vector.kind}: optimal raw inflate differs from input`,
+        );
+        stageProfileResults.push({
+          stage: `optimal-${vector.kind}`,
+          corpus: vector.corpus,
+          level: target.level,
+          inputBytes: source.byteLength,
+          outputBytes: vir.byteLength,
+          timings,
+        });
+      }
+    } else {
+      assert.equal(
+        manifest.profileMatches.length +
+          manifest.profileBases.length +
+          manifest.profileOptimals.length,
+        0,
+        "native oracle emitted profile stages without --profile",
+      );
+    }
+
     for (const vector of manifest.prescan) {
       const source = await input(vector.inputFile);
       let vir;
@@ -430,6 +600,61 @@ async function runAcceptance() {
           `profile: corpus=${result.corpus} level=${result.level} ` +
             `declaration=${result.declaration} execute=${result.timings.executeMs.toFixed(2)}ms ` +
             `total=${result.timings.totalMs.toFixed(2)}ms throughput=${throughputKiBs.toFixed(2)}KiB/s`,
+        );
+      }
+    }
+    if (stageProfileResults.length > 0) {
+      console.log(
+        "optimal-stage profile: diagnostic isolated calls; execute excludes token marshal/decode",
+      );
+      for (const result of stageProfileResults) {
+        const detail =
+          result.stage === "matcher"
+            ? `tokens=${result.outputBytes / 4}`
+            : `output=${result.outputBytes}B`;
+        console.log(
+          `stage-profile: corpus=${result.corpus} level=${result.level} stage=${result.stage} ` +
+            `execute=${result.timings.executeMs.toFixed(2)}ms ${detail}`,
+        );
+      }
+      for (const level of [9, 10]) {
+        const corpus = "large-heterogeneous";
+        const matcher = stageProfileResults.find(
+          (result) =>
+            result.corpus === corpus &&
+            result.level === level &&
+            result.stage === "matcher",
+        );
+        const base = stageProfileResults.find(
+          (result) =>
+            result.corpus === corpus &&
+            result.level === level &&
+            result.stage === "base-prep",
+        );
+        const optimal = stageProfileResults.find(
+          (result) =>
+            result.corpus === corpus &&
+            result.level === level &&
+            result.stage === (level === 9 ? "optimal-fast" : "optimal-exact"),
+        );
+        const whole = profileResults.find(
+          (result) => result.corpus === corpus && result.level === level,
+        );
+        assert.ok(
+          matcher && base && optimal && whole,
+          `level ${level}: incomplete optimal-stage profile`,
+        );
+        const componentsMs =
+          matcher.timings.executeMs +
+          base.timings.executeMs +
+          optimal.timings.executeMs;
+        const ratioPercent = (100 * componentsMs) / whole.timings.executeMs;
+        const winner =
+          optimal.outputBytes <= base.outputBytes ? "optimal" : "base";
+        console.log(
+          `stage-total: level=${level} components=${componentsMs.toFixed(2)}ms ` +
+            `whole=${whole.timings.executeMs.toFixed(2)}ms ratio=${ratioPercent.toFixed(1)}% ` +
+            `winner=${winner} base=${base.outputBytes}B optimal=${optimal.outputBytes}B`,
         );
       }
     }

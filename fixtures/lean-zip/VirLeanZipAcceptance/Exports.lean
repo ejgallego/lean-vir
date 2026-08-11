@@ -45,4 +45,22 @@ def profileLevel9 (input : ByteArray) : ByteArray :=
 def profileLevel10 (input : ByteArray) : ByteArray :=
   Zip.Native.Deflate.deflateRawL10P input
 
+@[vir_export]
+def profileMatchTokens (input : ByteArray) (level : UInt8) : ByteArray :=
+  (Zip.Native.Deflate.lzMatchP input level).bytes
+
+@[vir_export]
+def profileBasePrepSize (input packedTokens : ByteArray) : Nat :=
+  if h : packedTokens.size % 4 = 0 then
+    (Zip.Native.Deflate.deflateRawBasePPrep input { bytes := packedTokens, aligned := h }).1
+  else 0
+
+@[vir_export]
+def profileOptimalFast (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateDynamicBlocksOptimalFast input Zip.Native.Deflate.sharedTokChunk
+
+@[vir_export]
+def profileOptimalExact (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateDynamicBlocksOptimal input Zip.Native.Deflate.sharedTokChunk
+
 end VirLeanZipAcceptance

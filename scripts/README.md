@@ -120,7 +120,9 @@ map lives in `docs/HARNESS.md`.
   an existing `web/public/vir-upstream.wasm`; pass `--keep` to retain temporary
   artifacts. Add `--profile` to time direct levels 5 through 10 paths for the
   larger corpora through the opt-in runtime phase timer; these single samples
-  are diagnostic attribution rather than benchmark evidence.
+  are diagnostic attribution rather than benchmark evidence. The same mode
+  native-checks and times the heterogeneous level-9/10 packed matcher,
+  base-candidate preparation, and fast/exact optimal candidate separately.
 - `npm run test:site`
   Build the Vite site, runnable-surface and Wasm-size reports, local archive,
   SDK archive, and check the generated `web/dist` artifact shape.

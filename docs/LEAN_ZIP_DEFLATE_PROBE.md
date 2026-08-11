@@ -35,9 +35,14 @@ the entropy threshold.
 
 ## Exact revisions and source compatibility
 
-- lean-zip source: `feat/vir-fir-wasm-port` at
-  `9bc0e7d28691223e669474ffdf4ed1041d2522b5`, originally pinned to
-  `leanprover/lean4:v4.33.0-rc1`.
+- Final lean-zip consumer source: `feat/vir-fir-wasm-port` at
+  `f244c00a1d7ad837563b560633542755d154c654`, pinned upstream to
+  `leanprover/lean4:v4.33.0-rc1`. The final compatibility checkout changed only
+  `lean-toolchain` from rc1 to rc2; `git status --short` reported that single
+  tracked modification.
+- Initial feasibility source: the same branch at
+  `9bc0e7d28691223e669474ffdf4ed1041d2522b5`. The production compression core
+  measured below is unchanged in the final consumer commit.
 - Vir source: `feat/lean-zip-deflate-probe` at base
   `607ef30cf7e93a8adf732d0907009f1aa6865489`, pinned to
   `leanprover/lean4:v4.33.0-rc2`.
@@ -45,8 +50,21 @@ the entropy threshold.
   `leanprover/lean4:v4.33.0-rc2`, Lean commit
   `d8b18978322de05a8f3dba51ef03cf5461676c17`.
 
-A clean local snapshot of the lean-zip source and its already-present pinned
-`zipCommon` source compiled under rc2. In particular,
+A detached compatibility worktree can be reproduced without editing the
+lean-zip integration branch:
+
+```bash
+git -C /path/to/lean-zip worktree add --detach /tmp/lean-zip-rc2 \
+  f244c00a1d7ad837563b560633542755d154c654
+sed -i 's/v4.33.0-rc1/v4.33.0-rc2/' /tmp/lean-zip-rc2/lean-toolchain
+npm run accept:lean-zip -- /tmp/lean-zip-rc2 --passes 3 --keep
+npm run accept:lean-zip -- /tmp/lean-zip-rc2 --passes 1 --profile
+```
+
+Populate the detached worktree's ignored `.lake/packages/zipCommon` from its
+pinned manifest before the acceptance commands if the dependency is not
+already present. This leaves `lean-toolchain` as the only tracked difference.
+The source and its pinned `zipCommon` revision compile under rc2. In particular,
 `lake build Zip.Native.DeflateDynamic` completed all 47 jobs; the target itself
 took 432 seconds. There were no source incompatibilities, only the existing
 lint warnings. No remote dependency was fetched and no rc1 `.olean` or IR was
@@ -200,7 +218,7 @@ run checked 279 compression calls: 89 matrix vectors repeated three times plus
 3,564,426 output bytes; the prescan set additionally scanned nine 1 MiB inputs.
 The repeated-text outputs were 0.49% of their input size, and heterogeneous
 outputs ranged from 65.51% to 66.95%, depending on level. Observed runs took
-136.90–178.99 seconds after setup. These figures include lifting, lowering,
+136.90–204.46 seconds after setup. These figures include lifting, lowering,
 assertions, and large-input scans and are acceptance telemetry, not a
 compression throughput benchmark.
 
@@ -231,25 +249,58 @@ than a stable benchmark:
 
 | Level | Timed core path | Repeated text, 32 KiB | Heterogeneous, 64 KiB |
 | --- | --- | ---: | ---: |
-| 5 | `deflateRawL5Adaptive` | 812.16 ms | 2,422.57 ms |
-| 6 | `deflateRawL6Adaptive` | 872.66 ms | 2,933.96 ms |
-| 7 | `l7ProfileFor` + `deflateRawL7P` | 804.87 ms | 2,736.65 ms |
-| 8 | `deflateRawL8P` | 1,039.27 ms | 4,262.45 ms |
-| 9 | `deflateRawL9AdaptiveP` | 1,314.97 ms | 9,167.78 ms |
-| 10 | `deflateRawL10P` | 1,412.78 ms | 9,533.45 ms |
+| 5 | `deflateRawL5Adaptive` | 1,541.99 ms | 4,049.72 ms |
+| 6 | `deflateRawL6Adaptive` | 1,442.66 ms | 6,288.37 ms |
+| 7 | `l7ProfileFor` + `deflateRawL7P` | 947.38 ms | 2,836.30 ms |
+| 8 | `deflateRawL8P` | 1,328.32 ms | 4,316.82 ms |
+| 9 | `deflateRawL9AdaptiveP` | 2,405.34 ms | 11,057.98 ms |
+| 10 | `deflateRawL10P` | 2,463.08 ms | 11,012.17 ms |
 
-On the heterogeneous input, level 9 is 2.15 times the level-8 time, while
-level 10 is only 1.04 times level 9. This suggests that the common optimal-path
-work, rather than only level 10's exact-DP increment, is the first family to
-split into finer measurements. Vir still does not expose interpreter fuel or a
-general per-declaration sampler through the public runtime; this fixture-level
-timing deliberately avoids adding that machinery before it is needed.
+On the heterogeneous input, level 9 is 2.56 times the level-8 time, while
+level 10 is effectively equal to level 9. This suggests that the common
+optimal-path work, rather than only level 10's exact-DP increment, is the first
+family to split into finer measurements. Vir still does not expose interpreter
+fuel or a general per-declaration sampler through the public runtime; this
+fixture-level timing deliberately avoids adding that machinery before it is
+needed.
+
+#### Optimal-stage split
+
+Profile mode now also separates the heterogeneous level-9/10 paths into their
+packed matcher, base-candidate preparation, and fast or exact optimal candidate.
+Packed matcher bytes and optimal DEFLATE bytes are compared with new native
+oracle artifacts; base preparation is compared by its candidate byte count.
+The VIR-produced packed bytes cross the ordinary `ByteArray` interface before
+the base call, so `executeMs` excludes their result lifting and argument
+lowering. Both optimal candidates independently raw-inflate to the input.
+
+The final-source diagnostic run produced:
+
+| Level | Whole path | Matcher | Base prep | Optimal candidate | Independent component sum |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 9 | 11,057.98 ms | 1,977.73 ms | 1,717.92 ms | 7,734.67 ms fast | 11,430.33 ms (103.4%) |
+| 10 | 11,012.17 ms | 2,301.52 ms | 1,311.44 ms | 9,216.23 ms exact | 12,829.19 ms (116.5%) |
+
+Levels 9 and 10 produced the same native/VIR packed matcher stream: 47,840
+tokens in 191,360 bytes. Each base preparation selected a 47,405-byte
+candidate. The fast and exact optimal candidates were 43,766 and 43,764 bytes
+respectively, exactly matching the final public level-9 and level-10 outputs.
+The optimal candidate therefore wins both paths and the whole calls do not
+force the base emission thunk.
+
+The independently timed components exceed the corresponding whole calls by
+3.4% at level 9 and 16.5% at level 10, showing the variance limit of single
+inclusive samples. Even with that limit, fast-optimal candidate generation is
+70.0% of the level-9 whole and exact-optimal generation is 83.7% of the
+level-10 whole; each clearly outweighs its matcher and base-preparation calls.
+This supports targeting the optimal parser/emitter family while rejecting a
+precise additive allocation from this run.
 
 ## Smallest next green slice
 
 The level matrix, current-platform entropy boundary, larger compressible cases,
 repeated-pass memory check, and upper-level attribution are green. The next
-smallest slice is to separate matcher/base-candidate time from
-`deflateDynamicBlocksOptimalFast` and `deflateDynamicBlocksOptimal` on the
-heterogeneous input. Broader corpus and cross-platform CI remain necessary
-before treating the integration as universal acceptance.
+smallest slice is to separate `lz77OptimalFastIter` / `lz77OptimalIter` parsing
+from `emitSharedBlocks` encoding inside the now-dominant optimal candidate.
+Broader corpus and cross-platform CI remain necessary before treating the
+integration as universal acceptance.
