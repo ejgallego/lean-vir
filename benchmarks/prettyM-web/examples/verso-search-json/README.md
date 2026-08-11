@@ -1,8 +1,7 @@
 # Verso search JSON lanes
 
-This catalog example promotes the `ROOT-VIR-20260811-012` acceptance workload.
-It runs the same ten Verso xref-domain mappings through two independently
-catalogued VIR packages:
+This catalog example runs the same ten Verso xref-domain mappings through two
+independently catalogued VIR packages:
 
 - `default`: complete-tree lowering and lifting with `Lean.Vir.Json`;
 - `borrowed`: one-level handle inspection with opaque `ref` passthrough.
@@ -12,7 +11,7 @@ and `domain-mappers.js` content captured from the Verso search experiment;
 only a terminal newline was added for the tracked files. Their committed
 SHA-256 identities are in `tests.json`. The pre-normalization upstream hashes
 were `ff2612f…` / `074719e…` for Manual and `711b45e…` / `3c81376…` for
-the literate project. The acceptance capture used Verso experiment commit
+the literate project. The capture used Verso search experiment commit
 `1e50e60652508c8afea85a7a0399eb5309194337`. Together the fixtures cover all
 ten domain mappers and 323 output searchables. The borrowed variant additionally
 checks strict JavaScript identity for passthrough `ref` values.

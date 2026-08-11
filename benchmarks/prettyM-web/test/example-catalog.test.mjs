@@ -75,6 +75,14 @@ test("pins the generated Verso xref fixtures and JavaScript oracles", async () =
   );
   const fixtures = tests.variants[0].tests[0].data.fixtures;
   assert.deepEqual(
+    tests.variants[1].tests[0].data,
+    tests.variants[0].tests[0].data,
+  );
+  assert.deepEqual(
+    tests.variants[1].benchmark.data,
+    tests.variants[0].benchmark.data,
+  );
+  assert.deepEqual(
     fixtures.map(({ id, searchables }) => ({ id, searchables })),
     [
       { id: "manual", searchables: 295 },

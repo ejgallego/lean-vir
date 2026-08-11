@@ -54,7 +54,7 @@ async function fetchVerified(path, expectedSha256, label) {
       `${label} hash mismatch: expected ${expectedSha256}, got ${actualSha256}`,
     );
   }
-  return { bytes, url };
+  return bytes;
 }
 
 function mapXref(xref, domainMappers, domainIds) {
@@ -79,8 +79,16 @@ async function loadFixture(specification) {
       `${specification.id} mapper`,
     ),
   ]);
-  const xref = JSON.parse(new TextDecoder().decode(xrefFile.bytes));
-  const mapperModule = await import(mapperFile.url.href);
+  const xref = JSON.parse(new TextDecoder().decode(xrefFile));
+  const mapperUrl = URL.createObjectURL(
+    new Blob([mapperFile], { type: "text/javascript" }),
+  );
+  let mapperModule;
+  try {
+    mapperModule = await import(mapperUrl);
+  } finally {
+    URL.revokeObjectURL(mapperUrl);
+  }
   const domainMappers = mapperModule.domainMappers;
   if (!domainMappers || typeof domainMappers !== "object") {
     throw new Error(`${specification.id} does not export domainMappers`);

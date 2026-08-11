@@ -10,8 +10,8 @@ structure ExampleItem where
   name : String
   address : String
 
-private def objectGet? (entries : Array (String × JSON)) (key : String) : Option JSON :=
-  entries.findSome? fun (name, value) => if name == key then some value else none
+private def objectGet? {α : Type u} (entries : Array (String × α)) (key : String) : Option α :=
+  Lean.Vir.Json.objectFind? entries key
 
 private def asObject? : JSON → Option (Array (String × JSON))
   | .object entries => some entries
@@ -195,10 +195,17 @@ private def borrowedString? (value : Handle) : Lean.Vir.RuntimeM (Option String)
   | .string value => pure (some value)
   | _ => pure none
 
-private def borrowedGet?
-    (value : Handle) (key : String) : Lean.Vir.RuntimeM (Option Handle) := do
-  let some entries ← borrowedObject? value | return none
-  return entries.findSome? fun (name, value) => if name == key then some value else none
+private def borrowedStringField?
+    (entries : Array (String × Handle)) (key : String) :
+    Lean.Vir.RuntimeM (Option String) := do
+  let some value := objectGet? entries key | return none
+  borrowedString? value
+
+private def borrowedObjectField?
+    (entries : Array (String × Handle)) (key : String) :
+    Lean.Vir.RuntimeM (Option (Array (String × Handle))) := do
+  let some value := objectGet? entries key | return none
+  borrowedObject? value
 
 private def borrowedStringArray? (value : Handle) : Lean.Vir.RuntimeM (Option (Array String)) := do
   let some values ← borrowedArray? value | return none
@@ -208,8 +215,9 @@ private def borrowedStringArray? (value : Handle) : Lean.Vir.RuntimeM (Option (A
     out := out.push value
   return some out
 
-private def borrowedPriority? (data : Handle) : Lean.Vir.RuntimeM (Option Handle) := do
-  match ← borrowedGet? data "searchPriority" with
+private def borrowedPriority?
+    (data : Array (String × Handle)) : Lean.Vir.RuntimeM (Option Handle) := do
+  match objectGet? data "searchPriority" with
   | none => some <$> Lean.Vir.Json.Handle.ofJson (.number 50.0)
   | some value =>
     match ← Lean.Vir.Json.Handle.inspect value with
@@ -218,17 +226,15 @@ private def borrowedPriority? (data : Handle) : Lean.Vir.RuntimeM (Option Handle
     | _ => pure none
 
 private def borrowedItem? (target : Handle) : Lean.Vir.RuntimeM (Option ExampleItem) := do
-  let some addressValue ← borrowedGet? target "address" | return none
-  let some address ← borrowedString? addressValue | return none
-  let some idValue ← borrowedGet? target "id" | return none
-  let some id ← borrowedString? idValue | return none
+  let some target ← borrowedObject? target | return none
+  let some address ← borrowedStringField? target "address" | return none
+  let some id ← borrowedStringField? target "id" | return none
   let destination := s!"{address}#{id}"
-  let some data ← borrowedGet? target "data" | return none
-  let some item ← borrowedGet? data destination | return none
-  let some contextValue ← borrowedGet? item "context" | return none
+  let some data ← borrowedObjectField? target "data" | return none
+  let some item ← borrowedObjectField? data destination | return none
+  let some contextValue := objectGet? item "context" | return none
   let some context ← borrowedStringArray? contextValue | return none
-  let some nameValue ← borrowedGet? item "display" | return none
-  let some name ← borrowedString? nameValue | return none
+  let some name ← borrowedStringField? item "display" | return none
   return some { context, name, address := destination }
 
 private def stringHandle (value : String) : Lean.Vir.RuntimeM Handle :=
@@ -248,9 +254,11 @@ private def itemHandle (item : ExampleItem) : Lean.Vir.RuntimeM Handle := do
   ]
 
 private def mapBorrowedExamples (domainData : Handle) : Lean.Vir.RuntimeM Handle := do
-  let some contents ← borrowedGet? domainData "contents"
+  let some domainData ← borrowedObject? domainData
     | return ← Lean.Vir.Json.Handle.ofJson .null
-  let some contents ← borrowedObject? contents
+  let some contentsValue := objectGet? domainData "contents"
+    | return ← Lean.Vir.Json.Handle.ofJson .null
+  let some contents ← borrowedObject? contentsValue
     | return ← Lean.Vir.Json.Handle.ofJson .null
   let mut groups := #[]
   for (_, values) in contents do
@@ -283,7 +291,9 @@ private def mapBorrowedExamples (domainData : Handle) : Lean.Vir.RuntimeM Handle
 
 private def mapBorrowedSimple
     (domainId : String) (domainData : Handle) : Lean.Vir.RuntimeM Handle := do
-  let some contentsValue ← borrowedGet? domainData "contents"
+  let some domainData ← borrowedObject? domainData
+    | return ← Lean.Vir.Json.Handle.ofJson .null
+  let some contentsValue := objectGet? domainData "contents"
     | return ← Lean.Vir.Json.Handle.ofJson .null
   let some contents ← borrowedObject? contentsValue
     | return ← Lean.Vir.Json.Handle.ofJson .null
@@ -293,62 +303,50 @@ private def mapBorrowedSimple
       | return ← Lean.Vir.Json.Handle.ofJson .null
     let some target := values[0]?
       | return ← Lean.Vir.Json.Handle.ofJson .null
-    let some addressValue ← borrowedGet? target "address"
+    let some target ← borrowedObject? target
       | return ← Lean.Vir.Json.Handle.ofJson .null
-    let some address ← borrowedString? addressValue
+    let some address ← borrowedStringField? target "address"
       | return ← Lean.Vir.Json.Handle.ofJson .null
-    let some idValue ← borrowedGet? target "id"
-      | return ← Lean.Vir.Json.Handle.ofJson .null
-    let some id ← borrowedString? idValue
+    let some id ← borrowedStringField? target "id"
       | return ← Lean.Vir.Json.Handle.ofJson .null
     let destination := s!"{address}#{id}"
     let mut searchKey := key
     let mut ref := value
     let mut priority? : Option Handle := none
     if domainId == "VersoHtml.constant" then
-      let some data ← borrowedGet? target "data"
+      let some data ← borrowedObjectField? target "data"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some nameValue ← borrowedGet? data "userName"
-        | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some name ← borrowedString? nameValue
+      let some name ← borrowedStringField? data "userName"
         | return ← Lean.Vir.Json.Handle.ofJson .null
       searchKey := name
     else if domainId == "Verso.Genre.Manual.doc.suggestion" then
-      let some data ← borrowedGet? target "data"
+      let some data ← borrowedObjectField? target "data"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some termValue ← borrowedGet? data "searchTerm"
+      let some term ← borrowedStringField? data "searchTerm"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some term ← borrowedString? termValue
-        | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some redirect ← borrowedGet? data "suggestedRedirect"
+      let some redirect := objectGet? data "suggestedRedirect"
         | return ← Lean.Vir.Json.Handle.ofJson .null
       searchKey := term
       ref := redirect
     else if domainId == "Verso.Genre.Manual.doc.tech" then
-      let some data ← borrowedGet? target "data"
+      let some data ← borrowedObjectField? target "data"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some termValue ← borrowedGet? data "term"
-        | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some term ← borrowedString? termValue
+      let some term ← borrowedStringField? data "term"
         | return ← Lean.Vir.Json.Handle.ofJson .null
       searchKey := term
     else if domainId == "Verso.Genre.Manual.doc.tactic" ||
         domainId == "Verso.Genre.Manual.doc.tactic.conv" then
-      let some data ← borrowedGet? target "data"
+      let some data ← borrowedObjectField? target "data"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some nameValue ← borrowedGet? data "userName"
-        | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some name ← borrowedString? nameValue
+      let some name ← borrowedStringField? data "userName"
         | return ← Lean.Vir.Json.Handle.ofJson .null
       searchKey := name
     else if domainId == "Verso.Genre.Manual.section" then
-      let some data ← borrowedGet? target "data"
+      let some data ← borrowedObjectField? target "data"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some titleValue ← borrowedGet? data "title"
+      let some title ← borrowedStringField? data "title"
         | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some title ← borrowedString? titleValue
-        | return ← Lean.Vir.Json.Handle.ofJson .null
-      let some sectionNum ← (match ← borrowedGet? data "sectionNum" with
+      let some sectionNum ← (match objectGet? data "sectionNum" with
         | none => pure (some "")
         | some value => do
           match ← Lean.Vir.Json.Handle.inspect value with
@@ -357,7 +355,9 @@ private def mapBorrowedSimple
           | _ => pure none)
         | return ← Lean.Vir.Json.Handle.ofJson .null
       searchKey := s!"{sectionNum} {title}"
-      priority? ← borrowedPriority? data
+      let some priority ← borrowedPriority? data
+        | return ← Lean.Vir.Json.Handle.ofJson .null
+      priority? := some priority
     let searchKeyHandle ← stringHandle searchKey
     let address ← stringHandle destination
     let domain ← stringHandle domainId
