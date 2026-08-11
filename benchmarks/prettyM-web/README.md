@@ -47,6 +47,12 @@ the example descriptor before invoking the uniform VIR compiler. Local
 checkout paths are supplied on the command line and are never committed. See
 `docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
+FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
+`toolchains.local.json`, or `--toolchain-config`. Every selected checkout must
+still match the exact catalogued commit. These settings control generation;
+normal serving consumes already-built FIR packages selected and staged through
+the immutable artifact-set lock.
+
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
 `_sources/{vir,fir,workload}` directory; no producer source is copied into this

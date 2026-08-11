@@ -29,6 +29,11 @@ import {
   sha256,
   validateSeed,
 } from "./artifact-set-lib.mjs";
+import {
+  parsePathAssignment,
+  readToolchainConfig,
+  resolveBuildCheckoutPaths,
+} from "./toolchain-config-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildEnvironment = {
@@ -52,7 +57,12 @@ Build every component of a catalogued artifact from exact local Git checkouts,
 validate the producer packages, and atomically assemble _artifacts/seed.
 
   --database PATH       build database (default: artifact-builds.json)
-  --checkout NAME=PATH resolve one catalog checkout; repeat for every checkout
+  --checkout NAME=PATH override one catalog checkout; repeat as needed
+  --toolchain [NAME=]PATH
+                        select FIR by default, or a named FIR/VIR toolchain
+  --toolchain-config PATH
+                        read toolchains and checkout paths from JSON
+  --sources-dir PATH    fallback checkout root (default: _sources)
   --prepare             run catalogued producer setup before building
   --plan                verify checkouts and print the plan without building
   --list                list catalogued builds
@@ -63,6 +73,9 @@ function parseArgs(argv) {
   const options = {
     database: "artifact-builds.json",
     checkouts: new Map(),
+    toolchains: new Map(),
+    toolchainConfig: null,
+    sourcesDir: "_sources",
     prepare: false,
     plan: false,
     list: false,
@@ -72,15 +85,24 @@ function parseArgs(argv) {
     const argument = argv[index];
     if (argument === "--database") options.database = argv[++index];
     else if (argument === "--checkout") {
-      const value = argv[++index] ?? "";
-      const separator = value.indexOf("=");
-      if (separator < 1 || separator === value.length - 1) {
-        throw new Error("--checkout must have the form NAME=PATH");
-      }
-      const name = value.slice(0, separator);
+      const { name, path } = parsePathAssignment(argv[++index], {
+        label: "--checkout",
+      });
       if (options.checkouts.has(name))
         throw new Error(`duplicate checkout: ${name}`);
-      options.checkouts.set(name, resolve(value.slice(separator + 1)));
+      options.checkouts.set(name, path);
+    } else if (argument === "--toolchain") {
+      const { name, path } = parsePathAssignment(argv[++index], {
+        defaultName: "fir",
+        label: "--toolchain",
+      });
+      if (options.toolchains.has(name))
+        throw new Error(`duplicate toolchain: ${name}`);
+      options.toolchains.set(name, path);
+    } else if (argument === "--toolchain-config") {
+      options.toolchainConfig = argv[++index];
+    } else if (argument === "--sources-dir") {
+      options.sourcesDir = argv[++index];
     } else if (argument === "--prepare") options.prepare = true;
     else if (argument === "--plan") options.plan = true;
     else if (argument === "--list") options.list = true;
@@ -116,6 +138,15 @@ function run(
   return capture ? result.stdout.trim() : "";
 }
 
+function normalizedRepository(repository) {
+  const trimmed = repository.replace(/\/+$/, "").replace(/\.git$/, "");
+  const githubScp = /^git@github\.com:(.+)$/.exec(trimmed);
+  if (githubScp) return `https://github.com/${githubScp[1]}`;
+  const githubSsh = /^ssh:\/\/git@github\.com\/(.+)$/.exec(trimmed);
+  if (githubSsh) return `https://github.com/${githubSsh[1]}`;
+  return trimmed;
+}
+
 async function verifyCheckout(checkoutId, path, selectedSource) {
   if (!(await stat(path).catch(() => null))?.isDirectory()) {
     throw new Error(`checkout ${checkoutId} is not a directory: ${path}`);
@@ -127,6 +158,18 @@ async function verifyCheckout(checkoutId, path, selectedSource) {
     throw new Error(
       `checkout ${checkoutId} must point at its Git root: ${root}`,
     );
+  const origin = run("git", ["-C", path, "remote", "get-url", "origin"], {
+    capture: true,
+  });
+  if (
+    normalizedRepository(origin) !==
+    normalizedRepository(selectedSource.repository)
+  ) {
+    throw new Error(
+      `checkout ${checkoutId} origin mismatch: ` +
+        `expected ${selectedSource.repository}, got ${origin}`,
+    );
+  }
   const revision = run("git", ["-C", path, "rev-parse", "HEAD"], {
     capture: true,
   });
@@ -391,17 +434,27 @@ async function main() {
   );
   const exampleBytes = await readFile(examplePath);
   const sources = checkoutSources(database, options.buildId);
-  for (const checkoutId of options.checkouts.keys()) {
-    if (!sources[checkoutId])
-      throw new Error(`build ${options.buildId} has no checkout ${checkoutId}`);
-  }
+  const sourcesDir = inside(
+    appRoot,
+    options.sourcesDir,
+    "read artifact sources",
+  );
+  const toolchainConfig = await readToolchainConfig(
+    appRoot,
+    options.toolchainConfig,
+  );
+  const checkoutSelection = resolveBuildCheckoutPaths(build, sources, {
+    sourcesDir,
+    checkouts: options.checkouts,
+    toolchains: options.toolchains,
+    config: toolchainConfig,
+  });
+  const toolchainRoles = checkoutSelection.toolchainRoles;
   const resolvedCheckouts = {};
   for (const [checkoutId, selectedSource] of Object.entries(sources)) {
-    const path = options.checkouts.get(checkoutId);
-    if (!path) throw new Error(`missing --checkout ${checkoutId}=PATH`);
     resolvedCheckouts[checkoutId] = await verifyCheckout(
       checkoutId,
-      path,
+      checkoutSelection.paths.get(checkoutId),
       selectedSource,
     );
   }
@@ -409,6 +462,12 @@ async function main() {
   const order = componentOrder(build);
   console.log(`build: ${options.buildId}`);
   console.log(`artifact set: ${build.artifactSet.setId}`);
+  if (toolchainConfig.path) {
+    console.log(`toolchain config: ${toolchainConfig.path}`);
+  }
+  for (const [name, checkoutId] of toolchainRoles) {
+    console.log(`toolchain ${name}: ${resolvedCheckouts[checkoutId].path}`);
+  }
   for (const [checkoutId, checkout] of Object.entries(resolvedCheckouts)) {
     console.log(
       `checkout ${checkoutId}: ${checkout.path} @ ${checkout.revision}`,
@@ -494,6 +553,17 @@ async function main() {
       file: relative(appRoot, examplePath),
       sha256: sha256(exampleBytes),
     },
+    toolchainConfig: toolchainConfig.path,
+    toolchains: Object.fromEntries(
+      [...toolchainRoles].map(([name, checkoutId]) => [
+        name,
+        {
+          checkout: checkoutId,
+          path: resolvedCheckouts[checkoutId].path,
+          revision: resolvedCheckouts[checkoutId].revision,
+        },
+      ]),
+    ),
     sources: resolvedCheckouts,
     components: Object.fromEntries(
       order.map((componentId) => [

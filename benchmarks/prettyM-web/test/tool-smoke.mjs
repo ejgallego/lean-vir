@@ -65,7 +65,13 @@ assert.match(sourcePlan.stdout, /workload: https:\/\/github\.com\/leanprover\/ve
 
 const candidatePlan = spawnSync(
   process.execPath,
-  ["scripts/build-artifact-candidate.mjs", "prettyM", "--plan"],
+  [
+    "scripts/build-artifact-candidate.mjs",
+    "prettyM",
+    "--plan",
+    "--toolchain",
+    join(appRoot, "_sources/fir"),
+  ],
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(candidatePlan.status, 0, candidatePlan.stderr);
@@ -73,6 +79,7 @@ assert.match(
   candidatePlan.stdout,
   /candidate output: _artifacts\/candidates\/prettyM\/upload/,
 );
+assert.match(candidatePlan.stdout, /toolchain fir: .*\/_sources\/fir/);
 
 const escapedOutput = spawnSync(
   process.execPath,

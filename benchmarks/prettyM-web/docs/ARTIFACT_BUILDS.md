@@ -8,18 +8,56 @@ locks, and the provenance consumed by the packer. A VIR component names a
 descriptor before validating or building it. `prettyM` is the first record; it
 is not a default baked into the catalog tools.
 
-Machine-specific paths are deliberately absent from the catalog. Resolve each
-source to an existing checkout when invoking the driver:
+Machine-specific paths are deliberately absent from the catalog. The usual
+local flow materializes the catalogued sources, then optionally replaces the
+FIR producer checkout with an existing checkout selected as a toolchain:
 
 ```sh
 npm run artifacts:build -- --list
+npm run artifacts:sources -- prettyM
 
 npm run artifacts:build -- prettyM \
-  --checkout vir=/path/to/lean-vir-at-the-catalogued-commit \
-  --checkout fir=/path/to/lean-fir-at-the-catalogued-commit \
-  --checkout workload=/path/to/verso-slides-at-the-catalogued-commit \
+  --toolchain /path/to/lean-fir-at-the-catalogued-commit \
   --plan
 ```
+
+An unnamed `--toolchain` means FIR. Name both producer toolchains when needed:
+
+```sh
+npm run artifacts:build -- prettyM \
+  --toolchain fir=/path/to/lean-fir \
+  --toolchain vir=/path/to/lean-vir
+```
+
+For repeat use, put the same selection in ignored `toolchains.local.json`, or
+pass another file with `--toolchain-config PATH`:
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/toolchains",
+  "toolchains": {
+    "fir": "/path/to/lean-fir",
+    "vir": "/path/to/lean-vir"
+  },
+  "checkouts": {
+    "workload": "/path/to/verso-slides"
+  }
+}
+```
+
+Relative paths are resolved from the config file. The
+`VIR_BENCH_TOOLCHAIN_CONFIG` environment variable selects a config when no
+command-line config is given. Resolution order is an explicit `--checkout`, an
+explicit `--toolchain`, config `checkouts`, config `toolchains`, then
+`_sources/<checkout>`. `--checkout NAME=PATH` remains available for any catalog
+role that needs a one-off override.
+
+Selecting a toolchain does not relax provenance. The selected FIR or VIR path
+must still be a clean Git root at the exact revision recorded in
+`artifact-builds.json`. FIR's package scripts then use the Lean toolchain pinned
+by that FIR checkout; the benchmark application does not independently choose
+a Lean release.
 
 Producer source remains in its owning repository at the immutable catalogued
 commit. The artifact application contains only the source URL, commit, package
@@ -96,6 +134,15 @@ artifact set.
 
 ## Assemble the immutable set
 
+Serving and testing an accepted set does not invoke FIR or rebuild its Wasm.
+`artifact-set.lock.json` selects an immutable archive containing the FIR native
+and LLVM packages alongside the VIR package. `artifacts:fetch` verifies that
+archive and stages its declared members. `--toolchain` is only a source-build
+input used to produce a new seed or candidate. The current `local-prototype`
+lock has no download URL, so it still needs an explicit local `--archive`;
+publishing the CI archive and recording its immutable URL will remove that
+manual retrieval input.
+
 The packer reads the same catalog record, so source provenance is no longer
 duplicated in a separate artifact-set config:
 
@@ -125,7 +172,9 @@ The complete non-publishing path is available locally as:
 
 ```sh
 npm run artifacts:sources -- prettyM
-npm run artifacts:candidate -- prettyM --prepare
+npm run artifacts:candidate -- prettyM \
+  --toolchain /path/to/lean-fir-at-the-catalogued-commit \
+  --prepare
 ```
 
 The candidate command runs the source builder, packs with a separate ignored
