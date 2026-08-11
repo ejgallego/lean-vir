@@ -95,6 +95,18 @@ assert.match(
 );
 assert.match(candidatePlan.stdout, /toolchain fir: .*\/_sources\/fir/);
 
+const candidateMatrix = spawnSync(
+  process.execPath,
+  ["scripts/example-candidate-matrix.mjs"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(candidateMatrix.status, 0, candidateMatrix.stderr);
+assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
+  include: [
+    { example: "prettyM", variant: "default", build: "prettyM" },
+  ],
+});
+
 const buildPlan = spawnSync(
   process.execPath,
   ["scripts/build-artifacts.mjs", "prettyM", "--plan"],

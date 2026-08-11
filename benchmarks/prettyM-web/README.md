@@ -151,8 +151,10 @@ npm run dev
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
 not load or privilege either workload. Select an example there or use the
-direct links `?example=prettyM` and `?example=illuminate`. The included server
-supplies the cross-origin isolation headers required by threaded LLVM Wasm.
+direct links `?example=prettyM&variant=default` and
+`?example=illuminate&variant=default`. Example variants are selected in the
+shared header rather than by workload-specific UI. The included server supplies
+the cross-origin isolation headers required by threaded LLVM Wasm.
 `_headers` and `.htaccess` files are included at the root of `dist/` for static
 hosts; configure equivalent headers when the hosting platform does not consume
 either format.

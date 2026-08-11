@@ -109,6 +109,24 @@ try {
       .getAttribute("aria-current"),
     "page",
   );
+  assert.equal(await page.locator("#variant-picker").isVisible(), true);
+  assert.equal(await page.locator("#variant-select").inputValue(), "default");
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.__benchmarkApp.getVariants().map(({ id, title, build }) => ({
+        id,
+        title,
+        build,
+      })),
+    ),
+    [
+      {
+        id: "default",
+        title: "Compact Format to styled segments",
+        build: "prettyM",
+      },
+    ],
+  );
   const readiness = await page.evaluate(() => window.__prettyBenchApp.ready);
   assert.deepEqual(readiness, { readyCount: 5, backendCount: 5 });
   const artifactStatus = await page.evaluate(() =>

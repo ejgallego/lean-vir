@@ -78,6 +78,12 @@ try {
       .getAttribute("aria-current"),
     "page",
   );
+  assert.equal(await page.locator("#variant-picker").isVisible(), true);
+  assert.equal(await page.locator("#variant-select").inputValue(), "default");
+  assert.equal(
+    await page.locator("#variant-select option:checked").textContent(),
+    "Player trace replay",
+  );
   const readiness = await page.evaluate(
     () => window.__illuminateBenchApp.ready,
   );

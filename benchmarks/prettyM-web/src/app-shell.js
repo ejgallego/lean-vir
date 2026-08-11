@@ -115,6 +115,23 @@ function renderStudies(selectedView) {
   }
 }
 
+function renderVariants(testPackage, variant) {
+  const select = element("variant-select");
+  for (const candidate of testPackage.variants) {
+    const option = document.createElement("option");
+    option.value = candidate.id;
+    option.textContent = candidate.title;
+    option.selected = candidate.id === variant.id;
+    select.appendChild(option);
+  }
+  select.addEventListener("change", () => {
+    const url = new URL(location.href);
+    url.searchParams.set("example", selected.id);
+    url.searchParams.set("variant", select.value);
+    location.assign(url);
+  });
+}
+
 function showArtifactStatus(status) {
   const container = element("artifact-status");
   container.dataset.tone = status.tone;
@@ -272,6 +289,7 @@ async function boot() {
     bytes: testPackageBytes.byteLength,
     sha256: await sha256(testPackageBytes),
   };
+  renderVariants(testPackage, variant);
   globalThis.__benchmarkExampleContext = {
     example: selected,
     testPackage,
@@ -313,5 +331,7 @@ globalThis.__benchmarkApp = {
   ready: boot(),
   getController: () => controller,
   getArtifactStatus: () => artifactStatus,
+  getVariants: () =>
+    globalThis.__benchmarkExampleContext?.testPackage.variants ?? [],
   getVariant: () => globalThis.__benchmarkExampleContext?.variant ?? null,
 };

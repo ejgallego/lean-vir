@@ -91,6 +91,9 @@ carry their own build selection, differential inputs, backend set, and
 benchmark suite without changing the generic runner. `oracle: "js"`
 records that the JavaScript backend supplies the semantic reference. Use
 `null` when a test relies on fixture output or pairwise comparison instead.
+The browser presents the same variants in its shared selector and records the
+selection as `?example=<id>&variant=<id>`; controllers do not implement their
+own variant picker.
 
 Run or inspect one complete selection with:
 
@@ -107,6 +110,10 @@ entry point is registered for explicit controlled-machine runs. Candidate
 bundles retain the complete `EXAMPLE_TEST.json` run, including test-package
 identity, oracle, exercised backends, inputs echoed by the workload report, and
 artifact provenance.
+
+CI discovers every non-null variant build from these packages. The generic
+candidate matrix then selects the example and variant through the same command,
+so adding a canonical build does not require a workload-specific workflow.
 
 ## Uniform VIR compilation
 
