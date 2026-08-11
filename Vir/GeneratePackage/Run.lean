@@ -69,7 +69,7 @@ structure AnalyzedPackage where
 structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
 
-unsafe def loadRunDeclIndex (targets : Array Target) : IO DeclIndex := do
+private unsafe def loadRunDeclIndex (targets : Array Target) : IO DeclIndex := do
   let index ← loadDeclIndex targets
   let index ← match ← Vir.readClientNativeExternManifestFromEnv with
     | none => pure index

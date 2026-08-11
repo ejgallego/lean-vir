@@ -17,7 +17,7 @@ namespace Vir
 
 open GeneratePackage
 
-def clientNativeExternManifestEnv : String := "VIR_NATIVE_EXTERN_MANIFEST"
+private def clientNativeExternManifestEnv : String := "VIR_NATIVE_EXTERN_MANIFEST"
 
 structure ClientNativeExternManifest where
   modules : Array Name

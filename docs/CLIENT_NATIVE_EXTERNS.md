@@ -27,6 +27,9 @@ uint32_t my_project_increment(uint32_t value) {
 }
 ```
 
+C++ providers must declare selected functions with `extern "C"`; the manifest
+records unmangled C symbols, and the provider audit rejects a mangled export.
+
 ## Manifest
 
 Put `lean-vir-native-externs.json` at the root of the client's Lake project:
