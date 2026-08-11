@@ -63,6 +63,13 @@ summaries or refreshed bounded artifacts here.
 - The generic v2 stager derives the example from `ARTIFACT_SET.json`, replaces
   only `artifacts/<example-id>/`, and preserves sibling examples. There are no
   prettyM- or Illuminate-specific canonical set adapters.
+- Every example owns a self-contained `tests.json` package. Its variants bind
+  differential inputs, oracle and backend coverage, a benchmark suite, and an
+  optional canonical build. The generic `npm run example -- EXAMPLE VARIANT`
+  command selects that complete unit for compilation and testing.
+- The browser exposes the same example variants in the shared header. Candidate
+  CI discovers every non-null variant build from the catalog rather than
+  carrying a workload-specific job.
 - The browser derives verified/rehearsal/unverified status from the staged
   example manifest instead of controller labels.
 - The final PR #104 bounded validation report is locally available at
@@ -144,10 +151,13 @@ the CI contract.
 The current VIR `.irpkg` generator embeds generation time and source-path
 spelling. Source identity is exact, but fresh VIR packages are not yet expected
 to reproduce an old archive digest byte-for-byte. The CI candidate-build path
-is now prepared in `.github/workflows/prettyM-candidate.yml`. It materializes
-each exact catalogued source below `benchmarks/prettyM-web/_sources/`, runs the
-source build, packs to a separate candidate lock, re-imports and tests the
-archive, and uploads the archive plus checksums, manifests, and source receipt.
+is now prepared in `.github/workflows/example-candidate.yml`. Its matrix is
+derived from the example test packages and build catalog. For each row it
+materializes the exact catalogued sources below
+`benchmarks/prettyM-web/_sources/`, runs the selected example and variant,
+packs to a separate candidate lock, re-imports and tests the archive, and
+uploads the archive plus checksums, manifests, source receipt, and differential
+test report.
 It does not compare fresh bytes with the current lock or publish/promote them.
 The workflow still needs to run on GitHub before its hosted-runner setup and
 uploaded payload can be accepted as the validation record.
@@ -166,7 +176,12 @@ The second real client is Illuminate. Keep workload execution in each example
 controller; generalize only the source/package/staging boundary demonstrated by
 both examples. Illuminate remains a non-publishable rehearsal until its owning
 repository provides source-package-v1 producer entry points and the catalog can
-build it without application-side package knowledge.
+build it without application-side package knowledge. Illuminate commit
+`b4a005b17aacfcb28949160c5cf1a41ea6de81cc` consolidates its two local VIR
+stagers, but that script still installs/builds/copies client inputs itself and
+does not yet emit a fresh source-package-v1 directory through a stable producer
+entry point. Generic client staging is continuing in the separate
+`.worktrees/client-artifact-staging` lane based on checkpoint `9573843`.
 
 ## Commands
 
