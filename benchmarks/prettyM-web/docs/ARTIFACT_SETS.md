@@ -51,9 +51,10 @@ source-build catalog and its selected lockfiles are committed.
 ## Assemble a candidate
 
 1. Select a canonical example build from `artifact-builds.json` and resolve
-   its exact sources to clean local checkouts. Run the source builder with the
-   selected `BUILD` and `--checkout NAME=PATH` arguments; see
-   `ARTIFACT_BUILDS.md`.
+   its exact sources to clean local checkouts. Materialize the default
+   `_sources/` layout with `artifacts:sources`, or select existing FIR/VIR
+   producer checkouts with `--toolchain [NAME=]PATH` or a toolchain config.
+   Run the source builder for the selected `BUILD`; see `ARTIFACT_BUILDS.md`.
 2. Review the source-build receipt and validated `_artifacts/seed/`.
 3. Run `npm run artifacts:pack -- --build BUILD`.
 4. Review the generated manifest under `_artifacts/releases/`.

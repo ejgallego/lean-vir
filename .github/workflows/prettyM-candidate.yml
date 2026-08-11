@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/prettyM-candidate.yml"
       - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/examples/**"
       - "benchmarks/prettyM-web/package-lock.json"
       - "benchmarks/prettyM-web/package.json"
       - "benchmarks/prettyM-web/index.html"
@@ -20,6 +21,7 @@ on:
     paths:
       - ".github/workflows/prettyM-candidate.yml"
       - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/examples/**"
       - "benchmarks/prettyM-web/package-lock.json"
       - "benchmarks/prettyM-web/package.json"
       - "benchmarks/prettyM-web/index.html"
