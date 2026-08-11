@@ -44,6 +44,40 @@ including signed zero.
 version 8. It is a library-owned type with runtime-specialized lowering, not an
 application custom-inductive convention.
 
+### Relationship To `Lean.Json`
+
+`Lean.Vir.Json` is not an alias, coercion, or boundary spelling for
+`Lean.Json`. The two types describe the same broad JSON shapes, but serve
+different representations. Their correspondence is currently symbolic:
+
+| JSON shape | `Lean.Vir.Json` | `Lean.Json` |
+| --- | --- | --- |
+| null | `.null` | `.null` |
+| boolean | `.bool value` | `.bool value` |
+| number | `.number value` with `Float` | `.num value` with `JsonNumber` |
+| string | `.string value` | `.str value` |
+| array | `.array items` | `.arr items` |
+| object | `.object entries` with an ordered array | `.obj fields` with a tree map |
+
+This table is documentation, not an implemented conversion API. In
+particular, VIR does not define a `Coe` instance or conversion functions
+between the types. Such a conversion could not be an implicit lossless
+isomorphism:
+
+- `Lean.JsonNumber` stores an exact decimal mantissa and exponent, while a
+  JavaScript number and `Lean.Vir.Json.number` are IEEE-754 doubles. Converting
+  a `JsonNumber` can round or overflow, and converting through `Lean.Json`
+  cannot retain the sign of JavaScript negative zero.
+- `Lean.Json.obj` stores fields in a tree map, which does not retain the source
+  JavaScript enumeration order. `Lean.Vir.Json.object` keeps that order because
+  it is observable when lifting back to JavaScript and serializing the result.
+
+`Lean.Json` is therefore appropriate for parsing and rendering JSON text with
+exact decimal values. `Lean.Vir.Json` is the runtime-value representation for
+crossing already-materialized JavaScript values without a text codec. If
+executable adapters are added later, their names and result types should make
+the rounding, overflow, signed-zero, and ordering policy explicit.
+
 ## Borrowed JSON Handles
 
 `Lean.Vir.Json.Handle` retains an ordinary JavaScript JSON value as a runtime

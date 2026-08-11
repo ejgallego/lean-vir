@@ -260,6 +260,11 @@ their Lean representation.
 - `Lean.Vir.Json.Handle.ofJson` and `toJson` make an explicit transition
   between the owned and borrowed lanes.
 
+`Lean.Vir.Json` is intentionally distinct from Lean's text-oriented
+`Lean.Json`; their constructor-level correspondence and the number and object
+ordering differences are documented symbolically rather than exposed as an
+implicit conversion.
+
 The complete contract, validation rules, depth limit, ownership examples, and
 lane-selection guidance are in [JSON_LANES.md](JSON_LANES.md).
 
