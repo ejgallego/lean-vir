@@ -19,6 +19,11 @@ assert.deepEqual(report.summary, {
   provided: 132,
   missingProvider: 0,
   runtimeOnly: 0,
+  publicSurface: {
+    entries: 363,
+    targetEdges: 2888,
+    reachedTargets: 132,
+  },
   analysis: {
     externalGroups: 23,
     complete: 1,
@@ -46,6 +51,17 @@ const roots = report.libraries.flatMap((library) =>
   library.apiGroups.map((root) => ({ library: library.id, ...root })));
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
 assert.equal(new Set(targets).size, 132, "every shipped target should occur exactly once");
+const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
+assert.equal(publicEntries.size, 363);
+assert.deepEqual(
+  publicEntries.get("Lean.Vir.Browser.HTMLCanvasElement.getContext2D")?.targets.find(
+    (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
+  )?.path,
+  [
+    "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
+    "_private.Vir.Browser.0.Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
+  ],
+);
 
 const documentRoot = roots.find((root) => root.library === "browser" && root.id === "document");
 assert.deepEqual(documentRoot?.analysis, {
@@ -151,8 +167,10 @@ assert.match(html, /Automatic analysis/u);
 assert.match(html, /Upstream contract needs input/u);
 assert.match(html, /runtime coverage and API fidelity/u);
 assert.match(html, /Upstream libraries/u);
-assert.match(html, /VIR targets/u);
-assert.match(html, /Type fidelity comparisons/u);
+assert.match(html, /Public Lean API/u);
+assert.match(html, /Host targets/u);
+assert.match(html, /Expected versus actual type/u);
+assert.match(html, /Reviewed type fidelity/u);
 assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");

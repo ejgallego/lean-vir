@@ -8,6 +8,9 @@ one searchable page.
 The current report covers 119 ordinary `@[vir_js]` declarations and 13
 `@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
 shipped provider; there are no missing providers and no provider-only targets.
+The same compiler scan finds 363 public executable Lean declarations that
+reach those targets through 2,888 concrete IR call paths. Every shipped target
+is reached by at least one public declaration.
 Generation indexes the complete configured TypeScript surface for 20 API
 groups before presenting the report. The reviewed `Document` analysis expands
 its inheritance graph to 271 properties and methods: four members map to VIR's
@@ -21,7 +24,7 @@ React DOM root retains its narrower curated comparison.
 
 ## Fidelity Contract
 
-This check makes four mechanically enforceable claims:
+This check makes five mechanically enforceable claims:
 
 1. Every row comes from elaborated declarations and compiled IR metadata, not
    source-text matching.
@@ -34,6 +37,9 @@ This check makes four mechanically enforceable claims:
 4. Every declared target must be implemented by a shipped browser/React,
    virtual Node, or runtime-intrinsic provider, and every such provider target
    must have a compiled declaration.
+5. Public Lean-to-target links come from transitive references in compiled IR.
+   Each link carries its declaration path; the report does not infer callers
+   from naming or source text.
 
 This prevents accidental representation drift such as exposing a raw Lean
 `String` where the JavaScript API returns a `Js String`. Ergonomic wrappers may
@@ -64,6 +70,12 @@ The explorer reports independent facts for each API group:
 - **findings** contain only concrete runtime, coverage, or type-fidelity
   problems. An automatic suggestion is evidence for review, not a fidelity
   verdict.
+
+A **public Lean API** row is a public executable declaration in the measured
+`Vir` environment that reaches at least one JavaScript host target. It does not
+claim to inventory type-only declarations or pure APIs that never cross the
+host boundary. A **host target** is the lower-level dispatch key implemented by
+the JavaScript runtime.
 
 Therefore a green provided target proves that VIR ships the runtime path, while
 an automatic correspondence only proposes which upstream declaration to
@@ -100,6 +112,7 @@ once.
 compiled Vir + Vir.Infoview environments
   -> compiler-decoded vir_js metadata
   -> signature and boundary-policy validation
+  -> public declaration call reachability and exact paths
 
 browser/React + virtual Node provider maps
 runtime object-handle intrinsic targets
@@ -116,7 +129,7 @@ TypeScript declarations + configured API-group entry points
 reviewed API-group intent + focused type-anchor comparisons
   -> semantic comparison results
 
-reconciled targets + API groups + comparisons
+reconciled targets + public call paths + API groups + comparisons
   -> one machine report
   -> one interactive library explorer
 ```
@@ -148,13 +161,14 @@ automatic groups distinguish unique suggestions, ambiguous suggestions, and
 unmapped upstream entries.
 
 Use **Upstream libraries** to start from a library contract and inspect VIR's
-coverage. Use **VIR targets** for the reverse direction: all 132 low-level
-shipped targets, their providers and boundary declarations, and any reviewed or
-suggested upstream correspondence. This reverse view is an exhaustive inventory
-of the JavaScript boundary, not yet an inventory of public Lean wrappers.
-Deriving public-wrapper-to-target reachability requires an additional
-compiler-backed call-graph edge; the explorer deliberately does not infer that
-edge from source text.
+coverage. Expanding a mapped upstream entry shows its expected TypeScript
+declaration beside the nearest public Lean API type. Use **Public Lean API** for
+the reverse product surface: 363 public declarations, their elaborated types,
+source locations, nearest upstream expectations, and exact compiler paths to
+host targets. Use **Host targets** for all 132 lower-level dispatch keys, their
+providers and implementation boundaries. Reviewed mappings prefer the exact
+reviewed public declaration; other transitive callers remain available without
+being presented as reviewed matches.
 
 `docs/bindings/shipped-v1.coverage.json` and
 `docs/bindings/shipped-v1.dashboard.html` remain lower-level reconciliation

@@ -57,6 +57,16 @@ structure Binding where
   metadata : Vir.HostMetadata.HostImportMetadata
   boundary : Vir.Interface.HostImportBoundary
 
+structure ReachedTarget where
+  target : String
+  path : Array Name
+
+structure PublicEntry where
+  name : Name
+  info : ConstantInfo
+  moduleName : Name
+  targets : Array ReachedTarget
+
 def bindingJson (binding : Binding) : CoreM String := do
   let type ← prettyType binding.info
   let source ← declarationSourceJson binding.name
@@ -88,12 +98,86 @@ def collectBindings (env : Environment) : CoreM (Array Binding) := do
     else
       lhs.metadata.target < rhs.metadata.target
 
-def reportJson (options : Options) (env : Environment) : CoreM (String × Nat × Nat × Nat) := do
+private def rootName : Name → Name
+  | .str .anonymous part => .str .anonymous part
+  | .str pre _ => rootName pre
+  | .num pre _ => rootName pre
+  | .anonymous => .anonymous
+
+private def selectedModule (modules : Array Name) (moduleName : Name) : Bool :=
+  modules.any fun selected => rootName selected == rootName moduleName
+
+private def uniqueSortedNames (names : Array Name) : Array Name := Id.run do
+  let mut seen : Std.HashSet Name := {}
+  let mut result := #[]
+  for name in names do
+    if seen.contains name then continue
+    seen := seen.insert name
+    result := result.push name
+  return result.qsort fun lhs rhs => lhs.quickLt rhs
+
+private def reachableTargets (env : Environment) (root : Name) : Array ReachedTarget := Id.run do
+  let mut visited : Std.HashSet Name := {}
+  let mut found : Std.HashSet String := {}
+  let mut results : Array ReachedTarget := #[]
+  let mut pending : Array (Name × Array Name) := #[(root, #[root])]
+  let mut cursor := 0
+  while cursor < pending.size do
+    let (name, path) := pending[cursor]!
+    cursor := cursor + 1
+    if visited.contains name then continue
+    visited := visited.insert name
+    let some declaration := Lean.IR.findEnvDecl env name | continue
+    match virJsMetadataFromDecl? declaration with
+    | some metadata =>
+        if !found.contains metadata.target then
+          found := found.insert metadata.target
+          results := results.push { target := metadata.target, path }
+    | none =>
+        for dependency in uniqueSortedNames (refsOfDecl declaration) do
+          if !visited.contains dependency then
+            pending := pending.push (dependency, path.push dependency)
+  return results.qsort fun lhs rhs => lhs.target < rhs.target
+
+private def publicEntryJson (entry : PublicEntry) : CoreM String := do
+  let type ← prettyType entry.info
+  let source ← declarationSourceJson entry.name
+  let targets := entry.targets.map fun reached => jsonObject #[
+    ("target", jsonString reached.target),
+    ("path", jsonArray (reached.path.map jsonName))
+  ]
+  return jsonObject #[
+    ("declaration", jsonName entry.name),
+    ("module", jsonName entry.moduleName),
+    ("type", jsonString type),
+    ("source", source),
+    ("targets", jsonArray targets)
+  ]
+
+private def collectPublicEntries
+    (env : Environment) (modules : Array Name) : CoreM (Array PublicEntry) := do
+  let mut entries : Array PublicEntry := #[]
+  for (name, info) in env.constants do
+    if isPrivateName name then continue
+    let moduleName := (← findModuleOf? name).getD .anonymous
+    if !selectedModule modules moduleName then continue
+    let targets := reachableTargets env name
+    if targets.isEmpty then continue
+    entries := entries.push { name, info, moduleName, targets }
+  return entries.qsort fun lhs rhs => lhs.name.toString < rhs.name.toString
+
+def reportJson
+    (options : Options) (env : Environment) :
+    CoreM (String × Nat × Nat × Nat × Nat × Nat × Nat) := do
   let bindings ← collectBindings env
+  let publicEntries ← collectPublicEntries env options.modules
   let rows ← bindings.mapM bindingJson
+  let publicRows ← publicEntries.mapM publicEntryJson
   let hostImports := bindings.filter (·.metadata.marker == .hostImport) |>.size
   let explicitConversions := bindings.filter (·.metadata.marker == .explicitConversion) |>.size
   let targets := bindings.map (·.metadata.target) |>.toList.eraseDups.length
+  let publicTargetEdges := publicEntries.foldl (fun count entry => count + entry.targets.size) 0
+  let publicTargets := publicEntries.flatMap (·.targets.map (·.target)) |>.toList.eraseDups.length
   let json := jsonObject #[
     ("format", jsonString "lean-vir-js-inventory"),
     ("version", jsonNat 1),
@@ -108,15 +192,21 @@ def reportJson (options : Options) (env : Environment) : CoreM (String × Nat ×
       ("declarations", jsonNat bindings.size),
       ("virJs", jsonNat hostImports),
       ("explicitConversions", jsonNat explicitConversions),
-      ("targets", jsonNat targets)
+      ("targets", jsonNat targets),
+      ("publicEntries", jsonNat publicEntries.size),
+      ("publicTargetEdges", jsonNat publicTargetEdges),
+      ("publicTargets", jsonNat publicTargets)
     ]),
-    ("bindings", jsonArray rows)
+    ("bindings", jsonArray rows),
+    ("publicEntries", jsonArray publicRows)
   ]
-  return (json, hostImports, explicitConversions, targets)
+  return (json, hostImports, explicitConversions, targets,
+    publicEntries.size, publicTargetEdges, publicTargets)
 
 unsafe def run (options : Options) : IO UInt32 := do
   let env ← loadLibrarySurfaceEnvironment options.modules
-  let (json, hostImports, explicitConversions, targets) ← (reportJson options env).toIO'
+  let (json, hostImports, explicitConversions, targets,
+      publicEntries, publicTargetEdges, publicTargets) ← (reportJson options env).toIO'
     { fileName := options.output.toString, fileMap := default }
     { env }
   let contents := json ++ "\n"
@@ -133,6 +223,9 @@ unsafe def run (options : Options) : IO UInt32 := do
   IO.println s!"  vir_js declarations: {hostImports}"
   IO.println s!"  explicit conversions: {explicitConversions}"
   IO.println s!"  distinct targets: {targets}"
+  IO.println s!"  public entries reaching targets: {publicEntries}"
+  IO.println s!"  public entry/target edges: {publicTargetEdges}"
+  IO.println s!"  targets reached from public entries: {publicTargets}"
   let action := if options.check then "validated" else "wrote"
   IO.println s!"  artifact: {action} {options.output}"
   return 0

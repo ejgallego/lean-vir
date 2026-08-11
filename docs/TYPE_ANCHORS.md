@@ -86,6 +86,13 @@ mappings do not yet exist, it proposes candidates from owner, member, and
 accessor names. These candidates make the audit queue visible; they do not
 claim that the Lean and TypeScript types are faithful.
 
+The explorer joins those candidates with compiler-derived Lean call
+reachability. For a proposed or reviewed host target, it displays the expected
+TypeScript declaration beside the elaborated type of the nearest public Lean
+declaration, followed by the private or public implementation boundary. This
+makes the inputs to a fidelity review visible without turning an automatic name
+match into a structural verdict.
+
 ## Artifact Ownership
 
 The checked-in reports are generated review artifacts. Edit their authored

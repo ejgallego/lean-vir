@@ -25,6 +25,24 @@ assert.equal(report.summary.declaredTargets, 132);
 assert.equal(report.summary.provided, 132);
 assert.equal(report.summary.missingProvider, 0);
 assert.equal(report.summary.runtimeOnly, 0);
+assert.equal(report.summary.publicEntries, 363);
+assert.equal(report.summary.publicTargetEdges, 2888);
+assert.equal(report.summary.targetsReachedByPublicEntries, 132);
+
+const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
+const publicCanvasContext = publicEntries.get(
+  "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
+);
+assert.match(publicCanvasContext?.type ?? "", /DomM \(Option \(Lean\.Vir\.Js/u);
+assert.deepEqual(
+  publicCanvasContext?.targets.find(
+    (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
+  )?.path,
+  [
+    "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
+    "_private.Vir.Browser.0.Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
+  ],
+);
 
 const byTarget = new Map(report.bindings.map((entry) => [entry.target, entry]));
 assert.equal(byTarget.get("browser.document.getTitle")?.declarations[0]?.boundary, "hostResource");
