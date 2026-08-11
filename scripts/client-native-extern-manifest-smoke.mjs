@@ -168,6 +168,33 @@ try {
     { ...baseManifest, nativeLookup: "dynamic" },
     /unknown field `nativeLookup`/,
   );
+  await expectManifestFailure(
+    tempRoot,
+    "empty-modules",
+    { ...baseManifest, modules: [] },
+    /field `modules` must not be empty/,
+  );
+  await expectManifestFailure(
+    tempRoot,
+    "absolute-provider",
+    {
+      ...baseManifest,
+      providerSources: [join(tempRoot, "client_native_fixture.c")],
+    },
+    /must be relative to the manifest/,
+  );
+  await expectManifestFailure(
+    tempRoot,
+    "parent-provider",
+    { ...baseManifest, providerSources: ["../client_native_fixture.c"] },
+    /must be a normalized relative path/,
+  );
+  await expectManifestFailure(
+    tempRoot,
+    "missing-provider",
+    { ...baseManifest, providerSources: ["missing.c"] },
+    /provider source `missing\.c` does not exist/,
+  );
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }

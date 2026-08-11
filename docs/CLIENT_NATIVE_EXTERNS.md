@@ -15,6 +15,18 @@ Without a client-native profile, package generation uses that Lean body. With a
 profile, the same declaration is packaged as a native extern and the runtime
 contains a compiler-generated boxed adapter plus the client provider.
 
+The provider implements the raw C ABI named by `@[extern]`; VIR generates only
+the boxed adapter used by the interpreter. For this scalar example, the provider
+can be an ordinary C file:
+
+```c
+#include <stdint.h>
+
+uint32_t my_project_increment(uint32_t value) {
+  return value + 1;
+}
+```
+
 ## Manifest
 
 Put `lean-vir-native-externs.json` at the root of the client's Lake project:
@@ -65,6 +77,11 @@ LEAN_PATH=/path/to/lean-vir/.lake/build/lib/lean \
 The manifest must be visible to both commands. This is intentional: it makes
 native-over-fallback package selection and runtime provider selection one
 profile rather than two independent allowlists.
+
+The resulting Wasm runtime is specific to that manifest and must be deployed
+with packages generated under the same selection. Rebuilding without
+`VIR_NATIVE_EXTERN_MANIFEST` restores the generic VIR runtime. The manifest is
+mutually exclusive with the experimental `VIR_NATIVE_EXTERN_EXTRAS_FILE`.
 
 The generated boundary report records the manifest and provider sources.
 `build/upstream-probe/generated/native-provider-symbols.tsv` records the raw

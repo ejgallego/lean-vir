@@ -196,6 +196,26 @@ experiment. The lean-zip client can now keep its seven portable fallback
 annotations and select all their native providers through
 `VIR_NATIVE_EXTERN_MANIFEST` without a VIR catalog edit.
 
+The validated lean-zip manifest is:
+
+```json
+{
+  "format": "lean-vir-client-native-externs",
+  "version": 1,
+  "modules": ["Zip.Native.Wide"],
+  "externs": [
+    "ByteArray.ugetUInt32LE",
+    "ByteArray.ugetUInt64LE",
+    "ByteArray.usetUInt32LE",
+    "ByteArray.usetUInt64LE",
+    "ByteArray.pushUInt64LE",
+    "UInt32.log2Clz",
+    "UInt64.ctzFast"
+  ],
+  "providerSources": ["c/bytearray_wide_ffi.c"]
+}
+```
+
 ## `Float.log2` fidelity
 
 Lean rc2 declares `Float.log2` as `@[extern "log2"] opaque`, so there is no

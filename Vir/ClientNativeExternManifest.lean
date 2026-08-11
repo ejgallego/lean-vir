@@ -20,8 +20,6 @@ open GeneratePackage
 def clientNativeExternManifestEnv : String := "VIR_NATIVE_EXTERN_MANIFEST"
 
 structure ClientNativeExternManifest where
-  path : System.FilePath
-  root : System.FilePath
   modules : Array Name
   externs : Array Name
   providerSources : Array System.FilePath
@@ -106,7 +104,7 @@ def readClientNativeExternManifest
   let root := path.parent.getD "."
   let providerSources ← (← stringArrayField path json "providerSources").mapM
     (resolveProviderSource path root)
-  let manifest : ClientNativeExternManifest := { path, root, modules, externs, providerSources }
+  let manifest : ClientNativeExternManifest := { modules, externs, providerSources }
   match ClientNativeExternManifest.specs manifest with
   | .ok _ => return manifest
   | .error error => manifestError path error
