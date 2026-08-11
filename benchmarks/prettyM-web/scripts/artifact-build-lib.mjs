@@ -17,6 +17,14 @@ function object(value, label) {
   return value;
 }
 
+function exactObject(value, properties, label) {
+  object(value, label);
+  const allowed = new Set(properties);
+  const unknown = Object.keys(value).find((property) => !allowed.has(property));
+  if (unknown) throw new Error(`${label} has unknown property ${unknown}`);
+  return value;
+}
+
 function identifier(value, label) {
   if (typeof value !== "string" || !idPattern.test(value)) {
     throw new Error(`${label} is not a safe identifier`);
@@ -117,7 +125,11 @@ export async function readBuildDatabase(path) {
 }
 
 export function validateBuildDatabase(database) {
-  object(database, "artifact build database");
+  exactObject(
+    database,
+    ["schemaVersion", "kind", "sources", "builds"],
+    "artifact build database",
+  );
   if (
     database.schemaVersion !== 2 ||
     database.kind !== "browser-benchmarks/artifact-build-catalog"
@@ -129,7 +141,11 @@ export function validateBuildDatabase(database) {
 
   for (const [sourceId, value] of Object.entries(database.sources)) {
     identifier(sourceId, "source ID");
-    object(value, `source ${sourceId}`);
+    exactObject(
+      value,
+      ["kind", "repository", "revision"],
+      `source ${sourceId}`,
+    );
     if (value.kind !== "git")
       throw new Error(`source ${sourceId} is not a Git source`);
     const repository = string(
@@ -146,7 +162,11 @@ export function validateBuildDatabase(database) {
 
   for (const [buildId, build] of Object.entries(database.builds)) {
     identifier(buildId, "build ID");
-    object(build, `build ${buildId}`);
+    exactObject(
+      build,
+      ["example", "artifactSet", "checkouts", "components"],
+      `build ${buildId}`,
+    );
     const example = object(build.example, `build ${buildId} example`);
     if (
       Object.keys(example).length !== 1 ||
@@ -155,7 +175,11 @@ export function validateBuildDatabase(database) {
       throw new Error(`build ${buildId} example must contain only its ID`);
     }
     const exampleId = identifier(example.id, `build ${buildId} example ID`);
-    object(build.artifactSet, `build ${buildId} artifactSet`);
+    exactObject(
+      build.artifactSet,
+      ["setId", "benchmarkContract"],
+      `build ${buildId} artifactSet`,
+    );
     identifier(build.artifactSet.setId, `build ${buildId} artifact set ID`);
     object(
       build.artifactSet.benchmarkContract,
@@ -176,6 +200,11 @@ export function validateBuildDatabase(database) {
     const destinations = new Set();
     for (const [componentId, component] of Object.entries(build.components)) {
       identifier(componentId, `build ${buildId} component ID`);
+      exactObject(
+        component,
+        ["dependencies", "artifact", "producer"],
+        `component ${componentId}`,
+      );
       object(component.artifact, `component ${componentId} artifact`);
       if (component.artifact.boundary !== artifactBoundary) {
         throw new Error(
@@ -192,6 +221,21 @@ export function validateBuildDatabase(database) {
       ) {
         throw new Error(`component ${componentId} has an unsupported producer`);
       }
+      const producerProperties = [
+        "protocol",
+        "adapter",
+        "checkouts",
+        "files",
+        "setup",
+      ];
+      if (producer.adapter !== "vir") {
+        producerProperties.push("entrypoint", "manifest");
+      }
+      exactObject(
+        producer,
+        producerProperties,
+        `component ${componentId} producer`,
+      );
       object(producer.checkouts, `component ${componentId} producer checkouts`);
       for (const [role, checkoutId] of Object.entries(producer.checkouts)) {
         identifier(role, `component ${componentId} checkout role`);
@@ -263,7 +307,11 @@ export function validateBuildDatabase(database) {
         }
       }
       for (const setup of producer.setup ?? []) {
-        object(setup, `component ${componentId} setup command`);
+        exactObject(
+          setup,
+          ["checkout", "command", "args"],
+          `component ${componentId} setup command`,
+        );
         if (!producer.checkouts[setup.checkout]) {
           throw new Error(
             `component ${componentId} setup uses unknown checkout role`,

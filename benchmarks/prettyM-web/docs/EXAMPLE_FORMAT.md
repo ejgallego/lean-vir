@@ -50,8 +50,11 @@ every `packages` entry the harness performs the same operations:
 2. build the catalogued VIR runtime once;
 3. invoke `lake exe vir_irpkg` with the declared target and exports;
 4. place the package under the example's artifact namespace;
-5. record source, runtime, package, and file digests; and
-6. run the example controller's smoke study.
+5. record source, runtime, package, and file digests.
+
+Compilation stops at that package boundary. Candidate validation then packs
+and imports the complete artifact set and runs the shared browser tests,
+including the example controller's smoke study.
 
 Clients do not provide compilation commands. More than one package is allowed
 for declarations that cannot share one closure, but the compilation procedure
@@ -73,6 +76,11 @@ repository. The module exports:
 export const view = { /* controls and presentation */ };
 export async function loadExample(context) { /* return controller */ }
 ```
+
+`context.example` is the selected, validated example descriptor.
+`context.artifactBaseUrl` is the URL of its derived
+`artifacts/<example-id>/` directory. It is available to controllers that load
+staged payloads directly, so they do not need to declare another artifact root.
 
 The returned controller implements `browser-benchmarks/controller/v1`:
 

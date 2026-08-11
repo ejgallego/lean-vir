@@ -6,7 +6,6 @@ export const view = {
     "Compare correctness, pipeline timings, scaling, and retained memory across five independently versioned implementations.",
   progress: "Preparing bounded artifact set…",
   artifacts: {
-    root: "artifacts/prettyM",
     copy:
       "When present, the manifest ties reports to one immutable set of independently versioned runtimes and workload packages.",
   },

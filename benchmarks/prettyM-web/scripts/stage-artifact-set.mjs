@@ -1,9 +1,10 @@
-import { cp, mkdir, rename, rm, stat } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   inside,
+  replaceDirectoryAtomically,
   safeArchivePath,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
@@ -40,20 +41,6 @@ function parseArgs(argv) {
   }
   if (!options.source) throw new Error("select an artifact set directory");
   return options;
-}
-
-async function replaceDirectory(next, destination) {
-  const previous = `${destination}.previous`;
-  await rm(previous, { recursive: true, force: true });
-  const existing = await stat(destination).catch(() => null);
-  if (existing) await rename(destination, previous);
-  try {
-    await rename(next, destination);
-  } catch (error) {
-    if (existing) await rename(previous, destination);
-    throw error;
-  }
-  await rm(previous, { recursive: true, force: true });
 }
 
 async function main() {
@@ -95,7 +82,7 @@ async function main() {
     resolve(source, "ARTIFACT_SET.json"),
     resolve(next, "ARTIFACT_SET.json"),
   );
-  await replaceDirectory(next, destination);
+  await replaceDirectoryAtomically(next, destination);
   console.log(
     `staged ${exampleId}: ${relative(appRoot, source)} -> ${relative(
       appRoot,

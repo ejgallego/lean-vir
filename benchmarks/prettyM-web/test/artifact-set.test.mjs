@@ -112,6 +112,43 @@ test("catalog build identity and artifact paths are example-neutral", async () =
   );
 });
 
+test("catalog contract objects reject unknown properties", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const cases = [
+    [(value) => (value.typo = true), "artifact build database"],
+    [(value) => (value.sources["fir-prettyM"].typo = true), "source fir-prettyM"],
+    [(value) => (value.builds.prettyM.typo = true), "build prettyM"],
+    [
+      (value) => (value.builds.prettyM.artifactSet.typo = true),
+      "build prettyM artifactSet",
+    ],
+    [
+      (value) => (value.builds.prettyM.components.vir.typo = true),
+      "component vir",
+    ],
+    [
+      (value) =>
+        (value.builds.prettyM.components.vir.producer.typo = true),
+      "component vir producer",
+    ],
+    [
+      (value) =>
+        (value.builds.prettyM.components.llvm.producer.setup[0].typo = true),
+      "component llvm setup command",
+    ],
+  ];
+  for (const [mutate, label] of cases) {
+    const candidate = structuredClone(database);
+    mutate(candidate);
+    assert.throws(
+      () => validateBuildDatabase(candidate),
+      new RegExp(`${label} has unknown property typo`),
+    );
+  }
+});
+
 test("creates a deterministic normalized tar and extracts only regular files", async () => {
   const source = join(scratch, "source");
   const extracted = join(scratch, "extracted");
@@ -375,6 +412,17 @@ test("stages a verified example namespace without replacing siblings", async () 
     "sibling\n",
   );
   await assert.rejects(() => readFile(join(destination, "old.txt")), /ENOENT/);
+});
+
+test("legacy artifact sets require an explicit non-staging fetch", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/fetch-artifact-set.mjs"],
+    { cwd: appRoot, encoding: "utf8" },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /legacy schema v1 and cannot be staged/);
+  assert.match(result.stderr, /pass --no-stage/);
 });
 
 test("rejects undeclared artifact-set members", async () => {

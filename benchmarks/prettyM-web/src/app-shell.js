@@ -51,12 +51,10 @@ function requireView(example, value) {
   }
   if (
     !value.artifacts ||
-    typeof value.artifacts.root !== "string" ||
-    value.artifacts.root !== `artifacts/${example.id}`
+    typeof value.artifacts.copy !== "string" ||
+    value.artifacts.copy.length === 0
   ) {
-    throw new Error(
-      `${example.id} view artifact root must be artifacts/${example.id}`,
-    );
+    throw new Error(`${example.id} view has no artifact status copy`);
   }
   if (!Array.isArray(value.controls) || !Array.isArray(value.studies)) {
     throw new Error(`${example.id} view has no controls or studies`);
@@ -126,7 +124,7 @@ function showArtifactStatus(status) {
 }
 
 async function inspectArtifactStatus(example, selectedView) {
-  const root = selectedView.artifacts.root.replace(/\/+$/, "");
+  const root = `artifacts/${example.id}`;
   const url = new URL(`../${root}/ARTIFACT_SET.json`, import.meta.url);
   try {
     const response = await fetch(url, { cache: "no-store" });
@@ -233,10 +231,9 @@ async function boot() {
   if (typeof selectedModule.loadExample !== "function") {
     throw new Error(`${selected.id} controller module does not export loadExample()`);
   }
-  const artifactRoot = selectedView.artifacts.root.replace(/\/+$/, "");
   controller = await selectedModule.loadExample({
     example: selected,
-    artifactBaseUrl: new URL(`../${artifactRoot}/`, import.meta.url),
+    artifactBaseUrl: new URL(`../artifacts/${selected.id}/`, import.meta.url),
   });
   const readiness = await controller.ready;
   return { example: selected.id, ...readiness };

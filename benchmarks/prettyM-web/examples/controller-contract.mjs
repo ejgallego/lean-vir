@@ -1,5 +1,3 @@
-export const CONTROLLER_CONTRACT = "browser-benchmarks/controller/v1";
-
 export function requireController(value, exampleId) {
   if (!value || typeof value !== "object") {
     throw new Error(`${exampleId} controller did not return an object`);

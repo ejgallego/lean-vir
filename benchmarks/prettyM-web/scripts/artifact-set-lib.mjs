@@ -329,7 +329,7 @@ export async function verifyArtifactSet(directory, lock = null) {
   return manifest;
 }
 
-export async function replaceDirectoryAtomically(source, destination) {
+export async function installDirectoryIfAbsent(source, destination) {
   const existing = await stat(destination).catch(() => null);
   if (existing) {
     await rm(source, { recursive: true, force: true });
@@ -338,4 +338,19 @@ export async function replaceDirectoryAtomically(source, destination) {
   await mkdir(dirname(destination), { recursive: true });
   await rename(source, destination);
   return true;
+}
+
+export async function replaceDirectoryAtomically(source, destination) {
+  await mkdir(dirname(destination), { recursive: true });
+  const previous = `${destination}.previous`;
+  await rm(previous, { recursive: true, force: true });
+  const existing = await stat(destination).catch(() => null);
+  if (existing) await rename(destination, previous);
+  try {
+    await rename(source, destination);
+  } catch (error) {
+    if (existing) await rename(previous, destination);
+    throw error;
+  }
+  await rm(previous, { recursive: true, force: true });
 }

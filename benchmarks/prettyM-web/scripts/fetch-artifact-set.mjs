@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 import {
   extractTar,
   inside,
+  installDirectoryIfAbsent,
   readJson,
-  replaceDirectoryAtomically,
   sha256,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
@@ -44,7 +44,7 @@ overrides must remain inside this application directory.
   --lock PATH       lockfile (default: artifact-set.lock.json)
   --archive PATH    workspace-local release archive instead of lock URL
   --sets-dir PATH   verified installation root (default: _artifacts/sets)
-  --no-stage        verify and install the set without staging artifacts`);
+  --no-stage        verify and install without staging (required for v1 sets)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
   }
@@ -108,6 +108,11 @@ async function main() {
   ) {
     throw new Error("unsupported artifact-set lockfile");
   }
+  if (lock.schemaVersion === 1 && options.stage) {
+    throw new Error(
+      `artifact set ${lock.setId} uses legacy schema v1 and cannot be staged; pass --no-stage to verify and install it, or select a namespaced v2 lock`,
+    );
+  }
 
   const bytes = options.archive
     ? await readFile(inside(appRoot, options.archive, "read archive"))
@@ -116,9 +121,8 @@ async function main() {
 
   const sets = inside(appRoot, options.setsDir, "install artifact set");
   const destination = resolve(sets, lock.setId);
-  let manifest;
   if (existsSync(destination)) {
-    manifest = await verifyArtifactSet(destination, lock);
+    await verifyArtifactSet(destination, lock);
     console.log(`verified cached artifact set: ${relative(appRoot, destination)}`);
   } else {
     const temporary = resolve(sets, `.${lock.setId}.partial-${process.pid}`);
@@ -126,8 +130,8 @@ async function main() {
     await mkdir(temporary, { recursive: true });
     try {
       await extractTar(bytes, temporary);
-      manifest = await verifyArtifactSet(temporary, lock);
-      await replaceDirectoryAtomically(temporary, destination);
+      await verifyArtifactSet(temporary, lock);
+      await installDirectoryIfAbsent(temporary, destination);
     } catch (error) {
       await rm(temporary, { recursive: true, force: true });
       throw error;

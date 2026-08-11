@@ -47,7 +47,7 @@ artifacts/
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
-source-build catalog and its selected lockfiles are committed.
+source-build catalog and the accepted lock are committed.
 
 ## Assemble a candidate
 
@@ -100,8 +100,10 @@ URL. After upload:
 1. Copy the reviewed candidate lock to the application's accepted lock and set
    `archive.url` to the exact HTTPS release asset URL.
 2. Change `status` to `published`; do not change any digest or byte count.
-3. Open a lockfile PR. CI runs `npm run artifacts:fetch` and `npm test` from a
-   clean clone.
+3. Open a lockfile PR. Before merge, validate the accepted URL and lock by
+   running `npm run artifacts:fetch` and `npm test` from a clean clone. The
+   current candidate workflow does not implement this consumer check; add it
+   when the first immutable v2 archive is promoted.
 4. Mark the release stable after the lockfile PR passes and merges. Promotion
    changes release visibility, not bytes.
 

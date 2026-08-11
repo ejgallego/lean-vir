@@ -5,9 +5,7 @@ import {
   mkdir,
   readFile,
   realpath,
-  rename,
   rm,
-  stat,
   writeFile,
 } from "node:fs/promises";
 import {
@@ -34,6 +32,7 @@ import {
   fileRecord,
   fileRecords,
   inside,
+  replaceDirectoryAtomically,
   sha256,
   validateSeed,
 } from "./artifact-set-lib.mjs";
@@ -454,20 +453,6 @@ async function validatePackage(
   }
 }
 
-async function replaceSeed(next, seed) {
-  const previous = `${seed}.previous`;
-  await rm(previous, { recursive: true, force: true });
-  const existing = await stat(seed).catch(() => null);
-  if (existing) await rename(seed, previous);
-  try {
-    await rename(next, seed);
-  } catch (error) {
-    if (existing) await rename(previous, seed);
-    throw error;
-  }
-  await rm(previous, { recursive: true, force: true });
-}
-
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const databasePath = inside(
@@ -596,7 +581,7 @@ async function main() {
   await validateSeed(nextSeed, artifactSetConfig(database, options.buildId));
   const records = await fileRecords(nextSeed, artifactFiles(build));
   const seed = inside(appRoot, "_artifacts/seed", "replace artifact seed");
-  await replaceSeed(nextSeed, seed);
+  await replaceDirectoryAtomically(nextSeed, seed);
 
   const receipt = {
     schemaVersion: 2,

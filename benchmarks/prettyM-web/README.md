@@ -44,8 +44,8 @@ committed `artifact-builds.json` supplies exact producer and workload Git
 revisions, producer dependencies, expected package files, and artifact-set
 provenance. The accepted lock is separate consumer state. The build driver
 resolves each `packageRef` through the example descriptor before invoking the
-uniform VIR compiler. Local
-checkout paths are supplied on the command line and are never committed. See
+uniform VIR compiler. Local checkout paths are supplied on the command line
+and are never committed. See
 `docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
 FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
@@ -94,8 +94,8 @@ It writes a deterministic normalized tar, member checksums, an
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
 `_artifacts/sets/`, and atomically stages only `artifacts/<example-id>/`.
-Staging one example preserves every sibling. Every input, cache, set, and
-output path is restricted to this application directory.
+Staging one example preserves every sibling. Artifact inputs and outputs plus
+orchestrator-owned caches are restricted to this application directory.
 Source compilation caches remain in the explicitly selected producer
 checkouts; only declared package bytes cross into this application.
 
@@ -216,9 +216,10 @@ npm run cards
 ```
 
 `campaign` launches the Node collector in fresh processes and writes both JSON
-and Markdown. `cards` turns the default report into VIR-001 through VIR-003.
-Both Python scripts use only the standard library; browser automation continues
-to use this package's Playwright dependency.
+and Markdown. `cards` is the historical set-0001 evidence flow: it turns a
+matching default report into VIR-001 through VIR-003. Both Python scripts use
+only the standard library; browser automation continues to use this package's
+Playwright dependency.
 
 VIR-002 also reads the committed
 `evidence/vir-pr104-runtime-call-profile.json`. This is a bounded, hash-identified
@@ -226,17 +227,21 @@ summary of two external diagnostic captures against the locked VIR package; raw
 profiles and profiler machinery remain in the VIR producer worktree. Card
 generation rejects the attribution when its Lean version or bounded runtime JS,
 Wasm, and IR-package identities do not match the benchmark report.
+The refreshed set-0002 candidate intentionally has different package bytes, so
+its correctness reports and campaigns cannot generate these cards until new
+controlled-machine evidence is reviewed and fingerprinted.
 
-The complete local refresh is:
+The complete historical set-0001 evidence refresh is:
 
 ```sh
 npm run refresh
 ```
 
 It reuses the currently staged examples, builds and serves the app, collects a
-report, refreshes cards, and runs a three-process campaign. Pass
-`--artifact-set _artifacts/sets/<set-id>` to atomically stage one verified v2
-set first. It never publishes or reads artifact directories outside this
+report, refreshes cards, and runs a three-process campaign. Its card step will
+reject set 0002 rather than attribute set-0001 profiles to changed binaries.
+Pass `--artifact-set _artifacts/sets/<set-id>` to atomically stage one verified
+v2 set first. It never publishes or reads artifact directories outside this
 application.
 
 ## Spin-off boundary

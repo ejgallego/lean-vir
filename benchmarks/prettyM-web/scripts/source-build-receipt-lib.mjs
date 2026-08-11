@@ -86,5 +86,4 @@ export async function verifySourceBuildReceipt({
       }
     }
   }
-  return { receipt, bytes: receiptBytes };
 }

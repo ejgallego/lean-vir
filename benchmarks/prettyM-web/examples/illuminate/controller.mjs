@@ -6,7 +6,6 @@ export const view = {
     "Compare the production JavaScript player with typed VIR and FIR-native implementations over identical animations and event traces.",
   progress: "Preparing rehearsal artifacts…",
   artifacts: {
-    root: "artifacts/illuminate",
     copy:
       "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
   },

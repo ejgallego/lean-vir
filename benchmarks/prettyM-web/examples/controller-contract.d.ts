@@ -21,7 +21,6 @@ export interface ExampleContext {
   artifactBaseUrl: URL;
 }
 
-export declare const CONTROLLER_CONTRACT: "browser-benchmarks/controller/v1";
 export declare function requireController(
   value: unknown,
   exampleId: string,
