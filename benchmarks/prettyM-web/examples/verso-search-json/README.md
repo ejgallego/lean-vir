@@ -11,10 +11,19 @@ and `domain-mappers.js` content captured from the Verso search experiment;
 only a terminal newline was added for the tracked files. Their committed
 SHA-256 identities are in `tests.json`. The pre-normalization upstream hashes
 were `ff2612f…` / `074719e…` for Manual and `711b45e…` / `3c81376…` for
-the literate project. The capture used Verso search experiment commit
-`1e50e60652508c8afea85a7a0399eb5309194337`. Together the fixtures cover all
-ten domain mappers and 323 output searchables. The borrowed variant additionally
-checks strict JavaScript identity for passthrough `ref` values.
+the literate project. The capture came from a local checkout of
+[`ejgallego/verso`](https://github.com/ejgallego/verso) at unpublished search
+experiment checkpoint `1e50e60652508c8afea85a7a0399eb5309194337`
+(`feat: add experimental VIR search backend`). The commit identifies the source
+state but is not a fetchable catalog input.
+
+To refresh the fixtures, reproduce the Manual and literate sites from that
+checkout, copy each generated `xref.json` and
+`-verso-search/domain-mappers.js`, add only a terminal newline, then update the
+hashes, domain lists, and searchable counts in `tests.json`. Together the
+fixtures cover all ten domain mappers and 323 output searchables. The borrowed
+variant additionally checks strict JavaScript identity for passthrough `ref`
+values.
 
 Run the catalog checks and inspect either build plan from the application
 directory:
