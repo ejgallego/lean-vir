@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example",
+  "id": "illuminate",
+  "title": "Illuminate player",
+  "summary": "Three backends · player trace parity and scaling",
+  "lifecycle": "rehearsal",
+  "packages": [
+    {
+      "id": "player",
+      "target": "src/Illuminate/Animation/Vir.lean",
+      "exports": [
+        "Illuminate.Animation.Vir.replayTrace",
+        "Illuminate.Animation.Vir.replayTraceTyped"
+      ]
+    }
+  ],
+  "controller": "examples/illuminate/controller.mjs"
+}

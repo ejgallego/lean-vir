@@ -64,6 +64,7 @@
     "bench:paired": "node scripts/bench-paired.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
     "bench:pretty:web:stage": "npm --prefix benchmarks/prettyM-web run stage --",
+    "bench:pretty:web:examples:check": "npm --prefix benchmarks/prettyM-web run examples:check",
     "bench:pretty:web:artifacts:sources": "npm --prefix benchmarks/prettyM-web run artifacts:sources --",
     "bench:pretty:web:artifacts:build": "npm --prefix benchmarks/prettyM-web run artifacts:build --",
     "bench:pretty:web:artifacts:candidate": "npm --prefix benchmarks/prettyM-web run artifacts:candidate --",

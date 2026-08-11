@@ -1,110 +1,71 @@
 // @ts-check
 
-const examples = [
-  {
-    id: "prettyM",
-    label: "Std.Format.prettyM",
-    summary: "Five backends · formatting, scaling, and memory",
-    eyebrow: "Bounded runtimes · browser Wasm",
-    title: "Std.Format.prettyM",
-    intro:
-      "Compare correctness, pipeline timings, scaling, and retained memory across five independently versioned implementations.",
-    progress: "Preparing bounded artifact set…",
-    artifactTone: "verified",
-    artifactHeading: "Canonical bounded artifact set",
-    artifactCopy:
-      "Reports remain tied to one verified, immutable set of independently versioned runtimes and workload packages.",
-    backendDescription:
-      "Choose which implementations participate in the next run. Report views have their own non-destructive backend filter.",
-    protocolDescription:
-      "Defaults match the consolidated browser study. Treat timings as observations unless the host and run protocol are controlled.",
-    controls: [
-      { id: "warmup", label: "Warm-up rounds", min: 0, max: 100, value: 2 },
-      { id: "samples", label: "Measured rounds", min: 1, max: 1000, value: 9 },
-      {
-        id: "batch-target",
-        label: "Batch target (ms)",
-        min: 0,
-        max: 1000,
-        value: 20,
-      },
-      {
-        id: "repeat-cycles",
-        label: "Repeat cycles",
-        min: 1,
-        max: 10000,
-        value: 32,
-      },
-    ],
-    studyDescription:
-      "Execute one study or collect the complete dashboard dataset.",
-    studies: [
-      { id: "smoke", label: "Quick check" },
-      { id: "differential", label: "Corpus" },
-      { id: "scaling", label: "Scaling" },
-      { id: "memory-retained", label: "Memory" },
-      { id: "interactions", label: "Interactions" },
-      { id: "repeated", label: "Repeated calls" },
-      { id: "suite", label: "Full suite", primary: true },
-    ],
-    emptyResults: "No prettyM benchmark has run yet.",
-    footer:
-      "Reports contain artifact provenance, startup timings, per-phase samples, parity results, and memory observations.",
-    classicScripts: [
-      "config.js",
-      "benchmark-core.js",
-      "backends/pretty-vir.js",
-      "backends/pretty-native.js",
-      "backends/pretty-llvm.js",
-      "dashboard.js",
-      "app.js",
-    ],
-    api: "__prettyBenchApp",
-  },
-  {
-    id: "illuminate",
-    label: "Illuminate player",
-    summary: "Three backends · player trace parity and scaling",
-    eyebrow: "Real client · browser Wasm",
-    title: "Illuminate player trace",
-    intro:
-      "Compare the production JavaScript player with typed VIR and FIR-native implementations over identical animations and event traces.",
-    progress: "Preparing rehearsal artifacts…",
-    artifactTone: "rehearsal",
-    artifactHeading: "Local integration rehearsal",
-    artifactCopy:
-      "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
-    backendDescription:
-      "JavaScript is the semantic oracle. VIR and FIR run the same typed replay contract and return normalized frame actions.",
-    protocolDescription:
-      "Runs are interleaved and starting order rotates. Adaptive batching is disabled because both Wasm runtimes retain allocations.",
-    controls: [
-      { id: "warmup", label: "Warm-up rounds", min: 0, max: 20, value: 1 },
-      { id: "samples", label: "Measured rounds", min: 1, max: 100, value: 5 },
-    ],
-    studyDescription:
-      "Quick check uses three trace lengths. Trace scaling adds longer event sequences and opens the shared plotting report.",
-    studies: [
-      { id: "quick", label: "Quick parity" },
-      { id: "scaling", label: "Trace scaling", primary: true },
-    ],
-    emptyResults: "No Illuminate benchmark has run yet.",
-    footer:
-      "Common plotted phases are prepare, execute, decode, and total. Backend-specific raw fields remain in the JSON report.",
-    externalScripts: ["artifacts/illuminate/workload/anim_core.js"],
-    classicScripts: ["dashboard.js"],
-    module: "illuminate-app.js",
-    api: "__illuminateBenchApp",
-  },
-];
-
+const catalogUrl = new URL("../examples/catalog.json", import.meta.url);
+const catalogResponse = await fetch(catalogUrl, { cache: "no-store" });
+if (!catalogResponse.ok) {
+  throw new Error(`failed to load example catalog: HTTP ${catalogResponse.status}`);
+}
+const catalog = await catalogResponse.json();
+if (
+  catalog?.schemaVersion !== 1 ||
+  catalog?.kind !== "browser-benchmarks/example-catalog" ||
+  !Array.isArray(catalog.examples)
+) {
+  throw new Error("unsupported example catalog");
+}
+const examples = catalog.examples.filter(
+  (example) => !["queued", "archived"].includes(example.lifecycle),
+);
 const selectedId = new URL(location.href).searchParams.get("example");
 const selected = examples.find((example) => example.id === selectedId) ?? null;
+const selectedModule = selected
+  ? await import(new URL(`../${selected.controller}`, import.meta.url).href)
+  : null;
+const view = selectedModule?.view ?? null;
+let controller = null;
 
 function element(id) {
   const found = document.querySelector(`#${id}`);
   if (!(found instanceof HTMLElement)) throw new Error(`missing #${id}`);
   return found;
+}
+
+function requireView(example, value) {
+  if (!value || typeof value !== "object") {
+    throw new Error(`${example.id} controller does not export view metadata`);
+  }
+  for (const field of [
+    "eyebrow",
+    "intro",
+    "progress",
+    "backendDescription",
+    "protocolDescription",
+    "studyDescription",
+    "emptyResults",
+    "footer",
+  ]) {
+    if (typeof value[field] !== "string" || value[field].length === 0) {
+      throw new Error(`${example.id} view.${field} must be a non-empty string`);
+    }
+  }
+  if (
+    !value.artifacts ||
+    typeof value.artifacts.root !== "string" ||
+    !value.artifacts.root.startsWith("artifacts")
+  ) {
+    throw new Error(`${example.id} view has no artifact root`);
+  }
+  if (!Array.isArray(value.controls) || !Array.isArray(value.studies)) {
+    throw new Error(`${example.id} view has no controls or studies`);
+  }
+  if (
+    !value.bootstrap ||
+    !Array.isArray(value.bootstrap.externalScripts) ||
+    !Array.isArray(value.bootstrap.classicScripts)
+  ) {
+    throw new Error(`${example.id} view has no bootstrap declaration`);
+  }
+  return value;
 }
 
 function renderNavigation() {
@@ -114,7 +75,7 @@ function renderNavigation() {
     link.href = `./?example=${example.id}`;
     link.dataset.example = example.id;
     const label = document.createElement("strong");
-    label.textContent = example.label;
+    label.textContent = example.title;
     const summary = document.createElement("small");
     summary.textContent = example.summary;
     link.append(label, summary);
@@ -123,13 +84,10 @@ function renderNavigation() {
   }
 }
 
-function renderControls(example) {
+function renderControls(selectedView) {
   const controls = element("protocol-controls");
-  controls.style.setProperty(
-    "--control-count",
-    String(example.controls.length),
-  );
-  for (const control of example.controls) {
+  controls.style.setProperty("--control-count", String(selectedView.controls.length));
+  for (const control of selectedView.controls) {
     const label = document.createElement("label");
     const text = document.createElement("span");
     text.textContent = control.label;
@@ -144,9 +102,9 @@ function renderControls(example) {
   }
 }
 
-function renderStudies(example) {
+function renderStudies(selectedView) {
   const actions = element("study-actions");
-  for (const study of example.studies) {
+  for (const study of selectedView.studies) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.study = study.id;
@@ -157,6 +115,7 @@ function renderStudies(example) {
 }
 
 function renderShell() {
+  renderNavigation();
   if (!selected) {
     document.documentElement.dataset.activeExample = "catalog";
     document.title = "Lean browser benchmarks";
@@ -166,31 +125,30 @@ function renderShell() {
       "Choose a benchmark example. Every example uses the same application shell, artifact status, backend selection, protocol, studies, and report workflow.";
     element("app-state").textContent = "Choose an example";
     element("app-state").dataset.state = "ready";
-    element("app-progress").textContent =
-      `${examples.length} examples available`;
+    element("app-progress").textContent = `${examples.length} examples available`;
     document.querySelectorAll("[data-example-content]").forEach((content) => {
       /** @type {HTMLElement} */ (content).hidden = true;
     });
-    renderNavigation();
     return;
   }
+
+  const selectedView = requireView(selected, view);
   document.documentElement.dataset.activeExample = selected.id;
-  document.title = `${selected.label} · Lean browser benchmarks`;
-  element("example-eyebrow").textContent = selected.eyebrow;
+  document.title = `${selected.title} · Lean browser benchmarks`;
+  element("example-eyebrow").textContent = selectedView.eyebrow;
   element("example-title").textContent = selected.title;
-  element("example-intro").textContent = selected.intro;
-  element("app-progress").textContent = selected.progress;
-  element("artifact-status").dataset.tone = selected.artifactTone;
-  element("artifact-status-heading").textContent = selected.artifactHeading;
-  element("artifact-status-copy").textContent = selected.artifactCopy;
-  element("backend-description").textContent = selected.backendDescription;
-  element("protocol-description").textContent = selected.protocolDescription;
-  element("study-description").textContent = selected.studyDescription;
-  element("empty-results").textContent = selected.emptyResults;
-  element("example-footer").textContent = selected.footer;
-  renderNavigation();
-  renderControls(selected);
-  renderStudies(selected);
+  element("example-intro").textContent = selectedView.intro;
+  element("app-progress").textContent = selectedView.progress;
+  element("artifact-status").dataset.tone = selectedView.artifacts.tone;
+  element("artifact-status-heading").textContent = selectedView.artifacts.heading;
+  element("artifact-status-copy").textContent = selectedView.artifacts.copy;
+  element("backend-description").textContent = selectedView.backendDescription;
+  element("protocol-description").textContent = selectedView.protocolDescription;
+  element("study-description").textContent = selectedView.studyDescription;
+  element("empty-results").textContent = selectedView.emptyResults;
+  element("example-footer").textContent = selectedView.footer;
+  renderControls(selectedView);
+  renderStudies(selectedView);
 }
 
 function loadScript(url) {
@@ -201,30 +159,30 @@ function loadScript(url) {
     script.addEventListener(
       "error",
       () => reject(new Error(`failed to load ${url}`)),
-      {
-        once: true,
-      },
+      { once: true },
     );
     document.head.appendChild(script);
   });
 }
 
 async function boot() {
-  if (!selected) {
-    return { example: null, readyCount: 0, backendCount: 0 };
-  }
-  for (const path of selected.externalScripts ?? []) {
+  if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
+  const selectedView = requireView(selected, view);
+  for (const path of selectedView.bootstrap.externalScripts) {
     await loadScript(new URL(`../${path}`, import.meta.url).href);
   }
-  for (const path of selected.classicScripts) {
-    await loadScript(new URL(path, import.meta.url).href);
+  for (const path of selectedView.bootstrap.classicScripts) {
+    await loadScript(new URL(`../${path}`, import.meta.url).href);
   }
-  if (selected.module)
-    await import(new URL(selected.module, import.meta.url).href);
-  const api = globalThis[selected.api];
-  if (!api?.ready)
-    throw new Error(`${selected.id} controller did not initialize`);
-  const readiness = await api.ready;
+  if (typeof selectedModule.loadExample !== "function") {
+    throw new Error(`${selected.id} controller module does not export loadExample()`);
+  }
+  const artifactRoot = selectedView.artifacts.root.replace(/\/+$/, "");
+  controller = await selectedModule.loadExample({
+    example: selected,
+    artifactBaseUrl: new URL(`../${artifactRoot}/`, import.meta.url),
+  });
+  const readiness = await controller.ready;
   return { example: selected.id, ...readiness };
 }
 
@@ -232,7 +190,7 @@ renderShell();
 
 globalThis.__benchmarkApp = {
   activeExample: selected?.id ?? null,
-  examples: examples.map(({ id, label }) => ({ id, label })),
+  examples: examples.map(({ id, title }) => ({ id, label: title })),
   ready: boot(),
-  getController: () => (selected ? globalThis[selected.api] : null),
+  getController: () => controller,
 };

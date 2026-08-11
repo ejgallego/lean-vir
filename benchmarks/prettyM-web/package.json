@@ -5,6 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "examples:check": "node scripts/check-example-catalog.mjs",
     "artifacts:sources": "node scripts/checkout-artifact-sources.mjs",
     "artifacts:build": "node scripts/build-artifacts.mjs",
     "artifacts:candidate": "node scripts/build-artifact-candidate.mjs",
@@ -20,7 +21,8 @@
     "campaign": "python3 scripts/run-campaign.py",
     "cards": "python3 scripts/generate-observation-cards.py",
     "refresh": "python3 scripts/refresh-benchmark.py",
-    "test": "npm run test:tools && npm run test:artifact-set && npm run test:browser",
+    "test": "npm run test:tools && npm run test:examples && npm run test:artifact-set && npm run test:browser",
+    "test:examples": "node --test test/example-catalog.test.mjs",
     "test:artifact-set": "node --test test/artifact-set.test.mjs",
     "test:tools": "node test/tool-smoke.mjs",
     "test:browser": "npm run build && node test/browser-smoke.mjs",

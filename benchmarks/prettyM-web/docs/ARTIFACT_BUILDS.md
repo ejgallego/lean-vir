@@ -1,11 +1,12 @@
 # Source artifact builds
 
-`artifact-builds.json` is the canonical catalog of buildable benchmark
-examples. A build record names its example and staging adapter, exact Git
-sources, the local checkout roles needed to resolve them, the producer entry
-points, the expected package files, component dependencies, artifact-set lock,
-and the provenance consumed by the packer. `prettyM` is the first record; it is
-not a default baked into the catalog tools.
+`examples/<id>/example.json` is the canonical declaration of each example's
+VIR targets and exports. `artifact-builds.json` selects exact Git sources, local
+checkout roles, producer dependencies, expected package files, artifact-set
+locks, and the provenance consumed by the packer. A VIR component names a
+`packageRef`; the driver resolves its target and exports from the example
+descriptor before validating or building it. `prettyM` is the first record; it
+is not a default baked into the catalog tools.
 
 Machine-specific paths are deliberately absent from the catalog. Resolve each
 source to an existing checkout when invoking the driver:
@@ -73,10 +74,11 @@ supplies verified checkout roots and a fresh output path. A producer must:
 5. return success only after its package-local smoke or differential checks
    pass.
 
-The initial adapters use the producer entry points that already exist:
+The VIR adapter is uniform across examples: every package reference becomes
+one `lake exe vir_irpkg` call over its declared target and exports. Clients do
+not provide shell commands. The other initial adapters use producer entry
+points that already exist:
 
-- VIR: `npm run build:demo:release`, `lake exe vir_irpkg`, and the checkout's
-  browser-runtime bundler;
 - FIR native: `integration/talos/artifact/package-pretty-format.sh OUTPUT`;
 - FIR LLVM: `integration/lcnf-c-wasm/package-prettyM-emscripten.sh OUTPUT`, with
   the just-built native package supplied for its differential check.
@@ -87,9 +89,10 @@ rewrite producer bytes. FIR LLVM depends on FIR native because its producer
 validates exact output equivalence against that package.
 
 The generated `_artifacts/builds/<build-id>/BUILD.json` is a local receipt. It
-records the catalog digest, resolved checkout commits, adapters, and staged
-file hashes. It is evidence about one invocation, not a second source of build
-configuration and not part of the published artifact set.
+records both the build-catalog and example-manifest digests, resolved checkout
+commits, adapters, and staged file hashes. It is evidence about one invocation,
+not a second source of build configuration and not part of the published
+artifact set.
 
 ## Assemble the immutable set
 

@@ -56,17 +56,13 @@
             },
             "workload": {
               "file": "prettyM-vir.irpkg",
+              "packageRef": "prettyM",
               "packageFormat": 10,
               "manifestVersion": 7,
               "source": {
                 "sourceRef": "prettyM-workload",
-                "file": "VersoSlides/Pretty.lean",
                 "dirty": false
-              },
-              "exports": [
-                "VersoSlides.Pretty.formatJsonSegmentsJsonForVir",
-                "VersoSlides.Pretty.formatSegmentsForVir"
-              ]
+              }
             }
           },
           "producer": {
@@ -76,34 +72,6 @@
               "producer": "vir",
               "workload": "workload"
             },
-            "entrypoints": {
-              "runtimeBuild": {
-                "command": "npm",
-                "args": ["run", "build:demo:release"]
-              },
-              "package": {
-                "command": "lake",
-                "args": ["exe", "vir_irpkg"]
-              },
-              "runtimeBundler": "node_modules/.bin/esbuild"
-            },
-            "inputs": {
-              "runtimeSource": "web/src/vir-runtime.js",
-              "releaseWasm": "web/public/vir-upstream.wasm",
-              "debugWasm": "web/public/vir-upstream.dev.wasm"
-            },
-            "setup": [
-              {
-                "checkout": "producer",
-                "command": "npm",
-                "args": ["install"]
-              },
-              {
-                "checkout": "producer",
-                "command": "npm",
-                "args": ["run", "setup"]
-              }
-            ],
             "files": {
               "prettyM-vir.irpkg": "prettyM-vir.irpkg",
               "lean-vir/js/vir-runtime.js": "lean-vir/js/vir-runtime.js",

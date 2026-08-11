@@ -12,6 +12,12 @@ The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
 this package.
 
+Client examples use the compact `browser-benchmarks/example` v1 descriptor
+under `examples/<id>/example.json`. It declares only identity, lifecycle, Lean
+targets and exports, and a browser controller. Run `npm run examples:check` to
+validate the catalog. See [`docs/EXAMPLE_FORMAT.md`](docs/EXAMPLE_FORMAT.md)
+for the contribution and uniform VIR compilation contract.
+
 ## Responsibilities
 
 - load the JavaScript, VIR JSON, VIR typed-Format, native FIR Wasm, and
@@ -33,11 +39,12 @@ slide DOM state.
 
 ## Artifact contract
 
-The committed `artifact-builds.json` is the canonical catalog for rebuilding
-example artifacts. Each build defines its example and staging adapter, exact
-producer and workload Git revisions, producer entry points and dependencies,
-expected package files, lock path, and artifact-set provenance. Local checkout
-paths are supplied on the command line and are never committed. See
+The example descriptors are canonical for VIR targets and exports. The
+committed `artifact-builds.json` supplies exact producer and workload Git
+revisions, producer dependencies, expected package files, lock paths, and
+artifact-set provenance. The build driver resolves each `packageRef` through
+the example descriptor before invoking the uniform VIR compiler. Local
+checkout paths are supplied on the command line and are never committed. See
 `docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
 Producer source remains in its owning Git repository. CI and self-contained

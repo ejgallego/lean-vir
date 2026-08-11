@@ -36,6 +36,14 @@ const buildEnvironment = {
   NPM_CONFIG_CACHE:
     process.env.NPM_CONFIG_CACHE ?? join(appRoot, "_artifacts/npm-cache"),
 };
+const virCompiler = {
+  runtimeBuild: ["npm", ["run", "build:demo:release"]],
+  packageBuild: ["lake", ["exe", "vir_irpkg"]],
+  runtimeBundler: "node_modules/.bin/esbuild",
+  runtimeSource: "web/src/vir-runtime.js",
+  releaseWasm: "web/public/vir-upstream.wasm",
+  debugWasm: "web/public/vir-upstream.dev.wasm",
+};
 
 function usage() {
   console.log(`Usage: node scripts/build-artifacts.mjs [options] BUILD
@@ -159,12 +167,9 @@ async function buildVir(component, output, resolvedCheckouts) {
   await mkdir(join(output, "lean-vir/js"), { recursive: true });
   await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
 
-  const entrypoints = component.producer.entrypoints;
-  run(entrypoints.runtimeBuild.command, entrypoints.runtimeBuild.args, {
-    cwd: vir,
-  });
-  const releaseWasm = join(vir, component.producer.inputs.releaseWasm);
-  const debugWasm = join(vir, component.producer.inputs.debugWasm);
+  run(virCompiler.runtimeBuild[0], virCompiler.runtimeBuild[1], { cwd: vir });
+  const releaseWasm = join(vir, virCompiler.releaseWasm);
+  const debugWasm = join(vir, virCompiler.debugWasm);
   const [releaseRecord, debugRecord] = await Promise.all([
     fileRecord(releaseWasm),
     fileRecord(debugWasm),
@@ -181,9 +186,9 @@ async function buildVir(component, output, resolvedCheckouts) {
     : `${workloadConfig.file}.report.md`;
   const reportPath = join(output, reportName);
   run(
-    entrypoints.package.command,
+    virCompiler.packageBuild[0],
     [
-      ...entrypoints.package.args,
+      ...virCompiler.packageBuild[1],
       packagePath,
       reportPath,
       "--target",
@@ -192,14 +197,14 @@ async function buildVir(component, output, resolvedCheckouts) {
     ],
     { cwd: vir },
   );
-  const esbuild = join(vir, entrypoints.runtimeBundler);
+  const esbuild = join(vir, virCompiler.runtimeBundler);
   if (!(await stat(esbuild).catch(() => null))?.isFile()) {
     throw new Error(`VIR esbuild is missing; rerun with --prepare: ${esbuild}`);
   }
   run(
     esbuild,
     [
-      join(vir, component.producer.inputs.runtimeSource),
+      join(vir, virCompiler.runtimeSource),
       "--bundle",
       "--format=esm",
       "--platform=browser",
@@ -379,6 +384,12 @@ async function main() {
   if (!options.buildId) throw new Error("select a build ID or pass --list");
 
   const build = selectBuild(database, options.buildId);
+  const examplePath = inside(
+    appRoot,
+    `examples/${build.example.id}/example.json`,
+    "read example manifest",
+  );
+  const exampleBytes = await readFile(examplePath);
   const sources = checkoutSources(database, options.buildId);
   for (const checkoutId of options.checkouts.keys()) {
     if (!sources[checkoutId])
@@ -415,9 +426,19 @@ async function main() {
   for (const componentId of order) {
     const component = build.components[componentId];
     if (options.prepare) {
-      for (const setup of component.producer.setup ?? []) {
-        const path = checkoutFor(component, setup.checkout, resolvedCheckouts);
-        run(setup.command, setup.args, { cwd: path });
+      if (component.producer.adapter === "vir") {
+        const path = checkoutFor(component, "producer", resolvedCheckouts);
+        run("npm", ["install"], { cwd: path });
+        run("npm", ["run", "setup"], { cwd: path });
+      } else {
+        for (const setup of component.producer.setup ?? []) {
+          const path = checkoutFor(
+            component,
+            setup.checkout,
+            resolvedCheckouts,
+          );
+          run(setup.command, setup.args, { cwd: path });
+        }
       }
     }
     const output = join(buildRoot, "packages", componentId);
@@ -467,6 +488,11 @@ async function main() {
     database: {
       file: relative(appRoot, databasePath),
       sha256: sha256(databaseBytes),
+    },
+    example: {
+      id: build.example.id,
+      file: relative(appRoot, examplePath),
+      sha256: sha256(exampleBytes),
     },
     sources: resolvedCheckouts,
     components: Object.fromEntries(

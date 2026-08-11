@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example",
+  "id": "prettyM",
+  "title": "Std.Format.prettyM",
+  "summary": "Five backends · formatting, scaling, and memory",
+  "lifecycle": "active",
+  "packages": [
+    {
+      "id": "prettyM",
+      "target": "VersoSlides/Pretty.lean",
+      "exports": [
+        "VersoSlides.Pretty.formatJsonSegmentsJsonForVir",
+        "VersoSlides.Pretty.formatSegmentsForVir"
+      ]
+    }
+  ],
+  "controller": "examples/prettyM/controller.mjs"
+}

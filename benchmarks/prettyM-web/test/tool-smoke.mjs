@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
+  [process.execPath, ["scripts/check-example-catalog.mjs", "--help"]],
   [process.execPath, ["scripts/checkout-artifact-sources.mjs", "--help"]],
   [process.execPath, ["scripts/build-artifacts.mjs", "--help"]],
   [process.execPath, ["scripts/build-artifact-candidate.mjs", "--help"]],
@@ -34,6 +35,15 @@ for (const [command, args] of commands) {
   );
   assert.match(result.stdout, /usage:/i);
 }
+
+const exampleList = spawnSync(
+  process.execPath,
+  ["scripts/check-example-catalog.mjs"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(exampleList.status, 0, exampleList.stderr);
+assert.match(exampleList.stdout, /^illuminate\trehearsal\tIlluminate player$/m);
+assert.match(exampleList.stdout, /^prettyM\tactive\tStd\.Format\.prettyM$/m);
 
 const buildList = spawnSync(
   process.execPath,

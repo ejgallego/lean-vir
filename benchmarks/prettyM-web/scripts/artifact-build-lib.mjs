@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 import { safeArchivePath } from "./artifact-set-lib.mjs";
+import { discoverExampleCatalog } from "./example-catalog-lib.mjs";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
@@ -65,11 +67,51 @@ function materializeComponent(database, component) {
     artifact.workload.source,
     "vir workload source",
   );
+  delete artifact.workload.packageRef;
   return artifact;
+}
+
+function materializeExamplePackages(database, catalog) {
+  const examples = new Map(
+    catalog.examples.map((example) => [example.id, example]),
+  );
+  for (const [buildId, build] of Object.entries(database.builds ?? {})) {
+    const exampleId = build?.example?.id;
+    const example = examples.get(exampleId);
+    if (!example) {
+      throw new Error(
+        `build ${buildId} references unknown example ${exampleId}`,
+      );
+    }
+    for (const [componentId, component] of Object.entries(
+      build.components ?? {},
+    )) {
+      if (component?.producer?.adapter !== "vir") continue;
+      const workload = component?.artifact?.workload;
+      if (!workload?.packageRef) continue;
+      const packageSpec = example.packages.find(
+        (item) => item.id === workload.packageRef,
+      );
+      if (!packageSpec) {
+        throw new Error(
+          `component ${componentId} references unknown ${exampleId} package ${workload.packageRef}`,
+        );
+      }
+      if (workload.source?.file || workload.exports) {
+        throw new Error(
+          `component ${componentId} duplicates target or exports from example package ${workload.packageRef}`,
+        );
+      }
+      workload.source.file = packageSpec.target;
+      workload.exports = structuredClone(packageSpec.exports);
+    }
+  }
 }
 
 export async function readBuildDatabase(path) {
   const database = JSON.parse(await readFile(path, "utf8"));
+  const catalog = await discoverExampleCatalog(resolve(dirname(path)));
+  materializeExamplePackages(database, catalog);
   validateBuildDatabase(database);
   return database;
 }
@@ -171,6 +213,10 @@ export function validateBuildDatabase(database) {
         destinations.add(destination);
       }
       if (producer.adapter === "vir") {
+        identifier(
+          component.artifact.workload.packageRef,
+          "VIR workload example package",
+        );
         const runtimeSource = build.checkouts[producer.checkouts.producer];
         const workloadSource = build.checkouts[producer.checkouts.workload];
         if (
@@ -180,28 +226,6 @@ export function validateBuildDatabase(database) {
           throw new Error(
             "VIR producer checkouts and artifact provenance must use the same sources",
           );
-        }
-        const entrypoints = object(
-          producer.entrypoints,
-          "VIR producer entrypoints",
-        );
-        for (const name of ["runtimeBuild", "package"]) {
-          const entrypoint = object(
-            entrypoints[name],
-            `VIR ${name} entrypoint`,
-          );
-          string(entrypoint.command, `VIR ${name} command`);
-          if (
-            !Array.isArray(entrypoint.args) ||
-            entrypoint.args.some((arg) => typeof arg !== "string")
-          ) {
-            throw new Error(`VIR ${name} args must be strings`);
-          }
-        }
-        safeArchivePath(entrypoints.runtimeBundler);
-        const inputs = object(producer.inputs, "VIR producer inputs");
-        for (const name of ["runtimeSource", "releaseWasm", "debugWasm"]) {
-          safeArchivePath(inputs[name]);
         }
         safeArchivePath(component.artifact.workload.source.file);
         if (!Object.hasOwn(producer.files, component.artifact.workload.file)) {
