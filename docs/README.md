@@ -54,6 +54,8 @@ ownership diagrams.
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md) owns the public Lean API inventory.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md) owns JavaScript host target behavior and
   resource cleanup rules.
+- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md) owns the exhaustive compiler/runtime
+  reconciliation for shipped JavaScript boundaries.
 - [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
   renderer details.
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns implementation paths, call-flow
@@ -94,6 +96,9 @@ ownership diagrams.
 - [TYPE_ANCHORS.md](TYPE_ANCHORS.md): generated TypeScript descriptors,
   compiler-backed Lean VIR comparison, standalone HTML reports, and the
   focused React DOM root review seed.
+- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): exhaustive compiler-derived
+  `vir_js` inventory, faithful boundary policy, shipped provider reconciliation,
+  and the interactive binding dashboard.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary

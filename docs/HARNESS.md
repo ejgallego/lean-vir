@@ -125,6 +125,7 @@ npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
 npm run generate:ir-codec-tags
+npm run check:shipped-bindings
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:client-native-externs
@@ -222,6 +223,8 @@ changes.
   `npm run check:api-coverage`; use
   `node scripts/check-api-coverage.mjs --write` only to materialize
   `build/analysis/api-coverage.tsv`
+- Lean `@[vir_js]`, explicit conversion, JavaScript provider, or host-boundary
+  policy changes: `npm run check:shipped-bindings`
 - IR package name/declaration tag changes:
   `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
   `npm run test:upstream`

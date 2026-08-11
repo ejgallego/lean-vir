@@ -25,6 +25,9 @@ The documentation owners are:
   artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
 - IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
   instead of invoking `lean --run tools/GeneratePackage.lean`.
+- Shipped JavaScript binding inventory and report generation live in
+  `tools/ExportVirJsInventory.lean` and
+  `scripts/generate-shipped-bindings-report.mjs`.
 - Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
 - IR declaration payload tag values live in
   `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in

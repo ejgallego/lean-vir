@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:tutorials
+      - run: npm run check:shipped-bindings
       - run: npm run check:type-anchors
       - run: npm run check:react-dom-root-type-anchors
       - run: npm run test:bench

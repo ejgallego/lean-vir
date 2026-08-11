@@ -10,6 +10,12 @@ diagnostic codes to decide what to revise. It is deliberately not a source-to-
 source binding generator yet. Once repeated, reviewed port intents become
 stable, a later generator can consume the same descriptor and intent data.
 
+The exhaustive shipped-boundary gate is documented separately in
+`SHIPPED_BINDINGS.md`. It proves that every compiled `@[vir_js]` and explicit
+conversion declaration obeys VIR's representation policy and has a shipped
+runtime provider. Type anchors add the narrower semantic question: how one of
+those faithful VIR boundaries corresponds to an upstream TypeScript API.
+
 ## Data Flow
 
 TypeScript information is generated from declaration files with the TypeScript
@@ -78,6 +84,11 @@ Markdown, or HTML output directly.
 | --- | --- | --- |
 | Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
 | React DOM root | `react-dom-root-v1.symbols.txt`, `react-dom-root-v1.dependencies.json`, `react-dom-root-v1.anchors.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+
+The separate shipped-bindings pipeline tracks
+`docs/bindings/shipped-v1.coverage.json` and
+`docs/bindings/shipped-v1.dashboard.html`; its compiler inventory remains under
+ignored `build/type-descriptors/` paths.
 
 Intermediate `.irpkg` and generator reports under `build/type-descriptors/`
 are ignored local artifacts.
