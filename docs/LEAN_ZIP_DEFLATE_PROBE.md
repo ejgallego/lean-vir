@@ -199,8 +199,8 @@ run checked 279 compression calls: 89 matrix vectors repeated three times plus
 12 larger one-shot vectors. These calls represented 3,899,628 input bytes and
 3,564,426 output bytes; the prescan set additionally scanned nine 1 MiB inputs.
 The repeated-text outputs were 0.49% of their input size, and heterogeneous
-outputs ranged from 65.51% to 66.95%, depending on level. Two observed runs took
-136.90–156.70 seconds after setup. These figures include lifting, lowering,
+outputs ranged from 65.51% to 66.95%, depending on level. Observed runs took
+136.90–178.99 seconds after setup. These figures include lifting, lowering,
 assertions, and large-input scans and are acceptance telemetry, not a
 compression throughput benchmark.
 
@@ -211,15 +211,45 @@ page count; `--passes 1` is available for a quicker diagnostic run but does not
 make this steady-state assertion. This is a bounded repeated-pass result, not a
 proof that every corpus has the same high-water mark.
 
-Vir still does not expose interpreter fuel or per-declaration sampling through
-the public runtime. The next performance gate is explicit hot-declaration
-instrumentation, followed by a broader representative corpus and cross-platform
-CI.
+### Scoped upper-level timing
+
+The harness has an opt-in diagnostic path:
+
+```bash
+npm run accept:lean-zip -- /path/to/lean-zip --passes 1 --profile
+```
+
+It substitutes six direct fixture exports for the larger levels 5 through 10
+calls and measures them with the existing `callTimed` execution phase. Each
+direct result must still match the public native `deflateRaw` output byte for
+byte and independently inflate to the input. Normal acceptance calls do not
+read the clock, and the upstream interpreter remains unmodified.
+
+One diagnostic run produced these inclusive execution times. Each cell is one
+sample, includes the small export wrapper, and is attribution evidence rather
+than a stable benchmark:
+
+| Level | Timed core path | Repeated text, 32 KiB | Heterogeneous, 64 KiB |
+| --- | --- | ---: | ---: |
+| 5 | `deflateRawL5Adaptive` | 812.16 ms | 2,422.57 ms |
+| 6 | `deflateRawL6Adaptive` | 872.66 ms | 2,933.96 ms |
+| 7 | `l7ProfileFor` + `deflateRawL7P` | 804.87 ms | 2,736.65 ms |
+| 8 | `deflateRawL8P` | 1,039.27 ms | 4,262.45 ms |
+| 9 | `deflateRawL9AdaptiveP` | 1,314.97 ms | 9,167.78 ms |
+| 10 | `deflateRawL10P` | 1,412.78 ms | 9,533.45 ms |
+
+On the heterogeneous input, level 9 is 2.15 times the level-8 time, while
+level 10 is only 1.04 times level 9. This suggests that the common optimal-path
+work, rather than only level 10's exact-DP increment, is the first family to
+split into finer measurements. Vir still does not expose interpreter fuel or a
+general per-declaration sampler through the public runtime; this fixture-level
+timing deliberately avoids adding that machinery before it is needed.
 
 ## Smallest next green slice
 
 The level matrix, current-platform entropy boundary, larger compressible cases,
-and repeated-pass memory check are green. The next smallest slice is lightweight
-per-declaration timing or sampling around the upper-level paths so future work
-can target measured interpreter hotspots. Broader corpus and cross-platform CI
-remain necessary before treating the integration as universal acceptance.
+repeated-pass memory check, and upper-level attribution are green. The next
+smallest slice is to separate matcher/base-candidate time from
+`deflateDynamicBlocksOptimalFast` and `deflateDynamicBlocksOptimal` on the
+heterogeneous input. Broader corpus and cross-platform CI remain necessary
+before treating the integration as universal acceptance.

@@ -21,4 +21,28 @@ def compressRaw (input : ByteArray) (level : UInt8) : ByteArray :=
 def incompressiblePrescan (input : ByteArray) : Bool :=
   Zip.Native.Deflate.incompressiblePrescan input
 
+@[vir_export]
+def profileLevel5 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL5Adaptive input
+
+@[vir_export]
+def profileLevel6 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL6Adaptive input
+
+@[vir_export]
+def profileLevel7 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL7P input (Zip.Native.Deflate.l7ProfileFor input)
+
+@[vir_export]
+def profileLevel8 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL8P input
+
+@[vir_export]
+def profileLevel9 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL9AdaptiveP input
+
+@[vir_export]
+def profileLevel10 (input : ByteArray) : ByteArray :=
+  Zip.Native.Deflate.deflateRawL10P input
+
 end VirLeanZipAcceptance

@@ -118,7 +118,9 @@ map lives in `docs/HARNESS.md`.
   matrix passes also assert that Wasm memory stabilizes after the first pass;
   pass `--passes 1` for a quicker diagnostic without that assertion. Requires
   an existing `web/public/vir-upstream.wasm`; pass `--keep` to retain temporary
-  artifacts.
+  artifacts. Add `--profile` to time direct levels 5 through 10 paths for the
+  larger corpora through the opt-in runtime phase timer; these single samples
+  are diagnostic attribution rather than benchmark evidence.
 - `npm run test:site`
   Build the Vite site, runnable-surface and Wasm-size reports, local archive,
   SDK archive, and check the generated `web/dist` artifact shape.

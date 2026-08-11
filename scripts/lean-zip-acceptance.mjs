@@ -28,6 +28,7 @@ const { values, positionals } = parseArgs({
   options: {
     keep: { type: "boolean", default: false },
     passes: { type: "string", default: "3" },
+    profile: { type: "boolean", default: false },
     wasm: { type: "string" },
   },
 });
@@ -35,7 +36,7 @@ const { values, positionals } = parseArgs({
 const leanZipArgument = positionals[0] ?? process.env.LEAN_ZIP_CHECKOUT;
 if (!leanZipArgument || positionals.length > 1) {
   throw new Error(
-    "usage: npm run accept:lean-zip -- /path/to/lean-zip [--passes count] [--wasm path] [--keep]",
+    "usage: npm run accept:lean-zip -- /path/to/lean-zip [--passes count] [--profile] [--wasm path] [--keep]",
   );
 }
 
@@ -49,6 +50,50 @@ const wasmPath = resolve(
   values.wasm ?? join(repoRoot, "web", "public", "vir-upstream.wasm"),
 );
 const lakefile = join(leanZipRoot, "lakefile.lean");
+const upperLevelProfiles = new Map([
+  [
+    5,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel5",
+      declaration: "Zip.Native.Deflate.deflateRawL5Adaptive",
+    },
+  ],
+  [
+    6,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel6",
+      declaration: "Zip.Native.Deflate.deflateRawL6Adaptive",
+    },
+  ],
+  [
+    7,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel7",
+      declaration: "Zip.Native.Deflate.l7ProfileFor + deflateRawL7P",
+    },
+  ],
+  [
+    8,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel8",
+      declaration: "Zip.Native.Deflate.deflateRawL8P",
+    },
+  ],
+  [
+    9,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel9",
+      declaration: "Zip.Native.Deflate.deflateRawL9AdaptiveP",
+    },
+  ],
+  [
+    10,
+    {
+      exportName: "VirLeanZipAcceptance.profileLevel10",
+      declaration: "Zip.Native.Deflate.deflateRawL10P",
+    },
+  ],
+]);
 
 for (const [path, message] of [
   [lakefile, `lean-zip Lake configuration not found: ${lakefile}`],
@@ -216,9 +261,14 @@ async function runAcceptance() {
   let compressedInputBytes = 0;
   let compressedOutputBytes = 0;
   let compressionCalls = 0;
+  const profileResults = [];
   const started = performance.now();
   try {
-    const runCompressionVector = async (vector, requireSmaller) => {
+    const runCompressionVector = async (
+      vector,
+      requireSmaller,
+      profileTarget = null,
+    ) => {
       const source = await input(vector.inputFile);
       const native = await nativeOutput(vector.outputFile);
       if (requireSmaller) {
@@ -228,15 +278,26 @@ async function runAcceptance() {
         );
       }
       let vir;
+      let timings = null;
       try {
-        vir = runtime.call(
-          "VirLeanZipAcceptance.compressRaw",
-          source,
-          vector.level,
-        );
+        if (profileTarget === null) {
+          vir = runtime.call(
+            "VirLeanZipAcceptance.compressRaw",
+            source,
+            vector.level,
+          );
+        } else {
+          ({ value: vir, timings } = runtime.callTimed(
+            profileTarget.exportName,
+            source,
+          ));
+        }
       } catch (cause) {
         throw new Error(
-          `${vector.name} level ${vector.level}: VIR call failed`,
+          `${vector.name} level ${vector.level}: VIR call failed` +
+            (profileTarget === null
+              ? ""
+              : ` through ${profileTarget.exportName}`),
           { cause },
         );
       }
@@ -260,12 +321,20 @@ async function runAcceptance() {
       return {
         inputBytes: source.byteLength,
         outputBytes: vir.byteLength,
+        timings,
       };
     };
 
     const largeResults = new Map();
     for (const vector of manifest.largeCompression) {
-      const result = await runCompressionVector(vector, true);
+      const profileTarget = values.profile
+        ? upperLevelProfiles.get(vector.level)
+        : null;
+      assert.ok(
+        profileTarget !== undefined,
+        `${vector.name} level ${vector.level}: no upper-level profile export`,
+      );
+      const result = await runCompressionVector(vector, true, profileTarget);
       const current = largeResults.get(vector.name) ?? {
         inputBytes: result.inputBytes,
         outputBytes: [],
@@ -277,6 +346,15 @@ async function runAcceptance() {
       );
       current.outputBytes.push(result.outputBytes);
       largeResults.set(vector.name, current);
+      if (result.timings !== null) {
+        profileResults.push({
+          corpus: vector.name,
+          level: vector.level,
+          declaration: profileTarget.declaration,
+          inputBytes: result.inputBytes,
+          timings: result.timings,
+        });
+      }
     }
 
     for (const vector of manifest.prescan) {
@@ -339,6 +417,22 @@ async function runAcceptance() {
         })
         .join(", ")}`,
     );
+    if (profileResults.length > 0) {
+      console.log(
+        "upper-level profile: diagnostic single samples; execute includes the export wrapper",
+      );
+      for (const result of profileResults) {
+        const throughputKiBs =
+          result.timings.executeMs === 0
+            ? Infinity
+            : result.inputBytes / 1024 / (result.timings.executeMs / 1000);
+        console.log(
+          `profile: corpus=${result.corpus} level=${result.level} ` +
+            `declaration=${result.declaration} execute=${result.timings.executeMs.toFixed(2)}ms ` +
+            `total=${result.timings.totalMs.toFixed(2)}ms throughput=${throughputKiBs.toFixed(2)}KiB/s`,
+        );
+      }
+    }
     console.log(
       `runtime: ${(elapsedMs / 1000).toFixed(2)}s; Wasm pages: initial=${initialPages}, ` +
         `after large/prescan=${setupPages}, passes=${passPages.join(",")}, final=${finalPages}`,
