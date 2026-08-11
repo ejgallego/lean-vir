@@ -219,14 +219,21 @@ export function validateBuildDatabase(database) {
         destinations.add(destination);
       }
       if (producer.adapter === "vir") {
+        string(
+          component.artifact.runtime?.wasiSdk,
+          "VIR runtime WASI SDK version",
+        );
         identifier(
           component.artifact.workload.packageRef,
           "VIR workload example package",
         );
         const runtimeSource = build.checkouts[producer.checkouts.producer];
+        const leanSource = build.checkouts[producer.checkouts.runtime];
         const workloadSource = build.checkouts[producer.checkouts.workload];
         if (
           component.artifact.runtime?.sourceRef !== runtimeSource ||
+          component.artifact.lean?.commit !==
+            database.sources[leanSource]?.revision ||
           component.artifact.workload?.source?.sourceRef !== workloadSource
         ) {
           throw new Error(

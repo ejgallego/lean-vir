@@ -1,9 +1,10 @@
 # Source artifact builds
 
 `examples/<id>/example.json` is the canonical declaration of each example's
-VIR targets and exports. `artifact-builds.json` selects exact Git sources, local
-checkout roles, producer dependencies, expected package files, artifact-set
-identity, and the provenance consumed by the packer. Accepted locks are
+VIR targets and exports. `artifact-builds.json` selects exact Git sources,
+including the Lean runtime source consumed by VIR, local checkout roles,
+producer dependencies, expected package files, artifact-set identity, and the
+provenance consumed by the packer. Accepted locks are
 separate consumer state. A VIR component names a `packageRef`; the driver
 resolves its target and exports from the example
 descriptor before validating or building it. `prettyM` is the first record; it
@@ -78,6 +79,7 @@ working tree does not match the catalog. The controlled layout is:
 ```text
 _sources/vir/       lean-vir at the catalogued commit
 _sources/fir/       lean-fir at the catalogued commit
+_sources/lean/      Lean interpreter/runtime source at the component's commit
 _sources/workload/  verso-slides at the catalogued commit
 ```
 
@@ -91,15 +93,23 @@ The driver defaults npm's cache to `_artifacts/npm-cache`, keeping setup writes
 inside the application checkout. Set `NPM_CONFIG_CACHE` explicitly only when a
 different controlled cache is desired.
 
+Prepared VIR checkouts normally provide their lockfile-pinned esbuild binary.
+For an offline local build, `VIR_ESBUILD` may select an existing controlled
+binary; the driver checks its version against the VIR checkout's package lock
+before starting the expensive runtime build. `WASI_SDK_PATH` may likewise
+select an already installed catalog-compatible SDK.
+
 The driver never fetches, switches, or edits source revisions. Each path must
 be the root of a clean Git checkout whose `HEAD` is the catalog's full commit.
 This keeps local worktree policy outside the portable build description.
 
 Remove `--plan` to build all components and atomically replace
 `_artifacts/seed`. Prepared checkouts can build directly. Add `--prepare` for a
-fresh checkout; the catalog then runs the VIR npm setup and the FIR
-Emscripten/Lean-runtime setup before their respective builds. These setup steps
-may download toolchains and are intentionally explicit.
+fresh checkout; the driver installs VIR's npm dependencies and WASI SDK and
+runs the FIR Emscripten/Lean-runtime setup before their respective builds. Lean
+source is an ordinary exact catalog checkout rather than an ambient VIR setup
+side effect. These setup steps may download toolchains and are intentionally
+explicit.
 
 ## Producer package contract
 

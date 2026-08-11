@@ -56,8 +56,8 @@ the immutable artifact-set lock.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
-`_sources/{vir,fir,workload}` directory; no producer source is copied into this
-application or an artifact archive:
+`_sources/{vir,fir,lean,workload}` directory; no producer source is copied into
+this application or an artifact archive:
 
 ```sh
 npm run artifacts:sources -- prettyM

@@ -7,6 +7,11 @@
       "repository": "https://github.com/ejgallego/lean-fir",
       "revision": "298682a766d80e90053d3e76ee2f3e4af78a52aa"
     },
+    "lean-4.33.0-rc2": {
+      "kind": "git",
+      "repository": "https://github.com/leanprover/lean4",
+      "revision": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+    },
     "prettyM-workload": {
       "kind": "git",
       "repository": "https://github.com/leanprover/verso-slides",
@@ -34,6 +39,7 @@
       },
       "checkouts": {
         "fir": "fir-prettyM",
+        "lean": "lean-4.33.0-rc2",
         "vir": "vir-pr104",
         "workload": "prettyM-workload"
       },
@@ -68,6 +74,7 @@
             "adapter": "vir",
             "checkouts": {
               "producer": "vir",
+              "runtime": "lean",
               "workload": "workload"
             },
             "files": {

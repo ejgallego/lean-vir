@@ -10,7 +10,15 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -204,14 +212,68 @@ async function resetOutput(output) {
   await mkdir(dirname(output), { recursive: true });
 }
 
+async function resolveVirEsbuild(vir) {
+  const lock = JSON.parse(
+    await readFile(join(vir, "package-lock.json"), "utf8"),
+  );
+  const expectedVersion = lock.packages?.["node_modules/esbuild"]?.version;
+  if (typeof expectedVersion !== "string") {
+    throw new Error("VIR package lock does not pin esbuild");
+  }
+  const selected = process.env.VIR_ESBUILD
+    ? resolve(process.env.VIR_ESBUILD)
+    : join(vir, virCompiler.runtimeBundler);
+  if (!(await stat(selected).catch(() => null))?.isFile()) {
+    throw new Error(
+      `VIR esbuild is missing; rerun with --prepare or set VIR_ESBUILD: ${selected}`,
+    );
+  }
+  const actualVersion = run(selected, ["--version"], { capture: true });
+  if (actualVersion !== expectedVersion) {
+    throw new Error(
+      `VIR esbuild version mismatch: expected ${expectedVersion}, got ${actualVersion}`,
+    );
+  }
+  return selected;
+}
+
+async function resolveVirWasiSdk(component, vir) {
+  const selected = resolve(
+    process.env.WASI_SDK_PATH ?? join(vir, ".tools/wasi-sdk"),
+  );
+  if (!(await stat(join(selected, "bin/clang++")).catch(() => null))?.isFile()) {
+    throw new Error(
+      `VIR WASI SDK is missing; rerun with --prepare or set WASI_SDK_PATH: ${selected}`,
+    );
+  }
+  const expectedVersion = component.artifact.runtime.wasiSdk;
+  const installed = basename(await realpath(selected));
+  if (!installed.startsWith(`wasi-sdk-${expectedVersion}-`)) {
+    throw new Error(
+      `VIR WASI SDK version mismatch: expected ${expectedVersion}, got ${installed}`,
+    );
+  }
+  return selected;
+}
+
 async function buildVir(component, output, resolvedCheckouts) {
   const vir = checkoutFor(component, "producer", resolvedCheckouts);
+  const lean = checkoutFor(component, "runtime", resolvedCheckouts);
   const workload = checkoutFor(component, "workload", resolvedCheckouts);
+  const esbuild = await resolveVirEsbuild(vir);
+  const wasiSdk = await resolveVirWasiSdk(component, vir);
   await resetOutput(output);
   await mkdir(join(output, "lean-vir/js"), { recursive: true });
   await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
 
-  run(virCompiler.runtimeBuild[0], virCompiler.runtimeBuild[1], { cwd: vir });
+  run(virCompiler.runtimeBuild[0], virCompiler.runtimeBuild[1], {
+    cwd: vir,
+    env: {
+      ...buildEnvironment,
+      LEAN4_SRC: lean,
+      WASI_SDK_PATH: wasiSdk,
+    },
+  });
   const releaseWasm = join(vir, virCompiler.releaseWasm);
   const debugWasm = join(vir, virCompiler.debugWasm);
   const [releaseRecord, debugRecord] = await Promise.all([
@@ -241,10 +303,6 @@ async function buildVir(component, output, resolvedCheckouts) {
     ],
     { cwd: vir },
   );
-  const esbuild = join(vir, virCompiler.runtimeBundler);
-  if (!(await stat(esbuild).catch(() => null))?.isFile()) {
-    throw new Error(`VIR esbuild is missing; rerun with --prepare: ${esbuild}`);
-  }
   run(
     esbuild,
     [
@@ -489,7 +547,7 @@ async function main() {
       if (component.producer.adapter === "vir") {
         const path = checkoutFor(component, "producer", resolvedCheckouts);
         run("npm", ["install"], { cwd: path });
-        run("npm", ["run", "setup"], { cwd: path });
+        run("npm", ["run", "install:wasi"], { cwd: path });
       } else {
         for (const setup of component.producer.setup ?? []) {
           const path = checkoutFor(

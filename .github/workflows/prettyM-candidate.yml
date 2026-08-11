@@ -71,7 +71,6 @@ jobs:
           path: |
             benchmarks/prettyM-web/_artifacts/npm-cache
             benchmarks/prettyM-web/_sources/vir/.tools/cache
-            benchmarks/prettyM-web/_sources/vir/third_party/lean4-src
             benchmarks/prettyM-web/_sources/fir/.deps/lcnf-c-wasm
           key: ${{ runner.os }}-${{ runner.arch }}-prettyM-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
 

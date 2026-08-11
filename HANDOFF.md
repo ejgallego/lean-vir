@@ -109,32 +109,37 @@ for an accepted or rejected optimization conclusion. Treat them as
 inconclusive, leave bounded set 0001 unchanged, and require measurements from a
 controlled host before importing a decision.
 
-The full `prettyM` source build previously passed with merged FIR `main` at
+The full `prettyM` source build passed with merged FIR `main` at
 `298682a766d80e90053d3e76ee2f3e4af78a52aa`, including the native marshaling
 change. VIR, FIR native, and FIR LLVM produced complete packages; the
 producer-local checks passed, native and LLVM agreed on exact traces, and the
 assembled candidate passed the application's tool, artifact-set, and
-five-backend browser smoke tests. The latest rehearsal materialized all three
-sources below the application-local `_sources/` directory, exactly as CI will.
-Its receipt is
+five-backend browser smoke tests. The latest local build selected four exact
+sources: FIR, VIR, Lean interpreter/runtime, and the Verso Slides workload. CI
+will materialize all four below the application-local `_sources/` directory.
+The portable receipt is
 `benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`, and its candidate
 archive has SHA-256
-`531ac9af7a6ae48e07384edae6f86fb174d0a2c66e0184f2f3116d2df1fca1f6`
-and size 2,680,320 bytes. No performance measurement was collected.
+`109d1d254fa4799295019a24581e753418a9851488b741f034d7e38a80f73847`
+and size 2,686,976 bytes. Repacking the same seed reproduced that digest. No
+performance measurement was collected.
 
 The committed set-0001 lock and its `26f54081e15145b6...` archive remain
 deliberately unchanged. The application-local ignored `artifacts/prettyM/`
-tree is a relocated rehearsal of the previously built bytes and does not carry
-a v2 `ARTIFACT_SET.json`; the UI correctly labels it unverified. Fresh
+tree is staged from the verified set-0002 candidate and carries its v2
+`ARTIFACT_SET.json`; the UI reports the exact set ID. The generic import
+preserved `artifacts/illuminate/`, and both browser clients passed. Fresh
 source-built archives can differ from set 0001 despite matching source and
-toolchain identities. Treat any source-built archive as a candidate, not a
-silent lock refresh.
+toolchain identities. Treat set 0002 as a candidate, not a silent accepted-lock
+refresh.
 
 Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
 The validated candidate layout is the self-contained
-`benchmarks/prettyM-web/_sources/{vir,fir,workload}` tree populated from the
-catalog. Existing clean linked worktrees may still be passed explicitly to the
-lower-level source builder, but they are not part of the CI contract.
+`benchmarks/prettyM-web/_sources/{vir,fir,lean,workload}` tree populated from
+the catalog. Lean's interpreter/runtime source is an explicit checkout, not an
+ambient VIR setup dependency. Existing clean linked worktrees may still be
+passed explicitly to the lower-level source builder, but they are not part of
+the CI contract.
 
 The current VIR `.irpkg` generator embeds generation time and source-path
 spelling. Source identity is exact, but fresh VIR packages are not yet expected
