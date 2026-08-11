@@ -1,0 +1,80 @@
+{
+  "$schema": "../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "browser",
+  "title": "Browser APIs",
+  "description": "DOM, events, canvas, animation, timers, and browser-owned values exposed by Vir.Browser.",
+  "lean": { "modules": ["Vir.Browser"] },
+  "roots": [
+    {
+      "id": "animation",
+      "title": "Animation frames",
+      "targets": ["browser.animation.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Animation"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["requestAnimationFrame", "cancelAnimationFrame"] }
+    },
+    {
+      "id": "canvas-2d",
+      "title": "Canvas 2D",
+      "targets": ["browser.canvas2d.*"],
+      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D"] }
+    },
+    {
+      "id": "console",
+      "title": "Console",
+      "targets": ["browser.console.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Console"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Console"] }
+    },
+    {
+      "id": "document",
+      "title": "Document",
+      "targets": ["browser.document.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Document"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" }
+    },
+    {
+      "id": "element",
+      "title": "Element",
+      "targets": ["browser.element.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Element"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" }
+    },
+    {
+      "id": "event",
+      "title": "Events",
+      "targets": ["browser.event.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Event"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Event"] }
+    },
+    {
+      "id": "canvas-element",
+      "title": "HTML canvas element",
+      "targets": ["browser.htmlCanvasElement.*"],
+      "lean": { "public": ["Lean.Vir.Browser.HTMLCanvasElement"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["HTMLCanvasElement"] }
+    },
+    {
+      "id": "input-element",
+      "title": "HTML input element",
+      "targets": ["browser.htmlInputElement.*"],
+      "lean": { "public": ["Lean.Vir.Browser.HTMLInputElement"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["HTMLInputElement"] }
+    },
+    {
+      "id": "timers",
+      "title": "Timers",
+      "targets": ["browser.timer.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Timer"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] }
+    },
+    {
+      "id": "owned-primitives",
+      "title": "Browser-owned primitives",
+      "targets": ["js.float.owned", "js.string.owned"],
+      "lean": { "public": ["Lean.Vir.Browser.ownedFloat", "Lean.Vir.Browser.ownedString"] },
+      "upstream": { "kind": "internal" }
+    }
+  ]
+}

@@ -538,6 +538,7 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     notes: reviewedDiagnostics.map((item) => item.message),
     diagnostics: reviewedDiagnostics,
     ...(anchor.category ? { category: anchor.category } : {}),
+    ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
     ...(anchor.portIntent ? { portIntent: anchor.portIntent } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),

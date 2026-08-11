@@ -1,0 +1,17 @@
+{
+  "$schema": "../../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "proofwidgets",
+  "title": "ProofWidgets RPC",
+  "description": "ProofWidgets reference transport and inspection calls implemented by the VIR host.",
+  "lean": { "modules": ["Vir.ProofWidgets.Rpc"] },
+  "roots": [
+    {
+      "id": "rpc-references",
+      "title": "RPC references",
+      "targets": ["proofwidgets.rpc.*", "js.value.proofwidgets.*"],
+      "lean": { "public": ["Lean.Vir.ProofWidgets.Rpc"] },
+      "upstream": { "kind": "local" }
+    }
+  ]
+}

@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const scriptPath = fileURLToPath(import.meta.url);
+const root = resolve(dirname(scriptPath), "..");
 
 function usage() {
   console.error(`usage: node scripts/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
@@ -19,6 +20,8 @@ function usage() {
 Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
 Options:
+  --binding-root FILE#ID
+                  Load declarations, roots, policy, and anchors from a binding-library root.
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
   --symbols FILE  Keep TypeScript symbol ids listed in FILE.
@@ -41,6 +44,7 @@ function fail(message) {
 
 function parseArgs(argv) {
   const files = [];
+  let bindingRoot = null;
   let anchors = null;
   let out = null;
   let check = false;
@@ -60,6 +64,9 @@ function parseArgs(argv) {
         anchors = argv[index + 1];
         if (!anchors || anchors.startsWith("--")) fail("--anchors requires a file");
         index += 1;
+        break;
+      case "--binding-root":
+        bindingRoot = requiredValue(argv, ++index, "--binding-root");
         break;
       case "--symbol":
         symbols.add(requiredValue(argv, ++index, "--symbol"));
@@ -93,12 +100,21 @@ function parseArgs(argv) {
         break;
     }
   }
-  if (files.length === 0) fail("at least one TypeScript declaration file is required");
+  if (files.length === 0 && bindingRoot === null) {
+    fail("at least one TypeScript declaration file or --binding-root is required");
+  }
+  if (bindingRoot !== null &&
+      (files.length !== 0 || anchors !== null || symbols.size !== 0 || symbolFiles.length !== 0 ||
+       sourceUrl !== null || dependencyDepth !== 0 || dependencyPolicy !== null)) {
+    fail("--binding-root supplies declarations, roots, policy, and anchors; do not pass those options separately");
+  }
   if (check && out === null) fail("--check requires --out");
   if (sourceUrl !== null && files.length !== 1) fail("--source-url requires exactly one declaration file");
   return {
     files: files.map((file) => resolve(root, file)),
+    bindingRoot,
     anchors: anchors === null ? null : resolve(root, anchors),
+    anchorsData: null,
     out: out === null ? null : resolve(root, out),
     check,
     symbols,
@@ -106,6 +122,7 @@ function parseArgs(argv) {
     sourceUrl,
     dependencyDepth,
     dependencyPolicy,
+    dependencyPolicyData: null,
   };
 }
 
@@ -115,31 +132,37 @@ function requiredValue(argv, index, option) {
   return value;
 }
 
-const cli = parseArgs(process.argv.slice(2));
-const descriptor = await generateDescriptorFile(cli);
-const text = `${JSON.stringify(descriptor, null, 2)}\n`;
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === scriptPath) await main();
 
-if (cli.out === null) {
-  process.stdout.write(text);
-} else if (cli.check) {
-  const existing = await readFile(cli.out, "utf8");
-  if (existing.replace(/\r\n/g, "\n") !== text) {
-    fail(`${relative(root, cli.out)} is stale; rerun the corresponding generation step without --check`);
+async function main() {
+  const cli = await resolveBindingRoot(parseArgs(process.argv.slice(2)));
+  const descriptor = await generateDescriptorFile(cli);
+  const text = `${JSON.stringify(descriptor, null, 2)}\n`;
+
+  if (cli.out === null) {
+    process.stdout.write(text);
+  } else if (cli.check) {
+    const existing = await readFile(cli.out, "utf8");
+    if (existing.replace(/\r\n/g, "\n") !== text) {
+      fail(`${relative(root, cli.out)} is stale; rerun the corresponding generation step without --check`);
+    }
+    console.log(`validated ${relative(root, cli.out)}`);
+  } else {
+    await writeFile(cli.out, text);
+    console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
   }
-  console.log(`validated ${relative(root, cli.out)}`);
-} else {
-  await writeFile(cli.out, text);
-  console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
 }
 
-async function generateDescriptorFile({
+export async function generateDescriptorFile({
   files,
   anchors,
+  anchorsData,
   symbols: requestedSymbols,
   symbolFiles,
   sourceUrl,
   dependencyDepth,
   dependencyPolicy,
+  dependencyPolicyData,
 }) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
@@ -159,9 +182,9 @@ async function generateDescriptorFile({
   const sourceFiles = program.getSourceFiles()
     .filter((sourceFile) => fileSet.has(resolve(sourceFile.fileName)));
   const symbols = [];
-  const symbolIds = new Set();
+  const symbolsById = new Map();
   for (const sourceFile of sourceFiles) {
-    collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolIds);
+    collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolsById);
   }
   const availableSymbols = sourceUrl === null
     ? symbols
@@ -176,14 +199,15 @@ async function generateDescriptorFile({
   for (const id of symbolFilter) {
     if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
   }
-  const policy = dependencyPolicy === null
-    ? new Map()
-    : await readDependencyPolicy(dependencyPolicy);
+  const policy = dependencyPolicyData !== null
+    ? validateDependencyPolicy({ version: 1, symbols: dependencyPolicyData }, "binding root dependency policy")
+    : dependencyPolicy === null ? new Map() : await readDependencyPolicy(dependencyPolicy);
   const closure = dependencyClosure(rootSymbols, availableSymbols, policy, dependencyDepth);
   const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
-  const anchorData = anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8"));
+  const anchorData = anchorsData ??
+    (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -203,6 +227,39 @@ async function generateDescriptorFile({
   return descriptor;
 }
 
+async function resolveBindingRoot(options) {
+  if (options.bindingRoot === null) return options;
+  const separator = options.bindingRoot.lastIndexOf("#");
+  if (separator <= 0 || separator === options.bindingRoot.length - 1) {
+    fail("--binding-root must use FILE#ID syntax");
+  }
+  const configPath = resolve(root, options.bindingRoot.slice(0, separator));
+  const rootId = options.bindingRoot.slice(separator + 1);
+  const config = JSON.parse(await readFile(configPath, "utf8"));
+  if (config?.version !== 1 || !Array.isArray(config.roots)) {
+    fail(`${relative(root, configPath)} is not a binding-library v1 configuration`);
+  }
+  const binding = config.roots.find((entry) => entry?.id === rootId);
+  if (binding === undefined) fail(`${relative(root, configPath)} has no binding root ${rootId}`);
+  const upstream = binding.upstream;
+  if (upstream?.kind !== "typescript" || !Array.isArray(upstream.declarations) ||
+      !Array.isArray(upstream.roots)) {
+    fail(`binding root ${config.id}/${rootId} does not define a TypeScript declaration surface`);
+  }
+  if (upstream.sourceUrl !== undefined && upstream.declarations.length !== 1) {
+    fail(`binding root ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
+  }
+  return {
+    ...options,
+    files: upstream.declarations.map((file) => resolve(root, file)),
+    anchorsData: { version: 1, anchors: binding.anchors ?? [] },
+    symbols: new Set(upstream.roots),
+    sourceUrl: upstream.sourceUrl ?? null,
+    dependencyDepth: upstream.dependencyDepth ?? 0,
+    dependencyPolicyData: upstream.dependencyPolicy ?? null,
+  };
+}
+
 async function readSymbolIds(file) {
   return (await readFile(file, "utf8"))
     .split(/\r?\n/gu)
@@ -212,8 +269,12 @@ async function readSymbolIds(file) {
 
 async function readDependencyPolicy(file) {
   const value = JSON.parse(await readFile(file, "utf8"));
+  return validateDependencyPolicy(value, "dependency policy");
+}
+
+function validateDependencyPolicy(value, label) {
   if (value?.version !== 1 || !Array.isArray(value.symbols)) {
-    throw new Error("dependency policy must be { version: 1, symbols: [...] }");
+    throw new Error(`${label} must be { version: 1, symbols: [...] }`);
   }
   const symbols = new Map();
   for (const [index, entry] of value.symbols.entries()) {
@@ -310,24 +371,50 @@ function shapeReferences(shape) {
   }
 }
 
-function collectStatements(statements, sourceFile, prefix, symbols, symbolIds) {
+function collectStatements(statements, sourceFile, prefix, symbols, symbolsById) {
   for (const statement of statements) {
-    if (ts.isModuleDeclaration(statement) && hasExportModifier(statement)) {
+    const visible = hasExportModifier(statement) || sourceFile.isDeclarationFile;
+    if (ts.isModuleDeclaration(statement) && visible) {
       const name = moduleDeclarationName(statement);
       if (name !== null && statement.body && ts.isModuleBlock(statement.body)) {
-        collectStatements(statement.body.statements, sourceFile, [...prefix, name], symbols, symbolIds);
+        collectStatements(statement.body.statements, sourceFile, [...prefix, name], symbols, symbolsById);
       }
       continue;
     }
-    if (!hasExportModifier(statement)) continue;
+    if (!visible) continue;
     for (const symbol of symbolsForStatement(statement, sourceFile, prefix)) {
-      if (symbolIds.has(symbol.id)) {
-        throw new Error(`duplicate TypeScript descriptor id ${symbol.id}`);
+      const existingIndex = symbolsById.get(symbol.id);
+      if (existingIndex === undefined) {
+        symbolsById.set(symbol.id, symbols.length);
+        symbols.push(symbol);
+      } else {
+        symbols[existingIndex] = mergeDeclarationSymbols(symbols[existingIndex], symbol);
       }
-      symbolIds.add(symbol.id);
-      symbols.push(symbol);
     }
   }
+}
+
+function mergeDeclarationSymbols(left, right) {
+  if (left.kind === "interface" && right.kind === "interface" &&
+      left.shape.kind === "record" && right.shape.kind === "record") {
+    return {
+      ...left,
+      display: `${left.display}\n${right.display}`,
+      hover: left.hover || right.hover,
+      shape: { ...left.shape, fields: { ...left.shape.fields, ...right.shape.fields } },
+    };
+  }
+  if (["function", "method"].includes(left.kind) && left.kind === right.kind) {
+    const options = left.shape.kind === "union" ? [...left.shape.options] : [left.shape];
+    options.push(...(right.shape.kind === "union" ? right.shape.options : [right.shape]));
+    return {
+      ...left,
+      display: `${left.display}\n${right.display}`,
+      hover: left.hover || right.hover,
+      shape: { kind: "union", options },
+    };
+  }
+  throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
 }
 
 function symbolsForStatement(statement, sourceFile, prefix) {

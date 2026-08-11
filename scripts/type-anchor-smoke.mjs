@@ -28,6 +28,8 @@ try {
   const renderedHtml = join(tmp, "anchors.html");
   const dependencyPolicy = join(tmp, "dependency-policy.json");
   const dependencyDescriptors = join(tmp, "dependency-descriptors.json");
+  const ambientTypes = join(tmp, "ambient.d.ts");
+  const ambientDescriptors = join(tmp, "ambient-descriptors.json");
 
   await writeFile(types, `export namespace Demo {
   /** Box hover docs & <safe>. */
@@ -49,6 +51,16 @@ try {
   /** Reviewed external dependency fixture. */
   export type ExternalFn = (value: External.Node) => void;
 }
+`);
+
+  await writeFile(ambientTypes, `interface AmbientRoot {
+  value: string;
+  run(value: string): void;
+  run(value: number): void;
+}
+
+declare function schedule(value: string): void;
+declare function schedule(value: number): void;
 `);
 
   await writeFile(dependencyPolicy, `${JSON.stringify({
@@ -165,6 +177,14 @@ try {
   run(["scripts/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
   run([
     "scripts/generate-ts-descriptors.mjs",
+    "--symbol", "AmbientRoot",
+    "--symbol", "AmbientRoot.run",
+    "--symbol", "schedule",
+    "--out", ambientDescriptors,
+    ambientTypes,
+  ]);
+  run([
+    "scripts/generate-ts-descriptors.mjs",
     "--symbol", "Demo.BoxFn",
     "--symbol", "Demo.ExternalFn",
     "--dependency-depth", "1",
@@ -189,6 +209,15 @@ try {
 
   const comparison = JSON.parse(await readFile(report, "utf8"));
   const dependencyComparison = JSON.parse(await readFile(dependencyDescriptors, "utf8"));
+  const ambientComparison = JSON.parse(await readFile(ambientDescriptors, "utf8"));
+  assert.deepEqual(ambientComparison.symbols.map((symbol) => symbol.id), [
+    "AmbientRoot",
+    "AmbientRoot.run",
+    "schedule",
+  ]);
+  assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.run")?.shape.kind,
+    "union");
+  assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "schedule")?.shape.options.length, 2);
   assert.deepEqual(dependencyComparison.dependencies.unresolved, []);
   assert.deepEqual(
     dependencyComparison.symbols.map((symbol) => symbol.id),

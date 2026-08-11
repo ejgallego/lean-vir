@@ -1,8 +1,9 @@
-# Shipped JavaScript binding coverage
+# Binding explorer and shipped JavaScript coverage
 
-The shipped-bindings report is the exhaustive pre-release census of VIR's
-JavaScript boundary. It reconciles declarations discovered from compiled Lean
-metadata with the JavaScript providers in this checkout.
+The binding explorer is the primary human report for VIR's pre-release library
+surface. It combines the exhaustive JavaScript boundary census, colocated
+library-root configuration, and available TypeScript-to-Lean comparisons in
+one searchable page.
 
 The current report covers 119 ordinary `@[vir_js]` declarations and 13
 `@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
@@ -28,11 +29,35 @@ This prevents accidental representation drift such as exposing a raw Lean
 `String` where the JavaScript API returns a `Js String`. Ergonomic wrappers may
 convert above the boundary, but they do not change the faithful boundary type.
 
-The check deliberately does not claim that all upstream APIs have been ported,
-or that every phantom resource name has been proven equivalent to an upstream
-TypeScript type. Library-specific type-anchor reports provide that second,
-semantic layer. Keeping the mechanical census and semantic comparison separate
-lets the exhaustive gate stay strict without inventing correspondences.
+The compiler/runtime check deliberately does not claim that all upstream APIs
+have been ported, or that every phantom resource name has been proven equivalent
+to an upstream TypeScript type. Configured library roots and type-anchor
+comparisons provide that semantic layer. The explorer keeps the layers visibly
+distinct while presenting their findings together.
+
+## Library Configuration
+
+Each Lean source group that owns shipped bindings has a companion
+`*.bindings.json` file, validated against
+`scripts/binding-library.schema.json`:
+
+- `Vir/Browser.bindings.json`
+- `Vir/Common.bindings.json`
+- `Vir/Js.bindings.json`
+- `Vir/React.bindings.json`
+- `Vir/Infoview/Surface.bindings.json`
+- `Vir/ProofWidgets/Rpc.bindings.json`
+
+A configuration identifies its compiled Lean modules and divides their targets
+into semantic roots. External roots name their declaration files and upstream
+symbols; internal roots explicitly state that they have no external parity
+contract. Reviewed anchors and dependency policy live with the root rather than
+in parallel symbol, policy, and anchor files.
+
+Generation rejects an unowned module, a target assigned to zero or multiple
+roots, a stale selector, or a comparison anchor attached to a target outside
+its root. The current six configurations assign all 132 shipped targets exactly
+once.
 
 ## Data Flow
 
@@ -47,29 +72,43 @@ runtime object-handle intrinsic targets
 
 compiler targets + provider targets
   -> strict reconciliation JSON
-  -> interactive HTML dashboard
+  -> configured library roots
+
+TypeScript declarations + reviewed root intent
+  -> generated upstream root inventory
+  -> semantic comparison results
+
+reconciled targets + roots + comparisons
+  -> one machine report
+  -> one interactive library explorer
 ```
 
-Generate the tracked report and dashboard with:
+Generate the complete tracked report with human-readable progress output:
 
 ```bash
-npm run generate:shipped-bindings
+npm run generate:bindings
 ```
 
-Validate the compiler inventory, tracked outputs, reconciliation invariants,
-and dashboard contract with:
+Validate all layers and the explorer contract with:
 
 ```bash
-npm run check:shipped-bindings
+npm run check:bindings
 ```
 
 The Lean compiler inventory is an ignored intermediate under
-`build/type-descriptors/`. The tracked machine report is
-`docs/bindings/shipped-v1.coverage.json`; the primary human report is
-`docs/bindings/shipped-v1.dashboard.html`.
+`build/type-descriptors/`. The consolidated machine report is
+`docs/bindings/report.json`; the primary human report is
+`docs/bindings/index.html`.
 
-The dashboard supports search, status, provider, boundary, and visibility
-filters; deep links; Lean source links; exact elaborated types; and light/dark
-themes. A `provided` row means the representation policy and runtime dispatch
-path are covered. Consult a library-specific type-anchor report for upstream
-semantic parity.
+The explorer supports library, root-status, and finding filters; deep links;
+generated upstream TypeScript declarations; Lean and TypeScript source context;
+exact elaborated boundary types; side-by-side semantic descriptors; and
+light/dark themes. A `provided` target proves
+the representation policy and runtime dispatch path. `reviewed`, `weak`,
+`missing`, and `pending` root states describe upstream semantic coverage.
+
+`docs/bindings/shipped-v1.coverage.json` and
+`docs/bindings/shipped-v1.dashboard.html` remain lower-level reconciliation
+artifacts while the consolidated view settles. Focused type-anchor HTML files
+likewise remain useful for generator debugging, but they are no longer the
+main entry point.

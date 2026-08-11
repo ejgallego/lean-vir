@@ -28,6 +28,10 @@ The documentation owners are:
 - Shipped JavaScript binding inventory and report generation live in
   `tools/ExportVirJsInventory.lean` and
   `scripts/generate-shipped-bindings-report.mjs`.
+- The consolidated binding explorer uses the colocated `Vir/*.bindings.json`
+  manifests and `scripts/generate-binding-explorer.mjs`; run
+  `npm run generate:bindings` to refresh it and `npm run check:bindings` to
+  validate all layers.
 - Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
 - IR declaration payload tag values live in
   `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in

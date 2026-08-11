@@ -669,6 +669,7 @@
       "category": "React DOM root",
       "lean": "Lean.Vir.React.Root.render",
       "ts": "Root.render",
+      "target": "react.root.render",
       "relation": "audit",
       "portIntent": {
         "disposition": "bind",
@@ -682,6 +683,7 @@
       "category": "React DOM root",
       "lean": "Lean.Vir.React.Root.unmount",
       "ts": "Root.unmount",
+      "target": "react.root.unmount",
       "relation": "audit",
       "portIntent": {
         "disposition": "bind",
@@ -695,6 +697,7 @@
       "category": "React DOM root",
       "lean": "Lean.Vir.React.Root.create",
       "ts": "createRoot",
+      "target": "react.root.create",
       "relation": "audit",
       "portIntent": {
         "disposition": "bind",

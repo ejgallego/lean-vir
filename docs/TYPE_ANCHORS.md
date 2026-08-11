@@ -10,11 +10,11 @@ diagnostic codes to decide what to revise. It is deliberately not a source-to-
 source binding generator yet. Once repeated, reviewed port intents become
 stable, a later generator can consume the same descriptor and intent data.
 
-The exhaustive shipped-boundary gate is documented separately in
-`SHIPPED_BINDINGS.md`. It proves that every compiled `@[vir_js]` and explicit
-conversion declaration obeys VIR's representation policy and has a shipped
-runtime provider. Type anchors add the narrower semantic question: how one of
-those faithful VIR boundaries corresponds to an upstream TypeScript API.
+The exhaustive shipped-boundary gate and consolidated library explorer are
+documented in `SHIPPED_BINDINGS.md`. The gate proves that every compiled
+`@[vir_js]` and explicit conversion declaration obeys VIR's representation
+policy and has a shipped runtime provider. Type anchors add the narrower
+semantic question; their results are incorporated into the explorer.
 
 ## Data Flow
 
@@ -74,6 +74,12 @@ for external dependencies that should not be expanded, such as browser host
 resources or very large recursive library types. The generated descriptor
 records every included dependency and any unresolved names.
 
+The descriptor reader also supports ambient declaration libraries such as
+TypeScript's `lib.dom.d.ts` and `@types/react`. Overloaded functions and methods
+are retained as alternative callable shapes. The consolidated explorer groups
+roots that share a declaration source, so a large ambient library is parsed
+once per generation group rather than once per configured root.
+
 ## Artifact Ownership
 
 The checked-in reports are generated review artifacts. Edit their authored
@@ -83,19 +89,21 @@ Markdown, or HTML output directly.
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
 | Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
-| React DOM root | `react-dom-root-v1.symbols.txt`, `react-dom-root-v1.dependencies.json`, `react-dom-root-v1.anchors.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+| React DOM root | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
-The separate shipped-bindings pipeline tracks
-`docs/bindings/shipped-v1.coverage.json` and
-`docs/bindings/shipped-v1.dashboard.html`; its compiler inventory remains under
-ignored `build/type-descriptors/` paths.
+The binding explorer consumes the React DOM comparison alongside the lower-
+level shipped census. Its primary outputs are `docs/bindings/report.json` and
+`docs/bindings/index.html`; the compiler inventory remains under ignored
+`build/type-descriptors/` paths.
 
 Intermediate `.irpkg` and generator reports under `build/type-descriptors/`
 are ignored local artifacts.
 
-## Output Contract
+## Lower-level Output Contract
 
-The pipeline has four public outputs.
+The type-anchor pipeline has four lower-level outputs. They remain stable inputs
+and useful debugging views, while `docs/bindings/index.html` is the public human
+entry point.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 
@@ -133,7 +141,7 @@ names in the comparison report.
 of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
 show the same report with usable links and hovers.
 
-`vir-v1.anchors.html` is the standalone human-ready report. It treats the
+`vir-v1.anchors.html` is a standalone focused report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
 text. This focused renderer is static HTML: it does not yet provide client-side
@@ -213,8 +221,9 @@ links, and native hover text through `title` plus
 `data-vir-type-anchor-hover`. This is intentionally functional without adding a
 full Verso/Blueprint site target to this repository.
 
-The generated `docs/type-descriptors/vir-v1.anchors.html` is the easiest output
-to review in a browser today.
+The generated `docs/type-descriptors/vir-v1.anchors.html` remains useful for
+testing the focused renderer. Review the real shipped library surface through
+`docs/bindings/index.html`.
 
 Validate the core generated files and comparator smoke test with:
 

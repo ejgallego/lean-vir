@@ -191,6 +191,7 @@
         }
       ],
       "category": "React DOM root",
+      "target": "react.root.render",
       "portIntent": {
         "disposition": "bind",
         "effect": "dom",
@@ -293,6 +294,7 @@
         }
       ],
       "category": "React DOM root",
+      "target": "react.root.unmount",
       "portIntent": {
         "disposition": "bind",
         "effect": "dom",
@@ -381,6 +383,7 @@
         }
       ],
       "category": "React DOM root",
+      "target": "react.root.create",
       "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument.",
       "portIntent": {
         "disposition": "bind",

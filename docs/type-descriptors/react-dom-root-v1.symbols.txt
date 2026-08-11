@@ -1,8 +1,0 @@
-# Small React DOM root review surface from @types/react-dom/client.
-Root
-Root.render
-Root.unmount
-RootOptions
-createRoot
-hydrateRoot
-HydrationOptions
