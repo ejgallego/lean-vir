@@ -66,7 +66,7 @@ FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
 `toolchains.local.json`, or `--toolchain-config`. Every selected checkout must
 still match the exact catalogued commit. These settings control generation;
 normal serving consumes already-built FIR packages selected and staged through
-the immutable artifact-set lock.
+an explicit v2 artifact-set lock.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
@@ -77,10 +77,9 @@ this application or an artifact archive:
 npm run artifacts:sources -- prettyM
 ```
 
-The committed `artifact-set.lock.json` preserves historical set 0001. The
-refreshed FIR closure in the build catalog deliberately targets set 0002 rather
-than changing set 0001's meaning. Binary artifacts and downloaded release
-archives remain ignored by Git. Build and import a set-0002 candidate locally:
+The repository does not retain obsolete prototype locks. Binary artifacts,
+candidate locks, and downloaded release archives remain ignored by Git. Build
+and import the current prettyM candidate locally:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
@@ -115,23 +114,24 @@ checkouts; only declared package bytes cross into this application.
 
 Once the archive is uploaded as an immutable release asset, set its exact HTTPS
 URL in the lockfile and change the status from `local-prototype` to `published`.
-Clean clones can then use `npm run artifacts:fetch` without an override. See
+If that lock is accepted into the repository, clean clones can use
+`npm run artifacts:fetch -- --lock artifact-set.lock.json`. See
 `docs/ARTIFACT_SETS.md` for producer, promotion, and publication details.
 
 The candidate workflow stops before that publication boundary. It builds from
 the catalogued sources, packs to a separate candidate lock, re-imports the
 archive, runs the application tests, and uploads the archive, checksums,
 manifest, source receipt, and `CANDIDATE.json` as a short-lived CI artifact.
-It never edits `artifact-set.lock.json` or publishes a release asset.
+It never edits an accepted lock or publishes a release asset.
 
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
 workload. The browser only observes the common semantic input/output and timing
-contract. Historical set 0001 remains immutable. Proposed set 0002 retains its
-VIR and workload pins while selecting merged FIR `298682a`. Five-backend parity
-is the compatibility gate; no cross-backend Lean heap values are exchanged.
+contract. The current candidate retains the VIR and workload pins while
+selecting merged FIR `298682a`. Five-backend parity is the compatibility gate;
+no cross-backend Lean heap values are exchanged.
 
-The current VIR package retains the historical
+The current VIR package uses the producer-facing
 `VersoSlides.Pretty.*ForVir` export names. They are declared in
 `examples/prettyM/config.js` as artifact compatibility data; the application
 itself does not load Verso or depend on slide sources. Renaming those two

@@ -54,10 +54,7 @@ summaries or refreshed bounded artifacts here.
   Sigma (leanVersion), boundedRuntime leanVersion x prettyMWorkload leanVersion
   ```
 
-- Historical set `prettyM-bounded-set-0001` combines VIR/Lean 4.33.0-rc2 at
-  exact PR #104 commit `64e3078` with native and LLVM bounded runtimes carrying
-  Lean 4.32. It remains immutable and uses the legacy unnamespaced format.
-- The build catalog now targets `prettyM-bounded-set-0002`, retains the VIR and
+- The build catalog targets `prettyM-bounded-set-0002`, retains the VIR and
   workload revisions, selects merged FIR `298682a`, and namespaces all payload
   files below `prettyM/`.
 - The generic v2 stager derives the example from `ARTIFACT_SET.json`, replaces
@@ -131,14 +128,12 @@ archive has SHA-256
 and size 2,686,976 bytes. Repacking the same seed reproduced that digest. No
 performance measurement was collected.
 
-The committed set-0001 lock and its `26f54081e15145b6...` archive remain
-deliberately unchanged. The application-local ignored `artifacts/prettyM/`
-tree is staged from the verified set-0002 candidate and carries its v2
-`ARTIFACT_SET.json`; the UI reports the exact set ID. The generic import
-preserved `artifacts/illuminate/`, and both browser clients passed. Fresh
-source-built archives can differ from set 0001 despite matching source and
-toolchain identities. Treat set 0002 as a candidate, not a silent accepted-lock
-refresh.
+The obsolete unnamespaced prototype lock has been removed. The
+application-local ignored `artifacts/prettyM/` tree is staged from the verified
+set-0002 candidate and carries its v2 `ARTIFACT_SET.json`; the UI reports the
+exact set ID. The generic import preserved `artifacts/illuminate/`, and both
+browser clients passed. Treat set 0002 as a candidate until its generated v2
+lock is explicitly accepted.
 
 Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
 The validated candidate layout is the self-contained
@@ -180,8 +175,8 @@ build it without application-side package knowledge. Illuminate commit
 `b4a005b17aacfcb28949160c5cf1a41ea6de81cc` consolidates its two local VIR
 stagers, but that script still installs/builds/copies client inputs itself and
 does not yet emit a fresh source-package-v1 directory through a stable producer
-entry point. Generic client staging is continuing in the separate
-`.worktrees/client-artifact-staging` lane based on checkpoint `9573843`.
+entry point. Generic client staging remains separate follow-up work and should
+consume the catalog, source-package, and controller contracts recorded here.
 
 ## Commands
 
@@ -205,9 +200,7 @@ npm run artifacts:fetch -- \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
-Do not feed the legacy set-0001 archive to the generic stager. It remains
-verifiable as historical input, but canonical staging requires namespaced
-artifact-set schema v2.
+The fetcher and generic stager accept only namespaced artifact-set schema v2.
 
 The development server listens on `http://127.0.0.1:18334` and supplies the
 cross-origin-isolation headers required by threaded LLVM Wasm.

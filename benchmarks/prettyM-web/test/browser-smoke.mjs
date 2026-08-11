@@ -111,6 +111,16 @@ try {
   );
   assert.equal(await page.locator("#variant-picker").isVisible(), true);
   assert.equal(await page.locator("#variant-select").inputValue(), "default");
+  assert.equal(
+    await page.evaluate(
+      () => window.__benchmarkExampleContext.artifactBaseUrl.href,
+    ),
+    `${url}/artifacts/prettyM/`,
+  );
+  assert.equal(
+    await page.evaluate(() => window.__prettyBenchArtifactBase),
+    `${url}/artifacts/prettyM/`,
+  );
   assert.deepEqual(
     await page.evaluate(() =>
       window.__benchmarkApp.getVariants().map(({ id, title, build }) => ({

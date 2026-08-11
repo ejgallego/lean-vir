@@ -47,7 +47,8 @@ artifacts/
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
-source-build catalog and the accepted lock are committed.
+source-build catalog is committed. A reviewed published lock may be committed
+later; candidate locks remain with the generated release payload.
 
 ## Assemble a candidate
 
@@ -101,7 +102,8 @@ URL. After upload:
    `archive.url` to the exact HTTPS release asset URL.
 2. Change `status` to `published`; do not change any digest or byte count.
 3. Open a lockfile PR. Before merge, validate the accepted URL and lock by
-   running `npm run artifacts:fetch` and `npm test` from a clean clone. The
+   running `npm run artifacts:fetch -- --lock artifact-set.lock.json` and
+   `npm test` from a clean clone. The
    current candidate workflow does not implement this consumer check; add it
    when the first immutable v2 archive is promoted.
 4. Mark the release stable after the lockfile PR passes and merges. Promotion
@@ -131,19 +133,7 @@ manifest provenance and selected example/variant test-package digest; newly
 packed manifests bind that digest as well. prettyM runtime profiles additionally
 hash the manifest and every browser-observed runtime asset.
 
-## Set 0001
-
-`prettyM-bounded-set-0001` contains three independent bounded runtimes. Its VIR
-interpreter and `prettyM` IR package use Lean 4.33.0-rc2 and the exact prototype from
-[`ejgallego/lean-vir` PR #104](https://github.com/ejgallego/lean-vir/pull/104),
-commit `64e30784da16957cca92951344d776f895b30491`, built with WASI SDK 33. Native
-FIR and LLVM/Emscripten each carry Lean 4.32. Their isolation is explicit in
-the component-local `lean`, `runtime`, and `workload` manifest fields.
-
-Set 0001 is historical and must not be regenerated or assigned new source
-bytes. Its committed lock remains `local-prototype` and has no public URL.
-
-## Proposed set 0002
+## Current prettyM candidate
 
 `prettyM-bounded-set-0002` is the candidate identity for the refreshed source
 closure. It retains VIR `64e3078` and the Verso Slides workload `c16a6f8`, uses

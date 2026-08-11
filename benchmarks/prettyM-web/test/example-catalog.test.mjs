@@ -102,7 +102,46 @@ test("validates self-contained test variants and JavaScript oracles", () => {
       },
     ],
   };
+  base.variants.push({
+    id: "html",
+    title: "HTML",
+    build: "small-html",
+    tests: [
+      {
+        id: "parity",
+        study: "smoke",
+        oracle: "js",
+        backends: ["js", "vir", "fir"],
+        data: { cases: [{ input: 2 }] },
+      },
+    ],
+    benchmark: { study: "suite", data: { studies: ["scaling"] } },
+  });
   assert.doesNotThrow(() => validateExampleTestPackage(base, "small"));
+
+  const wrongDefault = structuredClone(base);
+  wrongDefault.variants.reverse();
+  assert.throws(
+    () => validateExampleTestPackage(wrongDefault, "small"),
+    /must declare default as its first variant/,
+  );
+
+  const duplicateVariant = structuredClone(base);
+  duplicateVariant.variants[1].id = "default";
+  assert.throws(
+    () => validateExampleTestPackage(duplicateVariant, "small"),
+    /repeats variant default/,
+  );
+
+  const duplicateTest = structuredClone(base);
+  duplicateTest.variants[0].tests.push(
+    structuredClone(duplicateTest.variants[0].tests[0]),
+  );
+  assert.throws(
+    () => validateExampleTestPackage(duplicateTest, "small"),
+    /repeats test parity/,
+  );
+
   const missingOracle = structuredClone(base);
   missingOracle.variants[0].tests[0].backends = ["vir", "fir"];
   assert.throws(

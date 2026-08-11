@@ -23,30 +23,30 @@ const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function parseArgs(argv) {
   const options = {
-    lock: "artifact-set.lock.json",
+    lock: null,
     archive: null,
     setsDir: "_artifacts/sets",
-    stage: true,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--lock") options.lock = argv[++index];
     else if (argument === "--archive") options.archive = argv[++index];
     else if (argument === "--sets-dir") options.setsDir = argv[++index];
-    else if (argument === "--no-stage") options.stage = false;
     else if (argument === "--help" || argument === "-h") {
       console.log(`Usage: node scripts/fetch-artifact-set.mjs [options]
 
-Fetch or import the locked artifact set, verify it before extraction, verify
-every extracted member, and optionally stage it for the webapp. Local archive
+Fetch or import a v2 artifact set, verify it before extraction, verify every
+extracted member, and stage it for the webapp. Local archive
 overrides must remain inside this application directory.
 
-  --lock PATH       lockfile (default: artifact-set.lock.json)
+  --lock PATH       v2 artifact-set lockfile (required)
   --archive PATH    workspace-local release archive instead of lock URL
-  --sets-dir PATH   verified installation root (default: _artifacts/sets)
-  --no-stage        verify and install without staging (required for v1 sets)`);
+  --sets-dir PATH   verified installation root (default: _artifacts/sets)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
+  }
+  if (!options.lock) {
+    throw new Error("select an artifact-set lock with --lock PATH");
   }
   return options;
 }
@@ -102,18 +102,12 @@ async function main() {
   const lockPath = inside(appRoot, options.lock, "read lockfile");
   const lock = await readJson(lockPath);
   if (
-    ![1, 2].includes(lock.schemaVersion) ||
+    lock.schemaVersion !== 2 ||
     typeof lock.setId !== "string" ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(lock.setId)
   ) {
     throw new Error("unsupported artifact-set lockfile");
   }
-  if (lock.schemaVersion === 1 && options.stage) {
-    throw new Error(
-      `artifact set ${lock.setId} uses legacy schema v1 and cannot be staged; pass --no-stage to verify and install it, or select a namespaced v2 lock`,
-    );
-  }
-
   const bytes = options.archive
     ? await readFile(inside(appRoot, options.archive, "read archive"))
     : await downloadArchive(lock);
@@ -139,15 +133,13 @@ async function main() {
     console.log(`installed artifact set: ${relative(appRoot, destination)}`);
   }
 
-  if (options.stage) {
-    const result = spawnSync(
-      process.execPath,
-      [resolve(appRoot, "scripts/stage-artifact-set.mjs"), destination],
-      { cwd: appRoot, stdio: "inherit" },
-    );
-    if (result.status !== 0) {
-      throw new Error(`artifact staging failed with status ${result.status}`);
-    }
+  const result = spawnSync(
+    process.execPath,
+    [resolve(appRoot, "scripts/stage-artifact-set.mjs"), destination],
+    { cwd: appRoot, stdio: "inherit" },
+  );
+  if (result.status !== 0) {
+    throw new Error(`artifact staging failed with status ${result.status}`);
   }
 }
 

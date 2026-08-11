@@ -27,7 +27,7 @@ export const view = {
   footer:
     "Common plotted phases are prepare, execute, decode, and total. Backend-specific raw fields remain in the JSON report.",
   bootstrap: {
-    externalScripts: ["artifacts/illuminate/workload/anim_core.js"],
+    artifactScripts: ["workload/anim_core.js"],
     classicScripts: ["src/dashboard.js"],
   },
 };

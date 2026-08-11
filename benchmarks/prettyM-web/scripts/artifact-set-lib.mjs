@@ -11,23 +11,6 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
-export const legacyPrettyMArtifactFiles = [
-  "lean-vir/js/vir-runtime.js",
-  "lean-vir/wasm/vir-upstream.wasm",
-  "prettyM-vir.irpkg",
-  "lean-native/BUILD.json",
-  "lean-native/prettyM-browser-adapter.mjs",
-  "lean-native/prettyM.wasm",
-  "lean-native/prettyM.wasm.json",
-  "lean-llvm/README.md",
-  "lean-llvm/SHA256SUMS",
-  "lean-llvm/emscripten-loader.mjs",
-  "lean-llvm/prettyM-emscripten-adapter.mjs",
-  "lean-llvm/prettyM.manifest.json",
-  "lean-llvm/prettyM.mjs",
-  "lean-llvm/prettyM.wasm",
-];
-
 export function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -238,12 +221,10 @@ export async function verifyArtifactSet(directory, lock = null) {
   const manifestPath = resolve(directory, "ARTIFACT_SET.json");
   const manifestBytes = await readFile(manifestPath);
   const manifest = JSON.parse(manifestBytes);
-  const legacy =
-    manifest.schemaVersion === 1 && manifest.kind === "prettyM-artifact-set";
-  const current =
-    manifest.schemaVersion === 2 &&
-    manifest.kind === "browser-benchmarks/artifact-set";
-  if (!legacy && !current) {
+  if (
+    manifest.schemaVersion !== 2 ||
+    manifest.kind !== "browser-benchmarks/artifact-set"
+  ) {
     throw new Error("unsupported artifact-set manifest");
   }
   if (lock && manifest.setId !== lock.setId) {
@@ -291,12 +272,7 @@ export async function verifyArtifactSet(directory, lock = null) {
       throw new Error(`artifact-set member digest mismatch: ${path}`);
     }
   }
-  if (legacy) {
-    for (const path of legacyPrettyMArtifactFiles) {
-      if (!manifest.files?.[path])
-        throw new Error(`manifest omits required file: ${path}`);
-    }
-  } else if (
+  if (
     typeof manifest.example?.id !== "string" ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifest.example.id) ||
     Object.keys(manifest.files ?? {}).length === 0

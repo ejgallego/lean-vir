@@ -3,8 +3,12 @@
   "use strict";
 
   var params = new URLSearchParams(window.location.search);
+  var context = globalThis.__benchmarkExampleContext;
+  if (!(context && context.artifactBaseUrl instanceof URL)) {
+    throw new Error("prettyM requires the benchmark example context");
+  }
   var artifactBase = new URL(
-    params.get("artifacts") || "artifacts/prettyM/",
+    params.get("artifacts") || context.artifactBaseUrl.href,
     window.location.href,
   );
   var fetchCache = params.get("cache") === "default" ? "default" : "no-store";

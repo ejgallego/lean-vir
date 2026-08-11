@@ -152,9 +152,9 @@ Serving and testing an accepted set does not invoke FIR or rebuild its Wasm.
 The accepted lock selects an immutable archive containing the FIR native and
 LLVM packages alongside the VIR package. `artifacts:fetch` verifies that
 archive and stages its declared example namespace. `--toolchain` is only a
-source-build input used to produce a new seed or candidate. Historical set
-0001 remains in `artifact-set.lock.json`; the refreshed catalog targets set
-0002 so changing FIR source does not redefine an existing set.
+source-build input used to produce a new seed or candidate. Until a candidate
+is promoted, use the generated v2 lock under `_artifacts/releases/` explicitly;
+the repository does not retain obsolete prototype locks.
 
 The packer reads the same catalog record, so source provenance is no longer
 duplicated in a separate artifact-set config. It also requires the corresponding
@@ -200,8 +200,8 @@ its checksum, the artifact-set manifest, the source `BUILD.json` receipt, the
 candidate-only lock, the hash-identified `EXAMPLE_TEST.json` differential
 report, and a `CANDIDATE.json` validation statement.
 
-`.github/workflows/prettyM-candidate.yml` runs the same commands on relevant
+`.github/workflows/example-candidate.yml` runs the same commands on relevant
 pull requests and `main` updates and supports explicit dispatch. The workflow
 has read-only repository permission and uploads only a short-lived Actions
-artifact. It neither compares the candidate bytes with the committed lock nor
+artifact. It neither compares the candidate bytes with an accepted lock nor
 publishes or promotes them.

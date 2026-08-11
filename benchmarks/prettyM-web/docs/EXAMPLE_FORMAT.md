@@ -144,7 +144,11 @@ directory, so refreshing one client cannot delete another client's artifacts.
 
 `controller.mjs` is ordinary JavaScript. TypeScript may be used by a client,
 but it must publish an ES module and TypeScript is not required by this
-repository. The module exports:
+repository. [`examples/controller-contract.d.ts`](../examples/controller-contract.d.ts)
+is the editor-facing type declaration for the context and returned controller.
+The runtime guard remains
+[`examples/controller-contract.mjs`](../examples/controller-contract.mjs).
+The module exports:
 
 ```js
 export const view = { /* controls and presentation */ };
@@ -158,6 +162,11 @@ staged payloads directly, so they do not need to declare another artifact root.
 `context.testPackage` and `context.variant` contain the selected self-contained
 test data. The same selection is available to classic-script controllers as
 `globalThis.__benchmarkExampleContext`.
+
+Bootstrap scripts declared in `view.bootstrap.classicScripts` are resolved
+from the application root. Payload scripts use `artifactScripts` and are
+resolved from `context.artifactBaseUrl`; example controllers must not repeat
+`artifacts/<example-id>/` in their declarations.
 
 The returned controller implements `browser-benchmarks/controller/v1`:
 

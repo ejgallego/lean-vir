@@ -1,10 +1,8 @@
-import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   cp,
   mkdir,
   readFile,
-  rename,
   rm,
   stat,
   writeFile,
@@ -12,7 +10,11 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalJson } from "./artifact-set-lib.mjs";
+import {
+  canonicalJson,
+  replaceDirectoryAtomically,
+  sha256,
+} from "./artifact-set-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -70,10 +72,6 @@ function gitOptional(source, args) {
   } catch {
     return null;
   }
-}
-
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 async function requireFile(path) {
@@ -282,20 +280,7 @@ async function main() {
   };
   await writeFile(join(next, "REHEARSAL.json"), canonicalJson(receipt));
 
-  const previous = `${destination}.previous`;
-  await rm(previous, { recursive: true, force: true });
-  if (await stat(destination).catch(() => null)) {
-    await rename(destination, previous);
-  }
-  try {
-    await rename(next, destination);
-  } catch (error) {
-    if (await stat(previous).catch(() => null)) {
-      await rename(previous, destination);
-    }
-    throw error;
-  }
-  await rm(previous, { recursive: true, force: true });
+  await replaceDirectoryAtomically(next, destination);
   console.log(
     `staged Illuminate rehearsal: ${relative(appRoot, destination)} (${examples.length} examples)`,
   );

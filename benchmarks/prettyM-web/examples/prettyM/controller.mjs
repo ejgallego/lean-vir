@@ -33,7 +33,7 @@ export const view = {
   footer:
     "Reports contain artifact provenance, startup timings, per-phase samples, parity results, and memory observations.",
   bootstrap: {
-    externalScripts: [],
+    artifactScripts: [],
     classicScripts: [
       "examples/prettyM/config.js",
       "examples/prettyM/benchmark-core.js",

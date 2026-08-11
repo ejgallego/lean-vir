@@ -81,6 +81,12 @@ try {
   assert.equal(await page.locator("#variant-picker").isVisible(), true);
   assert.equal(await page.locator("#variant-select").inputValue(), "default");
   assert.equal(
+    await page.evaluate(
+      () => window.__benchmarkExampleContext.artifactBaseUrl.href,
+    ),
+    `http://127.0.0.1:${port}/artifacts/illuminate/`,
+  );
+  assert.equal(
     await page.locator("#variant-select option:checked").textContent(),
     "Player trace replay",
   );

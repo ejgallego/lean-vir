@@ -61,7 +61,7 @@ function requireView(example, value) {
   }
   if (
     !value.bootstrap ||
-    !Array.isArray(value.bootstrap.externalScripts) ||
+    !Array.isArray(value.bootstrap.artifactScripts) ||
     !Array.isArray(value.bootstrap.classicScripts)
   ) {
     throw new Error(`${example.id} view has no bootstrap declaration`);
@@ -145,9 +145,9 @@ async function inspectArtifactStatus(
   variant,
   selectedView,
   testPackageIdentity,
+  artifactBaseUrl,
 ) {
-  const root = `artifacts/${example.id}`;
-  const url = new URL(`../${root}/ARTIFACT_SET.json`, import.meta.url);
+  const url = new URL("ARTIFACT_SET.json", artifactBaseUrl);
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -289,9 +289,14 @@ async function boot() {
     bytes: testPackageBytes.byteLength,
     sha256: await sha256(testPackageBytes),
   };
+  const artifactBaseUrl = new URL(
+    `../artifacts/${selected.id}/`,
+    import.meta.url,
+  );
   renderVariants(testPackage, variant);
   globalThis.__benchmarkExampleContext = {
     example: selected,
+    artifactBaseUrl,
     testPackage,
     testPackageIdentity,
     variant,
@@ -301,10 +306,11 @@ async function boot() {
     variant,
     selectedView,
     testPackageIdentity,
+    artifactBaseUrl,
   );
   showArtifactStatus(artifactStatus);
-  for (const path of selectedView.bootstrap.externalScripts) {
-    await loadScript(new URL(`../${path}`, import.meta.url).href);
+  for (const path of selectedView.bootstrap.artifactScripts) {
+    await loadScript(new URL(path, artifactBaseUrl).href);
   }
   for (const path of selectedView.bootstrap.classicScripts) {
     await loadScript(new URL(`../${path}`, import.meta.url).href);
@@ -314,7 +320,7 @@ async function boot() {
   }
   controller = await selectedModule.loadExample({
     example: selected,
-    artifactBaseUrl: new URL(`../artifacts/${selected.id}/`, import.meta.url),
+    artifactBaseUrl,
     testPackage,
     testPackageIdentity,
     variant,

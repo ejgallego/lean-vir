@@ -10,7 +10,6 @@ import {
   createTar,
   extractTar,
   fileRecord,
-  legacyPrettyMArtifactFiles,
   safeArchivePath,
   sha256,
   sha256File,
@@ -28,17 +27,30 @@ import { verifySourceBuildReceipt } from "../scripts/source-build-receipt-lib.mj
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const scratch = join(appRoot, "test-results", "artifact-set-unit");
+const prettyMArtifactFiles = [
+  "prettyM/lean-llvm/README.md",
+  "prettyM/lean-llvm/SHA256SUMS",
+  "prettyM/lean-llvm/emscripten-loader.mjs",
+  "prettyM/lean-llvm/prettyM-emscripten-adapter.mjs",
+  "prettyM/lean-llvm/prettyM.manifest.json",
+  "prettyM/lean-llvm/prettyM.mjs",
+  "prettyM/lean-llvm/prettyM.wasm",
+  "prettyM/lean-native/BUILD.json",
+  "prettyM/lean-native/prettyM-browser-adapter.mjs",
+  "prettyM/lean-native/prettyM.wasm",
+  "prettyM/lean-native/prettyM.wasm.json",
+  "prettyM/lean-vir/js/vir-runtime.js",
+  "prettyM/lean-vir/wasm/vir-upstream.wasm",
+  "prettyM/prettyM-vir.irpkg",
+];
 
-test("the prettyM source build is complete and materializes pack provenance", async () => {
+test("the prettyM catalog selects the complete source and component graph", async () => {
   const database = await readBuildDatabase(
     join(appRoot, "artifact-builds.json"),
   );
   const build = database.builds.prettyM;
   assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
-  assert.deepEqual(
-    artifactFiles(build),
-    legacyPrettyMArtifactFiles.map((path) => `prettyM/${path}`).sort(),
-  );
+  assert.deepEqual(artifactFiles(build), prettyMArtifactFiles);
 
   const sources = checkoutSources(database, "prettyM");
   assert.equal(
@@ -62,11 +74,6 @@ test("the prettyM source build is complete and materializes pack provenance", as
   assert.equal(config.schemaVersion, 2);
   assert.deepEqual(config.example, { id: "prettyM", variant: "default" });
   assert.equal(config.setId, "prettyM-bounded-set-0002");
-  const acceptedLock = JSON.parse(
-    await readFile(join(appRoot, "artifact-set.lock.json"), "utf8"),
-  );
-  assert.equal(acceptedLock.setId, "prettyM-bounded-set-0001");
-  assert.notEqual(acceptedLock.setId, config.setId);
   assert.equal(
     config.components.vir.runtime.repository,
     "https://github.com/ejgallego/lean-vir",
@@ -445,15 +452,14 @@ test("stages a verified example namespace without replacing siblings", async () 
   await assert.rejects(() => readFile(join(destination, "old.txt")), /ENOENT/);
 });
 
-test("legacy artifact sets require an explicit non-staging fetch", () => {
+test("artifact fetch requires an explicit lock", () => {
   const result = spawnSync(
     process.execPath,
     ["scripts/fetch-artifact-set.mjs"],
     { cwd: appRoot, encoding: "utf8" },
   );
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /legacy schema v1 and cannot be staged/);
-  assert.match(result.stderr, /pass --no-stage/);
+  assert.match(result.stderr, /select an artifact-set lock with --lock PATH/);
 });
 
 test("rejects undeclared artifact-set members", async () => {
@@ -462,8 +468,9 @@ test("rejects undeclared artifact-set members", async () => {
   await writeFile(
     join(directory, "ARTIFACT_SET.json"),
     canonicalJson({
-      schemaVersion: 1,
-      kind: "prettyM-artifact-set",
+      schemaVersion: 2,
+      kind: "browser-benchmarks/artifact-set",
+      example: { id: "prettyM" },
       setId: "prettyM-test",
       files: {},
     }),

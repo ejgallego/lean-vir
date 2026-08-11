@@ -1,6 +1,9 @@
 // @ts-check
 
-const artifactBase = new URL("../../artifacts/illuminate/", import.meta.url);
+const artifactBase = globalThis.__benchmarkExampleContext?.artifactBaseUrl;
+if (!(artifactBase instanceof URL)) {
+  throw new Error("Illuminate requires the benchmark example context");
+}
 const typedVirEntry = "Illuminate.Animation.Vir.replayTraceTyped";
 const backendColors = {
   js: "#74a9ff",
