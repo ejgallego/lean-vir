@@ -52,21 +52,10 @@ async function main() {
     "stage artifact examples",
   );
   const manifest = await verifyArtifactSet(source);
-  if (
-    manifest.schemaVersion !== 2 ||
-    manifest.kind !== "browser-benchmarks/artifact-set"
-  ) {
-    throw new Error("only namespaced artifact-set v2 manifests can be staged");
-  }
 
   const exampleId = manifest.example.id;
   const prefix = `${exampleId}/`;
   const files = Object.keys(manifest.files).sort();
-  if (files.length === 0 || files.some((path) => !path.startsWith(prefix))) {
-    throw new Error(
-      `artifact files must use the ${exampleId}/ namespace`,
-    );
-  }
 
   const destination = resolve(artifactsDir, exampleId);
   const next = resolve(artifactsDir, `.${exampleId}.next-${process.pid}`);

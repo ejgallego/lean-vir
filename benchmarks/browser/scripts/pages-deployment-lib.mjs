@@ -26,8 +26,6 @@ async function verifyStagedDeployment(
   const directory = resolve(artifactsRoot, example.id);
   const manifest = await verifyStagedArtifactSet(directory);
   if (
-    manifest.schemaVersion !== 2 ||
-    manifest.kind !== "browser-benchmarks/artifact-set" ||
     manifest.example?.id !== example.id ||
     manifest.example?.variant !== variant.id ||
     manifest.setId !== build.artifactSet.setId

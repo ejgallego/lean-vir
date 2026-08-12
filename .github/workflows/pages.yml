@@ -37,6 +37,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            benchmarks/browser/package-lock.json
       - run: npm ci
       - name: Cache Lean source
         uses: actions/cache@v4
@@ -55,25 +58,25 @@ jobs:
       - run: npm run build:site
       - run: npm run test:pages
       - name: Install benchmark dependencies
-        run: npm --prefix benchmarks/prettyM-web ci
+        run: npm --prefix benchmarks/browser ci
       - name: Materialize benchmark sources
-        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- "$PAGES_BENCHMARK_BUILD"
+        run: npm --prefix benchmarks/browser run artifacts:sources -- "$PAGES_BENCHMARK_BUILD"
       - name: Cache benchmark producer toolchains
         uses: actions/cache@v4
         with:
           path: |
-            benchmarks/prettyM-web/_artifacts/npm-cache
-            benchmarks/prettyM-web/_sources/**/.lake
-            benchmarks/prettyM-web/_sources/**/.tools/cache
-            benchmarks/prettyM-web/_sources/**/.deps
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ env.PAGES_BENCHMARK_BUILD }}-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+            benchmarks/browser/_artifacts/npm-cache
+            benchmarks/browser/_sources/**/.lake
+            benchmarks/browser/_sources/**/.tools/cache
+            benchmarks/browser/_sources/**/.deps
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ env.PAGES_BENCHMARK_BUILD }}-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
       - name: Install benchmark Chromium
-        run: npm --prefix benchmarks/prettyM-web run playwright:install
+        run: npm --prefix benchmarks/browser run playwright:install
       - name: Build and validate benchmark candidate
-        run: npm --prefix benchmarks/prettyM-web run example -- "$PAGES_BENCHMARK_EXAMPLE" "$PAGES_BENCHMARK_VARIANT" --prepare
+        run: npm --prefix benchmarks/browser run example -- "$PAGES_BENCHMARK_EXAMPLE" "$PAGES_BENCHMARK_VARIANT" --prepare
       - name: Install admitted benchmark under Pages
         run: |
-          npm --prefix benchmarks/prettyM-web run build -- \
+          npm --prefix benchmarks/browser run build -- \
             --deploy "$PAGES_BENCHMARK_EXAMPLE=$PAGES_BENCHMARK_VARIANT"
           npm run build:benchmark-pages
       - name: Test deployed benchmark subtree

@@ -90,6 +90,31 @@ button:disabled {
   padding: 2rem 0 3rem;
 }
 
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #697483;
+  font-size: 0.75rem;
+}
+
+.site-nav a {
+  color: #9bc7f2;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  color: #d9ebfb;
+  outline: none;
+}
+
+.site-nav strong {
+  color: #9aa4b1;
+  font-weight: 650;
+}
+
 .bench-header,
 .bench-section-heading {
   display: flex;

@@ -272,14 +272,14 @@ async function verifyArtifactPayload(
     ...(staged ? [] : ["SHA256SUMS"]),
     ...localFiles.map(([path]) => path),
   ]);
-  const actualPaths = await regularFilePaths(directory);
+  const actualPaths = new Set(await regularFilePaths(directory));
   for (const path of actualPaths) {
     if (!expectedPaths.has(path)) {
       throw new Error(`artifact set contains an unexpected member: ${path}`);
     }
   }
   for (const path of expectedPaths) {
-    if (!actualPaths.includes(path)) {
+    if (!actualPaths.has(path)) {
       throw new Error(`artifact set is missing a declared member: ${path}`);
     }
   }

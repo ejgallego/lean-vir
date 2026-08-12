@@ -131,37 +131,18 @@ Compare two saved reports with:
 npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
 
-## Browser prettyM comparison
+## Browser benchmark catalog
 
-The five-backend `Std.Format.prettyM` benchmark interface is a standalone
-application under `benchmarks/prettyM-web/`. It does not initialize the VIR
-documentation site, Reveal, or Verso. The directory has its own package,
-artifact contract, build, isolated HTTP server, and browser regression so it
-can later become an independent repository by moving that directory intact.
+The standalone application under `benchmarks/browser/` owns the catalogued
+client-example format, candidate artifacts, differential tests, browser
+reports, and campaigns. Its current canonical example compares five
+`Std.Format.prettyM` backends; Illuminate is the first local second-client
+rehearsal. It does not initialize the VIR documentation site, Reveal, or Verso.
 
-From the VIR root, use the thin convenience commands:
-
-```bash
-npm run bench:pretty:web:stage -- _artifacts/sets/<set-id>
-npm run bench:pretty:web:example -- prettyM default --plan
-npm run bench:pretty:web:examples:check
-npm run bench:pretty:web:artifacts:pack -- --build prettyM
-npm run bench:pretty:web:artifacts:fetch -- --lock <lock> --archive <tar>
-npm run bench:pretty:web:build
-npm run bench:pretty:web:test
-npm run bench:pretty:web:dev
-npm run bench:pretty:web:report
-npm run bench:pretty:web:campaign
-```
-
-The generic stage command derives the example from a verified namespaced set
-and replaces only that example's artifacts. The report command collects
-cold-start, per-phase, scaling, interaction,
-retained and isolated memory, and repeated-call data. Campaigns launch the
-collector in fresh processes without publishing. See
-`benchmarks/prettyM-web/README.md` for the ignored
-artifact and result layouts and the commands that work directly from the
-application directory.
+Root commands use the `bench:browser:*` prefix as convenience pointers. See
+[`benchmarks/browser/README.md`](../benchmarks/browser/README.md) for the
+authoritative command list, ignored artifact layout, example contribution
+format, and measurement cautions.
 
 The Pages workflow generates and validates the canonical prettyM candidate in
 its own job, then deploys the admitted application under `/lean-vir/benchmarks/`.

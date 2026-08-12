@@ -32,7 +32,7 @@
       "artifactSet": {
         "setId": "prettyM-bounded-set-0002",
         "benchmarkContract": {
-          "id": "prettyM-web/artifacts/v1",
+          "id": "prettyM/artifacts/v1",
           "input": "prettyM-compact-format/v1",
           "output": "prettyM-text-and-complete-style-events/v1",
           "timingPhases": ["prepare", "execute", "decode", "render"]

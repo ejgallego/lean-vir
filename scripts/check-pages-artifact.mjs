@@ -61,6 +61,7 @@ async function assertLocalBundle(path) {
     "lean-vir-local/LICENSE",
     "lean-vir-local/NOTICE",
     "lean-vir-local/index.html",
+    "lean-vir-local/demo.html",
     "lean-vir-local/dev.html",
     "lean-vir-local/format.html",
     "lean-vir-local/react.html",
@@ -84,7 +85,10 @@ async function assertLocalBundle(path) {
   );
 
   const { stdout: indexHtml } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-local/index.html"]);
-  assert.ok(indexHtml.includes('src="./assets/'), "local bundle should use relative asset paths");
+  assert.ok(
+    /(?:src|href)="\.\/assets\//.test(indexHtml),
+    "local bundle should use relative asset paths",
+  );
 }
 
 async function assertSdkBundle(path) {
@@ -204,23 +208,28 @@ async function assertWasmSizeReport() {
 }
 
 const indexHtml = await assertHtmlAssetLinks("index.html");
+const demoHtml = await assertHtmlAssetLinks("demo.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 const formatHtml = await assertHtmlAssetLinks("format.html");
 const reactHtml = await assertHtmlAssetLinks("react.html");
 
+assertLink(indexHtml, "demo.html");
 assertLink(indexHtml, "dev.html");
 assertLink(indexHtml, "react.html");
 assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
-assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/surface/");
-assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/size/");
+assertLink(indexHtml, "surface/");
+assertLink(indexHtml, "size/");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "benchmarks/");
-assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
-assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
-assertLink(indexHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);
-assertLink(indexHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore`);
-assertLink(indexHtml, `dev.html?package=${boundaryPackageFile}&amp;entry=Vir_Fixtures_Boundary_floatScaleScore`);
+assertLink(demoHtml, "index.html");
+assertLink(demoHtml, "surface/");
+assertLink(demoHtml, "size/");
+assertLink(demoHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
+assertLink(demoHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
+assertLink(demoHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);
+assertLink(demoHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore`);
+assertLink(demoHtml, `dev.html?package=${boundaryPackageFile}&amp;entry=Vir_Fixtures_Boundary_floatScaleScore`);
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
 assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");
@@ -240,7 +249,7 @@ await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 await assertSurfaceReport();
 await assertWasmSizeReport();
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runtime demo, runner, React review, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;

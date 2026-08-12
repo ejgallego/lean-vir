@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const source = resolve(root, "benchmarks/prettyM-web/dist");
+const source = resolve(root, "benchmarks/browser/dist");
 const destination = resolve(root, "web/dist/benchmarks");
 if (!(await stat(source).catch(() => null))?.isDirectory()) {
   throw new Error("benchmark Pages build is missing; run its build first");

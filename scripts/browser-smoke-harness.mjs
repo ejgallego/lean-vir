@@ -21,6 +21,7 @@ export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
 export const requiredDistFiles = Object.freeze([
   "index.html",
+  "demo.html",
   "dev.html",
   "format.html",
   "react.html",

@@ -1,0 +1,287 @@
+<!doctype html>
+<!--
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lean VIR Runtime Demo</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="workspace">
+        <header class="topbar">
+          <div class="topbar-title">
+            <p class="eyebrow">Lean IR / wasm32-wasip1</p>
+            <h1>Runtime Demo</h1>
+            <nav class="topbar-links" aria-label="Demo pages">
+              <a href="index.html">Home</a>
+              <a href="dev.html">Package Runner</a>
+              <a href="format.html?case=list&amp;width=12">Format.pretty</a>
+              <a href="benchmarks/">Browser Benchmarks</a>
+              <a href="surface/">Runnable Surface</a>
+              <a href="size/">Wasm Size</a>
+              <a href="downloads/lean-vir-local.tar.gz" download>Download Bundle</a>
+              <a href="downloads/lean-vir-sdk.tar.gz" download>Download SDK</a>
+            </nav>
+          </div>
+          <div class="runtime-summary" aria-label="Runtime summary">
+            <div id="status" class="status">Loading WASM</div>
+            <div>
+              <span>WASM</span>
+              <strong id="wasm-target">wasm32-wasip1</strong>
+            </div>
+            <div>
+              <span>Link</span>
+              <strong id="link-status">strict</strong>
+            </div>
+            <div>
+              <span>Package</span>
+              <strong id="package-name">...</strong>
+            </div>
+            <div>
+              <span>Size</span>
+              <strong id="package-size">...</strong>
+            </div>
+            <div>
+              <span>Ptr</span>
+              <strong id="ptr-width">...</strong>
+            </div>
+            <div>
+              <span>Decls</span>
+              <strong id="decl-count">...</strong>
+            </div>
+            <div>
+              <span>Layout</span>
+              <strong id="layout-guard">...</strong>
+            </div>
+          </div>
+        </header>
+
+        <section class="pet-demo" aria-label="Lean DOM Tamagotchi demo">
+          <div class="pet-state-card">
+            <div class="pet-card-heading">
+              <div>
+                <p class="eyebrow">Interactive demo</p>
+                <h2>Lean DOM Tamagotchi</h2>
+              </div>
+              <div class="pet-heading-controls">
+                <label class="pet-name-field" for="pet-name-input">
+                  <span>Name</span>
+                  <input id="pet-name-input" type="text" value="Octi" maxlength="18" autocomplete="off" />
+                </label>
+                <label class="art-switch" for="pet-art-toggle">
+                  <input id="pet-art-toggle" type="checkbox" checked />
+                  <span class="art-switch-track" aria-hidden="true">
+                    <span class="art-switch-thumb"></span>
+                  </span>
+                  <span>Octopus</span>
+                </label>
+              </div>
+            </div>
+            <div class="pet-state">
+              <div
+                id="pet-device"
+                class="pet-device"
+                role="img"
+                aria-label="Octopus mood happy"
+                data-art="octopus"
+              >
+                <div class="pet-screen">
+                  <div class="pet-pixel-pet" aria-hidden="true">
+                    <span class="pet-ear pet-ear-left"></span>
+                    <span class="pet-ear pet-ear-right"></span>
+                    <span class="pet-body"></span>
+                    <span class="pet-tentacle pet-tentacle-1"></span>
+                    <span class="pet-tentacle pet-tentacle-2"></span>
+                    <span class="pet-tentacle pet-tentacle-3"></span>
+                    <span class="pet-tentacle pet-tentacle-4"></span>
+                    <span class="pet-tentacle pet-tentacle-5"></span>
+                    <span class="pet-eye pet-eye-left"></span>
+                    <span class="pet-eye pet-eye-right"></span>
+                    <span class="pet-mouth"></span>
+                    <span class="pet-signal"></span>
+                  </div>
+                </div>
+                <span class="pet-device-button pet-device-button-left"></span>
+                <span class="pet-device-button pet-device-button-center"></span>
+                <span class="pet-device-button pet-device-button-right"></span>
+              </div>
+              <div class="pet-mood-readout">
+                <span>Mood</span>
+                <strong id="pet-mood-display">happy</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pet-action-card">
+            <section class="pet-stats-band" aria-label="Pet state summary">
+              <div>
+                <span>name</span>
+                <strong id="pet-name-display">Octi</strong>
+              </div>
+              <div>
+                <span>care</span>
+                <strong id="pet-care-display">3/5</strong>
+              </div>
+              <div>
+                <span>turns</span>
+                <strong id="pet-turn-display">0</strong>
+              </div>
+            </section>
+            <div class="action-grid">
+              <button type="button" data-action="feed">Feed</button>
+              <button type="button" data-action="play">Play</button>
+              <button type="button" data-action="nap">Nap</button>
+              <button type="button" data-action="wake">Wake</button>
+              <button type="button" data-action="ignore">Ignore</button>
+              <button type="button" id="pet-reset-button">Reset</button>
+            </div>
+            <section class="pet-trace-band" aria-live="polite">
+              <div>
+                <span>last action</span>
+                <strong id="pet-action-display">...</strong>
+              </div>
+              <div>
+                <span>trace</span>
+                <strong id="pet-trace-display">happy</strong>
+              </div>
+              <div>
+                <span>summary</span>
+                <strong id="pet-summary-display">Octi is happy</strong>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="package-panel" aria-labelledby="package-title">
+          <div class="section-heading package-heading">
+            <div>
+              <p class="eyebrow">Focused packages</p>
+              <h2 id="package-title">Browser package set</h2>
+            </div>
+            <a class="section-link" href="dev.html">Open runner</a>
+          </div>
+          <div class="package-list">
+            <a
+              class="package-item"
+              href="dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total"
+            >
+              <strong>local-quickstart.irpkg</strong>
+              <span>Four small exports from one Lean file</span>
+            </a>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"
+            >
+              <strong>fixtures-basic.irpkg</strong>
+              <span>Basic, list/option, interface shapes</span>
+            </a>
+            <a
+              class="package-item"
+              href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake"
+            >
+              <strong>demo-host.irpkg</strong>
+              <span>Browser host calls, React, and Tamagotchi demos</span>
+            </a>
+            <a
+              class="package-item"
+              href="react.html"
+            >
+              <strong>react.html</strong>
+              <span>Lean-authored React examples</span>
+            </a>
+            <a
+              class="package-item"
+              href="format.html?case=list&amp;width=12"
+            >
+              <strong>pretty-printer.irpkg</strong>
+              <span>Std.Format.pretty component package</span>
+            </a>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore"
+            >
+              <strong>fixtures-lean.irpkg</strong>
+              <span>Lean Expr, parser, Task</span>
+            </a>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore"
+            >
+              <strong>fixtures-boundary.irpkg</strong>
+              <span>Numeric and runtime boundaries</span>
+            </a>
+          </div>
+        </section>
+
+        <section class="fixture-workbench" aria-labelledby="fixture-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Fixture coverage</p>
+              <h2 id="fixture-title">Runnable entries</h2>
+            </div>
+            <div class="fixture-stats" aria-label="Fixture manifest summary">
+              <div>
+                <span>entries</span>
+                <strong id="fixture-count">...</strong>
+              </div>
+              <div>
+                <span>files</span>
+                <strong id="fixture-file-count">...</strong>
+              </div>
+              <div>
+                <span>result types</span>
+                <strong id="fixture-result-type">Nat</strong>
+              </div>
+            </div>
+          </div>
+          <div class="fixture-actions">
+            <div class="fixture-toolbar" aria-label="Fixture source filter">
+              <button type="button" data-fixture-filter="all" aria-pressed="true">All</button>
+              <button type="button" data-fixture-filter="demos">Demos</button>
+              <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
+              <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
+              <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
+              <button type="button" data-fixture-filter="fixtures/ExprPrinter.lean">Lean</button>
+              <button type="button" data-fixture-filter="fixtures/FormatPretty.lean">Format</button>
+              <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
+            </div>
+            <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>
+              Run visible
+            </button>
+          </div>
+          <p id="fixture-run-status" class="fixture-run-status">Waiting for WASM</p>
+          <div class="fixture-runner-layout">
+            <div id="fixture-list" class="fixture-list"></div>
+            <aside class="fixture-source-panel" aria-labelledby="fixture-source-title">
+              <div class="fixture-source-header">
+                <div>
+                  <span id="fixture-source-path">fixtures/Basic.lean</span>
+                  <strong id="fixture-source-title">Fixture source</strong>
+                </div>
+                <small id="fixture-source-entry">...</small>
+              </div>
+              <div class="fixture-source-controls">
+                <div id="fixture-input-panel" class="fixture-input-panel" hidden>
+                  <label id="fixture-input-label" for="fixture-input">Input</label>
+                  <input id="fixture-input" type="text" />
+                  <small id="fixture-input-hint"></small>
+                </div>
+                <div>
+                  <span>Result</span>
+                  <output id="fixture-selected-result">...</output>
+                </div>
+                <button id="fixture-run-selected" type="button" disabled>Run</button>
+              </div>
+              <pre class="fixture-source-viewer"><code id="fixture-source-code"></code></pre>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

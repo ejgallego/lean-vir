@@ -1,4 +1,4 @@
-# Lean browser benchmark app
+# Lean browser benchmark catalog
 
 This directory is one standalone browser benchmark application. Its example
 selector currently exposes `Std.Format.prettyM` and the Illuminate player at
@@ -174,9 +174,10 @@ not load or privilege either workload. Select an example there or use the
 direct links `?example=prettyM&variant=default` and
 `?example=illuminate&variant=default`. Example variants are selected in the
 shared header rather than by workload-specific UI. The included server supplies
-`_headers` and `.htaccess` are included for static hosts that consume them. The
-scoped service worker covers hosts such as GitHub Pages that cannot configure
-those headers, with one reload before application startup.
+the required cross-origin isolation headers. `_headers` and `.htaccess` are
+included for static hosts that consume them. The scoped service worker covers
+hosts such as GitHub Pages that cannot configure those headers, with one reload
+before application startup.
 
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction

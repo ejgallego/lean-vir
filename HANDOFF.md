@@ -1,16 +1,16 @@
 # Handoff: browser benchmark catalog and artifact pipeline
 
-Last verified: 2026-08-11
+Last verified: 2026-08-12
 
 ## Purpose
 
-`benchmarks/prettyM-web/` is a standalone browser benchmark catalog hosted in
+`benchmarks/browser/` is a standalone browser benchmark catalog hosted in
 VIR. It has no runtime dependency on the parent VIR source tree, Verso Slides,
 Reveal, or Lake. Producer source stays in the repositories that own it; this
 application owns selection, artifact assembly, correctness testing, serving,
 and report presentation.
 
-Read `AGENTS.md`, this file, and `benchmarks/prettyM-web/README.md` before
+Read `AGENTS.md`, this file, and `benchmarks/browser/README.md` before
 changing the catalog. Generated sources, packages, artifacts, reports, and
 machine-local toolchain configuration stay below the ignored application
 directories.
@@ -31,7 +31,7 @@ directories.
   controller boundary. The shared shell owns discovery, variants, artifact
   status, controls, report placement, and backend filtering.
 
-See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
+See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 `ARTIFACT_SETS.md` for the complete formats.
 
 ## Current state
@@ -62,7 +62,7 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 
 ## Operator commands
 
-Run application commands from `benchmarks/prettyM-web/`:
+Run application commands from `benchmarks/browser/`:
 
 ```bash
 npm install

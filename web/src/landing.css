@@ -1,0 +1,451 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+:root {
+  color: #e9eee9;
+  background: #0c1210;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background:
+    radial-gradient(
+      circle at 78% 2%,
+      rgba(96, 178, 141, 0.16),
+      transparent 32rem
+    ),
+    radial-gradient(
+      circle at 8% 38%,
+      rgba(91, 131, 175, 0.11),
+      transparent 29rem
+    ),
+    #0c1210;
+}
+
+a {
+  color: inherit;
+}
+
+.landing-shell {
+  width: min(1180px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  min-height: 5.5rem;
+  border-bottom: 1px solid #29332e;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+.wordmark-mark {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  color: #0c1210;
+  background: #8dd0aa;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-weight: 900;
+}
+
+.wordmark strong,
+.wordmark small {
+  display: block;
+}
+
+.wordmark strong {
+  font-size: 0.95rem;
+}
+
+.wordmark small {
+  margin-top: 0.08rem;
+  color: #89968f;
+  font-size: 0.67rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.site-nav a {
+  padding: 0.5rem 0.7rem;
+  color: #aeb9b2;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  color: #e9eee9;
+  background: #17201c;
+  outline: none;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.55fr);
+  gap: clamp(2rem, 7vw, 6rem);
+  align-items: center;
+  min-height: 35rem;
+  padding: 5rem 0;
+  border-bottom: 1px solid #29332e;
+}
+
+.kicker,
+.card-label,
+.terminal-label {
+  margin: 0 0 0.65rem;
+  color: #8dd0aa;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  max-width: 14ch;
+  margin-bottom: 1.3rem;
+  font-size: clamp(3.3rem, 8vw, 6.8rem);
+  line-height: 0.88;
+  letter-spacing: -0.065em;
+  text-wrap: balance;
+}
+
+.hero-intro {
+  max-width: 46rem;
+  margin-bottom: 2rem;
+  color: #aeb9b2;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  min-width: 13rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #47544d;
+  color: #e9eee9;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.action:hover,
+.action:focus-visible {
+  border-color: #8dd0aa;
+  outline: none;
+}
+
+.action-primary {
+  color: #0c1210;
+  background: #8dd0aa;
+  border-color: #8dd0aa;
+}
+
+.action-primary:hover,
+.action-primary:focus-visible {
+  background: #a3debd;
+}
+
+.runtime-card {
+  padding: 1.25rem;
+  border: 1px solid #344039;
+  background: rgba(18, 26, 22, 0.82);
+  box-shadow: 1.25rem 1.25rem 0 rgba(141, 208, 170, 0.05);
+}
+
+.runtime-card ol {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 1px;
+  list-style: none;
+  background: #2b3630;
+}
+
+.runtime-card li {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  background: #101713;
+}
+
+.runtime-card li span {
+  color: #64736a;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.runtime-card li strong {
+  font-size: 0.84rem;
+}
+
+.runtime-note {
+  margin: 1rem 0 0;
+  color: #89968f;
+  font-size: 0.78rem;
+}
+
+.destination-section {
+  padding: 4rem 0 1rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.35rem;
+}
+
+.section-number {
+  margin: 0;
+  color: #526158;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.section-heading .kicker {
+  margin-bottom: 0.2rem;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.card-grid {
+  display: grid;
+  gap: 1px;
+  padding: 1px;
+  background: #303b35;
+}
+
+.card-grid-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.card-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.destination-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 15rem;
+  padding: 1.25rem;
+  color: #e9eee9;
+  background: #111815;
+  text-decoration: none;
+  transition: background-color 140ms ease;
+}
+
+.destination-card:hover,
+.destination-card:focus-visible {
+  background: #18231e;
+  outline: 1px solid #8dd0aa;
+  outline-offset: -1px;
+}
+
+.destination-card-featured,
+.destination-card-accent {
+  background: #15251d;
+}
+
+.destination-card h3 {
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+.destination-card p {
+  color: #98a59d;
+  font-size: 0.86rem;
+}
+
+.destination-card code,
+.integration-band code {
+  color: #c6e8d4;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82em;
+}
+
+.card-link {
+  margin-top: auto;
+  color: #8dd0aa;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.integration-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.75fr);
+  gap: 3rem;
+  align-items: center;
+  margin: 4rem 0;
+  padding: 2rem;
+  color: #0c1210;
+  background: #8dd0aa;
+}
+
+.integration-band .kicker,
+.integration-band p {
+  color: #254334;
+}
+
+.integration-band h2 {
+  max-width: 18ch;
+  margin-bottom: 0.75rem;
+}
+
+.integration-band p:last-child {
+  margin-bottom: 0;
+}
+
+.integration-actions {
+  display: grid;
+  gap: 1px;
+  background: rgba(12, 18, 16, 0.22);
+}
+
+.integration-actions a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  padding: 0.7rem 0.85rem;
+  color: #102019;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.8rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.integration-actions a::after {
+  content: "→";
+}
+
+.integration-actions a:hover,
+.integration-actions a:focus-visible {
+  background: rgba(255, 255, 255, 0.42);
+  outline: none;
+}
+
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem 0 2.5rem;
+  border-top: 1px solid #29332e;
+  color: #748179;
+  font-size: 0.72rem;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .runtime-card {
+    width: min(32rem, 100%);
+  }
+
+  .card-grid-four,
+  .card-grid-three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .site-header,
+  .site-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .site-header {
+    padding: 1rem 0;
+  }
+
+  .site-nav {
+    justify-content: flex-start;
+  }
+
+  .hero {
+    padding: 4rem 0;
+  }
+
+  h1 {
+    font-size: clamp(3rem, 17vw, 5rem);
+  }
+
+  .card-grid-four,
+  .card-grid-three,
+  .integration-band {
+    grid-template-columns: 1fr;
+  }
+
+  .destination-card {
+    min-height: 12rem;
+  }
+
+  .integration-band {
+    gap: 1.5rem;
+    padding: 1.4rem;
+  }
+}

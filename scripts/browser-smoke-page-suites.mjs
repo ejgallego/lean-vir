@@ -30,6 +30,30 @@ import { packageInfoFor } from "./browser-smoke-dev-runner.mjs";
 
 export async function smokeLanding(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}`);
+  const state = await evaluate(cdp, `({
+    title: document.title,
+    heading: document.querySelector("h1")?.textContent?.trim(),
+    hasRuntimeStatus: Boolean(document.querySelector("#status")),
+    destinations: Array.from(document.querySelectorAll("a[href]"), (link) => link.getAttribute("href")),
+  })`);
+  assert.equal(state.title, "Lean VIR · Lean IR in the browser");
+  assert.equal(state.heading, "Run Lean’s real IR in the browser.");
+  assert.equal(state.hasRuntimeStatus, false);
+  for (const href of [
+    "demo.html",
+    "dev.html",
+    "format.html?case=list&width=12",
+    "react.html",
+    "benchmarks/",
+    "surface/",
+    "size/",
+  ]) {
+    assert.ok(state.destinations.includes(href), `landing page is missing ${href}`);
+  }
+}
+
+export async function smokeRuntimeDemo(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}demo.html`);
   await waitForReady(cdp);
   const state = await evaluate(cdp, `({
     packageName: document.querySelector("#package-name")?.textContent?.trim(),

@@ -164,14 +164,21 @@ guide, including `Sum` and `Except` result shapes.
 
 ## Built-In Demos
 
-Open the Vite URL from `npm run dev -- --port 5173` to see the DOM Tamagotchi,
-the React review page, fixture browser, and links into the package runner. The
-Lean sources are in [examples/](examples/), with broader fixture coverage under
-[fixtures/](fixtures/).
+Open the Vite URL from `npm run dev -- --port 5173` to choose a runnable or
+analysis surface. The runtime workbench at `/demo.html` contains the DOM
+Tamagotchi and fixture browser, with links into the package runner and focused
+React and `Format.pretty` demos. The Lean sources are in [examples/](examples/),
+with broader fixture coverage under [fixtures/](fixtures/).
 
 The hosted demo is deployed from `main`:
 
 [Lean VIR hosted demo](https://ejgallego.github.io/lean-vir/)
+
+The same deployment includes the catalogued browser comparison harness. It
+currently publishes the verified `prettyM/default` candidate with its complete
+differential test package and report dashboard:
+
+[Lean browser benchmark catalog](https://ejgallego.github.io/lean-vir/benchmarks/)
 
 The same deployment publishes the current static analysis of which functions
 in Lean's installed libraries have a complete VIR-runnable dependency closure:

@@ -8,279 +8,189 @@ Author: Emilio J. Gallego Arias
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lean IR WASI POC</title>
+    <meta
+      name="description"
+      content="Run selected Lean 4 declarations in the browser through Lean's IR interpreter compiled to WebAssembly."
+    />
+    <title>Lean VIR · Lean IR in the browser</title>
+    <link rel="stylesheet" href="/src/landing.css" />
   </head>
   <body>
-    <main id="app">
-      <section class="workspace">
-        <header class="topbar">
-          <div class="topbar-title">
-            <p class="eyebrow">Lean IR / wasm32-wasip1</p>
-            <h1>IR Interpreter Demo</h1>
-            <nav class="topbar-links" aria-label="Demo pages">
-              <a href="dev.html">Package Runner</a>
-              <a href="format.html?case=list&amp;width=12">Format.pretty</a>
-              <a href="benchmarks/">Browser Benchmarks</a>
-              <a href="https://ejgallego.github.io/lean-vir/surface/">Runnable Surface</a>
-              <a href="https://ejgallego.github.io/lean-vir/size/">Wasm Size</a>
-              <a href="downloads/lean-vir-local.tar.gz" download>Download Bundle</a>
-              <a href="downloads/lean-vir-sdk.tar.gz" download>Download SDK</a>
-            </nav>
-          </div>
-          <div class="runtime-summary" aria-label="Runtime summary">
-            <div id="status" class="status">Loading WASM</div>
-            <div>
-              <span>WASM</span>
-              <strong id="wasm-target">wasm32-wasip1</strong>
-            </div>
-            <div>
-              <span>Link</span>
-              <strong id="link-status">strict</strong>
-            </div>
-            <div>
-              <span>Package</span>
-              <strong id="package-name">...</strong>
-            </div>
-            <div>
-              <span>Size</span>
-              <strong id="package-size">...</strong>
-            </div>
-            <div>
-              <span>Ptr</span>
-              <strong id="ptr-width">...</strong>
-            </div>
-            <div>
-              <span>Decls</span>
-              <strong id="decl-count">...</strong>
-            </div>
-            <div>
-              <span>Layout</span>
-              <strong id="layout-guard">...</strong>
-            </div>
-          </div>
-        </header>
+    <div class="landing-shell">
+      <header class="site-header">
+        <a class="wordmark" href="./" aria-label="Lean VIR home">
+          <span class="wordmark-mark" aria-hidden="true">V</span>
+          <span>
+            <strong>Lean VIR</strong>
+            <small>IR interpreter · WebAssembly</small>
+          </span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="demo.html">Runtime demo</a>
+          <a href="benchmarks/">Benchmarks</a>
+          <a href="https://github.com/ejgallego/lean-vir">Source</a>
+        </nav>
+      </header>
 
-        <section class="pet-demo" aria-label="Lean DOM Tamagotchi demo">
-          <div class="pet-state-card">
-            <div class="pet-card-heading">
-              <div>
-                <p class="eyebrow">Interactive demo</p>
-                <h2>Lean DOM Tamagotchi</h2>
-              </div>
-              <div class="pet-heading-controls">
-                <label class="pet-name-field" for="pet-name-input">
-                  <span>Name</span>
-                  <input id="pet-name-input" type="text" value="Octi" maxlength="18" autocomplete="off" />
-                </label>
-                <label class="art-switch" for="pet-art-toggle">
-                  <input id="pet-art-toggle" type="checkbox" checked />
-                  <span class="art-switch-track" aria-hidden="true">
-                    <span class="art-switch-thumb"></span>
-                  </span>
-                  <span>Octopus</span>
-                </label>
-              </div>
-            </div>
-            <div class="pet-state">
-              <div
-                id="pet-device"
-                class="pet-device"
-                role="img"
-                aria-label="Octopus mood happy"
-                data-art="octopus"
-              >
-                <div class="pet-screen">
-                  <div class="pet-pixel-pet" aria-hidden="true">
-                    <span class="pet-ear pet-ear-left"></span>
-                    <span class="pet-ear pet-ear-right"></span>
-                    <span class="pet-body"></span>
-                    <span class="pet-tentacle pet-tentacle-1"></span>
-                    <span class="pet-tentacle pet-tentacle-2"></span>
-                    <span class="pet-tentacle pet-tentacle-3"></span>
-                    <span class="pet-tentacle pet-tentacle-4"></span>
-                    <span class="pet-tentacle pet-tentacle-5"></span>
-                    <span class="pet-eye pet-eye-left"></span>
-                    <span class="pet-eye pet-eye-right"></span>
-                    <span class="pet-mouth"></span>
-                    <span class="pet-signal"></span>
-                  </div>
-                </div>
-                <span class="pet-device-button pet-device-button-left"></span>
-                <span class="pet-device-button pet-device-button-center"></span>
-                <span class="pet-device-button pet-device-button-right"></span>
-              </div>
-              <div class="pet-mood-readout">
-                <span>Mood</span>
-                <strong id="pet-mood-display">happy</strong>
-              </div>
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="kicker">Lean 4 · wasm32-wasip1</p>
+            <h1 id="hero-title">Run Lean’s real IR in the browser.</h1>
+            <p class="hero-intro">
+              Lean VIR packages selected declarations and executes them through
+              Lean’s IR interpreter compiled to WebAssembly—with typed browser
+              boundaries, focused artifacts, and no JavaScript rewrite.
+            </p>
+            <div class="hero-actions">
+              <a class="action action-primary" href="benchmarks/">
+                Compare backends
+                <span aria-hidden="true">→</span>
+              </a>
+              <a class="action" href="demo.html">
+                Explore the runtime
+                <span aria-hidden="true">→</span>
+              </a>
             </div>
           </div>
-          <div class="pet-action-card">
-            <section class="pet-stats-band" aria-label="Pet state summary">
-              <div>
-                <span>name</span>
-                <strong id="pet-name-display">Octi</strong>
-              </div>
-              <div>
-                <span>care</span>
-                <strong id="pet-care-display">3/5</strong>
-              </div>
-              <div>
-                <span>turns</span>
-                <strong id="pet-turn-display">0</strong>
-              </div>
-            </section>
-            <div class="action-grid">
-              <button type="button" data-action="feed">Feed</button>
-              <button type="button" data-action="play">Play</button>
-              <button type="button" data-action="nap">Nap</button>
-              <button type="button" data-action="wake">Wake</button>
-              <button type="button" data-action="ignore">Ignore</button>
-              <button type="button" id="pet-reset-button">Reset</button>
-            </div>
-            <section class="pet-trace-band" aria-live="polite">
-              <div>
-                <span>last action</span>
-                <strong id="pet-action-display">...</strong>
-              </div>
-              <div>
-                <span>trace</span>
-                <strong id="pet-trace-display">happy</strong>
-              </div>
-              <div>
-                <span>summary</span>
-                <strong id="pet-summary-display">Octi is happy</strong>
-              </div>
-            </section>
-          </div>
+          <aside class="runtime-card" aria-label="Runtime architecture">
+            <p class="terminal-label">Execution path</p>
+            <ol>
+              <li><span>01</span><strong>Lean declaration</strong></li>
+              <li><span>02</span><strong>Focused .irpkg</strong></li>
+              <li><span>03</span><strong>IR interpreter</strong></li>
+              <li><span>04</span><strong>Browser host</strong></li>
+            </ol>
+            <p class="runtime-note">
+              This landing page stays lightweight. Wasm loads only after you
+              choose a runnable surface.
+            </p>
+          </aside>
         </section>
 
-        <section class="package-panel" aria-labelledby="package-title">
-          <div class="section-heading package-heading">
+        <section class="destination-section" aria-labelledby="run-heading">
+          <div class="section-heading">
+            <p class="section-number">01</p>
             <div>
-              <p class="eyebrow">Focused packages</p>
-              <h2 id="package-title">Browser package set</h2>
+              <p class="kicker">Run</p>
+              <h2 id="run-heading">Start with a working program</h2>
             </div>
-            <a class="section-link" href="dev.html">Open runner</a>
           </div>
-          <div class="package-list">
+          <div class="card-grid card-grid-four">
             <a
-              class="package-item"
-              href="dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total"
+              class="destination-card destination-card-featured"
+              href="demo.html"
             >
-              <strong>local-quickstart.irpkg</strong>
-              <span>Four small exports from one Lean file</span>
+              <span class="card-label">Full demo</span>
+              <h3>Runtime workbench</h3>
+              <p>
+                Tamagotchi, focused packages, and the runnable fixture catalog.
+              </p>
+              <span class="card-link">Open demo →</span>
+            </a>
+            <a class="destination-card" href="dev.html">
+              <span class="card-label">General tool</span>
+              <h3>Package runner</h3>
+              <p>
+                Load an <code>.irpkg</code>, inspect its exports, and call an
+                entry.
+              </p>
+              <span class="card-link">Open runner →</span>
             </a>
             <a
-              class="package-item"
-              href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"
-            >
-              <strong>fixtures-basic.irpkg</strong>
-              <span>Basic, list/option, interface shapes</span>
-            </a>
-            <a
-              class="package-item"
-              href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake"
-            >
-              <strong>demo-host.irpkg</strong>
-              <span>Browser host calls, React, and Tamagotchi demos</span>
-            </a>
-            <a
-              class="package-item"
-              href="react.html"
-            >
-              <strong>react.html</strong>
-              <span>Lean-authored React examples</span>
-            </a>
-            <a
-              class="package-item"
+              class="destination-card"
               href="format.html?case=list&amp;width=12"
             >
-              <strong>pretty-printer.irpkg</strong>
-              <span>Std.Format.pretty component package</span>
+              <span class="card-label">Focused demo</span>
+              <h3>Format.pretty</h3>
+              <p>
+                Adjust the document width and render Lean’s pretty printer live.
+              </p>
+              <span class="card-link">Open workbench →</span>
             </a>
-            <a
-              class="package-item"
-              href="dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore"
-            >
-              <strong>fixtures-lean.irpkg</strong>
-              <span>Lean Expr, parser, Task</span>
-            </a>
-            <a
-              class="package-item"
-              href="dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore"
-            >
-              <strong>fixtures-boundary.irpkg</strong>
-              <span>Numeric and runtime boundaries</span>
+            <a class="destination-card" href="react.html">
+              <span class="card-label">Host integration</span>
+              <h3>Lean-authored React</h3>
+              <p>
+                Exercise React nodes, callbacks, attributes, and resource
+                lifetimes.
+              </p>
+              <span class="card-link">Open examples →</span>
             </a>
           </div>
         </section>
 
-        <section class="fixture-workbench" aria-labelledby="fixture-title">
+        <section class="destination-section" aria-labelledby="inspect-heading">
           <div class="section-heading">
+            <p class="section-number">02</p>
             <div>
-              <p class="eyebrow">Fixture coverage</p>
-              <h2 id="fixture-title">Runnable entries</h2>
-            </div>
-            <div class="fixture-stats" aria-label="Fixture manifest summary">
-              <div>
-                <span>entries</span>
-                <strong id="fixture-count">...</strong>
-              </div>
-              <div>
-                <span>files</span>
-                <strong id="fixture-file-count">...</strong>
-              </div>
-              <div>
-                <span>result types</span>
-                <strong id="fixture-result-type">Nat</strong>
-              </div>
+              <p class="kicker">Inspect</p>
+              <h2 id="inspect-heading">
+                Compare behavior and understand the boundary
+              </h2>
             </div>
           </div>
-          <div class="fixture-actions">
-            <div class="fixture-toolbar" aria-label="Fixture source filter">
-              <button type="button" data-fixture-filter="all" aria-pressed="true">All</button>
-              <button type="button" data-fixture-filter="demos">Demos</button>
-              <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
-              <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
-              <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
-              <button type="button" data-fixture-filter="fixtures/ExprPrinter.lean">Lean</button>
-              <button type="button" data-fixture-filter="fixtures/FormatPretty.lean">Format</button>
-              <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
-            </div>
-            <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>
-              Run visible
-            </button>
-          </div>
-          <p id="fixture-run-status" class="fixture-run-status">Waiting for WASM</p>
-          <div class="fixture-runner-layout">
-            <div id="fixture-list" class="fixture-list"></div>
-            <aside class="fixture-source-panel" aria-labelledby="fixture-source-title">
-              <div class="fixture-source-header">
-                <div>
-                  <span id="fixture-source-path">fixtures/Basic.lean</span>
-                  <strong id="fixture-source-title">Fixture source</strong>
-                </div>
-                <small id="fixture-source-entry">...</small>
-              </div>
-              <div class="fixture-source-controls">
-                <div id="fixture-input-panel" class="fixture-input-panel" hidden>
-                  <label id="fixture-input-label" for="fixture-input">Input</label>
-                  <input id="fixture-input" type="text" />
-                  <small id="fixture-input-hint"></small>
-                </div>
-                <div>
-                  <span>Result</span>
-                  <output id="fixture-selected-result">...</output>
-                </div>
-                <button id="fixture-run-selected" type="button" disabled>Run</button>
-              </div>
-              <pre class="fixture-source-viewer"><code id="fixture-source-code"></code></pre>
-            </aside>
+          <div class="card-grid card-grid-three">
+            <a
+              class="destination-card destination-card-accent"
+              href="benchmarks/"
+            >
+              <span class="card-label">Catalogued candidates</span>
+              <h3>Browser benchmarks</h3>
+              <p>
+                Run differential suites, select backends, and explore complete
+                reports from verified artifact sets.
+              </p>
+              <span class="card-link">Open catalog →</span>
+            </a>
+            <a class="destination-card" href="surface/">
+              <span class="card-label">Static analysis</span>
+              <h3>Runnable surface</h3>
+              <p>
+                Trace which installed Lean declarations have complete VIR
+                closures.
+              </p>
+              <span class="card-link">Explore surface →</span>
+            </a>
+            <a class="destination-card" href="size/">
+              <span class="card-label">Artifact analysis</span>
+              <h3>Wasm size</h3>
+              <p>
+                Attribute retained bytes across sections, symbols, and runtime
+                code.
+              </p>
+              <span class="card-link">Explore size →</span>
+            </a>
           </div>
         </section>
-      </section>
-    </main>
-    <script type="module" src="/src/main.js"></script>
+
+        <section class="integration-band" aria-labelledby="integrate-heading">
+          <div>
+            <p class="kicker">03 · Integrate</p>
+            <h2 id="integrate-heading">Bring the runtime to a Lean project</h2>
+            <p>
+              Mark exports in Lean, build a module’s <code>:vir</code> facet,
+              and install the matching browser SDK.
+            </p>
+          </div>
+          <div class="integration-actions">
+            <a href="downloads/lean-vir-sdk.tar.gz" download>Download SDK</a>
+            <a href="downloads/lean-vir-local.tar.gz" download
+              >Download local bundle</a
+            >
+            <a
+              href="https://github.com/ejgallego/lean-vir#lake-facets-exports-and-startup-hooks"
+            >
+              Read the integration guide
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>Lean VIR is an experimental proof of concept.</p>
+        <p>Lean IR interpreter · focused packages · browser host boundaries</p>
+      </footer>
+    </div>
   </body>
 </html>
