@@ -4,24 +4,37 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
+import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
+import { validateSurfaceReport } from "./surface-report-schema.mjs";
 
-const SURFACE_FORMAT = "lean-vir-library-surface";
 const HTML_FORMAT = "lean-vir-surface-html";
-const HTML_VERSION = 2;
+const HTML_VERSION = 6;
 const templateDir = fileURLToPath(new URL("surface-report/", import.meta.url));
 
 const [inputArg, outputArg, ...rest] = process.argv.slice(2);
 let frontierCostsArg = null;
-if (rest.length === 2 && rest[0] === "--frontier-costs") frontierCostsArg = rest[1];
-if (!inputArg || !outputArg || (rest.length !== 0 && !frontierCostsArg)) {
+let collection = false;
+for (let index = 0; index < rest.length; index += 1) {
+  if (rest[index] === "--frontier-costs" && rest[index + 1]) {
+    frontierCostsArg = rest[index + 1];
+    index += 1;
+  } else if (rest[index] === "--collection") {
+    collection = true;
+  } else {
+    usage();
+  }
+}
+if (!inputArg || !outputArg) usage();
+
+function usage() {
   console.error(
     "usage: render-surface-report.mjs <surface.json> <output-directory> " +
-      "[--frontier-costs <costs.json>]",
+      "[--frontier-costs <costs.json>] [--collection]",
   );
   process.exit(2);
 }
@@ -31,22 +44,57 @@ const outputDir = resolve(outputArg);
 const modulesDir = join(outputDir, "data", "modules");
 const assetsDir = join(outputDir, "assets");
 const report = JSON.parse(await readFile(inputPath, "utf8"));
-validateReport(report);
+validateSurfaceReport(report, { label: inputPath });
 const frontierCosts = frontierCostsArg
   ? compactFrontierCostReport(
     JSON.parse(await readFile(resolve(frontierCostsArg), "utf8")),
     resolve(frontierCostsArg),
   )
   : null;
-const externs = report.externs ?? [];
+const externs = (report.externs ?? []).map((declaration) => ({
+  ...declaration,
+  family: classifySurfaceBoundary(declaration.name, declaration.module),
+}));
+const selectedDeclarationNames = report.selectedDeclarations ?? [];
 const costsByName = frontierCostsByName(frontierCosts);
 
+await rm(modulesDir, { recursive: true, force: true });
 await Promise.all([
   mkdir(modulesDir, { recursive: true }),
   mkdir(assetsDir, { recursive: true }),
 ]);
 
 const countsByModule = new Map(report.modules.map((module) => [module.name, module.counts]));
+const selectedDeclarationNameSet = new Set(selectedDeclarationNames);
+const selectedDeclarationModules = new Map(
+  report.declarations
+    .filter((declaration) => selectedDeclarationNameSet.has(declaration.name))
+    .map((declaration) => [declaration.name, declaration.module]),
+);
+const declarationByName = new Map(
+  report.declarations.map((declaration) => [declaration.name, declaration]),
+);
+const selectedDeclarations = selectedDeclarationNames.map((name) => {
+  const module = selectedDeclarationModules.get(name);
+  if (!module) throw new Error(`selected declaration ${JSON.stringify(name)} has no report record`);
+  return { name, module };
+});
+const selectedRootBlockerSets = selectedDeclarationNames.map((name) => {
+  const declaration = declarationByName.get(name);
+  if (!declaration) throw new Error(`selected declaration ${JSON.stringify(name)} has no report record`);
+  const blockers = Array.isArray(declaration.blockers)
+    ? declaration.blockers
+    : declaration.blocker
+      ? [{ blocker: declaration.blocker, path: declaration.blockerPath ?? [] }]
+      : [];
+  return {
+    name,
+    module: declaration.module,
+    runnable: declaration.runnable,
+    primaryBlocker: declaration.blocker,
+    blockers,
+  };
+});
 const declarationsByModule = new Map();
 for (const declaration of report.declarations) {
   const declarations = declarationsByModule.get(declaration.module) ?? [];
@@ -101,14 +149,21 @@ const indexPayload = {
   sourceFormat: report.format,
   sourceVersion: report.version,
   sourceFile: basename(inputPath),
+  collection,
   lean: report.lean,
+  capture: report.capture ?? null,
   definition: report.definition,
+  closure: report.closure ?? null,
   selectedModuleCount: report.selectedModules.length,
+  selectedDeclarations,
+  selectedRootBlockerSets,
   loadedModules: report.loadedModules,
   runtimeCapabilityCount: report.runtimeCapabilities.nativeExternCount,
+  runtimeCapabilityLean: report.runtimeCapabilities.lean ?? report.lean,
   counts: report.counts,
   libraries: report.libraries,
-  primaryBlockers: report.primaryBlockers,
+  primaryBlockers: enrichBlockers(report.primaryBlockers),
+  reachableBlockers: report.reachableBlockers ? enrichBlockers(report.reachableBlockers) : null,
   frontierCosts,
   externs,
   declarationTuple: [
@@ -118,6 +173,9 @@ const indexPayload = {
     "blockerKind?",
     "blockerName?",
     "blockerPath?",
+    "allBlockers?",
+    "type?",
+    "doc?",
   ],
   modules: moduleRecords,
 };
@@ -159,8 +217,12 @@ const manifest = {
     version: report.version,
     file: basename(inputPath),
     lean: report.lean,
+    capture: report.capture ?? null,
+    closure: report.closure ?? null,
   },
   selectedModules: report.selectedModules.length,
+  selectedDeclarations: selectedDeclarations.length,
+  selectedRootBlockerSets: selectedRootBlockerSets.length,
   modulesWithFunctions: report.modules.length,
   declarations: report.declarations.length,
   externs: externs.length,
@@ -186,28 +248,6 @@ async function writeOutput(relativePath, contents) {
   return Buffer.byteLength(contents);
 }
 
-function validateReport(value) {
-  if (value?.format !== SURFACE_FORMAT) {
-    throw new Error(`expected ${SURFACE_FORMAT} input, got ${JSON.stringify(value?.format)}`);
-  }
-  for (const field of ["selectedModules", "modules", "declarations", "libraries", "primaryBlockers"]) {
-    if (!Array.isArray(value[field])) {
-      throw new Error(`surface report field ${JSON.stringify(field)} must be an array`);
-    }
-  }
-  if (value.externs !== undefined && !Array.isArray(value.externs)) {
-    throw new Error("surface report field \"externs\" must be an array when present");
-  }
-  if (!value.counts || !value.lean || !value.definition || !value.runtimeCapabilities) {
-    throw new Error("surface report is missing counts, Lean identity, definition, or capabilities");
-  }
-  if (value.counts.total !== value.declarations.length) {
-    throw new Error(
-      `surface report has ${value.counts.total} counted functions but ${value.declarations.length} records`,
-    );
-  }
-}
-
 function emptyCounts() {
   return {
     total: 0,
@@ -221,18 +261,40 @@ function emptyCounts() {
   };
 }
 
+function enrichBlockers(summaries) {
+  const externByName = new Map(externs.map((declaration) => [declaration.name, declaration]));
+  return summaries.map((summary) => ({
+    ...summary,
+    family: classifySurfaceBoundary(
+      summary.blocker.name,
+      externByName.get(summary.blocker.name)?.module ?? "",
+    ),
+  }));
+}
+
 function declarationTuple(declaration) {
   if (declaration.runnable) {
-    return [declaration.name, declaration.kind, 1];
+    if (!declaration.type && !declaration.doc) return [declaration.name, declaration.kind, 1];
+    return [
+      declaration.name, declaration.kind, 1, null, null, null, null,
+      declaration.type ?? null, declaration.doc ?? null,
+    ];
   }
-  return [
+  const tuple = [
     declaration.name,
     declaration.kind,
     0,
     declaration.blocker?.kind ?? "unknown",
     declaration.blocker?.name ?? "(unknown)",
     declaration.blockerPath,
+    (declaration.blockers ?? []).map((entry) => [
+      entry.blocker.kind,
+      entry.blocker.name,
+      entry.path,
+    ]),
   ];
+  if (!declaration.type && !declaration.doc) return tuple;
+  return [...tuple, declaration.type ?? null, declaration.doc ?? null];
 }
 
 function frontierCostsByName(report) {

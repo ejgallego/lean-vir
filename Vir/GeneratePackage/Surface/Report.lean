@@ -85,7 +85,9 @@ private def SurfaceExternResult.toJson (result : SurfaceExternResult) : String :
     ("name", jsonName result.name),
     ("module", jsonName result.moduleName),
     ("status", jsonString result.status.label),
-    ("targets", jsonArray (result.targets.map SurfaceExternTarget.toJson))
+    ("targets", jsonArray (result.targets.map SurfaceExternTarget.toJson)),
+    ("type", result.typeSignature?.map jsonString |>.getD "null"),
+    ("doc", result.docString?.map jsonString |>.getD "null")
   ]
 
 private def SurfaceDeclResult.toJson (result : SurfaceDeclResult) : String :=
@@ -95,7 +97,9 @@ private def SurfaceDeclResult.toJson (result : SurfaceDeclResult) : String :=
     ("kind", jsonString result.kind.label),
     ("runnable", jsonBool result.runnable),
     ("blocker", result.blocker?.map SurfaceBlocker.toJson |>.getD "null"),
-    ("blockerPath", jsonNames result.blockerPath)
+    ("blockerPath", jsonNames result.blockerPath),
+    ("type", result.typeSignature?.map jsonString |>.getD "null"),
+    ("doc", result.docString?.map jsonString |>.getD "null")
   ]
 
 /-- Machine-readable complete declaration and module surface report. -/
@@ -114,12 +118,28 @@ def SurfaceReport.toJson (report : SurfaceReport) : String :=
       ("encodingIsGate", jsonBool false),
       ("interfaceCallabilityIsGate", jsonBool false),
       ("dynamicValidationIsGate", jsonBool false),
-      ("primaryBlockerPolicy", jsonString "deterministic nearest terminal blocker")
+      ("primaryBlockerPolicy", jsonString "deterministic nearest terminal blocker"),
+      ("completeBlockerFrontier", jsonBool false),
+      ("blockerCoverage", jsonString "one primary terminal blocker per blocked root"),
+      ("externScope", jsonString <| if report.selectedDeclarations.isEmpty then
+        "extern declarations owned by selected modules"
+      else
+        "extern declarations reached from selected roots"),
+      ("hostProvisioningVerified", jsonBool false),
+      ("missingNodeKind", jsonString "namespace heuristic")
     ]),
     ("selectedModules", jsonNames report.selectedModules),
+    ("selectedDeclarations", jsonNames report.selectedDeclarations),
     ("loadedModules", jsonNat report.loadedModules),
+    ("closure", jsonObject #[
+      ("selectedRoots", jsonNat report.counts.total),
+      ("capturedNodes", jsonNat report.rootReachableNodes),
+      ("rootReachableNodes", jsonNat report.rootReachableNodes),
+      ("supportOnlyNodes", jsonNat 0)
+    ]),
     ("runtimeCapabilities", jsonObject #[
       ("nativeExternCount", jsonNat externs.size),
+      ("primitiveNamespaces", jsonArray (primitiveNamespaces.toArray.map jsonString)),
       ("nativeExterns", jsonArray (externs.map NativeExtern.surfaceJson))
     ]),
     ("counts", report.counts.toJson),
@@ -166,7 +186,10 @@ def SurfaceReport.toMarkdown (report : SurfaceReport) : String :=
   "## Summary\n\n" ++
   s!"- Lean: `{Lean.versionString}` (`{Lean.githash}`)\n" ++
   s!"- Selected modules: {report.selectedModules.size}\n" ++
+  (if report.selectedDeclarations.isEmpty then "" else
+    s!"- Selected declarations: {report.selectedDeclarations.size} (`{"`, `".intercalate (report.selectedDeclarations.map displayName).toList}`)\n") ++
   s!"- Loaded modules including dependencies: {report.loadedModules}\n" ++
+  s!"- Root-reachable IR graph nodes: {report.rootReachableNodes}\n" ++
   s!"- Native runtime capabilities: {report.nativeExterns.size}\n" ++
   s!"- Public constants with IR runnable: {ratio summary.publicRunnable summary.publicTotal}\n" ++
   s!"- All IR functions runnable: {ratio summary.runnable summary.total}\n" ++

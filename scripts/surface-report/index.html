@@ -10,12 +10,17 @@
   <body>
     <header class="page-header">
       <div>
-        <p class="eyebrow">Lean library coverage</p>
-        <h1>VIR Runnable Surface</h1>
+        <p id="report-eyebrow" class="eyebrow">Lean library coverage</p>
+        <h1 id="report-title">VIR Runnable Surface</h1>
         <p id="report-identity" class="report-identity"></p>
+        <details id="analysis-method" class="analysis-method">
+          <summary>How this analysis is counted</summary>
+          <div id="analysis-method-body"></div>
+        </details>
         <nav class="report-links" aria-label="Related VIR reports">
-          <a href="../size/">Wasm size explorer</a>
-          <a href="../">Hosted demo</a>
+          <a id="all-analyses-link" href="../" hidden>All analyses</a>
+          <a id="wasm-size-link" href="../size/">Wasm size explorer</a>
+          <a id="hosted-demo-link" href="../">Hosted demo</a>
         </nav>
       </div>
       <div id="global-summary" class="global-summary" aria-label="Global report summary"></div>
@@ -44,15 +49,29 @@
         </div>
         <nav class="report-views" aria-label="Report views">
           <button id="libraries-view" class="report-view" type="button">
-            <span>All libraries</span>
+            <span id="libraries-view-label">All libraries</span>
             <span id="libraries-view-count" class="report-view-count"></span>
           </button>
-          <button id="top-blockers-view" class="report-view" type="button">
-            <span>Top blockers</span>
-            <span id="top-blockers-view-count" class="report-view-count"></span>
+          <button id="blockers-view" class="report-view" type="button">
+            <span id="blockers-view-label">Primary blockers</span>
+            <span id="blockers-view-count" class="report-view-count"></span>
+          </button>
+          <button id="blocker-sets-view" class="report-view" type="button" hidden>
+            <span>Blocker sets</span>
+            <span id="blocker-sets-view-count" class="report-view-count"></span>
+          </button>
+          <button id="externs-view" class="report-view" type="button">
+            <span>Externs</span>
+            <span id="externs-view-count" class="report-view-count"></span>
           </button>
         </nav>
-        <nav id="module-tree" class="module-tree" aria-label="Folders and modules"></nav>
+        <details id="module-browser" class="module-browser" open>
+          <summary>
+            <span>Browse report modules</span>
+            <span id="module-browser-count" class="report-view-count"></span>
+          </summary>
+          <nav id="module-tree" class="module-tree" aria-label="Folders and modules"></nav>
+        </details>
       </aside>
 
       <main id="report-main" class="report-main" tabindex="-1">

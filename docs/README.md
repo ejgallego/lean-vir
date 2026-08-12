@@ -37,9 +37,11 @@ ownership diagrams.
   `wasm/upstream_shim/README.md`,
   `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
   `wasm/upstream_shim/abi/call_abi.cpp`.
+- Runtime coverage work: read [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md),
+  `Vir/GeneratePackage/Surface/`, `tools/AnalyzeSurface.lean`, and
+  `scripts/surface-report/`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
-  [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md),
   `scripts/bench-vir.mjs`, `scripts/bench-env-lookup.mjs`,
   `scripts/bench-differential.mjs`, and `scripts/bench-utils.mjs`.
 
@@ -99,6 +101,8 @@ ownership diagrams.
 - [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md): static runnable-surface
   definition, full-library scan and interactive HTML workflows, report
   interpretation, and runtime control/candidate comparison rules.
+- [SURFACE_EXPERIMENTS.md](SURFACE_EXPERIMENTS.md): historical frontier
+  findings and accepted or rejected runtime decisions.
 - [LEAN_ZIP_DEFLATE_PROBE.md](LEAN_ZIP_DEFLATE_PROBE.md): exact-toolchain
   compatibility, package boundary, acceptance coverage, and performance
   findings for lean-zip's raw-DEFLATE entry point.

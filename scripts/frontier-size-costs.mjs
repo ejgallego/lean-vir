@@ -90,9 +90,15 @@ function loadCandidates(args) {
   candidates.push(...args.externs.map((name) => ({ id: name, names: [name] })));
   if (candidates.length === 0) throw new Error("provide at least one EXTERN or --plan");
   const ids = new Set();
+  const isolatedNames = new Set();
   for (const candidate of candidates) {
     if (ids.has(candidate.id)) throw new Error(`duplicate candidate id ${candidate.id}`);
     ids.add(candidate.id);
+    if (candidate.names.length === 1) {
+      const [name] = candidate.names;
+      if (isolatedNames.has(name)) throw new Error(`duplicate isolated candidate ${name}`);
+      isolatedNames.add(name);
+    }
   }
   return candidates;
 }
@@ -117,8 +123,16 @@ export function validateFrontierCostReport(report, label = "frontier size report
       typeof report.baseline.sha256 !== "string") {
     throw new Error(`${label}: invalid baseline sizes or SHA-256`);
   }
+  const isolatedNames = new Set();
   for (const [index, candidate] of report.candidates.entries()) {
     normalizeCandidate(candidate, `${label} candidate ${index}`);
+    if (candidate.names.length === 1) {
+      const [name] = candidate.names;
+      if (isolatedNames.has(name)) {
+        throw new Error(`${label}: duplicate isolated candidate ${name}`);
+      }
+      isolatedNames.add(name);
+    }
     if (!candidate.error &&
         (!Number.isSafeInteger(candidate.rawDeltaBytes) ||
          !Number.isSafeInteger(candidate.gzipDeltaBytes))) {

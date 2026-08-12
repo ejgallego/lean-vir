@@ -178,27 +178,15 @@ in Lean's installed libraries have a complete VIR-runnable dependency closure:
 
 [VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
 
-The release and debug Wasm artifacts also have an interactive retained-size
-breakdown by section, subsystem, object/module, and linker symbol. A second map
-places the current VIR boundary inside Lean's installed native runtime archives;
-it follows Lean's source hierarchy, separates the compiled `LeanIR.lean` program
-layer, exposes up to seven local hierarchy levels with a sticky depth slider,
-drills from source files into their sized native functions, and can color byte
-area by exact retained-function coverage, measured primary-blocker density, or
-a combined view where purple exposes code that is retained but not registered
-as a native extern. The context view reports total retained native-support
-coverage by archive bytes, sized-function bytes, and function count, while
-showing the cross-target Wasm size separately. Its combined-mode sidebar lists
-the overlap functions directly for one-click inspection. The compact coverage
-strip follows treemap hover so each archive, source subtree, file, and function
-can be compared without leaving the map. Deep zoom rendering
-is coalesced while dragging the slider, so only the newest requested level is
-drawn. Extern symbols link back to their coverage entries in the
-runnable-surface report. Both reports also display exact raw and gzip deltas
-from directly linked native-frontier experiments, keeping those costs separate
-from current blocker pressure:
+The release and debug artifacts also have a size explorer for Wasm sections,
+objects, and symbols, plus the installed Lean runtime archives. It cross-links
+native providers with the surface report and keeps measured byte costs distinct
+from blocker pressure and exact function unlocks:
 
 [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
+
+See [docs/SURFACE_ANALYSIS.md](docs/SURFACE_ANALYSIS.md) for local analysis,
+rendering, and serving commands.
 
 A downloadable static bundle is published with the hosted demo:
 

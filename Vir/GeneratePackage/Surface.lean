@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 import Lean.Compiler.InitAttr
+import Lean.Elab.Frontend
 public import Lean.Compiler.MetaAttr
 public import Vir.GeneratePackage.Closure
 public import Vir.GeneratePackage.Json
@@ -21,7 +22,7 @@ open Lean.IR
 
 def surfaceReportFormat : String := "lean-vir-library-surface"
 
-def currentSurfaceReportVersion : Nat := 2
+def currentSurfaceReportVersion : Nat := 3
 
 /-- Why a transitive IR closure cannot currently be executed by VIR. -/
 inductive SurfaceBlockerKind where
@@ -93,6 +94,8 @@ structure SurfaceExternResult where
   moduleName : Name
   status : SurfaceExternStatus
   targets : Array SurfaceExternTarget
+  typeSignature? : Option String := none
+  docString? : Option String := none
   deriving Repr
 
 /-- Static closure result for one Lean IR function. -/
@@ -103,6 +106,8 @@ structure SurfaceDeclResult where
   runnable : Bool
   blocker? : Option SurfaceBlocker := none
   blockerPath : Array Name := #[]
+  typeSignature? : Option String := none
+  docString? : Option String := none
   deriving Repr
 
 /-- Aggregate counts for a module or complete report. -/
@@ -172,7 +177,11 @@ structure SurfaceBlockerSummary where
 /-- Complete static VIR-runnable report for a selected set of Lean modules. -/
 structure SurfaceReport where
   selectedModules : Array Name
+  /-- Explicit declaration roots. Empty means every IR function owned by `selectedModules`. -/
+  selectedDeclarations : Array Name := #[]
   loadedModules : Nat
+  /-- Nodes in the union of the selected roots' static dependency closures. -/
+  rootReachableNodes : Nat
   nativeExterns : Array NativeExtern
   counts : SurfaceCounts
   libraries : Array SurfaceLibraryResult
@@ -322,24 +331,25 @@ private def declKind (env : Environment) (name : Name) : SurfaceDeclKind :=
   else
     .generated
 
-private def moduleForSurfaceDecl (env : Environment) (name : Name) : Name :=
+private def moduleForSurfaceDecl
+    (env : Environment) (fallbackModule? : Option Name) (name : Name) : Name :=
   match env.getModuleIdxFor? name with
   | some moduleIdx => env.header.modules[moduleIdx]?.map (·.module) |>.getD .anonymous
-  | none => .anonymous
+  | none => fallbackModule?.getD .anonymous
 
 private def resultFor
     (env : Environment) (blocked : SurfaceNameMap BlockedBy) (maxPathDepth : Nat)
-    (name : Name) : SurfaceDeclResult :=
+    (fallbackModule? : Option Name) (name : Name) : SurfaceDeclResult :=
   match blocked.get? name with
   | none => {
       name
-      moduleName := moduleForSurfaceDecl env name
+      moduleName := moduleForSurfaceDecl env fallbackModule? name
       kind := declKind env name
       runnable := true
     }
   | some info => {
       name
-      moduleName := moduleForSurfaceDecl env name
+      moduleName := moduleForSurfaceDecl env fallbackModule? name
       kind := declKind env name
       runnable := false
       blocker? := some info.blocker
@@ -426,7 +436,8 @@ private def externResult
   { name := catalog.name, moduleName := catalog.moduleName, status, targets }
 
 private def catalogDecls
-    (env : Environment) (selectedModules : SurfaceNameSet) :
+    (env : Environment) (selectedModules : SurfaceNameSet)
+    (fallbackModule? : Option Name) :
     SurfaceNameMap Decl × Array Name × Array CatalogExtern := Id.run do
   let capacity := env.header.moduleData.foldl
     (fun size data => size + data.constNames.size + data.extraConstNames.size) 0
@@ -441,34 +452,70 @@ private def catalogDecls
         continue
       let some decl := findEnvDecl env name | continue
       decls := decls.insert name decl
-      if selectedModules.contains moduleName then
-        match decl with
-        | .fdecl .. => roots := roots.push name
-        | .extern .. => externs := externs.push { name, moduleName, decl }
+      match decl with
+      | .fdecl .. =>
+          if selectedModules.contains moduleName then
+            roots := roots.push name
+      | .extern .. => externs := externs.push { name, moduleName, decl }
+  -- `runFrontend` keeps declarations compiled from the source file in the
+  -- local IR extension rather than imported module data. Add those declarations
+  -- so an external source file can be analyzed without first producing `.ir`.
+  for decl in getDecls env do
+    if decls.contains decl.name then
+      continue
+    decls := decls.insert decl.name decl
+    if let .extern .. := decl then
+      externs := externs.push {
+        name := decl.name
+        moduleName := moduleForSurfaceDecl env fallbackModule? decl.name
+        decl
+      }
   roots := roots.qsort fun lhs rhs => lhs.quickLt rhs
   externs := externs.qsort fun lhs rhs =>
     lhs.moduleName.toString < rhs.moduleName.toString ||
       (lhs.moduleName == rhs.moduleName && lhs.name.toString < rhs.name.toString)
   return (decls, roots, externs)
 
-/-- Analyze all IR functions owned by `selectedModules` in one imported environment. -/
+/--
+Analyze selected IR declaration roots, or every IR function owned by
+`selectedModules` when `selectedDeclarations` is empty.
+-/
 def analyzeLibrarySurface
     (env : Environment) (selectedModules : Array Name)
-    (nativeExterns : Array NativeExtern) : SurfaceReport :=
+    (nativeExterns : Array NativeExtern)
+    (selectedDeclarations : Array Name := #[])
+    (fallbackModule? : Option Name := none) : Except String SurfaceReport := do
   let selectedSet := selectedModules.foldl (fun names name => names.insert name)
     (Std.HashSet.emptyWithCapacity selectedModules.size : SurfaceNameSet)
-  let (decls, roots, catalogExterns) := catalogDecls env selectedSet
+  let (decls, moduleRoots, catalogExterns) := catalogDecls env selectedSet fallbackModule?
+  let selectedDeclarations := uniqueNames selectedDeclarations
+  let roots ←
+    if selectedDeclarations.isEmpty then
+      pure moduleRoots
+    else
+      selectedDeclarations.mapM fun name =>
+        match decls.get? name with
+        | some (.fdecl ..) => pure name
+        | some (.extern ..) => throw s!"selected declaration `{name}` is an extern, not an IR function"
+        | none => throw s!"selected declaration `{name}` has no Lean IR function in the loaded environment"
   let capabilities := nativeExterns.foldl (fun capabilities ext => capabilities.insert ext.name ext)
     (Std.HashMap.emptyWithCapacity nativeExterns.size : SurfaceNameMap NativeExtern)
   let graph := buildSurfaceGraph env decls capabilities roots
   let blocked := propagateBlockers graph
   let maxPathDepth := graph.nodes.size + 1
-  let declarations := roots.map (resultFor env blocked maxPathDepth)
+  let declarations := roots.map (resultFor env blocked maxPathDepth fallbackModule?)
   let counts := declarations.foldl (fun counts result => counts.addResult result) {}
   let modules := aggregateModules declarations
-  {
+  let catalogExterns := catalogExterns.filter fun catalog =>
+    if selectedDeclarations.isEmpty then
+      selectedSet.contains catalog.moduleName
+    else
+      graph.nodes.contains catalog.name
+  return {
     selectedModules
+    selectedDeclarations
     loadedModules := env.header.moduleNames.size
+    rootReachableNodes := graph.nodes.size
     nativeExterns
     counts
     libraries := aggregateLibraries modules
@@ -508,5 +555,16 @@ unsafe def loadLibrarySurfaceEnvironment (modules : Array Name) : IO Environment
   let imports := modules.map fun moduleName => ({ module := moduleName, importAll := true } : Import)
   let opts := Elab.async.set ({} : Options) false
   importModules (loadExts := true) imports opts
+
+/-- Elaborate and compile one source file so its local IR can be surface-analyzed directly. -/
+unsafe def loadLibrarySurfaceSourceEnvironment
+    (source : System.FilePath) (moduleName : Name) : IO Environment := do
+  enableInitializersExecution
+  initSearchPath (← findSysroot)
+  let contents ← IO.FS.readFile source
+  let opts := Elab.async.set ({} : Options) false
+  match ← Elab.runFrontend contents opts source.toString moduleName with
+  | some env => return env
+  | none => throw <| IO.userError s!"Lean frontend failed for `{source}`"
 
 end Vir.GeneratePackage

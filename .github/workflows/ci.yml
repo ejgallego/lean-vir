@@ -28,6 +28,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:bench
+      - run: npm run test:surface
+      - run: npm run test:surface:browser
       - run: npm run check:package-abi
       - run: npm run check:ir-codec-tags
       - run: npm run test:wasm-extensions

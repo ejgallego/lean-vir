@@ -22,6 +22,21 @@ test("frontier size candidates reject duplicate names", () => {
   );
 });
 
+test("frontier size reports reject ambiguous repeated isolated measurements", () => {
+  assert.throws(
+    () => validateFrontierCostReport({
+      format: "lean-vir-frontier-size-costs",
+      version: 1,
+      baseline: { rawBytes: 1000, gzipBytes: 500, sha256: "baseline" },
+      candidates: [
+        { id: "first", names: ["Float.add"], rawDeltaBytes: 10, gzipDeltaBytes: 4 },
+        { id: "second", names: ["Float.add"], rawDeltaBytes: 12, gzipDeltaBytes: 5 },
+      ],
+    }),
+    /duplicate isolated candidate Float\.add/,
+  );
+});
+
 test("frontier size pressure sums distinct primary blockers", () => {
   const candidate = normalizeCandidate({
     id: "float-basic",

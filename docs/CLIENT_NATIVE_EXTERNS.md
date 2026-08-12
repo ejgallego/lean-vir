@@ -92,6 +92,11 @@ symbols derived from Lean metadata. The generated provider source and symbol
 plans are empty after a generic build, so they never describe a previously
 selected client profile.
 
+To inspect the same profile in the boundary explorer, pass the manifest through
+`VIR_NATIVE_EXTERN_MANIFEST` (or `--native-extern-manifest`) to
+`npm run analyze:target-surface -- ...`. The explorer records its hash and
+selection but leaves provider compilation and strict linking to the build.
+
 ## Validation and boundary
 
 The tooling rejects:

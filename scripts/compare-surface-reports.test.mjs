@@ -11,12 +11,18 @@ import {
   compareSurfaceReports,
   renderSurfaceDeltaMarkdown,
 } from "./compare-surface-reports.mjs";
+import {
+  nativeExternFixture,
+  surfaceDefinition,
+  targetCaptureFixture,
+} from "./surface-report-test-fixtures.mjs";
+import { aggregateSurfaceDeclarations } from "./surface-report-schema.mjs";
 
 const eqv = { kind: "missingExtern", name: "Lean.Expr.eqv" };
 const dbg = { kind: "missingExtern", name: "Lean.Expr.dbgToString" };
 const trim = { kind: "missingExtern", name: "String.Internal.trim" };
 
-test("surface comparison reports exact unlocks, regressions, and newly exposed blockers", () => {
+test("surface comparison reports exact unlocks, regressions, and nearest blocker transitions", () => {
   const control = report([
     blocked("A.pubUnlock", "Lean.A", "publicConstant", eqv),
     blocked("A.privateReveal", "Lean.A", "privateConstant", eqv),
@@ -78,7 +84,7 @@ test("surface comparison reports exact unlocks, regressions, and newly exposed b
   const markdown = renderSurfaceDeltaMarkdown(delta);
   assert.match(markdown, /Public constants \| 2 \/ 3 \(66\.7%\) \| 2 \/ 3 \(66\.7%\) \| 1 \| 1/);
   assert.match(markdown, /`Lean\.Expr\.eqv` \| `lean_Lean_Expr_eqv`/);
-  assert.match(markdown, /Newly Exposed Blockers/);
+  assert.match(markdown, /Nearest Blocker Transitions/);
   assert.match(markdown, /Exact Declaration Sets/);
 });
 
@@ -92,6 +98,95 @@ test("surface comparison rejects a different Lean build", () => {
   );
 });
 
+test("exact-target comparison rejects a different captured source", () => {
+  const declarations = [blocked("A.entry", "Lean.A", "publicConstant", eqv)];
+  const control = exactTargetReport(declarations, "a".repeat(64));
+  const candidate = exactTargetReport(declarations, "b".repeat(64));
+  assert.throws(
+    () => compareSurfaceReports(control, candidate),
+    /captured source SHA-256 differs/,
+  );
+});
+
+test("exact-target comparison rejects a different root-reachable graph", () => {
+  const declarations = [blocked("A.entry", "Lean.A", "publicConstant", eqv)];
+  const control = exactTargetReport(declarations, "a".repeat(64), "c".repeat(64));
+  const candidate = exactTargetReport(declarations, "a".repeat(64), "d".repeat(64));
+  assert.throws(
+    () => compareSurfaceReports(control, candidate),
+    /root-reachable graph SHA-256 differs/,
+  );
+});
+
+function exactTargetReport(
+  declarations,
+  sourceSha256,
+  rootGraphSha256 = "d".repeat(64),
+) {
+  const value = report(declarations);
+  value.version = 3;
+  value.capture = targetCaptureFixture({
+    sourceSha256,
+    rootGraphSha256,
+  });
+  value.definition = surfaceDefinition(true);
+  value.selectedModules = ["Library.Entry"];
+  value.selectedDeclarations = declarations.map((declaration) => declaration.name);
+  value.closure = {
+    selectedRoots: declarations.length,
+    capturedNodes: declarations.length,
+    rootReachableNodes: declarations.length,
+    supportOnlyNodes: 0,
+  };
+  value.runtimeCapabilities.primitiveNamespaces = ["Lean"];
+  value.externs = value.externs.map((declaration) => ({
+    ...declaration,
+    type: null,
+    doc: null,
+  }));
+  value.reachableBlockers = [];
+  value.declarations = declarations.map((declaration) => ({
+    ...declaration,
+    type: null,
+    doc: null,
+    blockers: declaration.blocker
+      ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
+      : [],
+  }));
+  const aggregates = aggregateSurfaceDeclarations(value.declarations);
+  value.counts = aggregates.counts;
+  value.modules = aggregates.modules;
+  value.libraries = aggregates.libraries;
+  value.primaryBlockers = summarizeBlockers(value.declarations, false);
+  value.reachableBlockers = summarizeBlockers(value.declarations, true);
+  return value;
+}
+
+function summarizeBlockers(declarations, all) {
+  const summaries = new Map();
+  for (const declaration of declarations) {
+    const blockers = all
+      ? declaration.blockers
+      : declaration.blocker
+        ? [{ blocker: declaration.blocker, path: declaration.blockerPath }]
+        : [];
+    for (const entry of blockers) {
+      const key = `${entry.blocker.kind}\u0000${entry.blocker.name}`;
+      const summary = summaries.get(key) ?? {
+        blocker: entry.blocker,
+        roots: 0,
+        publicRoots: 0,
+        exampleRoot: declaration.name,
+        examplePath: entry.path,
+      };
+      summary.roots += 1;
+      if (declaration.kind === "publicConstant") summary.publicRoots += 1;
+      summaries.set(key, summary);
+    }
+  }
+  return [...summaries.values()];
+}
+
 function report(declarations, nativeNames = [], statusOverrides = {}) {
   const counts = countDeclarations(declarations);
   const modules = [...new Set(declarations.map((declaration) => declaration.module))]
@@ -100,14 +195,7 @@ function report(declarations, nativeNames = [], statusOverrides = {}) {
       name,
       counts: countDeclarations(declarations.filter((declaration) => declaration.module === name)),
     }));
-  const nativeExterns = nativeNames.map((name) => ({
-    name,
-    symbol: `lean_${name.replaceAll(".", "_")}`,
-    generateBoxedWrapper: false,
-    params: [],
-    resultType: "object",
-    deps: [],
-  }));
+  const nativeExterns = nativeNames.map((name) => nativeExternFixture(name));
   return {
     format: "lean-vir-library-surface",
     version: 2,
@@ -121,12 +209,16 @@ function report(declarations, nativeNames = [], statusOverrides = {}) {
       encodingIsGate: false,
     },
     selectedModules: ["Lean.A", "Std.B"],
+    selectedDeclarations: [],
+    loadedModules: 2,
     counts,
     runtimeCapabilities: {
       nativeExternCount: nativeExterns.length,
       nativeExterns,
     },
+    libraries: [],
     modules,
+    primaryBlockers: [],
     externs: [
       extern("Lean.Expr.eqv", "Lean.A", statusOverrides["Lean.Expr.eqv"] ?? "missing", "lean_expr_eqv"),
       extern("Lean.Expr.dbgToString", "Lean.A", "missing", "lean_expr_dbg_to_string"),
