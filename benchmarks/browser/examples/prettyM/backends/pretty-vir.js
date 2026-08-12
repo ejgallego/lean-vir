@@ -13,7 +13,8 @@
    *   fetchCache?: RequestCache,
    *   irPackageUrl?: string,
    *   jsonExportName?: string,
-   *   formatExportName?: string
+   *   formatExportName?: string,
+   *   htmlExportName?: string
    * }} PrettyVirConfig
    *
    * @typedef {{
@@ -21,8 +22,11 @@
    *   runtime?: { call: (name: string, ...args: *[]) => * },
    *   jsonExportName?: string,
    *   formatExportName?: string,
+   *   htmlExportName?: string,
    *   formatJsonSegmentsJson?: (fmtJson: string, width: number, indent: number) => string,
    *   formatSegments?: (fmt: *, width: number, indent: number) => *,
+   *   formatHtml?: (fmt: *, annotations: *, width: number, indent: number) => string,
+   *   formatHtmlTimed?: (fmt: *, annotations: *, width: number, indent: number) => *,
    *   ready?: Promise<*>,
    *   status?: string,
    *   error?: *,
@@ -70,6 +74,10 @@
     config.formatExportName ||
     bridge.formatExportName ||
     "PrettyBench.formatSegmentsForVir";
+  bridge.htmlExportName =
+    config.htmlExportName ||
+    bridge.htmlExportName ||
+    "VersoSlides.Pretty.formatHtmlForVir";
   bridge.assets = [scriptUrl, runtimeUrl, wasmUrl, irPackageUrl];
   root.__prettyBenchVir = bridge;
 
@@ -121,6 +129,30 @@
           throw new Error("missing VIR Std.Format pretty export name");
         return runtime.call(bridge.formatExportName, fmt, width, indent);
       };
+      bridge.formatHtml = function (fmt, annotations, width, indent) {
+        if (!bridge.htmlExportName)
+          throw new Error("missing VIR HTML pretty export name");
+        return runtime.call(
+          bridge.htmlExportName,
+          fmt,
+          annotations,
+          width,
+          indent,
+        );
+      };
+      if (typeof runtime.callTimed === "function") {
+        bridge.formatHtmlTimed = function (fmt, annotations, width, indent) {
+          if (!bridge.htmlExportName)
+            throw new Error("missing VIR HTML pretty export name");
+          return runtime.callTimed(
+            bridge.htmlExportName,
+            fmt,
+            annotations,
+            width,
+            indent,
+          );
+        };
+      }
       return runtime;
     })
     .catch(function (error) {
@@ -129,7 +161,7 @@
       console.warn("VIR pretty-printer bootstrap failed.", error);
       return null;
     });
-  ["vir", "vir-format"].forEach(function (id) {
+  ["vir", "vir-format", "vir-html"].forEach(function (id) {
     var backend = getPrettyBackend(id);
     if (backend) backend.ready = bridge.ready;
   });

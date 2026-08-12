@@ -84,6 +84,102 @@ button:disabled {
   opacity: 0.5;
 }
 
+.live-render-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.live-render-lane {
+  min-width: 0;
+  overflow: hidden;
+  background: #11151b;
+  border: 1px solid #343c49;
+  border-top: 0.25rem solid var(--backend-color, #86b5e8);
+  border-radius: 0.45rem;
+}
+
+.live-render-lane header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.7rem;
+  padding: 0.65rem 0.75rem;
+  background: #1a2029;
+  border-bottom: 1px solid #343c49;
+}
+
+.live-render-lane header small {
+  grid-column: 1 / -1;
+  color: #8f99a7;
+}
+
+.live-render-output {
+  min-height: 10rem;
+  max-height: 22rem;
+  margin: 0;
+  padding: 0.85rem;
+  overflow: auto;
+  color: #d8dee8;
+  font:
+    0.8rem/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+}
+
+.live-render-output {
+  --verso-code-color: #d8dee8;
+  --verso-code-keyword-color: #c678dd;
+  --verso-code-const-color: #61afef;
+  --verso-code-var-color: #56d4c0;
+  --verso-code-comment-color: #9da0a8;
+}
+
+.live-render-output .keyword {
+  color: var(--verso-code-keyword-color);
+  font-weight: 700;
+}
+
+.live-render-output .const,
+.live-render-output .identifier,
+.live-render-output .module-name,
+.live-render-output .sort {
+  color: var(--verso-code-const-color);
+}
+
+.live-render-output .var,
+.live-render-output .level-var {
+  color: var(--verso-code-var-color);
+  font-style: italic;
+}
+
+.live-render-output .literal.string,
+.live-render-output .literal.number,
+.live-render-output .literal.char {
+  color: #a8db8f;
+}
+
+.live-render-output .comment,
+.live-render-output .doc-comment {
+  color: var(--verso-code-comment-color);
+  font-style: italic;
+}
+
+.live-render-output .punctuation,
+.live-render-output .delim,
+.live-render-output .wildcard,
+.live-render-output .level-op,
+.live-render-output .option {
+  color: #c7a0e8;
+}
+
+.live-render-output .unknown,
+.live-render-output .literal:not(.string):not(.number):not(.char) {
+  color: var(--verso-code-color);
+}
+
 .bench-shell {
   width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;

@@ -45,12 +45,20 @@ body:has(.pretty-corpus-overlay) {
   padding: 1rem 1.25rem 2rem;
   color: #e5eaf0;
   background:
-    radial-gradient(circle at 100% 0, rgba(70, 119, 176, 0.14), transparent 28rem),
+    radial-gradient(
+      circle at 100% 0,
+      rgba(70, 119, 176, 0.14),
+      transparent 28rem
+    ),
     rgba(18, 21, 27, 0.992);
   border: 1px solid #3e4857;
   border-radius: 0.8rem;
   box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.72);
-  font: 0.82rem/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+  font:
+    0.82rem/1.45 Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
   overscroll-behavior: contain;
   text-align: left;
 }
@@ -470,6 +478,28 @@ body:has(.pretty-corpus-overlay) {
 .pretty-dashboard-overlay .pretty-repeated-memory-chart {
   max-height: 23rem;
   margin: 0.35rem 0 0.9rem;
+}
+
+.pretty-live-timeline {
+  max-height: 24rem;
+  margin: 0.35rem 0 0.9rem;
+}
+
+.pretty-live-overlay .pretty-dashboard-controls {
+  position: sticky;
+  top: 3.4rem;
+}
+
+.pretty-live-summary-table td,
+.pretty-live-summary-table th,
+.pretty-live-frame-table td,
+.pretty-live-frame-table th {
+  font-variant-numeric: tabular-nums;
+}
+
+.pretty-live-summary-table td:first-child,
+.pretty-live-frame-table td:nth-child(2) {
+  font-weight: 650;
 }
 
 .pretty-dashboard-scaling-grid {

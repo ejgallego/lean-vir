@@ -34,6 +34,17 @@
   /** @type {Record<string, *>} */
   var reports = {};
   var running = false;
+  var variantId = globalThis.__benchmarkExampleContext.variant.id;
+  var htmlMode = ["html", "live-html"].includes(variantId);
+  var allowedBackendIds = htmlMode
+    ? ["js-html", "vir-html", "native-html", "llvm-html"]
+    : ["js", "vir-format", "native", "native-flat", "llvm"];
+
+  function activeBackends() {
+    return getPrettyBackends().filter(function (backend) {
+      return allowedBackendIds.includes(backend.id);
+    });
+  }
 
   /** @type {Record<string, string>} */
   var backendColors = {
@@ -41,7 +52,12 @@
     vir: "#f0a35e",
     "vir-format": "#77c879",
     native: "#d879c6",
+    "native-flat": "#a778df",
     llvm: "#d7c45c",
+    "js-html": "#74a9ff",
+    "vir-html": "#f0a35e",
+    "native-html": "#d879c6",
+    "llvm-html": "#d7c45c",
   };
 
   /** @type {Record<string, string>} */
@@ -51,6 +67,7 @@
     "memory-retained": "Memory",
     interactions: "Interactions",
     repeated: "Repeated calls",
+    "live-render": "Live rendering",
   };
 
   function setState(label, state, detail) {
@@ -86,7 +103,7 @@
 
   function renderBackends() {
     var previous = new Set(selectedBackendIds());
-    var backends = getPrettyBackends();
+    var backends = activeBackends();
     backendList.replaceChildren();
     backends.forEach(function (backend) {
       var label = document.createElement("label");
@@ -171,6 +188,39 @@
 
   async function executeStudy(kind, suppliedOptions) {
     var options = studySelection(kind, suppliedOptions);
+    if (htmlMode) {
+      var htmlOptions = baseOptions(
+        kind === "scaling" ? "HTML scaling" : "HTML corpus",
+        options,
+      );
+      if (kind === "smoke") {
+        htmlOptions.scenarios =
+          options.test &&
+          options.test.data &&
+          Array.isArray(options.test.data.scenarios)
+            ? options.test.data.scenarios
+            : null;
+        htmlOptions.warmup = 0;
+        htmlOptions.samples = 1;
+        htmlOptions.batchTargetMs = 0;
+        htmlOptions.maxBatchIterations = 1;
+        htmlOptions.smoke = true;
+      } else if (kind === "scaling") {
+        htmlOptions.scaling = true;
+      } else if (kind === "repeated") {
+        htmlOptions.warmup = 0;
+        htmlOptions.samples = 1;
+        htmlOptions.batchTargetMs = 0;
+        htmlOptions.repeated = true;
+        htmlOptions.cycles = readNumber("repeat-cycles", 1, 10000);
+      } else if (kind === "live-render") {
+        htmlOptions.liveRender = true;
+        htmlOptions.cycles = readNumber("repeat-cycles", 1, 10000);
+      } else if (kind !== "differential") {
+        throw new Error("unsupported complete-HTML study " + kind);
+      }
+      return runPrettyHtmlStudy(htmlOptions);
+    }
     if (kind === "smoke") {
       var scenarios =
         options.test &&
@@ -243,8 +293,7 @@
       variant: context.variant.id,
       testPackage: context.testPackageIdentity,
       test: options && options.test ? options.test.id : null,
-      benchmark:
-        options && options.benchmark ? options.benchmark.study : null,
+      benchmark: options && options.benchmark ? options.benchmark.study : null,
     };
     return report;
   }
@@ -319,20 +368,26 @@
     var memory = reportsByStudy["memory-retained"];
     var interactions = reportsByStudy.interactions;
     var repeated = reportsByStudy.repeated;
-    if (!corpus || !scaling || !memory || !interactions || !repeated) {
-      throw new Error("benchmark suite omits a required prettyM study");
+    var required = studies.map(function (study) {
+      return reportsByStudy[study];
+    });
+    if (
+      required.some(function (report) {
+        return !report;
+      })
+    ) {
+      throw new Error("benchmark suite omits a declared prettyM study");
     }
-    corpus.scaling = scaling;
-    corpus.memory = memory;
-    corpus.interactions = interactions;
-    corpus.repeated = repeated;
-    corpus.passed = [corpus, scaling, memory, interactions, repeated].every(
-      function (report) {
-        return report.passed;
-      },
-    );
-    PrettyBenchDashboard.load(corpus);
-    return corpus;
+    if (corpus) corpus.scaling = scaling;
+    if (corpus) corpus.memory = memory;
+    if (corpus) corpus.interactions = interactions;
+    if (corpus) corpus.repeated = repeated;
+    var primary = corpus || required[0];
+    primary.passed = required.every(function (report) {
+      return report.passed;
+    });
+    PrettyBenchDashboard.load(primary);
+    return primary;
   }
 
   async function runStudy(kind, suppliedOptions) {
@@ -422,7 +477,7 @@
 
   async function boot() {
     renderBackends();
-    var backends = getPrettyBackends();
+    var backends = activeBackends();
     await Promise.all(
       backends.map(function (backend) {
         return backend.ready && typeof backend.ready.then === "function"
@@ -451,7 +506,7 @@
       return Object.assign({}, reports);
     },
     getBackends: function () {
-      return getPrettyBackends().map(function (backend) {
+      return activeBackends().map(function (backend) {
         return {
           id: backend.id,
           label: backend.label,

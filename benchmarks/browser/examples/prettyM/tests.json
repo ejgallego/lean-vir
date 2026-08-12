@@ -12,7 +12,7 @@
           "id": "smoke-parity",
           "study": "smoke",
           "oracle": "js",
-          "backends": ["js", "vir", "vir-format", "native", "llvm"],
+          "backends": ["js", "vir-format", "native", "native-flat", "llvm"],
           "data": {
             "scenarios": [
               {
@@ -38,6 +38,38 @@
             "interactions",
             "repeated"
           ]
+        }
+      }
+    },
+    {
+      "id": "html",
+      "title": "Complete escaped HTML and live DOM rendering",
+      "build": "prettyM-html",
+      "tests": [
+        {
+          "id": "html-smoke-parity",
+          "study": "smoke",
+          "oracle": "js-html",
+          "backends": ["js-html", "vir-html", "native-html", "llvm-html"],
+          "data": {
+            "scenarios": [
+              {
+                "case": {
+                  "id": "html-smoke",
+                  "label": "Tags and escaping",
+                  "origin": "example-package",
+                  "format": [7, 5, [4, "Lean <&\"", [4, 1, "Wasm"]]]
+                },
+                "width": 8
+              }
+            ]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "suite",
+        "data": {
+          "studies": ["differential", "scaling", "repeated", "live-render"]
         }
       }
     }

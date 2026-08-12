@@ -3,7 +3,7 @@
   "kind": "browser-benchmarks/example",
   "id": "prettyM",
   "title": "Std.Format.prettyM",
-  "summary": "Five backends · formatting, scaling, and memory",
+  "summary": "Layout events and complete HTML across JS, VIR, FIR, and LLVM",
   "lifecycle": "active",
   "packages": [
     {
@@ -13,6 +13,11 @@
         "VersoSlides.Pretty.formatJsonSegmentsJsonForVir",
         "VersoSlides.Pretty.formatSegmentsForVir"
       ]
+    },
+    {
+      "id": "prettyM-html",
+      "target": "VersoSlides/Pretty.lean",
+      "exports": ["VersoSlides.Pretty.formatHtmlForVir"]
     }
   ],
   "controller": "examples/prettyM/controller.mjs",

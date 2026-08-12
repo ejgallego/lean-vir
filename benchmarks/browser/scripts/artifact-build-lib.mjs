@@ -271,7 +271,12 @@ export function validateBuildDatabase(database) {
         "setup",
       ];
       if (producer.adapter !== "vir") {
-        producerProperties.push("entrypoint", "manifest");
+        producerProperties.push(
+          "entrypoint",
+          "manifest",
+          "packagePath",
+          "dependencyEnvironment",
+        );
       }
       exactObject(
         producer,
@@ -335,6 +340,30 @@ export function validateBuildDatabase(database) {
       } else {
         safeArchivePath(producer.entrypoint);
         safeArchivePath(producer.manifest);
+        if (producer.packagePath !== undefined) {
+          safeArchivePath(producer.packagePath);
+          if (!producer.checkouts.workload) {
+            throw new Error(
+              `component ${componentId} packagePath requires a workload checkout`,
+            );
+          }
+        }
+        if (producer.dependencyEnvironment !== undefined) {
+          string(
+            producer.dependencyEnvironment,
+            `component ${componentId} dependency environment`,
+          );
+          if (!/^[A-Z][A-Z0-9_]*$/.test(producer.dependencyEnvironment)) {
+            throw new Error(
+              `component ${componentId} has an unsafe dependency environment`,
+            );
+          }
+          if ((component.dependencies ?? []).length !== 1) {
+            throw new Error(
+              `component ${componentId} dependency environment requires one dependency`,
+            );
+          }
+        }
         if (!Object.hasOwn(producer.files, producer.manifest)) {
           throw new Error(
             `component ${componentId} manifest is not a declared package file`,

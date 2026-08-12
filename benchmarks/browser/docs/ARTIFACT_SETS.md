@@ -43,7 +43,8 @@ _artifacts/
   downloads/            verified download cache
   sets/<set-id>/        verified extracted immutable sets
 artifacts/
-  <example-id>/          one independently staged example
+  <example-id>/
+    <variant-id>/        one independently staged compatibility boundary
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
@@ -106,8 +107,9 @@ the manifest digest, recomputes `SHA256SUMS`, and verifies every member size and
 digest before atomically installing the set.
 
 The generic stager requires every payload member to live below the manifest's
-`<example-id>/` namespace. It replaces only `artifacts/<example-id>/`, copies
-the verified manifest into that directory, and preserves sibling examples.
+`<example-id>/` namespace. It replaces only
+`artifacts/<example-id>/<variant-id>/`, copies the verified manifest into that
+directory, and preserves sibling examples and variants.
 The browser derives stage-time verification status from this copied manifest;
 it does not independently rehash the whole set on page load. Missing manifests
 are shown as rehearsal or unverified local state. Example reports retain the
@@ -121,3 +123,8 @@ hash the manifest and every browser-observed runtime asset.
 producer revisions, workload revisions, and component files. Generated locks
 record the exact archive digest for one build; documentation deliberately does
 not duplicate changing source pins.
+
+The compact build covers Format to text/style events with five browser
+backends, including FIR's flat output. The HTML build covers complete escaped
+HTML with four backends. Both place payload members below `prettyM/`, but they
+are verified and staged into independent variant directories.

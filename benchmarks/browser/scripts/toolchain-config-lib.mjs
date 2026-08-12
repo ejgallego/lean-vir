@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-const toolchainNames = new Set(["vir", "fir"]);
 
 function object(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -70,17 +69,26 @@ export function checkoutReceipt(checkout) {
 
 export function producerToolchainRoles(build) {
   const roles = new Map();
+  const checkoutsByToolchain = new Map();
   for (const component of Object.values(build.components)) {
     const name = toolchainForAdapter(component.producer.adapter);
     if (!name) continue;
     const checkout = component.producer.checkouts.producer;
-    const previous = roles.get(name);
-    if (previous && previous !== checkout) {
-      throw new Error(
-        `toolchain ${name} maps to both ${previous} and ${checkout}`,
-      );
+    const checkouts = checkoutsByToolchain.get(name) ?? new Set();
+    checkouts.add(checkout);
+    checkoutsByToolchain.set(name, checkouts);
+  }
+  for (const [name, checkoutSet] of checkoutsByToolchain) {
+    const checkouts = [...checkoutSet];
+    const primary = checkouts.includes(name) ? name : checkouts[0];
+    roles.set(name, primary);
+    for (const checkout of checkouts) {
+      if (checkout === primary) continue;
+      if (roles.has(checkout) && roles.get(checkout) !== checkout) {
+        throw new Error(`toolchain role ${checkout} is ambiguous`);
+      }
+      roles.set(checkout, checkout);
     }
-    roles.set(name, checkout);
   }
   return roles;
 }
@@ -105,6 +113,11 @@ export function resolveBuildCheckoutPaths(
     }
   }
   for (const name of toolchains.keys()) {
+    if (!toolchainRoles.has(name)) {
+      throw new Error(`build has no ${name} toolchain`);
+    }
+  }
+  for (const name of config.toolchains.keys()) {
     if (!toolchainRoles.has(name)) {
       throw new Error(`build has no ${name} toolchain`);
     }
@@ -154,11 +167,6 @@ export async function readToolchainConfig(appRoot, selectedPath = null) {
   }
   const base = dirname(path);
   const toolchains = configuredPaths(config.toolchains, "toolchains", base);
-  for (const name of toolchains.keys()) {
-    if (!toolchainNames.has(name)) {
-      throw new Error(`unsupported toolchain name: ${name}`);
-    }
-  }
   return {
     path,
     toolchains,

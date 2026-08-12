@@ -9,6 +9,7 @@ const buildDatabase = JSON.parse(
   readFileSync(join(appRoot, "artifact-builds.json"), "utf8"),
 );
 const prettyMSetId = buildDatabase.builds.prettyM.artifactSet.setId;
+const prettyMHtmlSetId = buildDatabase.builds["prettyM-html"].artifactSet.setId;
 const commands = [
   [process.execPath, ["scripts/check-example-catalog.mjs", "--help"]],
   [process.execPath, ["scripts/run-example.mjs", "--help"]],
@@ -81,7 +82,7 @@ assert.equal(examplePlan.status, 0, examplePlan.stderr);
 assert.match(examplePlan.stdout, /^build: prettyM$/m);
 assert.match(
   examplePlan.stdout,
-  /^test: smoke-parity · smoke · js, vir, vir-format, native, llvm · oracle js$/m,
+  /^test: smoke-parity · smoke · js, vir-format, native, native-flat, llvm · oracle js$/m,
 );
 assert.match(examplePlan.stdout, /^benchmark: suite \(not measured\)$/m);
 assert.match(examplePlan.stdout, /^sources: materialize catalogued revisions$/m);
@@ -111,6 +112,12 @@ const buildList = spawnSync(
 assert.equal(buildList.status, 0, buildList.stderr);
 assert.ok(
   buildList.stdout.split(/\r?\n/).includes(`prettyM\t${prettyMSetId}`),
+  buildList.stdout,
+);
+assert.ok(
+  buildList.stdout
+    .split(/\r?\n/)
+    .includes(`prettyM-html\t${prettyMHtmlSetId}`),
   buildList.stdout,
 );
 
@@ -151,6 +158,7 @@ assert.equal(candidateMatrix.status, 0, candidateMatrix.stderr);
 assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   include: [
     { example: "prettyM", variant: "default", build: "prettyM" },
+    { example: "prettyM", variant: "html", build: "prettyM-html" },
   ],
 });
 

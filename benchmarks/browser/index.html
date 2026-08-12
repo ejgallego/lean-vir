@@ -87,6 +87,26 @@
       </section>
 
       <section
+        id="live-render-panel"
+        class="bench-panel live-render-panel"
+        aria-labelledby="live-render-heading"
+        data-example-content
+        hidden
+      >
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Live renderer</p>
+            <h2 id="live-render-heading">Synthetic output</h2>
+          </div>
+          <p>
+            Each lane uses the selected backend’s escaped HTML. Formatting and
+            browser DOM commit/layout remain separate measurements.
+          </p>
+        </div>
+        <div id="live-render-stage" class="live-render-stage"></div>
+      </section>
+
+      <section
         class="bench-panel"
         aria-labelledby="protocol-heading"
         data-example-content

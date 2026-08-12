@@ -271,18 +271,44 @@ async function buildVir(component, output, resolvedCheckouts) {
 async function buildFirNative(component, output, resolvedCheckouts) {
   const fir = checkoutFor(component, "producer", resolvedCheckouts);
   await resetOutput(output);
+  if (component.producer.packagePath) {
+    const workload = checkoutFor(component, "workload", resolvedCheckouts);
+    run("bash", [component.producer.entrypoint], {
+      cwd: fir,
+      env: { ...buildEnvironment, VERSO_ROOT: workload },
+    });
+    const packageRoot = await realpath(
+      join(fir, component.producer.packagePath),
+    );
+    for (const packagePath of Object.keys(component.producer.files)) {
+      const target = join(output, packagePath);
+      await mkdir(dirname(target), { recursive: true });
+      await cp(join(packageRoot, packagePath), target);
+    }
+    return;
+  }
   run("bash", [component.producer.entrypoint, output], { cwd: fir });
 }
 
 async function buildFirLlvm(component, output, resolvedCheckouts, packages) {
   const fir = checkoutFor(component, "producer", resolvedCheckouts);
   await resetOutput(output);
+  const dependency = component.dependencies?.[0];
+  const dependencyEnvironment =
+    component.producer.dependencyEnvironment ??
+    "FIR_PRETTY_M_NATIVE_PACKAGE";
+  const environment = { ...buildEnvironment };
+  if (dependency) environment[dependencyEnvironment] = packages[dependency];
+  if (component.producer.checkouts.workload) {
+    environment.VERSO_ROOT = checkoutFor(
+      component,
+      "workload",
+      resolvedCheckouts,
+    );
+  }
   run("bash", [component.producer.entrypoint, output], {
     cwd: fir,
-    env: {
-      ...buildEnvironment,
-      FIR_PRETTY_M_NATIVE_PACKAGE: packages[component.dependencies?.[0]],
-    },
+    env: environment,
   });
 }
 
@@ -354,14 +380,29 @@ async function validateNative(component, output, resolvedCheckouts) {
     await readFile(join(output, component.producer.manifest), "utf8"),
   );
   const sourceId = component.producer.checkouts.producer;
+  const producerSource = build.sources?.fir ?? {
+    commit: build.sourceCommit,
+    dirty: build.sourceDirty,
+  };
   if (
-    build.sourceCommit !== resolvedCheckouts[sourceId].revision ||
-    build.sourceDirty !== false ||
+    producerSource.commit !== resolvedCheckouts[sourceId].revision ||
+    producerSource.dirty !== false ||
     build.capabilities?.inputLayout?.leanVersion !==
       component.artifact.lean.version
   ) {
     throw new Error(
       "native FIR package metadata does not match the build database",
+    );
+  }
+  const workloadId = component.producer.checkouts.workload;
+  if (
+    workloadId &&
+    (build.sources?.verso?.commit !==
+      resolvedCheckouts[workloadId].revision ||
+      build.sources?.verso?.dirty !== false)
+  ) {
+    throw new Error(
+      "native FIR workload metadata does not match the build database",
     );
   }
   const artifact = await fileRecord(join(output, build.artifact?.file ?? ""));

@@ -28,6 +28,12 @@ const build = {
         checkouts: { producer: "fir" },
       },
     },
+    nativeCurrent: {
+      producer: {
+        adapter: "fir-native",
+        checkouts: { producer: "fir-current" },
+      },
+    },
     llvm: {
       producer: {
         adapter: "fir-llvm",
@@ -36,7 +42,7 @@ const build = {
     },
   },
 };
-const sources = { vir: {}, fir: {}, workload: {} };
+const sources = { vir: {}, fir: {}, "fir-current": {}, workload: {} };
 
 test("parses default and named toolchain paths", () => {
   assert.deepEqual(
@@ -79,13 +85,21 @@ test("loads a compact config with paths relative to the config", async () => {
     JSON.stringify({
       schemaVersion: 1,
       kind: "browser-benchmarks/toolchains",
-      toolchains: { fir: "checkouts/fir", vir: "checkouts/vir" },
+      toolchains: {
+        fir: "checkouts/fir",
+        "fir-current": "checkouts/fir-current",
+        vir: "checkouts/vir"
+      },
       checkouts: { workload: "clients/workload" },
     }),
   );
   const config = await readToolchainConfig(appRoot, configPath);
   assert.equal(config.path, configPath);
   assert.equal(config.toolchains.get("fir"), join(fixtureRoot, "checkouts/fir"));
+  assert.equal(
+    config.toolchains.get("fir-current"),
+    join(fixtureRoot, "checkouts/fir-current"),
+  );
   assert.equal(config.toolchains.get("vir"), join(fixtureRoot, "checkouts/vir"));
   assert.equal(
     config.checkouts.get("workload"),
@@ -111,15 +125,20 @@ test("resolves command-line, config, and source-directory precedence", () => {
     },
   });
   assert.equal(selection.paths.get("fir"), "/explicit/fir");
+  assert.equal(
+    selection.paths.get("fir-current"),
+    "/controlled/sources/fir-current",
+  );
   assert.equal(selection.paths.get("vir"), "/configured/vir-checkout");
   assert.equal(selection.paths.get("workload"), "/explicit/workload");
   assert.deepEqual([...selection.toolchainRoles], [
     ["vir", "vir"],
     ["fir", "fir"],
+    ["fir-current", "fir-current"],
   ]);
 });
 
-test("rejects unsupported config and command-line toolchain names", async () => {
+test("rejects toolchain names not selected by a build", async () => {
   await mkdir(fixtureRoot, { recursive: true });
   const configPath = join(fixtureRoot, "invalid.json");
   await writeFile(
@@ -130,15 +149,12 @@ test("rejects unsupported config and command-line toolchain names", async () => 
       toolchains: { unknown: "checkouts/unknown" },
     }),
   );
-  await assert.rejects(
-    () => readToolchainConfig(appRoot, configPath),
-    /unsupported toolchain name: unknown/,
-  );
+  const config = await readToolchainConfig(appRoot, configPath);
   assert.throws(
     () =>
       resolveBuildCheckoutPaths(build, sources, {
         sourcesDir: "/controlled/sources",
-        toolchains: new Map([["unknown", "/controlled/unknown"]]),
+        config,
       }),
     /build has no unknown toolchain/,
   );

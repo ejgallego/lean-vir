@@ -33,6 +33,12 @@ npm run artifacts:build -- prettyM \
   --toolchain vir=/path/to/lean-vir
 ```
 
+If one bounded set intentionally contains components from two FIR revisions,
+the checkout named `fir` remains the primary toolchain and each additional FIR
+producer is selected by its checkout role, for example
+`--toolchain fir-current=/path/to/newer-lean-fir`. The source receipt preserves
+both exact revisions.
+
 For repeat use, put the same selection in ignored `toolchains.local.json`, or
 pass another file with `--toolchain-config PATH`:
 
@@ -72,6 +78,19 @@ ignored application-local directory with:
 
 ```sh
 npm run artifacts:sources -- prettyM
+```
+
+Variants that pin different producer revisions use separate source roots:
+
+```sh
+npm run artifacts:sources -- prettyM-html --sources-dir _sources/html
+```
+
+At build time, a shared exact producer can still be selected explicitly, which
+avoids duplicate FIR and Emscripten compilation caches:
+
+```sh
+npm run artifacts:build -- prettyM-html --toolchain fir=_sources/fir --plan
 ```
 
 The command initializes detached Git checkouts by fetching each exact commit.
@@ -127,12 +146,19 @@ supplies verified checkout roots and a fresh output path. A producer must:
 
 The VIR adapter is uniform across examples: every package reference becomes
 one `lake exe vir_irpkg` call over its declared target and exports. Clients do
-not provide shell commands. The other initial adapters use producer entry
-points that already exist:
+not provide shell commands. The other adapters use producer-owned entry
+points. A component may either write directly to the supplied output directory
+or declare a `packagePath` whose validated package files are copied without
+rewriting:
 
 - FIR native: `integration/talos/artifact/package-pretty-format.sh OUTPUT`;
+- FIR flat: `integration/verso-flat/check.sh`, then its declared package;
+- FIR complete HTML: `integration/verso-html/check.sh`, then its declared
+  package;
 - FIR LLVM: `integration/lcnf-c-wasm/package-prettyM-emscripten.sh OUTPUT`, with
-  the just-built native package supplied for its differential check.
+  the just-built native package supplied for its differential check;
+- FIR LLVM HTML: the corresponding HTML packager, with the just-built native
+  HTML package supplied for its differential check.
 
 The builder validates package metadata against the catalog, verifies producer
 checksums, and copies only the declared regular files into the seed. It does not
@@ -200,3 +226,6 @@ pull requests and explicit dispatches. On `main`, the Pages workflow runs this
 candidate path once, uploads the same short-lived payload, and deploys the
 admitted static application. Neither workflow compares candidate bytes across
 runs or updates repository state.
+
+The HTML variant follows the same path with build id `prettyM-html`; it is not
+a special workflow or a prepublished binary dependency.

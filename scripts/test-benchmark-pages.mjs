@@ -6,20 +6,31 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 
-const [requestedExample, requestedVariant, extra] = process.argv.slice(2);
-if (extra || requestedExample === "--help" || requestedExample === "-h") {
-  console.log(`Usage: node scripts/test-benchmark-pages.mjs EXAMPLE VARIANT
+const requested = process.argv.slice(2);
+if (requested[0] === "--help" || requested[0] === "-h") {
+  console.log(`Usage: node scripts/test-benchmark-pages.mjs EXAMPLE VARIANT [EXAMPLE VARIANT ...]
 
-Test the benchmark subtree installed below web/dist. EXAMPLE and VARIANT may
-instead be set with PAGES_BENCHMARK_EXAMPLE and PAGES_BENCHMARK_VARIANT.`);
-  process.exit(extra ? 1 : 0);
+Test every selected benchmark variant in the subtree installed below web/dist.
+One EXAMPLE and VARIANT may instead be set with PAGES_BENCHMARK_EXAMPLE and
+PAGES_BENCHMARK_VARIANT.`);
+  process.exit(0);
 }
 
-const example = requestedExample ?? process.env.PAGES_BENCHMARK_EXAMPLE;
-const variant = requestedVariant ?? process.env.PAGES_BENCHMARK_VARIANT;
-if (!example || !variant) {
+if (requested.length % 2 !== 0) {
+  throw new Error("benchmark Pages test requires EXAMPLE VARIANT pairs");
+}
+const selections = [];
+for (let index = 0; index < requested.length; index += 2) {
+  selections.push({ example: requested[index], variant: requested[index + 1] });
+}
+if (selections.length === 0) {
+  const example = process.env.PAGES_BENCHMARK_EXAMPLE;
+  const variant = process.env.PAGES_BENCHMARK_VARIANT;
+  if (example && variant) selections.push({ example, variant });
+}
+if (selections.length === 0) {
   throw new Error(
-    "benchmark Pages test requires an explicit example and variant",
+    "benchmark Pages test requires at least one explicit example and variant",
   );
 }
 
@@ -39,16 +50,18 @@ function run(script, args) {
 run("test:pages", [
   "--directory",
   "../../web/dist/benchmarks",
-  "--deploy",
-  `${example}=${variant}`,
+  ...selections.flatMap(({ example, variant }) => [
+    "--deploy",
+    `${example}=${variant}`,
+  ]),
 ]);
-run("test:pages:browser", [
-  "--directory",
-  "../../web/dist",
-  "--base-path",
-  "/benchmarks/",
-  "--example",
-  example,
-  "--variant",
-  variant,
-]);
+for (const { example, variant } of selections) {
+  run("test:pages:browser", [
+    "--directory",
+    "../../web/dist",
+    "--base-path",
+    "/benchmarks/",
+    example,
+    variant,
+  ]);
+}

@@ -122,10 +122,10 @@ so adding a canonical build does not require a workload-specific workflow.
 Static deployment is a separate admission step. `--deploy EXAMPLE=VARIANT`
 requires the selected variant to own a canonical build and requires its staged
 artifact manifest, payload hashes, and complete test-package identity to match
-that build. A static artifact root represents one variant per example, so the
-deployment builder rejects multi-variant test packages until their artifact
-sets have a variant-aware static layout. Rehearsals with `build: null` remain
-available locally but are not included in the public catalog.
+that build. Repeating `--deploy` admits multiple variants of one example; each
+is verified and copied from its own artifact directory. Rehearsals with
+`build: null` remain available locally but are not included in the public
+catalog.
 
 ## Uniform VIR compilation
 
@@ -149,8 +149,9 @@ is unchanged. FIR, LLVM, or other comparison artifacts use the common
 commands remain producer-owned.
 
 Every packed payload path begins with `<example-id>/`, and the browser stages
-it under `artifacts/<example-id>/`. The shared stager replaces only that
-directory, so refreshing one client cannot delete another client's artifacts.
+it under `artifacts/<example-id>/<variant-id>/`. The shared stager replaces
+only that variant directory, so refreshing one boundary cannot delete another
+variant's or client's artifacts.
 
 ## Controller boundary
 
@@ -163,14 +164,17 @@ The runtime guard remains
 The module exports:
 
 ```js
-export const view = { /* controls and presentation */ };
-export async function loadExample(context) { /* return controller */ }
+export const view = {/* controls and presentation */};
+export async function loadExample(context) {
+  /* return controller */
+}
 ```
 
 `context.example` is the selected, validated example descriptor.
 `context.artifactBaseUrl` is the URL of its derived
-`artifacts/<example-id>/` directory. It is available to controllers that load
-staged payloads directly, so they do not need to declare another artifact root.
+`artifacts/<example-id>/<variant-id>/` directory. It is available to
+controllers that load staged payloads directly, so they do not need to declare
+another artifact root.
 `context.testPackage` and `context.variant` contain the selected self-contained
 test data. The same selection is available to classic-script controllers as
 `globalThis.__benchmarkExampleContext`.
@@ -178,7 +182,7 @@ test data. The same selection is available to classic-script controllers as
 Bootstrap scripts declared in `view.bootstrap.classicScripts` are resolved
 from the application root. Payload scripts use `artifactScripts` and are
 resolved from `context.artifactBaseUrl`; example controllers must not repeat
-`artifacts/<example-id>/` in their declarations.
+the staged artifact namespace in their declarations.
 
 The returned controller implements `browser-benchmarks/controller/v1`:
 

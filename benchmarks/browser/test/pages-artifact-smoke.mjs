@@ -67,8 +67,7 @@ for (const path of [
 
 const catalog = await json("examples/catalog.json");
 assert.equal(catalog.kind, "browser-benchmarks/example-catalog");
-const expectedIds = deployments.map(({ example }) => example).sort();
-assert.equal(new Set(expectedIds).size, expectedIds.length);
+const expectedIds = [...new Set(deployments.map(({ example }) => example))].sort();
 assert.deepEqual(catalog.examples.map(({ id }) => id).sort(), expectedIds);
 assert.deepEqual(await childDirectories("examples"), expectedIds);
 assert.deepEqual(await childDirectories("artifacts"), expectedIds);
@@ -80,12 +79,19 @@ for (const deployment of deployments) {
   await requireFile(example.testPackage);
   const tests = await json(example.testPackage);
   assert.equal(tests.example, example.id);
+  assert.ok(
+    tests.variants.some(({ id }) => id === deployment.variant),
+    `${example.id} omits deployed variant ${deployment.variant}`,
+  );
   assert.deepEqual(
-    tests.variants.map(({ id }) => id),
-    [deployment.variant],
+    catalog.deployments?.[example.id],
+    deployments
+      .filter(({ example: id }) => id === example.id)
+      .map(({ variant }) => variant)
+      .sort(),
   );
 
-  const artifactRoot = `artifacts/${example.id}`;
+  const artifactRoot = `artifacts/${example.id}/${deployment.variant}`;
   const manifest = await verifyStagedArtifactSet(
     resolve(directory, artifactRoot),
   );

@@ -35,6 +35,12 @@ const prettyMArtifactFiles = [
   "prettyM/lean-llvm/prettyM.manifest.json",
   "prettyM/lean-llvm/prettyM.mjs",
   "prettyM/lean-llvm/prettyM.wasm",
+  "prettyM/lean-native-flat/BUILD.json",
+  "prettyM/lean-native-flat/SHA256SUMS",
+  "prettyM/lean-native-flat/prettyM-browser-adapter.mjs",
+  "prettyM/lean-native-flat/prettyM.wasm",
+  "prettyM/lean-native-flat/prettyM.wasm.json",
+  "prettyM/lean-native-flat/smoke.mjs",
   "prettyM/lean-native/BUILD.json",
   "prettyM/lean-native/prettyM-browser-adapter.mjs",
   "prettyM/lean-native/prettyM.wasm",
@@ -49,15 +55,22 @@ test("the prettyM catalog selects the complete source and component graph", asyn
     join(appRoot, "artifact-builds.json"),
   );
   const build = database.builds.prettyM;
-  assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
+  assert.deepEqual(componentOrder(build), [
+    "vir",
+    "native",
+    "native-flat",
+    "llvm",
+  ]);
   assert.deepEqual(artifactFiles(build), prettyMArtifactFiles);
 
   const sources = checkoutSources(database, "prettyM");
   assert.deepEqual(Object.keys(sources).sort(), [
     "fir",
+    "fir-current",
     "lean",
     "vir",
     "workload",
+    "workload-flat",
   ]);
   for (const source of Object.values(sources)) {
     assert.match(source.revision, /^[0-9a-f]{40}$/);
@@ -66,7 +79,7 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);
   assert.deepEqual(config.example, { id: "prettyM", variant: "default" });
-  assert.equal(config.setId, "prettyM-bounded-set-0002");
+  assert.equal(config.setId, build.artifactSet.setId);
   assert.equal(
     config.components.vir.runtime.repository,
     "https://github.com/ejgallego/lean-vir",
@@ -81,6 +94,34 @@ test("the prettyM catalog selects the complete source and component graph", asyn
     file: "VersoSlides/Pretty.lean",
     dirty: false,
   });
+});
+
+test("the HTML variant selects four complete renderer backends", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const build = database.builds["prettyM-html"];
+  assert.deepEqual(componentOrder(build), [
+    "vir-html",
+    "native-html",
+    "llvm-html",
+  ]);
+  assert.ok(
+    artifactFiles(build).includes("prettyM/prettyM-html-vir.irpkg"),
+  );
+  assert.ok(
+    artifactFiles(build).includes("prettyM/lean-native-html/prettyM.wasm"),
+  );
+  assert.ok(
+    artifactFiles(build).includes("prettyM/lean-llvm-html/prettyM-html.wasm"),
+  );
+  const config = artifactSetConfig(database, "prettyM-html");
+  assert.deepEqual(config.example, { id: "prettyM", variant: "html" });
+  assert.equal(config.setId, build.artifactSet.setId);
+  assert.equal(
+    config.components["vir-html"].workload.exports[0],
+    "VersoSlides.Pretty.formatHtmlForVir",
+  );
 });
 
 test("catalog build identity and artifact paths are example-neutral", async () => {
@@ -119,7 +160,10 @@ test("catalog contract objects reject unknown properties", async () => {
   );
   const cases = [
     [(value) => (value.typo = true), "artifact build database"],
-    [(value) => (value.sources["fir-prettyM"].typo = true), "source fir-prettyM"],
+    [
+      (value) => (value.sources["fir-prettyM-extended"].typo = true),
+      "source fir-prettyM-extended",
+    ],
     [(value) => (value.builds.prettyM.typo = true), "build prettyM"],
     [
       (value) => (value.builds.prettyM.artifactSet.typo = true),
@@ -366,7 +410,7 @@ test("verifies an example-neutral artifact-set manifest", async () => {
     canonicalJson({
       schemaVersion: 2,
       kind: "browser-benchmarks/artifact-set",
-      example: { id: "illuminate" },
+      example: { id: "illuminate", variant: "default" },
       setId: "illuminate-player-set-0001",
       components: {},
       files,
@@ -417,11 +461,16 @@ test("rejects artifact-set manifests without a safe set ID", async () => {
 test("stages a verified example namespace without replacing siblings", async () => {
   const directory = join(scratch, "illuminate-set");
   const artifactsDir = join(scratch, "staged-examples");
-  const destination = join(artifactsDir, "illuminate");
+  const destination = join(artifactsDir, "illuminate/default");
   await rm(directory, { recursive: true, force: true });
   await rm(artifactsDir, { recursive: true, force: true });
-  await mkdir(join(artifactsDir, "prettyM"), { recursive: true });
-  await writeFile(join(artifactsDir, "prettyM/keep.txt"), "sibling\n");
+  await mkdir(join(artifactsDir, "prettyM/default"), { recursive: true });
+  await writeFile(join(artifactsDir, "prettyM/default/keep.txt"), "sibling\n");
+  await mkdir(join(artifactsDir, "illuminate/alternate"), { recursive: true });
+  await writeFile(
+    join(artifactsDir, "illuminate/alternate/keep.txt"),
+    "variant sibling\n",
+  );
   await mkdir(destination, { recursive: true });
   await writeFile(join(destination, "old.txt"), "old\n");
   const paths = [
@@ -458,7 +507,7 @@ test("stages a verified example namespace without replacing siblings", async () 
     canonicalJson({
       schemaVersion: 2,
       kind: "browser-benchmarks/artifact-set",
-      example: { id: "illuminate" },
+      example: { id: "illuminate", variant: "default" },
       setId: "illuminate-test-set",
       components: {},
       files,
@@ -497,8 +546,15 @@ test("stages a verified example namespace without replacing siblings", async () 
     "illuminate-test-set",
   );
   assert.equal(
-    await readFile(join(artifactsDir, "prettyM/keep.txt"), "utf8"),
+    await readFile(join(artifactsDir, "prettyM/default/keep.txt"), "utf8"),
     "sibling\n",
+  );
+  assert.equal(
+    await readFile(
+      join(artifactsDir, "illuminate/alternate/keep.txt"),
+      "utf8",
+    ),
+    "variant sibling\n",
   );
   await assert.rejects(() => readFile(join(destination, "old.txt")), /ENOENT/);
 });
@@ -526,7 +582,7 @@ test("rejects undeclared artifact-set members", async () => {
     canonicalJson({
       schemaVersion: 2,
       kind: "browser-benchmarks/artifact-set",
-      example: { id: "prettyM" },
+      example: { id: "prettyM", variant: "default" },
       setId: "prettyM-test",
       files,
     }),

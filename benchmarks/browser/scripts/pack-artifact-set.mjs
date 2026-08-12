@@ -145,13 +145,14 @@ async function main() {
     if (adapter === "fir-native") {
       packed.runtime = {
         pipeline: "lean-lcnf-to-fir-native-wasm",
-        sourceCommit: producer.sourceCommit,
-        sourceDirty: producer.sourceDirty,
+        sourceCommit: producer.sources?.fir?.commit ?? producer.sourceCommit,
+        sourceDirty: producer.sources?.fir?.dirty ?? producer.sourceDirty,
         functionImports: producer.functionImports,
         memoryOwner: producer.capabilities?.memoryOwner,
       };
       packed.workload = {
         entry: producer.entry,
+        source: producer.sources?.verso ?? null,
         inputAbi: producer.capabilities?.inputLayout?.version,
         adapterApi: producer.capabilities?.browserAdapter?.apiVersion,
         output: producer.capabilities?.output,

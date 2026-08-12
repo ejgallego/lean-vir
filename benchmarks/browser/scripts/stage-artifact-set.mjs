@@ -14,8 +14,9 @@ const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 function usage() {
   console.log(`Usage: node scripts/stage-artifact-set.mjs [options] SET
 
-Stage one verified artifact set under artifacts/<example-id>. Existing sibling
-examples are preserved. All paths must remain inside this application.
+Stage one verified artifact set under artifacts/<example-id>/<variant-id>.
+Existing sibling examples and variants are preserved. All paths must remain
+inside this application.
 
   --artifacts-dir PATH  staged examples root (default: artifacts)
   -h, --help            show this help`);
@@ -54,11 +55,16 @@ async function main() {
   const manifest = await verifyArtifactSet(source);
 
   const exampleId = manifest.example.id;
+  const variantId = manifest.example.variant;
   const prefix = `${exampleId}/`;
   const files = Object.keys(manifest.files).sort();
 
-  const destination = resolve(artifactsDir, exampleId);
-  const next = resolve(artifactsDir, `.${exampleId}.next-${process.pid}`);
+  const destination = resolve(artifactsDir, exampleId, variantId);
+  const next = resolve(
+    artifactsDir,
+    exampleId,
+    `.${variantId}.next-${process.pid}`,
+  );
   await rm(next, { recursive: true, force: true });
   await mkdir(next, { recursive: true });
   for (const path of files) {
@@ -73,7 +79,7 @@ async function main() {
   );
   await replaceDirectoryAtomically(next, destination);
   console.log(
-    `staged ${exampleId}: ${relative(appRoot, source)} -> ${relative(
+    `staged ${exampleId}/${variantId}: ${relative(appRoot, source)} -> ${relative(
       appRoot,
       destination,
     )}`,

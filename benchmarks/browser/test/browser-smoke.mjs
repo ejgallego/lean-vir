@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const hasVerifiedPrettyHtml = existsSync(
+  join(appRoot, "artifacts/prettyM/html/ARTIFACT_SET.json"),
+);
 const port = Number(process.env.BENCH_PORT ?? "18334");
 const url = `http://127.0.0.1:${port}`;
 const server = spawn(
@@ -79,7 +82,7 @@ try {
     example: { id: "prettyM", variant: "default" },
     setId: "browser-smoke-without-test-package",
   };
-  await page.route("**/artifacts/prettyM/ARTIFACT_SET.json", (route) =>
+  await page.route("**/artifacts/prettyM/default/ARTIFACT_SET.json", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -125,11 +128,11 @@ try {
     await page.evaluate(
       () => window.__benchmarkExampleContext.artifactBaseUrl.href,
     ),
-    `${url}/artifacts/prettyM/`,
+    `${url}/artifacts/prettyM/default/`,
   );
   assert.equal(
     await page.evaluate(() => window.__prettyBenchArtifactBase),
-    `${url}/artifacts/prettyM/`,
+    `${url}/artifacts/prettyM/default/`,
   );
   assert.deepEqual(
     await page.evaluate(() =>
@@ -144,6 +147,11 @@ try {
         id: "default",
         title: "Compact Format to styled segments",
         build: "prettyM",
+      },
+      {
+        id: "html",
+        title: "Complete escaped HTML and live DOM rendering",
+        build: "prettyM-html",
       },
     ],
   );
@@ -184,7 +192,7 @@ try {
   );
   assert.deepEqual(
     backends.map((backend) => backend.id),
-    ["js", "vir", "vir-format", "native", "llvm"],
+    ["js", "vir-format", "native", "native-flat", "llvm"],
   );
   assert.ok(
     backends.every((backend) => backend.status === "ready"),
@@ -216,7 +224,7 @@ try {
     ".pretty-dashboard-overlay input[data-backend-filter]",
   );
   assert.equal(await dashboardFilters.count(), 5);
-  for (const id of ["js", "vir", "vir-format", "llvm"]) {
+  for (const id of ["js", "vir-format", "native-flat", "llvm"]) {
     await page
       .locator(`.pretty-dashboard-overlay input[data-backend-filter="${id}"]`)
       .uncheck();
@@ -276,9 +284,99 @@ try {
   await page
     .locator(".pretty-corpus-overlay header button", { hasText: "Close" })
     .click();
+  if (hasVerifiedPrettyHtml) {
+    await page.locator("#variant-select").selectOption("html");
+    await page.waitForLoadState("networkidle");
+    await page.waitForFunction(
+      () => globalThis.__benchmarkApp?.getVariant()?.id === "html",
+    );
+    assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
+      example: "prettyM",
+      readyCount: 4,
+      backendCount: 4,
+    });
+    assert.equal(
+      await page.evaluate(
+        () => window.__benchmarkExampleContext.artifactBaseUrl.href,
+      ),
+      `${url}/artifacts/prettyM/html/`,
+    );
+    assert.deepEqual(
+      (
+        await page.evaluate(() =>
+          window.__benchmarkApp.getController().getBackends(),
+        )
+      ).map((backend) => backend.id),
+      ["js-html", "vir-html", "native-html", "llvm-html"],
+    );
+    await page.locator("#repeat-cycles").fill("3");
+    const live = await page.evaluate(() =>
+      window.__benchmarkApp.getController().runStudy("live-render"),
+    );
+    assert.equal(live.passed, true);
+    assert.equal(live.frameCount, 3);
+    assert.equal(live.parityCount, 3);
+    assert.equal(
+      live.contract.browserEndpoint,
+      "innerHTML parse, tree replacement, and forced synchronous layout",
+    );
+    assert.equal(await page.locator("#live-render-panel").isVisible(), true);
+    assert.equal(await page.locator("#live-render-stage > article").count(), 4);
+    const syntaxColors = await page.evaluate(() => ({
+      keyword: getComputedStyle(
+        document.querySelector(".live-render-output .keyword"),
+      ).color,
+      constant: getComputedStyle(
+        document.querySelector(".live-render-output .const"),
+      ).color,
+      literal: getComputedStyle(
+        document.querySelector(".live-render-output .literal.string"),
+      ).color,
+    }));
+    assert.equal(new Set(Object.values(syntaxColors)).size, 3, syntaxColors);
+    await page
+      .locator(".report-card button", { hasText: "View report" })
+      .click();
+    await page.locator(".pretty-live-overlay").waitFor({ state: "visible" });
+    assert.equal(
+      await page.locator(".pretty-live-overlay h2").textContent(),
+      "Live rendering report",
+    );
+    assert.equal(
+      await page.locator(".pretty-live-overlay [data-backend-filter]").count(),
+      4,
+    );
+    const swatchColors = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll(
+          ".pretty-live-overlay .pretty-dashboard-swatch",
+        ),
+        (swatch) => getComputedStyle(swatch).backgroundColor,
+      ),
+    );
+    assert.equal(new Set(swatchColors).size, 4, swatchColors);
+    assert.equal(
+      await page.locator(".pretty-live-timeline polyline").count(),
+      4,
+    );
+    await page
+      .locator('.pretty-live-overlay [data-backend-filter="llvm-html"]')
+      .uncheck();
+    assert.equal(
+      await page.locator(".pretty-live-timeline polyline").count(),
+      3,
+    );
+    assert.equal(
+      await page.locator(".pretty-live-summary-table tr").count(),
+      4,
+    );
+    await page
+      .locator(".pretty-live-overlay header button", { hasText: "Close" })
+      .click();
+  }
   assert.deepEqual(pageErrors, []);
   await browser.close();
-  console.log("PASS standalone five-backend prettyM benchmark webapp smoke");
+  console.log("PASS compact and complete-HTML prettyM benchmark webapp smoke");
 } finally {
   server.kill("SIGTERM");
 }

@@ -75,11 +75,15 @@ if (deployments.length === 0) {
       resolve(output, "examples", example.id),
       { recursive: true },
     );
-    await cp(
-      resolve(artifacts, example.id),
-      resolve(output, "artifacts", example.id),
-      { recursive: true },
-    );
+    const variants = catalog.deployments?.[example.id] ?? [];
+    await mkdir(resolve(output, "artifacts", example.id), { recursive: true });
+    for (const variant of variants) {
+      await cp(
+        resolve(artifacts, example.id, variant),
+        resolve(output, "artifacts", example.id, variant),
+        { recursive: true },
+      );
+    }
   }
 }
 await writeFile(join(output, "examples/catalog.json"), canonicalJson(catalog));

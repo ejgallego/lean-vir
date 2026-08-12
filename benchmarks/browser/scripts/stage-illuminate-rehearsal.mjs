@@ -169,8 +169,8 @@ async function main() {
     ]);
   }
 
-  const destination = join(appRoot, "artifacts/illuminate");
-  const next = join(appRoot, "artifacts/illuminate.next");
+  const destination = join(appRoot, "artifacts/illuminate/default");
+  const next = join(appRoot, "artifacts/illuminate/.default.next");
   await rm(next, { recursive: true, force: true });
   await mkdir(next, { recursive: true });
 

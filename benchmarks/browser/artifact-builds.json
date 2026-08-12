@@ -2,10 +2,15 @@
   "schemaVersion": 2,
   "kind": "browser-benchmarks/artifact-build-catalog",
   "sources": {
-    "fir-prettyM": {
+    "fir-prettyM-extended": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-fir",
-      "revision": "298682a766d80e90053d3e76ee2f3e4af78a52aa"
+      "revision": "f4fde1d33afe65db15dd9f65f1e3d3f15d421d07"
+    },
+    "fir-prettyM-current": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-fir",
+      "revision": "07bb49616a85bfa4c11f629e3dc9b6d3050bc2ab"
     },
     "lean-4.33.0": {
       "kind": "git",
@@ -17,10 +22,20 @@
       "repository": "https://github.com/leanprover/verso-slides",
       "revision": "c16a6f83b622dd8ebc2f4975d93b856b08dde444"
     },
+    "prettyM-flat-workload": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/verso-slides",
+      "revision": "eb8d2b8fcf145810996ad388d701e9337cfe1ceb"
+    },
+    "prettyM-html-workload": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/verso-slides",
+      "revision": "eb8d2b8fcf145810996ad388d701e9337cfe1ceb"
+    },
     "vir-prettyM": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65"
+      "revision": "4995d46a165279452951a7a75758d76ccc2a76ad"
     }
   },
   "builds": {
@@ -30,7 +45,7 @@
         "variant": "default"
       },
       "artifactSet": {
-        "setId": "prettyM-bounded-set-0002",
+        "setId": "prettyM-bounded-set-0007",
         "benchmarkContract": {
           "id": "prettyM/artifacts/v1",
           "input": "prettyM-compact-format/v1",
@@ -39,10 +54,12 @@
         }
       },
       "checkouts": {
-        "fir": "fir-prettyM",
+        "fir": "fir-prettyM-extended",
+        "fir-current": "fir-prettyM-current",
         "lean": "lean-4.33.0",
         "vir": "vir-prettyM",
-        "workload": "prettyM-workload"
+        "workload": "prettyM-workload",
+        "workload-flat": "prettyM-flat-workload"
       },
       "components": {
         "vir": {
@@ -108,6 +125,46 @@
             }
           }
         },
+        "native-flat": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "fir-native",
+            "checkouts": {
+              "producer": "fir-current",
+              "workload": "workload-flat"
+            },
+            "setup": [
+              {
+                "checkout": "workload",
+                "command": "git",
+                "args": [
+                  "fetch",
+                  "--no-tags",
+                  "origin",
+                  "refs/heads/upgrade/fir-html-lean-4.33:refs/remotes/ejgallego/upgrade/fir-html-lean-4.33"
+                ]
+              }
+            ],
+            "entrypoint": "integration/verso-flat/check.sh",
+            "packagePath": "integration/verso-flat/_build/verso-flat-current",
+            "manifest": "BUILD.json",
+            "files": {
+              "BUILD.json": "prettyM/lean-native-flat/BUILD.json",
+              "SHA256SUMS": "prettyM/lean-native-flat/SHA256SUMS",
+              "prettyM-browser-adapter.mjs": "prettyM/lean-native-flat/prettyM-browser-adapter.mjs",
+              "prettyM.wasm": "prettyM/lean-native-flat/prettyM.wasm",
+              "prettyM.wasm.json": "prettyM/lean-native-flat/prettyM.wasm.json",
+              "smoke.mjs": "prettyM/lean-native-flat/smoke.mjs"
+            }
+          }
+        },
         "llvm": {
           "dependencies": ["native"],
           "artifact": {
@@ -140,6 +197,148 @@
               "prettyM.manifest.json": "prettyM/lean-llvm/prettyM.manifest.json",
               "prettyM.mjs": "prettyM/lean-llvm/prettyM.mjs",
               "prettyM.wasm": "prettyM/lean-llvm/prettyM.wasm"
+            }
+          }
+        }
+      }
+    },
+    "prettyM-html": {
+      "example": {
+        "id": "prettyM",
+        "variant": "html"
+      },
+      "artifactSet": {
+        "setId": "prettyM-html-bounded-set-0003",
+        "benchmarkContract": {
+          "id": "prettyM-complete-html/v1",
+          "input": "compact-format-plus-tagged-annotations",
+          "output": "verso-token-html/v1",
+          "endpoint": "escaped HTML before DOM commit",
+          "timingPhases": ["prepare", "execute", "decode", "render"]
+        }
+      },
+      "checkouts": {
+        "fir": "fir-prettyM-extended",
+        "fir-current": "fir-prettyM-current",
+        "lean": "lean-4.33.0",
+        "vir": "vir-prettyM",
+        "workload": "prettyM-html-workload"
+      },
+      "components": {
+        "vir-html": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            },
+            "runtime": {
+              "pipeline": "lean-vir-ir-interpreter-wasm32-wasip1",
+              "sourceRef": "vir-prettyM",
+              "sourceDirty": false,
+              "wasiSdk": "33.0"
+            },
+            "workload": {
+              "file": "prettyM-html-vir.irpkg",
+              "packageRef": "prettyM-html",
+              "packageFormat": 10,
+              "manifestVersion": 7,
+              "source": {
+                "sourceRef": "prettyM-html-workload",
+                "dirty": false
+              }
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "vir",
+            "checkouts": {
+              "producer": "vir",
+              "runtime": "lean",
+              "workload": "workload"
+            },
+            "files": {
+              "prettyM-html-vir.irpkg": "prettyM/prettyM-html-vir.irpkg",
+              "lean-vir/js/vir-runtime.js": "prettyM/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "prettyM/lean-vir/wasm/vir-upstream.wasm"
+            }
+          }
+        },
+        "native-html": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "fir-native",
+            "checkouts": {
+              "producer": "fir-current",
+              "workload": "workload"
+            },
+            "setup": [
+              {
+                "checkout": "workload",
+                "command": "git",
+                "args": [
+                  "fetch",
+                  "--no-tags",
+                  "origin",
+                  "refs/heads/upgrade/fir-html-lean-4.33:refs/remotes/ejgallego/upgrade/fir-html-lean-4.33"
+                ]
+              }
+            ],
+            "entrypoint": "integration/verso-html/check.sh",
+            "packagePath": "integration/verso-html/_build/verso-html-current",
+            "manifest": "BUILD.json",
+            "files": {
+              "BUILD.json": "prettyM/lean-native-html/BUILD.json",
+              "SHA256SUMS": "prettyM/lean-native-html/SHA256SUMS",
+              "prettyM-browser-adapter.mjs": "prettyM/lean-native-html/prettyM-browser-adapter.mjs",
+              "prettyM.wasm": "prettyM/lean-native-html/prettyM.wasm",
+              "prettyM.wasm.json": "prettyM/lean-native-html/prettyM.wasm.json",
+              "smoke.mjs": "prettyM/lean-native-html/smoke.mjs"
+            }
+          }
+        },
+        "llvm-html": {
+          "dependencies": ["native-html"],
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.32.0",
+              "commit": "8c9756b28d64dab099da31a4c09229a9e6a2ef35"
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "fir-llvm",
+            "checkouts": {
+              "producer": "fir",
+              "workload": "workload"
+            },
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
+            "entrypoint": "integration/lcnf-c-wasm/package-prettyM-html-emscripten.sh",
+            "manifest": "prettyM-html.manifest.json",
+            "dependencyEnvironment": "FIR_PRETTY_M_NATIVE_HTML_PACKAGE",
+            "files": {
+              "README.md": "prettyM/lean-llvm-html/README.md",
+              "SHA256SUMS": "prettyM/lean-llvm-html/SHA256SUMS",
+              "emscripten-loader.mjs": "prettyM/lean-llvm-html/emscripten-loader.mjs",
+              "prettyM-emscripten-adapter.mjs": "prettyM/lean-llvm-html/prettyM-emscripten-adapter.mjs",
+              "prettyM-html-emscripten-adapter.mjs": "prettyM/lean-llvm-html/prettyM-html-emscripten-adapter.mjs",
+              "prettyM-html.manifest.json": "prettyM/lean-llvm-html/prettyM-html.manifest.json",
+              "prettyM-html.mjs": "prettyM/lean-llvm-html/prettyM-html.mjs",
+              "prettyM-html.wasm": "prettyM/lean-llvm-html/prettyM-html.wasm"
             }
           }
         }

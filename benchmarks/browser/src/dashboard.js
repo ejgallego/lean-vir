@@ -15,6 +15,8 @@
   var prettyMemoryReport = null;
   /** @type {*} */
   var prettyInteractionReport = null;
+  /** @type {*} */
+  var prettyLiveReport = null;
   /** @type {HTMLElement | null} */
   var prettyCorpusOverlay = null;
 
@@ -25,7 +27,8 @@
       prettyScalingReport ||
       prettyMemoryReport ||
       prettyInteractionReport ||
-      prettyRepeatedReport,
+      prettyRepeatedReport ||
+      prettyLiveReport,
     );
   }
 
@@ -64,6 +67,7 @@
     else if (data.kind === "memory-retained") prettyMemoryReport = data;
     else if (data.kind === "interactions") prettyInteractionReport = data;
     else if (data.kind === "repeated") prettyRepeatedReport = data;
+    else if (data.kind === "live-render") prettyLiveReport = data;
     else throw new TypeError("unsupported pretty benchmark kind: " + data.kind);
   }
 
@@ -123,7 +127,12 @@
     vir: "#f0a35e",
     "vir-format": "#77c879",
     native: "#d879c6",
+    "native-flat": "#a778df",
     llvm: "#d7c45c",
+    "js-html": "#74a9ff",
+    "vir-html": "#f0a35e",
+    "native-html": "#d879c6",
+    "llvm-html": "#d7c45c",
   };
 
   /** @type {Set<string>} */
@@ -236,6 +245,7 @@
       prettyScalingReport,
       prettyRepeatedReport,
       prettyMemoryReport,
+      prettyLiveReport,
     ];
     for (var index = 0; index < sources.length; index++) {
       if (sources[index] && Array.isArray(sources[index].backendIds)) {
@@ -254,6 +264,7 @@
       prettyCorpusReport,
       prettyScalingReport,
       prettyRepeatedReport,
+      prettyLiveReport,
     ];
     for (var index = 0; index < reports.length; index++) {
       var report = reports[index];
@@ -1182,6 +1193,7 @@
         memory: prettyMemoryReport,
         interactions: prettyInteractionReport,
         repeated: prettyRepeatedReport,
+        live: prettyLiveReport,
       },
     };
   }
@@ -1574,7 +1586,7 @@
         var runtimeNote = document.createElement("p");
         runtimeNote.className = "pretty-corpus-note";
         runtimeNote.textContent =
-          "Asset bytes are exact SHA-256-profiled total browser payloads, including the shared formatter/segment harness. VIR JSON and VIR Format share one runtime; bridge startup and resource-wall time are reported separately.";
+          "Asset bytes are exact SHA-256-profiled total browser payloads, including the shared formatter/segment harness. Backends that share one in-page runtime do not duplicate its bytes; bridge startup and resource-wall time are reported separately.";
         overlay.appendChild(runtimeNote);
         var runtimeTable = document.createElement("table");
         runtimeTable.className = "pretty-corpus-runtime";
@@ -2481,7 +2493,7 @@
         var memoryNote = document.createElement("p");
         memoryNote.className = "pretty-corpus-note";
         memoryNote.textContent =
-          "A plateau means committed capacity did not grow in the final trace window; it does not prove that live memory is stable. VIR JSON and VIR Format share one in-page runtime here. The CLI also runs each VIR mode in its own fresh browser context.";
+          "A plateau means committed capacity did not grow in the final trace window; it does not prove that live memory is stable. Backends may share one in-page runtime here; isolated CLI runs remain the stronger check for backend-specific growth.";
         overlay.appendChild(memoryNote);
         var metricControl = document.createElement("label");
         metricControl.className = "pretty-scaling-phase-control";
@@ -3223,6 +3235,349 @@
     closeButton.focus();
   }
 
+  /**
+   * @param {*} report
+   * @param {string[]} backendIds
+   * @param {string} metric
+   * @param {string} metricLabel
+   */
+  function createPrettyLiveTimeline(report, backendIds, metric, metricLabel) {
+    var namespace = "http://www.w3.org/2000/svg";
+    var width = 940;
+    var height = 300;
+    var left = 62;
+    var right = 914;
+    var top = 30;
+    var bottom = 252;
+    var frames = Array.isArray(report.frames) ? report.frames : [];
+    var values = frames
+      .flatMap(function (frame) {
+        return backendIds.map(function (id) {
+          return Number(frame.backends?.[id]?.[metric]);
+        });
+      })
+      .filter(function (value) {
+        return Number.isFinite(value) && value >= 0;
+      });
+    var maximum = Math.max.apply(null, values.concat([0.001]));
+    var svg = /** @type {SVGSVGElement} */ (
+      document.createElementNS(namespace, "svg")
+    );
+    svg.classList.add("pretty-dashboard-chart", "pretty-live-timeline");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      metricLabel + " by live-render frame and backend",
+    );
+
+    /** @param {string} name @param {Record<string, string>} attributes @param {Element} [parent] */
+    function element(name, attributes, parent) {
+      var node = document.createElementNS(namespace, name);
+      Object.keys(attributes).forEach(function (key) {
+        node.setAttribute(key, attributes[key]);
+      });
+      (parent || svg).appendChild(node);
+      return node;
+    }
+    /** @param {string} value @param {number} x @param {number} y @param {string} anchor */
+    function label(value, x, y, anchor) {
+      var node = /** @type {SVGTextElement} */ (
+        element("text", { x: String(x), y: String(y), "text-anchor": anchor })
+      );
+      node.textContent = value;
+      return node;
+    }
+    /** @param {number} index */
+    function xFor(index) {
+      return frames.length <= 1
+        ? left
+        : left + (index / (frames.length - 1)) * (right - left);
+    }
+    /** @param {number} value */
+    function yFor(value) {
+      return bottom - (value / maximum) * (bottom - top);
+    }
+
+    for (var tick = 0; tick <= 4; tick++) {
+      var value = (maximum * tick) / 4;
+      var y = yFor(value);
+      element("line", {
+        x1: String(left),
+        y1: String(y),
+        x2: String(right),
+        y2: String(y),
+        class: "grid",
+      });
+      label(formatCorpusTiming(value), left - 10, y + 4, "end");
+    }
+    backendIds.forEach(function (id) {
+      var points = [];
+      var group = element("g", {});
+      frames.forEach(function (frame, index) {
+        var value = Number(frame.backends?.[id]?.[metric]);
+        if (!Number.isFinite(value)) return;
+        var x = xFor(index);
+        var y = yFor(value);
+        points.push(x + "," + y);
+        var dot = element(
+          "circle",
+          {
+            cx: String(x),
+            cy: String(y),
+            r: frames.length > 80 ? "1.3" : "2.4",
+            fill: prettyDashboardColor(id),
+          },
+          group,
+        );
+        var title = document.createElementNS(namespace, "title");
+        title.textContent =
+          prettyDashboardBackendLabel(id) +
+          " · frame " +
+          frame.frame +
+          " · " +
+          formatCorpusTiming(value) +
+          " ms";
+        dot.appendChild(title);
+      });
+      if (points.length > 0) {
+        group.insertBefore(
+          element(
+            "polyline",
+            {
+              points: points.join(" "),
+              fill: "none",
+              stroke: prettyDashboardColor(id),
+              "stroke-width": "2",
+              "stroke-linejoin": "round",
+            },
+            group,
+          ),
+          group.firstChild,
+        );
+      }
+    });
+    label(metricLabel + " (ms)", left, 16, "start");
+    label("frame 1", left, height - 14, "start");
+    label("frame " + Math.max(1, frames.length), right, height - 14, "end");
+    return svg;
+  }
+
+  /** @param {*} report */
+  function showPrettyLiveReport(report) {
+    if (prettyCorpusOverlay) prettyCorpusOverlay.remove();
+    var overlay = document.createElement("section");
+    overlay.className = "pretty-corpus-overlay pretty-live-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Live rendering benchmark report");
+    overlay.addEventListener("keydown", function (event) {
+      event.stopPropagation();
+      if (event.key === "Escape") closePrettyDashboard();
+    });
+
+    var header = document.createElement("header");
+    var title = document.createElement("h2");
+    title.textContent = "Live rendering report";
+    var actions = document.createElement("div");
+    var exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.textContent = "Export JSON";
+    exportButton.addEventListener("click", function () {
+      downloadPrettyCorpusReport(report);
+    });
+    var closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.textContent = "Close";
+    closeButton.addEventListener("click", closePrettyDashboard);
+    actions.append(exportButton, closeButton);
+    header.append(title, actions);
+    overlay.appendChild(header);
+
+    var result = document.createElement("p");
+    result.className =
+      "pretty-corpus-result " + (report.passed ? "status-pass" : "status-fail");
+    result.textContent = report.passed
+      ? report.parityCount +
+        "/" +
+        report.frameCount +
+        " frames have exact HTML parity"
+      : "Live rendering reported a mismatch or backend failure";
+    overlay.appendChild(result);
+
+    var cards = document.createElement("div");
+    cards.className = "pretty-dashboard-cards";
+    cards.append(
+      createPrettyDashboardCard(
+        "Frames",
+        String(report.frameCount),
+        "Synthetic updates, backend order rotated each frame",
+      ),
+      createPrettyDashboardCard(
+        "Parity",
+        report.parityCount + "/" + report.frameCount,
+        "Exact escaped HTML before browser commit",
+      ),
+      createPrettyDashboardCard(
+        "Backends",
+        String(report.backendIds.length),
+        "Independent formatter implementations",
+      ),
+      createPrettyDashboardCard(
+        "Run duration",
+        formatCorpusTiming(report.durationMs) + " ms",
+        "Includes animation-frame scheduling",
+      ),
+    );
+    overlay.appendChild(cards);
+
+    var note = document.createElement("p");
+    note.className = "pretty-corpus-note";
+    note.textContent =
+      "Formatter time ends at the escaped HTML string. DOM time covers innerHTML parsing, tree replacement, and forced synchronous layout. Frame time covers both plus adapter and measurement overhead; asynchronous paint is excluded.";
+    overlay.appendChild(note);
+
+    var selectedIds = prettyDashboardSelectedBackendIds(report.backendIds);
+    var controls = document.createElement("div");
+    controls.className = "pretty-dashboard-controls";
+    var phaseLabel = document.createElement("label");
+    phaseLabel.appendChild(document.createTextNode("Timeline metric "));
+    var phaseSelector = document.createElement("select");
+    [
+      { id: "formatterMs", label: "Formatter" },
+      { id: "domCommitMs", label: "DOM commit + layout" },
+      { id: "frameMs", label: "Total frame" },
+    ].forEach(function (phase) {
+      var option = document.createElement("option");
+      option.value = phase.id;
+      option.textContent = phase.label;
+      phaseSelector.appendChild(option);
+    });
+    phaseSelector.value = "frameMs";
+    phaseLabel.appendChild(phaseSelector);
+    var backendFilter = createPrettyBackendFilter(
+      report.backendIds,
+      function (id) {
+        return report.summaries[id]?.label || id;
+      },
+      function (ids) {
+        selectedIds = ids;
+        renderLiveReport();
+      },
+    );
+    controls.append(backendFilter, phaseLabel);
+    overlay.appendChild(controls);
+
+    var content = document.createElement("div");
+    overlay.appendChild(content);
+
+    function renderLiveReport() {
+      content.replaceChildren();
+      var metric = phaseSelector.value;
+      var metricLabel =
+        phaseSelector.options[phaseSelector.selectedIndex]?.textContent ||
+        metric;
+      var heading = document.createElement("h3");
+      heading.textContent = metricLabel + " across frames";
+      content.append(
+        heading,
+        createPrettyLiveTimeline(report, selectedIds, metric, metricLabel),
+      );
+
+      var summaryHeading = document.createElement("h3");
+      summaryHeading.textContent = "Backend timing summary";
+      content.appendChild(summaryHeading);
+      var summaryTable = document.createElement("table");
+      summaryTable.className = "pretty-live-summary-table";
+      var summaryHead = document.createElement("tr");
+      [
+        "Backend",
+        "Formatter median / p95",
+        "DOM median / p95",
+        "Frame median / p95",
+        "Errors",
+      ].forEach(function (label) {
+        appendCorpusCell(summaryHead, label, "th");
+      });
+      summaryTable.appendChild(summaryHead);
+      selectedIds.forEach(function (id) {
+        var summary = report.summaries[id];
+        var row = document.createElement("tr");
+        row.dataset.prettyBackend = id;
+        var backend = appendCorpusCell(row, summary.label);
+        backend.style.color = prettyDashboardColor(id);
+        appendCorpusCell(
+          row,
+          formatCorpusTiming(summary.formatterMs.median) +
+            " / " +
+            formatCorpusTiming(summary.formatterMs.p95) +
+            " ms",
+        );
+        appendCorpusCell(
+          row,
+          formatCorpusTiming(summary.domCommitMs.median) +
+            " / " +
+            formatCorpusTiming(summary.domCommitMs.p95) +
+            " ms",
+        );
+        appendCorpusCell(
+          row,
+          formatCorpusTiming(summary.frameMs.median) +
+            " / " +
+            formatCorpusTiming(summary.frameMs.p95) +
+            " ms",
+        );
+        appendCorpusCell(row, String(summary.errors?.length || 0));
+        summaryTable.appendChild(row);
+      });
+      content.appendChild(summaryTable);
+
+      var framesHeading = document.createElement("h3");
+      framesHeading.textContent = "Frame observations — " + metricLabel;
+      content.appendChild(framesHeading);
+      var frameTable = document.createElement("table");
+      frameTable.className = "pretty-live-frame-table";
+      var frameHead = document.createElement("tr");
+      ["Frame", "Synthetic workload", "Parity"].forEach(function (label) {
+        appendCorpusCell(frameHead, label, "th");
+      });
+      selectedIds.forEach(function (id) {
+        var cell = appendCorpusCell(
+          frameHead,
+          report.summaries[id]?.label || id,
+          "th",
+        );
+        cell.style.color = prettyDashboardColor(id);
+      });
+      frameTable.appendChild(frameHead);
+      report.frames.forEach(function (frame) {
+        var row = document.createElement("tr");
+        appendCorpusCell(row, String(frame.frame));
+        appendCorpusCell(
+          row,
+          frame.caseId + " · " + frame.dimension + "=" + frame.size,
+        );
+        var parity = appendCorpusCell(row, frame.parity ? "pass" : "fail");
+        parity.className = "pretty-parity";
+        row.className = frame.parity ? "status-pass" : "status-fail";
+        selectedIds.forEach(function (id) {
+          appendCorpusCell(
+            row,
+            formatCorpusTiming(frame.backends?.[id]?.[metric]) + " ms",
+          );
+        });
+        frameTable.appendChild(row);
+      });
+      content.appendChild(frameTable);
+    }
+
+    phaseSelector.addEventListener("change", renderLiveReport);
+    renderLiveReport();
+    document.body.appendChild(overlay);
+    prettyCorpusOverlay = overlay;
+    closeButton.focus();
+  }
+
   function closePrettyDashboard() {
     if (prettyCorpusOverlay) prettyCorpusOverlay.remove();
     prettyCorpusOverlay = null;
@@ -3236,6 +3591,7 @@
     prettyRepeatedReport = null;
     prettyMemoryReport = null;
     prettyInteractionReport = null;
+    prettyLiveReport = null;
   }
 
   /** @param {string} kind */
@@ -3250,8 +3606,22 @@
       return showPrettyInteractionReport(prettyInteractionReport);
     if (kind === "repeated" && prettyRepeatedReport)
       return showPrettyRepeatedReport(prettyRepeatedReport);
+    if (kind === "live-render" && prettyLiveReport)
+      return showPrettyLiveReport(prettyLiveReport);
     if (!prettyDashboardHasData())
       throw new Error("no benchmark report is loaded");
+    if (
+      kind === "dashboard" &&
+      prettyLiveReport &&
+      !prettyCampaignReport &&
+      !prettyCorpusReport &&
+      !prettyScalingReport &&
+      !prettyRepeatedReport &&
+      !prettyMemoryReport &&
+      !prettyInteractionReport
+    ) {
+      return showPrettyLiveReport(prettyLiveReport);
+    }
     return showPrettyResultsDashboard();
   }
 

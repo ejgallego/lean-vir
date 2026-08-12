@@ -30,6 +30,8 @@ npm run example -- prettyM default --test-only
 # From a clean checkout, materializes exact sources, prepares producers, builds,
 # packs, imports, validates, then runs the declared differential tests:
 npm run example -- prettyM default --materialize --prepare
+# The complete-HTML boundary is a second independently reproducible variant:
+npm run example -- prettyM html --materialize --prepare
 # Existing FIR/VIR checkouts may instead be selected explicitly:
 npm run example -- prettyM default --prepare --toolchain /path/to/lean-fir
 ```
@@ -39,11 +41,14 @@ commands. Performance collection remains an explicit controlled-machine step.
 
 ## Responsibilities
 
-- load the JavaScript, VIR JSON, VIR typed-Format, native FIR Wasm, and
-  LLVM/Emscripten candidates;
+- compare JavaScript, VIR typed-Format, FIR direct Wasm, FIR flat-output Wasm,
+  and FIR-through-LLVM/Emscripten at the compact styled-segment boundary;
+- compare JavaScript, VIR, FIR direct Wasm, and FIR-through-LLVM/Emscripten at
+  the complete escaped-HTML boundary;
 - verify exact rendered-text and styling parity;
 - collect marshal, execute, decode, and total timings;
-- run corpus, scaling, interaction, retained-memory, and repeated-call studies;
+- run corpus, scaling, interaction, retained-memory, repeated-call, and live
+  DOM-rendering studies;
 - collect cold-start and isolated-runtime observations in fresh browser contexts;
 - aggregate multiple fresh browser processes into campaign reports;
 - display reports and campaigns with a shared, non-destructive backend filter; and
@@ -79,6 +84,7 @@ this application or an artifact archive:
 
 ```sh
 npm run artifacts:sources -- prettyM
+npm run artifacts:sources -- prettyM-html --sources-dir _sources/html
 ```
 
 The repository does not retain obsolete prototype locks. Binary artifacts,
@@ -89,7 +95,7 @@ candidate locks, and downloaded release archives remain ignored by Git. The
 boundary.
 
 `artifacts:build` produces a validated `_artifacts/seed/`, and
-`artifacts:pack` consumes it with this layout:
+`artifacts:pack` consumes it. The compact set includes:
 
 ```text
 prettyM/lean-vir/js/vir-runtime.js
@@ -97,17 +103,25 @@ prettyM/lean-vir/wasm/vir-upstream.wasm
 prettyM/prettyM-vir.irpkg
 prettyM/lean-native/{BUILD.json,prettyM-browser-adapter.mjs,
                      prettyM.wasm,prettyM.wasm.json}
+prettyM/lean-native-flat/{BUILD.json,SHA256SUMS,
+                          prettyM-browser-adapter.mjs,prettyM.wasm,
+                          prettyM.wasm.json,smoke.mjs}
 prettyM/lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
                    prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
                    prettyM.mjs,prettyM.wasm}
 ```
 
+The HTML set has the parallel `prettyM-html-vir.irpkg`,
+`lean-native-html/`, and `lean-llvm-html/` members. Its four backends all
+return the same `verso-token-html/v1` bytes before any DOM operation.
+
 It writes a deterministic normalized tar, member checksums, an
 `ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
-`_artifacts/sets/`, and atomically stages only `artifacts/<example-id>/`.
-Staging one example preserves every sibling. Artifact inputs and outputs plus
+`_artifacts/sets/`, and atomically stages only
+`artifacts/<example-id>/<variant-id>/`. Staging one variant preserves every
+sibling example and variant. Artifact inputs and outputs plus
 orchestrator-owned caches are restricted to this application directory.
 Source compilation caches remain in the explicitly selected producer
 checkouts; only declared package bytes cross into this application.
@@ -127,14 +141,15 @@ deployment build is explicit:
 
 ```sh
 npm run build -- --deploy prettyM=default
+npm run build -- --deploy prettyM=default --deploy prettyM=html
 ```
 
 Deployment admission requires a canonical build, an exact example/variant and
 artifact-set identity, the canonical `tests.json` digest, and no missing,
 changed, extra, or symbolic-link artifact files. Only admitted example
 directories and artifacts are copied. The generated `examples/catalog.json`
-therefore exposes `prettyM/default` on Pages while Illuminate remains a local
-rehearsal.
+can therefore expose `prettyM/default` and `prettyM/html` together on Pages
+while Illuminate remains a local rehearsal.
 
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
@@ -144,17 +159,19 @@ test declared by the admitted variant to pass.
 
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
-workload. The browser only observes the common semantic input/output and timing
-contract. `artifact-builds.json` owns the current producer and workload pins.
-Five-backend parity is the compatibility gate; no cross-backend Lean heap
-values are exchanged.
+workload. The browser only observes the selected variant's common semantic
+input/output and timing contract. Five-backend compact parity and four-backend
+complete-HTML parity are independent compatibility gates; no cross-backend
+Lean heap values are exchanged. `artifact-builds.json` owns the current
+producer and workload pins.
 
 The current VIR package uses the producer-facing
-`VersoSlides.Pretty.*ForVir` export names. `example.json` is their canonical
-build declaration; `config.js` maps the same names to their browser roles. The
-application itself does not load Verso or depend on slide sources. Renaming
-those two exports can accompany a later artifact refresh without changing the
-benchmark or dashboard APIs.
+`VersoSlides.Pretty.*ForVir` export names, including the direct HTML export.
+`example.json` is their canonical build declaration; `config.js` maps the same
+names to browser roles as artifact compatibility data. The application itself
+does not load Verso or depend on slide sources. Renaming those exports can
+accompany a later artifact refresh without changing the benchmark or dashboard
+APIs.
 
 ## Develop and test
 
@@ -170,6 +187,7 @@ npm run dev
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
 not load or privilege either workload. Select an example there or use the
 direct links `?example=prettyM&variant=default` and
+`?example=prettyM&variant=html`, plus
 `?example=illuminate&variant=default`. Example variants are selected in the
 shared header rather than by workload-specific UI. The included server supplies
 the required cross-origin isolation headers. `_headers` and `.htaccess` are
@@ -180,6 +198,12 @@ before application startup.
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction
 views, while downloaded JSON always retains every backend in the source report.
+The complete-HTML variant adds a live-rendering study. Each animation frame
+generates synthetic styled output in all four lanes, checks byte-exact HTML
+parity, and reports formatter time, synchronous `innerHTML` replacement plus
+forced layout, and total frame time separately. Asynchronous paint and
+presentation are explicitly outside that measurement.
+
 Exported runtime profiles retain artifact pathnames and hashes but omit URL
 origins and query strings. They intentionally retain browser user-agent data.
 

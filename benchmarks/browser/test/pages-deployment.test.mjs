@@ -27,7 +27,7 @@ async function stagedDeployment(t) {
   await mkdir(resultsRoot, { recursive: true });
   const artifactsRoot = await mkdtemp(join(resultsRoot, "pages-admission-"));
   t.after(() => rm(artifactsRoot, { recursive: true, force: true }));
-  const directory = join(artifactsRoot, "prettyM");
+  const directory = join(artifactsRoot, "prettyM", "default");
   await mkdir(directory, { recursive: true });
   const payloadPath = join(directory, "payload.bin");
   await writeFile(payloadPath, "pages payload\n");
@@ -73,6 +73,60 @@ test("admits a canonical staged example to Pages", async (t) => {
     pagesCatalog.examples.map(({ id }) => id),
     ["prettyM"],
   );
+  assert.deepEqual(pagesCatalog.deployments, { prettyM: ["default"] });
+});
+
+test("rejects only an exact duplicate Pages variant", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await assert.rejects(
+    () =>
+      selectPagesCatalog({
+        appRoot,
+        artifactsRoot: fixture.artifactsRoot,
+        catalog: fixture.catalog,
+        database: fixture.database,
+        deployments: [
+          parsePagesDeployment("prettyM=default"),
+          parsePagesDeployment("prettyM=default"),
+        ],
+      }),
+    /duplicate Pages variant/,
+  );
+});
+
+test("admits two independently staged variants for one Pages example", async (t) => {
+  const fixture = await stagedDeployment(t);
+  const directory = join(fixture.artifactsRoot, "prettyM", "html");
+  await mkdir(directory, { recursive: true });
+  const payloadPath = join(directory, "html-payload.bin");
+  await writeFile(payloadPath, "html pages payload\n");
+  const manifest = {
+    schemaVersion: 2,
+    kind: "browser-benchmarks/artifact-set",
+    example: { id: "prettyM", variant: "html" },
+    setId: fixture.database.builds["prettyM-html"].artifactSet.setId,
+    testPackage: fixture.manifest.testPackage,
+    files: {
+      "prettyM/html-payload.bin": await fileRecord(payloadPath),
+    },
+  };
+  await writeFile(
+    join(directory, "ARTIFACT_SET.json"),
+    canonicalJson(manifest),
+  );
+  const pagesCatalog = await selectPagesCatalog({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    catalog: fixture.catalog,
+    database: fixture.database,
+    deployments: [
+      parsePagesDeployment("prettyM=default"),
+      parsePagesDeployment("prettyM=html"),
+    ],
+  });
+  assert.deepEqual(pagesCatalog.deployments, {
+    prettyM: ["default", "html"],
+  });
 });
 
 test("rejects a Pages example without a canonical build", async (t) => {
@@ -115,7 +169,10 @@ test("rejects a staged manifest without payload files", async (t) => {
     fixture.manifestPath,
     canonicalJson({ ...fixture.manifest, files: {} }),
   );
-  await assert.rejects(() => fixture.select(), /omits its example or files/);
+  await assert.rejects(
+    () => fixture.select(),
+    /omits its example, variant, or files/,
+  );
 });
 
 test("rejects an unexpected staged artifact file", async (t) => {

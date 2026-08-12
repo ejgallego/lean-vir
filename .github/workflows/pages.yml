@@ -22,10 +22,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      PAGES_BENCHMARK_BUILD: prettyM
-      PAGES_BENCHMARK_EXAMPLE: prettyM
-      PAGES_BENCHMARK_VARIANT: default
     steps:
       - uses: actions/checkout@v5
       - name: Install Lean
@@ -60,7 +56,11 @@ jobs:
       - name: Install benchmark dependencies
         run: npm --prefix benchmarks/browser ci
       - name: Materialize benchmark sources
-        run: npm --prefix benchmarks/browser run artifacts:sources -- "$PAGES_BENCHMARK_BUILD"
+        run: |
+          npm --prefix benchmarks/browser run artifacts:sources -- prettyM \
+            --sources-dir _sources/default
+          npm --prefix benchmarks/browser run artifacts:sources -- prettyM-html \
+            --sources-dir _sources/html
       - name: Cache benchmark producer toolchains
         uses: actions/cache@v4
         with:
@@ -69,23 +69,31 @@ jobs:
             benchmarks/browser/_sources/**/.lake
             benchmarks/browser/_sources/**/.tools/cache
             benchmarks/browser/_sources/**/.deps
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ env.PAGES_BENCHMARK_BUILD }}-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-prettyM-variants-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
       - name: Install benchmark Chromium
         run: npm --prefix benchmarks/browser run playwright:install
       - name: Build and validate benchmark candidate
-        run: npm --prefix benchmarks/browser run example -- "$PAGES_BENCHMARK_EXAMPLE" "$PAGES_BENCHMARK_VARIANT" --prepare
-      - name: Install admitted benchmark under Pages
+        run: |
+          npm --prefix benchmarks/browser run example -- prettyM default \
+            --prepare --sources-dir _sources/default
+          npm --prefix benchmarks/browser run example -- prettyM html \
+            --prepare --sources-dir _sources/html \
+            --toolchain fir=_sources/default/fir
+      - name: Install admitted benchmark variants under Pages
         run: |
           npm --prefix benchmarks/browser run build -- \
-            --deploy "$PAGES_BENCHMARK_EXAMPLE=$PAGES_BENCHMARK_VARIANT"
+            --deploy prettyM=default \
+            --deploy prettyM=html
           npm run build:benchmark-pages
       - name: Test deployed benchmark subtree
-        run: npm run test:benchmark-pages
+        run: npm run test:benchmark-pages -- prettyM default prettyM html
       - name: Upload benchmark candidate archive and receipt
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PAGES_BENCHMARK_EXAMPLE }}-${{ env.PAGES_BENCHMARK_VARIANT }}-candidate-${{ github.sha }}
-          path: benchmarks/browser/_artifacts/candidates/${{ env.PAGES_BENCHMARK_BUILD }}/upload
+          name: prettyM-variants-candidate-${{ github.sha }}
+          path: |
+            benchmarks/browser/_artifacts/candidates/prettyM/upload
+            benchmarks/browser/_artifacts/candidates/prettyM-html/upload
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4

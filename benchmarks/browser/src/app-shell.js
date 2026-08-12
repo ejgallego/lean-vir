@@ -117,9 +117,24 @@ function renderStudies(selectedView) {
   }
 }
 
-function renderVariants(testPackage, variant) {
+function renderExampleView(selectedView) {
+  element("example-eyebrow").textContent = selectedView.eyebrow;
+  element("example-intro").textContent = selectedView.intro;
+  element("app-progress").textContent = selectedView.progress;
+  element("backend-description").textContent = selectedView.backendDescription;
+  element("protocol-description").textContent = selectedView.protocolDescription;
+  element("study-description").textContent = selectedView.studyDescription;
+  element("empty-results").textContent = selectedView.emptyResults;
+  element("example-footer").textContent = selectedView.footer;
+  element("protocol-controls").replaceChildren();
+  element("study-actions").replaceChildren();
+  renderControls(selectedView);
+  renderStudies(selectedView);
+}
+
+function renderVariants(variants, variant) {
   const select = element("variant-select");
-  for (const candidate of testPackage.variants) {
+  for (const candidate of variants) {
     const option = document.createElement("option");
     option.value = candidate.id;
     option.textContent = candidate.title;
@@ -212,23 +227,14 @@ function renderShell() {
   const selectedView = requireView(selected, view);
   document.documentElement.dataset.activeExample = selected.id;
   document.title = `${selected.title} · Lean browser benchmarks`;
-  element("example-eyebrow").textContent = selectedView.eyebrow;
   element("example-title").textContent = selected.title;
-  element("example-intro").textContent = selectedView.intro;
-  element("app-progress").textContent = selectedView.progress;
+  renderExampleView(selectedView);
   showArtifactStatus({
     verified: false,
     tone: "checking",
     heading: "Checking artifact manifest",
     copy: selectedView.artifacts.copy,
   });
-  element("backend-description").textContent = selectedView.backendDescription;
-  element("protocol-description").textContent = selectedView.protocolDescription;
-  element("study-description").textContent = selectedView.studyDescription;
-  element("empty-results").textContent = selectedView.emptyResults;
-  element("example-footer").textContent = selectedView.footer;
-  renderControls(selectedView);
-  renderStudies(selectedView);
 }
 
 function loadScript(url) {
@@ -247,7 +253,6 @@ function loadScript(url) {
 
 async function boot() {
   if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
-  const selectedView = requireView(selected, view);
   const testPackageUrl = new URL(`../${selected.testPackage}`, import.meta.url);
   const testPackageResponse = await fetch(testPackageUrl, { cache: "no-store" });
   if (!testPackageResponse.ok) {
@@ -267,32 +272,49 @@ async function boot() {
     throw new Error(`${selected.id} has an unsupported test package`);
   }
   const variantId = new URL(location.href).searchParams.get("variant");
-  const variant = variantId
-    ? testPackage.variants.find((candidate) => candidate.id === variantId)
-    : testPackage.variants[0];
-  if (!variant) {
-    throw new Error(`${selected.id} has no test variant ${variantId}`);
-  }
   const testPackageIdentity = {
     file: selected.testPackage,
     bytes: testPackageBytes.byteLength,
     sha256: await sha256(testPackageBytes),
   };
+  const admittedVariantIds = catalog.deployments?.[selected.id];
+  const availableVariants = Array.isArray(admittedVariantIds)
+    ? testPackage.variants.filter((candidate) =>
+        admittedVariantIds.includes(candidate.id),
+      )
+    : testPackage.variants;
+  if (availableVariants.length === 0) {
+    throw new Error(`${selected.id} has no admitted test variants`);
+  }
+  const selectedVariant = variantId
+    ? availableVariants.find((candidate) => candidate.id === variantId)
+    : availableVariants[0];
+  if (!selectedVariant) {
+    throw new Error(`${selected.id} has no admitted test variant ${variantId}`);
+  }
+  const selectedView = requireView(
+    selected,
+    typeof selectedModule.viewForVariant === "function"
+      ? selectedModule.viewForVariant(selectedVariant)
+      : view,
+  );
+  renderExampleView(selectedView);
   const artifactBaseUrl = new URL(
-    `../artifacts/${selected.id}/`,
+    `../artifacts/${selected.id}/${selectedVariant.id}/`,
     import.meta.url,
   );
-  renderVariants(testPackage, variant);
+  renderVariants(availableVariants, selectedVariant);
   globalThis.__benchmarkExampleContext = {
     example: selected,
     artifactBaseUrl,
+    availableVariants,
     testPackage,
     testPackageIdentity,
-    variant,
+    variant: selectedVariant,
   };
   artifactStatus = await inspectArtifactStatus(
     selected,
-    variant,
+    selectedVariant,
     selectedView,
     testPackageIdentity,
     artifactBaseUrl,
@@ -310,9 +332,10 @@ async function boot() {
   controller = await selectedModule.loadExample({
     example: selected,
     artifactBaseUrl,
+    availableVariants,
     testPackage,
     testPackageIdentity,
-    variant,
+    variant: selectedVariant,
   });
   const readiness = await controller.ready;
   return { example: selected.id, ...readiness };
@@ -327,6 +350,6 @@ globalThis.__benchmarkApp = {
   getController: () => controller,
   getArtifactStatus: () => artifactStatus,
   getVariants: () =>
-    globalThis.__benchmarkExampleContext?.testPackage.variants ?? [],
+    globalThis.__benchmarkExampleContext?.availableVariants ?? [],
   getVariant: () => globalThis.__benchmarkExampleContext?.variant ?? null,
 };

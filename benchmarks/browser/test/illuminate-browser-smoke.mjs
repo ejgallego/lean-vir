@@ -84,7 +84,7 @@ try {
     await page.evaluate(
       () => window.__benchmarkExampleContext.artifactBaseUrl.href,
     ),
-    `http://127.0.0.1:${port}/artifacts/illuminate/`,
+    `http://127.0.0.1:${port}/artifacts/illuminate/default/`,
   );
   assert.equal(
     await page.locator("#variant-select option:checked").textContent(),

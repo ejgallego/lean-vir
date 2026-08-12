@@ -981,6 +981,127 @@ function normalizeVirSegments(value) {
 }
 
 /**
+ * Build the UTF-8-byte to JavaScript UTF-16 boundary map needed by FIR's
+ * direct text/event result. The bounded-runtime ABI uses byte offsets so the
+ * same representation remains useful outside JavaScript.
+ * @param {string} value
+ * @return {Map<number, number>}
+ */
+function utf8ToUtf16Boundaries(value) {
+  var boundaries = new Map();
+  var utf8 = 0;
+  var utf16 = 0;
+  boundaries.set(0, 0);
+  for (var scalar of value) {
+    var codePoint = scalar.codePointAt(0) || 0;
+    utf8 +=
+      codePoint <= 0x7f
+        ? 1
+        : codePoint <= 0x7ff
+          ? 2
+          : codePoint <= 0xffff
+            ? 3
+            : 4;
+    utf16 += scalar.length;
+    boundaries.set(utf8, utf16);
+  }
+  return boundaries;
+}
+
+/**
+ * Validate FIR's flat `Rendered` result and project it to the semantic segment
+ * surface used by the differential sampler. Event kinds are 0=startTag,
+ * 1=endTags, and 2=unstyled newline.
+ * @param {*} value
+ * @return {Segment[] | null}
+ */
+function normalizePrettyRendered(value) {
+  if (
+    !value ||
+    typeof value.text !== "string" ||
+    !Array.isArray(value.events)
+  ) {
+    return null;
+  }
+
+  var boundaries = utf8ToUtf16Boundaries(value.text);
+  var totalBytes = 0;
+  for (var boundary of boundaries.keys()) totalBytes = boundary;
+
+  /** @type {{ offset: number, kind: number, value: number }[]} */
+  var events = [];
+  var previousOffset = 0;
+  for (var index = 0; index < value.events.length; index++) {
+    var raw = value.events[index];
+    if (!raw) return null;
+    var event = {
+      offset: Number(raw.offset),
+      kind: Number(raw.kind),
+      value: Number(raw.value),
+    };
+    if (
+      !Number.isSafeInteger(event.offset) ||
+      !Number.isSafeInteger(event.kind) ||
+      !Number.isSafeInteger(event.value) ||
+      event.offset < previousOffset ||
+      event.offset > totalBytes ||
+      event.value < 0 ||
+      !boundaries.has(event.offset) ||
+      (event.kind !== 0 && event.kind !== 1 && event.kind !== 2)
+    ) {
+      return null;
+    }
+    events.push(event);
+    previousOffset = event.offset;
+  }
+
+  /** @type {number[]} */
+  var tagStack = [];
+  /** @type {Segment[]} */
+  var segments = [];
+  var cursorBytes = 0;
+
+  /** @param {number} endBytes @param {number[]} tags */
+  function pushThrough(endBytes, tags) {
+    var start = boundaries.get(cursorBytes);
+    var end = boundaries.get(endBytes);
+    if (start === undefined || end === undefined || endBytes < cursorBytes) {
+      return false;
+    }
+    var text = value.text.slice(start, end);
+    if (text.length > 0) segments.push({ text: text, tags: tags.slice() });
+    cursorBytes = endBytes;
+    return true;
+  }
+
+  for (var eventIndex = 0; eventIndex < events.length; eventIndex++) {
+    var event = events[eventIndex];
+    if (!pushThrough(event.offset, tagStack)) return null;
+    if (event.kind === 0) {
+      tagStack.push(event.value);
+    } else if (event.kind === 1) {
+      if (event.value > tagStack.length) return null;
+      tagStack.length -= event.value;
+    } else {
+      var newlineEnd = event.offset + event.value + 1;
+      var start = boundaries.get(event.offset);
+      var end = boundaries.get(newlineEnd);
+      if (
+        newlineEnd > totalBytes ||
+        start === undefined ||
+        end === undefined ||
+        value.text.slice(start, end) !== "\n" + " ".repeat(event.value) ||
+        !pushThrough(newlineEnd, [])
+      ) {
+        return null;
+      }
+    }
+  }
+  if (tagStack.length !== 0 || !pushThrough(totalBytes, tagStack)) return null;
+  return segments;
+}
+
+/**
  * @param {PrettyVirBridge} bridge
  * @param {string} backend
  * @param {*} error

@@ -228,6 +228,7 @@ function artifactManifestFiles(manifest) {
   }
   const exampleId = manifest.example?.id;
   const setId = manifest.setId;
+  const variantId = manifest.example?.variant;
   const files = Object.entries(manifest.files ?? {});
   if (typeof setId !== "string" || !identifierPattern.test(setId)) {
     throw new Error("artifact-set manifest has no safe set ID");
@@ -235,9 +236,11 @@ function artifactManifestFiles(manifest) {
   if (
     typeof exampleId !== "string" ||
     !identifierPattern.test(exampleId) ||
+    typeof variantId !== "string" ||
+    !identifierPattern.test(variantId) ||
     files.length === 0
   ) {
-    throw new Error("artifact-set manifest omits its example or files");
+    throw new Error("artifact-set manifest omits its example, variant, or files");
   }
   const prefix = `${exampleId}/`;
   if (files.some(([path]) => !path.startsWith(prefix))) {

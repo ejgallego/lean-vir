@@ -23,7 +23,7 @@ async function verifyStagedDeployment(
   variant,
   build,
 ) {
-  const directory = resolve(artifactsRoot, example.id);
+  const directory = resolve(artifactsRoot, example.id, variant.id);
   const manifest = await verifyStagedArtifactSet(directory);
   if (
     manifest.example?.id !== example.id ||
@@ -57,11 +57,8 @@ export async function selectPagesCatalog({
   if (!Array.isArray(deployments) || deployments.length === 0) {
     throw new Error("select at least one Pages deployment");
   }
-  const selected = new Set();
+  const selected = new Map();
   for (const deployment of deployments) {
-    if (selected.has(deployment.example)) {
-      throw new Error(`duplicate Pages example: ${deployment.example}`);
-    }
     const example = catalog.examples.find(
       ({ id }) => id === deployment.example,
     );
@@ -76,9 +73,10 @@ export async function selectPagesCatalog({
         `unknown Pages variant: ${deployment.example}/${deployment.variant}`,
       );
     }
-    if (testPackage.variants.length !== 1) {
+    const selectedVariants = selected.get(example.id) ?? new Set();
+    if (selectedVariants.has(variant.id)) {
       throw new Error(
-        `Pages deployment requires one staged variant for ${example.id}`,
+        `duplicate Pages variant: ${example.id}/${variant.id}`,
       );
     }
     if (variant.build === null) {
@@ -102,10 +100,17 @@ export async function selectPagesCatalog({
       variant,
       build,
     );
-    selected.add(example.id);
+    selectedVariants.add(variant.id);
+    selected.set(example.id, selectedVariants);
   }
   return {
     ...catalog,
     examples: catalog.examples.filter(({ id }) => selected.has(id)),
+    deployments: Object.fromEntries(
+      [...selected].map(([exampleId, variants]) => [
+        exampleId,
+        [...variants].sort(),
+      ]),
+    ),
   };
 }

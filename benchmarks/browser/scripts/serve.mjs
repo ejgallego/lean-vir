@@ -31,10 +31,15 @@ const server = createServer(async (request, response) => {
     const relative = normalize(
       pathname === "/" ? "index.html" : pathname.replace(/^\/+/, ""),
     );
-    const file = resolve(join(root, relative));
+    let file = resolve(join(root, relative));
     if (file !== root && !file.startsWith(root + sep))
       throw new Error("path escapes root");
-    const info = await stat(file);
+    let info = await stat(file);
+    if (info.isDirectory()) {
+      file = resolve(file, "index.html");
+      if (!file.startsWith(root + sep)) throw new Error("path escapes root");
+      info = await stat(file);
+    }
     if (!info.isFile()) throw new Error("not a file");
     const headers = {
       "Content-Type": mime[extname(file)] ?? "application/octet-stream",

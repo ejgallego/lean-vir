@@ -37,14 +37,46 @@ export const view = {
     classicScripts: [
       "examples/prettyM/config.js",
       "examples/prettyM/benchmark-core.js",
+      "examples/prettyM/backends/pretty-html.js",
       "examples/prettyM/backends/pretty-vir.js",
       "examples/prettyM/backends/pretty-native.js",
+      "examples/prettyM/backends/pretty-native-flat.js",
       "examples/prettyM/backends/pretty-llvm.js",
+      "examples/prettyM/backends/pretty-native-html.js",
+      "examples/prettyM/backends/pretty-llvm-html.js",
       "src/dashboard.js",
       "examples/prettyM/app.js",
     ],
   },
 };
+
+export function viewForVariant(variant) {
+  if (variant.id !== "html") return view;
+  return {
+    ...view,
+    eyebrow: "Complete renderer · browser Wasm",
+    intro:
+      "Compare JavaScript, VIR, FIR-native Wasm, and FIR-through-LLVM Wasm across layout, annotation resolution, escaping, and token-span construction.",
+    progress: "Preparing complete HTML renderers…",
+    backendDescription:
+      "Every candidate returns the same escaped verso-token-html/v1 string. The live study then measures browser DOM commit and forced layout separately.",
+    protocolDescription:
+      "Formatter samples exclude DOM work. Live frames expose formatter, synchronous DOM commit/layout, and end-to-end time as distinct values.",
+    studyDescription:
+      "Check exact HTML, explore size scaling and repeated calls, or render synthetic output live in four side-by-side lanes.",
+    studies: [
+      { id: "smoke", label: "Quick check" },
+      { id: "differential", label: "HTML corpus" },
+      { id: "scaling", label: "HTML scaling" },
+      { id: "repeated", label: "Repeated calls" },
+      { id: "live-render", label: "Live rendering" },
+      { id: "suite", label: "Full HTML suite", primary: true },
+    ],
+    emptyResults: "No complete-HTML study has run yet.",
+    footer:
+      "Exact HTML parity gates every timing report. Live rendering includes synchronous DOM parsing, replacement, and forced layout, but not asynchronous paint.",
+  };
+}
 
 export async function loadExample(context) {
   if (context.example.id !== "prettyM") {
