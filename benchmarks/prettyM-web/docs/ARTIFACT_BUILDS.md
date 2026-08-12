@@ -144,17 +144,17 @@ commits, adapters, staged file hashes, selected variant, and the digest of its
 self-contained `tests.json`. Machine-local checkout and config paths are
 deliberately omitted because the receipt is included in the CI candidate
 payload. It is evidence about one invocation, not a second source of build
-configuration and not part of the published artifact set.
+configuration and not part of the packed artifact set.
 
-## Assemble the immutable set
+## Assemble the candidate set
 
-Serving and testing an accepted set does not invoke FIR or rebuild its Wasm.
-The accepted lock selects an immutable archive containing the FIR native and
+Serving and testing a staged set does not invoke FIR or rebuild its Wasm. The
+generated lock identifies an immutable archive containing the FIR native and
 LLVM packages alongside the VIR package. `artifacts:fetch` verifies that
 archive and stages its declared example namespace. `--toolchain` is only a
-source-build input used to produce a new seed or candidate. Until a candidate
-is promoted, use the generated v2 lock under `_artifacts/releases/` explicitly;
-the repository does not retain obsolete prototype locks.
+source-build input used to produce a new seed or candidate. Generated v2 locks
+remain under ignored `_artifacts/releases/`; the repository does not retain
+artifact locks.
 
 The packer reads the same catalog record, so source provenance is no longer
 duplicated in a separate artifact-set config. It also requires the corresponding
@@ -169,20 +169,17 @@ npm test
 ```
 
 Building and packing remain separate. A newly generated producer byte changes
-the archive digest; exactly one reviewed digest can be promoted for a new set
-ID. A published set ID is never reused for changed bytes. Performance
-measurement is never part of this source build command.
+the archive digest, and the generated lock binds that exact invocation.
+Performance measurement is never part of this source build command.
 
 The source-package v1 contract guarantees exact source identity and validated
-package output; it does not yet promise byte-for-byte reproducibility of every
-producer. In particular, the current VIR package manifest embeds its generation time and the
-spelling of the workload source path. Until VIR exposes deterministic metadata,
-CI should generate and test a candidate archive rather than expect a fresh
-`.irpkg` to reproduce the committed archive digest.
+package output. Historical byte-for-byte reproduction is not a project
+requirement; CI generates and validates a fresh candidate for the current
+source selection.
 
 ## CI candidate build
 
-The complete non-publishing path is available locally as:
+The complete ephemeral-candidate path is available locally as:
 
 ```sh
 npm run artifacts:sources -- prettyM
@@ -203,5 +200,5 @@ report, and a `CANDIDATE.json` validation statement.
 `.github/workflows/example-candidate.yml` runs the same commands on relevant
 pull requests and `main` updates and supports explicit dispatch. The workflow
 has read-only repository permission and uploads only a short-lived Actions
-artifact. It neither compares the candidate bytes with an accepted lock nor
-publishes or promotes them.
+artifact. It does not compare candidate bytes across runs or update repository
+state.

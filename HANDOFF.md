@@ -49,12 +49,12 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 - The fetcher and stager accept only namespaced artifact-set schema v2. No
   historical prototype lock or compatibility verifier is retained.
 - `.github/workflows/example-candidate.yml` derives its matrix from catalogued
-  example variants, builds non-publishing candidates, re-imports them through
+  example variants, builds ephemeral candidates, re-imports them through
   the consumer path, runs differential tests, and uploads short-lived payloads.
 - The Pages workflow builds the same canonical `prettyM/default` candidate,
   admits it only after its staged manifest and test-package digest match the
   catalog, and installs the filtered app under `web/dist/benchmarks/`. It does
-  not publish or promote an artifact archive.
+  not consume a pre-existing artifact archive.
 - Dashboard backend filters are presentation-only; exported JSON retains the
   complete report.
 - Timings from an uncontrolled or loaded machine are observations, not accepted
@@ -92,7 +92,7 @@ npm run artifacts:fetch -- \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
-These commands never publish an artifact or update an accepted lock.
+These commands write only ignored candidate data and staged local artifacts.
 
 ## Validation expectations
 
@@ -109,7 +109,3 @@ Before handing off a catalog, controller, or artifact change:
 
 1. Add canonical Illuminate producer entry points and a clean catalog build,
    then admit it to Pages and remove its application-local rehearsal stager.
-2. Decide whether a reviewed v2 candidate should be published and selected by
-   an accepted lock. Candidate CI intentionally stops before publication.
-3. Remove generation timestamps and source-path spelling from VIR package
-   metadata if byte-for-byte candidate reproducibility becomes a requirement.

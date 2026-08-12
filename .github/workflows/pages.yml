@@ -22,6 +22,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      PAGES_BENCHMARK_BUILD: prettyM
+      PAGES_BENCHMARK_EXAMPLE: prettyM
+      PAGES_BENCHMARK_VARIANT: default
     steps:
       - uses: actions/checkout@v5
       - name: Install Lean
@@ -53,7 +57,7 @@ jobs:
       - name: Install benchmark dependencies
         run: npm --prefix benchmarks/prettyM-web ci
       - name: Materialize benchmark sources
-        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- prettyM
+        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- "$PAGES_BENCHMARK_BUILD"
       - name: Cache benchmark producer toolchains
         uses: actions/cache@v4
         with:
@@ -62,14 +66,15 @@ jobs:
             benchmarks/prettyM-web/_sources/**/.lake
             benchmarks/prettyM-web/_sources/**/.tools/cache
             benchmarks/prettyM-web/_sources/**/.deps
-          key: ${{ runner.os }}-${{ runner.arch }}-prettyM-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ env.PAGES_BENCHMARK_BUILD }}-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
       - name: Install benchmark Chromium
         run: npm --prefix benchmarks/prettyM-web run playwright:install
       - name: Build and validate benchmark candidate
-        run: npm --prefix benchmarks/prettyM-web run example -- prettyM default --prepare
+        run: npm --prefix benchmarks/prettyM-web run example -- "$PAGES_BENCHMARK_EXAMPLE" "$PAGES_BENCHMARK_VARIANT" --prepare
       - name: Install admitted benchmark under Pages
         run: |
-          npm --prefix benchmarks/prettyM-web run build -- --deploy prettyM=default
+          npm --prefix benchmarks/prettyM-web run build -- \
+            --deploy "$PAGES_BENCHMARK_EXAMPLE=$PAGES_BENCHMARK_VARIANT"
           npm run build:benchmark-pages
       - name: Test deployed benchmark subtree
         run: npm run test:benchmark-pages

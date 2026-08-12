@@ -1,8 +1,10 @@
-import { lstat, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { selectBuild } from "./artifact-build-lib.mjs";
-import { fileRecord, readJson, safeArchivePath } from "./artifact-set-lib.mjs";
+import {
+  fileRecord,
+  verifyStagedArtifactSet,
+} from "./artifact-set-lib.mjs";
 import { readExampleTestPackage } from "./example-catalog-lib.mjs";
 
 const selectionPattern =
@@ -14,23 +16,6 @@ export function parsePagesDeployment(value) {
   return { example: match[1], variant: match[2] };
 }
 
-async function stagedFiles(root, prefix = "") {
-  const paths = [];
-  for (const entry of await readdir(root, { withFileTypes: true })) {
-    const local = prefix ? `${prefix}/${entry.name}` : entry.name;
-    safeArchivePath(local);
-    const path = resolve(root, entry.name);
-    const info = await lstat(path);
-    if (info.isSymbolicLink()) {
-      throw new Error(`staged artifact is a symbolic link: ${local}`);
-    }
-    if (info.isDirectory()) paths.push(...(await stagedFiles(path, local)));
-    else if (info.isFile()) paths.push(local);
-    else throw new Error(`staged artifact is not a regular file: ${local}`);
-  }
-  return paths.sort();
-}
-
 async function verifyStagedDeployment(
   appRoot,
   artifactsRoot,
@@ -39,7 +24,7 @@ async function verifyStagedDeployment(
   build,
 ) {
   const directory = resolve(artifactsRoot, example.id);
-  const manifest = await readJson(resolve(directory, "ARTIFACT_SET.json"));
+  const manifest = await verifyStagedArtifactSet(directory);
   if (
     manifest.schemaVersion !== 2 ||
     manifest.kind !== "browser-benchmarks/artifact-set" ||
@@ -62,35 +47,6 @@ async function verifyStagedDeployment(
       `staged artifact test package does not match ${example.id}/${variant.id}`,
     );
   }
-
-  const prefix = `${example.id}/`;
-  const expected = new Set(["ARTIFACT_SET.json"]);
-  const files = Object.entries(manifest.files ?? {});
-  if (files.length === 0) {
-    throw new Error(`staged artifact has no payload files: ${example.id}`);
-  }
-  for (const [path, recorded] of files) {
-    safeArchivePath(path);
-    if (!path.startsWith(prefix)) {
-      throw new Error(`staged artifact path is outside ${prefix}: ${path}`);
-    }
-    const local = safeArchivePath(path.slice(prefix.length));
-    const actual = await fileRecord(resolve(directory, local));
-    if (
-      actual.bytes !== recorded?.bytes ||
-      actual.sha256 !== recorded?.sha256
-    ) {
-      throw new Error(`staged artifact file does not match: ${path}`);
-    }
-    expected.add(local);
-  }
-  const actual = await stagedFiles(directory);
-  if (
-    actual.length !== expected.size ||
-    actual.some((path) => !expected.has(path))
-  ) {
-    throw new Error(`staged artifact contains undeclared files: ${example.id}`);
-  }
 }
 
 export async function selectPagesCatalog({
@@ -103,7 +59,7 @@ export async function selectPagesCatalog({
   if (!Array.isArray(deployments) || deployments.length === 0) {
     throw new Error("select at least one Pages deployment");
   }
-  const selected = new Map();
+  const selected = new Set();
   for (const deployment of deployments) {
     if (selected.has(deployment.example)) {
       throw new Error(`duplicate Pages example: ${deployment.example}`);
@@ -148,7 +104,7 @@ export async function selectPagesCatalog({
       variant,
       build,
     );
-    selected.set(example.id, example);
+    selected.add(example.id);
   }
   return {
     ...catalog,

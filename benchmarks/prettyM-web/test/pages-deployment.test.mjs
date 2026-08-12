@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -75,9 +75,37 @@ test("admits only canonical staged examples to Pages", async () => {
           database,
           deployments: [parsePagesDeployment("prettyM=default")],
         }),
-      /has no payload files/,
+      /omits its example or files/,
     );
     await writeFile(manifestPath, canonicalJson(manifest));
+    const unexpectedPath = join(directory, "unexpected.bin");
+    await writeFile(unexpectedPath, "extra\n");
+    await assert.rejects(
+      () =>
+        selectPagesCatalog({
+          appRoot,
+          artifactsRoot,
+          catalog,
+          database,
+          deployments: [parsePagesDeployment("prettyM=default")],
+        }),
+      /unexpected member/,
+    );
+    await rm(unexpectedPath);
+    const linkPath = join(directory, "payload-link.bin");
+    await symlink("payload.bin", linkPath);
+    await assert.rejects(
+      () =>
+        selectPagesCatalog({
+          appRoot,
+          artifactsRoot,
+          catalog,
+          database,
+          deployments: [parsePagesDeployment("prettyM=default")],
+        }),
+      /not a regular file/,
+    );
+    await rm(linkPath);
     await writeFile(payloadPath, "changed\n");
     await assert.rejects(
       () =>
@@ -88,7 +116,7 @@ test("admits only canonical staged examples to Pages", async () => {
           database,
           deployments: [parsePagesDeployment("prettyM=default")],
         }),
-      /file does not match/,
+      /member digest mismatch/,
     );
   } finally {
     await rm(artifactsRoot, { recursive: true, force: true });

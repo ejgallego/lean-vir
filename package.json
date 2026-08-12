@@ -94,7 +94,7 @@
     "test:fixtures:no-build": "node scripts/run-fixtures.mjs --no-build",
     "test:site": "npm run build:site && npm run test:pages",
     "test:pages": "node scripts/check-pages-artifact.mjs",
-    "test:benchmark-pages": "npm --prefix benchmarks/prettyM-web run test:pages -- --directory ../../web/dist/benchmarks --deploy prettyM=default && npm --prefix benchmarks/prettyM-web run test:pages:browser -- --directory ../../web/dist --base-path /benchmarks/ --example prettyM --variant default",
+    "test:benchmark-pages": "npm --prefix benchmarks/prettyM-web run test:pages -- --directory ../../web/dist/benchmarks --deploy ${PAGES_BENCHMARK_EXAMPLE}=${PAGES_BENCHMARK_VARIANT} && npm --prefix benchmarks/prettyM-web run test:pages:browser -- --directory ../../web/dist --base-path /benchmarks/ --example ${PAGES_BENCHMARK_EXAMPLE} --variant ${PAGES_BENCHMARK_VARIANT}",
     "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
     "test:infoview": "npm run check:infoview-bundle && lake build Vir.Infoview Vir.Infoview.ImportedHelperSmoke && lake env lean scripts/smoke-infoview-lean.lean && node scripts/smoke-infoview-widget.mjs",
     "test:runtime": "node scripts/test-vir-runtime.mjs",

@@ -149,7 +149,6 @@ try {
     ["totalMs", "prepareMs", "executeMs", "decodeMs"],
   );
   assert.equal(report.provenance.acceptedMeasurement, false);
-  assert.equal(report.provenance.rehearsal.publishable, false);
   assert.equal(await page.locator(".result-actions button").count(), 4);
   assert.equal(await page.locator("#download-results").isEnabled(), true);
   assert.equal(await page.locator("#clear-results").isEnabled(), true);

@@ -494,7 +494,12 @@ test("artifact fetch requires an explicit lock", () => {
 
 test("rejects undeclared artifact-set members", async () => {
   const directory = join(scratch, "unexpected-member");
-  await mkdir(directory, { recursive: true });
+  await mkdir(join(directory, "prettyM"), { recursive: true });
+  const payloadPath = join(directory, "prettyM/payload.bin");
+  await writeFile(payloadPath, "payload\n");
+  const files = {
+    "prettyM/payload.bin": await fileRecord(payloadPath),
+  };
   await writeFile(
     join(directory, "ARTIFACT_SET.json"),
     canonicalJson({
@@ -502,10 +507,20 @@ test("rejects undeclared artifact-set members", async () => {
       kind: "browser-benchmarks/artifact-set",
       example: { id: "prettyM" },
       setId: "prettyM-test",
-      files: {},
+      files,
     }),
   );
-  await writeFile(join(directory, "SHA256SUMS"), "");
+  const checksummedPaths = ["ARTIFACT_SET.json", ...Object.keys(files)].sort();
+  await writeFile(
+    join(directory, "SHA256SUMS"),
+    `${(
+      await Promise.all(
+        checksummedPaths.map(
+          async (path) => `${await sha256File(join(directory, path))}  ${path}`,
+        ),
+      )
+    ).join("\n")}\n`,
+  );
   await writeFile(join(directory, "surprise.txt"), "not declared\n");
   await assert.rejects(() => verifyArtifactSet(directory), /unexpected member/);
 });

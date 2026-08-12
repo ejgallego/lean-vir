@@ -21,7 +21,7 @@ const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 function usage() {
   console.log(`Usage: node scripts/stage-illuminate-rehearsal.mjs --source PATH [options]
 
-Stage an explicitly local, non-publishable Illuminate benchmark rehearsal.
+Stage an explicitly local Illuminate benchmark rehearsal.
 PATH must be the root of a prepared Illuminate checkout containing test_output.
 The staged files remain inside this application's ignored artifacts directory.
 
@@ -233,7 +233,6 @@ async function main() {
   const receipt = {
     schemaVersion: 1,
     kind: "illuminate-player/local-rehearsal",
-    publishable: false,
     source: {
       repository: git(source, ["remote", "get-url", sourceRemote]),
       remote: sourceRemote,

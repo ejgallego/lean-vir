@@ -25,7 +25,7 @@ const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 function usage() {
   console.log(`Usage: node scripts/build-artifact-candidate.mjs [options] BUILD
 
-Build, pack, re-import, test, and collect a non-publishing artifact candidate.
+Build, pack, re-import, test, and collect an ephemeral artifact candidate.
 Fallback source checkouts must already exist below the controlled source
 directory.
 
@@ -276,10 +276,6 @@ async function main() {
       archiveImport: "passed",
       applicationUnitTests: "passed",
       exampleDifferential: "passed",
-    },
-    promotion: {
-      published: false,
-      committedLockUpdated: false,
     },
   };
   await writeFile(

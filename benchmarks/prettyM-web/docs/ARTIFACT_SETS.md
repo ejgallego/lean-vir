@@ -26,7 +26,7 @@ rendered text plus complete styling events.
 - LLVM produces its Emscripten module, Wasm, loader, adapter, manifest, and
   checksums.
 - The benchmark maintainer selects compatible producer outputs, runs parity,
-  and publishes one composite set without rewriting producer bytes.
+  and packs one composite candidate without rewriting producer bytes.
 
 Adapters are part of their producer components. Marshal and decode timings
 depend on them, so an adapter change is a candidate change.
@@ -37,9 +37,9 @@ All generated data stays inside the movable application directory:
 
 ```text
 _artifacts/
-  seed/                 validated producer inputs used by the publisher
+  seed/                 validated producer inputs used by the packer
   pack/<set-id>/        normalized assembly directory
-  releases/             deterministic tar and inspection files
+  releases/             ignored deterministic tar and inspection files
   downloads/            verified download cache
   sets/<set-id>/        verified extracted immutable sets
 artifacts/
@@ -47,8 +47,8 @@ artifacts/
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
-source-build catalog is committed. A reviewed published lock may be committed
-later; candidate locks remain with the generated release payload.
+source-build catalog is committed; generated locks remain with their candidate
+payloads and are not committed.
 
 ## Assemble a candidate
 
@@ -61,8 +61,7 @@ later; candidate locks remain with the generated release payload.
    The packer refuses a seed whose catalog, example, source pins, adapters, or
    file hashes differ from that receipt.
 3. Run `npm run artifacts:pack -- --build BUILD`. By default its candidate
-   lock is written below ignored `_artifacts/releases/`; writing a tracked lock
-   always requires an explicit `--lock`.
+   lock is written below ignored `_artifacts/releases/`.
 4. Review the generated manifest under `_artifacts/releases/`.
 5. Import the generated tar through the same consumer path:
 
@@ -85,34 +84,14 @@ Packing is deterministic: members are sorted, regular-file-only, mode 0644,
 UID/GID zero, and timestamp zero. Repacking unchanged inputs must reproduce the
 same archive digest.
 
-## Publish and promote
+## Deployment lifecycle
 
-Upload these three files to a prerelease owned by the benchmark project:
-
-```text
-<set-id>-<digest-prefix>.tar
-<set-id>-<digest-prefix>.tar.sha256
-<set-id>.manifest.json
-```
-
-Never replace those assets and never point the lockfile at a mutable `latest`
-URL. After upload:
-
-1. Copy the reviewed candidate lock to the application's accepted lock and set
-   `archive.url` to the exact HTTPS release asset URL.
-2. Change `status` to `published`; do not change any digest or byte count.
-3. Open a lockfile PR. Before merge, validate the accepted URL and lock by
-   running `npm run artifacts:fetch -- --lock artifact-set.lock.json` and
-   `npm test` from a clean clone. The
-   current candidate workflow does not implement this consumer check; add it
-   when the first immutable v2 archive is promoted.
-4. Mark the release stable after the lockfile PR passes and merges. Promotion
-   changes release visibility, not bytes.
-
-The first pass is intentionally manual. Producer-owned releases, attestations,
-and automated promotion can be added after this path has been exercised.
-The CI candidate workflow does not enter this section: Actions artifact upload
-is evidence transport, not publication or promotion.
+The project has no publication, promotion, or accepted-lock phase. Candidate
+locks exist only to re-import and verify the exact tar produced by the current
+build. CI may retain the candidate payload as a short-lived Actions artifact for
+inspection, while GitHub Pages regenerates and validates its candidate in the
+deployment job. An explicit HTTPS URL in a lock remains supported for transport
+when needed, but does not define repository state or a release policy.
 
 ## Verification boundary
 
@@ -137,5 +116,5 @@ hash the manifest and every browser-observed runtime asset.
 
 `prettyM-bounded-set-0002` is the candidate identity for the refreshed source
 closure. It retains VIR `64e3078` and the Verso Slides workload `c16a6f8`, uses
-merged FIR `298682a`, and places every payload below `prettyM/`. Only one
-reviewed candidate digest may be promoted under this identity.
+merged FIR `298682a`, and places every payload below `prettyM/`. Each generated
+lock records the exact archive digest for its own build.

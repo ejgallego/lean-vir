@@ -57,17 +57,18 @@ slide DOM state.
 The example descriptors are canonical for VIR targets and exports. The
 committed `artifact-builds.json` supplies exact producer and workload Git
 revisions, producer dependencies, expected package files, and artifact-set
-provenance. The accepted lock is separate consumer state. The build driver
-resolves each `packageRef` through the example descriptor before invoking the
-uniform VIR compiler. Local checkout paths are supplied on the command line
-and are never committed. See
+provenance. Generated candidate locks are integrity records for exact local
+re-import; they are not committed consumer state. The build driver resolves
+each `packageRef` through the example descriptor before invoking the uniform
+VIR compiler. Local checkout paths are supplied on the command line and are
+never committed. See
 `docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
 FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
 `toolchains.local.json`, or `--toolchain-config`. Every selected checkout must
 still match the exact catalogued commit. These settings control generation;
-normal serving consumes already-built FIR packages selected and staged through
-an explicit v2 artifact-set lock.
+normal serving consumes already-built FIR packages staged by the candidate
+pipeline or an explicit local rehearsal.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
@@ -113,23 +114,18 @@ orchestrator-owned caches are restricted to this application directory.
 Source compilation caches remain in the explicitly selected producer
 checkouts; only declared package bytes cross into this application.
 
-Once the archive is uploaded as an immutable release asset, set its exact HTTPS
-URL in the lockfile and change the status from `local-prototype` to `published`.
-If that lock is accepted into the repository, clean clones can use
-`npm run artifacts:fetch -- --lock artifact-set.lock.json`. See
-`docs/ARTIFACT_SETS.md` for producer, promotion, and publication details.
-
-The candidate workflow stops before that publication boundary. It builds from
-the catalogued sources, packs to a separate candidate lock, re-imports the
+There is no accepted-lock or promotion phase. The candidate workflow builds
+from the catalogued sources, writes an ignored lock, re-imports that exact
 archive, runs the application tests, and uploads the archive, checksums,
-manifest, source receipt, and `CANDIDATE.json` as a short-lived CI artifact.
-It never edits an accepted lock or publishes a release asset.
+manifest, source receipt, and `CANDIDATE.json` as short-lived CI diagnostics.
+The fetcher retains exact-URL support as an optional transport mechanism, not
+as a repository release lifecycle.
 
 ## GitHub Pages deployment
 
 GitHub Pages consumes a candidate generated inside its own build job; it does
-not require a release asset or accepted lock. After the candidate is staged,
-the deployment build is explicit:
+not require a pre-existing archive. After the candidate is staged, the
+deployment build is explicit:
 
 ```sh
 npm run build -- --deploy prettyM=default
@@ -145,8 +141,8 @@ rehearsal.
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
 fallback and reload once before starting the application. CI tests that path
-without server-supplied isolation and still requires all five prettyM backends
-and the declared differential smoke test to pass.
+without server-supplied isolation and requires every backend and differential
+test declared by the admitted variant to pass.
 
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
@@ -178,10 +174,9 @@ not load or privilege either workload. Select an example there or use the
 direct links `?example=prettyM&variant=default` and
 `?example=illuminate&variant=default`. Example variants are selected in the
 shared header rather than by workload-specific UI. The included server supplies
-the cross-origin isolation headers required by threaded LLVM Wasm.
-`_headers` and `.htaccess` files are included at the root of `dist/` for static
-hosts; configure equivalent headers when the hosting platform does not consume
-either format.
+`_headers` and `.htaccess` are included for static hosts that consume them. The
+scoped service worker covers hosts such as GitHub Pages that cannot configure
+those headers, with one reload before application startup.
 
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction

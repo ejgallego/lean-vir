@@ -42,14 +42,14 @@ function parseArgs(argv) {
     else if (argument === "--help" || argument === "-h") {
       console.log(`Usage: node scripts/pack-artifact-set.mjs [options]
 
-Build a deterministic release tar and prototype lock from a validated seed.
+Build a deterministic candidate tar and local import lock from a validated seed.
 Every input and output path must remain inside this application directory.
 
   --seed PATH          component seed (default: _artifacts/seed)
   --database PATH      canonical source/build database
   --build ID           database build to pack (required)
-  --output-dir PATH    ignored release directory
-  --lock PATH          lockfile to write (default: ignored release lock)
+  --output-dir PATH    ignored candidate output directory
+  --lock PATH          lockfile to write (default: ignored candidate lock)
   --receipt PATH       source receipt (default: build receipt)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
@@ -72,7 +72,7 @@ async function main() {
     options.database,
     "read artifact build database",
   );
-  const outputDir = inside(appRoot, options.outputDir, "write release");
+  const outputDir = inside(appRoot, options.outputDir, "write candidate");
   const database = await readBuildDatabase(databasePath);
   const config = artifactSetConfig(database, options.build);
   const examplePath = inside(
@@ -254,7 +254,6 @@ async function main() {
 
   const lock = {
     schemaVersion: 2,
-    status: "local-prototype",
     setId: config.setId,
     archive: {
       file: archiveName,

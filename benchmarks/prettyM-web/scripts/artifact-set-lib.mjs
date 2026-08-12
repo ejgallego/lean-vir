@@ -217,39 +217,62 @@ export async function extractTar(bytes, destination) {
   throw new Error("archive is missing its end marker");
 }
 
-export async function verifyArtifactSet(directory, lock = null) {
-  const manifestPath = resolve(directory, "ARTIFACT_SET.json");
-  const manifestBytes = await readFile(manifestPath);
-  const manifest = JSON.parse(manifestBytes);
+function artifactManifestFiles(manifest) {
   if (
     manifest.schemaVersion !== 2 ||
     manifest.kind !== "browser-benchmarks/artifact-set"
   ) {
     throw new Error("unsupported artifact-set manifest");
   }
-  if (lock && manifest.setId !== lock.setId) {
-    throw new Error(`artifact set ID mismatch: ${manifest.setId}`);
+  const exampleId = manifest.example?.id;
+  const files = Object.entries(manifest.files ?? {});
+  if (
+    typeof exampleId !== "string" ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(exampleId) ||
+    files.length === 0
+  ) {
+    throw new Error("artifact-set manifest omits its example or files");
   }
-  if (lock && sha256(manifestBytes) !== lock.manifestSha256) {
-    throw new Error("artifact-set manifest digest mismatch");
+  const prefix = `${exampleId}/`;
+  if (files.some(([path]) => !path.startsWith(prefix))) {
+    throw new Error(`artifact-set files must use the ${exampleId}/ namespace`);
   }
+  return { files, prefix };
+}
 
-  const expectedPaths = new Set([
-    "ARTIFACT_SET.json",
-    "SHA256SUMS",
-    ...Object.keys(manifest.files ?? {}),
-  ]);
-  const actualPaths = [];
-  async function visit(path, prefix = "") {
-    for (const entry of await readdir(path, { withFileTypes: true })) {
-      const local = prefix ? `${prefix}/${entry.name}` : entry.name;
-      safeArchivePath(local);
-      if (entry.isDirectory()) await visit(resolve(path, entry.name), local);
-      else if (entry.isFile()) actualPaths.push(local);
-      else throw new Error(`artifact-set member is not a regular file: ${local}`);
+async function regularFilePaths(root, prefix = "") {
+  const paths = [];
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const local = prefix ? `${prefix}/${entry.name}` : entry.name;
+    safeArchivePath(local);
+    const path = resolve(root, entry.name);
+    if (entry.isDirectory()) {
+      paths.push(...(await regularFilePaths(path, local)));
+    } else if (entry.isFile()) {
+      paths.push(local);
+    } else {
+      throw new Error(`artifact-set member is not a regular file: ${local}`);
     }
   }
-  await visit(directory);
+  return paths.sort();
+}
+
+async function verifyArtifactPayload(
+  directory,
+  manifest,
+  { staged = false, manifestFiles = artifactManifestFiles(manifest) } = {},
+) {
+  const { files, prefix } = manifestFiles;
+  const localFiles = files.map(([path, record]) => [
+    staged ? safeArchivePath(path.slice(prefix.length)) : safeArchivePath(path),
+    record,
+  ]);
+  const expectedPaths = new Set([
+    "ARTIFACT_SET.json",
+    ...(staged ? [] : ["SHA256SUMS"]),
+    ...localFiles.map(([path]) => path),
+  ]);
+  const actualPaths = await regularFilePaths(directory);
   for (const path of actualPaths) {
     if (!expectedPaths.has(path)) {
       throw new Error(`artifact set contains an unexpected member: ${path}`);
@@ -260,33 +283,38 @@ export async function verifyArtifactSet(directory, lock = null) {
       throw new Error(`artifact set is missing a declared member: ${path}`);
     }
   }
-
-  for (const [path, expected] of Object.entries(manifest.files ?? {})) {
-    const target = inside(directory, safeArchivePath(path), "verify");
+  for (const [path, expected] of localFiles) {
+    const target = inside(directory, path, "verify");
     const info = await lstat(target).catch(() => null);
     if (!info?.isFile() || info.isSymbolicLink()) {
       throw new Error(`artifact-set member is missing or unsafe: ${path}`);
     }
     const actual = await fileRecord(target);
-    if (actual.bytes !== expected.bytes || actual.sha256 !== expected.sha256) {
+    if (actual.bytes !== expected?.bytes || actual.sha256 !== expected?.sha256) {
       throw new Error(`artifact-set member digest mismatch: ${path}`);
     }
   }
-  if (
-    typeof manifest.example?.id !== "string" ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifest.example.id) ||
-    Object.keys(manifest.files ?? {}).length === 0
-  ) {
-    throw new Error("artifact-set manifest omits its example or files");
-  } else if (
-    Object.keys(manifest.files).some(
-      (path) => !path.startsWith(`${manifest.example.id}/`),
-    )
-  ) {
-    throw new Error(
-      `artifact-set files must use the ${manifest.example.id}/ namespace`,
-    );
+  return manifest;
+}
+
+export async function verifyStagedArtifactSet(directory) {
+  const manifest = await readJson(resolve(directory, "ARTIFACT_SET.json"));
+  return verifyArtifactPayload(directory, manifest, { staged: true });
+}
+
+export async function verifyArtifactSet(directory, lock = null) {
+  const manifestPath = resolve(directory, "ARTIFACT_SET.json");
+  const manifestBytes = await readFile(manifestPath);
+  const manifest = JSON.parse(manifestBytes);
+  const manifestFiles = artifactManifestFiles(manifest);
+  if (lock && manifest.setId !== lock.setId) {
+    throw new Error(`artifact set ID mismatch: ${manifest.setId}`);
   }
+  if (lock && sha256(manifestBytes) !== lock.manifestSha256) {
+    throw new Error("artifact-set manifest digest mismatch");
+  }
+
+  await verifyArtifactPayload(directory, manifest, { manifestFiles });
 
   const checksummedPaths = [
     "ARTIFACT_SET.json",

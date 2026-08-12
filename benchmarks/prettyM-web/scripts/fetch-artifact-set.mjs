@@ -40,7 +40,7 @@ extracted member, and stage it for the webapp. Local archive
 overrides must remain inside this application directory.
 
   --lock PATH       v2 artifact-set lockfile (required)
-  --archive PATH    workspace-local release archive instead of lock URL
+  --archive PATH    workspace-local candidate archive instead of lock URL
   --sets-dir PATH   verified installation root (default: _artifacts/sets)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
@@ -55,7 +55,7 @@ async function downloadArchive(lock) {
   const url = lock.archive?.url;
   if (typeof url !== "string" || url.length === 0) {
     throw new Error(
-      "artifact set is not published yet; pass --archive with the workspace-local prototype release",
+      "artifact lock has no archive URL; pass --archive with a workspace-local candidate",
     );
   }
   const parsed = new URL(url);

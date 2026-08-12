@@ -6,7 +6,7 @@ and section format as `prettyM`, while retaining its player-specific controls
 and execution contract. It compares the production JavaScript state machine
 with typed VIR and FIR-native implementations of the same player trace. All
 recorded rehearsal below used clean immutable revisions. Local staging remains
-non-publishable until the package is built through the canonical artifact
+outside canonical deployment until the package is built through the artifact
 catalog.
 
 ## Refreshed builds
@@ -75,7 +75,7 @@ Illuminate checkout. The stager verifies every SDK file against
 under the ignored `artifacts/illuminate/` directory, and writes
 `REHEARSAL.json` with the exact dirty/source/build identities. A v3-only local
 rehearsal remains accepted when `--selection-package` is omitted. It does not
-update the canonical artifact lock or publish anything.
+enter the canonical build catalog or Pages deployment.
 
 The catalog and artifact-set formats can now describe this workload without
 `prettyM`-specific paths or component names. FIR's full-action v3 producer now

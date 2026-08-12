@@ -200,6 +200,6 @@ means the compilation descriptor stays small and stable.
 
 - `candidate`: descriptor or artifacts are under integration.
 - `active`: accepted and runnable through a catalogued artifact set.
-- `rehearsal`: runnable from explicitly local, non-publishable inputs.
+- `rehearsal`: runnable only from explicitly local inputs.
 - `queued`: validator-visible but hidden from the runnable browser catalog.
 - `archived`: retained for provenance but hidden from the default catalog.
