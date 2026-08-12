@@ -971,6 +971,7 @@ const groupBehaviorField = groupCtor.fields.find((field) => field.name === "beha
 assert.ok(groupBehaviorField, "Std.Format.group manifest should include behavior field");
 assert.equal(groupBehaviorField.type.kind, "simpleEnum");
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
+assert.deepEqual(runtime.call("SortDemo.sortArray", [4, 1, 3, 2]), ["1", "2", "3", "4"]);
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"), "Aé∀Z");

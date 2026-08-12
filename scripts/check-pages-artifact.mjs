@@ -235,9 +235,8 @@ assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain packa
 assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");
 assert.ok(formatHtml.includes("format-width-range"), "format.html should contain width controls");
 assert.ok(formatHtml.includes("format-output"), "format.html should contain rendered output controls");
-assert.ok(reactHtml.includes("react-counter-root"), "react.html should contain the React counter mount");
-assert.ok(reactHtml.includes("react-attributes-root"), "react.html should contain the React attributes mount");
 assert.ok(reactHtml.includes("react-pet-root"), "react.html should contain the React Tamagotchi mount");
+assert.ok(!reactHtml.includes("react-counter-root"), "react.html should keep tutorial counters out of the flagship page");
 
 for (const file of generatedPublicFiles) {
   await assertFile(file, minGeneratedPublicFileSize(file));
@@ -249,7 +248,7 @@ await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 await assertSurfaceReport();
 await assertWasmSizeReport();
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runtime demo, runner, React review, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runtime diagnostics, runner, React Tamagotchi, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;

@@ -35,10 +35,14 @@ export async function smokeLanding(cdp, origin) {
     heading: document.querySelector("h1")?.textContent?.trim(),
     hasRuntimeStatus: Boolean(document.querySelector("#status")),
     destinations: Array.from(document.querySelectorAll("a[href]"), (link) => link.getAttribute("href")),
+    journeys: Array.from(document.querySelectorAll("main > section[id]"), (section) => section.id),
+    integrationSteps: Array.from(document.querySelectorAll(".use-flow strong"), (step) => step.textContent?.trim()),
   })`);
   assert.equal(state.title, "Lean VIR · Lean IR in the browser");
-  assert.equal(state.heading, "Run Lean’s real IR in the browser.");
+  assert.equal(state.heading, "Lean VIR");
   assert.equal(state.hasRuntimeStatus, false);
+  assert.deepEqual(state.journeys, ["try", "run", "use", "inspect"]);
+  assert.deepEqual(state.integrationSteps, ["Mark", "Build", "Call"]);
   for (const href of [
     "demo.html",
     "dev.html",
@@ -50,6 +54,17 @@ export async function smokeLanding(cdp, origin) {
   ]) {
     assert.ok(state.destinations.includes(href), `landing page is missing ${href}`);
   }
+
+  await setInputValueAndDispatch(cdp, "#sort-input", "4, 1, 3, 2", "input");
+  await clickSelector(cdp, "#sort-run");
+  const sorted = await waitForBrowserState(cdp, `(() => {
+    const value = document.querySelector("#sort-result")?.textContent?.trim();
+    return { ready: value === "[1, 2, 3, 4]", value };
+  })()`, {
+    timeoutMessage: "landing merge sort did not return the Lean result",
+    timeoutMs: 15000,
+  });
+  assert.equal(sorted, "[1, 2, 3, 4]");
 }
 
 export async function smokeRuntimeDemo(cdp, origin) {
@@ -83,7 +98,7 @@ export async function smokeRuntimeDemo(cdp, origin) {
   assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
   assert.ok(state.packageItems[2].text.includes("Browser host calls, React, and Tamagotchi demos"));
-  assert.ok(state.packageItems[3].text.includes("Lean-authored React examples"));
+  assert.ok(state.packageItems[3].text.includes("Lean-authored React Tamagotchi"));
   assert.ok(state.packageItems[4].text.includes("Std.Format.pretty component package"));
   assert.ok(state.packageItems[5].text.includes("Lean Expr, parser, Task"));
   assert.equal(state.name, "Octi");

@@ -166,7 +166,7 @@ guide, including `Sum` and `Except` result shapes.
 
 Open the Vite URL from `npm run dev -- --port 5173` to choose a runnable or
 analysis surface. The runtime workbench at `/demo.html` contains the DOM
-Tamagotchi and fixture browser, with links into the package runner and focused
+React Tamagotchi and runtime diagnostics, with links into the package runner and focused
 React and `Format.pretty` demos. The Lean sources are in [examples/](examples/),
 with broader fixture coverage under [fixtures/](fixtures/).
 

@@ -3,5 +3,5 @@
   "source": "examples/MergeSort.lean",
   "package": "web/public/local-mergesort.irpkg",
   "report": "build/generated/local-mergesort.report.md",
-  "roots": ["SortDemo.demo", "SortDemo.demoFromArray"]
+  "roots": ["SortDemo.demo", "SortDemo.demoFromArray", "SortDemo.sortArray"]
 }

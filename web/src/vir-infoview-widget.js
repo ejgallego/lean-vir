@@ -788,6 +788,30 @@ function createInfoviewCommandDispatcher({
       });
       return true;
     },
+    insertText(position, text) {
+      const editorConnection = editorConnectionRef?.current ?? null;
+      if (
+        editorConnection === null ||
+        typeof editorConnection !== "object" ||
+        editorConnection.api === null ||
+        typeof editorConnection.api !== "object" ||
+        typeof editorConnection.api.applyEdit !== "function"
+      ) {
+        return false;
+      }
+      const cursor = { line: position.line, character: position.character };
+      const edit = editorConnection.api.applyEdit({
+        changes: {
+          [position.uri]: [{ range: { start: cursor, end: cursor }, newText: text }],
+        },
+      });
+      if (edit !== null && typeof edit === "object" && typeof edit.catch === "function") {
+        edit.catch((error) => {
+          console.error(error);
+        });
+      }
+      return true;
+    },
     proofwidgetsRpcInspectRef(ref) {
       const result = resolveRef(ref);
       if (result === false) {

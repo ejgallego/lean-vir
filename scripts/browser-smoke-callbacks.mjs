@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { basePath, distAssetPath, evaluate } from "./browser-smoke-harness.mjs";
+import { basePath, distAssetPathContaining, evaluate } from "./browser-smoke-harness.mjs";
 import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./browser-package-config.mjs";
 import {
   clickSelector,
@@ -373,7 +373,7 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
     text: "callback:reload-idle",
   });
 
-  const runtimeAsset = await distAssetPath("vir-runtime-");
+  const runtimeAsset = await distAssetPathContaining("irPackageSetUrl");
   const disposed = await evaluate(cdp, `new Promise(async (resolve, reject) => {
     try {
       const runtimeModule = await import(${JSON.stringify(`${origin}${basePath}${runtimeAsset}`)});

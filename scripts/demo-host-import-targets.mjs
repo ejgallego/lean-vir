@@ -37,6 +37,7 @@ export const demoHostImportTargets = [
   "browser.timer.setInterval",
   "browser.timer.setTimeout",
   "infoview.clipboard.writeText",
+  "infoview.command.insertText",
   "infoview.command.revealPosition",
   "infoview.documentPosition",
   "js.array.item",

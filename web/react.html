@@ -8,126 +8,68 @@ Author: Emilio J. Gallego Arias
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lean React Review</title>
+    <title>Lean React Tamagotchi · Lean VIR</title>
   </head>
   <body>
-    <main id="app" class="react-review-page">
+    <main id="app" class="react-tamagotchi-page">
       <section class="workspace">
         <header class="topbar">
           <div class="topbar-title">
-            <p class="eyebrow">demo-host.irpkg</p>
-            <h1>React Review</h1>
+            <p class="eyebrow">Lean-authored React · demo-host.irpkg</p>
+            <h1>Tamagotchi</h1>
             <nav class="topbar-links" aria-label="Page links">
               <a href="index.html">Home</a>
-              <a href="dev.html?package=demo-host.irpkg&amp;entry=ReactCounter_mount">Runner</a>
+              <a href="dev.html?package=demo-host.irpkg&amp;entry=ReactTamagotchi.mount">Runner</a>
             </nav>
           </div>
           <div class="runtime-summary" aria-label="Runtime summary">
-            <div id="react-review-status" class="status">Loading WASM</div>
+            <div id="react-status" class="status">Loading WASM</div>
             <div>
               <span>Package</span>
-              <strong id="react-review-package">...</strong>
+              <strong id="react-package">...</strong>
             </div>
             <div>
               <span>Decls</span>
-              <strong id="react-review-decls">...</strong>
+              <strong id="react-decls">...</strong>
             </div>
             <div>
               <span>Exports</span>
-              <strong id="react-review-exports">...</strong>
+              <strong id="react-exports">...</strong>
             </div>
             <div>
               <span>Ptr</span>
-              <strong id="react-review-ptr">...</strong>
+              <strong id="react-ptr">...</strong>
             </div>
           </div>
         </header>
 
-        <section class="react-review-toolbar" aria-labelledby="react-review-title">
+        <section class="react-tamagotchi-toolbar" aria-labelledby="react-title">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Lean-authored React</p>
-              <h2 id="react-review-title">Examples</h2>
+              <p class="eyebrow">Flagship example</p>
+              <h2 id="react-title">One component, several hosts</h2>
+              <p>
+                The state machine and React tree are written in Lean. The same
+                <code>ReactTamagotchi.View</code> mounts here as an application
+                and inside the Lean infoview as a panel widget.
+              </p>
             </div>
-            <button id="react-review-reload" type="button">Reload</button>
+            <button id="react-reload" type="button">Reload</button>
           </div>
         </section>
 
-        <section class="react-demo-grid" aria-label="React examples">
-          <article class="react-demo-panel">
-            <header>
-              <p class="eyebrow">ReactCounter.mount</p>
-              <h2>Counter</h2>
-            </header>
-            <div id="react-counter-root" class="react-mount"></div>
-            <output id="react-counter-result">...</output>
-          </article>
-
-          <article class="react-demo-panel">
-            <header>
-              <p class="eyebrow">ReactInput.mountInput</p>
-              <h2>Input</h2>
-            </header>
-            <div id="react-input-root" class="react-mount"></div>
-            <output id="react-input-result">...</output>
-          </article>
-
-          <article class="react-demo-panel">
-            <header>
-              <p class="eyebrow">ReactInput.mountChangeInput</p>
-              <h2>Change</h2>
-            </header>
-            <div id="react-change-root" class="react-mount"></div>
-            <output id="react-change-result">...</output>
-          </article>
-
-          <article class="react-demo-panel">
-            <header>
-              <p class="eyebrow">ReactInput.mountSelectTextarea</p>
-              <h2>Textarea + Select</h2>
-            </header>
-            <div id="react-select-textarea-root" class="react-mount"></div>
-            <output id="react-select-textarea-result">...</output>
-          </article>
-
-          <article class="react-demo-panel">
-            <header>
-              <p class="eyebrow">ReactInput.mountCheckbox</p>
-              <h2>Checkbox</h2>
-            </header>
-            <div id="react-checkbox-root" class="react-mount"></div>
-            <output id="react-checkbox-result">...</output>
-          </article>
-
-          <article class="react-demo-panel react-demo-panel-wide">
-            <header>
-              <p class="eyebrow">ReactInput.mountAttributes</p>
-              <h2>Attributes</h2>
-            </header>
-            <div id="react-attributes-root" class="react-mount"></div>
-            <output id="react-attributes-result">...</output>
-          </article>
-
-          <article class="react-demo-panel react-demo-panel-wide">
+        <section class="react-demo-grid" aria-label="React Tamagotchi example">
+          <article class="react-demo-panel react-demo-panel-wide react-flagship-panel">
             <header>
               <p class="eyebrow">ReactTamagotchi.mount</p>
-              <h2>Tamagotchi</h2>
+              <h2>Browser application</h2>
             </header>
             <div id="react-pet-root" class="react-mount react-pet-mount"></div>
             <output id="react-pet-result">...</output>
           </article>
-
-          <article class="react-demo-panel react-demo-panel-wide">
-            <header>
-              <p class="eyebrow">ReactProofWidget.mount</p>
-              <h2>ProofWidget Surface</h2>
-            </header>
-            <div id="react-proof-review-root" class="react-mount react-proof-review-mount"></div>
-            <output id="react-proof-review-result">...</output>
-          </article>
         </section>
       </section>
     </main>
-    <script type="module" src="/src/react-review.js"></script>
+    <script type="module" src="/src/react-tamagotchi.js"></script>
   </body>
 </html>

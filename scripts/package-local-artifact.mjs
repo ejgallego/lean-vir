@@ -61,9 +61,9 @@ browsers because the runtime fetches WebAssembly modules and package files.
 Useful entry points:
 
   index.html              Lightweight project landing
-  demo.html               Runtime demo and fixture browser
+  demo.html               Runtime diagnostics and fixture browser
   dev.html                Package runner
-  react.html              Lean-authored React examples
+  react.html              Lean-authored React Tamagotchi
   format.html             Format.pretty workbench
   runtime-example.html    Minimal JavaScript runtime example
 `;

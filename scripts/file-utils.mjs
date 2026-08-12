@@ -11,11 +11,13 @@ import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { runSync } from "./process-utils.mjs";
 
 const chromiumExecutablePaths = [
-  "/snap/bin/chromium",
   "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
   "/usr/bin/google-chrome",
   "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium-browser",
+  // Keep the snap launcher last: its transient systemd scope can fail before
+  // Chromium starts even when a directly installed browser is available.
+  "/snap/bin/chromium",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
 ];

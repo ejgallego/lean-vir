@@ -4,12 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-/-
-A tiny merge-sort style demo.
-
-The public entry point returns a weighted checksum so the browser can display a
-single Nat while the interpreter still evaluates the sort closure.
--/
+/- A small merge sort used by the browser quickstart and runtime tests. -/
 
 namespace SortDemo
 
@@ -42,6 +37,10 @@ def mergeSortFuel : Nat -> List Nat -> List Nat
 
 def sortedFromArray (input : Array Nat) : List Nat :=
   mergeSortFuel 32 input.toList
+
+/-- The user-facing boundary: sort a JavaScript array in Lean and return it. -/
+def sortArray (input : Array Nat) : Array Nat :=
+  (sortedFromArray input).toArray
 
 def sorted : List Nat :=
   sortedFromArray inputArray

@@ -230,7 +230,7 @@ required shape:
 - a `vir_proof_widget` declaration that derives the standard entries and props;
 - a `show_panel_widgets` command that loads the package in the infoview.
 
-For a fuller API showcase, see `examples/ReactProofWidget.lean`.
+For a practical editor action tool, see `examples/ReactProofWidget.lean`.
 -/
 
 show_panel_widgets [local Lean.Vir.Infoview.widget with ReactProofWidgetHello.widgetProps]

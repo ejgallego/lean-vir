@@ -8,62 +8,23 @@ import "./style.css";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
 import { hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
-import { createProofSurfaceFixture } from "./proof-surface-fixtures.js";
 import { fetchBytes } from "./vir-runtime.js";
 
 const packageFile = hostPackageFile;
 const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}` });
 
-const statusEl = document.querySelector("#react-review-status");
-const packageEl = document.querySelector("#react-review-package");
-const declsEl = document.querySelector("#react-review-decls");
-const exportsEl = document.querySelector("#react-review-exports");
-const ptrEl = document.querySelector("#react-review-ptr");
-const reloadButton = document.querySelector("#react-review-reload");
-
-const proofSurfaceFixture = createProofSurfaceFixture();
+const statusEl = document.querySelector("#react-status");
+const packageEl = document.querySelector("#react-package");
+const declsEl = document.querySelector("#react-decls");
+const exportsEl = document.querySelector("#react-exports");
+const ptrEl = document.querySelector("#react-ptr");
+const reloadButton = document.querySelector("#react-reload");
 
 const examples = [
-  {
-    entry: "ReactCounter.mount",
-    selector: "#react-counter-root",
-    result: document.querySelector("#react-counter-result"),
-  },
-  {
-    entry: "ReactInput.mountInput",
-    selector: "#react-input-root",
-    result: document.querySelector("#react-input-result"),
-  },
-  {
-    entry: "ReactInput.mountChangeInput",
-    selector: "#react-change-root",
-    result: document.querySelector("#react-change-result"),
-  },
-  {
-    entry: "ReactInput.mountSelectTextarea",
-    selector: "#react-select-textarea-root",
-    result: document.querySelector("#react-select-textarea-result"),
-  },
-  {
-    entry: "ReactInput.mountCheckbox",
-    selector: "#react-checkbox-root",
-    result: document.querySelector("#react-checkbox-result"),
-  },
-  {
-    entry: "ReactInput.mountAttributes",
-    selector: "#react-attributes-root",
-    result: document.querySelector("#react-attributes-result"),
-  },
   {
     entry: "ReactTamagotchi.mount",
     selector: "#react-pet-root",
     result: document.querySelector("#react-pet-result"),
-  },
-  {
-    entry: "ReactProofWidget.mount",
-    selector: "#react-proof-review-root",
-    args: [proofSurfaceFixture],
-    result: document.querySelector("#react-proof-review-result"),
   },
 ];
 

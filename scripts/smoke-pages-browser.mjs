@@ -31,7 +31,7 @@ import {
   smokeWasmSizeExplorer,
 } from "./browser-smoke-page-suites.mjs";
 import { smokeBrowserReactLifetimes } from "./browser-smoke-react-lifetimes.mjs";
-import { smokeReactReview } from "./browser-smoke-react-review.mjs";
+import { smokeReactTamagotchi } from "./browser-smoke-react-tamagotchi.mjs";
 import { packageFiles } from "./browser-package-config.mjs";
 
 await assertDistReady();
@@ -60,7 +60,7 @@ try {
   await smokeFormatWorkbench(cdp, server.origin);
   await smokeSurfaceExplorer(cdp, server.origin);
   await smokeWasmSizeExplorer(cdp, server.origin);
-  await smokeReactReview(cdp, server.origin);
+  await smokeReactTamagotchi(cdp, server.origin);
   await smokeBrowserReactLifetimes(cdp);
   for (const packageFile of packageFiles) {
     await smokeManifestDrivenEntryList(cdp, server.origin, packageFile);
@@ -81,7 +81,7 @@ try {
   }
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, runtime demo, React review, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, runtime diagnostics, React Tamagotchi, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium?.stderr() ?? "";
   if (details) {

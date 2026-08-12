@@ -415,13 +415,12 @@ export async function smokeVirtualReactProofWidget(runtime, documentState, selec
   assert.equal(runtime.call("ReactProofWidget.mount", selector, proofSurfaceFixture), true);
   const element = documentState.elements.get(selector);
   const root = element.reactRoot;
-  assertLiveCallbacks(runtime, 10);
   const widget = reactElementById(element, "react-proof-widget");
   assert.match(String(widget.props.style?.background ?? ""), /--vscode-editorWidget-background/);
   assert.equal(widget.props.style?.colorScheme, "light dark");
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-selected-title")),
-    "Main goal",
+    "Proof actions",
   );
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-target-code")),
@@ -430,125 +429,70 @@ export async function smokeVirtualReactProofWidget(runtime, documentState, selec
   const summary = reactElementById(element, "react-proof-summary");
   assert.equal(
     virtualReactTextContent(summary),
-    "Main goal; 2 local hypotheses; 3 goals / 6 hypotheses at ReactProofWidget.lean:42:7",
+    "case main · 2 hypotheses · ReactProofWidget.lean:42:7",
   );
-  assert.equal(summary.props["aria-live"], "polite");
-  assert.equal(reactElementById(element, "react-proof-detail").props["aria-live"], "polite");
-  assert.equal(reactElementById(element, "react-proof-metrics").children.length, 4);
-  const apiStrip = reactElementById(element, "react-proof-api-strip");
-  assert.equal(apiStrip.children.length, 8);
-  assert.match(virtualReactTextContent(apiStrip), /Surface\.goals3/);
-  assert.match(virtualReactTextContent(apiStrip), /Hypothesis\.fvarIds2 fvars/);
-  assert.match(virtualReactTextContent(apiStrip), /Clipboard\.writeTextcopy actions/);
-  assert.match(virtualReactTextContent(apiStrip), /Command\.revealPositioncursor/);
-  assert.match(virtualReactTextContent(apiStrip), /WithRpcRef ExprWithCtxpending/);
-  const surfacePanel = reactElementById(element, "react-proof-surface-panel");
-  assert.equal(surfacePanel.children.length, 6);
-  assert.match(virtualReactTextContent(surfacePanel), /selectedLocationsmain/);
-  assert.match(virtualReactTextContent(surfacePanel), /mvarIdmain/);
-  assert.match(String(reactElementById(element, "react-proof-target").props.style?.background ?? ""), /--vscode-textCodeBlock-background/);
-  const goalList = reactElementById(element, "react-proof-goal-list");
-  assert.equal(goalList.props.role, "list");
-  assert.equal(goalList.children.length, 3);
-  const mainGoal = reactElementById(element, "react-proof-goal-main");
-  assert.equal(mainGoal.props["aria-pressed"], true);
-  assert.equal(mainGoal.props["aria-selected"], true);
-  assert.match(String(mainGoal.props.style?.background ?? ""), /--vscode-list-activeSelectionBackground/);
-  const stepGoal = reactElementById(element, "react-proof-goal-step");
-  assert.equal(stepGoal.props["data-goal"], "step");
-  assert.equal(stepGoal.props["aria-pressed"], false);
+  const commonActions = reactElementById(element, "react-proof-common-actions");
+  assert.equal(commonActions.children.length, 4);
+  assert.equal(reactElementById(element, "react-proof-hypotheses").children.length, 2);
+
+  reactElementById(element, "react-proof-tactic-assumption").handlers.onClick({});
+  assert.deepEqual(documentState.appliedEdits, [
+    {
+      position: {
+        uri: "file:///workspace/ReactProofWidget.lean",
+        line: 41,
+        character: 6,
+      },
+      newText: "assumption\n",
+    },
+  ]);
+  assert.deepEqual(documentState.infoviewCommands, [
+    {
+      kind: "insertText",
+      position: {
+        uri: "file:///workspace/ReactProofWidget.lean",
+        line: 41,
+        character: 6,
+      },
+      newText: "assumption\n",
+    },
+  ]);
+  assert.equal(
+    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
+    "Inserted `assumption` at ReactProofWidget.lean:42:7",
+  );
+
+  reactElementById(element, "react-proof-exact-main-hxs").handlers.onClick({});
+  assert.equal(documentState.appliedEdits.at(-1)?.newText, "exact hxs\n");
+
+  reactElementById(element, "react-proof-copy-context").handlers.onClick({});
+  assert.match(documentState.clipboardText, /Goal: case main/);
+  assert.match(documentState.clipboardText, /Target: xs\.reverse\.reverse = xs/);
+  assert.match(documentState.clipboardText, /hxs : xs\.length > 0/);
+  assert.equal(
+    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
+    "Context copied",
+  );
+
   reactElementById(element, "react-proof-reveal-cursor").handlers.onClick({});
   assert.deepEqual(documentState.revealedPosition, {
     uri: "file:///workspace/ReactProofWidget.lean",
     line: 41,
     character: 6,
   });
-  assert.deepEqual(documentState.infoviewCommands, [
-    {
-      kind: "revealPosition",
-      position: {
-        uri: "file:///workspace/ReactProofWidget.lean",
-        line: 41,
-        character: 6,
-      },
-    },
-  ]);
+  assert.equal(documentState.infoviewCommands.at(-1)?.kind, "revealPosition");
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
-    "Reveal cursor requested",
+    "Cursor revealed",
   );
-  reactElementById(element, "react-proof-copy-cursor").handlers.onClick({});
-  const cursorClipboardText = documentState.clipboardText;
-  assert.match(cursorClipboardText, /Cursor: ReactProofWidget\.lean:42:7/);
-  assert.match(cursorClipboardText, /URI: file:\/\/\/workspace\/ReactProofWidget\.lean/);
-  assert.match(cursorClipboardText, /Line: 42/);
-  assert.match(cursorClipboardText, /Character: 7/);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
-    "Cursor copied",
-  );
-  reactElementById(element, "react-proof-copy-selection").handlers.onClick({});
-  const selectionClipboardText = documentState.clipboardText;
-  assert.match(selectionClipboardText, /Selected locations: main/);
-  assert.match(selectionClipboardText, /Selection: main/);
-  assert.match(selectionClipboardText, /Kind: location/);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
-    "Selection copied",
-  );
-  reactElementById(element, "react-proof-copy-target").handlers.onClick({});
-  assert.equal(documentState.clipboardText, "xs.reverse.reverse = xs");
-  assert.deepEqual(documentState.clipboardWrites, [
-    cursorClipboardText,
-    selectionClipboardText,
-    "xs.reverse.reverse = xs",
-  ]);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
-    "Target copied",
-  );
-  reactElementById(element, "react-proof-goal-step").handlers.onClick({});
-  assertLiveCallbacks(runtime, 10);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-selected-title")),
-    "Induction step",
-  );
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-target-code")),
-    "(x :: xs).reverse.reverse = x :: xs",
-  );
-  const updatedSummary = reactElementById(element, "react-proof-summary");
-  assert.equal(
-    virtualReactTextContent(updatedSummary),
-    "Induction step; 3 local hypotheses; 3 goals / 6 hypotheses at ReactProofWidget.lean:42:7",
-  );
-  assert.equal(updatedSummary.props["aria-live"], "polite");
-  const hypotheses = reactElementById(element, "react-proof-hypotheses");
-  assert.equal(hypotheses.props.role, "list");
-  assert.equal(hypotheses.children.length, 3);
-  assert.equal(reactElementById(element, "react-proof-goal-step").props["aria-pressed"], true);
-  reactElementById(element, "react-proof-copy-context").handlers.onClick({});
-  assert.match(documentState.clipboardText, /Goal: Induction step/);
-  assert.match(documentState.clipboardText, /\(x :: xs\)\.reverse\.reverse = x :: xs/);
-  assert.match(documentState.clipboardText, /ih : xs\.reverse\.reverse = xs/);
-  assert.deepEqual(documentState.clipboardWrites, [
-    cursorClipboardText,
-    selectionClipboardText,
-    "xs.reverse.reverse = xs",
-    documentState.clipboardText,
-  ]);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
-    "Context copied",
-  );
+
   const movedProofSurfaceFixture = createMovedProofSurfaceFixture(proofSurfaceFixture);
   assert.equal(runtime.call("ReactProofWidget.mount", selector, movedProofSurfaceFixture), true);
   assert.equal(element.reactRoot, root);
   await flushMicrotasks();
-  assertLiveCallbacks(runtime, 10);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-summary")),
-    "Induction step; 3 local hypotheses; 3 goals / 6 hypotheses at ReactProofWidget.lean:87:3",
+    "case main · 2 hypotheses · ReactProofWidget.lean:87:3",
   );
   assert.equal(runtime.call("ReactProofWidget.unmount", selector), true);
   assertUnmountCleanup(runtime, element);

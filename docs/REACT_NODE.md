@@ -399,18 +399,17 @@ helpers check `currentTarget` first, then fall back to `target`.
    before rendering.
 5. Added browser and virtual Node host bindings for React roots, components,
    and hooks.
-6. Added `examples/ReactCounter.lean` that renders hook-backed function
+6. Added `fixtures/ReactCounter.lean` that renders hook-backed function
    components with `Hooks.useState`, `Hooks.useReducer`, functional state
    setters, fragments, and refs.
-7. Added `examples/ReactInput.lean` with hook-backed controlled text, change,
+7. Added `fixtures/ReactInput.lean` with hook-backed controlled text, change,
    submit, checkbox, attribute-conformance, label, and form examples.
 8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger reducer
    state example that shares the non-React Tamagotchi model, renders a keyed
    React tree, and handles controlled input, checkbox, submit, timer, and
    action callbacks.
-9. Added `examples/ReactProofWidget.lean` as a fuller proof-widget-shaped
-   example that compiles into `demo-host.irpkg`, displays on `react.html`, and
-   can also be loaded as a live infoview widget through `show_panel_widgets`.
+9. Added `examples/ReactProofWidget.lean` as a focused infoview tool that turns
+   the current goal and hypotheses into editor-inserting tactic actions.
 10. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
    component rerenders, root rerender cleanup, unmount cleanup, package reload
    cleanup, runtime dispose, malformed Node construction, depth limits, missing

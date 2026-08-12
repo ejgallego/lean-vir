@@ -26,171 +26,183 @@ Author: Emilio J. Gallego Arias
           </span>
         </a>
         <nav class="site-nav" aria-label="Primary navigation">
-          <a href="demo.html">Runtime demo</a>
-          <a href="benchmarks/">Benchmarks</a>
+          <a href="#run">Run</a>
+          <a href="#use">Use</a>
+          <a href="#inspect">Inspect</a>
           <a href="https://github.com/ejgallego/lean-vir">Source</a>
         </nav>
       </header>
 
       <main>
-        <section class="hero" aria-labelledby="hero-title">
-          <div class="hero-copy">
-            <p class="kicker">Lean 4 · wasm32-wasip1</p>
-            <h1 id="hero-title">Run Lean’s real IR in the browser.</h1>
-            <p class="hero-intro">
-              Lean VIR packages selected declarations and executes them through
-              Lean’s IR interpreter compiled to WebAssembly—with typed browser
-              boundaries, focused artifacts, and no JavaScript rewrite.
-            </p>
-            <div class="hero-actions">
-              <a class="action action-primary" href="benchmarks/">
-                Compare backends
-                <span aria-hidden="true">→</span>
-              </a>
-              <a class="action" href="demo.html">
-                Explore the runtime
-                <span aria-hidden="true">→</span>
-              </a>
-            </div>
-          </div>
-          <aside class="runtime-card" aria-label="Runtime architecture">
-            <p class="terminal-label">Execution path</p>
-            <ol>
-              <li><span>01</span><strong>Lean declaration</strong></li>
-              <li><span>02</span><strong>Focused .irpkg</strong></li>
-              <li><span>03</span><strong>IR interpreter</strong></li>
-              <li><span>04</span><strong>Browser host</strong></li>
-            </ol>
-            <p class="runtime-note">
-              This landing page stays lightweight. Wasm loads only after you
-              choose a runnable surface.
-            </p>
-          </aside>
+        <section class="intro" aria-labelledby="project-heading">
+          <p class="kicker">Experimental Lean 4 runtime</p>
+          <h1 id="project-heading">Lean VIR</h1>
+          <p class="intro-copy">
+            Lean VIR packages selected executable Lean declarations as focused
+            <code>.irpkg</code> files and runs them in the browser with Lean’s
+            IR interpreter compiled to <code>wasm32-wasip1</code>.
+          </p>
+          <p class="intro-note">
+            This is a proof of concept for selected declarations, not a general
+            browser target. Unsupported dependencies and JavaScript boundary
+            types are reported during packaging.
+          </p>
+          <nav class="intro-links" aria-label="Project links">
+            <a href="#try">Try it</a>
+            <a
+              href="https://github.com/ejgallego/lean-vir#lake-facets-exports-and-startup-hooks"
+              >Integration guide</a
+            >
+            <a href="https://github.com/ejgallego/lean-vir">Source</a>
+          </nav>
         </section>
 
-        <section class="destination-section" aria-labelledby="run-heading">
+        <section id="try" class="project-section try-section" aria-labelledby="try-heading">
           <div class="section-heading">
             <p class="section-number">01</p>
             <div>
-              <p class="kicker">Run</p>
-              <h2 id="run-heading">Start with a working program</h2>
+              <h2 id="try-heading">Try Lean in the browser</h2>
+              <p>Edit an array. Lean’s merge sort produces the result through VIR.</p>
             </div>
           </div>
-          <div class="card-grid card-grid-four">
-            <a
-              class="destination-card destination-card-featured"
-              href="demo.html"
-            >
-              <span class="card-label">Full demo</span>
-              <h3>Runtime workbench</h3>
-              <p>
-                Tamagotchi, focused packages, and the runnable fixture catalog.
-              </p>
-              <span class="card-link">Open demo →</span>
-            </a>
-            <a class="destination-card" href="dev.html">
-              <span class="card-label">General tool</span>
-              <h3>Package runner</h3>
-              <p>
-                Load an <code>.irpkg</code>, inspect its exports, and call an
-                entry.
-              </p>
-              <span class="card-link">Open runner →</span>
-            </a>
-            <a
-              class="destination-card"
-              href="format.html?case=list&amp;width=12"
-            >
-              <span class="card-label">Focused demo</span>
-              <h3>Format.pretty</h3>
-              <p>
-                Adjust the document width and render Lean’s pretty printer live.
-              </p>
-              <span class="card-link">Open workbench →</span>
-            </a>
-            <a class="destination-card" href="react.html">
-              <span class="card-label">Host integration</span>
-              <h3>Lean-authored React</h3>
-              <p>
-                Exercise React nodes, callbacks, attributes, and resource
-                lifetimes.
-              </p>
-              <span class="card-link">Open examples →</span>
-            </a>
-          </div>
+          <form id="sort-demo" class="sort-demo">
+            <label for="sort-input">Natural numbers</label>
+            <div class="sort-controls">
+              <input
+                id="sort-input"
+                name="values"
+                value="7, 3, 9, 1, 4, 1, 5, 2"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="sort-run" type="submit">Sort with Lean</button>
+            </div>
+            <output id="sort-result" aria-live="polite">Ready</output>
+            <p id="sort-status" class="sort-status">
+              <code>SortDemo.sortArray : Array Nat → Array Nat</code>
+            </p>
+          </form>
         </section>
 
-        <section class="destination-section" aria-labelledby="inspect-heading">
+        <section id="run" class="project-section" aria-labelledby="run-heading">
           <div class="section-heading">
             <p class="section-number">02</p>
             <div>
-              <p class="kicker">Inspect</p>
-              <h2 id="inspect-heading">
-                Compare behavior and understand the boundary
-              </h2>
+              <h2 id="run-heading">Examples</h2>
+              <p>Applications that show a reason to run Lean in a browser.</p>
             </div>
           </div>
-          <div class="card-grid card-grid-three">
-            <a
-              class="destination-card destination-card-accent"
-              href="benchmarks/"
-            >
-              <span class="card-label">Catalogued candidates</span>
-              <h3>Browser benchmarks</h3>
-              <p>
-                Run differential suites, select backends, and explore complete
-                reports from verified artifact sets.
-              </p>
-              <span class="card-link">Open catalog →</span>
+          <nav class="resource-list" aria-label="Runnable pages">
+            <a href="react.html">
+              <span
+                ><strong>React Tamagotchi</strong
+                ><small
+                  >A stateful Lean application reused in the browser and infoview</small
+                ></span
+              >
+              <span aria-hidden="true">→</span>
             </a>
-            <a class="destination-card" href="surface/">
-              <span class="card-label">Static analysis</span>
-              <h3>Runnable surface</h3>
-              <p>
-                Trace which installed Lean declarations have complete VIR
-                closures.
-              </p>
-              <span class="card-link">Explore surface →</span>
+            <a href="format.html?case=list&amp;width=12">
+              <span
+                ><strong>Format.pretty</strong
+                ><small>Focused pretty-printer workload</small></span
+              >
+              <span aria-hidden="true">→</span>
             </a>
-            <a class="destination-card" href="size/">
-              <span class="card-label">Artifact analysis</span>
-              <h3>Wasm size</h3>
-              <p>
-                Attribute retained bytes across sections, symbols, and runtime
-                code.
-              </p>
-              <span class="card-link">Explore size →</span>
-            </a>
-          </div>
+          </nav>
+          <nav class="section-links" aria-label="Developer tools">
+            <a href="demo.html">Runtime diagnostics</a>
+            <a href="dev.html">Package runner</a>
+          </nav>
         </section>
 
-        <section class="integration-band" aria-labelledby="integrate-heading">
-          <div>
-            <p class="kicker">03 · Integrate</p>
-            <h2 id="integrate-heading">Bring the runtime to a Lean project</h2>
-            <p>
-              Mark exports in Lean, build a module’s <code>:vir</code> facet,
-              and install the matching browser SDK.
-            </p>
+        <section id="use" class="project-section" aria-labelledby="use-heading">
+          <div class="section-heading">
+            <p class="section-number">03</p>
+            <div>
+              <h2 id="use-heading">Use from a Lean project</h2>
+              <p>
+                Mark an export, build its package, and call it by Lean name.
+              </p>
+            </div>
           </div>
-          <div class="integration-actions">
-            <a href="downloads/lean-vir-sdk.tar.gz" download>Download SDK</a>
-            <a href="downloads/lean-vir-local.tar.gz" download
-              >Download local bundle</a
-            >
+          <ol class="use-flow">
+            <li>
+              <span>1</span>
+              <div><strong>Mark</strong><code>@[vir_export]</code></div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <strong>Build</strong><code>lake build +MyApp:vir</code>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <strong>Call</strong><code>vir.call("MyApp.answer")</code>
+              </div>
+            </li>
+          </ol>
+          <nav class="section-links" aria-label="Integration resources">
             <a
               href="https://github.com/ejgallego/lean-vir#lake-facets-exports-and-startup-hooks"
+              >Integration guide</a
             >
-              Read the integration guide
-            </a>
+            <a href="downloads/lean-vir-sdk.tar.gz" download>SDK archive</a>
+            <a href="downloads/lean-vir-local.tar.gz" download>Local bundle</a>
+          </nav>
+        </section>
+
+        <section
+          id="inspect"
+          class="project-section"
+          aria-labelledby="inspect-heading"
+        >
+          <div class="section-heading">
+            <p class="section-number">04</p>
+            <div>
+              <h2 id="inspect-heading">Inspect</h2>
+              <p>Comparisons and reports generated alongside the runtime.</p>
+            </div>
           </div>
+          <nav class="resource-list" aria-label="Reports and comparisons">
+            <a href="benchmarks/">
+              <span
+                ><strong>Browser benchmarks</strong
+                ><small
+                  >JS, FIR, LLVM, and VIR under one differential suite</small
+                ></span
+              >
+              <span aria-hidden="true">→</span>
+            </a>
+            <a href="surface/">
+              <span
+                ><strong>Runnable surface</strong
+                ><small
+                  >Installed declarations with complete VIR closures</small
+                ></span
+              >
+              <span aria-hidden="true">→</span>
+            </a>
+            <a href="size/">
+              <span
+                ><strong>Wasm size</strong
+                ><small
+                  >Retained bytes by section, symbol, and runtime code</small
+                ></span
+              >
+              <span aria-hidden="true">→</span>
+            </a>
+          </nav>
         </section>
       </main>
 
       <footer class="site-footer">
-        <p>Lean VIR is an experimental proof of concept.</p>
-        <p>Lean IR interpreter · focused packages · browser host boundaries</p>
+        <p>Lean VIR · Apache 2.0</p>
+        <p>Lean IR interpreter · wasm32-wasip1</p>
       </footer>
     </div>
+    <script type="module" src="/src/landing.js"></script>
   </body>
 </html>
