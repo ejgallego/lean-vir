@@ -357,7 +357,7 @@ function focusedReportFixture() {
     loadedModules: 3,
     closure: { selectedRoots: 1, capturedNodes: 6, rootReachableNodes: 5, supportOnlyNodes: 1 },
     runtimeCapabilities: {
-      lean: { version: "4.33.0-rc2", githash: "policy" },
+      lean: { version: "4.33.0", githash: "policy" },
       nativeExternCount: 2,
       primitiveNamespaces: ["ByteArray", "IO"],
       nativeExterns: [nativeExternFixture("ByteArray.data", {
