@@ -5,8 +5,8 @@ def freshEchoBang (s : String) : Lean.Vir.RuntimeM String := do
   Lean.Vir.Common.echoString (s ++ "!")
 
 def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do
-  Lean.Vir.Browser.Document.setTitleString s
-  Lean.Vir.Browser.Document.getTitleString
+  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString s)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
 
 def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option String) := do
   match ← Lean.Vir.Browser.Document.querySelectorString "#fresh" with

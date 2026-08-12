@@ -79,8 +79,8 @@ above.
    ```lean
    def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
-     Lean.Vir.Browser.Document.setTitleString title
-     Lean.Vir.Browser.Document.getTitleString
+     Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
+     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
    ```
 
 3. Generate a package with that declaration as a root.
@@ -314,8 +314,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Document.querySelector : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)`
 - `Lean.Vir.Browser.Document.querySelectorAll : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Document.createElement : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
-- explicit conversion helpers: `Document.getTitleString`, `setTitleString`,
-  `querySelectorString`, `querySelectorAllString`, and `createElementString`
+- explicit method-argument conversion helpers: `Document.querySelectorString`,
+  `querySelectorAllString`, and `createElementString`; the `title` property
+  remains the faithful `getTitle`/`setTitle` pair, with conversions composed by
+  applications
 - `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
@@ -554,8 +556,8 @@ namespace HostInterop
 
 def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitleString title
-  Lean.Vir.Browser.Document.getTitleString
+  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
 
 end HostInterop
 ```

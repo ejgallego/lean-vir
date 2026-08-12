@@ -35,7 +35,13 @@
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" },
       "comparison": { "report": "docs/type-descriptors/document-v1.report.json" },
       "mappings": [
-        { "typescript": "Document.title", "targets": ["browser.document.getTitle", "browser.document.setTitle"], "lean": ["Lean.Vir.Browser.Document.getTitle", "Lean.Vir.Browser.Document.setTitle"] },
+        {
+          "typescript": "Document.title",
+          "accessors": {
+            "get": { "target": "browser.document.getTitle", "lean": "Lean.Vir.Browser.Document.getTitle", "anchor": "document.title.get" },
+            "set": { "target": "browser.document.setTitle", "lean": "Lean.Vir.Browser.Document.setTitle", "anchor": "document.title.set" }
+          }
+        },
         { "typescript": "Document.querySelector", "targets": ["browser.document.querySelector"], "lean": ["Lean.Vir.Browser.Document.querySelector"] },
         { "typescript": "Document.querySelectorAll", "targets": ["browser.document.querySelectorAll"], "lean": ["Lean.Vir.Browser.Document.querySelectorAll"] },
         { "typescript": "Document.createElement", "targets": ["browser.document.createElement"], "lean": ["Lean.Vir.Browser.Document.createElement"] }

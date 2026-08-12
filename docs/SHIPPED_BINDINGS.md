@@ -8,8 +8,8 @@ one searchable page.
 The current report covers 119 ordinary `@[vir_js]` declarations and 13
 `@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
 shipped provider; there are no missing providers and no provider-only targets.
-The same compiler scan finds 363 public executable Lean declarations that
-reach those targets through 2,888 concrete IR call paths. Every shipped target
+The same compiler scan finds 361 public executable Lean declarations that
+reach those targets through 2,884 concrete IR call paths. Every shipped target
 is reached by at least one public declaration.
 Generation indexes the complete configured TypeScript surface for 20 API
 groups before presenting the report. The reviewed `Document` analysis expands
@@ -24,7 +24,7 @@ React DOM root retains its narrower curated comparison.
 
 ## Fidelity Contract
 
-This check makes five mechanically enforceable claims:
+This check makes six mechanically enforceable claims:
 
 1. Every row comes from elaborated declarations and compiled IR metadata, not
    source-text matching.
@@ -40,10 +40,17 @@ This check makes five mechanically enforceable claims:
 5. Public Lean-to-target links come from transitive references in compiled IR.
    Each link carries its declaration path; the report does not infer callers
    from naming or source text.
+6. A reviewed TypeScript property is decomposed into named getter and setter
+   operations (getter only for a readonly property). Each operation either
+   identifies one host target, one public Lean declaration, and one reviewed
+   anchor, or explicitly records a missing coverage gap. Another public
+   declaration in the configured binding namespace may not reach that accessor
+   target unless it corresponds to a distinct upstream operation.
 
 This prevents accidental representation drift such as exposing a raw Lean
-`String` where the JavaScript API returns a `Js String`. Ergonomic wrappers may
-convert above the boundary, but they do not change the faithful boundary type.
+`String` where the JavaScript API returns a `Js String`. Applications may
+convert at call sites or in their own policy layer, but the reviewed binding
+surface remains one-to-one with the upstream property operations.
 
 The compiler/runtime check deliberately does not claim that all upstream APIs
 have been ported, or that every phantom resource name has been proven equivalent
@@ -99,12 +106,17 @@ A configuration identifies its compiled Lean modules and divides their targets
 into API groups. External groups name their declaration files and upstream
 entry points; internal groups explicitly state that they have no external
 parity contract. Reviewed anchors and dependency policy live with the group
-rather than in parallel symbol, policy, and anchor files.
+rather than in parallel symbol, policy, and anchor files. A method mapping
+names its target list. A property mapping instead names `get` and `set`
+operations, or only `get` for a readonly property, with an exact host target,
+public Lean declaration, and comparison anchor for each shipped operation.
+An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
+entry, so partial property coverage cannot be mistaken for a faithful pair.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
-groups, a stale selector, or a comparison anchor attached to a target outside
-its group. The current six configurations assign all 132 shipped targets exactly
-once.
+groups, a stale selector, a property operation that disagrees with its reviewed
+anchor, or an unclassified public accessor alias. The current six
+configurations assign all 132 shipped targets exactly once.
 
 ## Data Flow
 
@@ -163,7 +175,7 @@ unmapped upstream entries.
 Use **Upstream libraries** to start from a library contract and inspect VIR's
 coverage. Expanding a mapped upstream entry shows its expected TypeScript
 declaration beside the nearest public Lean API type. Use **Public Lean API** for
-the reverse product surface: 363 public declarations, their elaborated types,
+the reverse product surface: 361 public declarations, their elaborated types,
 source locations, nearest upstream expectations, and exact compiler paths to
 host targets. Use **Host targets** for all 132 lower-level dispatch keys, their
 providers and implementation boundaries. Reviewed mappings prefer the exact

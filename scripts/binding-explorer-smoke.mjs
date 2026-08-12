@@ -20,8 +20,8 @@ assert.deepEqual(report.summary, {
   missingProvider: 0,
   runtimeOnly: 0,
   publicSurface: {
-    entries: 363,
-    targetEdges: 2888,
+    entries: 361,
+    targetEdges: 2884,
     reachedTargets: 132,
   },
   analysis: {
@@ -52,7 +52,9 @@ const roots = report.libraries.flatMap((library) =>
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
 assert.equal(new Set(targets).size, 132, "every shipped target should occur exactly once");
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
-assert.equal(publicEntries.size, 363);
+assert.equal(publicEntries.size, 361);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.deepEqual(
   publicEntries.get("Lean.Vir.Browser.HTMLCanvasElement.getContext2D")?.targets.find(
     (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
@@ -91,6 +93,30 @@ assert.deepEqual(documentTitle?.mapping.targets, [
   "browser.document.getTitle",
   "browser.document.setTitle",
 ]);
+assert.deepEqual(
+  documentRoot?.coverage.targetMappings.filter((mapping) =>
+    mapping.typescript === "Document.title"),
+  [
+    {
+      target: "browser.document.getTitle",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Document.title",
+      lean: ["Lean.Vir.Browser.Document.getTitle"],
+      anchors: ["document.title.get"],
+      accessor: "get",
+    },
+    {
+      target: "browser.document.setTitle",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Document.title",
+      lean: ["Lean.Vir.Browser.Document.setTitle"],
+      anchors: ["document.title.set"],
+      accessor: "set",
+    },
+  ],
+);
 const documentQuerySelector = documentRoot?.coverage.members.find(
   (member) => member.id === "Document.querySelector",
 );
@@ -170,6 +196,7 @@ assert.match(html, /Upstream libraries/u);
 assert.match(html, /Public Lean API/u);
 assert.match(html, /Host targets/u);
 assert.match(html, /Expected versus actual type/u);
+assert.match(html, /function accessorDisplay\(symbol,accessor\)/u);
 assert.match(html, /Reviewed type fidelity/u);
 assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);

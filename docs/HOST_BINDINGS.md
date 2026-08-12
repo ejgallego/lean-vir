@@ -86,11 +86,12 @@ returns the browser's native static `NodeList` as
 element handles with `Js.NodeList.toLeanArray`. Dropping the list or copied
 array does not invalidate element handles already obtained from it.
 `Document.createElement` creates a browser element resource by tag name.
-The `getTitleString`, `setTitleString`, `querySelectorString`,
-`querySelectorAllString`, and `createElementString` helpers provide separately
-named conversions for callers that want native Lean strings or options. Other
-browser API convenience wrappers likewise keep conversions above their
-faithful `browser.*` host targets.
+`querySelectorString`, `querySelectorAllString`, and `createElementString`
+provide separately named conversions for method arguments. The `title`
+property is deliberately only the faithful `getTitle`/`setTitle` pair;
+applications can compose `JsValue.toString` or `JsValue.ofString` at their own
+policy boundary. Other browser API convenience wrappers likewise keep
+conversions above their faithful `browser.*` host targets.
 
 `Lean.Vir.Browser.Element.*` targets query descendants, read and write text
 content, attributes, and `innerHTML`, append and remove elements, update

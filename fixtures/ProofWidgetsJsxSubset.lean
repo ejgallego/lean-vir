@@ -185,7 +185,8 @@ def View : Component Unit := fun _ => do
         Html.buttonWith
           #[Attr.id "proofwidgets-jsx-action", Attr.className "pw-jsx-action"]
           #[Handler.onClick do
-            Lean.Vir.Browser.Document.setTitleString "ProofWidgets JSX subset clicked"]
+            let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
+            Lean.Vir.Browser.Document.setTitle title]
           #[Html.text "mark"],
         Html.ulWith #[Attr.id "proofwidgets-jsx-rows", Attr.className "pw-jsx-rows"] #[
           row "tags" "lowercase tags" "b, img, span, hr",

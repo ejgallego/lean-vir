@@ -47,8 +47,8 @@
     "missingProvider": 0,
     "runtimeOnly": 0,
     "publicSurface": {
-      "entries": 363,
-      "targetEdges": 2888,
+      "entries": 361,
+      "targetEdges": 2884,
       "reachedTargets": 132
     },
     "analysis": {
@@ -90,9 +90,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 969,
+        "startLine": 961,
         "startColumn": 1,
-        "endLine": 975,
+        "endLine": 967,
         "endColumn": 80
       },
       "targets": [
@@ -111,9 +111,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 964,
+        "startLine": 956,
         "startColumn": 1,
-        "endLine": 967,
+        "endLine": 959,
         "endColumn": 19
       },
       "targets": [
@@ -142,9 +142,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 761,
+        "startLine": 753,
         "startColumn": 1,
-        "endLine": 767,
+        "endLine": 759,
         "endColumn": 43
       },
       "targets": [
@@ -182,9 +182,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 730,
+        "startLine": 722,
         "startColumn": 1,
-        "endLine": 732,
+        "endLine": 724,
         "endColumn": 77
       },
       "targets": [
@@ -203,9 +203,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 695,
+        "startLine": 687,
         "startColumn": 1,
-        "endLine": 701,
+        "endLine": 693,
         "endColumn": 35
       },
       "targets": [
@@ -241,9 +241,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 734,
+        "startLine": 726,
         "startColumn": 1,
-        "endLine": 736,
+        "endLine": 728,
         "endColumn": 77
       },
       "targets": [
@@ -262,9 +262,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 769,
+        "startLine": 761,
         "startColumn": 1,
-        "endLine": 771,
+        "endLine": 763,
         "endColumn": 72
       },
       "targets": [
@@ -283,9 +283,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 708,
+        "startLine": 700,
         "startColumn": 1,
-        "endLine": 715,
+        "endLine": 707,
         "endColumn": 34
       },
       "targets": [
@@ -321,9 +321,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 752,
+        "startLine": 744,
         "startColumn": 1,
-        "endLine": 754,
+        "endLine": 746,
         "endColumn": 61
       },
       "targets": [
@@ -355,9 +355,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 743,
+        "startLine": 735,
         "startColumn": 1,
-        "endLine": 745,
+        "endLine": 737,
         "endColumn": 61
       },
       "targets": [
@@ -389,9 +389,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 811,
+        "startLine": 803,
         "startColumn": 1,
-        "endLine": 813,
+        "endLine": 805,
         "endColumn": 75
       },
       "targets": [
@@ -410,9 +410,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 829,
+        "startLine": 821,
         "startColumn": 1,
-        "endLine": 831,
+        "endLine": 823,
         "endColumn": 50
       },
       "targets": [
@@ -442,9 +442,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 807,
+        "startLine": 799,
         "startColumn": 1,
-        "endLine": 809,
+        "endLine": 801,
         "endColumn": 72
       },
       "targets": [
@@ -463,9 +463,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 782,
+        "startLine": 774,
         "startColumn": 1,
-        "endLine": 785,
+        "endLine": 777,
         "endColumn": 43
       },
       "targets": [
@@ -492,9 +492,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 802,
+        "startLine": 794,
         "startColumn": 1,
-        "endLine": 805,
+        "endLine": 797,
         "endColumn": 56
       },
       "targets": [
@@ -524,9 +524,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 792,
+        "startLine": 784,
         "startColumn": 1,
-        "endLine": 795,
+        "endLine": 787,
         "endColumn": 45
       },
       "targets": [
@@ -553,9 +553,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 773,
+        "startLine": 765,
         "startColumn": 1,
-        "endLine": 775,
+        "endLine": 767,
         "endColumn": 74
       },
       "targets": [
@@ -574,9 +574,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 722,
+        "startLine": 714,
         "startColumn": 1,
-        "endLine": 728,
+        "endLine": 720,
         "endColumn": 36
       },
       "targets": [
@@ -612,9 +612,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 820,
+        "startLine": 812,
         "startColumn": 1,
-        "endLine": 822,
+        "endLine": 814,
         "endColumn": 64
       },
       "targets": [
@@ -675,9 +675,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 310,
+        "startLine": 302,
         "startColumn": 1,
-        "endLine": 312,
+        "endLine": 304,
         "endColumn": 26
       },
       "targets": [
@@ -697,9 +697,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 314,
+        "startLine": 306,
         "startColumn": 1,
-        "endLine": 316,
+        "endLine": 308,
         "endColumn": 54
       },
       "targets": [
@@ -742,44 +742,15 @@
       ]
     },
     {
-      "declaration": "Lean.Vir.Browser.Document.getTitleString",
-      "module": "Vir.Browser",
-      "type": "Lean.Vir.Browser.DomM String",
-      "source": {
-        "module": "Vir.Browser",
-        "path": "Vir/Browser.lean",
-        "startLine": 230,
-        "startColumn": 1,
-        "endLine": 232,
-        "endColumn": 41
-      },
-      "targets": [
-        {
-          "target": "browser.document.getTitle",
-          "path": [
-            "Lean.Vir.Browser.Document.getTitleString",
-            "_private.Vir.Browser.0.Lean.Vir.Browser.Document.getTitleJs"
-          ]
-        },
-        {
-          "target": "js.string.value",
-          "path": [
-            "Lean.Vir.Browser.Document.getTitleString",
-            "Lean.Vir.JsValue.toString"
-          ]
-        }
-      ]
-    },
-    {
       "declaration": "Lean.Vir.Browser.Document.querySelector",
       "module": "Vir.Browser",
       "type": "Lean.Vir.Js String → Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)",
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 269,
+        "startLine": 261,
         "startColumn": 1,
-        "endLine": 273,
+        "endLine": 265,
         "endColumn": 33
       },
       "targets": [
@@ -799,9 +770,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 296,
+        "startLine": 288,
         "startColumn": 1,
-        "endLine": 299,
+        "endLine": 291,
         "endColumn": 30
       },
       "targets": [
@@ -821,9 +792,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 301,
+        "startLine": 293,
         "startColumn": 1,
-        "endLine": 305,
+        "endLine": 297,
         "endColumn": 58
       },
       "targets": [
@@ -850,9 +821,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 275,
+        "startLine": 267,
         "startColumn": 1,
-        "endLine": 280,
+        "endLine": 272,
         "endColumn": 61
       },
       "targets": [
@@ -905,9 +876,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 245,
+        "startLine": 241,
         "startColumn": 1,
-        "endLine": 247,
+        "endLine": 243,
         "endColumn": 19
       },
       "targets": [
@@ -921,44 +892,15 @@
       ]
     },
     {
-      "declaration": "Lean.Vir.Browser.Document.setTitleString",
-      "module": "Vir.Browser",
-      "type": "String → Lean.Vir.Browser.DomM Unit",
-      "source": {
-        "module": "Vir.Browser",
-        "path": "Vir/Browser.lean",
-        "startLine": 249,
-        "startColumn": 1,
-        "endLine": 251,
-        "endColumn": 47
-      },
-      "targets": [
-        {
-          "target": "browser.document.setTitle",
-          "path": [
-            "Lean.Vir.Browser.Document.setTitleString",
-            "_private.Vir.Browser.0.Lean.Vir.Browser.Document.setTitleJs"
-          ]
-        },
-        {
-          "target": "js.string",
-          "path": [
-            "Lean.Vir.Browser.Document.setTitleString",
-            "Lean.Vir.JsValue.ofString"
-          ]
-        }
-      ]
-    },
-    {
       "declaration": "Lean.Vir.Browser.Element.ClassList.add",
       "module": "Vir.Browser",
       "type": "Lean.Vir.Js Lean.Vir.Browser.Element → String → Lean.Vir.Browser.DomM Unit",
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 461,
+        "startLine": 453,
         "startColumn": 1,
-        "endLine": 463,
+        "endLine": 455,
         "endColumn": 56
       },
       "targets": [
@@ -985,9 +927,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 470,
+        "startLine": 462,
         "startColumn": 1,
-        "endLine": 472,
+        "endLine": 464,
         "endColumn": 59
       },
       "targets": [
@@ -1014,9 +956,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 479,
+        "startLine": 471,
         "startColumn": 1,
-        "endLine": 481,
+        "endLine": 473,
         "endColumn": 87
       },
       "targets": [
@@ -1050,9 +992,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 493,
+        "startLine": 485,
         "startColumn": 1,
-        "endLine": 499,
+        "endLine": 491,
         "endColumn": 40
       },
       "targets": [
@@ -1079,9 +1021,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 519,
+        "startLine": 511,
         "startColumn": 1,
-        "endLine": 525,
+        "endLine": 517,
         "endColumn": 46
       },
       "targets": [
@@ -1108,9 +1050,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 444,
+        "startLine": 436,
         "startColumn": 1,
-        "endLine": 448,
+        "endLine": 440,
         "endColumn": 14
       },
       "targets": [
@@ -1129,9 +1071,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 417,
+        "startLine": 409,
         "startColumn": 1,
-        "endLine": 423,
+        "endLine": 415,
         "endColumn": 23
       },
       "targets": [
@@ -1191,9 +1133,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 355,
+        "startLine": 347,
         "startColumn": 1,
-        "endLine": 356,
+        "endLine": 348,
         "endColumn": 55
       },
       "targets": [
@@ -1220,9 +1162,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 380,
+        "startLine": 372,
         "startColumn": 1,
-        "endLine": 382,
+        "endLine": 374,
         "endColumn": 33
       },
       "targets": [
@@ -1249,9 +1191,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 329,
+        "startLine": 321,
         "startColumn": 1,
-        "endLine": 334,
+        "endLine": 326,
         "endColumn": 77
       },
       "targets": [
@@ -1304,9 +1246,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 343,
+        "startLine": 335,
         "startColumn": 1,
-        "endLine": 347,
+        "endLine": 339,
         "endColumn": 68
       },
       "targets": [
@@ -1333,9 +1275,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 450,
+        "startLine": 442,
         "startColumn": 1,
-        "endLine": 452,
+        "endLine": 444,
         "endColumn": 61
       },
       "targets": [
@@ -1354,9 +1296,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 527,
+        "startLine": 519,
         "startColumn": 1,
-        "endLine": 533,
+        "endLine": 525,
         "endColumn": 81
       },
       "targets": [
@@ -1375,9 +1317,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 439,
+        "startLine": 431,
         "startColumn": 1,
-        "endLine": 442,
+        "endLine": 434,
         "endColumn": 40
       },
       "targets": [
@@ -1404,9 +1346,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 365,
+        "startLine": 357,
         "startColumn": 1,
-        "endLine": 366,
+        "endLine": 358,
         "endColumn": 46
       },
       "targets": [
@@ -1433,9 +1375,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 398,
+        "startLine": 390,
         "startColumn": 1,
-        "endLine": 400,
+        "endLine": 392,
         "endColumn": 34
       },
       "targets": [
@@ -1510,9 +1452,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 873,
+        "startLine": 865,
         "startColumn": 1,
-        "endLine": 878,
+        "endLine": 870,
         "endColumn": 23
       },
       "targets": [
@@ -1565,9 +1507,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 880,
+        "startLine": 872,
         "startColumn": 1,
-        "endLine": 889,
+        "endLine": 881,
         "endColumn": 61
       },
       "targets": [
@@ -1644,9 +1586,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 837,
+        "startLine": 829,
         "startColumn": 1,
-        "endLine": 849,
+        "endLine": 841,
         "endColumn": 61
       },
       "targets": [
@@ -1712,9 +1654,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 851,
+        "startLine": 843,
         "startColumn": 1,
-        "endLine": 860,
+        "endLine": 852,
         "endColumn": 59
       },
       "targets": [
@@ -1921,9 +1863,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 631,
+        "startLine": 623,
         "startColumn": 1,
-        "endLine": 635,
+        "endLine": 627,
         "endColumn": 64
       },
       "targets": [
@@ -1969,9 +1911,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 676,
+        "startLine": 668,
         "startColumn": 1,
-        "endLine": 680,
+        "endLine": 672,
         "endColumn": 64
       },
       "targets": [
@@ -2017,9 +1959,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 658,
+        "startLine": 650,
         "startColumn": 1,
-        "endLine": 660,
+        "endLine": 652,
         "endColumn": 48
       },
       "targets": [
@@ -2046,9 +1988,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 641,
+        "startLine": 633,
         "startColumn": 1,
-        "endLine": 643,
+        "endLine": 635,
         "endColumn": 47
       },
       "targets": [
@@ -2075,9 +2017,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 667,
+        "startLine": 659,
         "startColumn": 1,
-        "endLine": 669,
+        "endLine": 661,
         "endColumn": 55
       },
       "targets": [
@@ -2104,9 +2046,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 650,
+        "startLine": 642,
         "startColumn": 1,
-        "endLine": 652,
+        "endLine": 644,
         "endColumn": 53
       },
       "targets": [
@@ -2133,9 +2075,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 553,
+        "startLine": 545,
         "startColumn": 1,
-        "endLine": 554,
+        "endLine": 546,
         "endColumn": 64
       },
       "targets": [
@@ -2181,9 +2123,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 567,
+        "startLine": 559,
         "startColumn": 1,
-        "endLine": 569,
+        "endLine": 561,
         "endColumn": 34
       },
       "targets": [
@@ -2210,9 +2152,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 600,
+        "startLine": 592,
         "startColumn": 1,
-        "endLine": 602,
+        "endLine": 594,
         "endColumn": 34
       },
       "targets": [
@@ -2239,9 +2181,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 585,
+        "startLine": 577,
         "startColumn": 1,
-        "endLine": 587,
+        "endLine": 579,
         "endColumn": 31
       },
       "targets": [
@@ -2268,9 +2210,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 618,
+        "startLine": 610,
         "startColumn": 1,
-        "endLine": 620,
+        "endLine": 612,
         "endColumn": 27
       },
       "targets": [
@@ -2297,9 +2239,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 939,
+        "startLine": 931,
         "startColumn": 1,
-        "endLine": 945,
+        "endLine": 937,
         "endColumn": 70
       },
       "targets": [
@@ -2318,9 +2260,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 913,
+        "startLine": 905,
         "startColumn": 1,
-        "endLine": 919,
+        "endLine": 911,
         "endColumn": 67
       },
       "targets": [
@@ -2339,9 +2281,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 935,
+        "startLine": 927,
         "startColumn": 1,
-        "endLine": 937,
+        "endLine": 929,
         "endColumn": 33
       },
       "targets": [
@@ -2368,9 +2310,9 @@
       "source": {
         "module": "Vir.Browser",
         "path": "Vir/Browser.lean",
-        "startLine": 909,
+        "startLine": 901,
         "startColumn": 1,
-        "endLine": 911,
+        "endLine": 903,
         "endColumn": 32
       },
       "targets": [
@@ -38743,9 +38685,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 969,
+                    "startLine": 961,
                     "startColumn": 1,
-                    "endLine": 975,
+                    "endLine": 967,
                     "endColumn": 80
                   }
                 }
@@ -38775,9 +38717,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 951,
+                    "startLine": 943,
                     "startColumn": 1,
-                    "endLine": 962,
+                    "endLine": 954,
                     "endColumn": 38
                   }
                 }
@@ -40656,7 +40598,8 @@
                   {
                     "typescript": "CanvasRenderingContext2D.fillStyle",
                     "score": 95,
-                    "reason": "set accessor naming"
+                    "reason": "set accessor naming",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -40668,7 +40611,8 @@
                   {
                     "typescript": "CanvasRenderingContext2D.lineWidth",
                     "score": 95,
-                    "reason": "set accessor naming"
+                    "reason": "set accessor naming",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -40680,7 +40624,8 @@
                   {
                     "typescript": "CanvasRenderingContext2D.strokeStyle",
                     "score": 95,
-                    "reason": "set accessor naming"
+                    "reason": "set accessor naming",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -40756,9 +40701,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 756,
+                    "startLine": 748,
                     "startColumn": 1,
-                    "endLine": 759,
+                    "endLine": 751,
                     "endColumn": 72
                   }
                 }
@@ -40787,9 +40732,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 730,
+                    "startLine": 722,
                     "startColumn": 1,
-                    "endLine": 732,
+                    "endLine": 724,
                     "endColumn": 77
                   }
                 }
@@ -40818,9 +40763,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 690,
+                    "startLine": 682,
                     "startColumn": 1,
-                    "endLine": 693,
+                    "endLine": 685,
                     "endColumn": 58
                   }
                 }
@@ -40849,9 +40794,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 734,
+                    "startLine": 726,
                     "startColumn": 1,
-                    "endLine": 736,
+                    "endLine": 728,
                     "endColumn": 77
                   }
                 }
@@ -40880,9 +40825,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 769,
+                    "startLine": 761,
                     "startColumn": 1,
-                    "endLine": 771,
+                    "endLine": 763,
                     "endColumn": 72
                   }
                 }
@@ -40911,9 +40856,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 703,
+                    "startLine": 695,
                     "startColumn": 1,
-                    "endLine": 706,
+                    "endLine": 698,
                     "endColumn": 58
                   }
                 }
@@ -40942,9 +40887,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 747,
+                    "startLine": 739,
                     "startColumn": 1,
-                    "endLine": 750,
+                    "endLine": 742,
                     "endColumn": 45
                   }
                 }
@@ -40973,9 +40918,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 738,
+                    "startLine": 730,
                     "startColumn": 1,
-                    "endLine": 741,
+                    "endLine": 733,
                     "endColumn": 45
                   }
                 }
@@ -41004,9 +40949,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 811,
+                    "startLine": 803,
                     "startColumn": 1,
-                    "endLine": 813,
+                    "endLine": 805,
                     "endColumn": 75
                   }
                 }
@@ -41035,9 +40980,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 824,
+                    "startLine": 816,
                     "startColumn": 1,
-                    "endLine": 827,
+                    "endLine": 819,
                     "endColumn": 47
                   }
                 }
@@ -41066,9 +41011,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 807,
+                    "startLine": 799,
                     "startColumn": 1,
-                    "endLine": 809,
+                    "endLine": 801,
                     "endColumn": 72
                   }
                 }
@@ -41097,9 +41042,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 777,
+                    "startLine": 769,
                     "startColumn": 1,
-                    "endLine": 780,
+                    "endLine": 772,
                     "endColumn": 48
                   }
                 }
@@ -41128,9 +41073,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 797,
+                    "startLine": 789,
                     "startColumn": 1,
-                    "endLine": 800,
+                    "endLine": 792,
                     "endColumn": 47
                   }
                 }
@@ -41159,9 +41104,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 787,
+                    "startLine": 779,
                     "startColumn": 1,
-                    "endLine": 790,
+                    "endLine": 782,
                     "endColumn": 48
                   }
                 }
@@ -41190,9 +41135,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 773,
+                    "startLine": 765,
                     "startColumn": 1,
-                    "endLine": 775,
+                    "endLine": 767,
                     "endColumn": 74
                   }
                 }
@@ -41221,9 +41166,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 717,
+                    "startLine": 709,
                     "startColumn": 1,
-                    "endLine": 720,
+                    "endLine": 712,
                     "endColumn": 58
                   }
                 }
@@ -41252,9 +41197,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 815,
+                    "startLine": 807,
                     "startColumn": 1,
-                    "endLine": 818,
+                    "endLine": 810,
                     "endColumn": 45
                   }
                 }
@@ -46763,6 +46708,14 @@
                   "lean": [
                     "Lean.Vir.Browser.Document.createElement"
                   ],
+                  "operations": [
+                    {
+                      "target": "browser.document.createElement",
+                      "lean": [
+                        "Lean.Vir.Browser.Document.createElement"
+                      ]
+                    }
+                  ],
                   "status": "compatible",
                   "anchors": [
                     "document.createElement"
@@ -47972,6 +47925,14 @@
                   "lean": [
                     "Lean.Vir.Browser.Document.querySelector"
                   ],
+                  "operations": [
+                    {
+                      "target": "browser.document.querySelector",
+                      "lean": [
+                        "Lean.Vir.Browser.Document.querySelector"
+                      ]
+                    }
+                  ],
                   "status": "compatible",
                   "anchors": [
                     "document.querySelector"
@@ -47990,6 +47951,14 @@
                   ],
                   "lean": [
                     "Lean.Vir.Browser.Document.querySelectorAll"
+                  ],
+                  "operations": [
+                    {
+                      "target": "browser.document.querySelectorAll",
+                      "lean": [
+                        "Lean.Vir.Browser.Document.querySelectorAll"
+                      ]
+                    }
                   ],
                   "status": "compatible",
                   "anchors": [
@@ -48088,6 +48057,36 @@
                 "status": "compatible",
                 "mapping": {
                   "typescript": "Document.title",
+                  "accessors": {
+                    "get": {
+                      "target": "browser.document.getTitle",
+                      "lean": "Lean.Vir.Browser.Document.getTitle",
+                      "anchor": "document.title.get"
+                    },
+                    "set": {
+                      "target": "browser.document.setTitle",
+                      "lean": "Lean.Vir.Browser.Document.setTitle",
+                      "anchor": "document.title.set"
+                    }
+                  },
+                  "operations": [
+                    {
+                      "accessor": "get",
+                      "target": "browser.document.getTitle",
+                      "lean": [
+                        "Lean.Vir.Browser.Document.getTitle"
+                      ],
+                      "anchor": "document.title.get"
+                    },
+                    {
+                      "accessor": "set",
+                      "target": "browser.document.setTitle",
+                      "lean": [
+                        "Lean.Vir.Browser.Document.setTitle"
+                      ],
+                      "anchor": "document.title.set"
+                    }
+                  ],
                   "targets": [
                     "browser.document.getTitle",
                     "browser.document.setTitle"
@@ -48136,13 +48135,12 @@
                 "source": "reviewed",
                 "typescript": "Document.title",
                 "lean": [
-                  "Lean.Vir.Browser.Document.getTitle",
-                  "Lean.Vir.Browser.Document.setTitle"
+                  "Lean.Vir.Browser.Document.getTitle"
                 ],
                 "anchors": [
-                  "document.title.get",
-                  "document.title.set"
-                ]
+                  "document.title.get"
+                ],
+                "accessor": "get"
               },
               {
                 "target": "browser.document.setTitle",
@@ -48150,13 +48148,12 @@
                 "source": "reviewed",
                 "typescript": "Document.title",
                 "lean": [
-                  "Lean.Vir.Browser.Document.getTitle",
                   "Lean.Vir.Browser.Document.setTitle"
                 ],
                 "anchors": [
-                  "document.title.get",
                   "document.title.set"
-                ]
+                ],
+                "accessor": "set"
               },
               {
                 "target": "browser.document.querySelector",
@@ -48230,9 +48227,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 307,
+                    "startLine": 299,
                     "startColumn": 1,
-                    "endLine": 308,
+                    "endLine": 300,
                     "endColumn": 94
                   }
                 }
@@ -48294,9 +48291,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 253,
+                    "startLine": 245,
                     "startColumn": 1,
-                    "endLine": 267,
+                    "endLine": 259,
                     "endColumn": 40
                   }
                 }
@@ -48326,9 +48323,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 282,
+                    "startLine": 274,
                     "startColumn": 1,
-                    "endLine": 294,
+                    "endLine": 286,
                     "endColumn": 54
                   }
                 }
@@ -48358,9 +48355,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 234,
+                    "startLine": 230,
                     "startColumn": 1,
-                    "endLine": 243,
+                    "endLine": 239,
                     "endColumn": 70
                   }
                 }
@@ -66136,7 +66133,8 @@
                   {
                     "typescript": "Element.innerHTML",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -66148,7 +66146,8 @@
                   {
                     "typescript": "Element.textContent",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -66220,7 +66219,8 @@
                   {
                     "typescript": "Element.innerHTML",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -66232,7 +66232,8 @@
                   {
                     "typescript": "Element.textContent",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -66285,9 +66286,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 503,
+                    "startLine": 495,
                     "startColumn": 1,
-                    "endLine": 517,
+                    "endLine": 509,
                     "endColumn": 37
                   }
                 }
@@ -66316,9 +66317,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 444,
+                    "startLine": 436,
                     "startColumn": 1,
-                    "endLine": 448,
+                    "endLine": 440,
                     "endColumn": 14
                   }
                 }
@@ -66347,9 +66348,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 456,
+                    "startLine": 448,
                     "startColumn": 1,
-                    "endLine": 459,
+                    "endLine": 451,
                     "endColumn": 52
                   }
                 }
@@ -66378,9 +66379,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 465,
+                    "startLine": 457,
                     "startColumn": 1,
-                    "endLine": 468,
+                    "endLine": 460,
                     "endColumn": 52
                   }
                 }
@@ -66409,9 +66410,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 474,
+                    "startLine": 466,
                     "startColumn": 1,
-                    "endLine": 477,
+                    "endLine": 469,
                     "endColumn": 66
                   }
                 }
@@ -66441,9 +66442,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 402,
+                    "startLine": 394,
                     "startColumn": 1,
-                    "endLine": 415,
+                    "endLine": 407,
                     "endColumn": 39
                   }
                 }
@@ -66473,9 +66474,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 349,
+                    "startLine": 341,
                     "startColumn": 1,
-                    "endLine": 353,
+                    "endLine": 345,
                     "endColumn": 30
                   }
                 }
@@ -66505,9 +66506,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 368,
+                    "startLine": 360,
                     "startColumn": 1,
-                    "endLine": 378,
+                    "endLine": 370,
                     "endColumn": 95
                   }
                 }
@@ -66537,9 +66538,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 322,
+                    "startLine": 314,
                     "startColumn": 1,
-                    "endLine": 327,
+                    "endLine": 319,
                     "endColumn": 40
                   }
                 }
@@ -66569,9 +66570,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 336,
+                    "startLine": 328,
                     "startColumn": 1,
-                    "endLine": 341,
+                    "endLine": 333,
                     "endColumn": 54
                   }
                 }
@@ -66600,9 +66601,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 450,
+                    "startLine": 442,
                     "startColumn": 1,
-                    "endLine": 452,
+                    "endLine": 444,
                     "endColumn": 61
                   }
                 }
@@ -66632,9 +66633,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 527,
+                    "startLine": 519,
                     "startColumn": 1,
-                    "endLine": 533,
+                    "endLine": 525,
                     "endColumn": 81
                   }
                 }
@@ -66664,9 +66665,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 425,
+                    "startLine": 417,
                     "startColumn": 1,
-                    "endLine": 437,
+                    "endLine": 429,
                     "endColumn": 14
                   }
                 }
@@ -66696,9 +66697,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 358,
+                    "startLine": 350,
                     "startColumn": 1,
-                    "endLine": 363,
+                    "endLine": 355,
                     "endColumn": 14
                   }
                 }
@@ -66728,9 +66729,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 384,
+                    "startLine": 376,
                     "startColumn": 1,
-                    "endLine": 396,
+                    "endLine": 388,
                     "endColumn": 14
                   }
                 }
@@ -66759,9 +66760,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 487,
+                    "startLine": 479,
                     "startColumn": 1,
-                    "endLine": 491,
+                    "endLine": 483,
                     "endColumn": 53
                   }
                 }
@@ -67406,9 +67407,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 862,
+                    "startLine": 854,
                     "startColumn": 1,
-                    "endLine": 871,
+                    "endLine": 863,
                     "endColumn": 39
                   }
                 }
@@ -75280,7 +75281,8 @@
                   {
                     "typescript": "HTMLCanvasElement.height",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -75292,7 +75294,8 @@
                   {
                     "typescript": "HTMLCanvasElement.width",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -75304,7 +75307,8 @@
                   {
                     "typescript": "HTMLCanvasElement.height",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -75316,7 +75320,8 @@
                   {
                     "typescript": "HTMLCanvasElement.width",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               }
@@ -75356,9 +75361,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 626,
+                    "startLine": 618,
                     "startColumn": 1,
-                    "endLine": 629,
+                    "endLine": 621,
                     "endColumn": 50
                   }
                 }
@@ -75387,9 +75392,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 671,
+                    "startLine": 663,
                     "startColumn": 1,
-                    "endLine": 674,
+                    "endLine": 666,
                     "endColumn": 57
                   }
                 }
@@ -75418,9 +75423,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 654,
+                    "startLine": 646,
                     "startColumn": 1,
-                    "endLine": 656,
+                    "endLine": 648,
                     "endColumn": 73
                   }
                 }
@@ -75449,9 +75454,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 637,
+                    "startLine": 629,
                     "startColumn": 1,
-                    "endLine": 639,
+                    "endLine": 631,
                     "endColumn": 73
                   }
                 }
@@ -75480,9 +75485,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 662,
+                    "startLine": 654,
                     "startColumn": 1,
-                    "endLine": 665,
+                    "endLine": 657,
                     "endColumn": 46
                   }
                 }
@@ -75511,9 +75516,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 645,
+                    "startLine": 637,
                     "startColumn": 1,
-                    "endLine": 648,
+                    "endLine": 640,
                     "endColumn": 45
                   }
                 }
@@ -84292,7 +84297,8 @@
                   {
                     "typescript": "HTMLInputElement.checked",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -84304,7 +84310,8 @@
                   {
                     "typescript": "HTMLInputElement.value",
                     "score": 105,
-                    "reason": "get accessor naming on matching owner"
+                    "reason": "get accessor naming on matching owner",
+                    "accessor": "get"
                   }
                 ]
               },
@@ -84316,7 +84323,8 @@
                   {
                     "typescript": "HTMLInputElement.checked",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               },
@@ -84328,7 +84336,8 @@
                   {
                     "typescript": "HTMLInputElement.value",
                     "score": 105,
-                    "reason": "set accessor naming on matching owner"
+                    "reason": "set accessor naming on matching owner",
+                    "accessor": "set"
                   }
                 ]
               }
@@ -84369,9 +84378,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 539,
+                    "startLine": 531,
                     "startColumn": 1,
-                    "endLine": 551,
+                    "endLine": 543,
                     "endColumn": 49
                   }
                 }
@@ -84401,9 +84410,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 556,
+                    "startLine": 548,
                     "startColumn": 1,
-                    "endLine": 565,
+                    "endLine": 557,
                     "endColumn": 96
                   }
                 }
@@ -84433,9 +84442,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 589,
+                    "startLine": 581,
                     "startColumn": 1,
-                    "endLine": 598,
+                    "endLine": 590,
                     "endColumn": 96
                   }
                 }
@@ -84465,9 +84474,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 571,
+                    "startLine": 563,
                     "startColumn": 1,
-                    "endLine": 583,
+                    "endLine": 575,
                     "endColumn": 14
                   }
                 }
@@ -84497,9 +84506,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 604,
+                    "startLine": 596,
                     "startColumn": 1,
-                    "endLine": 616,
+                    "endLine": 608,
                     "endColumn": 14
                   }
                 }
@@ -84724,9 +84733,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 939,
+                    "startLine": 931,
                     "startColumn": 1,
-                    "endLine": 945,
+                    "endLine": 937,
                     "endColumn": 70
                   }
                 }
@@ -84756,9 +84765,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 913,
+                    "startLine": 905,
                     "startColumn": 1,
-                    "endLine": 919,
+                    "endLine": 911,
                     "endColumn": 67
                   }
                 }
@@ -84788,9 +84797,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 921,
+                    "startLine": 913,
                     "startColumn": 1,
-                    "endLine": 933,
+                    "endLine": 925,
                     "endColumn": 32
                   }
                 }
@@ -84820,9 +84829,9 @@
                   "source": {
                     "module": "Vir.Browser",
                     "path": "Vir/Browser.lean",
-                    "startLine": 895,
+                    "startLine": 887,
                     "startColumn": 1,
-                    "endLine": 907,
+                    "endLine": 899,
                     "endColumn": 31
                   }
                 }
@@ -91457,7 +91466,8 @@
                   {
                     "typescript": "React.Attributes.key",
                     "score": 95,
-                    "reason": "set accessor naming"
+                    "reason": "set accessor naming",
+                    "accessor": "set"
                   }
                 ]
               },

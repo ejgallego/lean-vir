@@ -227,10 +227,6 @@ private opaque getTitleJs : DomM (Lean.Vir.Js String)
 def getTitle : DomM (Lean.Vir.Js String) :=
   getTitleJs
 
-/-- Reads `document.title` and explicitly converts it to a Lean string. -/
-def getTitleString : DomM String := do
-  Lean.Vir.JsValue.toString (← getTitle)
-
 /--
 Sets the current document title through the JavaScript host.
 
@@ -245,10 +241,6 @@ private opaque setTitleJs (title : @& Lean.Vir.Js String) : DomM Unit
 /-- Faithful JavaScript-boundary setter for `document.title`. -/
 def setTitle (title : @& Lean.Vir.Js String) : DomM Unit :=
   setTitleJs title
-
-/-- Converts a Lean string explicitly before assigning `document.title`. -/
-def setTitleString (title : @& String) : DomM Unit := do
-  setTitle (← Lean.Vir.JsValue.ofString title)
 
 /--
 Returns the first element matching a CSS selector.

@@ -101,8 +101,21 @@ function validateConfig(value, path) {
       throw new Error(`${label} root ${bindingRoot.id} mappings must be an array`);
     }
     for (const [mappingIndex, mapping] of (bindingRoot.mappings ?? []).entries()) {
-      if (!nonemptyString(mapping?.typescript) || !Array.isArray(mapping.targets) ||
-          mapping.targets.length === 0 || mapping.targets.some((target) => !nonemptyString(target))) {
+      const direct = Array.isArray(mapping?.targets) && mapping.targets.length !== 0 &&
+        mapping.targets.every(nonemptyString) && mapping.accessors === undefined;
+      const accessorNames = mapping?.accessors && typeof mapping.accessors === "object" &&
+        !Array.isArray(mapping.accessors) ? Object.keys(mapping.accessors) : [];
+      const property = mapping?.targets === undefined && accessorNames.length !== 0 &&
+        accessorNames.every((accessor) => ["get", "set"].includes(accessor)) &&
+        accessorNames.every((accessor) => {
+          const operation = mapping.accessors[accessor];
+          return (nonemptyString(operation?.target) && nonemptyString(operation?.lean) &&
+            nonemptyString(operation?.anchor) && operation.missing === undefined) ||
+            (operation?.missing === true && nonemptyString(operation.note) &&
+              operation.target === undefined && operation.lean === undefined &&
+              operation.anchor === undefined);
+        });
+      if (!nonemptyString(mapping?.typescript) || (!direct && !property)) {
         throw new Error(`${label} root ${bindingRoot.id} mappings[${mappingIndex}] is invalid`);
       }
     }
@@ -262,6 +275,32 @@ function findingStatus(bindings, issues) {
   return "none";
 }
 
+function reviewedMappingOperations(mapping) {
+  if (mapping.accessors !== undefined) {
+    return Object.entries(mapping.accessors).map(([accessor, operation]) =>
+      operation.missing === true
+        ? { accessor, missing: true, note: operation.note }
+        : {
+            accessor,
+            target: operation.target,
+            lean: [operation.lean],
+            anchor: operation.anchor,
+          });
+  }
+  return mapping.targets.map((target) => ({
+    target,
+    lean: mapping.lean ?? [],
+  }));
+}
+
+function worstSemanticStatus(results) {
+  if (results.length === 0) return "unreviewed";
+  return results.reduce((candidate, result) =>
+    semanticStatuses.indexOf(result.status) > semanticStatuses.indexOf(candidate)
+      ? result.status
+      : candidate, "exact");
+}
+
 function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison) {
   if (!Array.isArray(bindingRoot.mappings)) {
     return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings);
@@ -269,7 +308,12 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
   const resultsByTypeScript = new Map();
+  const resultsById = new Map();
   for (const result of comparison?.results ?? []) {
+    if (resultsById.has(result.id)) {
+      throw new Error(`${config.id}/${bindingRoot.id} comparison repeats anchor ${result.id}`);
+    }
+    resultsById.set(result.id, result);
     const results = resultsByTypeScript.get(result.ts) ?? [];
     results.push(result);
     resultsByTypeScript.set(result.ts, results);
@@ -277,27 +321,61 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   const mappings = new Map();
   const mappedTargets = new Set();
   for (const mapping of bindingRoot.mappings) {
-    if (!symbolsById.has(mapping.typescript)) {
+    const symbol = symbolsById.get(mapping.typescript);
+    if (symbol === undefined) {
       throw new Error(`${config.id}/${bindingRoot.id} mapping references missing TypeScript member ${mapping.typescript}`);
     }
     if (mappings.has(mapping.typescript)) {
       throw new Error(`${config.id}/${bindingRoot.id} repeats TypeScript mapping ${mapping.typescript}`);
     }
-    for (const target of mapping.targets) {
-      if (!bindingsByTarget.has(target)) {
-        throw new Error(`${config.id}/${bindingRoot.id} mapping references target outside its root: ${target}`);
-      }
-      if (mappedTargets.has(target)) throw new Error(`${config.id}/${bindingRoot.id} maps target twice: ${target}`);
-      mappedTargets.add(target);
+    const operations = reviewedMappingOperations(mapping);
+    if (mapping.accessors !== undefined && symbol.kind !== "property") {
+      throw new Error(`${config.id}/${bindingRoot.id} maps accessors for non-property ${mapping.typescript}`);
     }
-    const results = resultsByTypeScript.get(mapping.typescript) ?? [];
-    const status = results.length === 0
-      ? "unreviewed"
-      : results.reduce((candidate, result) =>
-        semanticStatuses.indexOf(result.status) > semanticStatuses.indexOf(candidate)
-          ? result.status
-          : candidate, "exact");
-    mappings.set(mapping.typescript, { ...mapping, status, anchors: results.map((result) => result.id) });
+    if (mapping.accessors !== undefined) {
+      const readonly = /^readonly\s/u.test(symbol.display);
+      if (mapping.accessors.get === undefined) {
+        throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must classify its getter`);
+      }
+      if (readonly && mapping.accessors.set !== undefined) {
+        throw new Error(`${config.id}/${bindingRoot.id} maps a setter for readonly property ${mapping.typescript}`);
+      }
+      if (!readonly && mapping.accessors.set === undefined) {
+        throw new Error(`${config.id}/${bindingRoot.id} writable property ${mapping.typescript} must classify its setter`);
+      }
+    }
+    for (const operation of operations) {
+      if (operation.missing === true) continue;
+      if (!bindingsByTarget.has(operation.target)) {
+        throw new Error(`${config.id}/${bindingRoot.id} mapping references target outside its root: ${operation.target}`);
+      }
+      if (mappedTargets.has(operation.target)) {
+        throw new Error(`${config.id}/${bindingRoot.id} maps target twice: ${operation.target}`);
+      }
+      mappedTargets.add(operation.target);
+      if (operation.accessor !== undefined) {
+        const result = resultsById.get(operation.anchor);
+        if (result === undefined || result.ts !== mapping.typescript ||
+            result.target !== operation.target ||
+            result.portIntent?.accessor !== operation.accessor) {
+          throw new Error(`${config.id}/${bindingRoot.id} ${mapping.typescript} ${operation.accessor} accessor does not match reviewed anchor ${operation.anchor}`);
+        }
+      }
+    }
+    const mappedOperations = operations.filter((operation) => operation.missing !== true);
+    const results = mapping.accessors === undefined
+      ? resultsByTypeScript.get(mapping.typescript) ?? []
+      : mappedOperations.map((operation) => resultsById.get(operation.anchor));
+    mappings.set(mapping.typescript, {
+      ...mapping,
+      operations,
+      targets: mappedOperations.map((operation) => operation.target),
+      lean: mappedOperations.flatMap((operation) => operation.lean),
+      status: operations.some((operation) => operation.missing === true)
+        ? "missing"
+        : worstSemanticStatus(results),
+      anchors: results.map((result) => result.id),
+    });
   }
   if (mappedTargets.size !== bindings.length) {
     const missing = bindings.filter((binding) => !mappedTargets.has(binding.target)).map((binding) => binding.target);
@@ -315,14 +393,22 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   });
   const summary = { exact: 0, compatible: 0, weak: 0, missing: 0, unreviewed: 0 };
   for (const member of members) summary[member.status] += 1;
-  const targetMappings = [...mappings.values()].flatMap((mapping) => mapping.targets.map((target) => ({
-    target,
-    status: mapping.status,
-    source: "reviewed",
-    typescript: mapping.typescript,
-    lean: mapping.lean ?? [],
-    anchors: mapping.anchors,
-  })));
+  const targetMappings = [...mappings.values()].flatMap((mapping) =>
+    mapping.operations.filter((operation) => operation.missing !== true).map((operation) => {
+      const operationResults = operation.anchor === undefined
+        ? (resultsByTypeScript.get(mapping.typescript) ?? []).filter((result) =>
+            result.target === operation.target)
+        : [resultsById.get(operation.anchor)];
+      return {
+        target: operation.target,
+        status: worstSemanticStatus(operationResults),
+        source: "reviewed",
+        typescript: mapping.typescript,
+        lean: operation.lean,
+        anchors: operationResults.map((result) => result.id),
+        ...(operation.accessor === undefined ? {} : { accessor: operation.accessor }),
+      };
+    }));
   return {
     mode: "reviewed",
     summary: { ...summary, mappedTargets: mappedTargets.size },
@@ -368,7 +454,7 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings) {
 function suggestTargetMapping(target, members) {
   const scored = members.map((member) => ({
     typescript: member.id,
-    ...mappingScore(target, member.id),
+    ...mappingScore(target, member),
   })).filter((candidate) => candidate.score !== 0)
     .sort((left, right) => right.score - left.score || left.typescript.localeCompare(right.typescript));
   if (scored.length === 0) {
@@ -384,7 +470,8 @@ function suggestTargetMapping(target, members) {
   };
 }
 
-function mappingScore(targetValue, memberId) {
+function mappingScore(targetValue, memberSymbol) {
+  const memberId = memberSymbol.id;
   const targetParts = targetValue.split(".");
   const memberParts = memberId.split(".");
   const target = normalizedName(targetParts.at(-1));
@@ -402,6 +489,7 @@ function mappingScore(targetValue, memberId) {
       return {
         score: 95 + (ownerMatches ? 10 : 0),
         reason: `${prefix} accessor naming${ownerMatches ? " on matching owner" : ""}`,
+        ...(memberSymbol.kind === "property" ? { accessor: prefix } : {}),
       };
     }
   }
@@ -419,17 +507,60 @@ function normalizedName(value) {
   return value.replaceAll(/[^A-Za-z0-9]/gu, "").toLowerCase();
 }
 
+function declarationMatchesSelector(declaration, selector) {
+  return declaration === selector || declaration.startsWith(`${selector}.`);
+}
+
+function accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
+  if (surfaceCoverage?.mode !== "reviewed") return [];
+  const selectors = bindingRoot.lean?.public ?? [];
+  const issues = [];
+  for (const mapping of surfaceCoverage.targetMappings.filter((entry) =>
+    entry.accessor !== undefined)) {
+    const callers = publicByTarget.get(mapping.target) ?? [];
+    for (const declaration of mapping.lean) {
+      if (!callers.some((caller) => caller.entry.declaration === declaration)) {
+        issues.push(issue(
+          "mapped-public-api-unreachable",
+          "error",
+          `${declaration} is the reviewed ${mapping.accessor} accessor for ${mapping.typescript}, but compiled IR does not reach ${mapping.target}`,
+          { target: mapping.target, declaration, typescript: mapping.typescript,
+            accessor: mapping.accessor },
+        ));
+      }
+    }
+    const reviewed = new Set(mapping.lean);
+    for (const caller of callers) {
+      if (reviewed.has(caller.entry.declaration) ||
+          !selectors.some((selector) =>
+            declarationMatchesSelector(caller.entry.declaration, selector))) continue;
+      issues.push(issue(
+        "extra-public-accessor-api",
+        "error",
+        `${caller.entry.declaration} reaches the ${mapping.typescript} ${mapping.accessor} target but has no distinct upstream property operation`,
+        { target: mapping.target, declaration: caller.entry.declaration,
+          typescript: mapping.typescript, accessor: mapping.accessor },
+      ));
+    }
+  }
+  return issues;
+}
+
 async function buildReport(coverage, configs, typeScriptSurfaces) {
   if (coverage?.format !== "lean-vir-shipped-bindings-coverage" || coverage.version !== 1 ||
       !Array.isArray(coverage.bindings) || !Array.isArray(coverage.publicEntries)) {
     throw new Error("coverage input is not a shipped-bindings v1 report");
   }
   const shippedTargets = new Set(coverage.bindings.map((binding) => binding.target));
+  const publicByTarget = new Map();
   for (const entry of coverage.publicEntries) {
     for (const reached of entry.targets) {
       if (!shippedTargets.has(reached.target)) {
         throw new Error(`${entry.declaration} reaches unknown target ${reached.target}`);
       }
+      const callers = publicByTarget.get(reached.target) ?? [];
+      callers.push({ entry, reached });
+      publicByTarget.set(reached.target, callers);
     }
   }
   const moduleOwners = new Map();
@@ -492,7 +623,7 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
       const bindings = assigned.get(config.id).get(bindingRoot.id).sort((left, right) => left.target.localeCompare(right.target));
       const comparison = await loadComparison(bindingRoot);
       const typescript = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) ?? null;
-      const coverage = typescript === null
+      const surfaceCoverage = typescript === null
         ? null
         : buildSurfaceCoverage(config, bindingRoot, typescript, bindings, comparison);
       const issues = [];
@@ -503,16 +634,17 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
           issues.push(issue("runtime-only", "error", `${binding.target} has no compiler declaration`, { target: binding.target }));
         }
       }
-      if (coverage !== null && coverage.summary.missing !== 0 &&
-          !(comparison !== null && coverage.mode === "automatic")) {
+      if (surfaceCoverage !== null && surfaceCoverage.summary.missing !== 0 &&
+          !(comparison !== null && surfaceCoverage.mode === "automatic")) {
         issues.push(issue(
-          coverage.mode === "reviewed" ? "upstream-members-missing" : "upstream-members-unmapped",
+          surfaceCoverage.mode === "reviewed" ? "upstream-members-missing" : "upstream-members-unmapped",
           "gap",
-          coverage.mode === "reviewed"
-            ? `${coverage.summary.missing} of ${coverage.members.length} upstream members have no shipped VIR binding`
-            : `${coverage.summary.missing} of ${coverage.members.length} upstream entries have no automatic VIR mapping candidate`,
+          surfaceCoverage.mode === "reviewed"
+            ? `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream members have no shipped VIR binding`
+            : `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream entries have no automatic VIR mapping candidate`,
         ));
       }
+      issues.push(...accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget));
       issues.push(...semanticIssues(comparison));
       if (comparison !== null) {
         for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
@@ -532,8 +664,8 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
         lean: bindingRoot.lean ?? { public: [] },
         upstream: bindingRoot.upstream,
         ...(typescript === null ? {} : { typescript }),
-        ...(coverage === null ? {} : { coverage }),
-        analysis: analysisState(bindingRoot, coverage, comparison),
+        ...(surfaceCoverage === null ? {} : { coverage: surfaceCoverage }),
+        analysis: analysisState(bindingRoot, surfaceCoverage, comparison),
         findingStatus: findingStatus(bindings, issues),
         summary: {
           bindings: bindings.length,
@@ -738,8 +870,9 @@ function renderHtml(report) {
   function targetMappingState(target) { if(target.comparison) return {status:target.comparison.status,label:target.comparison.status}; if(target.mapping) return {status:target.mapping.status,label:target.mapping.status}; if(target.group.analysis.status==="not-applicable") return {status:"not-applicable",label:"no upstream contract"}; if(target.group.analysis.status==="needs-input") return {status:"needs-input",label:"contract input needed"}; return {status:"unmatched",label:"no correspondence"}; }
   function sourceLink(source,moduleName) { return source?.path?'<a class="source" href="../../'+escapeHtml(source.path)+'#L'+source.startLine+'">'+escapeHtml(moduleName+":"+source.startLine)+'</a>':''; }
   function symbolSource(symbol) { return symbol?.source?.url?'<a class="source" href="'+escapeHtml(symbol.source.url)+'#L'+symbol.source.startLine+'" target="_blank" rel="noreferrer">source</a>':symbol?.source?.path?'<a class="source" href="../../'+escapeHtml(symbol.source.path)+'#L'+symbol.source.startLine+'">source</a>':''; }
-  function expectedCandidates(target) { if(target.comparison) return [{typescript:target.comparison.ts,status:target.comparison.status,display:target.comparison.tsSymbol?.display||JSON.stringify(target.comparison.tsSymbol?.shape||{},null,2),symbol:target.comparison.tsSymbol,note:"Reviewed type-fidelity comparison."}]; if(target.mapping?.source==="reviewed") { const symbol=target.group.typescript?.symbols.find((entry)=>entry.id===target.mapping.typescript); return [{typescript:target.mapping.typescript,status:target.mapping.status,display:symbol?.display,symbol,note:"Reviewed upstream correspondence."}]; } return (target.mapping?.candidates||[]).map((candidate)=>{const symbol=target.group.typescript?.symbols.find((entry)=>entry.id===candidate.typescript); return {...candidate,status:target.mapping.status,display:symbol?.display,symbol,note:"Automatic name candidate: "+candidate.reason+" (score "+candidate.score+"). No type-fidelity verdict yet."};}); }
-  function renderExpected(target) { const expected=expectedCandidates(target); if(expected.length===0) { if(target.group.analysis.status==="not-applicable") return '<div class="empty">No upstream parity contract applies.</div>'; if(target.group.analysis.status==="needs-input") return '<div class="empty">The local upstream contract must be identified first.</div>'; return '<div class="empty">No upstream correspondence has been identified.</div>'; } return expected.map((item)=>'<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.typescript)+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div><p class="note">'+escapeHtml(item.note)+'</p><div class="card-head"><pre>'+escapeHtml(item.display||"Declaration unavailable")+'</pre>'+symbolSource(item.symbol)+'</div></article>').join(""); }
+  function accessorDisplay(symbol,accessor) { if(!symbol?.display||!accessor)return symbol?.display; const colon=symbol.display.indexOf(":"); if(colon===-1)return symbol.display; const name=symbol.id.split(".").at(-1); const type=symbol.display.slice(colon+1).trim().replace(/;$/u,""); return accessor==="get"?"get "+name+"(): "+type+";":"set "+name+"(value: "+type+");"; }
+  function expectedCandidates(target) { if(target.comparison) { const accessor=target.comparison.portIntent?.accessor; return [{typescript:target.comparison.ts,status:target.comparison.status,accessor,display:accessorDisplay(target.comparison.tsSymbol,accessor)||JSON.stringify(target.comparison.tsSymbol?.shape||{},null,2),symbol:target.comparison.tsSymbol,note:"Reviewed type-fidelity comparison."}]; } if(target.mapping?.source==="reviewed") { const symbol=target.group.typescript?.symbols.find((entry)=>entry.id===target.mapping.typescript); return [{typescript:target.mapping.typescript,status:target.mapping.status,accessor:target.mapping.accessor,display:accessorDisplay(symbol,target.mapping.accessor),symbol,note:"Reviewed upstream correspondence."}]; } return (target.mapping?.candidates||[]).map((candidate)=>{const symbol=target.group.typescript?.symbols.find((entry)=>entry.id===candidate.typescript); return {...candidate,status:target.mapping.status,display:accessorDisplay(symbol,candidate.accessor),symbol,note:"Automatic name candidate: "+candidate.reason+" (score "+candidate.score+"). No type-fidelity verdict yet."};}); }
+  function renderExpected(target) { const expected=expectedCandidates(target); if(expected.length===0) { if(target.group.analysis.status==="not-applicable") return '<div class="empty">No upstream parity contract applies.</div>'; if(target.group.analysis.status==="needs-input") return '<div class="empty">The local upstream contract must be identified first.</div>'; return '<div class="empty">No upstream correspondence has been identified.</div>'; } return expected.map((item)=>'<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.typescript+(item.accessor?" · "+item.accessor+"ter":""))+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div><p class="note">'+escapeHtml(item.note)+'</p><div class="card-head"><pre>'+escapeHtml(item.display||"Declaration unavailable")+'</pre>'+symbolSource(item.symbol)+'</div></article>').join(""); }
   function selectorMatches(declaration,selector) { return declaration===selector||declaration.startsWith(selector+"."); }
   function preferredPublicEntries(target) { const reviewedNames=[...(target.mapping?.source==="reviewed"?(target.mapping.lean||[]):[]),target.comparison?.lean].filter(Boolean); const reviewed=target.publicEntries.filter((item)=>reviewedNames.includes(item.entry.declaration)); if(reviewed.length)return reviewed; const selectors=target.group.lean.public||[]; const scoped=target.publicEntries.filter((item)=>selectors.some((selector)=>selectorMatches(item.entry.declaration,selector))); const pool=scoped.length?scoped:target.publicEntries; if(pool.length===0)return []; const minimum=Math.min(...pool.map((item)=>item.reach.path.length)); return pool.filter((item)=>item.reach.path.length===minimum).sort((left,right)=>left.entry.declaration.localeCompare(right.entry.declaration)); }
   function renderPublicCard(item,showPath=true) { return '<article class="binding"><div class="card-head"><span class="card-title">'+escapeHtml(item.entry.declaration)+'</span>'+sourceLink(item.entry.source,item.entry.module)+'</div><pre>'+escapeHtml(item.entry.type)+'</pre>'+(showPath?'<details><summary class="note path">Compiler path · '+(item.reach.path.length-1)+' call edge'+(item.reach.path.length===2?'':'s')+'</summary><pre>'+escapeHtml(item.reach.path.join("\\n→ "))+'</pre></details>':'')+'</article>'; }
@@ -748,7 +881,7 @@ function renderHtml(report) {
   function renderIssues(group) { if (group.issues.length === 0) return '<div class="empty">No runtime, coverage, or type-fidelity findings for this API group.</div>'; return group.issues.map((entry) => '<div class="issue '+escapeHtml(entry.severity)+'"><div class="card-head"><span class="card-title">'+escapeHtml(entry.kind)+'</span><span class="pill '+escapeHtml(entry.severity)+'">'+escapeHtml(entry.severity)+'</span></div><p class="note">'+escapeHtml(entry.message)+'</p>'+(entry.target?'<a href="#target-'+escapeHtml(entry.target)+'">'+escapeHtml(entry.target)+'</a>':'')+'</div>').join(""); }
   function renderAnchors(group) { const results=group.comparison?.results || []; if (results.length === 0) return '<div class="empty">Type fidelity has not been evaluated for this API group.</div>'; return results.map((item) => { const ts=item.tsSymbol?.display || JSON.stringify(item.tsSymbol?.shape || {},null,2); const lean=JSON.stringify(item.leanDescriptor?.shape || {},null,2); const diagnostics=(item.diagnostics || []).map((entry) => '<span class="badge '+escapeHtml(entry.severity)+'" title="'+escapeHtml(entry.message)+'">'+escapeHtml(entry.code)+'</span>').join(""); return '<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.ts)+' ↔ '+escapeHtml(item.lean)+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div>'+(item.note?'<p class="note">'+escapeHtml(item.note)+'</p>':'')+'<div class="badges">'+diagnostics+'</div><div class="panes"><div class="pane"><div class="pane-title">Expected TypeScript</div><pre>'+escapeHtml(ts)+'</pre></div><div class="pane"><div class="pane-title">Compared Lean descriptor</div><pre>'+escapeHtml(lean)+'</pre></div></div></article>'; }).join(""); }
   function mappingsForSymbol(group,id) { return (group.coverage?.targetMappings||[]).filter((mapping)=>mapping.typescript===id||(mapping.candidates||[]).some((candidate)=>candidate.typescript===id)); }
-  function renderSymbolActual(group,id) { const mappings=mappingsForSymbol(group,id); if(mappings.length===0)return '<div class="empty">No VIR target is mapped to this upstream entry.</div>'; return mappings.flatMap((mapping)=>{const target=targetById.get(mapping.target); return target?['<article class="anchor"><div class="card-head"><button class="inline-button card-title" type="button" data-open-target="'+escapeHtml(target.target)+'">'+escapeHtml(target.target)+'</button><span class="pill '+escapeHtml(mapping.status)+'">'+escapeHtml(mapping.status)+'</span></div>'+renderActual(target,false)+'</article>']:[];}).join(""); }
+  function renderSymbolActual(group,id) { const mappings=mappingsForSymbol(group,id); const member=(group.coverage?.members||[]).find((entry)=>entry.id===id); const symbol=group.typescript?.symbols.find((entry)=>entry.id===id); const missing=(member?.mapping?.operations||[]).filter((operation)=>operation.missing).map((operation)=>'<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(id+' · '+operation.accessor+'ter')+'</span><span class="pill missing">missing</span></div><pre>'+escapeHtml(accessorDisplay(symbol,operation.accessor)||symbol?.display||id)+'</pre><p class="note">'+escapeHtml(operation.note)+'</p></article>'); const mapped=mappings.flatMap((mapping)=>{const target=targetById.get(mapping.target); return target?['<article class="anchor"><div class="card-head"><button class="inline-button card-title" type="button" data-open-target="'+escapeHtml(target.target)+'">'+escapeHtml(target.target+(mapping.accessor?' · '+mapping.accessor+'ter':''))+'</button><span class="pill '+escapeHtml(mapping.status)+'">'+escapeHtml(mapping.status)+'</span></div>'+renderActual(target,false)+'</article>']:[];}); const cards=[...mapped,...missing]; return cards.length?cards.join(""):'<div class="empty">No VIR target is mapped to this upstream entry.</div>'; }
   function renderTypeScript(group) { const symbols=group.typescript?.symbols || []; if (symbols.length === 0) return '<div class="empty">This API group has no external TypeScript declaration surface.</div>'; const coverage=new Map((group.coverage?.members || []).map((member)=>[member.id,member])); return symbols.map((symbol) => { const member=coverage.get(symbol.id); const status=member?'<span class="pill '+escapeHtml(member.status)+'">'+escapeHtml(member.status)+'</span>':''; const inherited=symbol.inheritedFrom?'<span class="badge">from '+escapeHtml(symbol.inheritedFrom)+'</span>':''; const comparison=member?'<div class="panes"><div class="pane"><div class="pane-title">Expected upstream TypeScript</div><pre>'+escapeHtml(symbol.display)+'</pre></div><div class="pane"><div class="pane-title">Actual public Lean API</div>'+renderSymbolActual(group,symbol.id)+'</div></div>':'<pre>'+escapeHtml(symbol.display)+'</pre>'; return '<details class="binding"><summary><span class="card-title">'+escapeHtml(symbol.id)+'</span> <span class="badge">'+escapeHtml(symbol.kind)+'</span> '+inherited+' '+status+'</summary><div class="card-head"><p class="note">'+escapeHtml(symbol.hover || 'No declaration documentation.')+'</p>'+symbolSource(symbol)+'</div>'+comparison+'</details>'; }).join(""); }
   function renderDeclarations(binding) { return binding.declarations.map((decl) => { const source=decl.source?.path?'<a class="source" href="../../'+escapeHtml(decl.source.path)+'#L'+decl.source.startLine+'">'+escapeHtml(decl.module+":"+decl.source.startLine)+'</a>':''; return '<div class="binding"><div class="card-head"><span class="card-title">'+escapeHtml(decl.declaration)+'</span>'+source+'</div><div class="badges">'+badges([decl.marker,decl.boundary,decl.private?'private boundary':'public boundary'])+'</div><pre>'+escapeHtml(decl.type)+'</pre></div>'; }).join(""); }
   function renderBindings(group) { return group.bindings.map((binding) => '<details id="target-'+escapeHtml(binding.target)+'"><summary><span class="card-title">'+escapeHtml(binding.target)+'</span> <span class="pill '+escapeHtml(binding.status)+'">'+escapeHtml(binding.status)+'</span></summary><div class="badges">'+badges(binding.providers)+'</div>'+renderDeclarations(binding)+'</details>').join(""); }
@@ -799,8 +932,12 @@ try {
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
+  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
   console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);
+  if (report.summary.issues.error !== 0) {
+    fail(`binding explorer found ${report.summary.issues.error} binding-surface errors`);
+  }
 } catch (error) {
   fail(error.message);
 }

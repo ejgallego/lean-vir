@@ -93,6 +93,16 @@ declaration, followed by the private or public implementation boundary. This
 makes the inputs to a fidelity review visible without turning an automatic name
 match into a structural verdict.
 
+Properties are operation-specific in the explorer. A reviewed mapping records
+the getter and setter independently, including their host targets, public Lean
+declarations, and anchors. The expected pane renders accessor-shaped
+declarations such as `get title(): string` and `set title(value: string)` rather
+than showing the same undifferentiated property for both targets. A writable
+property must classify both operations; either may be an explicit missing gap
+while a binding is under development. Generation rejects a public sibling in
+the configured binding namespace that reaches the same accessor without a
+distinct upstream operation.
+
 ## Artifact Ownership
 
 The checked-in reports are generated review artifacts. Edit their authored

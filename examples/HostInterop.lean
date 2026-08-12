@@ -30,10 +30,13 @@ def recordNat (value : Nat) : DomM Unit := do
   let jsValue ← Lean.Vir.JsValue.ofNat value
   recordNatJs jsValue
 
+private def setDocumentTitle (title : String) : DomM Unit := do
+  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
+
 def titleHandshake (label : String) : DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitleString title
-  Lean.Vir.Browser.Document.getTitleString
+  setDocumentTitle title
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
 
 partial def titleHandshakeLoopAux (remaining acc : Nat) : DomM Nat := do
   match remaining with
@@ -173,7 +176,7 @@ def mountKeyTitle (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
-        Lean.Vir.Browser.Document.setTitleString (← Lean.Vir.Browser.Event.key event)
+        setDocumentTitle (← Lean.Vir.Browser.Event.key event)
       pure 1
   | none => pure 0
 
@@ -184,17 +187,17 @@ def timeoutRecord (value : Nat) : DomM Nat := do
 
 def timeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 0 do
-    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
+    setDocumentTitle ("timeout:" ++ label)
   pure 1
 
 def delayedTimeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 80 do
-    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
+    setDocumentTitle ("timeout:" ++ label)
   pure 1
 
 def clearTimeoutTitle (label : String) : DomM Nat := do
   let timeout ← Lean.Vir.Browser.Timer.setTimeout 20 do
-    Lean.Vir.Browser.Document.setTitleString ("timeout:" ++ label)
+    setDocumentTitle ("timeout:" ++ label)
   Lean.Vir.Browser.Timer.clearTimeout timeout
   pure 1
 
@@ -222,12 +225,12 @@ def animationRecord (value : Nat) : DomM Nat := do
 
 def animationTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
-    Lean.Vir.Browser.Document.setTitleString ("frame:" ++ label)
+    setDocumentTitle ("frame:" ++ label)
   pure 1
 
 def cancelAnimationTitle (label : String) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
-    Lean.Vir.Browser.Document.setTitleString ("frame:" ++ label)
+    setDocumentTitle ("frame:" ++ label)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
   pure 1
 

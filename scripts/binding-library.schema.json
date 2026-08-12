@@ -69,30 +69,79 @@
         "mappings": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["typescript", "targets"],
-            "properties": {
-              "typescript": { "type": "string", "minLength": 1 },
-              "targets": {
-                "type": "array",
-                "minItems": 1,
-                "uniqueItems": true,
-                "items": { "type": "string", "minLength": 1 }
-              },
-              "lean": {
-                "type": "array",
-                "uniqueItems": true,
-                "items": { "type": "string", "minLength": 1 }
-              },
-              "note": { "type": "string", "minLength": 1 }
-            }
+            "oneOf": [
+              { "$ref": "#/$defs/directMapping" },
+              { "$ref": "#/$defs/propertyMapping" }
+            ]
           }
         },
         "anchors": {
           "type": "array",
           "items": { "type": "object" }
         }
+      }
+    },
+    "directMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typescript", "targets"],
+      "properties": {
+        "typescript": { "type": "string", "minLength": 1 },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "lean": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "propertyMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typescript", "accessors"],
+      "properties": {
+        "typescript": { "type": "string", "minLength": 1 },
+        "accessors": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "get": { "$ref": "#/$defs/accessorOperation" },
+            "set": { "$ref": "#/$defs/accessorOperation" }
+          }
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "accessorOperation": {
+      "oneOf": [
+        { "$ref": "#/$defs/accessorMapping" },
+        { "$ref": "#/$defs/missingAccessor" }
+      ]
+    },
+    "accessorMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "lean", "anchor"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1 },
+        "lean": { "type": "string", "minLength": 1 },
+        "anchor": { "type": "string", "minLength": 1 }
+      }
+    },
+    "missingAccessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "note"],
+      "properties": {
+        "missing": { "const": true },
+        "note": { "type": "string", "minLength": 1 }
       }
     },
     "upstream": {

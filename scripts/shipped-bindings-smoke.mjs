@@ -25,11 +25,13 @@ assert.equal(report.summary.declaredTargets, 132);
 assert.equal(report.summary.provided, 132);
 assert.equal(report.summary.missingProvider, 0);
 assert.equal(report.summary.runtimeOnly, 0);
-assert.equal(report.summary.publicEntries, 363);
-assert.equal(report.summary.publicTargetEdges, 2888);
+assert.equal(report.summary.publicEntries, 361);
+assert.equal(report.summary.publicTargetEdges, 2884);
 assert.equal(report.summary.targetsReachedByPublicEntries, 132);
 
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
+assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 const publicCanvasContext = publicEntries.get(
   "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
 );

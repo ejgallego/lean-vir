@@ -461,9 +461,14 @@ Import one of the provided modules:
 import Vir.Browser
 
 def titleRoundtrip (title : String) : Lean.Vir.Browser.DomM String := do
-  Lean.Vir.Browser.Document.setTitleString title
-  Lean.Vir.Browser.Document.getTitleString
+  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
 ```
+
+`Document.title` is exposed as the faithful `getTitle`/`setTitle` property
+pair. Applications choose where to place conversions or other policy; the
+binding layer does not add a second upstream operation for a convenience
+wrapper.
 
 The full Lean-side declaration list is maintained in
 `docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
