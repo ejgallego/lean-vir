@@ -29,7 +29,7 @@ await writeFile(
   new URL("infoview-react-dom-stub.mjs", buildDir),
   "export { createRoot } from 'react-dom/client';\n",
 );
-const widgetSource = await readFile(new URL("../web/src/generated/vir-infoview-widget.js", import.meta.url), "utf8");
+const widgetSource = await readFile(new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url), "utf8");
 const smokeWidgetSource = widgetSource
   .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
   .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');

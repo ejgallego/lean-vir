@@ -1,8 +1,8 @@
 # API Coverage
 
 This document is the canonical API coverage source. The machine-readable data
-lives in the `vir-api-coverage` fenced block below. `docs/API_COVERAGE.tsv` is a
-generated compatibility artifact for tools that prefer a plain TSV file.
+lives in the `vir-api-coverage` fenced block below. Tools that need a plain TSV
+can generate `build/analysis/api-coverage.tsv` without duplicating it in Git.
 
 The fenced block stays intentionally simple: tab-separated, one header row, one
 feature per row, and no multiline fields. If this repository later grows a

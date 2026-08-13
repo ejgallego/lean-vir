@@ -18,7 +18,9 @@ browser controller, and a `tests.json` package containing selectable variants,
 differential inputs, JavaScript-oracle availability, required backends, and the
 benchmark entry point. Run `npm run examples:check` to validate the catalog.
 See [`docs/EXAMPLE_FORMAT.md`](docs/EXAMPLE_FORMAT.md) for the contribution and
-uniform VIR compilation contract.
+uniform VIR compilation contract. Maintainers should also read
+[`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) for the canonical build,
+artifact, Pages, and validation workflow.
 
 Select the complete build-and-test unit by example and variant:
 

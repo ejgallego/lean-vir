@@ -80,7 +80,7 @@ def smokeHostDecl (marker : Vir.HostMetadata.HostImportMarker) : Lean.IR.Decl :=
   }
 
 def importedHelperTargetSource : System.FilePath :=
-  "scripts/smoke-infoview-imported-helper-target.lean"
+  "fixtures/infoview/ImportedHelperTarget.lean"
 
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
   let target : Vir.GeneratePackage.Target := {
@@ -154,12 +154,12 @@ def expectImportedDecl
     expectImportedDecl
       "before helper"
       beforeClosure
-      `Lean.Vir.Infoview.ImportedHelperSmoke.labelBefore
+      `InfoviewFixtures.ImportedHelper.labelBefore
   let afterDecl ←
     expectImportedDecl
       "after helper"
       afterClosure
-      `Lean.Vir.Infoview.ImportedHelperSmoke.labelAfter
+      `InfoviewFixtures.ImportedHelper.labelAfter
   expect "real imported helper IR hash tracks helper bodies" <|
     Lean.Vir.Infoview.irDeclHash beforeDecl !=
       Lean.Vir.Infoview.irDeclHash afterDecl

@@ -272,6 +272,26 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 - [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) for
   maintainer-facing implementation details.
 
+## Repository Layout
+
+- `Vir/` and `tools/` contain the Lean library and package tools.
+- `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
+  boundary sources.
+- `web/src/` contains runtime and page code; reusable static tool templates
+  live under `web/tools/`.
+- `examples/` contains runnable applications and tutorials; `fixtures/`
+  contains regression-only Lean and host inputs.
+- `benchmarks/browser/` is a standalone browser benchmark catalog with its own
+  package, docs, tests, and ignored artifacts.
+- `scripts/` contains repository orchestration and checks. Generated sources,
+  reports, packages, bundles, and site output stay under ignored `build/`,
+  `web/public/`, or `web/dist/` paths.
+
+The default Lake target builds the core `Vir` library without browser tooling.
+Use `lake build VirInfoview` when working on the optional infoview integration;
+that target requires the repository npm dependencies and generates its bundle
+below `build/generated/infoview/`.
+
 ## Contributor Checks
 
 ```bash

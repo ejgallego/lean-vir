@@ -73,9 +73,9 @@ once in C++ decoding. The C++ side also owns object construction details and
 reference-counting behavior while materializing upstream `Lean.IR` values.
 
 The first centralization step is now the package name/IR declaration payload
-tag table: `scripts/ir-codec-tags.mjs` generates
-`Vir/GeneratePackage/PackageIRTags.lean` and
-`wasm/upstream_shim/package/package_ir_tags.h`. Name tags are shared by
+tag table: `Vir/GeneratePackage/PackageIRTags.lean` owns the wire values and
+`scripts/ir-codec-tags.mjs` maps them into the generated
+`build/generated/wasm/package/package_ir_tags.h`. Name tags are shared by
 declarations, initializer globals, host imports, and export summaries; the
 remaining tag groups are declaration-IR-specific. This removes duplicated
 numeric tag literals from the Lean emitter and C++ decoder, but the field order

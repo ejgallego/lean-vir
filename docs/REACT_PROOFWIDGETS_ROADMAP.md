@@ -61,8 +61,8 @@ not yet have the proof-script edit channel or broader ProofWidgets RPC
 compatibility that tactic UIs can rely on.
 
 The current API coverage inventory is maintained as a machine-readable block in
-`docs/API_COVERAGE.md`; `docs/API_COVERAGE.tsv` is generated from that
-documentation block for tooling compatibility.
+`docs/API_COVERAGE.md`; tooling can generate
+`build/analysis/api-coverage.tsv` from that documentation block.
 
 ## Current Vir Fit
 

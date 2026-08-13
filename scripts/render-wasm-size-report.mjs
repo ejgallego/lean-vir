@@ -15,7 +15,7 @@ import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
 const HTML_VERSION = 9;
-const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url));
+const templateDir = fileURLToPath(new URL("../web/tools/wasm-size-report/", import.meta.url));
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
 let surfaceLinksArg = null;
