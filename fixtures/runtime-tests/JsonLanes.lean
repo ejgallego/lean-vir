@@ -2,23 +2,26 @@ import Vir.Json
 
 namespace Vir.Fixtures.JsonLanes
 
-def ownedRoundTrip (value : Lean.Vir.Json) : Lean.Vir.Json :=
-  value
+def ownedRoundTrip (value : Lean.Vir.Json.Handle) :
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  Lean.Vir.Json.Handle.ofJson (← Lean.Vir.Json.Handle.toJson value)
 
-def ownedWrap (value : Lean.Vir.Json) : Lean.Vir.Json :=
-  .object #[
+def ownedWrap (value : Lean.Vir.Json.Handle) :
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  Lean.Vir.Json.Handle.ofJson (.object #[
     ("before", .bool true),
-    ("payload", value),
+    ("payload", ← Lean.Vir.Json.Handle.toJson value),
     ("after", .number (-0.0))
-  ]
+  ])
 
-def ownedDuplicate : Lean.Vir.Json :=
-  .object #[("same", .null), ("same", .bool true)]
+def ownedDuplicate : Lean.Vir.RuntimeM Lean.Vir.Json.Handle :=
+  Lean.Vir.Json.Handle.ofJson (.object #[("same", .null), ("same", .bool true)])
 
-def ownedIntegerKeys : Lean.Vir.Json :=
-  .object #[("10", .string "ten"), ("2", .string "two"), ("alpha", .string "letter")]
+def ownedIntegerKeys : Lean.Vir.RuntimeM Lean.Vir.Json.Handle :=
+  Lean.Vir.Json.Handle.ofJson
+    (.object #[("10", .string "ten"), ("2", .string "two"), ("alpha", .string "letter")])
 
-partial def materialize (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json := do
+private partial def materialize (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json := do
   match ← Lean.Vir.Json.Handle.inspect value with
   | .null => pure .null
   | .bool value => pure (.bool value)
@@ -40,13 +43,14 @@ def borrowedRoundTrip (value : Lean.Vir.Json.Handle) :
   Lean.Vir.Json.Handle.ofJson (← materialize value)
 
 def borrowedPickWanted (value : Lean.Vir.Json.Handle) :
-    Lean.Vir.RuntimeM Lean.Vir.Json := do
-  match ← Lean.Vir.Json.Handle.inspect value with
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  let result ← match ← Lean.Vir.Json.Handle.inspect value with
   | .object entries =>
       match Lean.Vir.Json.objectFind? entries "wanted" with
       | some item => materialize item
       | none => pure .null
   | _ => pure .null
+  Lean.Vir.Json.Handle.ofJson result
 
 def borrowedPickWantedHandle (value : Lean.Vir.Json.Handle) :
     Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
@@ -57,8 +61,9 @@ def borrowedPickWantedHandle (value : Lean.Vir.Json.Handle) :
       | none => Lean.Vir.Json.Handle.ofJson .null
   | _ => Lean.Vir.Json.Handle.ofJson .null
 
-def borrowedToOwned (value : Lean.Vir.Json.Handle) : Lean.Vir.RuntimeM Lean.Vir.Json :=
-  Lean.Vir.Json.Handle.toJson value
+def borrowedToOwned (value : Lean.Vir.Json.Handle) :
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  Lean.Vir.Json.Handle.ofJson (← Lean.Vir.Json.Handle.toJson value)
 
 def borrowedDuplicateObject : Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
   let first ← Lean.Vir.Json.Handle.ofJson .null

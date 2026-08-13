@@ -70,7 +70,7 @@ ownership diagrams.
 - [JS_API.md](JS_API.md): runtime wrapper API details.
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md): Lean-side host import helpers and
   demo APIs.
-- [JSON_LANES.md](JSON_LANES.md): owned structural JSON, borrowed JSON handles,
+- [JSON_LANES.md](JSON_LANES.md): explicit structural JSON transitions, borrowed JSON handles,
   validation, and ownership.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md): JavaScript host bindings, virtual
   hosts, and resources.

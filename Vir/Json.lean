@@ -9,13 +9,15 @@ import Vir.Js
 namespace Lean.Vir
 
 /--
-An ordered, structural JSON value for VIR's owned JSON boundary.
+An ordered, structural JSON value used by VIR's explicit JSON conversions.
 
 JavaScript objects lower to `object` entries in JavaScript enumeration order.
 Unlike `Lean.Json`, the representation deliberately keeps those entries in an
 array so clients can preserve the observed order without an intermediate text
 codec.
 Numbers are finite IEEE-754 doubles, matching ordinary JavaScript JSON values.
+Exported declarations must use `Json.Handle` at the JavaScript boundary and
+call `Json.Handle.toJson` or `Json.Handle.ofJson` at deliberate transitions.
 -/
 inductive Json where
   | null

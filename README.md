@@ -158,10 +158,12 @@ const result = runtime.call("Quickstart.double", 21);
 The manifest-driven call path supports pure declarations and recognized
 synchronous effects (`RuntimeM`, `IO`, `DomM`, and `ReactM`) over the currently
 supported scalar, array/list, option, product, sum, except, structure, enum,
-`ByteArray`, `Lean.Expr`, and ordered `Lean.Vir.Json` shapes. See
+`ByteArray`, and `Lean.Expr` shapes. JSON-facing exports use
+`Lean.Vir.Json.Handle` resources with explicit transitions to the ordered
+`Lean.Vir.Json` representation. See
 [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
 guide, including `Sum` and `Except` result shapes, and
-[docs/JSON_LANES.md](docs/JSON_LANES.md) for owned and borrowed JSON.
+[docs/JSON_LANES.md](docs/JSON_LANES.md) for structural and borrowed JSON.
 
 ## Built-In Demos
 

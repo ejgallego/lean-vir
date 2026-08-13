@@ -1,4 +1,5 @@
 import Vir.React
+import Vir.Json
 
 inductive IndexedPair : Nat → Type where
   | mk (left : Nat) (right : Nat) : IndexedPair 0
@@ -10,3 +11,6 @@ def nakedElementIdentity (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser
 def nakedReactRootIdentity (root : Lean.Vir.React.Root) : Lean.Vir.React.Root := root
 def nakedStateSetterIdentity (setter : Lean.Vir.React.StateSetter Nat) : Lean.Vir.React.StateSetter Nat := setter
 def nakedPropsIdentity (props : Lean.Vir.React.Props) : Lean.Vir.React.Props := props
+def automaticJsonIdentity (value : Lean.Vir.Json) : Lean.Vir.Json := value
+def automaticNestedJsonIdentity (value : Array Lean.Vir.Json) : Array Lean.Vir.Json := value
+def automaticJsonResult : Lean.Vir.Json := .null

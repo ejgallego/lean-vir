@@ -5,7 +5,7 @@ record, array, and inductive boundary. Use the typed boundary when the schema
 is known. Use these JSON lanes for heterogeneous trees, opaque passthrough
 fields, or APIs where duplicating a schema projector would add no value.
 
-## Owned Structural JSON
+## Explicit Structural JSON
 
 `Vir.Json` defines `Lean.Vir.Json`:
 
@@ -19,26 +19,50 @@ inductive Lean.Vir.Json where
   | object (entries : Array (String × Json))
 ```
 
-An exported function can accept and return ordinary JavaScript JSON directly:
+`Lean.Vir.Json` is a Lean-side representation, not an automatic export-boundary
+type. JSON-facing exports use `Lean.Vir.Json.Handle` and name every complete-tree
+transition explicitly:
 
 ```lean
 import Vir.Json
 
 @[vir_export]
-def wrapJson (value : Lean.Vir.Json) : Lean.Vir.Json :=
-  .object #[("payload", value), ("accepted", .bool true)]
+def wrapJson (value : Lean.Vir.Json.Handle) :
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  let owned ← Lean.Vir.Json.Handle.toJson value
+  Lean.Vir.Json.Handle.ofJson
+    (.object #[("payload", owned), ("accepted", .bool true)])
 ```
 
 ```js
-runtime.call("wrapJson", { source: [1, null, "two"] });
-// { payload: { source: [1, null, "two"] }, accepted: true }
+import { releaseHostResource } from "lean-vir";
+
+const input = runtime.borrowJson({ source: [1, null, "two"] });
+try {
+  const output = runtime.call("wrapJson", input);
+  try {
+    console.log(runtime.jsonValue(output));
+    // { payload: { source: [1, null, "two"] }, accepted: true }
+  } finally {
+    releaseHostResource(output);
+  }
+} finally {
+  releaseHostResource(input);
+}
 ```
 
-The runtime lowers the complete JavaScript tree directly to the ordered Lean
-representation and lifts it directly back. No `JSON.stringify`, VIR `String`,
-`Lean.Json.parse`, or `JSON.parse` step is involved. Object entries retain
-the order observed from `Object.keys`. Numbers retain their finite IEEE-754
-value, including signed zero.
+`Handle.toJson` materializes the complete JavaScript tree as the ordered Lean
+representation; `Handle.ofJson` constructs a JavaScript-owned result handle
+from a complete Lean tree. No `JSON.stringify`, VIR `String`, `Lean.Json.parse`,
+or `JSON.parse` step is involved. Object entries retain the order observed from
+`Object.keys`. Numbers retain their finite IEEE-754 value, including signed
+zero.
+
+An export argument or result tree containing `Lean.Vir.Json` is rejected with
+a diagnostic that points to `Lean.Vir.Json.Handle`. This policy is intentional:
+at VIR's current experimental stage, callers should be able to see and review
+every full-tree ownership transition rather than acquire one from a type
+classifier fallback.
 
 The reverse boundary creates ordinary JavaScript objects. Their enumeration
 therefore follows ECMAScript rules: array-index keys enumerate in ascending
@@ -46,9 +70,11 @@ numeric order before other string keys, while other string keys retain insertion
 order. An arbitrary Lean object-entry order containing keys such as `"10"` and
 `"2"` is consequently normalized when it becomes a JavaScript object.
 
-`Lean.Vir.Json` is interface tag 28 (`INTERFACE_TAG.JSON`) in manifest schema
-version 8. It is a library-owned type with runtime-specialized lowering, not an
-application custom-inductive convention.
+`Lean.Vir.Json` retains interface tag 28 (`INTERFACE_TAG.JSON`) in manifest
+schema version 8 because the named `js.json.handle` and `js.json.value` host
+imports need its structural descriptor. The tag does not enable automatic
+export marshalling. It is a library-owned type with runtime-specialized
+conversion, not an application custom-inductive convention.
 
 ### Relationship To `Lean.Json`
 
@@ -80,9 +106,9 @@ isomorphism:
 
 `Lean.Json` is therefore appropriate for parsing and rendering JSON text with
 exact decimal values. `Lean.Vir.Json` is the runtime-value representation for
-crossing already-materialized JavaScript values without a text codec. If
-executable adapters are added later, their names and result types should make
-the rounding, overflow, signed-zero, and ordering policy explicit.
+explicitly materializing JavaScript values without a text codec. If executable
+adapters are added later, their names and result types should make the rounding,
+overflow, signed-zero, and ordering policy explicit.
 
 ## Borrowed JSON Handles
 
@@ -102,14 +128,15 @@ length or member count.
 
 ```lean
 def wanted (input : Lean.Vir.Json.Handle) :
-    Lean.Vir.RuntimeM Lean.Vir.Json := do
-  match ← Lean.Vir.Json.Handle.inspect input with
+    Lean.Vir.RuntimeM Lean.Vir.Json.Handle := do
+  let result ← match ← Lean.Vir.Json.Handle.inspect input with
   | .object entries =>
       match entries.findSome? fun (key, value) =>
           if key == "wanted" then some value else none with
       | some value => Lean.Vir.Json.Handle.toJson value
       | none => pure .null
   | _ => pure .null
+  Lean.Vir.Json.Handle.ofJson result
 ```
 
 JavaScript explicitly creates and releases the root handle:
@@ -120,7 +147,11 @@ import { releaseHostResource } from "lean-vir";
 const input = runtime.borrowJson(payload);
 try {
   const result = runtime.call("wanted", input);
-  // `result` is ordinary JavaScript JSON because the Lean result is owned JSON.
+  try {
+    console.log(runtime.jsonValue(result));
+  } finally {
+    releaseHostResource(result);
+  }
 } finally {
   releaseHostResource(input);
 }
@@ -156,18 +187,18 @@ needed.
 
 ## Validation And Limits
 
-Both lanes accept only ordinary JSON values: `null`, booleans, finite numbers,
-strings, dense arrays, and plain objects with string keys. Functions,
+Both representations accept only ordinary JSON values: `null`, booleans,
+finite numbers, strings, dense arrays, and plain objects with string keys. Functions,
 `undefined`, `bigint`, non-finite numbers, sparse array holes, non-plain
 objects, and enumerable symbol properties are rejected.
 
-The owned lane validates the complete tree while lowering. It rejects cycles
-and paths deeper than 256 levels before calling Lean. Borrowing is intentionally
-constant-work: it validates the root shallowly, then `Handle.inspect` validates
-each visited child and detects cycles or excessive depth along that path.
-`Handle.toJson` necessarily validates the complete materialized tree.
+Borrowing is intentionally constant-work: it validates the root shallowly,
+then `Handle.inspect` validates each visited child and detects cycles or
+excessive depth along that path. `Handle.toJson` necessarily validates the
+complete materialized tree when Lean calls that explicit conversion; it rejects
+cycles and paths deeper than 256 levels.
 
-Lifting owned JSON also rejects non-finite numbers, duplicate object keys, and
+`Handle.ofJson` also rejects non-finite numbers, duplicate object keys, and
 trees deeper than 256 levels. Object construction defines keys directly, so a
 JSON key named `__proto__` remains an ordinary own data property.
 
@@ -175,10 +206,11 @@ JSON key named `__proto__` remains an ordinary own data property.
 
 - Prefer the manifest-driven typed boundary for stable, known schemas. It gives
   Lean typed records and avoids dynamic field checks.
-- Prefer owned structural JSON for bulk traversal or transformation of most of
-  a heterogeneous tree.
+- Prefer owned structural JSON behind an explicit `Handle.toJson` /
+  `Handle.ofJson` transition for bulk traversal or transformation of most of a
+  heterogeneous tree.
 - Prefer borrowed handles for sparse inspection, identity-preserving
   passthrough, or large opaque subtrees.
-- Mix lanes explicitly when useful: inspect a borrowed input sparsely and
-  return an owned JSON result, or use `Handle.ofJson` / `Handle.toJson` at a
-  deliberate ownership transition.
+- Mix representations explicitly when useful: inspect a borrowed input
+  sparsely, materialize only a selected subtree, and return a handle built with
+  `Handle.ofJson`.

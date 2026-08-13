@@ -178,13 +178,20 @@ runtime directly and prints sample calls.
 
 ## JSON Values And Handles
 
-Exports typed as `Lean.Vir.Json` accept and return ordinary JavaScript JSON.
-For a `Lean.Vir.Json.Handle` argument, retain the input explicitly:
+`Lean.Vir.Json` is not an automatic export-boundary type. JSON-facing exports
+use `Lean.Vir.Json.Handle`; Lean code calls `Handle.toJson` or `Handle.ofJson`
+when it deliberately wants to materialize or return an owned structural tree.
+Retain the JavaScript input explicitly:
 
 ```js
 const input = vir.borrowJson(payload);
 try {
   const output = vir.call("inspectPayload", input);
+  try {
+    console.log(vir.jsonValue(output));
+  } finally {
+    releaseHostResource(output);
+  }
 } finally {
   releaseHostResource(input);
 }

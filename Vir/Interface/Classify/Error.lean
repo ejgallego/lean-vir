@@ -93,6 +93,7 @@ public inductive InterfaceClassifierError where
   | structureFieldMissingProjection (field structureName : Lean.Name)
   | structureFieldMissingProjectionDeclaration (field structureName : Lean.Name)
   | structureFieldInvalidProjectionType (field structureName : Lean.Name) (type : Lean.Expr)
+  | automaticJsonBoundary
   | jsMarkerOutsideResource (marker : Lean.Name)
   | runtimeErasedParameterAfterArguments (name : Lean.Name)
   | implicitOrInstanceArgument (name : Lean.Name)
@@ -171,6 +172,10 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
       m!"field `{field}` of structure `{structureName}` has no projection declaration"
   | .structureFieldInvalidProjectionType field structureName type =>
       m!"field `{field}` of structure `{structureName}` has invalid projection type {quotedExpr type}"
+  | .automaticJsonBoundary =>
+      m!"`Lean.Vir.Json` requires an explicit JavaScript boundary; use \
+        `Lean.Vir.Json.Handle` in exported signatures and call \
+        `Lean.Vir.Json.Handle.toJson` or `Lean.Vir.Json.Handle.ofJson` explicitly"
   | .jsMarkerOutsideResource marker =>
       m!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
   | .runtimeErasedParameterAfterArguments name =>

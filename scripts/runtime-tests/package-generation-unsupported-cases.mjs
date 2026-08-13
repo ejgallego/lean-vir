@@ -37,6 +37,8 @@ const indexedPairPackageElaborationEvidence = new RegExp(
 );
 const nakedElementReason =
   /unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/;
+const automaticJsonReason =
+  /`Lean\.Vir\.Json` requires an explicit JavaScript boundary; use `Lean\.Vir\.Json\.Handle` in exported signatures and call `Lean\.Vir\.Json\.Handle\.toJson` or `Lean\.Vir\.Json\.Handle\.ofJson` explicitly/;
 
 async function assertInvalidAttributeSource(freshDir, stem, lines, patterns) {
   ensureVirJsBuilt();
@@ -82,6 +84,30 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ], [
     /invalid `@\[vir_export\]` declaration `nakedElementIdentity`/,
     nakedElementReason,
+  ]);
+
+  await assertInvalidAttributeSource(freshDir, "InvalidAutomaticJsonExportAttribute", [
+    "import Vir.Attributes",
+    "import Vir.Json",
+    "",
+    "@[vir_export]",
+    "def automaticJsonIdentity (value : Lean.Vir.Json) : Lean.Vir.Json := value",
+    "",
+  ], [
+    /invalid `@\[vir_export\]` declaration `automaticJsonIdentity`/,
+    automaticJsonReason,
+  ]);
+
+  await assertInvalidAttributeSource(freshDir, "InvalidAutomaticJsonResultAttribute", [
+    "import Vir.Attributes",
+    "import Vir.Json",
+    "",
+    "@[vir_export]",
+    "def automaticJsonResult : Lean.Vir.Json := .null",
+    "",
+  ], [
+    /invalid `@\[vir_export\]` declaration `automaticJsonResult`/,
+    automaticJsonReason,
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidImplicitHostAttribute", [
@@ -145,6 +171,12 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /unsupported type `Lean\.Vir\.React\.StateSetter Nat`/,
     /nakedPropsIdentity/,
     /unsupported type `Lean\.Vir\.React\.Props`/,
+    /automaticJsonIdentity/,
+    automaticJsonReason,
+    /automaticNestedJsonIdentity/,
+    automaticJsonReason,
+    /automaticJsonResult/,
+    automaticJsonReason,
   ], [
     "indexedPairIdentity",
     "implicitBump",
@@ -153,6 +185,9 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "nakedReactRootIdentity",
     "nakedStateSetterIdentity",
     "nakedPropsIdentity",
+    "automaticJsonIdentity",
+    "automaticNestedJsonIdentity",
+    "automaticJsonResult",
   ]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "UnsupportedRecursiveInductives.lean", [

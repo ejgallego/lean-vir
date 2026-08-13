@@ -489,8 +489,10 @@ requirements. Resolved calls without a package-owned summary fail.
 The package also records host-import arity, erased-prefix count, and effect
 metadata for Lean-to-JavaScript calls. The shim uses that metadata to send
 borrowed Lean object arguments through `env.vir_js_call_objects`, and JavaScript
-uses the JSON manifest descriptors to lift arguments and lower the owned Lean
-object result. The
+uses manifest descriptors to lift arguments and lower the owned Lean object
+result. For JSON, that structural path is invoked only by the explicit
+`js.json.handle` and `js.json.value` conversions; exports themselves carry
+`Lean.Vir.Json.Handle` resources. The
 opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
 Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
 resources.

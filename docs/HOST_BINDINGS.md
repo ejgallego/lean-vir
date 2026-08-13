@@ -53,6 +53,7 @@ For host imports, the relevant descriptor family is:
 | `INTERFACE_TAG.FUNCTION` | Argument only | Callback arguments/results must be `INTERFACE_TAG.UNIT` or `INTERFACE_TAG.RESOURCE`. |
 | `INTERFACE_TAG.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
 | Structural descriptors such as `INTERFACE_TAG.NAT`, `INTERFACE_TAG.STRING`, `INTERFACE_TAG.ARRAY`, and `INTERFACE_TAG.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
+| `INTERFACE_TAG.JSON` | No | Only the explicit `js.json.handle` / `js.json.value` conversions; JSON-facing exports use `Lean.Vir.Json.Handle`. |
 
 For example, a package can define a named conversion for a Lean structure when
 the JavaScript host binding wants to inspect that structure and return a real
