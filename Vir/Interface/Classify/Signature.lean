@@ -43,6 +43,26 @@ private def classifyResult (result : Lean.Expr) :
   | .error error => return .error (.inContext (.signatureResult result) error)
   | .ok resultType => return .ok (resultType, effect)
 
+/-- Whether an export type would implicitly marshal an owned JSON tree. -/
+private partial def InterfaceType.containsJson : InterfaceType → Bool
+  | .json => true
+  | .array element | .list element | .option element => element.containsJson
+  | .prod fst snd => fst.containsJson || snd.containsJson
+  | .taggedUnion _ _ constructors =>
+      constructors.any fun (_, _, payload, _, _, _, _) => payload.containsJson
+  | .customInductive _ _ constructors =>
+      constructors.any fun (_, _, _, _, _, fields) =>
+        fields.any fun (_, type, _) => type.containsJson
+  | .structure _ _ _ _ _ _ fields =>
+      fields.any fun (_, type, _, _) => type.containsJson
+  | .function args result _ =>
+      args.any (fun (_, type) => type.containsJson) || result.containsJson
+  | _ => false
+
+private def rejectAutomaticJsonBoundary (type : InterfaceType) :
+    Except InterfaceClassifierError Unit :=
+  if type.containsJson then .error .automaticJsonBoundary else .ok ()
+
 /--
 Classify a marker-preflighted export signature without rescanning its binders.
 -/
@@ -54,13 +74,21 @@ def classifyExportSignature (signature : ExportSignature) :
     | .error error =>
         return .error (.inContext (.signatureArgument binder.type) error)
     | .ok argType =>
+        match rejectAutomaticJsonBoundary argType with
+        | .error error =>
+            return .error (.inContext (.signatureArgument binder.type) error)
+        | .ok () => pure ()
         args := args.push {
           name := binderArgName (args.size + 1) binder.name
           type := argType
         }
   match ← classifyResult signature.result with
   | .error error => return .error error
-  | .ok (result, effect) => return .ok { args, result, effect }
+  | .ok (result, effect) =>
+      match rejectAutomaticJsonBoundary result with
+      | .error error =>
+          return .error (.inContext (.signatureResult signature.result) error)
+      | .ok () => return .ok { args, result, effect }
 
 /-- Validate and classify a declaration's complete JavaScript export interface. -/
 public def analyzeExportInterface (type : Lean.Expr) :

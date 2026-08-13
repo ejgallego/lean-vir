@@ -53,6 +53,7 @@ import {
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
+import { liftJsonObjectValue, makeJsonObjectValue } from "./json-values.js";
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
@@ -252,6 +253,8 @@ export class ObjectValueRuntime {
         return this.makeObjectFloat32(value, label);
       case INTERFACE_TAG.EXPR:
         return this.makeObjectExpr(value, label);
+      case INTERFACE_TAG.JSON:
+        return makeJsonObjectValue(this, value, label);
       case INTERFACE_TAG.ARRAY:
       case INTERFACE_TAG.LIST:
         return this.makeObjectSequenceValue(type, value, label, selfType, ownResources);
@@ -1248,6 +1251,8 @@ export class ObjectValueRuntime {
         return Math.fround(this.exports.vir_obj_float32_value(obj));
       case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
+      case INTERFACE_TAG.JSON:
+        return liftJsonObjectValue(this, obj, label);
       case INTERFACE_TAG.ARRAY:
         return this.liftObjectArrayValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.LIST:

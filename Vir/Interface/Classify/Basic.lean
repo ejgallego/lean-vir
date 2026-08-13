@@ -56,6 +56,7 @@ def preserveInterfaceHead (name : Name) : Bool :=
     | `USize
     | `ByteArray
     | `Lean.Expr
+    | `Lean.Vir.Json
     | `Array
     | `List
     | `Option
@@ -89,6 +90,7 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
+  | some `Lean.Vir.Json => some .json
   | _ => none
 
 def optParamType? (e : Lean.Expr) : Option Lean.Expr := do

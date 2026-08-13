@@ -28,6 +28,7 @@ in ordinary host imports. The supported boundary lanes are:
 | `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `hostResource` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
+| `Lean.Vir.Json.Handle` | JavaScript-owned JSON resource | `hostResource` plus `js.json.*` explicit conversions | Inspect one JSON level at a time or switch explicitly to/from owned `Lean.Vir.Json`. |
 | Structural interface values | JavaScript caller to exported Lean entrypoints | descriptor-guided object lowering | Call public Lean functions from JavaScript without a host-import wrapper. |
 
 The package manifest records each host import boundary as `hostResource`,
@@ -52,6 +53,7 @@ For host imports, the relevant descriptor family is:
 | `INTERFACE_TAG.FUNCTION` | Argument only | Callback arguments/results must be `INTERFACE_TAG.UNIT` or `INTERFACE_TAG.RESOURCE`. |
 | `INTERFACE_TAG.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
 | Structural descriptors such as `INTERFACE_TAG.NAT`, `INTERFACE_TAG.STRING`, `INTERFACE_TAG.ARRAY`, and `INTERFACE_TAG.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
+| `INTERFACE_TAG.JSON` | No | Only the explicit `js.json.handle` / `js.json.value` conversions; JSON-facing exports use `Lean.Vir.Json.Handle`. |
 
 For example, a package can define a named conversion for a Lean structure when
 the JavaScript host binding wants to inspect that structure and return a real
@@ -73,6 +75,14 @@ opaque payloadToJs (payload : @& Payload) :
 helpers through explicit `Lean.Vir.JsValue` conversions. The low-level
 `common.*` JavaScript targets receive and return `Lean.Vir.Js α` resources;
 the public Lean wrappers return ordinary Lean values in `RuntimeM`.
+
+The common bindings also install `js.json.handle`, `js.json.value`,
+`js.json.inspect`, `js.json.array`, and `js.json.object` for
+`Lean.Vir.Json.Handle`. JavaScript creates a root with
+`runtime.borrowJson(value)`; Lean owns child handles returned by inspection,
+and the builders retain embedded child values by JavaScript identity.
+See [JSON_LANES.md](JSON_LANES.md) for the full ownership and validation
+contract.
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`.
 

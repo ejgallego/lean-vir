@@ -12,6 +12,7 @@ import {
 } from "../../web/src/vir-runtime-node.js";
 import { hostResourceValue, releaseHostResource } from "../../web/src/host-resource.js";
 import { createHostResourceState } from "../../web/src/host/vir-host-resources.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import {
   assert,
   generateIrPackage,
@@ -145,6 +146,238 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     () => leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.useReleased"),
     /js\.leanRef\.value argument value did not lift to a live host resource/,
   );
+
+  const jsonSource = join(freshDir, "JsonLanes.lean");
+  const jsonPackage = join(freshDir, "json-lanes.irpkg");
+  await writeRuntimeFixture(jsonSource, "JsonLanes.lean");
+  generateIrPackage(jsonSource, jsonPackage);
+  const jsonDocumentState = createVirtualDocumentState();
+  const jsonRuntime = await createVirRuntimeFactory({
+    wasmBytes,
+    virtualDocumentState: jsonDocumentState,
+  }).createRuntime({ irPackageSetBytes: [await readFile(jsonPackage)] });
+  const ownedEntry = jsonRuntime.interfaceManifest.exports.find(
+    (entry) => entry.entry === "Vir.Fixtures.JsonLanes.ownedRoundTrip",
+  );
+  assert.equal(ownedEntry?.args[0]?.type?.interfaceTag, INTERFACE_TAG.RESOURCE);
+  assert.equal(ownedEntry?.result?.interfaceTag, INTERFACE_TAG.RESOURCE);
+  for (const target of [
+    "js.json.handle",
+    "js.json.value",
+    "js.json.inspect",
+    "js.json.array",
+    "js.json.object",
+  ]) {
+    assert.equal(
+      jsonRuntime.interfaceManifest.hostImports.find((entry) => entry.target === target)?.boundary,
+      "explicitConversion",
+    );
+  }
+  const jsonHandleImport = jsonRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "js.json.handle",
+  );
+  assert.equal(jsonHandleImport?.args[0]?.type?.interfaceTag, INTERFACE_TAG.JSON);
+  assert.equal(jsonHandleImport?.result?.interfaceTag, INTERFACE_TAG.RESOURCE);
+  const jsonValueImport = jsonRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "js.json.value",
+  );
+  assert.equal(jsonValueImport?.args[0]?.type?.interfaceTag, INTERFACE_TAG.RESOURCE);
+  assert.equal(jsonValueImport?.result?.interfaceTag, INTERFACE_TAG.JSON);
+
+  const callOwnedJson = (entry, ...values) => {
+    const inputs = [];
+    try {
+      for (const value of values) inputs.push(jsonRuntime.borrowJson(value));
+      const output = jsonRuntime.call(entry, ...inputs);
+      try {
+        return jsonRuntime.jsonValue(output);
+      } finally {
+        releaseHostResource(output);
+      }
+    } finally {
+      for (const input of inputs) releaseHostResource(input);
+    }
+  };
+
+  const ordered = {};
+  Object.defineProperties(ordered, {
+    zeta: { enumerable: true, value: 1 },
+    alpha: { enumerable: true, value: "two" },
+  });
+  Object.defineProperty(ordered, "__proto__", { enumerable: true, value: { safe: true } });
+  Object.defineProperty(ordered, "omega", { enumerable: true, value: [null, false, -0, 1.25e200] });
+  const ownedResult = callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", ordered);
+  assert.deepEqual(Object.keys(ownedResult), ["zeta", "alpha", "__proto__", "omega"]);
+  assert.equal(Object.getPrototypeOf(ownedResult), Object.prototype);
+  assert.deepEqual(ownedResult.__proto__, { safe: true });
+  assert.ok(Object.is(ownedResult.omega[2], -0));
+  assert.equal(ownedResult.omega[3], 1.25e200);
+  const wrapped = callOwnedJson("Vir.Fixtures.JsonLanes.ownedWrap", { nested: ["ok"] });
+  assert.deepEqual(Object.keys(wrapped), ["before", "payload", "after"]);
+  assert.ok(Object.is(wrapped.after, -0));
+  assert.deepEqual(wrapped.payload, { nested: ["ok"] });
+  const integerKeys = callOwnedJson("Vir.Fixtures.JsonLanes.ownedIntegerKeys");
+  assert.deepEqual(Object.keys(integerKeys), ["2", "10", "alpha"]);
+  assert.deepEqual(integerKeys, { 2: "two", 10: "ten", alpha: "letter" });
+
+  for (const malformed of [
+    undefined,
+    1n,
+    Symbol("bad"),
+    () => undefined,
+    NaN,
+    Infinity,
+    new Date(0),
+  ]) {
+    assert.throws(
+      () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", malformed),
+      /ordinary JSON value|finite JSON number|plain JSON object/,
+    );
+  }
+  const symbolObject = {};
+  Object.defineProperty(symbolObject, Symbol("bad"), { enumerable: true, value: 1 });
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", symbolObject),
+    /enumerable symbol property/,
+  );
+  const symbolArray = [];
+  Object.defineProperty(symbolArray, Symbol("bad"), { enumerable: true, value: 1 });
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", symbolArray),
+    /enumerable symbol property/,
+  );
+  assert.throws(() => jsonRuntime.borrowJson(symbolArray), /enumerable symbol property/);
+  const nestedMalformed = { "outer.key": [undefined] };
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", nestedMalformed),
+    /(?:argument value|borrowed JSON|js\.json\.value result)\["outer\.key"\]\[0\]/,
+  );
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedDuplicate"),
+    /duplicate JSON object key "same"/,
+  );
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedDuplicateObject"),
+    /JSON object builder contains duplicate key "same"/,
+  );
+  const sparseArray = [];
+  sparseArray.length = 1;
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", sparseArray),
+    /array hole/,
+  );
+  const cycle = {};
+  cycle.self = cycle;
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", cycle),
+    /JSON cycle/,
+  );
+  let deep = null;
+  for (let index = 0; index < 257; index++) deep = [deep];
+  assert.throws(
+    () => callOwnedJson("Vir.Fixtures.JsonLanes.ownedRoundTrip", deep),
+    /maximum JSON depth 256/,
+  );
+
+  const livePayload = { wanted: { title: "before" } };
+  const liveInput = jsonRuntime.borrowJson(livePayload);
+  const firstLivePick = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", liveInput);
+  assert.deepEqual(jsonRuntime.jsonValue(firstLivePick), { title: "before" });
+  releaseHostResource(firstLivePick);
+  livePayload.wanted = { title: "after" };
+  const secondLivePick = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", liveInput);
+  assert.deepEqual(jsonRuntime.jsonValue(secondLivePick), { title: "after" });
+  releaseHostResource(secondLivePick);
+  const liveOwned = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedToOwned", liveInput);
+  assert.deepEqual(jsonRuntime.jsonValue(liveOwned), livePayload);
+  releaseHostResource(liveOwned);
+  releaseHostResource(liveInput);
+
+  const borrowedInput = jsonRuntime.borrowJson({
+    skipped: { large: [1, 2, 3] },
+    wanted: { ref: { opaque: ["same", 17] }, title: "picked" },
+    tail: false,
+  });
+  const pickedOwned = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", borrowedInput);
+  assert.deepEqual(jsonRuntime.jsonValue(pickedOwned), {
+    ref: { opaque: ["same", 17] },
+    title: "picked",
+  });
+  releaseHostResource(pickedOwned);
+  const fullyOwned = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedToOwned", borrowedInput);
+  assert.deepEqual(jsonRuntime.jsonValue(fullyOwned), {
+    skipped: { large: [1, 2, 3] },
+    wanted: { ref: { opaque: ["same", 17] }, title: "picked" },
+    tail: false,
+  });
+  releaseHostResource(fullyOwned);
+  const wantedRef = jsonRuntime.jsonValue(borrowedInput).wanted;
+  const borrowedChild = jsonRuntime.call(
+    "Vir.Fixtures.JsonLanes.borrowedPickWantedHandle",
+    borrowedInput,
+  );
+  assert.equal(jsonRuntime.jsonValue(borrowedChild), wantedRef);
+  const borrowedOutput = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedInput);
+  assert.deepEqual(jsonRuntime.jsonValue(borrowedOutput), {
+    skipped: { large: [1, 2, 3] },
+    wanted: { ref: { opaque: ["same", 17] }, title: "picked" },
+    tail: false,
+  });
+  releaseHostResource(borrowedOutput);
+  assert.throws(() => jsonRuntime.jsonValue(borrowedOutput), /live|resource/);
+  const embeddedOutput = jsonRuntime.call(
+    "Vir.Fixtures.JsonLanes.borrowedEmbedWanted",
+    borrowedInput,
+  );
+  releaseHostResource(borrowedInput);
+  assert.equal(jsonRuntime.jsonValue(borrowedChild), wantedRef);
+  releaseHostResource(borrowedChild);
+  assert.throws(() => jsonRuntime.jsonValue(borrowedChild), /live|resource/);
+  const embeddedValue = jsonRuntime.jsonValue(embeddedOutput);
+  assert.equal(embeddedValue.ref, wantedRef);
+  assert.equal(embeddedValue.values[0], embeddedValue.ref);
+  assert.equal(embeddedValue.values[1], "passthrough");
+  releaseHostResource(embeddedOutput);
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedPickWanted", borrowedInput),
+    /must be a live host resource|resource is not live|did not lift to a live host resource/,
+  );
+
+  const borrowedCycle = jsonRuntime.borrowJson(cycle);
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedCycle),
+    /JSON cycle/,
+  );
+  releaseHostResource(borrowedCycle);
+  assert.throws(() => jsonRuntime.borrowJson(Symbol("bad")), /ordinary JSON value/);
+  const borrowedMalformed = jsonRuntime.borrowJson(nestedMalformed);
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedMalformed),
+    /borrowed JSON\["outer\.key"\]\[0\]/,
+  );
+  releaseHostResource(borrowedMalformed);
+  const borrowedDeep = jsonRuntime.borrowJson(deep);
+  assert.throws(
+    () => jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", borrowedDeep),
+    /maximum JSON depth 256/,
+  );
+  releaseHostResource(borrowedDeep);
+  for (let iteration = 0; iteration < 20; iteration++) {
+    const input = jsonRuntime.borrowJson({ iteration, values: [iteration + 0.5, null, true] });
+    const output = jsonRuntime.call("Vir.Fixtures.JsonLanes.borrowedRoundTrip", input);
+    assert.deepEqual(jsonRuntime.jsonValue(output), {
+      iteration,
+      values: [iteration + 0.5, null, true],
+    });
+    releaseHostResource(output);
+    releaseHostResource(input);
+  }
+  assert.deepEqual(jsonDocumentState.resources.debugResourceCounts(), {
+    scoped: 0,
+    temporaryScopes: 0,
+    owners: 0,
+  });
+  jsonRuntime.dispose();
 
   const customJsValueSource = join(freshDir, "CustomJsValue.lean");
   const customJsValuePackage = join(freshDir, "custom-js-value.irpkg");

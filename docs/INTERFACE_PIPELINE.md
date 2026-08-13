@@ -130,9 +130,11 @@ The embedded manifest currently supports:
 
 This broad surface is the descriptor-guided object lowering used by
 JavaScript-to-Lean exports and by declarations explicitly marked as
-conversions. It is not the ordinary Lean-to-JavaScript host-resource boundary,
-which is deliberately narrower and accepts only `Unit`, resources, and
-resource-shaped callbacks.
+conversions. `Lean.Vir.Json` is an exception: its structural descriptor is
+reserved for the explicit `Handle.toJson` / `Handle.ofJson` conversions and is
+rejected anywhere in an export argument or result tree. The surface is not the
+ordinary Lean-to-JavaScript host-resource boundary, which is deliberately
+narrower and accepts only `Unit`, resources, and resource-shaped callbacks.
 
 The numeric descriptor tag table is part of the package ABI. The JSON field is
 named `interfaceTag`; these tags describe interface descriptors, not the
@@ -140,7 +142,10 @@ ordinary host-resource import mode. Lean assigns tags in
 `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
 them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
 after editing either side.
-Manifest schema version 7 requires every export to carry an explicit Boolean
+Manifest schema version 8 adds the dedicated `Lean.Vir.Json` structural tag.
+It remains in the schema for named explicit conversions; it does not opt an
+export into automatic JSON marshalling.
+Version 7 requires every export to carry an explicit Boolean
 `startup` marker. Package generation sets it for declarations marked with
 `@[vir_startup]`. The runtime still accepts version 6 manifests and normalizes
 a missing marker to `false`. Version 6 intentionally rejected the old
@@ -175,6 +180,7 @@ aliases.
 | 25 | `INTERFACE_TAG.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
 | 26 | `INTERFACE_TAG.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
 | 27 | `INTERFACE_TAG.LEAN_OBJECT` | Opaque retained Lean object | Object-handle boundary descriptor. |
+| 28 | `INTERFACE_TAG.JSON` | `Lean.Vir.Json` | Ordered structural JSON used only by explicit conversion imports. |
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.

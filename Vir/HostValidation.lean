@@ -39,7 +39,8 @@ private def hostBoundaryKind : InterfaceType → String
   | .uint64
   | .usize
   | .byteArray
-  | .expr => "raw Lean type"
+  | .expr
+  | .json => "raw Lean type"
   | .simpleEnum .. => "enum"
   | .taggedUnion .. => "tagged union"
   | .customInductive .. => "inductive"

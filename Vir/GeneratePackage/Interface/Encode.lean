@@ -42,6 +42,7 @@ def InterfaceType.interfaceTag : InterfaceType → Nat
   | .resource .. => 23
   | .function .. => 24
   | .expr => 15
+  | .json => 28
   | .leanObject => 27
 
 def StructureFieldLayout.toJson : StructureFieldLayout → String

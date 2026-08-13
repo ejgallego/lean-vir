@@ -21,6 +21,9 @@ export {
 export {
   VirCallback,
 } from "./runtime/callbacks.js";
+export {
+  JSON_MAX_DEPTH,
+} from "./host/vir-json-bindings.js";
 
 export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
 export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";

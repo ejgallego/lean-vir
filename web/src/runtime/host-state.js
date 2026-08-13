@@ -19,6 +19,7 @@ import { releaseCallbackRoots } from "./callbacks.js";
 import { collectCleanupError, throwCollectedErrors, throwWithCleanup } from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
+import { VIR_JSON_BORROW, VIR_JSON_VALUE } from "../host/vir-json-bindings.js";
 
 const MAX_FINALIZER_ERRORS = 16;
 const MAX_FINALIZER_ERROR_MESSAGE_LENGTH = 2048;
@@ -59,6 +60,21 @@ export class VirHostState {
   setManifest(manifest) {
     this.manifest = manifest;
     this.hostImports = manifest?.hostImports ?? [];
+  }
+
+  borrowJson(value) {
+    return this.callRuntimeBinding(VIR_JSON_BORROW, value, "borrowed JSON support");
+  }
+
+  jsonValue(resource) {
+    return this.callRuntimeBinding(VIR_JSON_VALUE, resource, "borrowed JSON support");
+  }
+
+  callRuntimeBinding(target, value, label) {
+    if (this.disposed) throw new Error("Vir host state has been disposed");
+    const binding = lookupHostBinding(target, this.userBindings, this.defaultBindings);
+    if (typeof binding !== "function") throw new Error(`${label} is unavailable`);
+    return binding(value);
   }
 
   clearCallError() {

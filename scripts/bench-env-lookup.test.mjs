@@ -16,6 +16,7 @@ import {
   validateEnvironmentLookupOutputPaths,
 } from "./bench-env-lookup-contract.mjs";
 import { assertComparableBenchmarkReportIdentities } from "./bench-utils.mjs";
+import { INTERFACE_MANIFEST_VERSION } from "./package-versions.mjs";
 
 test("environment lookup identity covers package content but ignores generation time", () => {
   const packageInfo = (generatedAt) => ({
@@ -28,7 +29,7 @@ test("environment lookup identity covers package content but ignores generation 
       ],
     },
     manifest: {
-      version: 7,
+      version: INTERFACE_MANIFEST_VERSION,
       artifact: "lean-vir-ir-package",
       metadata: { generatedAt, generator: "test" },
       exports: [],

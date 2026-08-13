@@ -19,6 +19,10 @@ import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import {
+  objectArgumentSupported,
+  objectResultSupported,
+} from "../../web/src/runtime/object-abi.js";
 import { stdFormat as fmt } from "../std-format-values.mjs";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
@@ -187,11 +191,17 @@ const jsResourceType = { type: "Js", interfaceTag: INTERFACE_TAG.RESOURCE, kind:
 const leanObjectType = { type: "LeanObject", interfaceTag: INTERFACE_TAG.LEAN_OBJECT, kind: "leanObject" };
 const unitType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
 const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
+const jsonType = { type: "Lean.Vir.Json", interfaceTag: INTERFACE_TAG.JSON };
+const arrayJsonType = { type: "Array Lean.Vir.Json", interfaceTag: INTERFACE_TAG.ARRAY, element: jsonType };
 const arrayJsResourceType = { type: "Array Js", interfaceTag: INTERFACE_TAG.ARRAY, kind: "array", element: jsResourceType };
 const arrayResourceType = { type: "Array Resource", interfaceTag: INTERFACE_TAG.ARRAY, kind: "array", element: resourceType };
 const listJsResourceType = { type: "List Js", interfaceTag: INTERFACE_TAG.LIST, kind: "list", element: jsResourceType };
 const optionResourceType = { type: "Option Resource", interfaceTag: INTERFACE_TAG.OPTION, element: resourceType };
 const prodResourceType = { type: "Prod Resource Resource", interfaceTag: INTERFACE_TAG.PROD, fst: resourceType, snd: resourceType };
+assert.equal(objectArgumentSupported(jsonType), false);
+assert.equal(objectResultSupported(jsonType), false);
+assert.equal(objectArgumentSupported(arrayJsonType), false);
+assert.equal(objectResultSupported(arrayJsonType), false);
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
 assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
