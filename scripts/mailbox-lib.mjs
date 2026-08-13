@@ -1,9 +1,25 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, relative, resolve } from "node:path";
 
 export const mailboxProtocol = "agent-mailbox/v1";
-const messageIdPattern = /^[A-Z][A-Z0-9]*-[A-Z][A-Z0-9]*-[0-9]{8}-[0-9]{3}$/;
+const messageIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const addressPattern = /^[a-z][a-z0-9-]*\/(?:\*|[a-z][a-z0-9-]*)$/;
 const timestampPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 const hashPattern = /^[0-9a-fA-F]{7,64}$/;
@@ -18,13 +34,13 @@ const requiredFields = [
   "time",
   "from",
   "to",
-  "kind",
-  "state",
   "subject",
 ];
 
 const optionalFields = [
-  "requires-ack",
+  "kind",
+  "state",
+  "requires-claim",
   "owner",
   "worktree",
   "branch",
@@ -40,17 +56,17 @@ const allowedFields = new Set([...requiredFields, ...optionalFields]);
 
 const kindStates = new Map([
   ["request", new Set(["open"])],
-  ["acknowledgement", new Set(["claimed"])],
+  ["claim", new Set(["claimed"])],
   ["update", new Set(["claimed", "in-progress", "blocked"])],
   ["handoff", new Set(["claimed", "in-progress", "blocked"])],
   ["completion", new Set(["completed"])],
   ["closure", new Set(["closed"])],
   ["cancellation", new Set(["cancelled"])],
 ]);
-const ownerKinds = new Set(["acknowledgement", "handoff"]);
+const ownerKinds = new Set(["claim", "handoff"]);
 const dispositionKinds = new Set(["completion", "closure", "cancellation"]);
 const activeWorkStates = new Set(["in-progress", "blocked"]);
-export const terminalStates = new Set(["closed", "cancelled"]);
+const terminalStates = new Set(["closed", "cancelled"]);
 
 const worktreeStates = new Set(["clean", "dirty"]);
 const publications = new Set([
@@ -73,6 +89,10 @@ const dispositions = new Set([
 
 function issue(file, message) {
   return `${file}: ${message}`;
+}
+
+function advisory(file, message) {
+  return issue(file, message);
 }
 
 function dependencies(header) {
@@ -166,21 +186,22 @@ export function parseMessage(source, file = "<message>") {
 function validateHeader(message) {
   const { file, header, body } = message;
   const errors = [];
+  const warnings = [];
   for (const field of requiredFields) {
     if (!Object.hasOwn(header, field)) {
       errors.push(issue(file, `missing required field \`${field}\``));
     }
   }
   for (const field of Object.keys(header)) {
-    if (!allowedFields.has(field)) {
-      errors.push(issue(file, `unknown protocol v1 field \`${field}\``));
+    if (!allowedFields.has(field) && !field.startsWith("x-")) {
+      warnings.push(advisory(file, `unknown field \`${field}\`; prefer an \`x-*\` name for extensions`));
     }
   }
-  if (errors.length > 0) return errors;
+  if (errors.length > 0) return { errors, warnings };
 
-  for (const field of optionalFields) {
+  for (const field of [...optionalFields, ...Object.keys(header).filter((field) => field.startsWith("x-"))]) {
     if (Object.hasOwn(header, field) && !header[field]) {
-      errors.push(issue(file, `optional field \`${field}\` must be omitted rather than left empty`));
+      warnings.push(advisory(file, `optional field \`${field}\` should be omitted rather than left empty`));
     }
   }
 
@@ -197,12 +218,6 @@ function validateHeader(message) {
   }
   if (!validTimestamp(header.time)) {
     errors.push(issue(file, "`time` must be a valid ISO 8601 timestamp with an explicit offset"));
-  } else if (messageIdPattern.test(header["message-id"])) {
-    const idDate = header["message-id"].split("-").at(-2);
-    const timestampDate = header.time.slice(0, 10).replaceAll("-", "");
-    if (idDate !== timestampDate) {
-      errors.push(issue(file, "message ID date must equal the timestamp's local date"));
-    }
   }
   for (const field of ["from", "to"]) {
     if (!addressPattern.test(header[field])) {
@@ -213,89 +228,145 @@ function validateHeader(message) {
     errors.push(issue(file, "`from` must name a concrete agent, not a wildcard"));
   }
   if (!kindStates.has(header.kind)) {
-    errors.push(issue(file, `unknown message kind \`${header.kind}\``));
+    if (header.kind) warnings.push(advisory(file, `unknown message kind \`${header.kind}\``));
+  } else if (!header.state) {
+    warnings.push(advisory(file, `kind \`${header.kind}\` normally records a state`));
   } else if (!kindStates.get(header.kind).has(header.state)) {
-    errors.push(issue(file, `kind \`${header.kind}\` cannot use state \`${header.state}\``));
+    warnings.push(advisory(file, `kind \`${header.kind}\` normally does not use state \`${header.state}\``));
+  }
+  if (header.state && !header.kind) {
+    warnings.push(advisory(file, "`state` has no `kind`; free-form messages may omit both"));
   }
   if (!header.subject) errors.push(issue(file, "`subject` must not be empty"));
-  if (!body) errors.push(issue(file, "message body must not be empty"));
+  if (!body) warnings.push(advisory(file, "message body is empty"));
 
   if (header.kind === "request") {
-    if (!Object.hasOwn(header, "requires-ack")) {
-      errors.push(issue(file, "a request requires `requires-ack: true` or `requires-ack: false`"));
-    } else if (header["requires-ack"] && !["true", "false"].includes(header["requires-ack"])) {
-      errors.push(issue(file, "`requires-ack` must be `true` or `false`"));
+    if (!Object.hasOwn(header, "requires-claim")) {
+      warnings.push(advisory(file, "a request conventionally records `requires-claim: true` or `requires-claim: false`"));
+    } else if (header["requires-claim"] && !["true", "false"].includes(header["requires-claim"])) {
+      warnings.push(advisory(file, "`requires-claim` should be `true` or `false`"));
     }
-  } else if (Object.hasOwn(header, "requires-ack")) {
-    errors.push(issue(file, "`requires-ack` is valid only on a request"));
+  } else if (Object.hasOwn(header, "requires-claim")) {
+    warnings.push(advisory(file, "`requires-claim` is conventionally used only on a request"));
   }
   if (ownerKinds.has(header.kind) && !Object.hasOwn(header, "owner")) {
-    errors.push(issue(file, `kind \`${header.kind}\` requires an owner`));
+    warnings.push(advisory(file, `kind \`${header.kind}\` conventionally names an owner`));
   } else if (header.owner && !ownerKinds.has(header.kind)) {
-    errors.push(issue(file, "`owner` is valid only on acknowledgement and handoff messages"));
+    warnings.push(advisory(file, "`owner` is conventionally used on claim and handoff messages"));
   }
   if (dispositionKinds.has(header.kind) && !Object.hasOwn(header, "disposition")) {
-    errors.push(issue(file, `kind \`${header.kind}\` requires a durable disposition`));
+    warnings.push(advisory(file, `kind \`${header.kind}\` conventionally records a durable disposition`));
   }
   if (header.owner && !addressPattern.test(header.owner)) {
-    errors.push(issue(file, "`owner` must be a project/agent address"));
+    warnings.push(advisory(file, "`owner` should be a project/agent address"));
   } else if (header.owner?.endsWith("/*")) {
-    errors.push(issue(file, "`owner` must name a concrete agent, not a wildcard"));
+    warnings.push(advisory(file, "`owner` should name a concrete agent, not a wildcard"));
   }
   if (header.worktree && header.worktree !== "none" && !worktreePattern.test(header.worktree)) {
-    errors.push(issue(file, "`worktree` must be `none` or project-relative `.worktrees/<slug>`"));
+    warnings.push(advisory(file, "`worktree` should be `none` or project-relative `.worktrees/<slug>`"));
   }
   if (header.branch && !validBranch(header.branch)) {
-    errors.push(issue(file, "`branch` is not a valid Git branch name"));
+    warnings.push(advisory(file, "`branch` is not a valid Git branch name"));
   }
   for (const field of ["base", "head"]) {
     if (header[field] && !hashPattern.test(header[field])) {
-      errors.push(issue(file, `\`${field}\` must be a 7--64 character hexadecimal Git object ID`));
+      warnings.push(advisory(file, `\`${field}\` should be a 7--64 character hexadecimal Git object ID`));
     }
   }
   if (header["worktree-state"] && !worktreeStates.has(header["worktree-state"])) {
-    errors.push(issue(file, `unknown worktree state \`${header["worktree-state"]}\``));
+    warnings.push(advisory(file, `unknown worktree state \`${header["worktree-state"]}\``));
   }
   if (header["worktree-state"] && (!header.worktree || header.worktree === "none")) {
-    errors.push(issue(file, "`worktree-state` requires a concrete `worktree` path in the same message"));
+    warnings.push(advisory(file, "`worktree-state` should accompany a concrete `worktree` path"));
   }
   if (header.publication && !publications.has(header.publication)) {
-    errors.push(issue(file, `unknown publication state \`${header.publication}\``));
+    warnings.push(advisory(file, `unknown publication state \`${header.publication}\``));
   }
   if (header.disposition && !dispositions.has(header.disposition)) {
-    errors.push(issue(file, `unknown disposition \`${header.disposition}\``));
+    warnings.push(advisory(file, `unknown disposition \`${header.disposition}\``));
   }
   if (header.disposition && !dispositionKinds.has(header.kind)) {
-    errors.push(issue(file, "`disposition` is valid only on completion, closure, and cancellation messages"));
+    warnings.push(advisory(file, "`disposition` is conventionally used on completion, closure, and cancellation messages"));
   }
   if (header["parent-thread"] && !messageIdPattern.test(header["parent-thread"])) {
-    errors.push(issue(file, "`parent-thread` must be a valid thread ID"));
+    warnings.push(advisory(file, "`parent-thread` should be a valid thread ID"));
   }
   if (header["parent-thread"] === header["message-id"]) {
-    errors.push(issue(file, "a thread cannot name itself as its parent"));
+    warnings.push(advisory(file, "a thread should not name itself as its parent"));
   }
-  if (header["parent-thread"] && header.kind !== "request") {
-    errors.push(issue(file, "`parent-thread` is valid only on a request"));
+  if (header["parent-thread"] && header["in-reply-to"]) {
+    warnings.push(advisory(file, "`parent-thread` is conventionally used only on an opening message"));
   }
   const seenDependencies = new Set();
   for (const dependency of dependencies(header)) {
     if (!messageIdPattern.test(dependency)) {
-      errors.push(issue(file, `invalid dependency thread ID \`${dependency}\``));
+      warnings.push(advisory(file, `invalid dependency thread ID \`${dependency}\``));
     } else if (dependency === header["message-id"]) {
-      errors.push(issue(file, "a thread cannot depend on itself"));
+      warnings.push(advisory(file, "a thread should not depend on itself"));
     } else if (seenDependencies.has(dependency)) {
-      errors.push(issue(file, `duplicate dependency thread ID \`${dependency}\``));
+      warnings.push(advisory(file, `duplicate dependency thread ID \`${dependency}\``));
     }
     seenDependencies.add(dependency);
   }
-  if (header["depends-on"] && header.kind !== "request") {
-    errors.push(issue(file, "`depends-on` is valid only on a request"));
+  if (header["depends-on"] && header["in-reply-to"]) {
+    warnings.push(advisory(file, "`depends-on` is conventionally used only on an opening message"));
   }
-  return errors;
+  return { errors, warnings };
+}
+
+function loadMessageFile(path, label, expectedThread = null) {
+  try {
+    const message = parseMessage(readFileSync(path, "utf8"), label);
+    const errors = [];
+    const messageId = message.header["message-id"];
+    const expectedName = messageId ? `${messageId}.md` : null;
+    if (expectedName && basename(path) !== expectedName) {
+      errors.push(issue(label, `filename must be \`${expectedName}\``));
+    }
+    if (expectedThread && message.header["thread-id"]
+        && message.header["thread-id"] !== expectedThread) {
+      errors.push(issue(label, `archived message must belong to directory thread \`${expectedThread}\``));
+    }
+    return { message, errors };
+  } catch (error) {
+    return { message: null, errors: [error.message] };
+  }
+}
+
+function lstatIfExists(path) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function mailboxPathProblem(mailboxPath) {
+  if (!lstatIfExists(mailboxPath)) return null;
+  try {
+    if (statSync(mailboxPath).isDirectory()) return null;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  return issue(mailboxPath, "mailbox path must be a directory");
+}
+
+function ensureMailboxDirectory(mailboxPath) {
+  const problem = mailboxPathProblem(mailboxPath);
+  if (problem) throw new Error(problem);
+  try {
+    mkdirSync(mailboxPath, { recursive: true });
+  } catch (error) {
+    if (["EEXIST", "ENOTDIR"].includes(error.code)) {
+      throw new Error(issue(mailboxPath, "mailbox path must be a directory"));
+    }
+    throw error;
+  }
 }
 
 function project(address) {
-  return address.split("/", 1)[0];
+  return typeof address === "string" ? address.split("/", 1)[0] : "";
 }
 
 function acceptsAgent(address, agent) {
@@ -310,15 +381,21 @@ function latestField(chain, field) {
   return null;
 }
 
-function inheritedOwner(message, request, byId) {
+function ancestry(message, opener, byId) {
+  const chain = [];
   const seen = new Set();
   let current = message;
   while (current && !seen.has(current.header["message-id"])) {
-    if (current.header.owner) return current.header.owner;
+    chain.push(current);
+    if (current === opener) break;
     seen.add(current.header["message-id"]);
-    current = current === request ? null : byId.get(current.header["in-reply-to"]);
+    current = byId.get(current.header["in-reply-to"]);
   }
-  return null;
+  return chain.reverse();
+}
+
+function inheritedOwner(message, opener, byId) {
+  return latestField(ancestry(message, opener, byId), "owner");
 }
 
 function workStateError(kind, previousState, currentState) {
@@ -329,9 +406,9 @@ function workStateError(kind, previousState, currentState) {
   return `${kind} cannot move state from \`${previousState}\` to \`${currentState}\``;
 }
 
-function transitionError(previous, current, request, owner) {
-  const requesterProject = project(request.header.from);
-  const recipientProject = project(request.header.to);
+function transitionWarning(previous, current, opener, owner) {
+  const requesterProject = project(opener.header.from);
+  const recipientProject = project(opener.header.to);
   const sender = current.header.from;
   const senderProject = project(sender);
   const destinationProject = project(current.header.to);
@@ -362,10 +439,10 @@ function transitionError(previous, current, request, owner) {
   const kind = current.header.kind;
   const state = current.header.state;
   if (previousState === "open") {
-    if (kind === "acknowledgement") {
-      if (sender !== current.header.owner) return "acknowledgement sender must equal its owner";
-      if (!acceptsAgent(request.header.to, sender)) {
-        return "acknowledgement owner must match the requested project/agent address";
+    if (kind === "claim") {
+      if (sender !== current.header.owner) return "claim sender must equal its owner";
+      if (!acceptsAgent(opener.header.to, sender)) {
+        return "claim owner must match the requested project/agent address";
       }
       return null;
     }
@@ -374,17 +451,17 @@ function transitionError(previous, current, request, owner) {
         ? null
         : "an open request may be cancelled only by the requesting project";
     }
-    if (request.header["requires-ack"] === "true") {
-      return "a request requiring acknowledgement must be claimed before work updates";
+    if (opener.header["requires-claim"] === "true") {
+      return "a request requiring a claim must be claimed before work updates";
     }
     if (kind === "completion") {
-      return acceptsAgent(request.header.to, sender)
+      return acceptsAgent(opener.header.to, sender)
         ? null
         : "unclaimed completion must match the requested project/agent address";
     }
-    return "an open request accepts acknowledgement, completion without required acknowledgement, or cancellation";
+    return "an open request accepts a claim, completion without a required claim, or cancellation";
   }
-  if (kind === "acknowledgement") return "acknowledgement must reply to an open request";
+  if (kind === "claim") return "claim must reply to an open request";
   if (kind === "cancellation") {
     return senderProject === requesterProject || sender === owner
       ? null
@@ -408,9 +485,10 @@ function transitionError(previous, current, request, owner) {
 }
 
 export function validateMessages(messages) {
-  const headerErrors = new Map(messages.map((message) => [message, validateHeader(message)]));
-  const errors = [...headerErrors.values()].flat();
-  const graphMessages = messages.filter((message) => headerErrors.get(message).length === 0);
+  const headerResults = new Map(messages.map((message) => [message, validateHeader(message)]));
+  const errors = [...headerResults.values()].flatMap((result) => result.errors);
+  const warnings = [...headerResults.values()].flatMap((result) => result.warnings);
+  const graphMessages = messages.filter((message) => headerResults.get(message).errors.length === 0);
   const byId = new Map();
   for (const message of graphMessages) {
     const id = message.header["message-id"];
@@ -421,19 +499,17 @@ export function validateMessages(messages) {
 
   for (const message of graphMessages) {
     const { file, header } = message;
-    if (!header["message-id"] || !header.kind) continue;
-    const isRequest = header.kind === "request";
-    if (isRequest) {
+    if (!header["message-id"]) continue;
+    const isOpeningMessage = !header["in-reply-to"];
+    if (isOpeningMessage) {
       if (header["thread-id"] !== header["message-id"])
-        errors.push(issue(file, "request `thread-id` must equal its `message-id`"));
-      if (header["in-reply-to"])
-        errors.push(issue(file, "request `in-reply-to` must be empty"));
+        errors.push(issue(file, "opening message `thread-id` must equal its `message-id`"));
     } else {
-      if (!header["in-reply-to"])
-        errors.push(issue(file, "non-request message requires `in-reply-to`"));
       if (header["thread-id"] === header["message-id"])
-        errors.push(issue(file, "only a request may begin a thread"));
+        errors.push(issue(file, "a reply cannot begin its own thread"));
     }
+    if (header.kind === "request" && !isOpeningMessage)
+      warnings.push(advisory(file, "a request conventionally opens a thread rather than replying inside one"));
   }
 
   const threads = new Map();
@@ -446,14 +522,14 @@ export function validateMessages(messages) {
 
   const summaries = [];
   for (const [threadId, members] of threads) {
-    const request = byId.get(threadId);
-    if (!request || request.header.kind !== "request") {
-      for (const member of members) errors.push(issue(member.file, `thread request \`${threadId}\` is missing`));
+    const opener = byId.get(threadId);
+    if (!opener || opener.header["thread-id"] !== threadId || opener.header["in-reply-to"]) {
+      for (const member of members) errors.push(issue(member.file, `thread opener \`${threadId}\` is missing`));
       continue;
     }
     const children = new Map();
     for (const member of members) {
-      if (member === request) continue;
+      if (member === opener) continue;
       const parentId = member.header["in-reply-to"];
       const parent = byId.get(parentId);
       if (!parent) {
@@ -468,68 +544,99 @@ export function validateMessages(messages) {
       children.get(parentId).push(member);
     }
     for (const [parentId, replies] of children) {
-      if (replies.length > 1) {
-        for (const reply of replies) errors.push(issue(reply.file, `thread forks after \`${parentId}\`; reply to the current tail`));
-      }
       const parent = byId.get(parentId);
       for (const reply of replies) {
         if (Date.parse(reply.header.time) < Date.parse(parent.header.time)) {
-          errors.push(issue(reply.file, `reply timestamp precedes \`${parentId}\``));
+          warnings.push(advisory(reply.file, `reply timestamp precedes \`${parentId}\``));
         }
-        const problem = transitionError(parent, reply, request, inheritedOwner(parent, request, byId));
-        if (problem) errors.push(issue(reply.file, problem));
+        if (opener.header.kind === "request" && reply.header.kind) {
+          const problem = transitionWarning(parent, reply, opener, inheritedOwner(parent, opener, byId));
+          if (problem) warnings.push(advisory(reply.file, problem));
+        }
       }
     }
 
-    const chain = [];
+    const reachable = [];
     const seen = new Set();
-    let current = request;
-    while (current && !seen.has(current.header["message-id"])) {
-      chain.push(current);
-      seen.add(current.header["message-id"]);
-      const replies = children.get(current.header["message-id"]) ?? [];
-      current = replies.length === 1 ? replies[0] : null;
+    const pending = [opener];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      const id = current.header["message-id"];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      reachable.push(current);
+      pending.push(...(children.get(id) ?? []));
     }
     if (seen.size !== members.length) {
       for (const member of members.filter((item) => !seen.has(item.header["message-id"]))) {
-        errors.push(issue(member.file, "message is not reachable through the thread's linear reply chain"));
+        errors.push(issue(member.file, "message is not reachable from the thread opener"));
       }
     }
-    const tail = chain.at(-1);
+    reachable.sort((left, right) => Date.parse(left.header.time) - Date.parse(right.header.time)
+      || left.header["message-id"].localeCompare(right.header["message-id"]));
+    const latest = reachable.at(-1);
+    const latestPath = ancestry(latest, opener, byId);
+    const leaves = reachable.filter((message) => !(children.get(message.header["message-id"])?.length));
+    const leafStates = new Set(leaves.map((message) => message.header.state || "active"));
+    const allLeavesTerminal = leaves.every((message) => terminalStates.has(message.header.state));
+    const state = leafStates.size === 1 ? [...leafStates][0] : allLeavesTerminal ? "terminal" : "active";
     summaries.push({
       threadId,
-      state: tail.header.state,
-      subject: request.header.subject,
-      from: request.header.from,
-      to: request.header.to,
-      owner: latestField(chain, "owner"),
-      messageCount: chain.length,
-      tail: tail.header["message-id"],
-      updatedAt: tail.header.time,
-      disposition: latestField(chain, "disposition"),
-      worktree: latestField(chain, "worktree"),
-      branch: latestField(chain, "branch"),
-      base: latestField(chain, "base"),
-      head: latestField(chain, "head"),
-      worktreeState: latestField(chain, "worktree-state"),
-      publication: latestField(chain, "publication"),
-      parentThread: request.header["parent-thread"] || null,
-      dependsOn: dependencies(request.header),
+      state,
+      branchCount: leaves.length,
+      archivable: leaves.length > 0 && allLeavesTerminal,
+      subject: opener.header.subject,
+      from: opener.header.from,
+      to: opener.header.to,
+      owner: latestField(latestPath, "owner"),
+      messageCount: reachable.length,
+      latest: latest.header["message-id"],
+      updatedAt: latest.header.time,
+      disposition: latestField(latestPath, "disposition"),
+      worktree: latestField(latestPath, "worktree"),
+      branch: latestField(latestPath, "branch"),
+      base: latestField(latestPath, "base"),
+      head: latestField(latestPath, "head"),
+      worktreeState: latestField(latestPath, "worktree-state"),
+      publication: latestField(latestPath, "publication"),
+      parentThread: opener.header["parent-thread"] || null,
+      dependsOn: dependencies(opener.header),
     });
   }
 
   summaries.sort((left, right) => left.threadId.localeCompare(right.threadId));
-  return { errors, threads: summaries };
+  return { errors, warnings, threads: summaries };
 }
 
 function loadMailbox(mailboxPath) {
   const ignoredFiles = [];
   const messages = [];
   const parseErrors = [];
+  const pathProblem = mailboxPathProblem(mailboxPath);
+  if (pathProblem) {
+    parseErrors.push(pathProblem);
+    return { mailboxPath, messages, ignoredFiles, parseErrors };
+  }
   if (!existsSync(mailboxPath)) {
     return { mailboxPath, messages, ignoredFiles, parseErrors };
   }
   for (const entry of readdirSync(mailboxPath, { withFileTypes: true })) {
+    if (entry.name === "tmp") {
+      if (!entry.isDirectory()) {
+        parseErrors.push(issue("tmp", "reserved `tmp` path must be a directory"));
+      } else {
+        for (const pending of readdirSync(resolve(mailboxPath, entry.name), { withFileTypes: true })) {
+          ignoredFiles.push(`tmp/${pending.name}${pending.isDirectory() ? "/" : ""}`);
+        }
+      }
+      continue;
+    }
+    if (entry.name === "archive") {
+      if (!entry.isDirectory()) {
+        parseErrors.push(issue("archive", "reserved `archive` path must be a directory"));
+      }
+      continue;
+    }
     if (!entry.isFile()) {
       ignoredFiles.push(`${entry.name}/`);
       continue;
@@ -543,17 +650,9 @@ function loadMailbox(mailboxPath) {
       continue;
     }
     const file = resolve(mailboxPath, entry.name);
-    try {
-      const message = parseMessage(readFileSync(file, "utf8"), entry.name);
-      const messageId = message.header["message-id"];
-      const expected = messageId ? `${messageId}.md` : null;
-      if (expected && entry.name !== expected) {
-        parseErrors.push(issue(entry.name, `filename must be \`${expected}\``));
-      }
-      messages.push(message);
-    } catch (error) {
-      parseErrors.push(error.message);
-    }
+    const loaded = loadMessageFile(file, entry.name);
+    parseErrors.push(...loaded.errors);
+    if (loaded.message) messages.push(loaded.message);
   }
   ignoredFiles.sort();
   parseErrors.sort();
@@ -561,12 +660,246 @@ function loadMailbox(mailboxPath) {
   return { mailboxPath, messages, ignoredFiles, parseErrors };
 }
 
+function loadArchive(mailboxPath) {
+  const archivePath = resolve(mailboxPath, "archive");
+  const messages = [];
+  const parseErrors = [];
+  const pathProblem = mailboxPathProblem(mailboxPath);
+  if (pathProblem) {
+    parseErrors.push(pathProblem);
+    return { mailboxPath, archivePath, messages, parseErrors };
+  }
+  if (!existsSync(mailboxPath)) return { mailboxPath, archivePath, messages, parseErrors };
+  const archiveEntry = lstatIfExists(archivePath);
+  if (!archiveEntry) return { mailboxPath, archivePath, messages, parseErrors };
+  if (!archiveEntry.isDirectory()) {
+    parseErrors.push(issue("archive", "reserved `archive` path must be a directory"));
+    return { mailboxPath, archivePath, messages, parseErrors };
+  }
+  for (const threadEntry of readdirSync(archivePath, { withFileTypes: true })) {
+    if (!threadEntry.isDirectory()) {
+      parseErrors.push(issue(`archive/${threadEntry.name}`, "archive entries must be thread directories"));
+      continue;
+    }
+    const threadPath = resolve(archivePath, threadEntry.name);
+    let messageCount = 0;
+    for (const entry of readdirSync(threadPath, { withFileTypes: true })) {
+      const label = `archive/${threadEntry.name}/${entry.name}`;
+      if (!entry.isFile() || !entry.name.endsWith(".md")) {
+        parseErrors.push(issue(label, "archive thread directories may contain only message files"));
+        continue;
+      }
+      const file = resolve(threadPath, entry.name);
+      const loaded = loadMessageFile(file, label, threadEntry.name);
+      parseErrors.push(...loaded.errors);
+      if (loaded.message) {
+        messages.push(loaded.message);
+        messageCount += 1;
+      }
+    }
+    if (messageCount === 0) {
+      parseErrors.push(issue(`archive/${threadEntry.name}/`, "archive thread directory contains no messages"));
+    }
+  }
+  messages.sort((left, right) => left.file.localeCompare(right.file));
+  parseErrors.sort();
+  return { mailboxPath, archivePath, messages, parseErrors };
+}
+
 export function inspectMailbox(mailboxPath) {
   const loaded = loadMailbox(mailboxPath);
   const validated = validateMessages(loaded.messages);
+  const archivedIds = new Set(loadArchive(mailboxPath).messages
+    .map((message) => message.header["message-id"])
+    .filter(Boolean));
+  const reusedIds = loaded.messages
+    .filter((message) => message.header["message-id"]
+      && archivedIds.has(message.header["message-id"]))
+    .map((message) => issue(message.file, `message ID \`${message.header["message-id"]}\` already exists in the archive`));
   return {
     ...loaded,
-    errors: [...loaded.parseErrors, ...validated.errors],
+    errors: [...loaded.parseErrors, ...validated.errors, ...reusedIds],
+    warnings: validated.warnings,
     threads: validated.threads,
   };
+}
+
+export function inspectArchive(mailboxPath) {
+  const loaded = loadArchive(mailboxPath);
+  const validated = validateMessages(loaded.messages);
+  const activeIds = new Set(loadMailbox(mailboxPath).messages
+    .map((message) => message.header["message-id"])
+    .filter(Boolean));
+  const reusedIds = loaded.messages
+    .filter((message) => message.header["message-id"]
+      && activeIds.has(message.header["message-id"]))
+    .map((message) => issue(message.file, `message ID \`${message.header["message-id"]}\` also exists in the active mailbox`));
+  const activeThreads = validated.threads
+    .filter((thread) => !thread.archivable)
+    .map((thread) => issue(`archive/${thread.threadId}/`, "archived thread has a nonterminal reply"));
+  return {
+    ...loaded,
+    errors: [...loaded.parseErrors, ...validated.errors, ...reusedIds, ...activeThreads],
+    warnings: validated.warnings,
+    threads: validated.threads,
+  };
+}
+
+function withMailboxLock(mailboxPath, operation) {
+  const temporaryPath = resolve(mailboxPath, "tmp");
+  const lockPath = resolve(temporaryPath, "operation.lock");
+  const temporaryEntry = lstatIfExists(temporaryPath);
+  if (temporaryEntry && !temporaryEntry.isDirectory()) {
+    throw new Error("reserved `tmp` path must be a directory");
+  }
+  try {
+    mkdirSync(temporaryPath, { recursive: true });
+  } catch (error) {
+    if (error.code === "EEXIST") throw new Error("reserved `tmp` path must be a directory");
+    throw error;
+  }
+
+  let descriptor;
+  try {
+    descriptor = openSync(lockPath, "wx", 0o600);
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      throw new Error(`mailbox operation lock already exists: ${relative(mailboxPath, lockPath)}`);
+    }
+    throw error;
+  }
+
+  try {
+    return operation(temporaryPath);
+  } finally {
+    try { closeSync(descriptor); } catch {}
+    try { unlinkSync(lockPath); } catch {}
+  }
+}
+
+export function deliverMessage(mailboxPath, draftPath) {
+  const sourcePath = resolve(draftPath);
+  const source = readFileSync(sourcePath, "utf8");
+  const parsed = parseMessage(source, basename(sourcePath));
+  const headerResult = validateHeader(parsed);
+  if (headerResult.errors.length > 0) {
+    throw new Error(`draft message is invalid:\n${headerResult.errors.join("\n")}`);
+  }
+
+  const messageId = parsed.header["message-id"];
+  const filename = `${messageId}.md`;
+  const message = { ...parsed, file: filename };
+  ensureMailboxDirectory(mailboxPath);
+
+  return withMailboxLock(mailboxPath, (temporaryPath) => {
+    const active = inspectMailbox(mailboxPath);
+    if (active.errors.length > 0) {
+      throw new Error(`mailbox must pass integrity checks before delivery:\n${active.errors.join("\n")}`);
+    }
+    const archive = inspectArchive(mailboxPath);
+    if (archive.errors.length > 0) {
+      throw new Error(`mailbox archive must pass integrity checks before delivery:\n${archive.errors.join("\n")}`);
+    }
+    if (archive.messages.some((candidate) => candidate.header["message-id"] === messageId)) {
+      throw new Error(`message ID \`${messageId}\` already exists in the archive`);
+    }
+
+    const prospective = validateMessages([...active.messages, message]);
+    if (prospective.errors.length > 0) {
+      throw new Error(`message cannot be delivered:\n${prospective.errors.join("\n")}`);
+    }
+
+    const staging = resolve(temporaryPath, `deliver-${messageId}-${randomUUID()}.md`);
+    const destination = resolve(mailboxPath, filename);
+
+    let descriptor;
+    try {
+      descriptor = openSync(staging, "wx", 0o600);
+      writeFileSync(descriptor, source, "utf8");
+      fsyncSync(descriptor);
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+
+    try {
+      linkSync(staging, destination);
+    } catch (error) {
+      try { unlinkSync(staging); } catch {}
+      if (error.code === "EEXIST") {
+        throw new Error(`active message \`${messageId}\` already exists; no file was overwritten`);
+      }
+      throw error;
+    }
+
+    let cleanupWarning = null;
+    try {
+      unlinkSync(staging);
+    } catch {
+      cleanupWarning = `delivered message, but temporary file remains at ${relative(mailboxPath, staging)}`;
+    }
+    const warnings = prospective.warnings.filter((warning) => warning.startsWith(`${filename}:`));
+    if (cleanupWarning) warnings.push(cleanupWarning);
+    return {
+      messageId,
+      destination: relative(mailboxPath, destination),
+      warnings,
+    };
+  });
+}
+
+export function archiveThread(mailboxPath, threadId) {
+  if (!messageIdPattern.test(threadId)) {
+    throw new Error(`thread ID must match ${messageIdPattern}`);
+  }
+  const pathProblem = mailboxPathProblem(mailboxPath);
+  if (pathProblem) throw new Error(pathProblem);
+  if (!existsSync(mailboxPath)) throw new Error(`unknown active thread \`${threadId}\``);
+  ensureMailboxDirectory(mailboxPath);
+
+  return withMailboxLock(mailboxPath, (temporaryPath) => {
+    const result = inspectMailbox(mailboxPath);
+    if (result.errors.length > 0) {
+      throw new Error(`mailbox must pass integrity checks before archiving:\n${result.errors.join("\n")}`);
+    }
+    const archive = inspectArchive(mailboxPath);
+    if (archive.errors.length > 0) {
+      throw new Error(`mailbox archive must pass integrity checks before archiving:\n${archive.errors.join("\n")}`);
+    }
+    const thread = result.threads.find((candidate) => candidate.threadId === threadId);
+    if (!thread) throw new Error(`unknown active thread \`${threadId}\``);
+    if (!thread.archivable) {
+      throw new Error(`thread \`${threadId}\` has nonterminal replies; only wholly closed or cancelled threads may be archived`);
+    }
+    const members = result.messages.filter((message) => message.header["thread-id"] === threadId);
+    const archivePath = resolve(mailboxPath, "archive");
+    const staging = resolve(temporaryPath, `archive-${threadId}`);
+    const destination = resolve(archivePath, threadId);
+    if (existsSync(destination)) throw new Error(`archive destination already exists: ${destination}`);
+    mkdirSync(archivePath, { recursive: true });
+    try {
+      mkdirSync(staging);
+    } catch (error) {
+      if (error.code === "EEXIST") throw new Error(`archive staging already exists: ${staging}`);
+      throw error;
+    }
+    try {
+      for (const message of members) {
+        const source = resolve(mailboxPath, message.file);
+        renameSync(source, resolve(staging, basename(message.file)));
+      }
+      renameSync(staging, destination);
+    } catch (error) {
+      for (const message of members) {
+        const staged = resolve(staging, basename(message.file));
+        if (existsSync(staged)) renameSync(staged, resolve(mailboxPath, basename(message.file)));
+      }
+      try { rmdirSync(staging); } catch {}
+      throw error;
+    }
+    return {
+      threadId,
+      destination: relative(mailboxPath, destination),
+      messageCount: members.length,
+    };
+  });
 }

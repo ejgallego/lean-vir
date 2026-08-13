@@ -37,7 +37,8 @@ Agents in the root checkout and linked worktrees share the primary checkout's
 local `.agents/mailbox/`. Read that mailbox and `git worktree list` before
 claiming a lane. Cross-project requests live with the project that owns the
 requested code change. See [docs/MAILBOX_PROTOCOL.md](docs/MAILBOX_PROTOCOL.md)
-for message, ownership, handoff, and retirement rules.
+for the minimal message envelope and optional ownership, handoff, and archival
+conventions.
 
 ## Commits
 

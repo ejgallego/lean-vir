@@ -423,13 +423,16 @@ maintainer explicitly asks.
 
 Inter-agent coordination uses the one local mailbox under the primary/root
 checkout, including when the participating agents are running in linked
-worktrees or dependent projects. See `docs/MAILBOX_PROTOCOL.md` for thread
-ownership, immutable message files, lifecycle states, handoff identity, and
-cleanup rules.
+worktrees or dependent projects. See `docs/MAILBOX_PROTOCOL.md` for the small
+validated envelope, immutable message files, advisory workflow fields, and
+archival.
 
 ```bash
 npm run mailbox:check
 npm run mailbox:list
+npm run mailbox:deliver -- /path/to/draft.md
+npm run mailbox:archive -- <thread-id>
+npm run mailbox:list -- --archive
 npm run test:mailbox
 ```
 
