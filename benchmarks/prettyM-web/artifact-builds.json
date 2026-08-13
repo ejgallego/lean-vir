@@ -12,6 +12,11 @@
       "repository": "https://github.com/leanprover/lean4",
       "revision": "d8b18978322de05a8f3dba51ef03cf5461676c17"
     },
+    "vir-json-lanes": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-vir",
+      "revision": "0c5611a30008b882ae6bbf40e5b2fb83051a01fb"
+    },
     "prettyM-workload": {
       "kind": "git",
       "repository": "https://github.com/leanprover/verso-slides",
@@ -140,6 +145,126 @@
               "prettyM.manifest.json": "prettyM/lean-llvm/prettyM.manifest.json",
               "prettyM.mjs": "prettyM/lean-llvm/prettyM.mjs",
               "prettyM.wasm": "prettyM/lean-llvm/prettyM.wasm"
+            }
+          }
+        }
+      }
+    },
+    "verso-search-json-owned": {
+      "example": {
+        "id": "verso-search-json",
+        "variant": "default"
+      },
+      "artifactSet": {
+        "setId": "verso-search-json-owned-set-0001",
+        "benchmarkContract": {
+          "id": "verso-search-json/artifacts/v1",
+          "input": "verso-search-xref/v1",
+          "output": "verso-searchables-by-domain/v1",
+          "timingPhases": ["lower", "execute", "lift", "host", "total"]
+        }
+      },
+      "checkouts": {
+        "lean": "lean-4.33.0-rc2",
+        "vir": "vir-json-lanes"
+      },
+      "components": {
+        "vir": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0-rc2",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            },
+            "runtime": {
+              "pipeline": "lean-vir-ir-interpreter-wasm32-wasip1",
+              "sourceRef": "vir-json-lanes",
+              "sourceDirty": false,
+              "wasiSdk": "33.0"
+            },
+            "workload": {
+              "file": "owned.irpkg",
+              "packageRef": "owned",
+              "packageFormat": 10,
+              "manifestVersion": 8,
+              "source": {
+                "sourceRef": "vir-json-lanes",
+                "dirty": false
+              }
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "vir",
+            "checkouts": {
+              "producer": "vir",
+              "runtime": "lean",
+              "workload": "vir"
+            },
+            "files": {
+              "owned.irpkg": "verso-search-json/owned.irpkg",
+              "lean-vir/js/vir-runtime.js": "verso-search-json/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "verso-search-json/lean-vir/wasm/vir-upstream.wasm"
+            }
+          }
+        }
+      }
+    },
+    "verso-search-json-borrowed": {
+      "example": {
+        "id": "verso-search-json",
+        "variant": "borrowed"
+      },
+      "artifactSet": {
+        "setId": "verso-search-json-borrowed-set-0001",
+        "benchmarkContract": {
+          "id": "verso-search-json/artifacts/v1",
+          "input": "verso-search-xref/v1",
+          "output": "verso-searchables-by-domain/v1",
+          "timingPhases": ["lower", "execute", "lift", "host", "total"]
+        }
+      },
+      "checkouts": {
+        "lean": "lean-4.33.0-rc2",
+        "vir": "vir-json-lanes"
+      },
+      "components": {
+        "vir": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0-rc2",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            },
+            "runtime": {
+              "pipeline": "lean-vir-ir-interpreter-wasm32-wasip1",
+              "sourceRef": "vir-json-lanes",
+              "sourceDirty": false,
+              "wasiSdk": "33.0"
+            },
+            "workload": {
+              "file": "borrowed.irpkg",
+              "packageRef": "borrowed",
+              "packageFormat": 10,
+              "manifestVersion": 8,
+              "source": {
+                "sourceRef": "vir-json-lanes",
+                "dirty": false
+              }
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "vir",
+            "checkouts": {
+              "producer": "vir",
+              "runtime": "lean",
+              "workload": "vir"
+            },
+            "files": {
+              "borrowed.irpkg": "verso-search-json/borrowed.irpkg",
+              "lean-vir/js/vir-runtime.js": "verso-search-json/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "verso-search-json/lean-vir/wasm/vir-upstream.wasm"
             }
           }
         }

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example-tests",
+  "example": "verso-search-json",
+  "variants": [
+    {
+      "id": "default",
+      "title": "Explicit owned JSON",
+      "build": "verso-search-json-owned",
+      "tests": [
+        {
+          "id": "real-xref-parity",
+          "study": "smoke",
+          "oracle": "js",
+          "backends": ["js", "owned"],
+          "data": {
+            "fixtures": [
+              {
+                "id": "manual",
+                "title": "Verso Manual",
+                "xref": "examples/verso-search-json/fixtures/manual/xref.json",
+                "mapper": "examples/verso-search-json/fixtures/manual/domain-mappers.js",
+                "xrefSha256": "3150da8a058917de08d9bd5fd2b38c882ec23f310c2ee6e35e11872a9acb406a",
+                "mapperSha256": "30e4a1b431fe2e9f6d9e394b4fa1d7b70bf199cf6329705122c94a16dcb134fa",
+                "domains": [
+                  "Verso.Genre.Manual.section",
+                  "Verso.Genre.Manual.example",
+                  "Verso.Genre.Manual.doc.tech",
+                  "Verso.Genre.Manual.doc.tactic.conv",
+                  "Verso.Genre.Manual.doc.tactic",
+                  "Verso.Genre.Manual.doc.suggestion",
+                  "Verso.Genre.Manual.doc.option",
+                  "Verso.Genre.Manual.doc"
+                ],
+                "searchables": 295
+              },
+              {
+                "id": "literate",
+                "title": "Verso literate project",
+                "xref": "examples/verso-search-json/fixtures/literate/xref.json",
+                "mapper": "examples/verso-search-json/fixtures/literate/domain-mappers.js",
+                "xrefSha256": "4734d68e705cc552ad699c444dc7f57938a74275dc81d3a96a01ba246c718141",
+                "mapperSha256": "4701527b39a94ca774191bd9146ab5450991d159e71c9eba4c621e29a02cdc25",
+                "domains": ["VersoHtml.constant", "VersoHtml.module"],
+                "searchables": 28
+              }
+            ]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "benchmark",
+        "data": {
+          "fixtures": ["manual", "literate"],
+          "warmups": 5,
+          "samples": 30
+        }
+      }
+    },
+    {
+      "id": "borrowed",
+      "title": "Borrowed JSON handles",
+      "build": "verso-search-json-borrowed",
+      "tests": [
+        {
+          "id": "real-xref-parity",
+          "study": "smoke",
+          "oracle": "js",
+          "backends": ["js", "borrowed"],
+          "data": {
+            "fixtures": [
+              {
+                "id": "manual",
+                "title": "Verso Manual",
+                "xref": "examples/verso-search-json/fixtures/manual/xref.json",
+                "mapper": "examples/verso-search-json/fixtures/manual/domain-mappers.js",
+                "xrefSha256": "3150da8a058917de08d9bd5fd2b38c882ec23f310c2ee6e35e11872a9acb406a",
+                "mapperSha256": "30e4a1b431fe2e9f6d9e394b4fa1d7b70bf199cf6329705122c94a16dcb134fa",
+                "domains": [
+                  "Verso.Genre.Manual.section",
+                  "Verso.Genre.Manual.example",
+                  "Verso.Genre.Manual.doc.tech",
+                  "Verso.Genre.Manual.doc.tactic.conv",
+                  "Verso.Genre.Manual.doc.tactic",
+                  "Verso.Genre.Manual.doc.suggestion",
+                  "Verso.Genre.Manual.doc.option",
+                  "Verso.Genre.Manual.doc"
+                ],
+                "searchables": 295
+              },
+              {
+                "id": "literate",
+                "title": "Verso literate project",
+                "xref": "examples/verso-search-json/fixtures/literate/xref.json",
+                "mapper": "examples/verso-search-json/fixtures/literate/domain-mappers.js",
+                "xrefSha256": "4734d68e705cc552ad699c444dc7f57938a74275dc81d3a96a01ba246c718141",
+                "mapperSha256": "4701527b39a94ca774191bd9146ab5450991d159e71c9eba4c621e29a02cdc25",
+                "domains": ["VersoHtml.constant", "VersoHtml.module"],
+                "searchables": 28
+              }
+            ]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "benchmark",
+        "data": {
+          "fixtures": ["manual", "literate"],
+          "warmups": 5,
+          "samples": 30
+        }
+      }
+    }
+  ]
+}

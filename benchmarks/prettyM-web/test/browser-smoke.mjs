@@ -87,7 +87,7 @@ try {
     null,
   );
   assert.equal(await page.locator("[data-example-content]:visible").count(), 0);
-  assert.equal(await page.locator("#example-nav a").count(), 2);
+  assert.equal(await page.locator("#example-nav a").count(), 3);
   assert.equal(
     await page.locator('#example-nav [aria-current="page"]').count(),
     0,
@@ -101,6 +101,7 @@ try {
   });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.examples), [
     { id: "prettyM", label: "Std.Format.prettyM" },
+    { id: "verso-search-json", label: "Verso search JSON lanes" },
     { id: "illuminate", label: "Illuminate player" },
   ]);
   assert.equal(

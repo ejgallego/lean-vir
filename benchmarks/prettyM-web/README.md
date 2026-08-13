@@ -1,12 +1,12 @@
 # Lean browser benchmark app
 
 This directory is one standalone browser benchmark application. Its example
-selector currently exposes `Std.Format.prettyM` and the Illuminate player at
-the same level and through the same page structure. Each example supplies its
-own semantic contract, backend set, sampling controls, and studies while the
-application owns navigation, artifact status, report actions, plotting, and
-backend filtering. It has no runtime dependency on Verso, Reveal, Lake, or the
-parent VIR repository's source tree.
+selector exposes `Std.Format.prettyM`, the explicit-owned/borrowed Verso search JSON
+workload, and the Illuminate player at the same level and through the same page
+structure. Each example supplies its own semantic contract, backend set,
+sampling controls, and studies while the application owns navigation, artifact
+status, report actions, plotting, and backend filtering. It has no runtime
+dependency on Verso, Reveal, Lake, or the parent VIR repository's source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -24,6 +24,8 @@ Select the complete build-and-test unit by example and variant:
 
 ```sh
 npm run example -- prettyM default --plan
+npm run example -- verso-search-json default --plan
+npm run example -- verso-search-json borrowed --plan
 npm run example -- prettyM default --test-only
 # From a clean checkout, materializes exact sources, prepares producers, builds,
 # packs, imports, validates, then runs the declared differential tests:
@@ -47,6 +49,14 @@ commands. Performance collection remains an explicit controlled-machine step.
 - display reports and campaigns with a shared, non-destructive backend filter; and
 - import/export the complete JSON representation independently of the active
   presentation filter.
+
+The `verso-search-json` example retains two real generated xref fixtures and
+their JavaScript mapper oracles. Its independently catalogued explicit-owned
+and borrowed variants cover all ten domains, exact output and property order, 323
+searchables, borrowed `ref` identity, boundary timings, and Wasm-page growth.
+See
+[`examples/verso-search-json/README.md`](examples/verso-search-json/README.md)
+for the fixture and protocol details.
 
 The slide deck is not part of this application. It may link here or present a
 recorded report, but benchmark execution does not initialize Reveal or use
@@ -151,11 +161,13 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
-not load or privilege either workload. Select an example there or use the
-direct links `?example=prettyM&variant=default` and
+not load or privilege any workload. Select an example there or use the direct
+links `?example=prettyM&variant=default`,
+`?example=verso-search-json&variant=default`,
+`?example=verso-search-json&variant=borrowed`, and
 `?example=illuminate&variant=default`. Example variants are selected in the
-shared header rather than by workload-specific UI. The included server supplies
-the cross-origin isolation headers required by threaded LLVM Wasm.
+shared header rather than by workload-specific UI. The included server
+supplies the cross-origin isolation headers required by threaded LLVM Wasm.
 `_headers` and `.htaccess` files are included at the root of `dist/` for static
 hosts; configure equivalent headers when the hosting platform does not consume
 either format.

@@ -38,6 +38,10 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 
 - `prettyM/default` is the active canonical example. Its build contains VIR,
   FIR-native, and FIR-LLVM components and exercises five browser backends.
+- `verso-search-json/default` and `verso-search-json/borrowed` are canonical
+  candidate variants built from one pinned VIR revision. They retain separate
+  explicit-owned and borrowed mapper packages and replay two hash-pinned generated Verso
+  fixtures against their JavaScript oracles.
 - `illuminate/default` is the second real client and uses the same catalog,
   shell, variant selector, artifact root, and report workflow. It remains a
   local rehearsal until Illuminate and FIR expose complete canonical producer
@@ -64,6 +68,8 @@ Run application commands from `benchmarks/prettyM-web/`:
 npm install
 npm run examples:check
 npm run example -- prettyM default --plan
+npm run example -- verso-search-json default --plan
+npm run example -- verso-search-json borrowed --plan
 npm run example -- prettyM default --materialize --prepare
 npm run test:unit
 npm run test:browser
@@ -97,6 +103,8 @@ Before handing off a catalog, controller, or artifact change:
 - validate the example and build catalogs;
 - run the unit suite and the affected example's browser differential suite;
 - preserve exact rendered-text and styling-event parity;
+- preserve exact Verso JSON output, property order, and borrowed `ref`
+  identity;
 - preserve prepare, execute, decode, and total phase boundaries;
 - keep generated binaries and reports ignored; and
 - record only portable source and artifact identities in generated receipts.

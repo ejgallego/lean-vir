@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example",
+  "id": "verso-search-json",
+  "title": "Verso search JSON lanes",
+  "summary": "Explicit structural and borrowed VIR JSON mapping over ten real Verso xref domains",
+  "lifecycle": "candidate",
+  "packages": [
+    {
+      "id": "owned",
+      "target": "benchmarks/prettyM-web/examples/verso-search-json/Mapper.lean",
+      "exports": ["Vir.Benchmarks.VersoSearchJson.mapOwnedAll"]
+    },
+    {
+      "id": "borrowed",
+      "target": "benchmarks/prettyM-web/examples/verso-search-json/Mapper.lean",
+      "exports": ["Vir.Benchmarks.VersoSearchJson.mapBorrowedAll"]
+    }
+  ],
+  "controller": "examples/verso-search-json/controller.mjs",
+  "testPackage": "examples/verso-search-json/tests.json"
+}
