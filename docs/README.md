@@ -77,6 +77,8 @@ ownership diagrams.
 
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md): implementation map, call-flow
   diagrams, object ownership, and focused validation pointers.
+- [MAILBOX_PROTOCOL.md](MAILBOX_PROTOCOL.md): same-project and cross-project
+  agent communication, lane ownership, handoff, and cleanup rules.
 - [HARNESS.md](HARNESS.md): setup, generated artifacts, validation commands,
   and CI shape.
 - [ADDING_DEMOS.md](ADDING_DEMOS.md): adding browser demos and package roots.

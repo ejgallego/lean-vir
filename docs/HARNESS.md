@@ -393,6 +393,8 @@ logic into entry-point scripts or pages:
 - Benchmark helpers: `scripts/bench-differential.mjs` and
   `scripts/bench-utils.mjs`
 - Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
+- Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
+  `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`
 - IR package generator setup: `scripts/irpkg-generator.mjs`
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
@@ -414,3 +416,20 @@ repository-specific worktree harness here.
 The root checkout is the stable base. Avoid using it for unrelated parallel
 implementation branches, and do not delete unrelated worktrees unless the
 maintainer explicitly asks.
+
+## Agent Mailbox
+
+Inter-agent coordination uses the one local mailbox under the primary/root
+checkout, including when the participating agents are running in linked
+worktrees or dependent projects. See `docs/MAILBOX_PROTOCOL.md` for thread
+ownership, immutable message files, lifecycle states, handoff identity, and
+cleanup rules.
+
+```bash
+npm run mailbox:check
+npm run mailbox:list
+npm run test:mailbox
+```
+
+The commands resolve the primary checkout from any linked worktree. `.agents/`
+is ignored local state and must not appear in public PR descriptions.

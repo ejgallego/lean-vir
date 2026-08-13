@@ -31,6 +31,14 @@ under `.worktrees/`; it is ignored by Git.
 By default, clean up only worktrees and branches created for the current task.
 Do not delete unrelated local worktrees unless the maintainer explicitly asks.
 
+## Agent Coordination
+
+Agents in the root checkout and linked worktrees share the primary checkout's
+local `.agents/mailbox/`. Read that mailbox and `git worktree list` before
+claiming a lane. Cross-project requests live with the project that owns the
+requested code change. See [docs/MAILBOX_PROTOCOL.md](docs/MAILBOX_PROTOCOL.md)
+for message, ownership, handoff, and retirement rules.
+
 ## Commits
 
 Prefer concise imperative subjects in the form:

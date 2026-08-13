@@ -12,6 +12,15 @@ map lives in `docs/HARNESS.md`.
 - `npm run doctor`
   Check the local toolchain, pinned Lean source checkout, generated WASM/package
   artifacts, WASI SDK, and optional Chromium browser.
+- `npm run mailbox:check`
+  Validate immutable v1 mailbox messages in the primary checkout.
+- `npm run mailbox:list`
+  Summarize nonterminal mailbox threads from the primary checkout. Pass
+  `-- --all` to include closed and cancelled threads, or `-- --json` for
+  machine-readable output.
+- `npm run test:mailbox`
+  Exercise v1 parsing, documented examples, state transitions,
+  primary-checkout discovery, and CLI output.
 - `npm run build:demo`
   Build the upstream IR interpreter WASM and generated browser packages. The
   browser package step uses the compiled `vir_irpkg` generator executable. The

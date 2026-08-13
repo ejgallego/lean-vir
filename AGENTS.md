@@ -52,6 +52,20 @@ asks for that machinery.
 - Commit subjects should be concise and behavior-oriented, preferably
   `type: summary`.
 
+## Agent Coordination
+
+- Use the canonical mailbox at `.agents/mailbox/` in the primary/root
+  checkout. Linked implementation worktrees must not create separate
+  mailboxes.
+- Follow `docs/MAILBOX_PROTOCOL.md` for same-project and cross-project
+  messages. A cross-project thread belongs to the project that owns the
+  requested code change.
+- Read the mailbox and `git worktree list` before creating a lane. An
+  acknowledgement claims ownership; for implementation work, it records the
+  project-relative worktree, branch, base commit, and write scope.
+- Mailbox completion does not authorize a push, PR, worktree removal, or branch
+  deletion. Those remain explicit maintainer actions.
+
 ## Pull Requests
 
 - Use `scripts/pr-message.sh` before opening or editing a PR description.
@@ -87,6 +101,8 @@ asks for that machinery.
 - `README.md`: user-facing overview and getting-started guide.
 - `CONTRIBUTING.md`: branch, commit, PR, and local worktree conventions.
 - `docs/HARNESS.md`: setup, generated artifacts, and validation command map.
+- `docs/MAILBOX_PROTOCOL.md`: local inter-agent coordination and worktree
+  ownership protocol.
 - `docs/LOCAL_IRPKG.md`: local `.irpkg` package workflow.
 - `docs/CALL_LEAN_FROM_JS.md` and `docs/JS_API.md`: JavaScript runtime usage.
 - `docs/UPSTREAM_BOUNDARY.md`: current upstream interpreter boundary details.
