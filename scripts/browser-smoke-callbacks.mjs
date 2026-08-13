@@ -6,8 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
+import { createProofSurfaceFixture } from "../web/src/proof-surface-fixtures.js";
 import { basePath, distAssetPathContaining, evaluate } from "./browser-smoke-harness.mjs";
 import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./browser-package-config.mjs";
+import { runSelectedEntry } from "./browser-smoke-dev-runner.mjs";
 import {
   clickSelector,
   runDemoHostEntry,
@@ -113,6 +115,53 @@ export async function smokeBrowserCallbacks(cdp, origin) {
   );
   assert.match(reactClicked.text, /^react:[12]$/);
   assert.equal(reactClicked.status, "Ready");
+
+  const proofSurface = createProofSurfaceFixture();
+  const emptyProofSurface = {
+    ...proofSurface,
+    goals: [],
+    selectedLocations: [],
+    selections: [],
+  };
+  await runDemoHostEntry(cdp, origin, "ReactProofWidget.mount", {
+    runInputs: ["#react-proof-transition-root", JSON.stringify(emptyProofSurface)],
+    target: { id: "react-proof-transition-root" },
+  });
+  await waitForBrowserState(
+    cdp,
+    textMatchesScript(
+      "#react-proof-widget",
+      "Move the cursor into a tactic proof",
+      "empty proof widget mount trapped",
+    ),
+    { timeoutMessage: "empty proof widget did not mount" },
+  );
+  assert.equal(await runSelectedEntry(cdp, [
+    "#react-proof-transition-root",
+    JSON.stringify(proofSurface),
+  ]), "true");
+  await waitForBrowserState(
+    cdp,
+    textReadyScript(
+      "#react-proof-selected-title",
+      "Proof actions",
+      "proof widget goal transition trapped",
+    ),
+    { timeoutMessage: "proof widget did not transition from no goals to a goal" },
+  );
+  assert.equal(await runSelectedEntry(cdp, [
+    "#react-proof-transition-root",
+    JSON.stringify(emptyProofSurface),
+  ]), "true");
+  await waitForBrowserState(
+    cdp,
+    textMatchesScript(
+      "#react-proof-widget",
+      "Move the cursor into a tactic proof",
+      "proof widget empty transition trapped",
+    ),
+    { timeoutMessage: "proof widget did not transition from a goal to no goals" },
+  );
 
   await runDemoHostEntry(cdp, origin, "ReactInput.mountInput", {
     runInputs: ["#react-input-smoke-root"],

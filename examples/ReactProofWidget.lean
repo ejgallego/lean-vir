@@ -332,10 +332,10 @@ def EmptyView : Component Surface := fun surface => do
   ] #[title, empty]
 
 def App : Component Surface := fun surface => do
+  let state ← useStatus
   match surface.goals[0]? with
   | none => Node.component EmptyView surface
   | some goal =>
-      let state ← useStatus
       let runTactic (tactic : String) : DomM Unit := do
         let inserted ← Lean.Vir.Infoview.Command.insertAtCursor surface (tactic ++ "\n")
         if inserted then
