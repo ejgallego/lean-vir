@@ -99,6 +99,7 @@ build_module Vir/ProofWidgets/Html.lean
 build_module Vir/ProofWidgets/Rpc.lean
 build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean
+npm run --silent build:infoview
 build_module Vir/Infoview/Assets.lean
 build_module Vir/Infoview/Surface.lean
 build_module Vir/Infoview/Package.lean

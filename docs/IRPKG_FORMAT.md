@@ -92,10 +92,10 @@ Package IR constructor helpers consume owned child references, and the decoded
 package owner releases the complete graph both when a later section fails and
 when the package state is cleared.
 
-Package `Name` tags and IR declaration payload tags are generated from
-`scripts/ir-codec-tags.mjs` into
-`Vir/GeneratePackage/PackageIRTags.lean` and
-`wasm/upstream_shim/package/package_ir_tags.h`. Name encoding is shared by the
+Package `Name` tags and IR declaration payload tag values live in
+`Vir/GeneratePackage/PackageIRTags.lean`. The mapping in
+`scripts/ir-codec-tags.mjs` generates
+`build/generated/wasm/package/package_ir_tags.h`. Name encoding is shared by the
 declaration, initializer-global, host-import, and export-summary sections; the
 other generated tag groups are specific to IR declarations.
 
@@ -103,7 +103,7 @@ These assignments are part of the format-10 wire contract. Do not renumber or
 reuse them without reviewing whether `packageFormatVersion` must change. IR
 type tags `10` and `11` remain reserved for the currently unsupported
 `Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases. After editing the
-source table, run `npm run generate:ir-codec-tags`, then
+Lean constants or enum mapping, run `npm run generate:ir-codec-tags`, then
 `npm run check:ir-codec-tags`.
 
 See `docs/IRPKG_PAYLOAD_ANALYSIS.md` for a measured package-section snapshot

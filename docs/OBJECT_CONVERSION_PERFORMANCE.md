@@ -99,7 +99,7 @@ repository-owned comparison above is the acceptance evidence.
 
 ## Size And Validation
 
-The checked-in infoview bundle grew from 321,934 to 322,971 bytes. The Wasm is
+The generated infoview bundle grew from 321,934 to 322,971 bytes. The Wasm is
 unchanged. Validation includes the cached/replaced-plan test, workload shape
 contract, pure JavaScript and Lean-backed runtime suites, generated infoview
 bundle parity, exact benchmark output checks, and upstream fixtures.

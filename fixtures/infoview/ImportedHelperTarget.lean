@@ -1,11 +1,11 @@
-import Vir.Infoview.ImportedHelperSmoke
+import InfoviewFixtures.ImportedHelper
 
 namespace SmokeInfoviewImportedHelperTarget
 
 @[noinline] def before : String :=
-  Lean.Vir.Infoview.ImportedHelperSmoke.labelBefore ()
+  InfoviewFixtures.ImportedHelper.labelBefore ()
 
 @[noinline] def after : String :=
-  Lean.Vir.Infoview.ImportedHelperSmoke.labelAfter ()
+  InfoviewFixtures.ImportedHelper.labelAfter ()
 
 end SmokeInfoviewImportedHelperTarget

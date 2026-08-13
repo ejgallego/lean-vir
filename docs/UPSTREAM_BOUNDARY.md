@@ -660,11 +660,10 @@ the upstream interpreter file.
 policy. Run `npm run check:native-externs` after changing its
 `nativeExternSpecs` table; this verifies that every entry resolves through
 Lean's imported IR declarations and extern metadata. Run
-`node scripts/check-boundary-registry.mjs --write` after adding, removing, or
-renaming native extern entries; this regenerates
-`wasm/upstream_shim/runtime/native_symbols_registry.inc`. The regular
-`npm run check:boundary-registry` guard then verifies that the generated
-registry is current and that every native extern has a matching `dlsym` symbol
+`npm run generate:boundary-registry` when a standalone generated registry is
+useful for inspection; it writes
+`build/generated/wasm/runtime/native_symbols_registry.inc`. The regular
+`npm run check:boundary-registry` guard verifies that every native extern has a matching `dlsym` symbol
 plus one of a boxed wrapper in `wasm/upstream_shim/runtime/native_symbols.cpp`,
 a compiler-generated wrapper selected by the native extern entry, or a native
 constant entry in the generated registry. `npm test` runs these checks before
