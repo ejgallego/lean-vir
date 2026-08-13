@@ -55,7 +55,7 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   const sources = checkoutSources(database, "prettyM");
   assert.equal(
     sources.vir.revision,
-    "64e30784da16957cca92951344d776f895b30491",
+    "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65",
   );
   assert.equal(
     sources.fir.revision,

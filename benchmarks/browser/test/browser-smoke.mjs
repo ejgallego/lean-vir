@@ -192,7 +192,7 @@ try {
     assert.equal(
       report.runtimeProfile.artifactSet.manifest.components.vir.runtime
         .sourceCommit,
-      "64e30784da16957cca92951344d776f895b30491",
+      "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65",
     );
   } else {
     assert.equal(artifactStatus.tone, "unverified");
