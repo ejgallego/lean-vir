@@ -4,12 +4,13 @@
 VIR targets and exports. `artifact-builds.json` selects exact Git sources,
 including the Lean runtime source consumed by VIR, local checkout roles,
 producer dependencies, expected package files, artifact-set identity, and the
-provenance consumed by the packer. Accepted locks are separate consumer state.
-A VIR component names a `packageRef`, and every build binds an `example.id`
-plus `example.variant`. The driver resolves the package target and exports from
-the example descriptor and verifies that `tests.json` selects the same build
-before validating or building it. `prettyM/default` is the first record; it is
-not a default baked into the catalog tools.
+provenance consumed by the packer. Generated candidate locks are ignored
+invocation-local integrity records, not committed consumer state. A VIR
+component names a `packageRef`, and every build binds an `example.id` plus
+`example.variant`. The driver resolves the package target and exports from the
+example descriptor and verifies that `tests.json` selects the same build before
+validating or building it. `prettyM/default` is the first record; it is not a
+default baked into the catalog tools.
 
 Machine-specific paths are deliberately absent from the catalog. The usual
 local flow materializes the catalogued sources, then optionally replaces the

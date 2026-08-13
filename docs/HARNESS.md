@@ -147,6 +147,7 @@ node scripts/run-fixtures.mjs --help
 Tests:
 
 ```bash
+npm run test:tutorials
 npm run test:bench
 npm run test:surface
 npm run test:surface:browser
@@ -167,11 +168,12 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the artifact-cache, benchmark sampler, focused-identity, and
-paired-runner contract tests, package ABI and IR object-layout checks, IR codec
-tag freshness check, native extern metadata check, boundary registry check,
-native wrapper check, API coverage docs check, and Wasm extension probes. It
-then builds the demo artifacts once and reuses them for a paired-runner
+`npm test` elaborates the copyable tutorials, then runs the artifact-cache,
+benchmark sampler, focused-identity, and paired-runner contract tests, package
+ABI and IR object-layout checks, IR codec tag freshness check, native extern
+metadata check, boundary registry check, native wrapper check, API coverage
+docs check, and Wasm extension probes. It then builds the demo artifacts once
+and reuses them for a paired-runner
 control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
 tests, and the fixture suite. It is the default pre-merge signal for code
 changes.

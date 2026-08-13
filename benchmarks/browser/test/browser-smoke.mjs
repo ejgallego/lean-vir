@@ -5,7 +5,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
+import {
+  artifactSetConfig,
+  readBuildDatabase,
+} from "../scripts/artifact-build-lib.mjs";
+
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const prettyMArtifactSet = artifactSetConfig(
+  await readBuildDatabase(join(appRoot, "artifact-builds.json")),
+  "prettyM",
+);
 const hasVerifiedPrettyM = existsSync(
   join(appRoot, "artifacts/prettyM/ARTIFACT_SET.json"),
 );
@@ -184,15 +193,15 @@ try {
   assert.equal(report.parityCount, 1);
   assert.equal(report.scenarioCount, 1);
   if (hasVerifiedPrettyM) {
-    assert.equal(artifactStatus.setId, "prettyM-bounded-set-0002");
+    assert.equal(artifactStatus.setId, prettyMArtifactSet.setId);
     assert.equal(
       report.runtimeProfile.artifactSet.manifest.setId,
-      "prettyM-bounded-set-0002",
+      prettyMArtifactSet.setId,
     );
     assert.equal(
       report.runtimeProfile.artifactSet.manifest.components.vir.runtime
         .sourceCommit,
-      "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65",
+      prettyMArtifactSet.components.vir.runtime.sourceCommit,
     );
   } else {
     assert.equal(artifactStatus.tone, "unverified");

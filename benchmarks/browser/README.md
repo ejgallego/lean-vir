@@ -147,9 +147,9 @@ test declared by the admitted variant to pass.
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
 workload. The browser only observes the common semantic input/output and timing
-contract. The current candidate retains the VIR and workload pins while
-selecting merged FIR `298682a`. Five-backend parity is the compatibility gate;
-no cross-backend Lean heap values are exchanged.
+contract. `artifact-builds.json` owns the current producer and workload pins.
+Five-backend parity is the compatibility gate; no cross-backend Lean heap
+values are exchanged.
 
 The current VIR package uses the producer-facing
 `VersoSlides.Pretty.*ForVir` export names. They are declared in
@@ -218,11 +218,12 @@ selection-v4 API, uses its bit-exact scalar tick entry, and materializes patch
 rows from the original host-owned animation. The full-action v3 package remains
 the producer-side semantic oracle.
 
-The canonical consumer-side adapter requires both accepted FIR packages. Once
-an Illuminate catalog record can be built, `artifacts:fetch` selects it from
-the artifact-set manifest and atomically stages only verified `illuminate/`
-members. The app uses selection v4 and loads that set manifest as provenance,
-while retaining `REHEARSAL.json` and v3-only compatibility for local rehearsals.
+The canonical consumer-side adapter requires both producer-validated FIR
+packages. Once an Illuminate catalog record can be built, `artifacts:fetch`
+selects it from the artifact-set manifest and atomically stages only verified
+`illuminate/` members. The app uses selection v4 and loads that set manifest as
+provenance, while retaining `REHEARSAL.json` and v3-only compatibility for local
+rehearsals.
 
 The application and downloaded report display the exact staged build
 identities and mark all timings as non-authoritative. See

@@ -53,22 +53,15 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   assert.deepEqual(artifactFiles(build), prettyMArtifactFiles);
 
   const sources = checkoutSources(database, "prettyM");
-  assert.equal(
-    sources.vir.revision,
-    "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65",
-  );
-  assert.equal(
-    sources.fir.revision,
-    "298682a766d80e90053d3e76ee2f3e4af78a52aa",
-  );
-  assert.equal(
-    sources.lean.revision,
-    "d8b18978322de05a8f3dba51ef03cf5461676c17",
-  );
-  assert.equal(
-    sources.workload.revision,
-    "c16a6f83b622dd8ebc2f4975d93b856b08dde444",
-  );
+  assert.deepEqual(Object.keys(sources).sort(), [
+    "fir",
+    "lean",
+    "vir",
+    "workload",
+  ]);
+  for (const source of Object.values(sources)) {
+    assert.match(source.revision, /^[0-9a-f]{40}$/);
+  }
 
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);

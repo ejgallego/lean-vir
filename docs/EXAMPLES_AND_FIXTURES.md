@@ -33,6 +33,9 @@ not a gallery of applications.
 - `examples/tutorials/ReactProofWidgetHello.lean` introduces a live infoview
   component without the proof-action tool's behavior.
 
+`npm run test:tutorials` elaborates both tutorial sources. The ProofWidget
+tutorial is additionally exercised through the existing browser package.
+
 ## Fixtures
 
 A fixture exists to protect one runtime, host, or interface contract. Fixtures

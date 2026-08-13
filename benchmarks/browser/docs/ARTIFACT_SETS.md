@@ -112,9 +112,9 @@ manifest provenance and selected example/variant test-package digest; newly
 packed manifests bind that digest as well. prettyM runtime profiles additionally
 hash the manifest and every browser-observed runtime asset.
 
-## Current prettyM candidate
+## Catalog authority
 
-`prettyM-bounded-set-0002` is the candidate identity for the refreshed source
-closure. It retains VIR `64e3078` and the Verso Slides workload `c16a6f8`, uses
-merged FIR `298682a`, and places every payload below `prettyM/`. Each generated
-lock records the exact archive digest for its own build.
+`artifact-builds.json` is the single source of truth for current set IDs,
+producer revisions, workload revisions, and component files. Generated locks
+record the exact archive digest for one build; documentation deliberately does
+not duplicate changing source pins.

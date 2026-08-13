@@ -1,6 +1,6 @@
 # Handoff: browser benchmark catalog and artifact pipeline
 
-Last verified: 2026-08-12
+Last verified: 2026-08-13
 
 ## Purpose
 
@@ -99,6 +99,7 @@ These commands write only ignored candidate data and staged local artifacts.
 Before handing off a catalog, controller, or artifact change:
 
 - validate the example and build catalogs;
+- elaborate copyable tutorial sources;
 - run the unit suite and the affected example's browser differential suite;
 - preserve exact rendered-text and styling-event parity;
 - preserve prepare, execute, decode, and total phase boundaries;
