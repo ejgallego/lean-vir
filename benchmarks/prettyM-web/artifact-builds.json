@@ -15,7 +15,7 @@
     "vir-json-lanes": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "c1030e2e654c06a7c30a78cdebaf3c6f828f8dbc"
+      "revision": "0c5611a30008b882ae6bbf40e5b2fb83051a01fb"
     },
     "prettyM-workload": {
       "kind": "git",
