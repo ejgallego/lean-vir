@@ -4,17 +4,15 @@ const appRoot = new URL("../../", import.meta.url);
 const lanes = {
   default: {
     id: "owned",
-    label: "Lean · owned structural JSON",
+    label: "Lean · explicit owned JSON",
     package: "owned.irpkg",
     entry: "Vir.Benchmarks.VersoSearchJson.mapOwnedAll",
-    borrowed: false,
   },
   borrowed: {
     id: "borrowed",
     label: "Lean · borrowed JSON handles",
     package: "borrowed.irpkg",
     entry: "Vir.Benchmarks.VersoSearchJson.mapBorrowedAll",
-    borrowed: true,
   },
 };
 const backendColors = {
@@ -448,18 +446,6 @@ export function createController(context) {
 
   function invokeVir(fixture) {
     if (!vir) throw new Error("VIR backend is not ready");
-    if (!lane.borrowed) {
-      const timed = vir.runtime.callTimed(lane.entry, fixture.xref);
-      assertEquivalent(fixture, timed.value, false);
-      return {
-        lowerMs: timed.timings.marshalMs,
-        executeMs: timed.timings.executeMs,
-        liftMs: timed.timings.decodeMs,
-        hostMs: timed.timings.hostMs,
-        totalMs: timed.timings.totalMs,
-      };
-    }
-
     const started = performance.now();
     const lowerStarted = performance.now();
     let inputHandle;
@@ -472,7 +458,7 @@ export function createController(context) {
       const liftStarted = performance.now();
       const value = vir.runtime.jsonValue(outputHandle);
       const unwrapMs = performance.now() - liftStarted;
-      assertEquivalent(fixture, value, true);
+      assertEquivalent(fixture, value, lane.id === "borrowed");
       return {
         lowerMs: borrowMs + timed.timings.marshalMs,
         executeMs: timed.timings.executeMs,

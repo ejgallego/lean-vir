@@ -168,7 +168,7 @@ private def mapOwnedSimple (domainId : String) (domainData : JSON) : JSON := Id.
     output := output.push (.object fields)
   return .array output
 
-def mapOwnedAll (xref : JSON) : JSON := Id.run do
+private def mapOwnedValue (xref : JSON) : JSON := Id.run do
   let some domains := asObject? xref | return .null
   let mut output := #[]
   for (domainId, domainData) in domains do
@@ -179,6 +179,10 @@ def mapOwnedAll (xref : JSON) : JSON := Id.run do
       mapOwnedSimple domainId domainData
     output := output.push (domainId, mapped)
   return .object output
+
+def mapOwnedAll (xref : Handle) : Lean.Vir.RuntimeM Handle := do
+  let owned ← Lean.Vir.Json.Handle.toJson xref
+  Lean.Vir.Json.Handle.ofJson (mapOwnedValue owned)
 
 private def borrowedObject? (value : Handle) : Lean.Vir.RuntimeM (Option (Array (String × Handle))) := do
   match ← Lean.Vir.Json.Handle.inspect value with

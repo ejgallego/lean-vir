@@ -3,7 +3,7 @@
   "kind": "browser-benchmarks/example",
   "id": "verso-search-json",
   "title": "Verso search JSON lanes",
-  "summary": "Owned and borrowed VIR JSON mapping over ten real Verso xref domains",
+  "summary": "Explicit structural and borrowed VIR JSON mapping over ten real Verso xref domains",
   "lifecycle": "candidate",
   "packages": [
     {

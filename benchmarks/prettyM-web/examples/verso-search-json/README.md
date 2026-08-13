@@ -3,7 +3,8 @@
 This catalog example runs the same ten Verso xref-domain mappings through two
 independently catalogued VIR packages:
 
-- `default`: complete-tree lowering and lifting with `Lean.Vir.Json`;
+- `default`: explicit `Handle.toJson` / `Handle.ofJson` complete-tree
+  transitions around the pure `Lean.Vir.Json` mapper;
 - `borrowed`: one-level handle inspection with opaque `ref` passthrough.
 
 The `manual` and `literate` fixture pairs preserve generated `xref.json`
@@ -36,4 +37,9 @@ npm run example -- verso-search-json borrowed --plan
 
 The benchmark protocol retains five warm-ups and thirty samples per fixture,
 reports boundary phases and Wasm-page growth, and does not treat timings from
-an uncontrolled machine as accepted performance evidence.
+an uncontrolled machine as accepted performance evidence. Both variants expose
+`Lean.Vir.Json.Handle` and use the same JavaScript retain/call/read/release path.
+For `default`, the explicit full-tree `toJson` and `ofJson` host calls occur
+inside the Lean entrypoint, so their time is intentionally attributed to
+`executeMs` and its overlapping `hostMs`, not hidden in automatic marshal/lift
+phases.

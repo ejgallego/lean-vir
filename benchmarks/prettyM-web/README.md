@@ -1,7 +1,7 @@
 # Lean browser benchmark app
 
 This directory is one standalone browser benchmark application. Its example
-selector exposes `Std.Format.prettyM`, the owned/borrowed Verso search JSON
+selector exposes `Std.Format.prettyM`, the explicit-owned/borrowed Verso search JSON
 workload, and the Illuminate player at the same level and through the same page
 structure. Each example supplies its own semantic contract, backend set,
 sampling controls, and studies while the application owns navigation, artifact
@@ -51,8 +51,8 @@ commands. Performance collection remains an explicit controlled-machine step.
   presentation filter.
 
 The `verso-search-json` example retains two real generated xref fixtures and
-their JavaScript mapper oracles. Its independently catalogued owned and
-borrowed variants cover all ten domains, exact output and property order, 323
+their JavaScript mapper oracles. Its independently catalogued explicit-owned
+and borrowed variants cover all ten domains, exact output and property order, 323
 searchables, borrowed `ref` identity, boundary timings, and Wasm-page growth.
 See
 [`examples/verso-search-json/README.md`](examples/verso-search-json/README.md)

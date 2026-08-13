@@ -2,16 +2,16 @@ import { requireController } from "../controller-contract.mjs";
 import { createController } from "./app.mjs";
 
 export const view = {
-  eyebrow: "Real client · direct JSON boundary",
+  eyebrow: "Real client · explicit JSON boundary",
   intro:
-    "Compare Verso's generated JavaScript xref mappers with Lean running through VIR's owned structural and borrowed-handle JSON lanes.",
+    "Compare Verso's generated JavaScript xref mappers with Lean running through VIR's explicit structural and borrowed-handle JSON paths.",
   progress: "Loading pinned xref fixtures and VIR artifacts…",
   artifacts: {
     copy:
       "Each variant retains its own mapper package, runtime provenance, fixture hashes, and phase-separated measurements.",
   },
   backendDescription:
-    "JavaScript is the semantic oracle. The selected variant runs either the bulk owned lane or the identity-preserving borrowed lane.",
+    "JavaScript is the semantic oracle. The selected variant runs either explicit full-tree materialization or identity-preserving borrowed inspection.",
   protocolDescription:
     "The committed protocol uses five warm-ups and thirty measured calls per real generated fixture; timings remain observational on uncontrolled machines.",
   controls: [
@@ -26,7 +26,7 @@ export const view = {
   ],
   emptyResults: "No Verso JSON-lane study has run yet.",
   footer:
-    "Owned JSON is the bulk-computation lane; borrowed handles target sparse inspection and opaque JavaScript reference passthrough.",
+    "Both exports use JSON handles. The bulk path explicitly materializes the complete tree; the borrowed path targets sparse inspection and opaque JavaScript reference passthrough.",
   bootstrap: {
     artifactScripts: [],
     classicScripts: [],

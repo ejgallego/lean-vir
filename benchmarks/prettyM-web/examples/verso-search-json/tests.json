@@ -5,7 +5,7 @@
   "variants": [
     {
       "id": "default",
-      "title": "Owned structural JSON",
+      "title": "Explicit owned JSON",
       "build": "verso-search-json-owned",
       "tests": [
         {

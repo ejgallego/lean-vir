@@ -40,7 +40,7 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
   FIR-native, and FIR-LLVM components and exercises five browser backends.
 - `verso-search-json/default` and `verso-search-json/borrowed` are canonical
   candidate variants built from one pinned VIR revision. They retain separate
-  owned and borrowed mapper packages and replay two hash-pinned generated Verso
+  explicit-owned and borrowed mapper packages and replay two hash-pinned generated Verso
   fixtures against their JavaScript oracles.
 - `illuminate/default` is the second real client and uses the same catalog,
   shell, variant selector, artifact root, and report workflow. It remains a
