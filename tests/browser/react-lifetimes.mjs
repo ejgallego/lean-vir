@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
 
-import { evaluate } from "./browser-smoke-harness.mjs";
+import { evaluate } from "./harness.mjs";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 const strictModeResultKey = "__leanVirReactStrictModeSmoke";
@@ -24,7 +24,7 @@ export async function smokeBrowserReactLifetimes(cdp) {
 
 async function smokeBrowserReactRefLifetime(cdp) {
   const source = await bundledBrowserProbe(
-    "./browser-smoke-react-ref-lifetime-entry.js",
+    "./react-ref-lifetime-entry.js",
     "production",
   );
   await evaluateBrowserProbe(cdp, source, "lean-vir-react-ref-lifetime-smoke.js");
@@ -44,7 +44,7 @@ async function smokeBrowserReactRefLifetime(cdp) {
 
 async function smokeBrowserReactStrictModeLifetime(cdp) {
   const source = await bundledBrowserProbe(
-    "./browser-smoke-react-strict-mode-entry.js",
+    "./react-strict-mode-entry.js",
     "development",
   );
   await evaluateBrowserProbe(cdp, source, "lean-vir-react-strict-mode-smoke.js");

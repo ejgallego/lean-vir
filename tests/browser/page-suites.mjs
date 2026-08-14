@@ -11,12 +11,12 @@ import {
   evaluate,
   navigate,
   waitForReady,
-} from "./browser-smoke-harness.mjs";
+} from "./harness.mjs";
 import {
   clickSelector,
   setInputValueAndDispatch,
   waitForBrowserState,
-} from "./browser-smoke-page-actions.mjs";
+} from "./page-actions.mjs";
 import {
   boundaryPackageFile,
   defaultPackageFile,
@@ -25,8 +25,8 @@ import {
   packageFiles,
   packagePresets,
   prettyPackageFile,
-} from "./browser-package-config.mjs";
-import { packageInfoFor } from "./browser-smoke-dev-runner.mjs";
+} from "../../scripts/browser-package-config.mjs";
+import { packageInfoFor } from "./dev-runner.mjs";
 
 export async function smokeLanding(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}`);

@@ -6,10 +6,14 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { createProofSurfaceFixture } from "../web/src/proof-surface-fixtures.js";
-import { basePath, distAssetPathContaining, evaluate } from "./browser-smoke-harness.mjs";
-import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./browser-package-config.mjs";
-import { runSelectedEntry } from "./browser-smoke-dev-runner.mjs";
+import { createProofSurfaceFixture } from "../../web/src/proof-surface-fixtures.js";
+import { basePath, distAssetPathContaining, evaluate } from "./harness.mjs";
+import {
+  defaultPackageFile,
+  hostPackageFile,
+  wasmPublicFile,
+} from "../../scripts/browser-package-config.mjs";
+import { runSelectedEntry } from "./dev-runner.mjs";
 import {
   clickSelector,
   runDemoHostEntry,
@@ -17,7 +21,7 @@ import {
   waitForBrowserState,
   waitForDocumentTitle,
   waitInBrowser,
-} from "./browser-smoke-page-actions.mjs";
+} from "./page-actions.mjs";
 
 function textReadyScript(selector, expectedText, trapMessage = null) {
   return `(() => {

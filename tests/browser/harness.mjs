@@ -13,11 +13,11 @@ import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { generatedPublicFiles } from "./browser-package-config.mjs";
-import { pathExists, requireChromiumExecutable } from "./file-utils.mjs";
-import { readIrPackageFile } from "./irpkg-format.mjs";
+import { generatedPublicFiles } from "../../scripts/browser-package-config.mjs";
+import { pathExists, requireChromiumExecutable } from "../../scripts/file-utils.mjs";
+import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
 
-export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
+export const distRoot = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
 export const requiredDistFiles = Object.freeze([
   "index.html",

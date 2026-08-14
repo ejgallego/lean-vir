@@ -6,8 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { basePath, navigate, waitForReady } from "./browser-smoke-harness.mjs";
-import { clickSelector, waitForBrowserState } from "./browser-smoke-page-actions.mjs";
+import { basePath, navigate, waitForReady } from "./harness.mjs";
+import { clickSelector, waitForBrowserState } from "./page-actions.mjs";
 
 export async function smokeReactTamagotchi(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}react.html`);

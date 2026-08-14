@@ -8,7 +8,7 @@ on:
       - ".github/workflows/pages.yml"
       - "package.json"
       - "scripts/install-benchmark-pages.mjs"
-      - "scripts/test-benchmark-pages.mjs"
+      - "tests/browser/benchmark-pages.mjs"
       - "benchmarks/browser/**"
 
 permissions:

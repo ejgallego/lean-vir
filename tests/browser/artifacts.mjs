@@ -19,14 +19,18 @@ import {
   hostPackageFile,
   leanPackageFile,
   localPackageFiles,
-} from "./browser-package-config.mjs";
-import { assertDistReady, requiredDistFiles } from "./browser-smoke-harness.mjs";
-import { isGeneratedPublicFile } from "./file-utils.mjs";
-import { IR_PACKAGE_MAGIC } from "./irpkg-format.mjs";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
-import { sdkArchiveEntries } from "./sdk-payloads.mjs";
+} from "../../scripts/browser-package-config.mjs";
+import { assertDistReady, requiredDistFiles } from "./harness.mjs";
+import { isGeneratedPublicFile } from "../../scripts/file-utils.mjs";
+import { IR_PACKAGE_MAGIC } from "../../scripts/irpkg-format.mjs";
+import {
+  PACKAGE_FORMAT_VERSION,
+  INTERFACE_MANIFEST_VERSION,
+  RUNTIME_ABI_VERSION,
+} from "../../scripts/package-versions.mjs";
+import { sdkArchiveEntries } from "../../scripts/sdk-payloads.mjs";
 
-const distDir = new URL("../web/dist/", import.meta.url);
+const distDir = new URL("../../web/dist/", import.meta.url);
 const execFileAsync = promisify(execFile);
 const generatedPublicFileSet = new Set(generatedPublicFiles);
 const localPackageFileSet = new Set(localPackageFiles);

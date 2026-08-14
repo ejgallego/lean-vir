@@ -8,12 +8,12 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { registerHostResourcePayloadLifetime } from "../web/src/host-resource.js";
-import { createHostResourceState } from "../web/src/host/vir-host-resources.js";
+import { registerHostResourcePayloadLifetime } from "../../web/src/host-resource.js";
+import { createHostResourceState } from "../../web/src/host/vir-host-resources.js";
 import {
   createBrowserReactHookRuntime,
   createReactStateHostBindings,
-} from "../web/src/react/vir-react-hooks.js";
+} from "../../web/src/react/vir-react-hooks.js";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 

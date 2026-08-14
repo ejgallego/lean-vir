@@ -17,15 +17,15 @@ import {
   launchChromium,
   navigate,
   openCdp,
-} from "./browser-smoke-harness.mjs";
+} from "./harness.mjs";
 import {
   nativeExternFixture,
   surfaceCounts,
   surfaceDefinition,
   targetCaptureFixture,
-} from "./surface-report-test-fixtures.mjs";
+} from "../../scripts/surface-report-test-fixtures.mjs";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const temporary = await mkdtemp(join(tmpdir(), "vir-surface-browser-"));
 let chromium = null;
 

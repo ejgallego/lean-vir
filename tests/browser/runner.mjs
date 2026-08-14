@@ -12,16 +12,16 @@ import {
   launchChromium,
   openCdp,
   serveDist,
-} from "./browser-smoke-harness.mjs";
-import { browserRunnerCaseSpecs, browserRunnerFailureSpecs } from "./browser-smoke-cases.mjs";
-import { smokeBrowserCallbackCleanup, smokeBrowserCallbacks } from "./browser-smoke-callbacks.mjs";
+} from "./harness.mjs";
+import { browserRunnerCaseSpecs, browserRunnerFailureSpecs } from "./cases.mjs";
+import { smokeBrowserCallbackCleanup, smokeBrowserCallbacks } from "./callbacks.mjs";
 import {
   prepareNegativePackages,
   runnerCaseFromManifest,
   smokeManifestDrivenEntryList,
   smokeRunner,
   smokeRunnerFailure,
-} from "./browser-smoke-dev-runner.mjs";
+} from "./dev-runner.mjs";
 import {
   smokeFormatWorkbench,
   smokeLanding,
@@ -29,10 +29,10 @@ import {
   smokeRuntimeDemo,
   smokeSurfaceExplorer,
   smokeWasmSizeExplorer,
-} from "./browser-smoke-page-suites.mjs";
-import { smokeBrowserReactLifetimes } from "./browser-smoke-react-lifetimes.mjs";
-import { smokeReactTamagotchi } from "./browser-smoke-react-tamagotchi.mjs";
-import { packageFiles } from "./browser-package-config.mjs";
+} from "./page-suites.mjs";
+import { smokeBrowserReactLifetimes } from "./react-lifetimes.mjs";
+import { smokeReactTamagotchi } from "./react-tamagotchi.mjs";
+import { packageFiles } from "../../scripts/browser-package-config.mjs";
 
 await assertDistReady();
 await prepareNegativePackages();

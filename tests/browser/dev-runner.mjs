@@ -15,9 +15,13 @@ import {
   navigate,
   waitForReady,
   waitForStatus,
-} from "./browser-smoke-harness.mjs";
-import { interfaceInputTag } from "../web/src/pages/interface-inputs.js";
-import { encodeInvalidMagicPackage, readIrPackageInfo, replaceIrPackageManifest } from "./irpkg-format.mjs";
+} from "./harness.mjs";
+import { interfaceInputTag } from "../../web/src/pages/interface-inputs.js";
+import {
+  encodeInvalidMagicPackage,
+  readIrPackageInfo,
+  replaceIrPackageManifest,
+} from "../../scripts/irpkg-format.mjs";
 
 const packageInfoCache = new Map();
 
@@ -182,7 +186,7 @@ export async function prepareNegativePackages() {
       ...(Array.isArray(fibInfo.manifest.diagnostics) ? fibInfo.manifest.diagnostics : []),
       {
         name: "BrowserSmoke.unsupported",
-        source: "scripts/smoke-pages-browser.mjs",
+        source: "tests/browser/runner.mjs",
         reason: "unsupported interface export smoke fixture",
       },
     ],

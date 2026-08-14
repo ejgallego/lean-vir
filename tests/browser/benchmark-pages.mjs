@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 const [requestedExample, requestedVariant, extra] = process.argv.slice(2);
 if (extra || requestedExample === "--help" || requestedExample === "-h") {
-  console.log(`Usage: node scripts/test-benchmark-pages.mjs EXAMPLE VARIANT
+  console.log(`Usage: node tests/browser/benchmark-pages.mjs EXAMPLE VARIANT
 
 Test the benchmark subtree installed below web/dist. EXAMPLE and VARIANT may
 instead be set with PAGES_BENCHMARK_EXAMPLE and PAGES_BENCHMARK_VARIANT.`);

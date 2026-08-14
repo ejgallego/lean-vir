@@ -394,7 +394,7 @@ Keep focused checks and shared helpers in the split modules instead of copying
 logic into entry-point scripts or pages:
 
 - Runtime smoke tests: `tests/runtime/*.mjs`
-- Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
+- Browser smoke cases and page suites: `tests/browser/*.mjs`
 - Process helpers: `scripts/process-utils.mjs`
 - Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and
   `benchmarks/harness/bench-utils.mjs`

@@ -202,8 +202,8 @@ The split helpers below are the intended extension points for focused changes:
 - Runtime smoke cases live in `tests/runtime/*.mjs`; add new runtime, codec,
   manifest, or host binding checks there rather than growing
   `tests/runtime/runner.mjs`.
-- Browser smoke behavior is split across `scripts/browser-smoke-*.mjs`;
-  `scripts/smoke-pages-browser.mjs` should stay an orchestrator.
+- Browser smoke behavior is split across `tests/browser/*.mjs`;
+  `tests/browser/runner.mjs` stays the orchestrator.
 - Child process wrappers live in `scripts/process-utils.mjs`; filesystem,
   artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
 - IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it

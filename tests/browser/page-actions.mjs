@@ -11,10 +11,10 @@ import {
   evaluate,
   navigate,
   waitForReady,
-} from "./browser-smoke-harness.mjs";
-import { hostPackageFile } from "./browser-package-config.mjs";
-import { createDomTargetScript, inputValueHelperScript } from "./browser-smoke-dom-scripts.mjs";
-import { runnerCaseFromManifest, runSelectedEntry } from "./browser-smoke-dev-runner.mjs";
+} from "./harness.mjs";
+import { hostPackageFile } from "../../scripts/browser-package-config.mjs";
+import { createDomTargetScript, inputValueHelperScript } from "./dom-scripts.mjs";
+import { runnerCaseFromManifest, runSelectedEntry } from "./dev-runner.mjs";
 
 const defaultTimeoutMs = 5000;
 const defaultPollMs = 50;
