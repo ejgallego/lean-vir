@@ -9,6 +9,7 @@ import {
   readFile,
   realpath,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
@@ -147,11 +148,11 @@ async function main() {
     }
   }
   const wasiSdk = await realpath(join(producer, ".tools/wasi-sdk"));
-  if (!(await lstat(join(wasiSdk, "bin/clang++")).catch(() => null))?.isFile()) {
+  if (!(await stat(join(wasiSdk, "bin/clang++")).catch(() => null))?.isFile()) {
     throw new Error(`VIR WASI SDK is not installed: ${wasiSdk}`);
   }
   const esbuild = join(producer, "node_modules/.bin/esbuild");
-  if (!(await lstat(esbuild).catch(() => null))?.isFile()) {
+  if (!(await stat(esbuild).catch(() => null))?.isFile()) {
     throw new Error(`VIR esbuild is not installed: ${esbuild}`);
   }
 
