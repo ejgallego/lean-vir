@@ -28,7 +28,7 @@ try {
   assert.notEqual(runtime.findManifestEntry(build.entry), null);
   const actual = runtime.call(build.entry, input, build.smoke.level);
   assert.ok(actual instanceof Uint8Array);
-  assert.deepEqual(actual, expected);
+  assert.deepEqual(actual, new Uint8Array(expected));
   assert.deepEqual(inflateRawSync(actual), input);
 } finally {
   runtime.dispose();
