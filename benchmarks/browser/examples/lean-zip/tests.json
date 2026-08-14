@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example-tests",
+  "example": "lean-zip",
+  "variants": [
+    {
+      "id": "default",
+      "title": "Production raw DEFLATE",
+      "build": null,
+      "tests": [
+        {
+          "id": "browser-parity",
+          "study": "quick",
+          "oracle": "fir-native",
+          "backends": [
+            "vir",
+            "fir-native",
+            "fir-emscripten",
+            "compression-stream",
+            "fflate"
+          ],
+          "data": {
+            "vectors": ["repeated-1k"],
+            "levels": [1, 6]
+          }
+        }
+      ],
+      "benchmark": {
+        "study": "suite",
+        "data": { "vectors": "all" }
+      }
+    }
+  ]
+}
