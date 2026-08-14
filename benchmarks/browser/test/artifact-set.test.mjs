@@ -113,6 +113,33 @@ test("catalog build identity and artifact paths are example-neutral", async () =
   );
 });
 
+test("catalog accepts a repository-owned package command", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const candidate = structuredClone(database);
+  const component = candidate.builds.prettyM.components.native;
+  component.producer.adapter = "package-command";
+  component.producer.entrypoint = "integration/example/export-package.sh";
+  component.producer.files.SHA256SUMS =
+    "prettyM/lean-native/SHA256SUMS";
+  assert.doesNotThrow(() => validateBuildDatabase(candidate));
+
+  delete component.producer.files.SHA256SUMS;
+  assert.throws(
+    () => validateBuildDatabase(candidate),
+    /package command must declare SHA256SUMS/,
+  );
+
+  component.producer.files.SHA256SUMS =
+    "prettyM/lean-native/SHA256SUMS";
+  delete component.producer.checkouts.producer;
+  assert.throws(
+    () => validateBuildDatabase(candidate),
+    /package command must declare its producer checkout/,
+  );
+});
+
 test("catalog contract objects reject unknown properties", async () => {
   const database = await readBuildDatabase(
     join(appRoot, "artifact-builds.json"),

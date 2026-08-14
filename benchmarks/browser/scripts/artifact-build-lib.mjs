@@ -11,7 +11,12 @@ const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
 const producerProtocol = "browser-benchmarks/source-package/v1";
 const artifactBoundary = "browser-benchmarks/bounded-runtime/v1";
-const adapters = new Set(["vir", "fir-native", "fir-llvm"]);
+const adapters = new Set([
+  "vir",
+  "fir-native",
+  "fir-llvm",
+  "package-command",
+]);
 
 function object(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -338,6 +343,22 @@ export function validateBuildDatabase(database) {
         if (!Object.hasOwn(producer.files, producer.manifest)) {
           throw new Error(
             `component ${componentId} manifest is not a declared package file`,
+          );
+        }
+        if (
+          producer.adapter === "package-command" &&
+          !Object.hasOwn(producer.files, "SHA256SUMS")
+        ) {
+          throw new Error(
+            `component ${componentId} package command must declare SHA256SUMS`,
+          );
+        }
+        if (
+          producer.adapter === "package-command" &&
+          !Object.hasOwn(producer.checkouts, "producer")
+        ) {
+          throw new Error(
+            `component ${componentId} package command must declare its producer checkout`,
           );
         }
       }
