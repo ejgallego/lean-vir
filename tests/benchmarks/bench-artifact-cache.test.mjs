@@ -12,12 +12,12 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { untrackedBuildInputDigests } from "./bench-artifact-cache.mjs";
-import { benchmarkWasmBuildIdentity } from "./bench-utils.mjs";
+import { untrackedBuildInputDigests } from "../../benchmarks/harness/bench-artifact-cache.mjs";
 import {
   effectiveWasmBuildIdentity,
   resolveEffectiveWasmBuildTools,
-} from "./wasm-build-identity.mjs";
+  wasmBuildConfiguration,
+} from "../../scripts/wasm-build-identity.mjs";
 
 async function writeExecutable(path, contents) {
   await mkdir(dirname(path), { recursive: true });
@@ -40,21 +40,21 @@ async function writeLeanTool(path) {
 }
 
 test("Wasm build identity has one shared set of defaults and overrides", () => {
-  assert.deepEqual(benchmarkWasmBuildIdentity({}), {
+  assert.deepEqual(wasmBuildConfiguration({}), {
     profile: "dev",
     optimization: "-O3",
     target: "wasm32-wasip1",
     initialMemory: "4194304",
     stackSize: "1048576",
   });
-  assert.deepEqual(benchmarkWasmBuildIdentity({
+  assert.deepEqual(wasmBuildConfiguration({
     VIR_WASM_PROFILE: "",
     VIR_WASM_OPT_LEVEL: "",
     WASI_TARGET: "",
     VIR_WASM_INITIAL_MEMORY: "",
     VIR_WASM_STACK_SIZE: "",
-  }), benchmarkWasmBuildIdentity({}));
-  assert.deepEqual(benchmarkWasmBuildIdentity({
+  }), wasmBuildConfiguration({}));
+  assert.deepEqual(wasmBuildConfiguration({
     VIR_WASM_PROFILE: "release",
     VIR_WASM_OPT_LEVEL: "-O2",
     WASI_TARGET: "wasm32-wasi",

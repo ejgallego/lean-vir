@@ -7,8 +7,8 @@ Author: Emilio J. Gallego Arias
 import { resolve } from "node:path";
 
 import { sha256 } from "./bench-utils.mjs";
-import { IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
-import { runSync } from "./process-utils.mjs";
+import { IR_PACKAGE_SECTION } from "../../scripts/irpkg-format.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
 
 // Keep this conservative and explicit: every shared local module loaded by an
 // environment-lookup runner belongs to its comparison identity, even when a
@@ -16,9 +16,9 @@ import { runSync } from "./process-utils.mjs";
 const environmentLookupSharedHarnessPaths = [
   "package.json",
   "fixtures/browser-packages.json",
-  "scripts/bench-differential.mjs",
-  "scripts/bench-env-lookup-contract.mjs",
-  "scripts/bench-utils.mjs",
+  "benchmarks/harness/bench-differential.mjs",
+  "benchmarks/harness/bench-env-lookup-contract.mjs",
+  "benchmarks/harness/bench-utils.mjs",
   "scripts/browser-package-config.mjs",
   "scripts/irpkg-format.mjs",
   "scripts/package-versions.mjs",
@@ -50,15 +50,15 @@ const environmentLookupSharedHarnessPaths = [
 
 export const environmentLookupHarnessPaths = Object.freeze([
   ...environmentLookupSharedHarnessPaths,
-  "scripts/bench-artifact-cache.mjs",
-  "scripts/bench-env-lookup.mjs",
+  "benchmarks/harness/bench-artifact-cache.mjs",
+  "benchmarks/harness/bench-env-lookup.mjs",
   "scripts/file-utils.mjs",
   "scripts/wasm-build-identity.mjs",
 ].sort());
 
 export const environmentLookupPairHarnessPaths = Object.freeze([
   ...environmentLookupSharedHarnessPaths,
-  "scripts/bench-env-lookup-wasm-pair.mjs",
+  "benchmarks/harness/bench-env-lookup-wasm-pair.mjs",
 ].sort());
 
 export { sha256 };

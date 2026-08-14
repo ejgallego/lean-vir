@@ -11,7 +11,7 @@ import {
   parseNonnegativeInt,
   parsePositiveInt,
   summarizePairedSamples,
-} from "./bench-utils.mjs";
+} from "../../benchmarks/harness/bench-utils.mjs";
 
 test("positive integer parsing rejects values outside the safe integer range", () => {
   assert.equal(parsePositiveInt("42", "--iterations"), 42);

@@ -396,8 +396,8 @@ logic into entry-point scripts or pages:
 - Runtime smoke tests: `scripts/runtime-tests/*.mjs`
 - Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
 - Process helpers: `scripts/process-utils.mjs`
-- Benchmark helpers: `scripts/bench-differential.mjs` and
-  `scripts/bench-utils.mjs`
+- Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and
+  `benchmarks/harness/bench-utils.mjs`
 - Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
 - Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
   `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`

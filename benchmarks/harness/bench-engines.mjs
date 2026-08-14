@@ -11,14 +11,14 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
 import { formatMs, parseBenchmarkSamples, requireBenchmarkSample } from "./bench-utils.mjs";
-import { runSync } from "./process-utils.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
 
-const root = new URL("..", import.meta.url);
+const root = new URL("../..", import.meta.url);
 const benchWasm = "build/upstream-probe/vir-engine-bench.wasm";
 const sortInput = "7,3,9,1,4,1,5,2,8,6,0,10,12,11,13,14";
 const engineTimeoutMs = Number(process.env.VIR_ENGINE_TIMEOUT_MS ?? "20000");
 const wasmedgeTimeoutMs = Number(process.env.VIR_WASMEDGE_TIMEOUT_MS ?? "5000");
-const engineHome = fileURLToPath(new URL("../.tools/engine-home", import.meta.url));
+const engineHome = fileURLToPath(new URL("../../.tools/engine-home", import.meta.url));
 mkdirSync(join(engineHome, "cache"), { recursive: true });
 mkdirSync(join(engineHome, "config"), { recursive: true });
 mkdirSync(join(engineHome, "wasmer"), { recursive: true });
@@ -124,13 +124,13 @@ function printBenchmark(label, title, host, engines) {
   }
 }
 
-runSync("bash", ["scripts/build-engine-bench.sh"], { cwd: root, trimStdout: false });
+runSync("bash", ["benchmarks/harness/build-engine-bench.sh"], { cwd: root, trimStdout: false });
 
 const engines = [
   {
     name: "node-wasi-v8",
     cmd: process.execPath,
-    args: ["--no-warnings", "scripts/run-node-wasi-bench.mjs", benchWasm],
+    args: ["--no-warnings", "benchmarks/harness/run-node-wasi-bench.mjs", benchWasm],
     version: () => `node ${process.version}, V8 ${process.versions.v8}`,
   },
 ];

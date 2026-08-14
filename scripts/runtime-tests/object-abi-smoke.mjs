@@ -19,7 +19,7 @@ import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-import { stdFormat as fmt } from "../std-format-values.mjs";
+import { stdFormat as fmt } from "../../benchmarks/harness/std-format-values.mjs";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
 const { wasmBytes, defaultPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();

@@ -17,7 +17,7 @@ import {
   prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
-} from "./browser-package-config.mjs";
+} from "../../scripts/browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
   formatMs,
@@ -28,20 +28,20 @@ import {
   sha256,
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
-import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
+import { createVirRuntime as createBrowserVirRuntime } from "../../web/src/vir-runtime.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
   ensureVirtualElementState,
-} from "../web/src/vir-runtime-node.js";
-import { runSync } from "./process-utils.mjs";
+} from "../../web/src/vir-runtime-node.js";
+import { runSync } from "../../scripts/process-utils.mjs";
 import {
   balancedStdFormatAppend,
   stdFormat,
   taggedStdFormatChunks,
 } from "./std-format-values.mjs";
 
-const root = new URL("..", import.meta.url);
+const root = new URL("../..", import.meta.url);
 
 const fibInput = 17;
 const fibIterations = 80;
@@ -215,7 +215,7 @@ async function instantiateRuntimes() {
 }
 
 function readPublicArtifact(file) {
-  return readFile(new URL(`../${publicArtifactPath(file)}`, import.meta.url));
+  return readFile(new URL(`../../${publicArtifactPath(file)}`, import.meta.url));
 }
 
 function createBenchmarkHostBindings() {

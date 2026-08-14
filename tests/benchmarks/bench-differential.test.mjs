@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
+import { sampleBenchmarkCandidates } from "../../benchmarks/harness/bench-differential.mjs";
 
 function fakeClock() {
   let current = 0;

@@ -26,7 +26,7 @@ import {
   validateBenchmarkCacheOptions,
 } from "./bench-utils.mjs";
 import { pairedBenchmarkSchedule, pairedPercentDeltas } from "./bench-paired-schedule.mjs";
-import { runSync } from "./process-utils.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const before = await requireCheckout("before", args.beforePath, args.npmScript);

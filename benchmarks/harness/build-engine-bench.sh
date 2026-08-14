@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 src="${LEAN4_SRC:-third_party/lean4-src}"
 out="build/upstream-probe"

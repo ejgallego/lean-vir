@@ -14,8 +14,8 @@ import {
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   validateEnvironmentLookupOutputPaths,
-} from "./bench-env-lookup-contract.mjs";
-import { assertComparableBenchmarkReportIdentities } from "./bench-utils.mjs";
+} from "../../benchmarks/harness/bench-env-lookup-contract.mjs";
+import { assertComparableBenchmarkReportIdentities } from "../../benchmarks/harness/bench-utils.mjs";
 
 test("environment lookup identity covers package content but ignores generation time", () => {
   const packageInfo = (generatedAt) => ({
@@ -81,16 +81,16 @@ test("environment lookup identity covers package content but ignores generation 
 
 test("environment lookup harness identity covers every named source", () => {
   const original = environmentLookupHarnessIdentity([
-    { path: "scripts/bench-env-lookup.mjs", bytes: Buffer.from("main") },
-    { path: "scripts/bench-differential.mjs", bytes: Buffer.from("sampler") },
+    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
+    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("sampler") },
   ]);
   const reordered = environmentLookupHarnessIdentity([
-    { path: "scripts/bench-differential.mjs", bytes: Buffer.from("sampler") },
-    { path: "scripts/bench-env-lookup.mjs", bytes: Buffer.from("main") },
+    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("sampler") },
+    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
   ]);
   const changedSampler = environmentLookupHarnessIdentity([
-    { path: "scripts/bench-env-lookup.mjs", bytes: Buffer.from("main") },
-    { path: "scripts/bench-differential.mjs", bytes: Buffer.from("changed") },
+    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
+    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("changed") },
   ]);
 
   assert.deepEqual(original, reordered);
@@ -100,7 +100,7 @@ test("environment lookup harness identity covers every named source", () => {
 test("environment lookup harness identity covers the loaded runtime source closure", async () => {
   const runtimeDirectories = ["web/src/host", "web/src/react", "web/src/runtime"];
   const expectedRuntimeSources = (await Promise.all(runtimeDirectories.map(async (directory) =>
-    (await readdir(new URL(`../${directory}`, import.meta.url)))
+    (await readdir(new URL(`../../${directory}`, import.meta.url)))
       .filter((path) => path.endsWith(".js"))
       .map((path) => `${directory}/${path}`),
   ))).flat().sort();
@@ -109,7 +109,7 @@ test("environment lookup harness identity covers the loaded runtime source closu
     .sort();
   assert.deepEqual(declaredRuntimeSources, expectedRuntimeSources);
   for (const required of [
-    "scripts/bench-utils.mjs",
+    "benchmarks/harness/bench-utils.mjs",
     "web/src/host-resource.js",
     "web/src/pages/browser-package-config.js",
     "web/src/runtime/core.js",
@@ -120,7 +120,7 @@ test("environment lookup harness identity covers the loaded runtime source closu
     assert.ok(environmentLookupHarnessPaths.includes(required), `missing harness source ${required}`);
   }
   assert.equal(new Set(environmentLookupHarnessPaths).size, environmentLookupHarnessPaths.length);
-  assert.ok(environmentLookupPairHarnessPaths.includes("scripts/bench-env-lookup-wasm-pair.mjs"));
+  assert.ok(environmentLookupPairHarnessPaths.includes("benchmarks/harness/bench-env-lookup-wasm-pair.mjs"));
   assert.equal(
     new Set(environmentLookupPairHarnessPaths).size,
     environmentLookupPairHarnessPaths.length,
@@ -128,7 +128,7 @@ test("environment lookup harness identity covers the loaded runtime source closu
 
   const files = await Promise.all(environmentLookupHarnessPaths.map(async (path) => ({
     path,
-    bytes: await readFile(new URL(`../${path}`, import.meta.url)),
+    bytes: await readFile(new URL(`../../${path}`, import.meta.url)),
   })));
   const original = environmentLookupHarnessIdentity(files);
   const changedRuntime = environmentLookupHarnessIdentity(files.map((file) =>

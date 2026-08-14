@@ -24,11 +24,11 @@ import {
   requireOptionValue,
   summarizePairedSamples,
 } from "./bench-utils.mjs";
-import { leanPackageFile, publicArtifactPath } from "./browser-package-config.mjs";
-import { readIrPackageFile } from "./irpkg-format.mjs";
-import { createVirRuntimeFactory } from "../web/src/vir-runtime.js";
+import { leanPackageFile, publicArtifactPath } from "../../scripts/browser-package-config.mjs";
+import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
-const root = new URL("..", import.meta.url);
+const root = new URL("../..", import.meta.url);
 const rootPath = fileURLToPath(root);
 const entryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
@@ -48,7 +48,7 @@ const [packageBytes, packageInfo, harnessSourceBytes] = await Promise.all([
   readFile(packagePath),
   readIrPackageFile(packagePath),
   Promise.all(environmentLookupPairHarnessPaths.map((path) =>
-    readFile(new URL(`../${path}`, import.meta.url)))),
+    readFile(new URL(`../../${path}`, import.meta.url)))),
 ]);
 const packageIdentity = environmentLookupPackageIdentity(packageBytes, packageInfo);
 const harnessIdentity = environmentLookupHarnessIdentity(

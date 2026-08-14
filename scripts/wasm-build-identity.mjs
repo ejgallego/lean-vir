@@ -9,7 +9,6 @@ import { accessSync, constants as fsConstants, readFileSync } from "node:fs";
 import { delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { benchmarkWasmBuildIdentity } from "./bench-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 
 function nonempty(value) {
@@ -224,7 +223,7 @@ export function effectiveWasmBuildIdentity(root, env = process.env) {
   const tools = resolveEffectiveWasmBuildTools(root, env);
   const toolEnv = { ...process.env, ...env, PATH: tools.effectivePath };
   return {
-    ...benchmarkWasmBuildIdentity(env),
+    ...wasmBuildConfiguration(env),
     wasiSdkPath: portablePath(tools.rootPath, tools.wasiSdkPath),
     compiler: toolIdentity(tools.rootPath, tools.compiler, ["--version"], toolEnv),
     linker: toolIdentity(tools.rootPath, tools.wasmLd, ["--version"], toolEnv),
@@ -235,6 +234,16 @@ export function effectiveWasmBuildIdentity(root, env = process.env) {
       prefix: portablePath(tools.rootPath, tools.leanPrefix),
     },
     leanSource: leanSourceIdentity(tools.rootPath, tools.leanSourcePath),
+  };
+}
+
+export function wasmBuildConfiguration(env = process.env) {
+  return {
+    profile: nonempty(env.VIR_WASM_PROFILE) ?? "dev",
+    optimization: nonempty(env.VIR_WASM_OPT_LEVEL) ?? "-O3",
+    target: nonempty(env.WASI_TARGET) ?? "wasm32-wasip1",
+    initialMemory: nonempty(env.VIR_WASM_INITIAL_MEMORY) ?? "4194304",
+    stackSize: nonempty(env.VIR_WASM_STACK_SIZE) ?? "1048576",
   };
 }
 

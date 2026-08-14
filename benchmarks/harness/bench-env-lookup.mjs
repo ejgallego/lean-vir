@@ -24,7 +24,7 @@ import {
   publicArtifactPath,
   wasmDevPublicFile,
   wasmPublicFile,
-} from "./browser-package-config.mjs";
+} from "../../scripts/browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
   formatMs,
@@ -34,12 +34,12 @@ import {
   requireOptionValue,
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
-import { readIrPackageFile } from "./irpkg-format.mjs";
-import { runSync } from "./process-utils.mjs";
-import { effectiveWasmBuildIdentity } from "./wasm-build-identity.mjs";
-import { createVirRuntimeFactory } from "../web/src/vir-runtime.js";
+import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
+import { effectiveWasmBuildIdentity } from "../../scripts/wasm-build-identity.mjs";
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
-const root = new URL("..", import.meta.url);
+const root = new URL("../..", import.meta.url);
 const benchmarkEntryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));
@@ -383,16 +383,16 @@ const artifactCache = await prepareBenchArtifacts({
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
 
-const wasmPath = new URL(`../${publicArtifactPath(benchmarkWasmFile)}`, import.meta.url);
-const packagePath = new URL(`../${publicArtifactPath(leanPackageFile)}`, import.meta.url);
+const wasmPath = new URL(`../../${publicArtifactPath(benchmarkWasmFile)}`, import.meta.url);
+const packagePath = new URL(`../../${publicArtifactPath(leanPackageFile)}`, import.meta.url);
 const [wasmBytes, packageBytes, packageInfo, toolchain, harnessSourceBytes, fixtureBytes] = await Promise.all([
   readFile(wasmPath),
   readFile(packagePath),
   readIrPackageFile(packagePath),
-  readFile(new URL("../lean-toolchain", import.meta.url), "utf8"),
+  readFile(new URL("../../lean-toolchain", import.meta.url), "utf8"),
   Promise.all(environmentLookupHarnessPaths.map((path) =>
-    readFile(new URL(`../${path}`, import.meta.url)))),
-  readFile(new URL("../fixtures/ExprPrinter.lean", import.meta.url)),
+    readFile(new URL(`../../${path}`, import.meta.url)))),
+  readFile(new URL("../../fixtures/ExprPrinter.lean", import.meta.url)),
 ]);
 const harnessIdentity = environmentLookupHarnessIdentity(
   environmentLookupHarnessPaths.map((path, index) => ({ path, bytes: harnessSourceBytes[index] })),

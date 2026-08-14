@@ -10,9 +10,9 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { copyFileWithDirs } from "./file-utils.mjs";
-import { runSync } from "./process-utils.mjs";
-import { effectiveWasmBuildIdentity } from "./wasm-build-identity.mjs";
+import { copyFileWithDirs } from "../../scripts/file-utils.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
+import { effectiveWasmBuildIdentity } from "../../scripts/wasm-build-identity.mjs";
 
 const artifactCacheVersion = 4;
 const buildInputDiffPaths = [

@@ -217,8 +217,9 @@ The split helpers below are the intended extension points for focused changes:
 - Object ABI linker flags come from `scripts/object-abi-linker-flags.mjs`,
   which consumes the shared runtime export-name manifest rather than keeping a
   second linker-only list.
-- Differential benchmark sampling lives in `scripts/bench-differential.mjs`;
-  report parsing and formatting live in `scripts/bench-utils.mjs`.
+- Benchmark campaigns and their shared sampling/report helpers live in
+  `benchmarks/harness/`; their focused contract tests live in
+  `tests/benchmarks/`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 

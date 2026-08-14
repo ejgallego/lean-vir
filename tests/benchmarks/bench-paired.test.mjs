@@ -7,8 +7,11 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { pairedBenchmarkSchedule, pairedPercentDeltas } from "./bench-paired-schedule.mjs";
-import { assertComparableBenchmarkReportIdentities } from "./bench-utils.mjs";
+import {
+  pairedBenchmarkSchedule,
+  pairedPercentDeltas,
+} from "../../benchmarks/harness/bench-paired-schedule.mjs";
+import { assertComparableBenchmarkReportIdentities } from "../../benchmarks/harness/bench-utils.mjs";
 
 test("paired benchmark schedule alternates AB and BA passes", () => {
   assert.deepEqual(pairedBenchmarkSchedule(4), [

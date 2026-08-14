@@ -43,8 +43,10 @@ ownership diagrams.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
   [`benchmarks/browser/README.md`](../benchmarks/browser/README.md),
-  `scripts/bench-vir.mjs`, `scripts/bench-env-lookup.mjs`,
-  `scripts/bench-differential.mjs`, and `scripts/bench-utils.mjs`.
+  `benchmarks/harness/bench-vir.mjs`,
+  `benchmarks/harness/bench-env-lookup.mjs`,
+  `benchmarks/harness/bench-differential.mjs`, and
+  `benchmarks/harness/bench-utils.mjs`.
 
 ## Documentation Ownership
 

@@ -12,20 +12,6 @@ export function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function envOrDefault(env, name, fallback) {
-  return typeof env[name] === "string" && env[name].length !== 0 ? env[name] : fallback;
-}
-
-export function benchmarkWasmBuildIdentity(env = process.env) {
-  return {
-    profile: envOrDefault(env, "VIR_WASM_PROFILE", "dev"),
-    optimization: envOrDefault(env, "VIR_WASM_OPT_LEVEL", "-O3"),
-    target: envOrDefault(env, "WASI_TARGET", "wasm32-wasip1"),
-    initialMemory: envOrDefault(env, "VIR_WASM_INITIAL_MEMORY", "4194304"),
-    stackSize: envOrDefault(env, "VIR_WASM_STACK_SIZE", "1048576"),
-  };
-}
-
 export function benchmarkCacheOptionDefaults() {
   return {
     artifactCacheEnabled: true,
