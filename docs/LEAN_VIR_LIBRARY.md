@@ -534,7 +534,7 @@ expansion target when a caller needs to assemble those pieces manually.
 `examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and
 `examples/ReactProofWidget.lean` is the next rung: a focused editor tool that
 uses the goal surface and editor edit command without duplicating the infoview.
-`node scripts/smoke-infoview-widget.mjs` checks that the shell module loads and
+`node tests/infoview-widget.mjs` checks that the shell module loads and
 that the proof-widget entries have the required signatures.
 
 The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,

@@ -16,3 +16,5 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
   scenario helpers.
 
 Use the stable `npm run test:*` commands from the repository root.
+Top-level files are focused integration entry points whose implementation
+dependencies remain with their owning library or script directory.

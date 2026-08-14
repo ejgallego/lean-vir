@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { virIrpkgLakeBuildArgs, virIrpkgPath } from "./irpkg-generator.mjs";
+import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../scripts/irpkg-generator.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = join(repoRoot, "fixtures", "client-native-extern");
