@@ -203,3 +203,10 @@ means the compilation descriptor stays small and stable.
 - `rehearsal`: runnable only from explicitly local inputs.
 - `queued`: validator-visible but hidden from the runnable browser catalog.
 - `archived`: retained for provenance but hidden from the default catalog.
+
+Queued integrations may commit their descriptor, tests, and thin local
+controller before immutable producer revisions exist. They remain hidden and
+must keep `build: null`; workload engines still belong to the client-owned
+source package rather than being copied into this application. See
+[`LEAN_ZIP_INTEGRATION.md`](LEAN_ZIP_INTEGRATION.md) for a multi-producer
+example.

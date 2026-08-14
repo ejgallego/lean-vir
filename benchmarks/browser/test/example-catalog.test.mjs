@@ -20,6 +20,7 @@ test("discovers compact example manifests", async () => {
     [
       { id: "prettyM", lifecycle: "active" },
       { id: "illuminate", lifecycle: "rehearsal" },
+      { id: "lean-zip", lifecycle: "queued" },
     ],
   );
   for (const example of catalog.examples) {
