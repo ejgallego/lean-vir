@@ -16,7 +16,6 @@ import {
   environmentLookupGitIdentity,
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
-  sha256,
   validateEnvironmentLookupOutputPaths,
 } from "./bench-env-lookup-contract.mjs";
 import {
@@ -32,6 +31,7 @@ import {
   parseNonnegativeInt,
   parsePositiveInt,
   requireOptionValue,
+  sha256,
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
 import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";

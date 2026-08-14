@@ -16,12 +16,12 @@ import {
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   environmentLookupPairHarnessPaths,
-  sha256,
 } from "./bench-env-lookup-contract.mjs";
 import {
   parseNonnegativeInt,
   parsePositiveInt,
   requireOptionValue,
+  sha256,
   summarizePairedSamples,
 } from "./bench-utils.mjs";
 import { leanPackageFile, publicArtifactPath } from "../../scripts/browser-package-config.mjs";

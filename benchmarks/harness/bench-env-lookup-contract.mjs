@@ -61,8 +61,6 @@ export const environmentLookupPairHarnessPaths = Object.freeze([
   "benchmarks/harness/bench-env-lookup-wasm-pair.mjs",
 ].sort());
 
-export { sha256 };
-
 export function environmentLookupPackageIdentity(packageBytes, packageInfo) {
   const { generatedAt: _generatedAt, ...stableMetadata } = packageInfo.manifest.metadata ?? {};
   const stableManifest = {

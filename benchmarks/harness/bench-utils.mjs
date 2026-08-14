@@ -247,7 +247,7 @@ export function benchmarkSamplePerCallMs(sample) {
   return sample.perCallMs ?? sample.medianMs / sample.iterations;
 }
 
-export function benchmarkSampleNames(benchmark) {
+function benchmarkSampleNames(benchmark) {
   return Object.entries(benchmark)
     .filter(([, value]) => isBenchmarkSample(value))
     .map(([name]) => name);
@@ -272,7 +272,7 @@ export function benchmarkNamesForReports(sideLabel, reports) {
   return names;
 }
 
-export function summarizeBenchmarkSampleReports(benchmarkName, sampleName, reports) {
+function summarizeBenchmarkSampleReports(benchmarkName, sampleName, reports) {
   const summary = summarizeOptionalBenchmarkSampleReports(benchmarkName, sampleName, reports);
   if (summary === null) {
     throw new Error(`${benchmarkName}: missing ${sampleName} sample in one or more reports`);
