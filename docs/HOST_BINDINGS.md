@@ -79,12 +79,9 @@ the public Lean wrappers return ordinary Lean values in `RuntimeM`.
 `Lean.Vir.Browser.Document.getTitle` and `setTitle` map to `document.title`.
 `Document.querySelector` returns an opaque element resource, or `none`/`null`
 when there is no matching element. `Document.querySelectorAll` returns the
-browser's native static `NodeList` as
-`Lean.Vir.Js.NodeList (Lean.Vir.Js Element)`. Lean code can inspect it with
-`Js.NodeList.length` and `item`, copy it on the JavaScript side with
-`Js.NodeList.toArray`, or explicitly materialize a Lean array of independent
-element handles with `Js.NodeList.toLeanArray`. Dropping the list or copied
-array does not invalidate element handles already obtained from it.
+browser's native static `NodeList`; `querySelectorAllSnapshot` materializes an
+owned Lean `Array (Js Element)` when callers need independently retained
+element handles.
 `Document.createElement` creates a browser element resource by tag name.
 The public Lean browser APIs continue to expose ordinary `String`, `Bool`,
 `UInt32`, and `Float` values where appropriate, but their low-level
@@ -93,10 +90,12 @@ The public Lean browser APIs continue to expose ordinary `String`, `Bool`,
 `Lean.Vir.Browser.Element.*` targets query descendants, read and write text
 content, attributes, and `innerHTML`, append and remove elements, update
 `classList`, and set inline style properties through DOM element
-properties/methods. Replacing `innerHTML` detaches the old descendant DOM nodes;
-Lean callers should first replace any runtime state that holds handles to those
-descendants. Event listener targets retain Lean closures until the listener is
-removed or the runtime is disposed.
+properties/methods. `setInnerHTMLUnsafe` accepts trusted raw HTML or SVG markup.
+Replacing inner HTML detaches old descendant nodes, but handles to those nodes
+remain live JavaScript objects while reachable from Lean. Callers should drop
+obsolete snapshots before replacement when prompt release is desired; DOM
+membership is not inferred from Lean reachability. Event listener targets
+retain Lean closures until the listener is removed or the runtime is disposed.
 
 `Lean.Vir.Browser.HTMLCanvasElement.*` narrows canvas elements, reads and writes
 their bitmap size, and obtains a 2D context. `browser.canvas2d.*` covers
@@ -105,7 +104,7 @@ and rotation. One-shot float and string arguments use owned resources that the
 receiving canvas or text binding consumes after the synchronous DOM call.
 
 `Lean.Vir.Browser.Event.target` and `currentTarget` return element resources
-when the event target is an element. `Event.key` returns the string-valued
+when the event target is an element. `Event.key?` returns the string-valued
 keyboard key when present. `preventDefault` and `stopPropagation` forward to
 the browser event object.
 
@@ -226,8 +225,9 @@ const vir = await createVirRuntime({
 ```
 
 Virtual `Document.querySelector` follows DOM semantics and returns `none`/`null`
-for missing selectors. `Document.querySelectorAll` returns a static NodeList;
-use `ensureVirtualElementStates` to seed every match for a selector.
+for missing selectors. `querySelectorAll` returns a static NodeList and
+`querySelectorAllSnapshot` materializes independent element handles; use
+`ensureVirtualElementStates` to seed every match for a selector.
 Virtual elements accept a `queries` map for descendant
 `Element.querySelector` and `querySelectorAll` results, plus an `innerHTML`
 string. Setting inner HTML clears the descendant query map, mirroring

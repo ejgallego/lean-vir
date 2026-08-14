@@ -53,13 +53,10 @@ def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   Lean.Vir.JsValue.toFloat jsValue
 
 def querySelectorAllCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-  Lean.Vir.Js.NodeList.length nodes
+  Lean.Vir.Js.NodeList.length (← Lean.Vir.Browser.Document.querySelectorAll selector)
 
 def querySelectorAllLeanCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-  let elements ← Lean.Vir.Js.NodeList.toLeanArray nodes
-  pure elements.size
+  pure (← Lean.Vir.Browser.Document.querySelectorAllSnapshot selector).size
 
 def querySelectorAllArrayCount (selector : String) : DomM Nat := do
   let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
@@ -68,10 +65,7 @@ def querySelectorAllArrayCount (selector : String) : DomM Nat := do
   pure elements.size
 
 def querySelectorAllFirstText (selector : String) : DomM String := do
-  let element? ← do
-    let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-    Lean.Vir.Js.NodeList.item nodes 0
-  match element? with
+  match (← Lean.Vir.Browser.Document.querySelectorAllSnapshot selector)[0]? with
   | none => pure ""
   | some element => Lean.Vir.Browser.Element.getTextContent element
 
@@ -90,8 +84,7 @@ def elementQuerySelectorAllCount (selector childSelector : String) : DomM Nat :=
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure 0
   | some element =>
-    let nodes ← Lean.Vir.Browser.Element.querySelectorAll element childSelector
-    Lean.Vir.Js.NodeList.length nodes
+    Lean.Vir.Js.NodeList.length (← Lean.Vir.Browser.Element.querySelectorAll element childSelector)
 
 def elementQuerySelectorText (selector childSelector : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
@@ -105,16 +98,36 @@ def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure ""
   | some element =>
-    Lean.Vir.Browser.Element.setInnerHTML element html
+    Lean.Vir.Browser.Element.setInnerHTMLUnsafe element html
     Lean.Vir.Browser.Element.getInnerHTML element
 
 def runtimeRefRoundTrip (value : Nat) : Lean.Vir.RuntimeM Nat := do
-  let ref ← Lean.Vir.RuntimeRef.new value
-  Lean.Vir.RuntimeRef.modify ref (· + 2)
-  let previous ← Lean.Vir.RuntimeRef.modifyGet ref fun current => (current, current + 3)
-  let current ← Lean.Vir.RuntimeRef.get ref
-  Lean.Vir.RuntimeRef.set ref (current + 4)
-  pure (previous * 100 + (← Lean.Vir.RuntimeRef.get ref))
+  let ref ← Lean.Vir.RuntimeM.Ref.new value
+  Lean.Vir.RuntimeM.Ref.modify ref (· + 2)
+  let previous ← Lean.Vir.RuntimeM.Ref.swap ref (value + 5)
+  let current ← Lean.Vir.RuntimeM.Ref.modifyGet ref fun current => (current, current + 3)
+  Lean.Vir.RuntimeM.Ref.set ref (current + 4)
+  pure (previous * 100 + (← Lean.Vir.RuntimeM.Ref.get ref))
+
+def mountRetainedElementIndex
+    (selector childSelector replacementHTML : String) : DomM Nat := do
+  let some container ← Lean.Vir.Browser.Document.querySelector selector | pure 0
+  let targets ← Lean.Vir.Browser.Element.querySelectorAllSnapshot container childSelector
+  let state ← Lean.Vir.RuntimeM.Ref.new targets
+  let _ ← Lean.Vir.Browser.Element.addEventListener container "vir-check-index" fun _ => do
+    match (← Lean.Vir.RuntimeM.Ref.get state)[0]? with
+    | none => Lean.Vir.Browser.Document.setTitle "index:empty"
+    | some element =>
+        Lean.Vir.Browser.Document.setTitle (← Lean.Vir.Browser.Element.getTextContent element)
+  let _ ← Lean.Vir.Browser.Element.addEventListener container "vir-drop-index" fun _ =>
+    Lean.Vir.RuntimeM.Ref.set state #[]
+  let _ ← Lean.Vir.Browser.Element.addEventListener container "vir-replace-index" fun event => do
+    let some container ← Lean.Vir.Browser.Event.currentTarget event | pure ()
+    Lean.Vir.RuntimeM.Ref.set state #[]
+    Lean.Vir.Browser.Element.setInnerHTMLUnsafe container replacementHTML
+    let replacement ← Lean.Vir.Browser.Element.querySelectorAllSnapshot container childSelector
+    Lean.Vir.RuntimeM.Ref.set state replacement
+  pure targets.size
 
 partial def callbackRoundTripLoopAux : Nat → Nat → Lean.Vir.RuntimeM Nat
   | 0, acc => pure acc
@@ -173,7 +186,9 @@ def mountKeyTitle (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
-        Lean.Vir.Browser.Document.setTitle (← Lean.Vir.Browser.Event.key event)
+        match ← Lean.Vir.Browser.Event.key? event with
+        | none => Lean.Vir.Browser.Document.setTitle "key:none"
+        | some key => Lean.Vir.Browser.Document.setTitle key
       pure 1
   | none => pure 0
 
@@ -235,6 +250,33 @@ def cancelAnimationRecord (value : Nat) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     recordNat (value + 20)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
+  pure 1
+
+def mountCancelableAnimationRecord (selector : String) (value : Nat) : DomM Nat := do
+  let some element ← Lean.Vir.Browser.Document.querySelector selector | pure 0
+  let pending ← Lean.Vir.RuntimeM.Ref.new (none : Option (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame))
+  let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
+    Lean.Vir.RuntimeM.Ref.set pending none
+    recordNat value
+  Lean.Vir.RuntimeM.Ref.set pending (some frame)
+  let _ ← Lean.Vir.Browser.Element.addEventListener element "vir-cancel-frame" fun _ => do
+    let frame? ← Lean.Vir.RuntimeM.Ref.swap pending none
+    if let some frame := frame? then
+      Lean.Vir.Browser.Animation.cancelAnimationFrame frame
+  pure 1
+
+def mountCancelableAnimationTitle (selector label : String) : DomM Nat := do
+  let some element ← Lean.Vir.Browser.Document.querySelector selector | pure 0
+  let pending ← Lean.Vir.RuntimeM.Ref.new (none : Option (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame))
+  let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
+    Lean.Vir.RuntimeM.Ref.set pending none
+    Lean.Vir.Browser.Document.setTitle ("uncancelled:" ++ label)
+  Lean.Vir.RuntimeM.Ref.set pending (some frame)
+  let _ ← Lean.Vir.Browser.Element.addEventListener element "vir-cancel-frame" fun _ => do
+    let frame? ← Lean.Vir.RuntimeM.Ref.swap pending none
+    if let some frame := frame? then
+      Lean.Vir.Browser.Animation.cancelAnimationFrame frame
+      Lean.Vir.Browser.Document.setTitle ("cancelled:" ++ label)
   pure 1
 
 def animationLoop : Nat → Float → DomM Unit

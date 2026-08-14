@@ -176,17 +176,15 @@ Reference: [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/doc
 @[vir_js "browser.event.stopPropagation"]
 opaque stopPropagation (event : @& Lean.Vir.Js Event) : DomM Unit
 
-/--
-Returns the keyboard key represented by an event, or the empty string for
-events without a string-valued {lit}`key` property.
-
-Reference: [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
--/
+/-- Returns the keyboard key represented by an event, when present. -/
 @[vir_js "browser.event.key"]
-private opaque keyJs (event : @& Lean.Vir.Js Event) : DomM (Lean.Vir.Js String)
+private opaque keyNullable (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable String)
 
-def key (event : @& Lean.Vir.Js Event) : DomM String := do
-  Lean.Vir.JsValue.toString (← keyJs event)
+def key? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
+  match ← Lean.Vir.Js.Nullable.toOption (← keyNullable event) with
+  | none => pure none
+  | some key => some <$> Lean.Vir.JsValue.toString key
 
 end Event
 
@@ -263,11 +261,7 @@ def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) :
   Lean.Vir.Js.Nullable.toOption (← querySelectorNullable jsSelector)
 
 /--
-Returns the static list of elements matching a CSS selector.
-
-The returned `NodeList` remains in JavaScript land. Its element parameter is
-the Lean view produced by `Lean.Vir.Js.NodeList.item`; extracted element
-handles remain valid independently of the list.
+Returns the browser's static list of elements matching a CSS selector.
 
 Reference: [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll).
 -/
@@ -280,6 +274,12 @@ def querySelectorAll
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs (← Lean.Vir.JsValue.ofString selector)
+
+/-- Materializes independently owned handles for all matching elements. -/
+def querySelectorAllSnapshot
+    (selector : @& String) :
+    DomM (_root_.Array (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.NodeList.toLeanArray (← querySelectorAll selector)
 
 @[vir_js "browser.document.createElement"]
 private opaque createElementJs (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element)
@@ -306,7 +306,7 @@ def querySelector
   let jsSelector ← Lean.Vir.JsValue.ofString selector
   Lean.Vir.Js.Nullable.toOption (← querySelectorNullable element jsSelector)
 
-/-- Returns the static list of descendants matching a CSS selector. -/
+/-- Returns the browser's static list of descendants matching a CSS selector. -/
 @[vir_js "browser.element.querySelectorAll"]
 private opaque querySelectorAllJs
     (element : @& Lean.Vir.Js Element)
@@ -319,6 +319,13 @@ def querySelectorAll
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
 
+/-- Materializes independently owned handles for matching descendants. -/
+def querySelectorAllSnapshot
+    (element : @& Lean.Vir.Js Element)
+    (selector : @& String) :
+    DomM (_root_.Array (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.NodeList.toLeanArray (← querySelectorAll element selector)
+
 /-- Reads an element's serialized child markup. -/
 @[vir_js "browser.element.getInnerHTML"]
 private opaque getInnerHTMLJs
@@ -328,14 +335,19 @@ private opaque getInnerHTMLJs
 def getInnerHTML (element : @& Lean.Vir.Js Element) : DomM String := do
   Lean.Vir.JsValue.toString (← getInnerHTMLJs element)
 
-/-- Replaces an element's child markup. -/
+/--
+Replaces an element's child markup with trusted raw HTML or SVG markup.
+
+Existing handles to descendants remain live JavaScript objects, but refer to
+nodes detached from this element after replacement.
+-/
 @[vir_js "browser.element.setInnerHTML"]
 private opaque setInnerHTMLJs
     (element : @& Lean.Vir.Js Element)
     (html : @& Lean.Vir.Js String) :
     DomM Unit
 
-def setInnerHTML (element : @& Lean.Vir.Js Element) (html : @& String) : DomM Unit := do
+def setInnerHTMLUnsafe (element : @& Lean.Vir.Js Element) (html : @& String) : DomM Unit := do
   setInnerHTMLJs element (← ownedString html)
 
 /--

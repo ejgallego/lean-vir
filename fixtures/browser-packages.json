@@ -66,6 +66,7 @@
             "HostInterop.elementQuerySelectorText",
             "HostInterop.elementInnerHTMLRoundTrip",
             "HostInterop.runtimeRefRoundTrip",
+            "HostInterop.mountRetainedElementIndex",
             "HostInterop.callbackRoundTripLoop",
             "HostInterop.mountCallbackEvent",
             "HostInterop.mountAndRemoveCallbackEvent",
@@ -83,6 +84,8 @@
             "HostInterop.animationTitle",
             "HostInterop.cancelAnimationTitle",
             "HostInterop.cancelAnimationRecord",
+            "HostInterop.mountCancelableAnimationRecord",
+            "HostInterop.mountCancelableAnimationTitle",
             "HostInterop.startAnimationLoop"
           ]
         },
