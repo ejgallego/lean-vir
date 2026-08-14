@@ -38,8 +38,6 @@ map lives in `docs/HARNESS.md`.
   Build the same optimized demo WASM and packages, then strip the public WASM
   artifact for distribution. The debug companion remains optimized but
   unstripped; it is not an `-O0` build.
-- `npm run build:demo:dist`
-  Compatibility alias for `npm run build:demo:release`.
 - `npm run size:wasm`
   Print Markdown section-size tables for the generated WASM artifacts, including
   compressed sizes and link-map code-area attribution when available.

@@ -19,7 +19,7 @@ const argv = process.argv.slice(2);
 
 function usage() {
   return [
-    "usage: scripts/lean-to-irpkg.sh <source.lean> [package.irpkg] [root ...]",
+    "usage: npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]",
     "",
     "Generate one manifest-bearing .irpkg from one Lean source file.",
     "When roots are omitted, public source definitions are auto-discovered and",

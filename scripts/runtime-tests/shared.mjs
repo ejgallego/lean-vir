@@ -165,8 +165,8 @@ export function wait(ms) {
 export function generateIrPackage(source, packagePath) {
   ensureVirIrpkgBuilt();
   const generated = spawnSync(
-    "bash",
-    ["scripts/lean-to-irpkg.sh", source, packagePath],
+    "node",
+    ["scripts/lean-to-irpkg.mjs", source, packagePath],
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
@@ -244,10 +244,10 @@ export async function assertUnsupportedInterfaceFixture(dir, fixtureName, patter
 async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots) {
   ensureVirIrpkgBuilt();
   const generated = spawnSync(
-    "bash",
+    "node",
     roots === null
-      ? ["scripts/lean-to-irpkg.sh", source, packagePath]
-      : ["scripts/lean-to-irpkg.sh", source, packagePath, ...roots],
+      ? ["scripts/lean-to-irpkg.mjs", source, packagePath]
+      : ["scripts/lean-to-irpkg.mjs", source, packagePath, ...roots],
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.notEqual(generated.status, 0, `${source} unexpectedly generated successfully`);

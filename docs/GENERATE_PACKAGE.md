@@ -14,7 +14,7 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   lazily loaded HTML module browser.
 - `Vir/GeneratePackage.lean` is the public import shim for the split library.
 - `.lake/build/bin/vir_irpkg` is the Lake executable used by
-  `scripts/lean-to-irpkg.sh`, `scripts/generate-browser-package.mjs`, and the
+  `scripts/lean-to-irpkg.mjs`, `scripts/generate-browser-package.mjs`, and the
   fixture runner.
 
 Targets have one of five modes:

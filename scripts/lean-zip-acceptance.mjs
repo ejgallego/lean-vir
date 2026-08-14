@@ -13,13 +13,13 @@ import { parseArgs } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import { pathExists } from "./file-utils.mjs";
+import { virIrpkgLakeBuildArgs, virIrpkgPath } from "./irpkg-generator.mjs";
 import { runSync } from "./process-utils.mjs";
 import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = join(repoRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
-const generator = join(repoRoot, ".lake", "build", "bin", "vir_irpkg");
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -104,7 +104,7 @@ for (const [path, message] of [
   if (!(await pathExists(path))) throw new Error(message);
 }
 
-runSync("lake", ["build", "Vir", "vir_irpkg"], { cwd: repoRoot });
+runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repoRoot });
 const virLeanVersion = runSync("lean", ["--short-version"], {
   cwd: repoRoot,
   capture: true,
@@ -169,7 +169,7 @@ function generateVirPackage() {
     "lake",
     [
       "env",
-      generator,
+      virIrpkgPath,
       packagePath,
       reportPath,
       "--target-marked",

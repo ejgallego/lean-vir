@@ -316,7 +316,6 @@ when comparing CI runs:
 - `npm run build:demo:release` uses the same optimized build, then strips
   `web/public/vir-upstream.wasm` for distribution bundles while keeping
   `web/public/vir-upstream.dev.wasm` optimized but unstripped for debugging.
-  `npm run build:demo:dist` remains a compatibility alias.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing; when passed multiple configs, it prepares the generator once.
 - `npm run test:runtime` prints selected groups/filters plus per-test timings
