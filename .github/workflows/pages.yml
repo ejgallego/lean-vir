@@ -22,10 +22,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      PAGES_BENCHMARK_BUILD: prettyM
-      PAGES_BENCHMARK_EXAMPLE: prettyM
-      PAGES_BENCHMARK_VARIANT: default
     steps:
       - uses: actions/checkout@v5
       - name: Install Lean
@@ -60,7 +56,14 @@ jobs:
       - name: Install benchmark dependencies
         run: npm --prefix benchmarks/browser ci
       - name: Materialize benchmark sources
-        run: npm --prefix benchmarks/browser run artifacts:sources -- "$PAGES_BENCHMARK_BUILD"
+        working-directory: benchmarks/browser
+        run: |
+          mkdir -p _artifacts
+          node scripts/pages-deployment-plan.mjs > _artifacts/pages-plan.tsv
+          while IFS=$'\t' read -r _example _variant build; do
+            node scripts/checkout-artifact-sources.mjs "$build" \
+              --sources-dir "_sources/pages/$build"
+          done < _artifacts/pages-plan.tsv
       - name: Cache benchmark producer toolchains
         uses: actions/cache@v4
         with:
@@ -69,23 +72,32 @@ jobs:
             benchmarks/browser/_sources/**/.lake
             benchmarks/browser/_sources/**/.tools/cache
             benchmarks/browser/_sources/**/.deps
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ env.PAGES_BENCHMARK_BUILD }}-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pages-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
       - name: Install benchmark Chromium
         run: npm --prefix benchmarks/browser run playwright:install
-      - name: Build and validate benchmark candidate
-        run: npm --prefix benchmarks/browser run example -- "$PAGES_BENCHMARK_EXAMPLE" "$PAGES_BENCHMARK_VARIANT" --prepare
-      - name: Install admitted benchmark under Pages
+      - name: Build and validate benchmark candidates
+        working-directory: benchmarks/browser
         run: |
-          npm --prefix benchmarks/browser run build -- \
-            --deploy "$PAGES_BENCHMARK_EXAMPLE=$PAGES_BENCHMARK_VARIANT"
-          npm run build:benchmark-pages
+          while IFS=$'\t' read -r example variant build; do
+            node scripts/run-example.mjs "$example" "$variant" --prepare \
+              --sources-dir "_sources/pages/$build"
+          done < _artifacts/pages-plan.tsv
+      - name: Install admitted benchmarks under Pages
+        working-directory: benchmarks/browser
+        run: |
+          deployments=()
+          while IFS=$'\t' read -r example variant _build; do
+            deployments+=(--deploy "$example=$variant")
+          done < _artifacts/pages-plan.tsv
+          node scripts/build.mjs "${deployments[@]}"
+          npm --prefix ../.. run build:benchmark-pages
       - name: Test deployed benchmark subtree
         run: npm run test:benchmark-pages
-      - name: Upload benchmark candidate archive and receipt
+      - name: Upload benchmark candidate archives and receipts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PAGES_BENCHMARK_EXAMPLE }}-${{ env.PAGES_BENCHMARK_VARIANT }}-candidate-${{ github.sha }}
-          path: benchmarks/browser/_artifacts/candidates/${{ env.PAGES_BENCHMARK_BUILD }}/upload
+          name: browser-benchmark-candidates-${{ github.sha }}
+          path: benchmarks/browser/_artifacts/candidates/*/upload
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4

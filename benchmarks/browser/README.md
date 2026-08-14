@@ -122,19 +122,25 @@ as a repository release lifecycle.
 ## GitHub Pages deployment
 
 GitHub Pages consumes a candidate generated inside its own build job; it does
-not require a pre-existing archive. After the candidate is staged, the
-deployment build is explicit:
+not require a pre-existing archive. `npm run pages:plan` lists the active
+canonical example, variant, and build records that the workflow will build.
+After those candidates are staged, the deployment build remains explicit and
+accepts every selected example:
 
 ```sh
+npm run pages:plan
 npm run build -- --deploy prettyM=default
 ```
+
+Repeat `--deploy EXAMPLE=VARIANT` for every line in the plan.
 
 Deployment admission requires a canonical build, an exact example/variant and
 artifact-set identity, the canonical `tests.json` digest, and no missing,
 changed, extra, or symbolic-link artifact files. Only admitted example
 directories and artifacts are copied. The generated `examples/catalog.json`
-therefore exposes `prettyM/default` on Pages while Illuminate remains a local
-rehearsal.
+therefore exposes only active canonical examples. At present that is
+`prettyM/default`; changing Illuminate from rehearsal to active will add it to
+the same source-materialization, candidate, browser-test, and deployment loop.
 
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
