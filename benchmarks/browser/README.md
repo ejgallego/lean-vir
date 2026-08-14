@@ -80,14 +80,17 @@ npm run artifacts:sources -- prettyM
 ```
 
 The repository does not retain obsolete prototype locks. Binary artifacts,
-candidate locks, and downloaded release archives remain ignored by Git. Build
-and import the current prettyM candidate locally:
+candidate locks, and downloaded release archives remain ignored by Git. Pack
+and import a previously built prettyM seed using the exact paths printed by the
+packer:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
+LOCK_PATH=_artifacts/releases/example-set.lock.json
+ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
 npm run artifacts:fetch -- \
-  --lock _artifacts/releases/<generated-lock>.lock.json \
-  --archive _artifacts/releases/<generated-archive>.tar
+  --lock "$LOCK_PATH" \
+  --archive "$ARCHIVE_PATH"
 ```
 
 `artifacts:build` produces a validated `_artifacts/seed/`, and
@@ -152,11 +155,11 @@ Five-backend parity is the compatibility gate; no cross-backend Lean heap
 values are exchanged.
 
 The current VIR package uses the producer-facing
-`VersoSlides.Pretty.*ForVir` export names. They are declared in
-`examples/prettyM/config.js` as artifact compatibility data; the application
-itself does not load Verso or depend on slide sources. Renaming those two
-exports can accompany a later
-artifact refresh without changing the benchmark or dashboard APIs.
+`VersoSlides.Pretty.*ForVir` export names. `example.json` is their canonical
+build declaration; `config.js` maps the same names to their browser roles. The
+application itself does not load Verso or depend on slide sources. Renaming
+those two exports can accompany a later artifact refresh without changing the
+benchmark or dashboard APIs.
 
 ## Develop and test
 

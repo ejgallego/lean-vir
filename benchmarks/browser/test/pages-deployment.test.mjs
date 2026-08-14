@@ -83,6 +83,32 @@ test("rejects a Pages example without a canonical build", async (t) => {
   );
 });
 
+for (const [name, mutate, message] of [
+  [
+    "different variant",
+    (manifest) => (manifest.example.variant = "wide"),
+    /staged artifact does not match/,
+  ],
+  [
+    "different set ID",
+    (manifest) => (manifest.setId = "prettyM-other-set"),
+    /staged artifact does not match/,
+  ],
+  [
+    "different test-package digest",
+    (manifest) => (manifest.testPackage.sha256 = "0".repeat(64)),
+    /test package does not match/,
+  ],
+]) {
+  test(`rejects a staged manifest with a ${name}`, async (t) => {
+    const fixture = await stagedDeployment(t);
+    const manifest = structuredClone(fixture.manifest);
+    mutate(manifest);
+    await writeFile(fixture.manifestPath, canonicalJson(manifest));
+    await assert.rejects(() => fixture.select(), message);
+  });
+}
+
 test("rejects a staged manifest without payload files", async (t) => {
   const fixture = await stagedDeployment(t);
   await writeFile(

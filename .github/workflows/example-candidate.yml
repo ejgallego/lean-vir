@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/example-candidate.yml"
+      - ".github/workflows/pages.yml"
       - "package.json"
       - "scripts/install-benchmark-pages.mjs"
       - "scripts/test-benchmark-pages.mjs"
@@ -14,6 +15,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/example-candidate.yml"
+      - ".github/workflows/pages.yml"
       - "package.json"
       - "scripts/install-benchmark-pages.mjs"
       - "scripts/test-benchmark-pages.mjs"

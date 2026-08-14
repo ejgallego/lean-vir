@@ -48,7 +48,7 @@ export async function smokeLanding(cdp, origin) {
     "dev.html",
     "format.html?case=list&width=12",
     "react.html",
-    "benchmarks/",
+    "https://ejgallego.github.io/lean-vir/benchmarks/",
     "surface/",
     "size/",
   ]) {

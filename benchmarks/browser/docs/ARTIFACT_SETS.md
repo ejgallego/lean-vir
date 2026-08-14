@@ -66,9 +66,11 @@ payloads and are not committed.
 5. Import the generated tar through the same consumer path:
 
    ```sh
+   LOCK_PATH=_artifacts/releases/example-set.lock.json
+   ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
    npm run artifacts:fetch -- \
-     --lock LOCK \
-     --archive _artifacts/releases/<archive>.tar
+     --lock "$LOCK_PATH" \
+     --archive "$ARCHIVE_PATH"
    npm run test:unit
    npm run test:example -- EXAMPLE VARIANT
    ```

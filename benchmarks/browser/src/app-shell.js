@@ -1,5 +1,7 @@
 // @ts-check
 
+import { requireArtifactManifestIdentity } from "./artifact-status.js";
+
 const catalogUrl = new URL("../examples/catalog.json", import.meta.url);
 const catalogResponse = await fetch(catalogUrl, { cache: "no-store" });
 if (!catalogResponse.ok) {
@@ -152,24 +154,11 @@ async function inspectArtifactStatus(
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const manifest = await response.json();
-    if (
-      manifest?.schemaVersion !== 2 ||
-      manifest?.kind !== "browser-benchmarks/artifact-set" ||
-      manifest?.example?.id !== example.id ||
-      (manifest?.example?.variant !== undefined &&
-        manifest.example.variant !== variant.id) ||
-      typeof manifest?.setId !== "string"
-    ) {
-      throw new Error("manifest does not match the selected example");
-    }
-    if (
-      !manifest.testPackage ||
-      manifest.testPackage.file !== testPackageIdentity.file ||
-      manifest.testPackage.bytes !== testPackageIdentity.bytes ||
-      manifest.testPackage.sha256 !== testPackageIdentity.sha256
-    ) {
-      throw new Error("manifest test package does not match the selected example");
-    }
+    requireArtifactManifestIdentity(manifest, {
+      exampleId: example.id,
+      variantId: variant.id,
+      testPackage: testPackageIdentity,
+    });
     return {
       verified: true,
       tone: "verified",

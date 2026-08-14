@@ -22,8 +22,8 @@
     runtimeUrl: artifact("lean-vir/js/vir-runtime.js"),
     wasmUrl: artifact("lean-vir/wasm/vir-upstream.wasm"),
     irPackageUrl: artifact("prettyM-vir.irpkg"),
-    // Compatibility names in the current Lean 4.32 artifact. A future
-    // producer refresh can rename these without changing the app contract.
+    // Role-specific mappings for the package exports declared in example.json.
+    // A producer refresh can rename them without changing the app contract.
     jsonExportName: "VersoSlides.Pretty.formatJsonSegmentsJsonForVir",
     formatExportName: "VersoSlides.Pretty.formatSegmentsForVir",
     fetchCache: fetchCache,

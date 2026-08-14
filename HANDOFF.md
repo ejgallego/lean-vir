@@ -87,9 +87,11 @@ The lower-level candidate consumer path is:
 
 ```bash
 npm run artifacts:pack -- --build prettyM
+LOCK_PATH=_artifacts/releases/example-set.lock.json
+ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
 npm run artifacts:fetch -- \
-  --lock _artifacts/releases/<generated-lock>.lock.json \
-  --archive _artifacts/releases/<generated-archive>.tar
+  --lock "$LOCK_PATH" \
+  --archive "$ARCHIVE_PATH"
 ```
 
 These commands write only ignored candidate data and staged local artifacts.

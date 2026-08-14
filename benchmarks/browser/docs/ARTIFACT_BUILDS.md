@@ -163,9 +163,11 @@ source-build receipt before accepting `_artifacts/seed`:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
+LOCK_PATH=_artifacts/releases/example-set.lock.json
+ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
 npm run artifacts:fetch -- \
-  --lock _artifacts/releases/<generated-lock>.lock.json \
-  --archive _artifacts/releases/<archive>.tar
+  --lock "$LOCK_PATH" \
+  --archive "$ARCHIVE_PATH"
 npm test
 ```
 

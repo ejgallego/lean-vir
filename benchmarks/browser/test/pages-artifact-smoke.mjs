@@ -3,7 +3,10 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { fileRecord, safeArchivePath } from "../scripts/artifact-set-lib.mjs";
+import {
+  fileRecord,
+  verifyStagedArtifactSet,
+} from "../scripts/artifact-set-lib.mjs";
 import { parsePagesDeployment } from "../scripts/pages-deployment-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -55,6 +58,7 @@ for (const path of [
   "index.html",
   "coi-serviceworker.js",
   "src/bootstrap.js",
+  "src/artifact-status.js",
   "examples/catalog.json",
   "examples/example.schema.json",
   "examples/tests.schema.json",
@@ -85,7 +89,9 @@ for (const deployment of deployments) {
   );
 
   const artifactRoot = `artifacts/${example.id}`;
-  const manifest = await json(`${artifactRoot}/ARTIFACT_SET.json`);
+  const manifest = await verifyStagedArtifactSet(
+    resolve(directory, artifactRoot),
+  );
   assert.deepEqual(manifest.example, {
     id: example.id,
     variant: deployment.variant,
@@ -96,20 +102,6 @@ for (const deployment of deployments) {
     file: example.testPackage,
     ...(await fileRecord(resolve(directory, example.testPackage))),
   });
-  const files = Object.entries(manifest.files ?? {});
-  assert.ok(files.length > 0, `${example.id} has no artifact payload files`);
-  for (const [path, recorded] of files) {
-    safeArchivePath(path);
-    const prefix = `${example.id}/`;
-    assert.ok(path.startsWith(prefix), `${path} is outside ${prefix}`);
-    assert.deepEqual(
-      await fileRecord(
-        resolve(directory, artifactRoot, path.slice(prefix.length)),
-      ),
-      recorded,
-      `${path} does not match its manifest record`,
-    );
-  }
 }
 
 console.log(

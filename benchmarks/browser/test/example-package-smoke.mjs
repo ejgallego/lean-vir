@@ -141,6 +141,21 @@ try {
     await page.evaluate(() => globalThis.__benchmarkApp.getVariant()?.id),
     variant.id,
   );
+  const artifactStatus = await page.evaluate(() => {
+    const status = globalThis.__benchmarkApp.getArtifactStatus();
+    return {
+      verified: status.verified,
+      tone: status.tone,
+      setId: status.setId,
+    };
+  });
+  if (variant.build === null) {
+    assert.equal(artifactStatus.verified, false);
+  } else {
+    assert.equal(artifactStatus.verified, true);
+    assert.equal(artifactStatus.tone, "verified");
+    assert.match(artifactStatus.setId, /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/);
+  }
 
   for (const test of variant.tests) {
     const backends = await page.evaluate(() =>
