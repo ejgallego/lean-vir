@@ -9,6 +9,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { loadNativeExterns } from "./native-externs.mjs";
 import {
   generateNativeSymbolRegistry,
+  nativeSymbolRegistryEntry,
   parseNativeSymbolRegistry,
 } from "./native-symbol-registry.mjs";
 
@@ -28,18 +29,6 @@ function parseBoxedWrappers(source) {
   );
 }
 
-function expectedDlsymSymbol(entry) {
-  if (entry.params.length === 0 && entry.symbol.startsWith("l_")) {
-    return entry.symbol;
-  }
-  return `${entry.symbol}___boxed`;
-}
-
-function expectedWrapper(entry) {
-  const symbol = expectedDlsymSymbol(entry);
-  return symbol.endsWith("___boxed") ? symbol : null;
-}
-
 const nativeSymbols = await readFile(nativeSymbolsPath, "utf8");
 
 const nativeExterns = await loadNativeExterns();
@@ -49,7 +38,9 @@ if (writeMode) {
   await writeFile(nativeRegistryPath, generatedRegistry);
 }
 
-const nativeRegistryEntries = parseNativeSymbolRegistry(generatedRegistry);
+const nativeRegistryEntries = new Map(
+  parseNativeSymbolRegistry(generatedRegistry).map((entry) => [entry.leanName, entry]),
+);
 const boxedWrappers = parseBoxedWrappers(nativeSymbols);
 const failures = [];
 
@@ -69,8 +60,9 @@ for (const entry of nativeExterns) {
     continue;
   }
 
-  expectedDlsymSymbols.add(expectedDlsymSymbol(entry));
-  const wrapper = expectedWrapper(entry);
+  const expectedRegistryEntry = nativeSymbolRegistryEntry(entry);
+  expectedDlsymSymbols.add(expectedRegistryEntry.dlsymSymbol);
+  const wrapper = expectedRegistryEntry.kind === "X" ? expectedRegistryEntry.wrapper : null;
   if (wrapper) {
     expectedWrappers.add(wrapper);
   }
@@ -79,11 +71,15 @@ for (const entry of nativeExterns) {
     failures.push(`${entry.name}: missing native registry entry`);
   } else if (registryEntry.symbol !== entry.symbol) {
     failures.push(`${entry.name}: registry has ${registryEntry.symbol}, expected ${entry.symbol}`);
+  } else if (registryEntry.kind !== expectedRegistryEntry.kind) {
+    failures.push(`${entry.name}: registry has ${registryEntry.kind}, expected ${expectedRegistryEntry.kind}`);
   }
 
-  const dlsymSymbol = expectedDlsymSymbol(entry);
-  if (registryEntry !== undefined && registryEntry.dlsymSymbol !== dlsymSymbol) {
-    failures.push(`${entry.name}: registry dlsym symbol has ${registryEntry.dlsymSymbol}, expected ${dlsymSymbol}`);
+  if (registryEntry !== undefined && registryEntry.dlsymSymbol !== expectedRegistryEntry.dlsymSymbol) {
+    failures.push(
+      `${entry.name}: registry dlsym symbol has ${registryEntry.dlsymSymbol}, `
+      + `expected ${expectedRegistryEntry.dlsymSymbol}`,
+    );
   }
 
   if (wrapper && !boxedWrappers.has(wrapper)) {

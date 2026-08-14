@@ -10,7 +10,7 @@ import { readFile } from "node:fs/promises";
 import { loadNativeExterns } from "./native-externs.mjs";
 import {
   generateNativeSymbolRegistry,
-  nativeSymbolRegistryEntries,
+  parseNativeSymbolRegistry,
 } from "./native-symbol-registry.mjs";
 
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
@@ -120,10 +120,16 @@ const [nativeExterns, nativeSymbols] = await Promise.all([
 ]);
 
 const compilerGeneratedExterns = nativeExterns.filter((nativeExtern) => nativeExtern.generateBoxedWrapper);
-const { entries, constants } = nativeSymbolRegistryEntries(generateNativeSymbolRegistry(nativeExterns));
+const registryEntries = parseNativeSymbolRegistry(generateNativeSymbolRegistry(nativeExterns));
+const entries = registryEntries.filter((entry) => entry.kind === "X").map(inventoryRegistryEntry);
+const constants = registryEntries.filter((entry) => entry.kind === "X_CONST").map(inventoryRegistryEntry);
 const wrappers = parseWrappers(nativeSymbols);
 const grouped = entriesByWrapper(entries);
 const inventory = [];
+
+function inventoryRegistryEntry({ leanName, symbol, wrapper }) {
+  return { leanName, symbol, wrapper };
+}
 
 for (const [wrapperName, groupEntries] of grouped.entries()) {
   inventory.push({
