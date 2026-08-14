@@ -1311,11 +1311,11 @@ h2 {
   line-height: 1.45;
 }
 
-.react-review-toolbar {
+.react-tamagotchi-toolbar {
   margin-top: 28px;
 }
 
-.react-review-toolbar button {
+.react-tamagotchi-toolbar button {
   min-height: 40px;
   border: 0;
   background: #263d2c;
@@ -1325,30 +1325,44 @@ h2 {
   cursor: pointer;
 }
 
-.react-review-toolbar button:disabled {
+.react-tamagotchi-toolbar button:disabled {
   background: #bdc8bb;
   color: #415146;
   cursor: default;
 }
 
-.react-demo-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 16px;
+.react-tamagotchi-toolbar .section-heading > div > p:last-child {
+  max-width: 46rem;
+  margin: 8px 0 0;
+  color: #5f6f64;
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
-.react-demo-panel {
+.react-tamagotchi-panel {
   min-width: 0;
+  max-width: 920px;
+  margin-top: 16px;
   border: 1px solid #d9ded2;
   background: #ffffff;
 }
 
-.react-demo-panel-wide {
-  grid-column: 1 / -1;
+.react-tamagotchi-panel #react-pet-widget {
+  width: 100%;
+  max-width: none !important;
+  gap: 18px !important;
+  padding: clamp(14px, 3vw, 24px) !important;
 }
 
-.react-demo-panel header {
+.react-tamagotchi-panel #react-pet-widget .react-pet-body {
+  grid-template-columns: 1fr;
+}
+
+.react-tamagotchi-panel #react-pet-widget .pet-state {
+  justify-content: center;
+}
+
+.react-tamagotchi-panel header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1358,25 +1372,25 @@ h2 {
   border-bottom: 1px solid #d9ded2;
 }
 
-.react-demo-panel .eyebrow {
+.react-tamagotchi-panel .eyebrow {
   margin-bottom: 0;
   overflow-wrap: anywhere;
 }
 
-.react-mount {
-  min-height: 116px;
-  padding: 16px;
+.react-pet-mount {
+  min-height: 0;
+  padding: clamp(16px, 4vw, 34px);
   background: #f8faf6;
 }
 
-.react-mount label,
-.react-mount span {
+.react-pet-mount label,
+.react-pet-mount span {
   margin-right: 8px;
 }
 
-.react-mount input,
-.react-mount textarea,
-.react-mount select {
+.react-pet-mount input,
+.react-pet-mount textarea,
+.react-pet-mount select {
   min-height: 34px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
@@ -1384,17 +1398,17 @@ h2 {
   padding: 5px 8px;
 }
 
-.react-mount textarea,
-.react-mount select {
+.react-pet-mount textarea,
+.react-pet-mount select {
   margin-right: 8px;
   vertical-align: middle;
 }
 
-.react-mount textarea {
+.react-pet-mount textarea {
   resize: vertical;
 }
 
-.react-mount input[type="checkbox"] {
+.react-pet-mount input[type="checkbox"] {
   width: 22px;
   height: 22px;
   min-height: 22px;
@@ -1403,7 +1417,7 @@ h2 {
   vertical-align: middle;
 }
 
-.react-mount button {
+.react-pet-mount button {
   min-height: 38px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
@@ -1413,208 +1427,11 @@ h2 {
   cursor: pointer;
 }
 
-.react-mount button:hover,
-.react-mount input:focus-visible,
-.react-mount textarea:focus-visible,
-.react-mount select:focus-visible {
+.react-pet-mount button:hover,
+.react-pet-mount input:focus-visible,
+.react-pet-mount textarea:focus-visible,
+.react-pet-mount select:focus-visible {
   border-color: #516f88;
-}
-
-.react-attributes.is-mounted {
-  border-left: 4px solid #516f88;
-  background: #ffffff;
-  padding: 12px;
-}
-
-.react-proof-widget {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-  color: #17201a;
-}
-
-.react-proof-widget span {
-  margin-right: 0;
-}
-
-.react-proof-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  min-width: 0;
-}
-
-.react-proof-header h3,
-.react-proof-detail h3 {
-  margin: 0;
-  color: #17201a;
-  font-size: 1rem;
-  line-height: 1.2;
-}
-
-.react-proof-heading {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.react-proof-source {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  color: #5f6f64;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.react-proof-module,
-.react-proof-range {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.react-proof-range::before {
-  color: #8a9b90;
-  content: "/";
-  margin-right: 6px;
-}
-
-.react-proof-summary {
-  max-width: 360px;
-  margin: 0;
-  color: #5f6f64;
-  font-size: 0.84rem;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.react-proof-layout {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.72fr) minmax(0, 1.28fr);
-  gap: 12px;
-  min-width: 0;
-}
-
-.react-proof-sidebar,
-.react-proof-detail {
-  min-width: 0;
-}
-
-.react-proof-sidebar,
-.react-proof-main {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  min-width: 0;
-}
-
-.react-proof-panel-label {
-  margin: 0 0 8px;
-  color: #5f6f64;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.react-proof-goal-list,
-.react-proof-hypotheses {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.react-proof-goal {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 46px;
-  text-align: left;
-}
-
-.react-proof-goal[aria-pressed="true"] {
-  border-color: #516f88;
-  background: #edf5f9;
-  color: #20384a;
-}
-
-.react-proof-goal-title,
-.react-proof-goal-status {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.react-proof-goal-title {
-  font-weight: 800;
-}
-
-.react-proof-goal-status {
-  color: #5f6f64;
-  font-size: 0.72rem;
-  text-align: right;
-  text-transform: uppercase;
-}
-
-.react-proof-detail {
-  display: grid;
-  gap: 10px;
-}
-
-.react-proof-status-line {
-  margin: 0;
-  color: #33415c;
-  font-size: 0.88rem;
-  overflow-wrap: anywhere;
-}
-
-.react-proof-target {
-  min-height: 72px;
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid #263d2c;
-  background: #17201a;
-  color: #f8faf6;
-}
-
-.react-proof-target code,
-.react-proof-hypothesis code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  white-space: pre-wrap;
-}
-
-.react-proof-hypothesis {
-  min-width: 0;
-  padding: 8px 10px;
-  border-left: 3px solid #516f88;
-  background: #ffffff;
-  color: #33415c;
-  font-size: 0.86rem;
-  overflow-wrap: anywhere;
-}
-
-.react-proof-hypothesis-name {
-  color: #17201a;
-  font-weight: 800;
-}
-
-.react-proof-hypothesis-type {
-  color: #20384a;
-}
-
-.react-pet-mount {
-  min-height: 430px;
-}
-
-.react-proof-review-mount {
-  min-height: 560px;
 }
 
 .react-pet-widget {
@@ -1779,7 +1596,7 @@ h2 {
   width: max-content;
 }
 
-.react-demo-panel output {
+.react-tamagotchi-panel output {
   display: block;
   min-height: 38px;
   padding: 9px 14px;
@@ -1790,7 +1607,7 @@ h2 {
   text-transform: uppercase;
 }
 
-.react-demo-panel output[data-failed="true"] {
+.react-tamagotchi-panel output[data-failed="true"] {
   color: #7c2820;
 }
 
@@ -2018,14 +1835,6 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .react-demo-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .react-proof-layout {
-    grid-template-columns: 1fr;
-  }
-
   .react-pet-body {
     grid-template-columns: 1fr;
   }
@@ -2144,29 +1953,14 @@ h2 {
   }
 
   .dev-runner-grid,
-  .dev-eval-row,
-  .react-demo-grid {
+  .dev-eval-row {
     grid-template-columns: 1fr;
   }
 
   .react-pet-heading,
-  .react-proof-header,
   #react-pet-name-form {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .react-proof-summary {
-    max-width: none;
-    text-align: left;
-  }
-
-  .react-proof-goal {
-    grid-template-columns: 1fr;
-  }
-
-  .react-proof-goal-status {
-    text-align: left;
   }
 
   #react-pet-name-form input,

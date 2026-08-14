@@ -1,16 +1,16 @@
 # Handoff: browser benchmark catalog and artifact pipeline
 
-Last verified: 2026-08-11
+Last verified: 2026-08-14
 
 ## Purpose
 
-`benchmarks/prettyM-web/` is a standalone browser benchmark catalog hosted in
+`benchmarks/browser/` is a standalone browser benchmark catalog hosted in
 VIR. It has no runtime dependency on the parent VIR source tree, Verso Slides,
 Reveal, or Lake. Producer source stays in the repositories that own it; this
 application owns selection, artifact assembly, correctness testing, serving,
 and report presentation.
 
-Read `AGENTS.md`, this file, and `benchmarks/prettyM-web/README.md` before
+Read `AGENTS.md`, this file, and `benchmarks/browser/README.md` before
 changing the catalog. Generated sources, packages, artifacts, reports, and
 machine-local toolchain configuration stay below the ignored application
 directories.
@@ -31,7 +31,7 @@ directories.
   controller boundary. The shared shell owns discovery, variants, artifact
   status, controls, report placement, and backend filtering.
 
-See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
+See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 `ARTIFACT_SETS.md` for the complete formats.
 
 ## Current state
@@ -49,8 +49,13 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 - The fetcher and stager accept only namespaced artifact-set schema v2. No
   historical prototype lock or compatibility verifier is retained.
 - `.github/workflows/example-candidate.yml` derives its matrix from catalogued
-  example variants, builds non-publishing candidates, re-imports them through
-  the consumer path, runs differential tests, and uploads short-lived payloads.
+  example variants for pull requests and manual runs, builds ephemeral
+  candidates, re-imports them through the consumer path, runs differential
+  tests, and uploads short-lived payloads.
+- The Pages workflow is the sole `main`-branch candidate builder. It builds and
+  uploads the canonical `prettyM/default` payload, admits it only after its
+  staged manifest and test-package digest match the catalog, and installs the
+  filtered app under `web/dist/benchmarks/`.
 - Dashboard backend filters are presentation-only; exported JSON retains the
   complete report.
 - Timings from an uncontrolled or loaded machine are observations, not accepted
@@ -58,7 +63,7 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 
 ## Operator commands
 
-Run application commands from `benchmarks/prettyM-web/`:
+Run application commands from `benchmarks/browser/`:
 
 ```bash
 npm install
@@ -83,18 +88,21 @@ The lower-level candidate consumer path is:
 
 ```bash
 npm run artifacts:pack -- --build prettyM
+LOCK_PATH=_artifacts/releases/example-set.lock.json
+ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
 npm run artifacts:fetch -- \
-  --lock _artifacts/releases/prettyM-bounded-set-0002.lock.json \
-  --archive _artifacts/releases/<generated-archive>.tar
+  --lock "$LOCK_PATH" \
+  --archive "$ARCHIVE_PATH"
 ```
 
-These commands never publish an artifact or update an accepted lock.
+These commands write only ignored candidate data and staged local artifacts.
 
 ## Validation expectations
 
 Before handing off a catalog, controller, or artifact change:
 
 - validate the example and build catalogs;
+- elaborate copyable tutorial sources;
 - run the unit suite and the affected example's browser differential suite;
 - preserve exact rendered-text and styling-event parity;
 - preserve prepare, execute, decode, and total phase boundaries;
@@ -104,8 +112,4 @@ Before handing off a catalog, controller, or artifact change:
 ## Remaining integration
 
 1. Add canonical Illuminate producer entry points and a clean catalog build,
-   then remove its application-local rehearsal stager.
-2. Decide whether a reviewed v2 candidate should be published and selected by
-   an accepted lock. Candidate CI intentionally stops before publication.
-3. Remove generation timestamps and source-path spelling from VIR package
-   metadata if byte-for-byte candidate reproducibility becomes a requirement.
+   then admit it to Pages and remove its application-local rehearsal stager.

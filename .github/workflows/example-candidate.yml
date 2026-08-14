@@ -2,34 +2,14 @@ name: example candidate artifacts
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/example-candidate.yml"
-      - "benchmarks/prettyM-web/artifact-builds.json"
-      - "benchmarks/prettyM-web/examples/**"
-      - "benchmarks/prettyM-web/package-lock.json"
-      - "benchmarks/prettyM-web/package.json"
-      - "benchmarks/prettyM-web/index.html"
-      - "benchmarks/prettyM-web/scripts/**"
-      - "benchmarks/prettyM-web/src/**"
-      - "benchmarks/prettyM-web/static/**"
-      - "benchmarks/prettyM-web/styles/**"
-      - "benchmarks/prettyM-web/test/**"
   pull_request:
     paths:
       - ".github/workflows/example-candidate.yml"
-      - "benchmarks/prettyM-web/artifact-builds.json"
-      - "benchmarks/prettyM-web/examples/**"
-      - "benchmarks/prettyM-web/package-lock.json"
-      - "benchmarks/prettyM-web/package.json"
-      - "benchmarks/prettyM-web/index.html"
-      - "benchmarks/prettyM-web/scripts/**"
-      - "benchmarks/prettyM-web/src/**"
-      - "benchmarks/prettyM-web/static/**"
-      - "benchmarks/prettyM-web/styles/**"
-      - "benchmarks/prettyM-web/test/**"
+      - ".github/workflows/pages.yml"
+      - "package.json"
+      - "scripts/install-benchmark-pages.mjs"
+      - "scripts/test-benchmark-pages.mjs"
+      - "benchmarks/browser/**"
 
 permissions:
   contents: read
@@ -54,7 +34,7 @@ jobs:
 
       - id: matrix
         name: Select catalogued example variants
-        working-directory: benchmarks/prettyM-web
+        working-directory: benchmarks/browser
         run: echo "matrix=$(node scripts/example-candidate-matrix.mjs)" >> "$GITHUB_OUTPUT"
 
   build-candidate:
@@ -73,7 +53,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: benchmarks/prettyM-web/package-lock.json
+          cache-dependency-path: benchmarks/browser/package-lock.json
 
       - name: Install Lean toolchain manager
         run: |
@@ -82,31 +62,39 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
 
       - name: Install benchmark dependencies
-        run: npm --prefix benchmarks/prettyM-web ci
+        run: npm --prefix benchmarks/browser ci
 
       - name: Materialize catalogued sources
-        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- ${{ matrix.build }}
+        run: npm --prefix benchmarks/browser run artifacts:sources -- ${{ matrix.build }}
 
       - name: Cache producer toolchains
         uses: actions/cache@v4
         with:
           path: |
-            benchmarks/prettyM-web/_artifacts/npm-cache
-            benchmarks/prettyM-web/_sources/**/.lake
-            benchmarks/prettyM-web/_sources/**/.tools/cache
-            benchmarks/prettyM-web/_sources/**/.deps
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.build }}-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+            benchmarks/browser/_artifacts/npm-cache
+            benchmarks/browser/_sources/**/.lake
+            benchmarks/browser/_sources/**/.tools/cache
+            benchmarks/browser/_sources/**/.deps
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.build }}-producers-${{ hashFiles('benchmarks/browser/artifact-builds.json') }}
 
       - name: Install Chromium
-        run: npm --prefix benchmarks/prettyM-web run playwright:install
+        run: npm --prefix benchmarks/browser run playwright:install
 
       - name: Build and validate candidate
-        run: npm --prefix benchmarks/prettyM-web run example -- ${{ matrix.example }} ${{ matrix.variant }} --prepare
+        run: npm --prefix benchmarks/browser run example -- ${{ matrix.example }} ${{ matrix.variant }} --prepare
+
+      - name: Build admitted Pages benchmark
+        run: |
+          npm --prefix benchmarks/browser run build -- --deploy ${{ matrix.example }}=${{ matrix.variant }}
+          npm run build:benchmark-pages
+
+      - name: Test Pages benchmark subtree
+        run: npm run test:benchmark-pages -- ${{ matrix.example }} ${{ matrix.variant }}
 
       - name: Upload candidate archive and receipt
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.example }}-${{ matrix.variant }}-candidate-${{ github.event.pull_request.head.sha || github.sha }}
-          path: benchmarks/prettyM-web/_artifacts/candidates/${{ matrix.build }}/upload
+          path: benchmarks/browser/_artifacts/candidates/${{ matrix.build }}/upload
           if-no-files-found: error
           retention-days: 14

@@ -120,6 +120,31 @@ def revealPosition (position : @& DocumentPosition) : Lean.Vir.Browser.DomM Bool
 def revealCursor (surface : @& Surface) : Lean.Vir.Browser.DomM Bool :=
   revealPosition surface.cursor
 
+/--
+Inserts text at a document position through the connected editor.
+
+The bundled infoview host implements this with a zero-width
+`workspace/applyEdit`. Browser-only and virtual hosts may return `false` when
+there is no editable document.
+-/
+@[vir_js "infoview.command.insertText"]
+private opaque insertTextJs
+    (position : @& Lean.Vir.Js DocumentPosition)
+    (text : @& Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+def insertText (position : @& DocumentPosition) (text : @& String) :
+    Lean.Vir.Browser.DomM Bool := do
+  let jsPosition ← DocumentPosition.toJs position
+  let jsText ← Lean.Vir.JsValue.ofString text
+  let inserted ← insertTextJs jsPosition jsText
+  Lean.Vir.JsValue.toBool inserted
+
+/-- Inserts text at the cursor carried by the current infoview surface. -/
+def insertAtCursor (surface : @& Surface) (text : @& String) :
+    Lean.Vir.Browser.DomM Bool :=
+  insertText surface.cursor text
+
 end Command
 
 end Lean.Vir.Infoview

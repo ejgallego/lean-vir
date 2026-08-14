@@ -444,25 +444,24 @@ hatches for demos that need a DOM case not yet covered by the named surface.
 mappings, validation rules, callback ownership, and the JavaScript renderer
 contract.
 
-The React browser fixtures are split by intent: `examples/ReactCounter.lean`
+The React browser fixtures are split by intent: `fixtures/ReactCounter.lean`
 contains the hook-backed counter, static render, lifecycle, and stress cases, while
-`examples/ReactInput.lean` contains hook-backed controlled text, change,
+`fixtures/ReactInput.lean` contains hook-backed controlled text, change,
 submit, textarea/select, attribute-conformance, and checkbox callbacks.
-`Vir.Examples.Tamagotchi` keeps the shared Tamagotchi implementation:
-`Tamagotchi` is the non-React DOM-hosted version, and `ReactTamagotchi` reuses
-the same model with a hook-backed keyed React tree, controlled text input,
-checkbox state, form submit handling, and action callbacks.
-`examples/Tamagotchi.lean` is the browser-demo wrapper, while
+`Vir.Examples.Tamagotchi` keeps the shared Tamagotchi model and the flagship
+`ReactTamagotchi.View`: a hook-backed keyed React tree with controlled text
+input, checkbox state, form submit handling, timers, and action callbacks.
+The browser page mounts that component as an application, while
 `examples/ReactTamagotchiWidget.lean` mounts the same `ReactTamagotchi.View`
 component through the live infoview shell.
-`examples/ReactProofWidget.lean` is the fuller proof-widget-shaped React
-example. It compiles into `demo-host.irpkg`, displays on `react.html`, and can
-also be loaded as a live infoview widget through `show_panel_widgets`.
+`examples/ReactProofWidget.lean` is an infoview proof-action tool. It derives
+common and hypothesis-specific tactics from the current goal and inserts the
+selected tactic at the editor cursor.
 `Vir.ProofWidgets.Html` adds the first shallow ProofWidgets-style authoring
-facade over the same native React node ABI. `examples/ProofWidgetsHtml.lean`
+facade over the same native React node ABI. `fixtures/ProofWidgetsHtml.lean`
 uses `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and `Handler`
 aliases and is included in the host package as a compatibility regression.
-`examples/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
+`fixtures/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
 with explicit combinators, including child-bearing `Html.ofComponent`, image
 attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
 component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
@@ -529,8 +528,9 @@ widgets: users provide a `React.Component Surface`, and the command declares the
 standard selector-owned `mount`/`unmount` entries, `irPackage`, and
 `widgetProps` in the current namespace. `ReactWidget` is the lower-level
 expansion target when a caller needs to assemble those pieces manually.
-`examples/ReactProofWidgetHello.lean` is the minimal live example and
-`examples/ReactProofWidget.lean` is the fuller API showcase.
+`examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and
+`examples/ReactProofWidget.lean` is the next rung: a focused editor tool that
+uses the goal surface and editor edit command without duplicating the infoview.
 `node scripts/smoke-infoview-widget.mjs` checks that the shell module loads and
 that the proof-widget entries have the required signatures.
 

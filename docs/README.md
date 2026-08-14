@@ -42,6 +42,7 @@ ownership diagrams.
   `scripts/surface-report/`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
+  [`benchmarks/browser/README.md`](../benchmarks/browser/README.md),
   `scripts/bench-vir.mjs`, `scripts/bench-env-lookup.mjs`,
   `scripts/bench-differential.mjs`, and `scripts/bench-utils.mjs`.
 
@@ -82,6 +83,9 @@ ownership diagrams.
 - [HARNESS.md](HARNESS.md): setup, generated artifacts, validation commands,
   and CI shape.
 - [ADDING_DEMOS.md](ADDING_DEMOS.md): adding browser demos and package roots.
+- [EXAMPLES_AND_FIXTURES.md](EXAMPLES_AND_FIXTURES.md): deciding whether client
+  code is a public example, a copyable tutorial, a developer tool, or a test
+  fixture.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module

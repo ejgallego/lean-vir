@@ -158,21 +158,23 @@ A realistic path has three layers:
    that React render context; early tooling should document and lint the normal
    React rules rather than replacing them with a new model. Before adding that
    API layer,
-   `examples/ReactProofWidgetHello.lean` provides the first copyable
+   `examples/tutorials/ReactProofWidgetHello.lean` provides the first copyable
    infoview-only proof-widget example: it compiles through the existing React
    renderer, mounts a live `Surface`, and keeps the required widget package
-   shape visible without the full showcase UI. `examples/ReactProofWidget.lean`
-   is the next rung and provides the fuller API showcase. The JavaScript
+   shape visible without the action UI. `examples/ReactProofWidget.lean`
+   is the next rung and provides context-derived tactic actions. The JavaScript
    shell receives real `PanelWidgetProps`, flattens `InteractiveGoal` and
    `InteractiveTermGoal` values, normalizes cursor and selected-location data,
    and passes the shared `Lean.Vir.Infoview.Surface` structure to the VIR entry.
    The current blessed surface carries typed document position data, goal
    kind/index/user/metavariable identity, hypothesis free-variable identifiers,
    and normalized selected locations. The demo also exercises the first narrow
-   infoview host command, `Lean.Vir.Infoview.Clipboard.writeText`, by copying the
-   selected target or a text snapshot of the selected goal context, plus
+   infoview host command, `Lean.Vir.Infoview.Clipboard.writeText`, as a fallback
+   for copying the selected goal context, plus
    `Lean.Vir.Infoview.Command.revealCursor`, which dispatches through upstream
-   `EditorConnection.revealPosition` in the bundled infoview shell. The file also
+   `EditorConnection.revealPosition` in the bundled infoview shell, and
+   `Lean.Vir.Infoview.Command.insertAtCursor`, which applies a zero-width editor
+   edit for the selected tactic. The file also
    includes a file-local `vir_proof_widget` declaration and `show_panel_widgets`
    command that mount the component through a real Lean `@[widget_module]` shell
    in the infoview, then leave the widget active for the proof playground below

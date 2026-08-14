@@ -62,10 +62,10 @@ unrelated responsibilities.
 
 ## Demo And Page Modules
 
-- `main.js`: landing-page fixture runner and Tamagotchi demo wiring.
+- `main.js`: runtime-demo fixture runner and Tamagotchi wiring.
 - `dev.js`: local `.irpkg` package runner.
 - `format-demo.js`: pretty-printer workbench.
-- `react-review.js`: React review page.
+- `react-tamagotchi.js`: standalone React Tamagotchi page.
 - `runtime-example.js`: minimal runtime example page.
 - `pages/fixture-catalog.js`: fixture metadata, package mapping, and input
   defaults.

@@ -41,12 +41,22 @@ export function createVirtualDocumentState({
   clipboardText = "",
   clipboardWrites = [],
   revealedPosition = null,
+  appliedEdits = [],
   infoviewCommands = [],
 } = {}) {
   if (!(elements instanceof Map)) {
     throw new Error("virtual document elements must be a Map");
   }
-  return { title, elements, resources, clipboardText, clipboardWrites, revealedPosition, infoviewCommands };
+  return {
+    title,
+    elements,
+    resources,
+    clipboardText,
+    clipboardWrites,
+    revealedPosition,
+    appliedEdits,
+    infoviewCommands,
+  };
 }
 
 export function createVirtualElementState({
@@ -244,6 +254,21 @@ export function createVirtualDocumentHostBindings(
       state.revealedPosition = normalized;
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
+      return resources.resourceForValue(true);
+    },
+    "infoview.command.insertText": (position, text) => {
+      const normalized = normalizeInfoviewDocumentPosition(
+        resources.resolveResource(position, "DocumentPosition"),
+      );
+      const newText = resources.resolveResource(text, "JsString");
+      if (normalized === null) {
+        return resources.resourceForValue(false);
+      }
+      const edit = { position: normalized, newText };
+      state.appliedEdits ??= [];
+      state.appliedEdits.push(edit);
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "insertText", ...edit });
       return resources.resourceForValue(true);
     },
     "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>

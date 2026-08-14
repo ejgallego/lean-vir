@@ -186,8 +186,8 @@ function node(name, kind, deps = [], overrides = {}) {
 function capabilityReport(nativeExterns, primitiveNamespaces) {
   return emptySurfaceReportV3({
     lean: {
-      version: "4.33.0-rc2",
-      toolchain: "leanprover/lean4:4.33.0-rc2",
+      version: "4.33.0",
+      toolchain: "leanprover/lean4:4.33.0",
       githash: "policy",
     },
     runtimeCapabilities: {

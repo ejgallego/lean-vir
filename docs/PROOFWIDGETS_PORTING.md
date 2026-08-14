@@ -33,7 +33,7 @@ The first compatibility slice is `Vir.ProofWidgets.Html`, backed directly by
 native `ReactNode` resources instead of a second recursive HTML tree.
 `Html.ofComponent` passes `ComponentProps` with props and child `Html` values,
 so component children are rendered by ordinary Lean component functions. The
-`examples/ProofWidgetsHtml.lean` and `examples/ProofWidgetsJsxSubset.lean`
+`fixtures/ProofWidgetsHtml.lean` and `fixtures/ProofWidgetsJsxSubset.lean`
 demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and
 `Handler` aliases in an upstream-recognizable shape and are included in the
 `demo-host.irpkg` runtime smoke package.

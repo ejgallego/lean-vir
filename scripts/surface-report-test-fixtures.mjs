@@ -76,8 +76,8 @@ export function emptySurfaceReportV3(overrides = {}) {
     format: SURFACE_REPORT_FORMAT,
     version: 3,
     lean: {
-      version: "4.33.0-rc2",
-      toolchain: "leanprover/lean4:4.33.0-rc2",
+      version: "4.33.0",
+      toolchain: "leanprover/lean4:4.33.0",
       githash: "test-build",
     },
     definition: surfaceDefinition(false),

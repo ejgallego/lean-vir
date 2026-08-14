@@ -28,12 +28,17 @@ export const browserRunnerCaseSpecs = [
   },
   {
     packageFile: "local-mergesort.irpkg",
-    entryName: "SortDemo.demoFromArray",
+    entryName: "SortDemo.sortArray",
     expected: {
-      entryCount: 2,
+      entryCount: 3,
       input: "[]",
       runInput: "[4, 1, 3, 2]",
-      result: "30",
+      result: `[
+  "1",
+  "2",
+  "3",
+  "4"
+]`,
     },
   },
   {

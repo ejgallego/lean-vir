@@ -21,6 +21,7 @@ export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
 export const requiredDistFiles = Object.freeze([
   "index.html",
+  "demo.html",
   "dev.html",
   "format.html",
   "react.html",
@@ -73,11 +74,17 @@ async function assertBrowserPackagesCompatible(root, packageFiles) {
   }
 }
 
-export async function distAssetPath(prefix) {
-  const files = await readdir(resolve(distRoot, "assets"));
-  const file = files.find((candidate) => candidate.startsWith(prefix) && candidate.endsWith(".js"));
-  assert.ok(file, `missing built asset matching ${prefix}*.js`);
-  return `assets/${file}`;
+export async function distAssetPathContaining(fragment) {
+  const assetsDir = resolve(distRoot, "assets");
+  const files = (await readdir(assetsDir))
+    .filter((candidate) => candidate.endsWith(".js"))
+    .sort();
+  for (const file of files) {
+    if ((await readFile(resolve(assetsDir, file), "utf8")).includes(fragment)) {
+      return `assets/${file}`;
+    }
+  }
+  assert.fail(`missing built JavaScript asset containing ${JSON.stringify(fragment)}`);
 }
 
 export async function serveDist() {
@@ -240,6 +247,15 @@ function chromiumError(message, stderr, cause = null) {
   return error;
 }
 
+function devToolsPortFromStderr(stderr) {
+  const match = stderr.match(
+    /DevTools listening on ws:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):([0-9]+)\//,
+  );
+  if (match === null) return null;
+  const port = Number(match[1]);
+  return port > 0 && port <= 65535 ? port : null;
+}
+
 async function waitForDevToolsPort(profileDir, child, launchError, stderr) {
   const activePortPath = resolve(profileDir, "DevToolsActivePort");
   const deadline = Date.now() + chromiumDevToolsTimeoutMs;
@@ -254,6 +270,8 @@ async function waitForDevToolsPort(profileDir, child, launchError, stderr) {
         stderr,
       );
     }
+    const announcedPort = devToolsPortFromStderr(stderr());
+    if (announcedPort !== null) return announcedPort;
     try {
       const [portText = ""] = (await readFile(activePortPath, "utf8")).split(/\r?\n/, 1);
       if (/^[0-9]+$/.test(portText)) {

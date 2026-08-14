@@ -162,31 +162,45 @@ supported scalar, array/list, option, product, sum, except, structure, enum,
 [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
 guide, including `Sum` and `Except` result shapes.
 
-## Built-In Demos
+## Try, Examples, And Reports
 
-Open the Vite URL from `npm run dev -- --port 5173` to see the DOM Tamagotchi,
-the React review page, fixture browser, and links into the package runner. The
-Lean sources are in [examples/](examples/), with broader fixture coverage under
-[fixtures/](fixtures/).
+`npm run dev -- --port 5173` opens the project landing page. It keeps the public
+surfaces separate by purpose:
 
-The hosted demo is deployed from `main`:
+- **Try:** edit a small array and call Lean's merge sort through VIR.
+- **Examples:** run the React Tamagotchi or the focused `Format.pretty`
+  workload.
+- **Use:** follow the export, package, and JavaScript call path or download a
+  matching browser bundle.
+- **Developer tools:** open the DOM Tamagotchi and runtime diagnostics at
+  `/demo.html`, or inspect an `.irpkg` with the package runner at `/dev.html`.
+- **Inspect:** compare browser backends, runnable library coverage, and Wasm
+  size.
 
-[Lean VIR hosted demo](https://ejgallego.github.io/lean-vir/)
+Public applications live under [examples/](examples/), small teaching sources
+under [examples/tutorials/](examples/tutorials/), and conformance or regression
+coverage under [fixtures/](fixtures/). See
+[Examples, tutorials, and fixtures](docs/EXAMPLES_AND_FIXTURES.md) for the
+ownership rules.
 
-The same deployment publishes the current static analysis of which functions
-in Lean's installed libraries have a complete VIR-runnable dependency closure:
+The deployment from `main` follows the same layout:
 
-[VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
+- [Lean VIR landing page](https://ejgallego.github.io/lean-vir/)
+- [React Tamagotchi](https://ejgallego.github.io/lean-vir/react.html)
+- [`Format.pretty`](https://ejgallego.github.io/lean-vir/format.html?case=list&width=12)
+- [Browser benchmark catalog](https://ejgallego.github.io/lean-vir/benchmarks/)
+- [VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
+- [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
 
-The release and debug artifacts also have a size explorer for Wasm sections,
-objects, and symbols, plus the installed Lean runtime archives. It cross-links
-native providers with the surface report and keeps measured byte costs distinct
-from blocker pressure and exact function unlocks:
-
-[VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
+The benchmark catalog currently deploys the verified `prettyM/default`
+candidate and its differential test package. The runnable-surface report tracks
+installed declarations with complete VIR closures; the size explorer breaks
+the release and debug Wasm artifacts down by section, object, and symbol.
 
 See [docs/SURFACE_ANALYSIS.md](docs/SURFACE_ANALYSIS.md) for local analysis,
 rendering, and serving commands.
+
+## Browser Bundles And SDK Artifacts
 
 A downloadable static bundle is published with the hosted demo:
 
@@ -242,6 +256,10 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 - [docs/README.md](docs/README.md) for a map of maintainer and integration
   documentation.
+- [docs/EXAMPLES_AND_FIXTURES.md](docs/EXAMPLES_AND_FIXTURES.md) for deciding
+  whether client code is a public example, a tutorial, or a test fixture.
+- [benchmarks/browser/README.md](benchmarks/browser/README.md) for contributing
+  a self-contained browser example, differential suite, or artifact build.
 - [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for implementation paths,
   call-flow diagrams, and object ownership.
 - [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package

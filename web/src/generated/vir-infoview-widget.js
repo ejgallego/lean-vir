@@ -4590,6 +4590,11 @@ function createInfoviewHostBindings({ resources = createHostResourceState(), com
       commandDispatcher,
       resources.resolveResource(position, "DocumentPosition")
     )),
+    "infoview.command.insertText": (position, text) => resources.resourceForValue(insertInfoviewText(
+      commandDispatcher,
+      resources.resolveResource(position, "DocumentPosition"),
+      resources.resolveResource(text, "JsString")
+    )),
     "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => resources.resourceForValue({
       id: resources.resolveResource(id, "JsString"),
       label: resources.resolveResource(label, "JsString"),
@@ -4692,6 +4697,13 @@ function revealInfoviewPosition(commandDispatcher, position) {
   }
   return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
 }
+function insertInfoviewText(commandDispatcher, position, text) {
+  const normalized = normalizeInfoviewDocumentPosition(position);
+  if (normalized === null || typeof text !== "string") {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "insertText", normalized, text);
+}
 function nullableField(resources, value, name) {
   const payload = nullablePayload(resources, value);
   return payload === null ? {} : { [name]: payload };
@@ -4772,13 +4784,13 @@ function nonNegativeInteger(value) {
   }
   return null;
 }
-function dispatchInfoviewCommand(commandDispatcher, name, payload) {
+function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
   const handler = infoviewCommandHandler(commandDispatcher, name);
   if (handler === null) {
     return false;
   }
   try {
-    const result = handler(payload);
+    const result = handler(...payload);
     if (result !== null && typeof result === "object" && typeof result.then === "function") {
       result.catch((error) => {
         reportEventHandlerError(error);
@@ -9699,6 +9711,24 @@ function createInfoviewCommandDispatcher({
       editorConnection.revealPosition(position2).catch((error) => {
         console.error(error);
       });
+      return true;
+    },
+    insertText(position2, text) {
+      const editorConnection = editorConnectionRef?.current ?? null;
+      if (editorConnection === null || typeof editorConnection !== "object" || editorConnection.api === null || typeof editorConnection.api !== "object" || typeof editorConnection.api.applyEdit !== "function") {
+        return false;
+      }
+      const cursor = { line: position2.line, character: position2.character };
+      const edit = editorConnection.api.applyEdit({
+        changes: {
+          [position2.uri]: [{ range: { start: cursor, end: cursor }, newText: text }]
+        }
+      });
+      if (edit !== null && typeof edit === "object" && typeof edit.catch === "function") {
+        edit.catch((error) => {
+          console.error(error);
+        });
+      }
       return true;
     },
     proofwidgetsRpcInspectRef(ref) {

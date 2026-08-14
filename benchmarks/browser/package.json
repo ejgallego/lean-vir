@@ -1,0 +1,40 @@
+{
+  "name": "@leanprover/browser-benchmarks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "examples:check": "node scripts/check-example-catalog.mjs",
+    "example": "node scripts/run-example.mjs",
+    "artifacts:sources": "node scripts/checkout-artifact-sources.mjs",
+    "artifacts:build": "node scripts/build-artifacts.mjs",
+    "artifacts:candidate": "node scripts/build-artifact-candidate.mjs",
+    "artifacts:pack": "node scripts/pack-artifact-set.mjs",
+    "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
+    "stage": "node scripts/stage-artifact-set.mjs",
+    "stage:illuminate": "node scripts/stage-illuminate-rehearsal.mjs",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs",
+    "report": "node scripts/collect-report.mjs",
+    "campaign": "python3 scripts/run-campaign.py",
+    "test": "npm run test:unit && npm run test:browser",
+    "test:unit": "npm run test:tools && npm run test:examples && npm run test:artifact-status && npm run test:pages-deployment && npm run test:toolchains && npm run test:artifact-set",
+    "test:examples": "node --test test/example-catalog.test.mjs",
+    "test:artifact-status": "node --test test/artifact-status.test.mjs",
+    "test:pages-deployment": "node --test test/pages-deployment.test.mjs",
+    "test:toolchains": "node --test test/toolchain-config.test.mjs",
+    "test:artifact-set": "node --test test/artifact-set.test.mjs",
+    "test:tools": "node test/tool-smoke.mjs",
+    "test:browser": "npm run build && node test/browser-smoke.mjs",
+    "test:pages": "node test/pages-artifact-smoke.mjs",
+    "test:pages:browser": "node test/example-package-smoke.mjs --static-host",
+    "test:example": "npm run build && node test/example-package-smoke.mjs",
+    "test:illuminate": "npm run build && node test/illuminate-browser-smoke.mjs",
+    "playwright:install": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.0"
+  }
+}

@@ -15,7 +15,11 @@
         },
         {
           "source": "examples/MergeSort.lean",
-          "roots": ["SortDemo.demo", "SortDemo.demoFromArray"]
+          "roots": [
+            "SortDemo.demo",
+            "SortDemo.demoFromArray",
+            "SortDemo.sortArray"
+          ]
         },
         {
           "source": "fixtures/Basic.lean",
@@ -96,7 +100,7 @@
           ]
         },
         {
-          "source": "examples/ReactCounter.lean",
+          "source": "fixtures/ReactCounter.lean",
           "roots": [
             "ReactCounter.mount",
             "ReactCounter.mountDefault",
@@ -115,7 +119,7 @@
           ]
         },
         {
-          "source": "examples/ReactInput.lean",
+          "source": "fixtures/ReactInput.lean",
           "roots": [
             "ReactInput.mountInput",
             "ReactInput.mountChangeInput",
@@ -125,21 +129,21 @@
           ]
         },
         {
-          "source": "examples/ProofWidgetsHtml.lean",
+          "source": "fixtures/ProofWidgetsHtml.lean",
           "roots": [
             "ProofWidgetsHtml.mount",
             "ProofWidgetsHtml.mountDefault"
           ]
         },
         {
-          "source": "examples/ProofWidgetsJsxSubset.lean",
+          "source": "fixtures/ProofWidgetsJsxSubset.lean",
           "roots": [
             "ProofWidgetsJsxSubset.mount",
             "ProofWidgetsJsxSubset.mountDefault"
           ]
         },
         {
-          "source": "examples/ReactProofWidgetHello.lean",
+          "source": "examples/tutorials/ReactProofWidgetHello.lean",
           "roots": [
             "ReactProofWidgetHello.mount",
             "ReactProofWidgetHello.unmount"

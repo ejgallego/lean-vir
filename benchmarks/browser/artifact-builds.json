@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "kind": "browser-benchmarks/artifact-build-catalog",
+  "sources": {
+    "fir-prettyM": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-fir",
+      "revision": "298682a766d80e90053d3e76ee2f3e4af78a52aa"
+    },
+    "lean-4.33.0": {
+      "kind": "git",
+      "repository": "https://github.com/leanprover/lean4",
+      "revision": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+    },
+    "prettyM-workload": {
+      "kind": "git",
+      "repository": "https://github.com/leanprover/verso-slides",
+      "revision": "c16a6f83b622dd8ebc2f4975d93b856b08dde444"
+    },
+    "vir-prettyM": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-vir",
+      "revision": "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65"
+    }
+  },
+  "builds": {
+    "prettyM": {
+      "example": {
+        "id": "prettyM",
+        "variant": "default"
+      },
+      "artifactSet": {
+        "setId": "prettyM-bounded-set-0002",
+        "benchmarkContract": {
+          "id": "prettyM/artifacts/v1",
+          "input": "prettyM-compact-format/v1",
+          "output": "prettyM-text-and-complete-style-events/v1",
+          "timingPhases": ["prepare", "execute", "decode", "render"]
+        }
+      },
+      "checkouts": {
+        "fir": "fir-prettyM",
+        "lean": "lean-4.33.0",
+        "vir": "vir-prettyM",
+        "workload": "prettyM-workload"
+      },
+      "components": {
+        "vir": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.33.0",
+              "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+            },
+            "runtime": {
+              "pipeline": "lean-vir-ir-interpreter-wasm32-wasip1",
+              "sourceRef": "vir-prettyM",
+              "sourceDirty": false,
+              "wasiSdk": "33.0"
+            },
+            "workload": {
+              "file": "prettyM-vir.irpkg",
+              "packageRef": "prettyM",
+              "packageFormat": 10,
+              "manifestVersion": 7,
+              "source": {
+                "sourceRef": "prettyM-workload",
+                "dirty": false
+              }
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "vir",
+            "checkouts": {
+              "producer": "vir",
+              "runtime": "lean",
+              "workload": "workload"
+            },
+            "files": {
+              "prettyM-vir.irpkg": "prettyM/prettyM-vir.irpkg",
+              "lean-vir/js/vir-runtime.js": "prettyM/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "prettyM/lean-vir/wasm/vir-upstream.wasm"
+            }
+          }
+        },
+        "native": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.32.0",
+              "commit": "8c9756b28d64dab099da31a4c09229a9e6a2ef35"
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "fir-native",
+            "checkouts": {
+              "producer": "fir"
+            },
+            "entrypoint": "integration/talos/artifact/package-pretty-format.sh",
+            "manifest": "BUILD.json",
+            "files": {
+              "BUILD.json": "prettyM/lean-native/BUILD.json",
+              "prettyM-browser-adapter.mjs": "prettyM/lean-native/prettyM-browser-adapter.mjs",
+              "prettyM.wasm": "prettyM/lean-native/prettyM.wasm",
+              "prettyM.wasm.json": "prettyM/lean-native/prettyM.wasm.json"
+            }
+          }
+        },
+        "llvm": {
+          "dependencies": ["native"],
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "lean": {
+              "version": "4.32.0",
+              "commit": "8c9756b28d64dab099da31a4c09229a9e6a2ef35"
+            }
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "fir-llvm",
+            "checkouts": {
+              "producer": "fir"
+            },
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
+            "entrypoint": "integration/lcnf-c-wasm/package-prettyM-emscripten.sh",
+            "manifest": "prettyM.manifest.json",
+            "files": {
+              "README.md": "prettyM/lean-llvm/README.md",
+              "SHA256SUMS": "prettyM/lean-llvm/SHA256SUMS",
+              "emscripten-loader.mjs": "prettyM/lean-llvm/emscripten-loader.mjs",
+              "prettyM-emscripten-adapter.mjs": "prettyM/lean-llvm/prettyM-emscripten-adapter.mjs",
+              "prettyM.manifest.json": "prettyM/lean-llvm/prettyM.manifest.json",
+              "prettyM.mjs": "prettyM/lean-llvm/prettyM.mjs",
+              "prettyM.wasm": "prettyM/lean-llvm/prettyM.wasm"
+            }
+          }
+        }
+      }
+    }
+  }
+}
