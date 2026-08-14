@@ -5,19 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
-import {
-  artifactSetConfig,
-  readBuildDatabase,
-} from "../scripts/artifact-build-lib.mjs";
-
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const prettyMArtifactSet = artifactSetConfig(
-  await readBuildDatabase(join(appRoot, "artifact-builds.json")),
-  "prettyM",
-);
-const hasVerifiedPrettyM = existsSync(
-  join(appRoot, "artifacts/prettyM/ARTIFACT_SET.json"),
-);
 const port = Number(process.env.BENCH_PORT ?? "18334");
 const url = `http://127.0.0.1:${port}`;
 const server = spawn(
@@ -85,6 +73,19 @@ try {
   });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error)));
+  const smokeManifest = {
+    schemaVersion: 2,
+    kind: "browser-benchmarks/artifact-set",
+    example: { id: "prettyM", variant: "default" },
+    setId: "browser-smoke-without-test-package",
+  };
+  await page.route("**/artifacts/prettyM/ARTIFACT_SET.json", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(smokeManifest),
+    }),
+  );
   await page.goto(url, { waitUntil: "networkidle" });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
     example: null,
@@ -151,10 +152,13 @@ try {
   const artifactStatus = await page.evaluate(() =>
     window.__benchmarkApp.getArtifactStatus(),
   );
-  assert.equal(artifactStatus.verified, hasVerifiedPrettyM);
+  assert.equal(artifactStatus.verified, false);
+  assert.equal(artifactStatus.tone, "unverified");
+  assert.equal(artifactStatus.setId, null);
+  assert.match(artifactStatus.error, /test package/);
   assert.equal(
     await page.locator("#artifact-status").getAttribute("data-verified"),
-    String(hasVerifiedPrettyM),
+    "false",
   );
   assert.equal(await page.evaluate(() => typeof window.Reveal), "undefined");
   assert.deepEqual(
@@ -192,22 +196,7 @@ try {
   assert.equal(report.passed, true);
   assert.equal(report.parityCount, 1);
   assert.equal(report.scenarioCount, 1);
-  if (hasVerifiedPrettyM) {
-    assert.equal(artifactStatus.setId, prettyMArtifactSet.setId);
-    assert.equal(
-      report.runtimeProfile.artifactSet.manifest.setId,
-      prettyMArtifactSet.setId,
-    );
-    assert.equal(
-      report.runtimeProfile.artifactSet.manifest.components.vir.runtime
-        .sourceCommit,
-      prettyMArtifactSet.components.vir.runtime.sourceCommit,
-    );
-  } else {
-    assert.equal(artifactStatus.tone, "unverified");
-    assert.equal(artifactStatus.setId, null);
-    assert.match(report.runtimeProfile.artifactSet.manifest.error, /HTTP 404/);
-  }
+  assert.deepEqual(report.runtimeProfile.artifactSet.manifest, smokeManifest);
   assert.ok(report.runtimeProfile.backends.js.assetBytes > 0);
   for (const profile of Object.values(report.runtimeProfile.backends)) {
     for (const asset of profile.assets) {

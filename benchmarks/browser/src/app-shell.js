@@ -163,10 +163,10 @@ async function inspectArtifactStatus(
       throw new Error("manifest does not match the selected example");
     }
     if (
-      manifest.testPackage &&
-      (manifest.testPackage.file !== testPackageIdentity.file ||
-        manifest.testPackage.bytes !== testPackageIdentity.bytes ||
-        manifest.testPackage.sha256 !== testPackageIdentity.sha256)
+      !manifest.testPackage ||
+      manifest.testPackage.file !== testPackageIdentity.file ||
+      manifest.testPackage.bytes !== testPackageIdentity.bytes ||
+      manifest.testPackage.sha256 !== testPackageIdentity.sha256
     ) {
       throw new Error("manifest test package does not match the selected example");
     }

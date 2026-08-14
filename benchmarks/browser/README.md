@@ -163,8 +163,8 @@ artifact refresh without changing the benchmark or dashboard APIs.
 ```sh
 npm install
 npm run artifacts:fetch -- \
-  --lock /path/inside/this/app/to/set-0002.lock.json \
-  --archive /path/inside/this/app/to/set-0002.tar
+  --lock /path/inside/this/app/to/artifact-set.lock.json \
+  --archive /path/inside/this/app/to/artifact-set.tar
 npm run build
 npm run dev
 ```
