@@ -201,6 +201,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
   const testPackagePath = join(directory, "tests.json");
   const receiptPath = join(directory, "BUILD.json");
   const artifactPath = "prettyM/runtime.wasm";
+  const setId = "source-receipt-test-set";
   await rm(directory, { recursive: true, force: true });
   await mkdir(join(seed, "prettyM"), { recursive: true });
   await writeFile(join(seed, artifactPath), "wasm\n");
@@ -229,7 +230,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
     schemaVersion: 2,
     kind: "browser-benchmarks/source-build-receipt",
     build: "prettyM",
-    artifactSet: "prettyM-bounded-set-0002",
+    artifactSet: setId,
     database: {
       file: "artifact-builds.json",
       sha256: sha256(await readFile(databasePath)),
@@ -278,7 +279,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       exampleId: "prettyM",
       variantId: "default",
       buildId: "prettyM",
-      setId: "prettyM-bounded-set-0002",
+      setId,
       sources,
       components,
       seed,
@@ -297,7 +298,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         exampleId: "prettyM",
         variantId: "default",
         buildId: "prettyM",
-        setId: "prettyM-bounded-set-0002",
+        setId,
         sources,
         components,
         seed,
@@ -318,7 +319,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         exampleId: "prettyM",
         variantId: "default",
         buildId: "prettyM",
-        setId: "prettyM-bounded-set-0002",
+        setId,
         sources,
         components,
         seed,
@@ -338,7 +339,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         exampleId: "prettyM",
         variantId: "default",
         buildId: "prettyM",
-        setId: "prettyM-bounded-set-0002",
+        setId,
         sources,
         components,
         seed,
@@ -384,6 +385,33 @@ test("verifies an example-neutral artifact-set manifest", async () => {
   );
   const manifest = await verifyArtifactSet(directory);
   assert.equal(manifest.example.id, "illuminate");
+});
+
+test("rejects artifact-set manifests without a safe set ID", async () => {
+  const directory = join(scratch, "unsafe-set-id");
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(join(directory, "prettyM"), { recursive: true });
+  const payloadPath = join(directory, "prettyM/payload.bin");
+  await writeFile(payloadPath, "payload\n");
+  const files = {
+    "prettyM/payload.bin": await fileRecord(payloadPath),
+  };
+  for (const setId of [undefined, "", "../unsafe"]) {
+    await writeFile(
+      join(directory, "ARTIFACT_SET.json"),
+      canonicalJson({
+        schemaVersion: 2,
+        kind: "browser-benchmarks/artifact-set",
+        example: { id: "prettyM" },
+        setId,
+        files,
+      }),
+    );
+    await assert.rejects(
+      () => verifyArtifactSet(directory),
+      /no safe set ID/,
+    );
+  }
 });
 
 test("stages a verified example namespace without replacing siblings", async () => {

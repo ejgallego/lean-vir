@@ -80,18 +80,11 @@ npm run artifacts:sources -- prettyM
 ```
 
 The repository does not retain obsolete prototype locks. Binary artifacts,
-candidate locks, and downloaded release archives remain ignored by Git. Pack
-and import a previously built prettyM seed using the exact paths printed by the
-packer:
-
-```sh
-npm run artifacts:pack -- --build prettyM
-LOCK_PATH=_artifacts/releases/example-set.lock.json
-ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
-npm run artifacts:fetch -- \
-  --lock "$LOCK_PATH" \
-  --archive "$ARCHIVE_PATH"
-```
+candidate locks, and downloaded release archives remain ignored by Git. The
+`npm run example` command above is the normal complete workflow. See
+[`ARTIFACT_BUILDS.md`](docs/ARTIFACT_BUILDS.md) for producer construction and
+[`ARTIFACT_SETS.md`](docs/ARTIFACT_SETS.md) for the lower-level pack and import
+boundary.
 
 `artifacts:build` produces a validated `_artifacts/seed/`, and
 `artifacts:pack` consumes it with this layout:

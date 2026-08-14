@@ -163,17 +163,12 @@ source-build receipt before accepting `_artifacts/seed`:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
-LOCK_PATH=_artifacts/releases/example-set.lock.json
-ARCHIVE_PATH=_artifacts/releases/example-set-digest.tar
-npm run artifacts:fetch -- \
-  --lock "$LOCK_PATH" \
-  --archive "$ARCHIVE_PATH"
-npm test
 ```
 
 Building and packing remain separate. A newly generated producer byte changes
 the archive digest, and the generated lock binds that exact invocation.
-Performance measurement is never part of this source build command.
+Performance measurement is never part of this source build command. See
+`ARTIFACT_SETS.md` for the single canonical re-import and validation recipe.
 
 The source-package v1 contract guarantees exact source identity and validated
 package output. Historical byte-for-byte reproduction is not a project

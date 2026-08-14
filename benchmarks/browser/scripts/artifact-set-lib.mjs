@@ -11,6 +11,8 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
+const identifierPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
 export function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -225,10 +227,14 @@ function artifactManifestFiles(manifest) {
     throw new Error("unsupported artifact-set manifest");
   }
   const exampleId = manifest.example?.id;
+  const setId = manifest.setId;
   const files = Object.entries(manifest.files ?? {});
+  if (typeof setId !== "string" || !identifierPattern.test(setId)) {
+    throw new Error("artifact-set manifest has no safe set ID");
+  }
   if (
     typeof exampleId !== "string" ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(exampleId) ||
+    !identifierPattern.test(exampleId) ||
     files.length === 0
   ) {
     throw new Error("artifact-set manifest omits its example or files");

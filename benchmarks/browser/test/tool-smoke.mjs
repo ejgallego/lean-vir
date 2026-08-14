@@ -5,6 +5,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const buildDatabase = JSON.parse(
+  readFileSync(join(appRoot, "artifact-builds.json"), "utf8"),
+);
+const prettyMSetId = buildDatabase.builds.prettyM.artifactSet.setId;
 const commands = [
   [process.execPath, ["scripts/check-example-catalog.mjs", "--help"]],
   [process.execPath, ["scripts/run-example.mjs", "--help"]],
@@ -105,7 +109,10 @@ const buildList = spawnSync(
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(buildList.status, 0, buildList.stderr);
-assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0002$/m);
+assert.ok(
+  buildList.stdout.split(/\r?\n/).includes(`prettyM\t${prettyMSetId}`),
+  buildList.stdout,
+);
 
 const sourcePlan = spawnSync(
   process.execPath,
