@@ -227,6 +227,25 @@ def uintConversionParserDataScore : Nat :=
   let byte := (511 : UInt32).toUInt8
   narrowed.toNat + byte.toNat
 
+/-- Reports the execution target's pointer width. -/
+def platformNumBitsScore : Nat :=
+  System.Platform.numBits
+
+/-- Keeps the runtime conversion opaque so it cannot collapse into the `USize.ofNat` expression. -/
+@[noinline]
+private def uint64ToUSizeNat (wide : UInt64) : Nat :=
+  wide.toUSize.toNat
+
+/-- Exercises runtime narrowing from `UInt64` to the execution target's `USize`. -/
+def uint64ToUSizeTargetScore : Nat :=
+  uint64ToUSizeNat 4294967296
+
+/-- Checks whether `USize.ofNat` and runtime narrowing agree on the target. -/
+def usizeOfNatRuntimeCoherenceScore : Nat :=
+  let ofNat := (USize.ofNat 4294967296).toNat
+  let runtime := uint64ToUSizeNat 4294967296
+  if ofNat = runtime then 1 else 0
+
 def uint16UInt32ConversionScore : Nat :=
   let narrow : UInt16 := 65000
   let widened := narrow.toUInt32

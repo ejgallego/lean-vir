@@ -254,6 +254,8 @@ changes.
   same hook-backed `ReactTamagotchi.View` component as the browser React demo.
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
+- Fixture expectation parsing and target-specific manifest validation:
+  `npm run test:fixture-expectations`
 - A single fixture or fixture family:
   `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`
 - A single fixture after `npm run build:demo` has already refreshed the WASM
@@ -305,8 +307,8 @@ commands above.
 The local package-generation helper, browser package generator, and fixture
 runner use the `vir_irpkg` Lake executable instead of repeatedly starting
 `lean --run tools/GeneratePackage.lean`. The fixture runner builds that
-executable once, then reuses it for per-fixture packages while keeping the
-host-oracle checks unchanged.
+executable once, then reuses it for per-fixture packages while continuing to
+run the host oracle for every fixture.
 
 The build and test entry points print compact timing summaries that are useful
 when comparing CI runs:

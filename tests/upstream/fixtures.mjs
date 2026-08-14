@@ -5,12 +5,14 @@ Author: Emilio J. Gallego Arias
 */
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
+import { fixtureExpectation } from "../support/fixture-expectations.mjs";
 import { packageForFixture } from "./context.mjs";
 import { instantiateVirModule, loadIrPackageSet } from "./wasm-package.mjs";
 
 export async function smokeFixtureManifest(context) {
   const fixtures = context.fixtureManifest.fixtures ?? [];
   for (const fixture of fixtures) {
+    const expectation = fixtureExpectation(fixture);
     if (fixture.result?.type !== "Nat") {
       throw new Error(`${fixture.id}: unsupported smoke result type ${fixture.result?.type}`);
     }
@@ -24,6 +26,9 @@ export async function smokeFixtureManifest(context) {
     }
     if (!/^\d+$/.test(value)) {
       throw new Error(`${fixture.id}: expected Nat result, got ${value}`);
+    }
+    if (expectation.wasm !== null && value !== expectation.wasm) {
+      throw new Error(`${fixture.id}: expected Wasm Nat ${expectation.wasm}, got ${value}`);
     }
   }
   return fixtures.length;

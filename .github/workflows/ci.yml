@@ -132,6 +132,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - run: npm run test:fixture-expectations
       - name: Download demo artifacts
         uses: actions/download-artifact@v4
         with:
