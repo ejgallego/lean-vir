@@ -16,6 +16,43 @@ export function parsePagesDeployment(value) {
   return { example: parts[0], variant: parts[1] };
 }
 
+export async function activePagesDeployments({ appRoot, catalog, database }) {
+  const deployments = [];
+  for (const example of catalog.examples) {
+    if (example.lifecycle !== "active") continue;
+    const testPackage = await readExampleTestPackage(appRoot, example);
+    if (testPackage.variants.length !== 1) {
+      throw new Error(
+        `active Pages example must declare one variant: ${example.id}`,
+      );
+    }
+    const variant = testPackage.variants[0];
+    if (variant.build === null) {
+      throw new Error(
+        `active Pages example has no canonical build: ${example.id}/${variant.id}`,
+      );
+    }
+    const build = selectBuild(database, variant.build);
+    if (
+      build.example.id !== example.id ||
+      build.example.variant !== variant.id
+    ) {
+      throw new Error(
+        `active Pages build does not match ${example.id}/${variant.id}`,
+      );
+    }
+    deployments.push({
+      example: example.id,
+      variant: variant.id,
+      build: variant.build,
+    });
+  }
+  if (deployments.length === 0) {
+    throw new Error("catalog has no active Pages examples");
+  }
+  return deployments;
+}
+
 async function verifyStagedDeployment(
   appRoot,
   artifactsRoot,

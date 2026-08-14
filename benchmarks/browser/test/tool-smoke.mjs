@@ -154,6 +154,14 @@ assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   ],
 });
 
+const pagesPlan = spawnSync(
+  process.execPath,
+  ["scripts/pages-deployment-plan.mjs"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(pagesPlan.status, 0, pagesPlan.stderr);
+assert.equal(pagesPlan.stdout, "prettyM\tdefault\tprettyM\n");
+
 const escapedOutput = spawnSync(
   process.execPath,
   ["scripts/collect-report.mjs", "--output", "/tmp/escaped-report.json"],
