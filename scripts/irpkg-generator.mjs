@@ -15,7 +15,7 @@ export function virIrpkgLakeBuildArgs(lakeTargets = []) {
   return ["build", "Vir", "vir_irpkg", ...lakeTargets];
 }
 
-export function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PATH) {
+function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PATH) {
   return [
     ".lake/build/lib/lean",
     "build/lean-lib",

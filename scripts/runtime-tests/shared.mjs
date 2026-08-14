@@ -18,9 +18,8 @@ import {
   wasmPublicFile,
 } from "../browser-package-config.mjs";
 import {
-  leanPathWithGenerator,
-  virIrpkgLakeBuildArgs,
-  virIrpkgPath,
+  irpkgGeneratorFailureMessage,
+  prepareVirIrpkgSync,
 } from "../irpkg-generator.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
@@ -173,19 +172,11 @@ export function generateIrPackage(source, packagePath) {
   return generated;
 }
 
-let cachedVirIrpkgEnv = null;
+let cachedVirIrpkg = null;
 let virJsBuilt = false;
-let virIrpkgBuilt = false;
 
 export function virIrpkgEnv() {
-  if (cachedVirIrpkgEnv !== null) return cachedVirIrpkgEnv;
-  const leanPrefix = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
-  assert.equal(leanPrefix.status, 0, leanPrefix.stderr || leanPrefix.stdout);
-  cachedVirIrpkgEnv = {
-    ...process.env,
-    LEAN_PATH: leanPathWithGenerator(leanPrefix.stdout.trim()),
-  };
-  return cachedVirIrpkgEnv;
+  return preparedVirIrpkg().env;
 }
 
 function skipVirIrpkgBuildEnv() {
@@ -203,20 +194,23 @@ export function ensureVirJsBuilt() {
 }
 
 export function ensureVirIrpkgBuilt() {
-  if (virIrpkgBuilt) return;
-  const builtLeanLib = spawnSync("bash", ["scripts/build-lean-lib.sh"], { encoding: "utf8" });
-  assert.equal(builtLeanLib.status, 0, builtLeanLib.stderr || builtLeanLib.stdout);
-  const builtGenerator = spawnSync("lake", virIrpkgLakeBuildArgs(), { encoding: "utf8" });
-  assert.equal(builtGenerator.status, 0, builtGenerator.stderr || builtGenerator.stdout);
-  virIrpkgBuilt = true;
+  preparedVirIrpkg();
 }
 
 export function runVirIrpkg(args) {
-  ensureVirIrpkgBuilt();
-  return spawnSync(virIrpkgPath, args, {
+  const generator = preparedVirIrpkg();
+  return spawnSync(generator.path, args, {
     encoding: "utf8",
-    env: virIrpkgEnv(),
+    env: generator.env,
   });
+}
+
+function preparedVirIrpkg() {
+  if (cachedVirIrpkg !== null) return cachedVirIrpkg;
+  const generator = prepareVirIrpkgSync(new URL("../..", import.meta.url));
+  assert.equal(generator.ok, true, irpkgGeneratorFailureMessage(generator));
+  cachedVirIrpkg = generator;
+  return cachedVirIrpkg;
 }
 
 export async function writeRuntimeFixture(target, fixtureName) {
