@@ -48,7 +48,7 @@ import {
 } from "./shared.mjs";
 import {
   ensureVirtualElements,
-} from "../../scripts/virtual-fixtures.mjs";
+} from "../support/virtual-fixtures.mjs";
 import {
   smokeVirtualReactAttributes,
   smokeVirtualReactChangeInput,
@@ -65,7 +65,7 @@ import {
   smokeVirtualReactProofWidgetHello,
   smokeVirtualReactSelectTextarea,
   smokeVirtualReactTamagotchi,
-} from "../../scripts/virtual-react-smoke-scenarios.mjs";
+} from "../support/virtual-react-smoke-scenarios.mjs";
 
 const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 

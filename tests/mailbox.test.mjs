@@ -15,9 +15,9 @@ import {
   primaryCheckout,
   resolveMailbox,
   validateMessages,
-} from "./mailbox-lib.mjs";
+} from "../scripts/mailbox-lib.mjs";
 
-const script = resolve(import.meta.dirname, "mailbox.mjs");
+const script = resolve(import.meta.dirname, "../scripts/mailbox.mjs");
 
 function message({
   id,

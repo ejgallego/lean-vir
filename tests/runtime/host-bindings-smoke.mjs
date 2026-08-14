@@ -16,7 +16,7 @@ import {
   readRuntimeArtifacts,
   wait,
 } from "./shared.mjs";
-import { ensureTamagotchiVirtualDom } from "../../scripts/virtual-fixtures.mjs";
+import { ensureTamagotchiVirtualDom } from "../support/virtual-fixtures.mjs";
 
 const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 
