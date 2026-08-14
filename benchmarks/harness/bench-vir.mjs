@@ -39,7 +39,7 @@ import {
   balancedStdFormatAppend,
   stdFormat,
   taggedStdFormatChunks,
-} from "./std-format-values.mjs";
+} from "../../fixtures/js/std-format-values.mjs";
 
 const root = new URL("../..", import.meta.url);
 

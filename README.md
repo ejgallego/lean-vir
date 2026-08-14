@@ -292,11 +292,14 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   live under `web/tools/`.
 - `examples/` contains runnable applications and tutorials; `fixtures/`
   contains regression-only Lean and host inputs.
-- `benchmarks/browser/` is a standalone browser benchmark catalog with its own
-  package, docs, tests, and ignored artifacts.
-- `scripts/` contains repository orchestration and checks. Generated sources,
-  reports, packages, bundles, and site output stay under ignored `build/`,
-  `web/public/`, or `web/dist/` paths.
+- `benchmarks/harness/` owns repository-level benchmark runners and comparison
+  helpers; `benchmarks/browser/` is a standalone browser benchmark catalog with
+  its own package, docs, tests, and ignored artifacts.
+- `tests/` contains test-only runners, cases, and shared support grouped by the
+  subsystem they exercise.
+- `scripts/` contains repository build, packaging, analysis, and maintainer
+  tooling. Generated sources, reports, packages, bundles, and site output stay
+  under ignored `build/`, `web/public/`, or `web/dist/` paths.
 
 The default Lake target builds the core `Vir` library without browser tooling.
 Use `lake build VirInfoview` when working on the optional infoview integration;

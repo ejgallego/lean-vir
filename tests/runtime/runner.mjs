@@ -5,42 +5,44 @@ Author: Emilio J. Gallego Arias
 */
 
 import { availableParallelism } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { mapWithLimit, runAsync } from "../../scripts/process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "../../scripts/timing-utils.mjs";
 
-const root = new URL("../..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../..", import.meta.url));
+const runtimeTestDirectory = "tests/runtime";
 
 const tests = [
-  { id: "manifest", file: "tests/runtime/manifest-smoke.mjs", group: "pure" },
-  { id: "call-timing", file: "tests/runtime/call-timing-smoke.mjs", group: "pure" },
-  { id: "js-float", file: "tests/runtime/js-float-fidelity-smoke.mjs", group: "pure" },
-  { id: "host-bindings", file: "tests/runtime/host-bindings-smoke.mjs", group: "pure" },
-  { id: "host-resource-lifecycle", file: "tests/runtime/host-resource-lifecycle-smoke.mjs", group: "pure" },
+  { id: "manifest", file: "manifest-smoke.mjs", group: "pure" },
+  { id: "call-timing", file: "call-timing-smoke.mjs", group: "pure" },
+  { id: "js-float", file: "js-float-fidelity-smoke.mjs", group: "pure" },
+  { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },
+  { id: "host-resource-lifecycle", file: "host-resource-lifecycle-smoke.mjs", group: "pure" },
   {
     id: "host-resource-gc",
-    file: "tests/runtime/host-resource-gc-smoke.mjs",
+    file: "host-resource-gc-smoke.mjs",
     group: "pure",
     nodeArgs: ["--expose-gc"],
   },
-  { id: "browser-canvas-bindings", file: "tests/runtime/browser-canvas-bindings-smoke.mjs", group: "pure" },
-  { id: "startup-hooks", file: "tests/runtime/startup-runtime-smoke.mjs", group: "pure" },
-  { id: "callback-lifecycle", file: "tests/runtime/callback-lifecycle-smoke.mjs", group: "pure" },
-  { id: "react-host-bindings", file: "tests/runtime/react-host-bindings-smoke.mjs", group: "pure" },
-  { id: "custom-inductive-normalization", file: "tests/runtime/custom-inductive-normalization-smoke.mjs", group: "pure" },
-  { id: "object-abi", file: "tests/runtime/object-abi-smoke.mjs", group: "pure" },
-  { id: "package-decoder", file: "tests/runtime/package-decoder-smoke.mjs", group: "pure" },
-  { id: "package-set-descriptor", file: "tests/runtime/package-set-descriptor-smoke.mjs", group: "pure" },
-  { id: "package-generator", file: "tests/runtime/package-generator-smoke.mjs", group: "lean" },
+  { id: "browser-canvas-bindings", file: "browser-canvas-bindings-smoke.mjs", group: "pure" },
+  { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
+  { id: "callback-lifecycle", file: "callback-lifecycle-smoke.mjs", group: "pure" },
+  { id: "react-host-bindings", file: "react-host-bindings-smoke.mjs", group: "pure" },
+  { id: "custom-inductive-normalization", file: "custom-inductive-normalization-smoke.mjs", group: "pure" },
+  { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
+  { id: "package-decoder", file: "package-decoder-smoke.mjs", group: "pure" },
+  { id: "package-set-descriptor", file: "package-set-descriptor-smoke.mjs", group: "pure" },
+  { id: "package-generator", file: "package-generator-smoke.mjs", group: "lean" },
   {
     id: "interpreter-constant-cache",
-    file: "tests/runtime/interpreter-constant-cache-smoke.mjs",
+    file: "interpreter-constant-cache-smoke.mjs",
     group: "lean",
   },
-  { id: "module-package-set", file: "tests/runtime/module-package-set-smoke.mjs", group: "lean" },
-  { id: "slides-canvas", file: "tests/runtime/slides-canvas-runtime-smoke.mjs", group: "lean" },
-  { id: "package-generation", file: "tests/runtime/package-generation-smoke.mjs", group: "lean" },
-  { id: "sdk-import", file: "tests/runtime/sdk-import-smoke.mjs", group: "lean" },
+  { id: "module-package-set", file: "module-package-set-smoke.mjs", group: "lean" },
+  { id: "slides-canvas", file: "slides-canvas-runtime-smoke.mjs", group: "lean" },
+  { id: "package-generation", file: "package-generation-smoke.mjs", group: "lean" },
+  { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
 ];
 const runtimeGroupNames = [...new Set(tests.map((test) => test.group))].sort();
 const serialRuntimeGroups = new Set(["lean"]);
@@ -127,8 +129,12 @@ function runtimeGroup(cliGroup) {
 
 function testMatchesFilter(test, filters) {
   if (filters.length === 0) return true;
-  const haystack = `${test.id}\n${test.file}`.toLowerCase();
+  const haystack = `${test.id}\n${runtimeTestPath(test)}`.toLowerCase();
   return filters.some((filter) => haystack.includes(filter));
+}
+
+function runtimeTestPath(test) {
+  return `${runtimeTestDirectory}/${test.file}`;
 }
 
 function testMatchesGroup(test, group) {
@@ -145,7 +151,7 @@ function runtimeJobCount(total) {
 
 async function runRuntimeTest(test) {
   const start = timerStart();
-  const result = await runAsync(process.execPath, [...(test.nodeArgs ?? []), test.file], {
+  const result = await runAsync(process.execPath, [...(test.nodeArgs ?? []), runtimeTestPath(test)], {
     capture: true,
     cwd: root,
   });
@@ -194,7 +200,7 @@ const group = runtimeGroup(cli.group);
 const selected = tests.filter((test) => testMatchesGroup(test, group) && testMatchesFilter(test, filters));
 if (cli.list) {
   for (const test of selected) {
-    console.log(`${test.id}\t${test.group}\t${test.file}`);
+    console.log(`${test.id}\t${test.group}\t${runtimeTestPath(test)}`);
   }
   process.exit(0);
 }

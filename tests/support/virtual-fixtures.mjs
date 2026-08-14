@@ -1,7 +1,6 @@
 import { ensureVirtualElementState } from "../../web/src/vir-runtime-node.js";
-export { virtualReactTextContent } from "../../web/src/react/vir-react-node.js";
 
-export const TAMAGOTCHI_VIRTUAL_DOM_SELECTORS = [
+const TAMAGOTCHI_VIRTUAL_DOM_SELECTORS = [
   "#pet-name-input",
   "#pet-name-display",
   "#pet-mood-display",

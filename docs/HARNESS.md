@@ -1,7 +1,7 @@
 # Harness
 
 This document is for maintaining Lean VIR. The user-facing quickstart stays in
-the top-level `README.md`. A narrower map of script entry points lives in
+the top-level `README.md`; implementation ownership notes live in
 `scripts/README.md`.
 
 This document owns setup, generated-artifact policy, validation command

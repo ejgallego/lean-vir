@@ -11,7 +11,7 @@ import {
   balancedStdFormatAppend,
   stdFormat,
   taggedStdFormatChunks,
-} from "../../benchmarks/harness/std-format-values.mjs";
+} from "../../fixtures/js/std-format-values.mjs";
 
 test("Std.Format benchmark workloads preserve their declared node counts", () => {
   const tagWorkload = taggedStdFormatChunks(64, 64);

@@ -15,7 +15,7 @@ import {
   createMovedProofSurfaceFixture,
   createProofSurfaceFixture,
 } from "../../web/src/proof-surface-fixtures.js";
-import { virtualReactTextContent } from "./virtual-fixtures.mjs";
+import { virtualReactTextContent } from "../../web/src/react/vir-react-node.js";
 
 export function smokeVirtualReactCounter(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactCounter.mount", selector), true);

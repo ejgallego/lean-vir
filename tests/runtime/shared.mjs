@@ -214,7 +214,7 @@ function preparedVirIrpkg() {
 }
 
 export async function writeRuntimeFixture(target, fixtureName) {
-  const fixture = new URL(`../../fixtures/runtime-tests/${fixtureName}`, import.meta.url);
+  const fixture = new URL(`../../fixtures/runtime/${fixtureName}`, import.meta.url);
   await writeFile(target, await readFile(fixture, "utf8"));
 }
 
