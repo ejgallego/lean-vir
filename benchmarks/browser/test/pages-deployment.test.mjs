@@ -41,7 +41,7 @@ async function stagedDeployment(t) {
     schemaVersion: 2,
     kind: "browser-benchmarks/artifact-set",
     example: { id: "prettyM", variant: "default" },
-    setId: "prettyM-bounded-set-0002",
+    setId: database.builds.prettyM.artifactSet.setId,
     testPackage: { file: example.testPackage, ...testPackage },
     files: { "prettyM/payload.bin": await fileRecord(payloadPath) },
   };

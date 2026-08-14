@@ -86,7 +86,7 @@ and import the current prettyM candidate locally:
 ```sh
 npm run artifacts:pack -- --build prettyM
 npm run artifacts:fetch -- \
-  --lock _artifacts/releases/prettyM-bounded-set-0002.lock.json \
+  --lock _artifacts/releases/<generated-lock>.lock.json \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
