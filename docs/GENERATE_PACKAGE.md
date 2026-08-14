@@ -46,9 +46,9 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.GeneratePackage.PackageFormat`: package magic, package section kinds,
   and current package/interface-manifest version constants used by generated
   bytes and metadata.
-- `Vir.GeneratePackage.PackageIRTags`: tracked generated constants for package
-  `Name` and declaration-IR wire tags. `scripts/ir-codec-tags.mjs` is the source
-  of truth.
+- `Vir.GeneratePackage.PackageIRTags`: source of truth for package `Name` and
+  declaration-IR wire tag values. `scripts/ir-codec-tags.mjs` maps them to C++
+  enum names and reserved slots.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures and attribute-time marker
   validation.
@@ -168,7 +168,7 @@ for the full matrix.
   `npm run test:runtime -- package-generation`.
 - Native extern declarations: `npm run check:native-externs`. If entries are
   added, removed, or renamed, also run
-  `node scripts/check-boundary-registry.mjs --write` and
+  `npm run generate:boundary-registry` and
   `npm run check:boundary-registry`. If wrapper symbols or generated wrapper macros
   changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
@@ -232,10 +232,10 @@ Version constants are intentionally small and explicit:
 - `npm run check:package-abi` verifies package magic, package-set descriptor
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.
-- `scripts/ir-codec-tags.mjs` owns the format-10 package `Name` and
-  declaration-IR tag assignments; `npm run check:ir-codec-tags` verifies that
-  the tracked Lean/C++ outputs agree with it and that the emitter/decoder use
-  every non-reserved tag.
+- `Vir/GeneratePackage/PackageIRTags.lean` owns the format-10 package `Name`
+  and declaration-IR tag assignments; `scripts/ir-codec-tags.mjs` maps the
+  C++ enum structure. `npm run check:ir-codec-tags` verifies the assignments
+  and that the emitter/decoder use every non-reserved tag.
 
 Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,

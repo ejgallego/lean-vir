@@ -49,6 +49,7 @@
       "file": "demo-host.irpkg",
       "label": "Browser host calls, React, and Tamagotchi demos",
       "report": "build/generated/demo-host.report.md",
+      "lakeTargets": ["VirInfoview", "Vir.Examples.Tamagotchi"],
       "targets": [
         {
           "source": "examples/HostInterop.lean",

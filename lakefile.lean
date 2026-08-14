@@ -4,9 +4,38 @@ open Lake DSL
 package lean_vir where
   releaseRepo := "https://github.com/ejgallego/lean-vir"
 
+def npmCmd : String :=
+  if System.Platform.isWindows then "npm.cmd" else "npm"
+
+def runNpmScript (scriptName : String) : LogIO Unit :=
+  proc {
+    cmd := npmCmd
+    args := #["run", "--silent", scriptName]
+  }
+
+input_dir infoviewBundleSources where
+  path := "web/src"
+  filter := .extension <| .mem #["js"]
+  text := true
+
+target infoviewBundle : System.FilePath := do
+  let sources ← infoviewBundleSources.fetch
+  let output := (← getRootPackage).dir / "build/generated/infoview/vir-infoview-widget.js"
+  buildFileAfterDep (text := true) output sources (extraDepTrace := do
+    let scriptTrace ← computeTrace (System.FilePath.mk "scripts/build-infoview-widget.mjs")
+    let packageTrace ← computeTrace (System.FilePath.mk "package.json")
+    let lockTrace ← computeTrace (System.FilePath.mk "package-lock.json")
+    return mixTrace scriptTrace (mixTrace packageTrace lockTrace)) fun _ =>
+    runNpmScript "build:infoview"
+
 @[default_target]
 lean_lib Vir where
-  globs := #[.andSubmodules `Vir]
+  roots := #[`Vir]
+
+/-- Optional Lean infoview integration and its generated JavaScript shell. -/
+lean_lib VirInfoview where
+  roots := #[`Vir.Infoview]
+  needs := #[infoviewBundle]
 
 /-- Non-default, buildable sources used by the public VIR examples. -/
 lean_lib VirExamples where
@@ -17,6 +46,11 @@ lean_lib VirExamples where
 lean_lib VirModuleFixtures where
   srcDir := "fixtures/module-set"
   globs := #[.andSubmodules `ModuleSetFixture]
+
+/-- Infoview-only regression fixtures kept outside the public library. -/
+lean_lib VirInfoviewFixtures where
+  srcDir := "fixtures/infoview"
+  roots := #[`InfoviewFixtures.ImportedHelper]
 
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage

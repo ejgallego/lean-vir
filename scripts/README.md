@@ -79,12 +79,17 @@ map lives in `docs/HARNESS.md`.
 - `npm run check:native-wrappers`
   Run the same inventory in check mode and reject any missing, extra,
   reclassified, or unapproved handwritten boxed adapter.
+- `npm run generate:boundary-registry`
+  Generate the ignored C++ native-symbol registry from the tracked Lean native
+  extern policy.
+- `npm run check:boundary-registry`
+  Verify registry coverage and the handwritten boxed-wrapper boundary.
 - `npm run generate:ir-codec-tags`
-  Refresh generated Lean/C++ constants for IR declaration payload tag bytes
-  from `scripts/ir-codec-tags.mjs`.
+  Generate the C++ IR declaration tag enums from the tracked Lean constants
+  and `scripts/ir-codec-tags.mjs` mapping.
 - `npm run check:ir-codec-tags`
-  Verify that the generated IR declaration codec tag files are current and
-  that the Lean emitter and C++ decoder use every non-reserved tag.
+  Verify the tag assignments and that the Lean emitter and C++ decoder use
+  every non-reserved tag.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:upstream:no-build`
@@ -170,10 +175,11 @@ explicitly asks for a tracked artifact-policy change:
 - `.tools/`
 - `third_party/lean4-src/`
 
-The codec constants in `Vir/GeneratePackage/PackageIRTags.lean` and
-`wasm/upstream_shim/package/package_ir_tags.h` are intentionally tracked
-generated sources. Refresh them with `npm run generate:ir-codec-tags` and check
-them with `npm run check:ir-codec-tags`.
+The tracked Lean codec constants define the wire values; their C++ mirror and
+the native-symbol registry are generated below `build/generated/`. The WASM
+probe generates them as prerequisites; use
+`npm run generate:ir-codec-tags` or `npm run generate:boundary-registry` when a
+standalone generated copy is useful for inspection.
 
 Useful diagnostic reports include `build/upstream-probe/boundary.md`,
 `build/upstream-probe/link.map`, `build/generated/*.report.md`, and
@@ -206,7 +212,8 @@ The split helpers below are the intended extension points for focused changes:
   instead of shelling out through `lean --run tools/GeneratePackage.lean`.
 - Native wrapper inventory lives in `scripts/inventory-native-wrappers.mjs`;
   keep it as an inspection aid until regular wrapper generation exists.
-- IR declaration payload tag values live in `scripts/ir-codec-tags.mjs`; run
+- IR declaration payload tag values live in
+  `Vir/GeneratePackage/PackageIRTags.lean`; run
   `npm run generate:ir-codec-tags` and `npm run check:ir-codec-tags` after
   changing them.
 - Object ABI linker flags come from `scripts/object-abi-linker-flags.mjs`,

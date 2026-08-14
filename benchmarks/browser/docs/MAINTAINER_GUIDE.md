@@ -1,4 +1,4 @@
-# Handoff: browser benchmark catalog and artifact pipeline
+# Browser benchmark catalog maintainer guide
 
 Last verified: 2026-08-14
 
@@ -10,7 +10,7 @@ Reveal, or Lake. Producer source stays in the repositories that own it; this
 application owns selection, artifact assembly, correctness testing, serving,
 and report presentation.
 
-Read `AGENTS.md`, this file, and `benchmarks/browser/README.md` before
+Read the repository `AGENTS.md`, this file, and `benchmarks/browser/README.md` before
 changing the catalog. Generated sources, packages, artifacts, reports, and
 machine-local toolchain configuration stay below the ignored application
 directories.

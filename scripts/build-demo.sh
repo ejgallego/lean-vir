@@ -8,20 +8,5 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-npm run build:infoview
-
-# Vir.Infoview embeds the generated JavaScript bundle with `include_str`.
-# Lake does not currently rebuild this module just because that included file
-# changed, so refresh only the generated artifacts for the embedding module.
-rm -f \
-  .lake/build/lib/lean/Vir/Infoview.olean \
-  .lake/build/lib/lean/Vir/Infoview.olean.hash \
-  .lake/build/lib/lean/Vir/Infoview.ilean \
-  .lake/build/lib/lean/Vir/Infoview.ilean.hash \
-  .lake/build/lib/lean/Vir/Infoview.trace \
-  .lake/build/ir/Vir/Infoview.c \
-  .lake/build/ir/Vir/Infoview.c.hash \
-  .lake/build/ir/Vir/Infoview.setup.json
-
 lake build Vir
 npm run probe:upstream

@@ -146,6 +146,6 @@ macro "vir_proof_widget " component:term " with " "mountId" " := " mountId:str :
 
 @[widget_module]
 def widget : Widget.Module where
-  javascript := include_str ".." / ".." / "web" / "src" / "generated" / "vir-infoview-widget.js"
+  javascript := include_str ".." / ".." / "build" / "generated" / "infoview" / "vir-infoview-widget.js"
 
 end Lean.Vir.Infoview

@@ -108,6 +108,9 @@ mkdir -p "$generated_dir"
 mkdir -p "$overlay_include/lean"
 mkdir -p web/public
 
+npm run --silent generate:ir-codec-tags
+npm run --silent generate:boundary-registry
+
 cat > "$allowed_undefined" <<'EOF'
 vir_js_call_objects
 vir_resource_get
@@ -298,14 +301,14 @@ shim_deps=(
   "wasm/upstream_shim/package/package_binary_reader.h"
   "wasm/upstream_shim/package/package_decl_provider_types.h"
   "wasm/upstream_shim/package/package_ir_builders.h"
-  "wasm/upstream_shim/package/package_ir_tags.h"
+  "build/generated/wasm/package/package_ir_tags.h"
   "wasm/upstream_shim/package/package_section_directory.h"
   "wasm/upstream_shim/runtime/name_utils.h"
   "wasm/upstream_shim/abi/resource_abi.h"
 )
 
 native_symbol_lookup_deps=(
-  "wasm/upstream_shim/runtime/native_symbols_registry.inc"
+  "build/generated/wasm/runtime/native_symbols_registry.inc"
   "$generated_native_registry"
 )
 
@@ -321,6 +324,8 @@ common_flags=(
   "-I$lean_prefix/include"
   "-I$src/src"
   "-I$generated_dir"
+  -Ibuild/generated/wasm/package
+  -Ibuild/generated/wasm/runtime
   -Iwasm/upstream_shim
   -ffunction-sections
   -fdata-sections

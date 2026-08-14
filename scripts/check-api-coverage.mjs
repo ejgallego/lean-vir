@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const docPath = path.join(root, "docs/API_COVERAGE.md");
-const tsvPath = path.join(root, "docs/API_COVERAGE.tsv");
+const tsvPath = path.join(root, "build/analysis/api-coverage.tsv");
 
 const expectedColumns = [
   "id",
@@ -130,12 +130,9 @@ const rows = lines.slice(1).map((line, index) => {
 });
 
 if (args.has("--write")) {
+  await mkdir(path.dirname(tsvPath), { recursive: true });
   await writeFile(tsvPath, canonicalTsv);
-  console.log(`wrote docs/API_COVERAGE.tsv from ${rows.length} docs rows`);
+  console.log(`wrote build/analysis/api-coverage.tsv from ${rows.length} docs rows`);
 } else {
-  const existingTsv = (await readFile(tsvPath, "utf8")).replace(/\r\n/g, "\n");
-  if (existingTsv !== canonicalTsv) {
-    fail("docs/API_COVERAGE.tsv is stale; run node scripts/check-api-coverage.mjs --write");
-  }
   console.log(`validated ${rows.length} API coverage rows from docs/API_COVERAGE.md`);
 }

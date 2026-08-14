@@ -57,7 +57,8 @@ installed Lean archives.
 Generated files are useful evidence while debugging, but they are not commit
 material by default:
 
-- `build/`: object caches, generated packages, fixture reports, and summaries
+- `build/`: object caches, generated source inputs, packages, fixture reports,
+  and summaries
 - `web/dist/`: Vite Pages output
 - `web/public/*.wasm`: generated browser WASM
 - `web/public/*.irpkg`: generated browser packages
@@ -67,13 +68,12 @@ material by default:
 - `third_party/lean4-src/`: fetched Lean source checkout
 - `.tools/`: local WASI SDK and optional engine installs
 
-The checked-in infoview widget bundle
-`web/src/generated/vir-infoview-widget.js` is the exception: `Vir.Infoview`
-embeds it with `include_str`, so it must be present for Lean builds. Regenerate
-it with `npm run build:infoview` after editing the infoview widget shell or the
-JavaScript runtime modules it imports. `npm run build:demo` also runs that
-bundle step and rebuilds `Vir`, so the VS Code infoview demo does not get a
-stale shell embedded in `Vir.Infoview`.
+The infoview widget bundle, C++ codec tags, and native-symbol registry are
+generated below `build/generated/` rather than committed. The optional
+`VirInfoview` library builds the infoview bundle; the default `Vir` library does
+not require npm or generated JavaScript. The WASM probe generates both C++
+inputs before compiling the shim. The Lean codec constants are ordinary source
+and define the wire values used to generate the C++ tags.
 
 The most useful generated diagnostics are:
 
@@ -118,9 +118,12 @@ npm run build:frontier-size-site
 npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
+npm run generate:ir-codec-tags
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:client-native-externs
+npm run generate:boundary-registry
+npm run check:boundary-registry
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
 npm run analyze:surface -- /tmp/entry.json /tmp/entry.md --module Lean.Meta.Basic --root Lean.Meta.mkFreshExprMVar
@@ -170,7 +173,7 @@ npm test
 
 `npm test` elaborates the copyable tutorials, then runs the artifact-cache,
 benchmark sampler, focused-identity, and paired-runner contract tests, package
-ABI and IR object-layout checks, IR codec tag freshness check, native extern
+ABI and IR object-layout checks, IR codec tag consistency check, native extern
 metadata check, boundary registry check, native wrapper check, API coverage
 docs check, and Wasm extension probes. It then builds the demo artifacts once
 and reuses them for a paired-runner
@@ -203,13 +206,15 @@ changes.
   wrapper imports, or provider handoff changes
 - Shim/native extern registry changes:
   `npm run check:native-externs`,
-  `node scripts/check-boundary-registry.mjs --write`, then
+  `npm run generate:boundary-registry`, then
   `npm run check:boundary-registry` and `npm run check:native-wrappers`
 - Boxed native wrapper changes:
   `npm run check:boundary-registry`, `npm run check:native-wrappers`, and
   `npm run test:upstream`
 - API coverage documentation changes:
-  `npm run check:api-coverage`
+  `npm run check:api-coverage`; use
+  `node scripts/check-api-coverage.mjs --write` only to materialize
+  `build/analysis/api-coverage.tsv`
 - IR package name/declaration tag changes:
   `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
   `npm run test:upstream`

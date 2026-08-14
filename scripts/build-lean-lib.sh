@@ -28,6 +28,9 @@ stale_layouts=(
   "$out/$stale_flat_root.ilean"
   "$out/$stale_namespace_root/$stale_module_root"
   "$out/Vir/GeneratePackage/Interface/Classify"
+  "$out/Vir/Infoview"
+  "$out/Vir/Infoview.olean"
+  "$out/Vir/Infoview.ilean"
 )
 rm -rf \
   "${stale_layouts[@]}"
@@ -99,12 +102,6 @@ build_module Vir/ProofWidgets/Html.lean
 build_module Vir/ProofWidgets/Rpc.lean
 build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean
-build_module Vir/Infoview/Assets.lean
-build_module Vir/Infoview/Surface.lean
-build_module Vir/Infoview/Package.lean
-build_module Vir/Infoview/ProofWidgetsRpc.lean
-build_module Vir/Infoview/Widget.lean
-build_module Vir/Infoview.lean
 build_module Vir.lean
 
 for stale in "${stale_layouts[@]}"; do

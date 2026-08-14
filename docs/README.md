@@ -39,7 +39,7 @@ ownership diagrams.
   `wasm/upstream_shim/abi/call_abi.cpp`.
 - Runtime coverage work: read [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md),
   `Vir/GeneratePackage/Surface/`, `tools/AnalyzeSurface.lean`, and
-  `scripts/surface-report/`.
+  `web/tools/surface-report/`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
   [`benchmarks/browser/README.md`](../benchmarks/browser/README.md),

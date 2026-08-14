@@ -14,7 +14,7 @@ import { validateSurfaceReport } from "./surface-report-schema.mjs";
 
 const HTML_FORMAT = "lean-vir-surface-html";
 const HTML_VERSION = 6;
-const templateDir = fileURLToPath(new URL("surface-report/", import.meta.url));
+const templateDir = fileURLToPath(new URL("../web/tools/surface-report/", import.meta.url));
 
 const [inputArg, outputArg, ...rest] = process.argv.slice(2);
 let frontierCostsArg = null;

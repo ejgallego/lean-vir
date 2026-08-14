@@ -10,9 +10,15 @@ import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
 
-const check = process.argv.includes("--check");
+const args = new Set(process.argv.slice(2));
+for (const arg of args) {
+  if (arg !== "--check") {
+    throw new Error(`unknown argument ${JSON.stringify(arg)}; expected --check or no arguments`);
+  }
+}
+const check = args.has("--check");
 const entryPoint = new URL("../web/src/vir-infoview-widget.js", import.meta.url);
-const outFile = new URL("../web/src/generated/vir-infoview-widget.js", import.meta.url);
+const outFile = new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url);
 const repoRoot = new URL("..", import.meta.url);
 
 const infoviewReactDomClientPlugin = {
@@ -73,19 +79,21 @@ if (/from\s*["']react-dom\/client["']/.test(bundle)) {
   process.exit(1);
 }
 
+const existing = await readFile(outFile, "utf8").catch((error) => {
+  if (error?.code === "ENOENT") {
+    return null;
+  }
+  throw error;
+});
 if (check) {
-  const existing = await readFile(outFile, "utf8").catch((error) => {
-    if (error?.code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  });
   if (existing !== bundle) {
-    console.error("infoview widget bundle is stale; run `npm run build:infoview`");
+    console.error("infoview widget bundle is missing or stale; run `npm run build:infoview`");
     process.exit(1);
   }
-} else {
+} else if (existing !== bundle) {
   await mkdir(new URL(".", outFile), { recursive: true });
   await writeFile(outFile, bundle);
   console.log(`wrote ${fileURLToPath(outFile)}`);
+} else {
+  console.log(`current ${fileURLToPath(outFile)}`);
 }

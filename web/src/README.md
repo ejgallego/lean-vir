@@ -57,8 +57,6 @@ unrelated responsibilities.
   callback release.
 - `react/vir-react-hooks.js`: shared React component hook runtime and typed
   state setter host bindings for browser and virtual React roots.
-- `generated/vir-infoview-widget.js`: checked-in bundle generated from
-  `vir-infoview-widget.js` for `Vir.Infoview`'s `include_str` path.
 
 ## Demo And Page Modules
 
@@ -85,9 +83,9 @@ unrelated responsibilities.
   application API.
 - Keep React imports isolated to `vir-react-host-bindings.js` and modules that
   intentionally compose it.
-- Regenerate `generated/vir-infoview-widget.js` with
-  `npm run build:infoview` after editing the infoview widget shell or any
-  runtime modules it bundles.
+- The infoview bundle is generated at
+  `build/generated/infoview/vir-infoview-widget.js` by Lake or
+  `npm run build:infoview`; it stays out of Git.
 - Prefer adding focused helpers beside the relevant runtime area instead of
   growing page entry files or `vir-runtime.js`.
 - Generated `web/dist/` output and generated `web/public/*.wasm`, `.irpkg`,

@@ -35,7 +35,7 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 | Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | ~525 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
 | Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
-| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc`, `native-support-sources.txt`, `tools/GenerateNativeWrappers.lean`, `scripts/build-upstream-probe.sh` | ~1400 | Declaration/native symbol coupling | Standard boxed adapters are emitted by Lean's compiler into build-local C. The tracked stage0 source list supplies selected Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
+| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `native-support-sources.txt`, `tools/GenerateNativeWrappers.lean`, `scripts/native-symbol-registry.mjs`, `scripts/build-upstream-probe.sh` | ~1400 | Declaration/native symbol coupling | Standard boxed adapters and the lookup registry are emitted into `build/`. The tracked stage0 source list supplies selected Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
 | JavaScript package-call ABI | `abi/call_abi.cpp` | 134 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
 | Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h`, `interpreter/persistent_ir_interpreter.cpp` | ~160 | Low | Initializes the upstream interpreter, provides `lean_ir_find_env_decl` hooks, and owns the package-scoped interpreter session. |
 | Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
@@ -67,8 +67,8 @@ When adding or removing native extern wrappers, regenerate and check the
 registry:
 
 ```bash
-node scripts/check-boundary-registry.mjs --write
-node scripts/check-boundary-registry.mjs
+npm run generate:boundary-registry
+npm run check:boundary-registry
 npm run check:native-wrappers
 ```
 

@@ -9,13 +9,14 @@ rebuilding the upstream interpreter.
 
 1. Add or edit a Lean source under `examples/`.
 2. Add exported roots to the appropriate package in
-   `fixtures/browser-packages.json`; use `packageOnly` only for internal roots
-   that are needed by the demo but should not become JS interface exports.
+   `fixtures/browser-packages.json`. List additional Lake build prerequisites in
+   that package's `lakeTargets`; use `packageOnly` only for internal roots that
+   are needed by the demo but should not become JS interface exports.
 3. Run `npm run check:package`.
 4. Inspect the relevant `build/generated/*.report.md`.
 5. If you add or change a native extern in `Vir/GeneratePackage/NativeExterns.lean`, run
    `npm run check:native-externs`. If you add, remove, or rename a native extern
-   entry, also run `node scripts/check-boundary-registry.mjs --write`, then
+   entry, also run `npm run generate:boundary-registry`, then
    `npm run check:boundary-registry`. If you change boxed wrapper symbols or
    generated wrapper macros, also run `npm run check:native-wrappers`. This is
    not needed for `@[vir_js "..."]` host imports; those appear in the report's
@@ -77,8 +78,8 @@ declaration being encoded and the unsupported package field. The declaration
 codec currently covers all `Arg`, `Expr`, `Alt`, and `FnBody` constructors;
 the explicit IR payload exclusions are `IRType.struct` and `IRType.union`.
 If a future Lean toolchain adds another constructor or a demo reaches one of
-those types, update the generated tag schema plus the direct Lean encoder and
-C++ decoder before the new demo can run.
+those types, update the tracked Lean tag constants, the C++ enum mapping, and
+the direct Lean encoder and C++ decoder before the new demo can run.
 
 `build/fixtures/summary.json` also records imported IR declarations and native
 extern dependencies per fixture. Use it to see whether a new fixture is growing

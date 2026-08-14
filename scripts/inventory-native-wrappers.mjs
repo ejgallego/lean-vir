@@ -8,9 +8,12 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 
 import { loadNativeExterns } from "./native-externs.mjs";
+import {
+  generateNativeSymbolRegistry,
+  nativeSymbolRegistryEntries,
+} from "./native-symbol-registry.mjs";
 
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
-const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
 // This is the complete handwritten boxed-wrapper exception set. Every entry
 // records why VIR needs an adapter instead of Lean's standard boxed wrapper.
@@ -49,25 +52,6 @@ for (const arg of args) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function parseRegistry(source) {
-  const entries = [];
-  const constants = [];
-  const entryRegex = /^\s*(X|X_CONST)\("([^"]+)",\s*"([^"]+)",\s*([A-Za-z0-9_&]+)\)\s*\\?$/gm;
-  for (const match of source.matchAll(entryRegex)) {
-    const entry = {
-      leanName: match[2],
-      symbol: match[3],
-      wrapper: match[4].replace(/^&/, ""),
-    };
-    if (match[1] === "X_CONST") {
-      constants.push(entry);
-    } else {
-      entries.push(entry);
-    }
-  }
-  return { entries, constants };
 }
 
 function parseWrappers(source) {
@@ -130,14 +114,13 @@ function formatSymbols(entries) {
   return symbols.map((symbol) => `\`${symbol}\``).join(", ");
 }
 
-const [nativeExterns, nativeSymbols, nativeRegistry] = await Promise.all([
+const [nativeExterns, nativeSymbols] = await Promise.all([
   loadNativeExterns(),
   readFile(nativeSymbolsPath, "utf8"),
-  readFile(nativeRegistryPath, "utf8"),
 ]);
 
 const compilerGeneratedExterns = nativeExterns.filter((nativeExtern) => nativeExtern.generateBoxedWrapper);
-const { entries, constants } = parseRegistry(nativeRegistry);
+const { entries, constants } = nativeSymbolRegistryEntries(generateNativeSymbolRegistry(nativeExterns));
 const wrappers = parseWrappers(nativeSymbols);
 const grouped = entriesByWrapper(entries);
 const inventory = [];
