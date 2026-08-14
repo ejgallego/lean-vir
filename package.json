@@ -104,7 +104,7 @@
     "test:runtime:pure": "node tests/runtime/runner.mjs --group pure",
     "test:wasm-extensions": "node scripts/probe-wasm-extensions.mjs",
     "test:upstream": "npm run build:demo && npm run test:upstream:no-build",
-    "test:upstream:no-build": "node scripts/smoke_upstream.mjs",
+    "test:upstream:no-build": "node tests/upstream/runner.mjs",
     "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {

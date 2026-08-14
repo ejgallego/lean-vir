@@ -11,8 +11,8 @@ import {
 import {
   ensureTamagotchiVirtualDom,
   ensureVirtualElements,
-} from "../virtual-fixtures.mjs";
-import { demoHostImportTargets } from "../demo-host-import-targets.mjs";
+} from "../../scripts/virtual-fixtures.mjs";
+import { demoHostImportTargets } from "../../scripts/demo-host-import-targets.mjs";
 import {
   smokeVirtualReactAttributes,
   smokeVirtualReactChangeInput,
@@ -20,7 +20,7 @@ import {
   smokeVirtualReactCounter,
   smokeVirtualReactInput,
   smokeVirtualReactTamagotchi,
-} from "../virtual-react-smoke-scenarios.mjs";
+} from "../../scripts/virtual-react-smoke-scenarios.mjs";
 
 export async function smokeVirtualHostRuntime(context) {
   const hostDocumentState = createVirtualDocumentState();

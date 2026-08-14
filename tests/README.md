@@ -9,5 +9,7 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
 - `runtime/` owns the JavaScript runtime smoke-test runner and its focused test
   cases.
+- `upstream/` owns the end-to-end upstream interpreter smoke test and its
+  scenario helpers.
 
 Use the stable `npm run test:*` commands from the repository root.

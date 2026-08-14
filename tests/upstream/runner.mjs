@@ -4,11 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createUpstreamSmokeContext } from "./upstream-smoke/context.mjs";
-import { smokeFixtureManifest } from "./upstream-smoke/fixtures.mjs";
-import { smokeRuntimeCalls } from "./upstream-smoke/runtime-calls.mjs";
-import { smokeVirtualHostRuntime } from "./upstream-smoke/virtual-host.mjs";
-import { smokeWasmPackageBoundary } from "./upstream-smoke/wasm-package.mjs";
+import { createUpstreamSmokeContext } from "./context.mjs";
+import { smokeFixtureManifest } from "./fixtures.mjs";
+import { smokeRuntimeCalls } from "./runtime-calls.mjs";
+import { smokeVirtualHostRuntime } from "./virtual-host.mjs";
+import { smokeWasmPackageBoundary } from "./wasm-package.mjs";
 
 const context = await createUpstreamSmokeContext();
 const { runtime } = await smokeWasmPackageBoundary(context);

@@ -11,7 +11,7 @@ import {
   hostPackageFile,
   packageFileForFixtureSource,
   packageSpecs,
-} from "../browser-package-config.mjs";
+} from "../../scripts/browser-package-config.mjs";
 
 export async function createUpstreamSmokeContext() {
   const wasmBytes = await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url));
