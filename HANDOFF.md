@@ -49,12 +49,13 @@ See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 - The fetcher and stager accept only namespaced artifact-set schema v2. No
   historical prototype lock or compatibility verifier is retained.
 - `.github/workflows/example-candidate.yml` derives its matrix from catalogued
-  example variants, builds ephemeral candidates, re-imports them through
-  the consumer path, runs differential tests, and uploads short-lived payloads.
-- The Pages workflow builds the same canonical `prettyM/default` candidate,
-  admits it only after its staged manifest and test-package digest match the
-  catalog, and installs the filtered app under `web/dist/benchmarks/`. It does
-  not consume a pre-existing artifact archive.
+  example variants for pull requests and manual runs, builds ephemeral
+  candidates, re-imports them through the consumer path, runs differential
+  tests, and uploads short-lived payloads.
+- The Pages workflow is the sole `main`-branch candidate builder. It builds and
+  uploads the canonical `prettyM/default` payload, admits it only after its
+  staged manifest and test-package digest match the catalog, and installs the
+  filtered app under `web/dist/benchmarks/`.
 - Dashboard backend filters are presentation-only; exported JSON retains the
   complete report.
 - Timings from an uncontrolled or loaded machine are observations, not accepted

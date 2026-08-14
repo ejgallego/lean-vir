@@ -1339,48 +1339,30 @@ h2 {
   line-height: 1.5;
 }
 
-.react-demo-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.react-demo-panel {
+.react-tamagotchi-panel {
   min-width: 0;
+  max-width: 920px;
+  margin-top: 16px;
   border: 1px solid #d9ded2;
   background: #ffffff;
 }
 
-.react-demo-panel-wide {
-  grid-column: 1 / -1;
-}
-
-.react-flagship-panel {
-  max-width: 920px;
-}
-
-.react-flagship-panel .react-mount {
-  min-height: 0;
-  padding: clamp(16px, 4vw, 34px);
-}
-
-.react-flagship-panel #react-pet-widget {
+.react-tamagotchi-panel #react-pet-widget {
   width: 100%;
   max-width: none !important;
   gap: 18px !important;
   padding: clamp(14px, 3vw, 24px) !important;
 }
 
-.react-flagship-panel #react-pet-widget .react-pet-body {
+.react-tamagotchi-panel #react-pet-widget .react-pet-body {
   grid-template-columns: 1fr;
 }
 
-.react-flagship-panel #react-pet-widget .pet-state {
+.react-tamagotchi-panel #react-pet-widget .pet-state {
   justify-content: center;
 }
 
-.react-demo-panel header {
+.react-tamagotchi-panel header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1390,25 +1372,25 @@ h2 {
   border-bottom: 1px solid #d9ded2;
 }
 
-.react-demo-panel .eyebrow {
+.react-tamagotchi-panel .eyebrow {
   margin-bottom: 0;
   overflow-wrap: anywhere;
 }
 
-.react-mount {
-  min-height: 116px;
-  padding: 16px;
+.react-pet-mount {
+  min-height: 0;
+  padding: clamp(16px, 4vw, 34px);
   background: #f8faf6;
 }
 
-.react-mount label,
-.react-mount span {
+.react-pet-mount label,
+.react-pet-mount span {
   margin-right: 8px;
 }
 
-.react-mount input,
-.react-mount textarea,
-.react-mount select {
+.react-pet-mount input,
+.react-pet-mount textarea,
+.react-pet-mount select {
   min-height: 34px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
@@ -1416,17 +1398,17 @@ h2 {
   padding: 5px 8px;
 }
 
-.react-mount textarea,
-.react-mount select {
+.react-pet-mount textarea,
+.react-pet-mount select {
   margin-right: 8px;
   vertical-align: middle;
 }
 
-.react-mount textarea {
+.react-pet-mount textarea {
   resize: vertical;
 }
 
-.react-mount input[type="checkbox"] {
+.react-pet-mount input[type="checkbox"] {
   width: 22px;
   height: 22px;
   min-height: 22px;
@@ -1435,7 +1417,7 @@ h2 {
   vertical-align: middle;
 }
 
-.react-mount button {
+.react-pet-mount button {
   min-height: 38px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
@@ -1445,15 +1427,11 @@ h2 {
   cursor: pointer;
 }
 
-.react-mount button:hover,
-.react-mount input:focus-visible,
-.react-mount textarea:focus-visible,
-.react-mount select:focus-visible {
+.react-pet-mount button:hover,
+.react-pet-mount input:focus-visible,
+.react-pet-mount textarea:focus-visible,
+.react-pet-mount select:focus-visible {
   border-color: #516f88;
-}
-
-.react-pet-mount {
-  min-height: 430px;
 }
 
 .react-pet-widget {
@@ -1618,7 +1596,7 @@ h2 {
   width: max-content;
 }
 
-.react-demo-panel output {
+.react-tamagotchi-panel output {
   display: block;
   min-height: 38px;
   padding: 9px 14px;
@@ -1629,7 +1607,7 @@ h2 {
   text-transform: uppercase;
 }
 
-.react-demo-panel output[data-failed="true"] {
+.react-tamagotchi-panel output[data-failed="true"] {
   color: #7c2820;
 }
 
@@ -1857,14 +1835,6 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .react-demo-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .react-proof-layout {
-    grid-template-columns: 1fr;
-  }
-
   .react-pet-body {
     grid-template-columns: 1fr;
   }
@@ -1983,29 +1953,14 @@ h2 {
   }
 
   .dev-runner-grid,
-  .dev-eval-row,
-  .react-demo-grid {
+  .dev-eval-row {
     grid-template-columns: 1fr;
   }
 
   .react-pet-heading,
-  .react-proof-header,
   #react-pet-name-form {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .react-proof-summary {
-    max-width: none;
-    text-align: left;
-  }
-
-  .react-proof-goal {
-    grid-template-columns: 1fr;
-  }
-
-  .react-proof-goal-status {
-    text-align: left;
   }
 
   #react-pet-name-form input,

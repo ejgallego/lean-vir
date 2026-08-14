@@ -2,16 +2,6 @@ name: example candidate artifacts
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/example-candidate.yml"
-      - ".github/workflows/pages.yml"
-      - "package.json"
-      - "scripts/install-benchmark-pages.mjs"
-      - "scripts/test-benchmark-pages.mjs"
-      - "benchmarks/browser/**"
   pull_request:
     paths:
       - ".github/workflows/example-candidate.yml"

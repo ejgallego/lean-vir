@@ -196,7 +196,7 @@ candidate-only lock, the hash-identified `EXAMPLE_TEST.json` differential
 report, and a `CANDIDATE.json` validation statement.
 
 `.github/workflows/example-candidate.yml` runs the same commands on relevant
-pull requests and `main` updates and supports explicit dispatch. The workflow
-has read-only repository permission and uploads only a short-lived Actions
-artifact. It does not compare candidate bytes across runs or update repository
-state.
+pull requests and explicit dispatches. On `main`, the Pages workflow runs this
+candidate path once, uploads the same short-lived payload, and deploys the
+admitted static application. Neither workflow compares candidate bytes across
+runs or updates repository state.

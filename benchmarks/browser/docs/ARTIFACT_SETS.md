@@ -90,10 +90,11 @@ same archive digest.
 
 The project has no publication, promotion, or accepted-lock phase. Candidate
 locks exist only to re-import and verify the exact tar produced by the current
-build. CI may retain the candidate payload as a short-lived Actions artifact for
-inspection, while GitHub Pages regenerates and validates its candidate in the
-deployment job. An explicit HTTPS URL in a lock remains supported for transport
-when needed, but does not define repository state or a release policy.
+build. Pull-request validation and the Pages build retain their own candidate
+payloads as short-lived Actions artifacts; Pages deploys the candidate it built
+and validated in that job. An explicit HTTPS URL in a lock remains supported
+for transport when needed, but does not define repository state or a release
+policy.
 
 ## Verification boundary
 
