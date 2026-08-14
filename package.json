@@ -16,6 +16,8 @@
     "doctor": "node scripts/doctor.mjs",
     "mailbox:check": "node scripts/mailbox.mjs check",
     "mailbox:list": "node scripts/mailbox.mjs list",
+    "mailbox:deliver": "node scripts/mailbox.mjs deliver",
+    "mailbox:archive": "node scripts/mailbox.mjs archive",
     "check:api-coverage": "node scripts/check-api-coverage.mjs",
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "build:infoview": "node scripts/build-infoview-widget.mjs",

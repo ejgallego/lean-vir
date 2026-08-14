@@ -18,9 +18,17 @@ map lives in `docs/HARNESS.md`.
   Summarize nonterminal mailbox threads from the primary checkout. Pass
   `-- --all` to include closed and cancelled threads, or `-- --json` for
   machine-readable output.
+- `npm run mailbox:deliver -- /path/to/draft.md`
+  Validate a complete draft against the active mailbox and archive, then stage
+  and atomically publish it without consuming the source draft or overwriting
+  an existing message identity.
+- `npm run mailbox:archive -- <thread-id>`
+  Move a wholly closed or cancelled thread out of the active mailbox without
+  deleting its immutable messages. Inspect retained threads with
+  `npm run mailbox:list -- --archive`.
 - `npm run test:mailbox`
-  Exercise v1 parsing, documented examples, state transitions,
-  primary-checkout discovery, and CLI output.
+  Exercise v1 parsing, documented examples, integrity checks, advisory
+  workflow warnings, archival, primary-checkout discovery, and CLI output.
 - `npm run build:demo`
   Build the upstream IR interpreter WASM and generated browser packages. The
   browser package step uses the compiled `vir_irpkg` generator executable. The

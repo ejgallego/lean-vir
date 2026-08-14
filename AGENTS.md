@@ -60,9 +60,12 @@ asks for that machinery.
 - Follow `docs/MAILBOX_PROTOCOL.md` for same-project and cross-project
   messages. A cross-project thread belongs to the project that owns the
   requested code change.
-- Read the mailbox and `git worktree list` before creating a lane. An
-  acknowledgement claims ownership; for implementation work, it records the
-  project-relative worktree, branch, base commit, and write scope.
+- Read the mailbox and `git worktree list` before creating a lane. An explicit
+  claim records ownership; for implementation work, agents should
+  record the project-relative worktree, branch, base commit, and write scope.
+- The validated envelope is deliberately small. Kinds, states, ownership, and
+  lane metadata are recommended coordination conventions, not a requirement
+  for free-form agent messages.
 - Mailbox completion does not authorize a push, PR, worktree removal, or branch
   deletion. Those remain explicit maintainer actions.
 
