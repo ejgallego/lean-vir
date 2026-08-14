@@ -13,14 +13,14 @@ export const virIrpkgPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.
 
 export function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PATH) {
   return [
-    "build/lean-lib",
     ".lake/build/lib/lean",
+    "build/lean-lib",
     `${leanPrefix}/lib/lean`,
     existing,
   ].filter(Boolean).join(delimiter);
 }
 
-export function prepareVirIrpkgSync(root) {
+export function prepareVirIrpkgSync(root, { lakeTargets = [] } = {}) {
   const libStart = timerStart();
   const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
     cwd: root,
@@ -33,10 +33,11 @@ export function prepareVirIrpkgSync(root) {
   }
 
   const generatorStart = timerStart();
-  const generatorResult = spawnSync("lake", ["build", "vir_irpkg"], {
-    cwd: root,
-    stdio: "inherit",
-  });
+  const generatorResult = spawnSync(
+    "lake",
+    ["build", "Vir", "vir_irpkg", ...lakeTargets],
+    { cwd: root, stdio: "inherit" },
+  );
   const generatorSeconds = elapsedSeconds(generatorStart);
 
   if ((generatorResult.status ?? 1) !== 0) {

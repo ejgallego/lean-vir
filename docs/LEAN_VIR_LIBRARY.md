@@ -4,7 +4,7 @@
 JavaScript host while running through VIR's WASM interpreter. Those modules
 expose APIs in the `Lean.Vir.*` namespace.
 
-The library is built locally by:
+The core library used by local package generation is built by:
 
 ```bash
 npm run build:lean-lib
@@ -12,7 +12,9 @@ npm run build:lean-lib
 
 Package generation commands run that step automatically and add
 `build/lean-lib` to `LEAN_PATH`, so local `.lean` sources can import the
-modules below.
+core modules below. Build the optional infoview integration separately with
+`lake build VirInfoview`; that target generates its JavaScript bundle and
+requires the repository npm dependencies.
 
 ## Package Markers
 
@@ -488,7 +490,8 @@ The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md` and `docs/PROOFWIDGETS_PORTING.md`.
 
-The `Vir.Infoview` module provides the first infoview-facing shell:
+The optional `Vir.Infoview` module is built with `lake build VirInfoview` and
+provides the first infoview-facing shell:
 
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`

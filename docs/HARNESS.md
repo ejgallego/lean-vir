@@ -118,9 +118,12 @@ npm run build:frontier-size-site
 npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
+npm run generate:ir-codec-tags
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:client-native-externs
+npm run generate:boundary-registry
+npm run check:boundary-registry
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
 npm run analyze:surface -- /tmp/entry.json /tmp/entry.md --module Lean.Meta.Basic --root Lean.Meta.mkFreshExprMVar
@@ -170,7 +173,7 @@ npm test
 
 `npm test` elaborates the copyable tutorials, then runs the artifact-cache,
 benchmark sampler, focused-identity, and paired-runner contract tests, package
-ABI and IR object-layout checks, IR codec tag freshness check, native extern
+ABI and IR object-layout checks, IR codec tag consistency check, native extern
 metadata check, boundary registry check, native wrapper check, API coverage
 docs check, and Wasm extension probes. It then builds the demo artifacts once
 and reuses them for a paired-runner

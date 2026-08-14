@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
@@ -14,16 +14,6 @@ const check = process.argv.includes("--check");
 const entryPoint = new URL("../web/src/vir-infoview-widget.js", import.meta.url);
 const outFile = new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url);
 const repoRoot = new URL("..", import.meta.url);
-const embeddedModuleArtifacts = [
-  ".lake/build/lib/lean/Vir/Infoview.olean",
-  ".lake/build/lib/lean/Vir/Infoview.olean.hash",
-  ".lake/build/lib/lean/Vir/Infoview.ilean",
-  ".lake/build/lib/lean/Vir/Infoview.ilean.hash",
-  ".lake/build/lib/lean/Vir/Infoview.trace",
-  ".lake/build/ir/Vir/Infoview.c",
-  ".lake/build/ir/Vir/Infoview.c.hash",
-  ".lake/build/ir/Vir/Infoview.setup.json",
-];
 
 const infoviewReactDomClientPlugin = {
   name: "infoview-react-dom-client",
@@ -97,7 +87,6 @@ if (check) {
 } else if (existing !== bundle) {
   await mkdir(new URL(".", outFile), { recursive: true });
   await writeFile(outFile, bundle);
-  await Promise.all(embeddedModuleArtifacts.map((path) => rm(new URL(path, repoRoot), { force: true })));
   console.log(`wrote ${fileURLToPath(outFile)}`);
 } else {
   console.log(`current ${fileURLToPath(outFile)}`);

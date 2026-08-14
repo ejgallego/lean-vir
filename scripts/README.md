@@ -71,6 +71,11 @@ map lives in `docs/HARNESS.md`.
 - `npm run check:native-wrappers`
   Run the same inventory in check mode and reject any missing, extra,
   reclassified, or unapproved handwritten boxed adapter.
+- `npm run generate:boundary-registry`
+  Generate the ignored C++ native-symbol registry from the tracked Lean native
+  extern policy.
+- `npm run check:boundary-registry`
+  Verify registry coverage and the handwritten boxed-wrapper boundary.
 - `npm run generate:ir-codec-tags`
   Generate the C++ IR declaration tag enums from the tracked Lean constants
   and `scripts/ir-codec-tags.mjs` mapping.

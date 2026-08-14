@@ -107,6 +107,10 @@ def expectImportedDecl
       return loaded.decl
 
 #eval do
+  let generatedWidget ←
+    IO.FS.readFile "build/generated/infoview/vir-infoview-widget.js"
+  expect "embedded widget bundle matches generated output" <|
+    Lean.Vir.Infoview.widget.javascript == generatedWidget
   expect "base64 vir" (Lean.Vir.Infoview.base64Encode "vir".toUTF8 == "dmly")
   expect "base64 Lean" (Lean.Vir.Infoview.base64Encode "Lean".toUTF8 == "TGVhbg==")
   expect "embedded widget bundle has cursor surface" <|

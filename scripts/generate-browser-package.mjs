@@ -100,11 +100,6 @@ function targetsForSpec(spec, fixtures) {
   return { targets, packageTargets };
 }
 
-const generator = prepareVirIrpkgSync(root);
-if (!generator.ok) {
-  process.exit(generator.status);
-}
-
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const selectedPackageSpecs = args.packages.size === 0
   ? packageSpecs
@@ -113,6 +108,14 @@ const selectedPackageSpecs = args.packages.size === 0
 if (selectedPackageSpecs.length !== (args.packages.size === 0 ? packageSpecs.length : args.packages.size)) {
   const available = packageSpecs.map((spec) => `${spec.id} (${spec.file})`).join(", ");
   throw new Error(`unknown package filter; available packages: ${available}`);
+}
+
+const lakeTargets = [
+  ...new Set(selectedPackageSpecs.flatMap((spec) => spec.lakeTargets ?? [])),
+];
+const generator = prepareVirIrpkgSync(root, { lakeTargets });
+if (!generator.ok) {
+  process.exit(generator.status);
 }
 
 await mkdir(new URL("../build/generated/", import.meta.url), { recursive: true });

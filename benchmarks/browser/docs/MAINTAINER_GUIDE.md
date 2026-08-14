@@ -1,4 +1,4 @@
-# Handoff: browser benchmark catalog and artifact pipeline
+# Browser benchmark catalog maintainer guide
 
 Last verified: 2026-08-14
 

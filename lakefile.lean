@@ -23,8 +23,9 @@ target infoviewBundle : System.FilePath := do
   let output := (← getRootPackage).dir / "build/generated/infoview/vir-infoview-widget.js"
   buildFileAfterDep (text := true) output sources (extraDepTrace := do
     let scriptTrace ← computeTrace (System.FilePath.mk "scripts/build-infoview-widget.mjs")
+    let packageTrace ← computeTrace (System.FilePath.mk "package.json")
     let lockTrace ← computeTrace (System.FilePath.mk "package-lock.json")
-    return mixTrace scriptTrace lockTrace) fun _ =>
+    return mixTrace scriptTrace (mixTrace packageTrace lockTrace)) fun _ =>
     runNpmScript "build:infoview"
 
 @[default_target]
