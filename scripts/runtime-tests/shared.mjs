@@ -18,6 +18,11 @@ import {
   wasmPublicFile,
 } from "../browser-package-config.mjs";
 import {
+  leanPathWithGenerator,
+  virIrpkgLakeBuildArgs,
+  virIrpkgPath,
+} from "../irpkg-generator.mjs";
+import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceTypeDescriptor,
 } from "../../web/src/runtime/vir-codec.js";
@@ -178,12 +183,7 @@ export function virIrpkgEnv() {
   assert.equal(leanPrefix.status, 0, leanPrefix.stderr || leanPrefix.stdout);
   cachedVirIrpkgEnv = {
     ...process.env,
-    LEAN_PATH: [
-      "build/lean-lib",
-      ".lake/build/lib/lean",
-      `${leanPrefix.stdout.trim()}/lib/lean`,
-      process.env.LEAN_PATH,
-    ].filter(Boolean).join(":"),
+    LEAN_PATH: leanPathWithGenerator(leanPrefix.stdout.trim()),
   };
   return cachedVirIrpkgEnv;
 }
@@ -206,14 +206,14 @@ export function ensureVirIrpkgBuilt() {
   if (virIrpkgBuilt) return;
   const builtLeanLib = spawnSync("bash", ["scripts/build-lean-lib.sh"], { encoding: "utf8" });
   assert.equal(builtLeanLib.status, 0, builtLeanLib.stderr || builtLeanLib.stdout);
-  const builtGenerator = spawnSync("lake", ["build", "vir_irpkg"], { encoding: "utf8" });
+  const builtGenerator = spawnSync("lake", virIrpkgLakeBuildArgs(), { encoding: "utf8" });
   assert.equal(builtGenerator.status, 0, builtGenerator.stderr || builtGenerator.stdout);
   virIrpkgBuilt = true;
 }
 
 export function runVirIrpkg(args) {
   ensureVirIrpkgBuilt();
-  return spawnSync(".lake/build/bin/vir_irpkg", args, {
+  return spawnSync(virIrpkgPath, args, {
     encoding: "utf8",
     env: virIrpkgEnv(),
   });
