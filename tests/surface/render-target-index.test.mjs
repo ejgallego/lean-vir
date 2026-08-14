@@ -14,9 +14,9 @@ import test from "node:test";
 import {
   surfaceCounts,
   surfaceDefinition,
-} from "./surface-report-test-fixtures.mjs";
+} from "./fixtures.mjs";
 
-const repoRoot = resolve(import.meta.dirname, "..");
+const repoRoot = resolve(import.meta.dirname, "../..");
 
 test("target index compares only compatible complete-frontier reports", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "vir-target-index-"));

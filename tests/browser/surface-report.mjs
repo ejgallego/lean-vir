@@ -23,7 +23,7 @@ import {
   surfaceCounts,
   surfaceDefinition,
   targetCaptureFixture,
-} from "../../scripts/surface-report-test-fixtures.mjs";
+} from "../surface/fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const temporary = await mkdtemp(join(tmpdir(), "vir-surface-browser-"));

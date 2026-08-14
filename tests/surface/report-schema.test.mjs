@@ -10,14 +10,14 @@ import test from "node:test";
 import {
   aggregateSurfaceDeclarations,
   validateSurfaceReport,
-} from "./surface-report-schema.mjs";
+} from "../../scripts/surface-report-schema.mjs";
 import {
   emptySurfaceReportV3,
   nativeExternFixture,
   surfaceCounts,
   surfaceDefinition,
   targetCaptureFixture,
-} from "./surface-report-test-fixtures.mjs";
+} from "./fixtures.mjs";
 
 test("surface schema accepts a complete version 3 identity", () => {
   const report = emptySurfaceReportV3({ capture: targetCaptureFixture() });

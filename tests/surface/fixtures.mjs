@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { SURFACE_REPORT_FORMAT } from "./surface-report-schema.mjs";
+import { SURFACE_REPORT_FORMAT } from "../../scripts/surface-report-schema.mjs";
 
 export const TEST_SHA256 = "a".repeat(64);
 

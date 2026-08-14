@@ -7,12 +7,15 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { analyzeSurfaceGraph, renderTargetSurfaceMarkdown } from "./analyze-surface-graph.mjs";
+import {
+  analyzeSurfaceGraph,
+  renderTargetSurfaceMarkdown,
+} from "../../scripts/analyze-surface-graph.mjs";
 import {
   emptySurfaceReportV3,
   nativeExternFixture,
   TEST_SHA256,
-} from "./surface-report-test-fixtures.mjs";
+} from "./fixtures.mjs";
 
 const provenance = { graphSha256: "b".repeat(64), sourceSha256: TEST_SHA256 };
 

@@ -10,8 +10,8 @@ import test from "node:test";
 import {
   addClientNativeSurfaceCapabilities,
   parseClientNativeSurfaceProfile,
-} from "./client-native-surface-profile.mjs";
-import { emptySurfaceReportV3 } from "./surface-report-test-fixtures.mjs";
+} from "../../scripts/client-native-surface-profile.mjs";
+import { emptySurfaceReportV3 } from "./fixtures.mjs";
 
 const manifest = {
   format: "lean-vir-client-native-externs",

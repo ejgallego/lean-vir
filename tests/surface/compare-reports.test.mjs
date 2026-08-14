@@ -10,13 +10,13 @@ import test from "node:test";
 import {
   compareSurfaceReports,
   renderSurfaceDeltaMarkdown,
-} from "./compare-surface-reports.mjs";
+} from "../../scripts/compare-surface-reports.mjs";
 import {
   nativeExternFixture,
   surfaceDefinition,
   targetCaptureFixture,
-} from "./surface-report-test-fixtures.mjs";
-import { aggregateSurfaceDeclarations } from "./surface-report-schema.mjs";
+} from "./fixtures.mjs";
+import { aggregateSurfaceDeclarations } from "../../scripts/surface-report-schema.mjs";
 
 const eqv = { kind: "missingExtern", name: "Lean.Expr.eqv" };
 const dbg = { kind: "missingExtern", name: "Lean.Expr.dbgToString" };

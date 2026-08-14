@@ -13,7 +13,7 @@ import {
   markdownReport,
   normalizeCandidate,
   validateFrontierCostReport,
-} from "./frontier-size-costs.mjs";
+} from "../../scripts/frontier-size-costs.mjs";
 
 test("frontier size candidates reject duplicate names", () => {
   assert.throws(

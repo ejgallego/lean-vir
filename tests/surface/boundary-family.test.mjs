@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
+import { classifySurfaceBoundary } from "../../scripts/surface-boundary-family.mjs";
 
 test("surface boundary families separate runtime domains and project FFI", () => {
   assert.equal(classifySurfaceBoundary("IO.FS.Handle.read", "Init.System.IO"), "IO / filesystem / process");

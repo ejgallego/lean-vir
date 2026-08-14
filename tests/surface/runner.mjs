@@ -11,9 +11,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 
-import { runSync } from "./process-utils.mjs";
+import { runSync } from "../../scripts/process-utils.mjs";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const outputDir = await mkdtemp(join(tmpdir(), "vir-surface-smoke-"));
 const jsonPath = join(outputDir, "surface.json");
 const markdownPath = join(outputDir, "surface.md");
