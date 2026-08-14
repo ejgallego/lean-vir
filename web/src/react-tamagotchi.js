@@ -19,27 +19,20 @@ const declsEl = document.querySelector("#react-decls");
 const exportsEl = document.querySelector("#react-exports");
 const ptrEl = document.querySelector("#react-ptr");
 const reloadButton = document.querySelector("#react-reload");
-
-const examples = [
-  {
-    entry: "ReactTamagotchi.mount",
-    selector: "#react-pet-root",
-    result: document.querySelector("#react-pet-result"),
-  },
-];
+const tamagotchiEntry = "ReactTamagotchi.mount";
+const tamagotchiSelector = "#react-pet-root";
+const resultEl = document.querySelector("#react-pet-result");
 
 let runtime = null;
 
-function setExampleResult(example, text, failed = false) {
-  example.result.textContent = text;
-  example.result.dataset.failed = String(failed);
+function setTamagotchiResult(text, failed = false) {
+  resultEl.textContent = text;
+  resultEl.dataset.failed = String(failed);
 }
 
-function clearMounts() {
-  for (const example of examples) {
-    document.querySelector(example.selector)?.replaceChildren();
-    setExampleResult(example, "...");
-  }
+function clearMount() {
+  document.querySelector(tamagotchiSelector)?.replaceChildren();
+  setTamagotchiResult("...");
 }
 
 function renderRuntimeSummary() {
@@ -54,25 +47,24 @@ function disposeRuntime() {
   runtime = null;
 }
 
-async function mountExamples() {
+async function mountTamagotchi() {
   reloadButton.disabled = true;
   setReadyState(statusEl, "Loading package", false);
   disposeRuntime();
-  clearMounts();
+  clearMount();
   try {
     const packageMemberBytes = await fetchBytes(`${import.meta.env.BASE_URL}${packageFile}`);
     runtime = await runtimeFactory.createRuntime({ irPackageSetBytes: [packageMemberBytes] });
     renderRuntimeSummary();
-    for (const example of examples) {
-      const mounted = runtime.call(example.entry, example.selector, ...(example.args ?? []));
-      setExampleResult(example, mounted === true ? "mounted" : "missing", mounted !== true);
-    }
+    const mounted = runtime.call(tamagotchiEntry, tamagotchiSelector);
+    setTamagotchiResult(
+      mounted === true ? "mounted" : "missing",
+      mounted !== true,
+    );
     setReadyState(statusEl, "Ready", true);
   } catch (error) {
     setReadyState(statusEl, "Failed", false);
-    for (const example of examples) {
-      setExampleResult(example, errorMessage(error), true);
-    }
+    setTamagotchiResult(errorMessage(error), true);
     console.error(error);
   } finally {
     reloadButton.disabled = false;
@@ -80,11 +72,11 @@ async function mountExamples() {
 }
 
 reloadButton.addEventListener("click", () => {
-  mountExamples();
+  mountTamagotchi();
 });
 
 window.addEventListener("beforeunload", () => {
   disposeRuntime();
 });
 
-mountExamples();
+mountTamagotchi();

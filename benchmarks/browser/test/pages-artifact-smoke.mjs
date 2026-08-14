@@ -60,10 +60,7 @@ for (const path of [
   "src/bootstrap.js",
   "src/artifact-status.js",
   "examples/catalog.json",
-  "examples/example.schema.json",
-  "examples/tests.schema.json",
   "examples/controller-contract.mjs",
-  "examples/controller-contract.d.ts",
 ]) {
   await requireFile(path);
 }

@@ -50,7 +50,9 @@ const catalog = deployments.length
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-for (const path of ["index.html", "LICENSE", "NOTICE", "README.md"]) {
+const rootFiles = ["index.html", "LICENSE", "NOTICE"];
+if (deployments.length === 0) rootFiles.push("README.md");
+for (const path of rootFiles) {
   await cp(join(appRoot, path), join(output, path));
 }
 for (const path of ["src", "styles"]) {
@@ -63,14 +65,10 @@ if (deployments.length === 0) {
 } else {
   await mkdir(join(output, "artifacts"));
   await mkdir(join(output, "examples"));
-  for (const path of [
-    "controller-contract.d.ts",
-    "controller-contract.mjs",
-    "example.schema.json",
-    "tests.schema.json",
-  ]) {
-    await cp(join(appRoot, "examples", path), join(output, "examples", path));
-  }
+  await cp(
+    join(appRoot, "examples/controller-contract.mjs"),
+    join(output, "examples/controller-contract.mjs"),
+  );
   for (const example of catalog.examples) {
     await cp(
       resolve(appRoot, "examples", example.id),
