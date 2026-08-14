@@ -282,7 +282,7 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 available runtime smoke ids and groups are printed by:
 
 ```bash
-node scripts/test-vir-runtime.mjs --list
+node tests/runtime/runner.mjs --list
 ```
 
 Runtime smoke tests are split into two groups:
@@ -393,7 +393,7 @@ workflow live in `docs/PERFORMANCE.md`.
 Keep focused checks and shared helpers in the split modules instead of copying
 logic into entry-point scripts or pages:
 
-- Runtime smoke tests: `scripts/runtime-tests/*.mjs`
+- Runtime smoke tests: `tests/runtime/*.mjs`
 - Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
 - Process helpers: `scripts/process-utils.mjs`
 - Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and

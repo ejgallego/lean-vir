@@ -8,7 +8,7 @@ import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import {
   encodeInvalidMagicPackage,
   IR_PACKAGE_SECTION,
-} from "../irpkg-format.mjs";
+} from "../../scripts/irpkg-format.mjs";
 import { assert, readRuntimeArtifacts } from "./shared.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();

@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { hostResourceValue, releaseHostResource } from "../../web/src/host-resource.js";
-import { publicArtifactPath, wasmPublicFile } from "../browser-package-config.mjs";
+import { publicArtifactPath, wasmPublicFile } from "../../scripts/browser-package-config.mjs";
 import {
   assert,
   ensureVirJsBuilt,

@@ -5,8 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { defaultPackageFile, publicArtifactPath } from "../browser-package-config.mjs";
-import { PACKAGE_FORMAT_VERSION } from "../package-versions.mjs";
+import { defaultPackageFile, publicArtifactPath } from "../../scripts/browser-package-config.mjs";
+import { PACKAGE_FORMAT_VERSION } from "../../scripts/package-versions.mjs";
 import {
   createHostResource,
   ExternrefResourceRoots,

@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   IR_PACKAGE_SECTION,
   readIrPackageInfo,
-} from "../irpkg-format.mjs";
+} from "../../scripts/irpkg-format.mjs";
 import {
   createVirRuntime,
   IR_PACKAGE_SET_FORMAT,

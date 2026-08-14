@@ -6,41 +6,41 @@ Author: Emilio J. Gallego Arias
 
 import { availableParallelism } from "node:os";
 
-import { mapWithLimit, runAsync } from "./process-utils.mjs";
-import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
+import { mapWithLimit, runAsync } from "../../scripts/process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "../../scripts/timing-utils.mjs";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = new URL("../..", import.meta.url).pathname;
 
 const tests = [
-  { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
-  { id: "call-timing", file: "scripts/runtime-tests/call-timing-smoke.mjs", group: "pure" },
-  { id: "js-float", file: "scripts/runtime-tests/js-float-fidelity-smoke.mjs", group: "pure" },
-  { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
-  { id: "host-resource-lifecycle", file: "scripts/runtime-tests/host-resource-lifecycle-smoke.mjs", group: "pure" },
+  { id: "manifest", file: "tests/runtime/manifest-smoke.mjs", group: "pure" },
+  { id: "call-timing", file: "tests/runtime/call-timing-smoke.mjs", group: "pure" },
+  { id: "js-float", file: "tests/runtime/js-float-fidelity-smoke.mjs", group: "pure" },
+  { id: "host-bindings", file: "tests/runtime/host-bindings-smoke.mjs", group: "pure" },
+  { id: "host-resource-lifecycle", file: "tests/runtime/host-resource-lifecycle-smoke.mjs", group: "pure" },
   {
     id: "host-resource-gc",
-    file: "scripts/runtime-tests/host-resource-gc-smoke.mjs",
+    file: "tests/runtime/host-resource-gc-smoke.mjs",
     group: "pure",
     nodeArgs: ["--expose-gc"],
   },
-  { id: "browser-canvas-bindings", file: "scripts/runtime-tests/browser-canvas-bindings-smoke.mjs", group: "pure" },
-  { id: "startup-hooks", file: "scripts/runtime-tests/startup-runtime-smoke.mjs", group: "pure" },
-  { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
-  { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
-  { id: "custom-inductive-normalization", file: "scripts/runtime-tests/custom-inductive-normalization-smoke.mjs", group: "pure" },
-  { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
-  { id: "package-decoder", file: "scripts/runtime-tests/package-decoder-smoke.mjs", group: "pure" },
-  { id: "package-set-descriptor", file: "scripts/runtime-tests/package-set-descriptor-smoke.mjs", group: "pure" },
-  { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },
+  { id: "browser-canvas-bindings", file: "tests/runtime/browser-canvas-bindings-smoke.mjs", group: "pure" },
+  { id: "startup-hooks", file: "tests/runtime/startup-runtime-smoke.mjs", group: "pure" },
+  { id: "callback-lifecycle", file: "tests/runtime/callback-lifecycle-smoke.mjs", group: "pure" },
+  { id: "react-host-bindings", file: "tests/runtime/react-host-bindings-smoke.mjs", group: "pure" },
+  { id: "custom-inductive-normalization", file: "tests/runtime/custom-inductive-normalization-smoke.mjs", group: "pure" },
+  { id: "object-abi", file: "tests/runtime/object-abi-smoke.mjs", group: "pure" },
+  { id: "package-decoder", file: "tests/runtime/package-decoder-smoke.mjs", group: "pure" },
+  { id: "package-set-descriptor", file: "tests/runtime/package-set-descriptor-smoke.mjs", group: "pure" },
+  { id: "package-generator", file: "tests/runtime/package-generator-smoke.mjs", group: "lean" },
   {
     id: "interpreter-constant-cache",
-    file: "scripts/runtime-tests/interpreter-constant-cache-smoke.mjs",
+    file: "tests/runtime/interpreter-constant-cache-smoke.mjs",
     group: "lean",
   },
-  { id: "module-package-set", file: "scripts/runtime-tests/module-package-set-smoke.mjs", group: "lean" },
-  { id: "slides-canvas", file: "scripts/runtime-tests/slides-canvas-runtime-smoke.mjs", group: "lean" },
-  { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
-  { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },
+  { id: "module-package-set", file: "tests/runtime/module-package-set-smoke.mjs", group: "lean" },
+  { id: "slides-canvas", file: "tests/runtime/slides-canvas-runtime-smoke.mjs", group: "lean" },
+  { id: "package-generation", file: "tests/runtime/package-generation-smoke.mjs", group: "lean" },
+  { id: "sdk-import", file: "tests/runtime/sdk-import-smoke.mjs", group: "lean" },
 ];
 const runtimeGroupNames = [...new Set(tests.map((test) => test.group))].sort();
 const serialRuntimeGroups = new Set(["lean"]);
@@ -48,7 +48,7 @@ const serialRuntimeGroups = new Set(["lean"]);
 const cli = parseRuntimeArgs(process.argv.slice(2));
 
 function usage() {
-  console.log(`Usage: node scripts/test-vir-runtime.mjs [filter ...]
+  console.log(`Usage: node tests/runtime/runner.mjs [filter ...]
 
 Run JavaScript runtime smoke tests.
 
@@ -98,7 +98,7 @@ function parseRuntimeArgs(argv) {
       continue;
     }
     if (arg.startsWith("--")) {
-      throw new Error(`unknown argument: ${arg}; run node scripts/test-vir-runtime.mjs --help`);
+      throw new Error(`unknown argument: ${arg}; run node tests/runtime/runner.mjs --help`);
     }
     positionalFilters.push(arg);
   }

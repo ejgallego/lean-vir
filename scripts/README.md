@@ -199,9 +199,9 @@ specific narrow command.
 
 The split helpers below are the intended extension points for focused changes:
 
-- Runtime smoke cases live in `scripts/runtime-tests/*.mjs`; add new runtime,
-  codec, manifest, or host binding checks there rather than growing
-  `scripts/test-vir-runtime.mjs`.
+- Runtime smoke cases live in `tests/runtime/*.mjs`; add new runtime, codec,
+  manifest, or host binding checks there rather than growing
+  `tests/runtime/runner.mjs`.
 - Browser smoke behavior is split across `scripts/browser-smoke-*.mjs`;
   `scripts/smoke-pages-browser.mjs` should stay an orchestrator.
 - Child process wrappers live in `scripts/process-utils.mjs`; filesystem,

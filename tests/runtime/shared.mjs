@@ -16,11 +16,11 @@ import {
   prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
-} from "../browser-package-config.mjs";
+} from "../../scripts/browser-package-config.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-} from "../irpkg-generator.mjs";
+} from "../../scripts/irpkg-generator.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceTypeDescriptor,

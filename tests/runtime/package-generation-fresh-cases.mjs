@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../../scripts/package-versions.mjs";
 import {
   assert,
   assertManifestTypeDescriptorsRoundTrip,

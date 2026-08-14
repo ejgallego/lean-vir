@@ -71,7 +71,7 @@ For benchmark work, read:
 2. `benchmarks/harness/bench-vir.mjs`
 3. `benchmarks/harness/bench-differential.mjs`
 4. `benchmarks/harness/bench-utils.mjs`
-5. `scripts/runtime-tests/object-abi-smoke.mjs`
+5. `tests/runtime/object-abi-smoke.mjs`
 
 ## Top-Level Call Flow
 
