@@ -46,7 +46,8 @@ identity conflicts, installs the root manifest last, and runs initializer
 globals in module order only after every member is available.
 
 The same package encoder also supports focused developer packages through
-`scripts/lean-to-irpkg.sh`. That utility accepts explicit roots or packages
+`npm run generate:irpkg`, backed by `scripts/lean-to-irpkg.mjs`. That utility
+accepts explicit roots or packages
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls

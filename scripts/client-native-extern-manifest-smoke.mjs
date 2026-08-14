@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { virIrpkgLakeBuildArgs, virIrpkgPath } from "./irpkg-generator.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = join(repoRoot, "fixtures", "client-native-extern");
 const manifestPath = join(fixtureRoot, "lean-vir-native-externs.json");
@@ -21,7 +23,6 @@ const wrapperTool = join(
   "bin",
   "vir_native_wrappers",
 );
-const packageTool = join(repoRoot, ".lake", "build", "bin", "vir_irpkg");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -56,7 +57,7 @@ async function expectManifestFailure(tempRoot, name, manifest, pattern) {
   assert.match(result.stderr || result.stdout, pattern);
 }
 
-run("lake", ["build", "Vir", "vir_native_wrappers", "vir_irpkg"]);
+run("lake", virIrpkgLakeBuildArgs(["vir_native_wrappers"]));
 run("lake", ["-d", fixtureRoot, "build"]);
 
 const tempRoot = await mkdtemp(join(tmpdir(), "vir-client-native-extern-"));
@@ -99,7 +100,7 @@ try {
       "-d",
       fixtureRoot,
       "env",
-      packageTool,
+      virIrpkgPath,
       packagePath,
       reportPath,
       "--target-marked",

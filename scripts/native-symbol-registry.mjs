@@ -8,11 +8,27 @@ function cString(value) {
   return JSON.stringify(value);
 }
 
-function registryMacro(entry) {
-  const isConst = entry.params.length === 0 && entry.symbol.startsWith("l_");
-  return isConst
-    ? `X_CONST(${cString(entry.name)}, ${cString(entry.symbol)}, &${entry.symbol})`
-    : `X(${cString(entry.name)}, ${cString(entry.symbol)}, ${entry.symbol}___boxed)`;
+const registryEntryRegex =
+  /^\s*(X|X_CONST)\("([^"]+)",\s*"([^"]+)",\s*([A-Za-z0-9_&]+)\)\s*\\?$/gm;
+
+export function nativeSymbolRegistryEntry(nativeExtern) {
+  const kind = nativeExtern.params.length === 0 && nativeExtern.symbol.startsWith("l_")
+    ? "X_CONST"
+    : "X";
+  const wrapper = kind === "X_CONST" ? nativeExtern.symbol : `${nativeExtern.symbol}___boxed`;
+  return {
+    kind,
+    leanName: nativeExtern.name,
+    symbol: nativeExtern.symbol,
+    wrapper,
+    dlsymSymbol: wrapper,
+  };
+}
+
+function registryMacro(nativeExtern) {
+  const entry = nativeSymbolRegistryEntry(nativeExtern);
+  const target = entry.kind === "X_CONST" ? `&${entry.wrapper}` : entry.wrapper;
+  return `${entry.kind}(${cString(entry.leanName)}, ${cString(entry.symbol)}, ${target})`;
 }
 
 export function generateNativeSymbolRegistry(entries) {
@@ -35,7 +51,6 @@ export function generateNativeSymbolRegistry(entries) {
 }
 
 export function parseNativeSymbolRegistry(source) {
-  const entries = new Map();
   const startMarker = "#define VIR_NATIVE_SYMBOLS(X, X_CONST) \\\n";
   const start = source.indexOf(startMarker);
   if (start < 0) {
@@ -43,35 +58,19 @@ export function parseNativeSymbolRegistry(source) {
   }
 
   const table = source.slice(start + startMarker.length);
-  const entryRegex = /^\s*(X|X_CONST)\("([^"]+)",\s*"([^"]+)",\s*([A-Za-z0-9_&]+)\)\s*\\?$/gm;
-  for (const match of table.matchAll(entryRegex)) {
+  const entries = [];
+  for (const match of table.matchAll(registryEntryRegex)) {
     const kind = match[1];
-    const name = match[2];
     const symbol = match[3];
-    entries.set(name, {
+    const wrapper = match[4].replace(/^&/, "");
+    entries.push({
+      kind,
+      leanName: match[2],
       symbol,
-      dlsymSymbol: kind === "X_CONST" ? symbol : `${symbol}___boxed`,
+      wrapper,
+      dlsymSymbol: kind === "X_CONST" ? symbol : wrapper,
     });
   }
 
   return entries;
-}
-
-export function nativeSymbolRegistryEntries(source) {
-  const entries = [];
-  const constants = [];
-  const entryRegex = /^\s*(X|X_CONST)\("([^"]+)",\s*"([^"]+)",\s*([A-Za-z0-9_&]+)\)\s*\\?$/gm;
-  for (const match of source.matchAll(entryRegex)) {
-    const entry = {
-      leanName: match[2],
-      symbol: match[3],
-      wrapper: match[4].replace(/^&/, ""),
-    };
-    if (match[1] === "X_CONST") {
-      constants.push(entry);
-    } else {
-      entries.push(entry);
-    }
-  }
-  return { entries, constants };
 }

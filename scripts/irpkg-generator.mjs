@@ -11,7 +11,11 @@ import { elapsedSeconds, timerStart } from "./timing-utils.mjs";
 
 export const virIrpkgPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url).pathname;
 
-export function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PATH) {
+export function virIrpkgLakeBuildArgs(lakeTargets = []) {
+  return ["build", "Vir", "vir_irpkg", ...lakeTargets];
+}
+
+function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PATH) {
   return [
     ".lake/build/lib/lean",
     "build/lean-lib",
@@ -20,28 +24,32 @@ export function leanPathWithGenerator(leanPrefix, existing = process.env.LEAN_PA
   ].filter(Boolean).join(delimiter);
 }
 
-export function prepareVirIrpkgSync(root, { lakeTargets = [] } = {}) {
-  const libStart = timerStart();
-  const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  const libSeconds = elapsedSeconds(libStart);
+export function prepareVirIrpkgSync(root, { lakeTargets = [], skipBuild = false } = {}) {
+  let libSeconds = 0;
+  let generatorSeconds = 0;
+  if (!skipBuild) {
+    const libStart = timerStart();
+    const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
+      cwd: root,
+      stdio: "inherit",
+    });
+    libSeconds = elapsedSeconds(libStart);
 
-  if ((libResult.status ?? 1) !== 0) {
-    return failed("lean-lib", libResult, { libSeconds, generatorSeconds: 0 });
-  }
+    if ((libResult.status ?? 1) !== 0) {
+      return failed("lean-lib", libResult, { libSeconds, generatorSeconds });
+    }
 
-  const generatorStart = timerStart();
-  const generatorResult = spawnSync(
-    "lake",
-    ["build", "Vir", "vir_irpkg", ...lakeTargets],
-    { cwd: root, stdio: "inherit" },
-  );
-  const generatorSeconds = elapsedSeconds(generatorStart);
+    const generatorStart = timerStart();
+    const generatorResult = spawnSync(
+      "lake",
+      virIrpkgLakeBuildArgs(lakeTargets),
+      { cwd: root, stdio: "inherit" },
+    );
+    generatorSeconds = elapsedSeconds(generatorStart);
 
-  if ((generatorResult.status ?? 1) !== 0) {
-    return failed("vir-irpkg", generatorResult, { libSeconds, generatorSeconds });
+    if ((generatorResult.status ?? 1) !== 0) {
+      return failed("vir-irpkg", generatorResult, { libSeconds, generatorSeconds });
+    }
   }
 
   const leanPrefix = spawnSync("lean", ["--print-prefix"], {
