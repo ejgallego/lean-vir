@@ -14,7 +14,13 @@ import {
 
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../build/generated/wasm/runtime/native_symbols_registry.inc", import.meta.url);
-const writeMode = process.argv.includes("--write");
+const args = new Set(process.argv.slice(2));
+for (const arg of args) {
+  if (arg !== "--write") {
+    throw new Error(`unknown argument ${JSON.stringify(arg)}; expected --write or no arguments`);
+  }
+}
+const writeMode = args.has("--write");
 
 function parseBoxedWrappers(source) {
   return new Set(

@@ -10,7 +10,13 @@ import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
 
-const check = process.argv.includes("--check");
+const args = new Set(process.argv.slice(2));
+for (const arg of args) {
+  if (arg !== "--check") {
+    throw new Error(`unknown argument ${JSON.stringify(arg)}; expected --check or no arguments`);
+  }
+}
+const check = args.has("--check");
 const entryPoint = new URL("../web/src/vir-infoview-widget.js", import.meta.url);
 const outFile = new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url);
 const repoRoot = new URL("..", import.meta.url);

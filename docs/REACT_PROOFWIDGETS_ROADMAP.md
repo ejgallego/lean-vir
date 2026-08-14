@@ -57,8 +57,9 @@ For Vir, full infoview compatibility remains a follow-up target.
 The current `Vir.Infoview` shell can mount a VIR package in the Lean infoview
 and can fetch local WASM/`.irpkg` assets through a narrow asset RPC. It now has
 a minimal snapshot-aware activation path for live Lean widget code, but it does
-not yet have the proof-script edit channel or broader ProofWidgets RPC
-compatibility that tactic UIs can rely on.
+not yet have the broader structured proof-script edit and tactic RPC channels
+that full ProofWidgets compatibility requires. Narrow commands for revealing
+the cursor and inserting text at it are already available.
 
 The current API coverage inventory is maintained as a machine-readable block in
 `docs/API_COVERAGE.md`; tooling can generate
@@ -209,7 +210,8 @@ A realistic path has three layers:
    improvement; inside this repository we can avoid external patches, but raw
    binary transfer would need support from the host webview/RPC surface.
 3. **Infoview/RPC compatibility.** Extend the current typed cursor/goal/selection
-   surface with snapshot-aware RPC, server-side references, and edit commands.
+   surface with snapshot-aware RPC, server-side references, and broader
+   structured edit and tactic commands.
    This is the layer needed for tactic UIs and proof-script editing, and it
    should stay narrow and typed instead of exposing an arbitrary JavaScript RPC
    bag to Lean. The first reference slice is intentionally smaller than this
@@ -222,7 +224,7 @@ A realistic path has three layers:
    resource. `Vir.Infoview.ProofWidgetsRpc` builds that prop from Lean's
    current interactive goal at the cursor and still resolves descriptor
    fallbacks through the active Lean server snapshot. Broader ExprWithCtx
-   construction and edit commands remain future work.
+   construction and structured edit and tactic commands remain future work.
 
 ## Porting Targets
 
