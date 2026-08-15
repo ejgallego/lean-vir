@@ -85,7 +85,7 @@ callback from the current callback.
 
 ## Tests
 
-`scripts/test-vir-runtime.mjs` covers the current callback surface:
+`tests/runtime/runner.mjs` covers the current callback surface:
 
 - resource-shaped `RuntimeM` callback round-trip through a custom
   `test.callNatCallback` host import using explicit `Js Nat` values;

@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 export const SURFACE_REPORT_FORMAT = "lean-vir-library-surface";
 export const CURRENT_SURFACE_REPORT_VERSION = 3;
-export const SUPPORTED_SURFACE_REPORT_VERSIONS = [2, CURRENT_SURFACE_REPORT_VERSION];
+const SUPPORTED_SURFACE_REPORT_VERSIONS = [2, CURRENT_SURFACE_REPORT_VERSION];
 
 const COUNT_FIELDS = [
   "total", "runnable", "blocked", "publicTotal", "publicRunnable",

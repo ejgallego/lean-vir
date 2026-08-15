@@ -196,7 +196,7 @@ function printSectionReport(report) {
   console.log();
 }
 
-export function mapAreaFor(input) {
+function mapAreaFor(input) {
   if (input === "<internal>") return "Linker/internal glue";
   if (input.includes("libc++.a(") || input.includes("libc++abi.a(")) return "WASI SDK C++ runtime";
   if (input.includes("libc.a(") || input.includes("crt1-")) return "WASI libc / startup";
@@ -222,7 +222,7 @@ export function mapAreaFor(input) {
   return "Other";
 }
 
-export function mapDetailFor(input) {
+function mapDetailFor(input) {
   if (input === "<internal>") return "<internal>";
   const archiveMember = input.match(/([^/]+\.a)\(([^)]+)\)$/);
   if (archiveMember) return `${archiveMember[1]}(${archiveMember[2]})`;

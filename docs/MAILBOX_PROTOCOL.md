@@ -309,7 +309,7 @@ subject: persistent package interpreter accepted
 ## Write Scope
 
 - `wasm/upstream_shim/interpreter/`
-- `fixtures/runtime-tests/`
+- `fixtures/runtime/`
 
 No push or public PR is authorized.
 ```

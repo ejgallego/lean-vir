@@ -10,7 +10,7 @@ import { deriveBrowserPackageConfig } from "../web/src/pages/browser-package-con
 
 const configUrl = new URL("../fixtures/browser-packages.json", import.meta.url);
 
-export const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8"));
+const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8"));
 export const {
   wasmPublicFile,
   wasmDevPublicFile,

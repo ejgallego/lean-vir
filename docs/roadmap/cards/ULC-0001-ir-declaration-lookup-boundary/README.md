@@ -254,7 +254,7 @@ environment-backed API unchanged.
 - [VIR interpreter bridge](../../../../wasm/upstream_shim/interpreter/interpreter_bridge.cpp)
 - [Package declaration provider](../../../../wasm/upstream_shim/package/package_decl_provider.cpp)
 - [IR metadata layout regression](../../../../wasm/upstream_shim/package/package_ir_builders_test.cpp)
-- [In-process paired Wasm benchmark](../../../../scripts/bench-env-lookup-wasm-pair.mjs)
+- [In-process paired Wasm benchmark](../../../../benchmarks/harness/bench-env-lookup-wasm-pair.mjs)
 - [VIR PR #104: benchmark, indexed provider, and acceptance record](https://github.com/ejgallego/lean-vir/pull/104)
 
 The independent acceptance run measured 371.4 to 56.2 microseconds for fresh

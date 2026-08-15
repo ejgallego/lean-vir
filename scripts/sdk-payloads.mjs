@@ -34,7 +34,7 @@ export const SDK_PAYLOADS = [
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 
-export const SDK_METADATA_ENTRIES = [
+const SDK_METADATA_ENTRIES = [
   "README.txt",
   "LICENSE",
   "NOTICE",
