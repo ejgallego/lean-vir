@@ -5,9 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
-import { prettyPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
-import { errorMessage, setReadyState } from "./pages/page-utils.js";
-import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
+import { prettyPackageFile, wasmPublicFile } from "../pages/browser-packages.js";
+import { errorMessage, setReadyState } from "../pages/page-utils.js";
+import { createVirRuntimeFactory, fetchBytes } from "../vir-runtime.js";
 
 const cases = [
   {

@@ -144,7 +144,7 @@ npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
 npm run inspect:native-wrappers
 npm run size:wasm
-node tests/fixtures/runner.mjs --help
+node tests/fixture-runner.mjs --help
 ```
 
 Tests:

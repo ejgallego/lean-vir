@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
-import { createVirRuntime, fetchBytes } from "./vir-runtime.js";
+import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "../pages/browser-packages.js";
+import { createVirRuntime, fetchBytes } from "../vir-runtime.js";
 
 const output = document.querySelector("#runtime-example-output");
 

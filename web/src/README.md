@@ -16,8 +16,6 @@ unrelated responsibilities.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.
-- `browser-react-runtime.js`: repository browser convenience factory that composes generic
-  browser bindings with React bindings.
 - `vir-infoview-widget.js`: repository live infoview widget shell that loads WASM,
   requests fresh `.irpkg` packages from Lean, and mounts Lean-authored React
   widgets.
@@ -60,11 +58,13 @@ unrelated responsibilities.
 
 ## Demo And Page Modules
 
-- `main.js`: runtime-demo fixture runner and Tamagotchi wiring.
-- `dev.js`: local `.irpkg` package runner.
-- `format-demo.js`: pretty-printer workbench.
-- `react-tamagotchi.js`: standalone React Tamagotchi page.
-- `runtime-example.js`: minimal runtime example page.
+- `apps/`: Vite page entry points, page-only styles, and the browser React
+  runtime composition helper.
+- `apps/demo.js`: runtime-demo fixture runner and Tamagotchi wiring.
+- `apps/dev.js`: local `.irpkg` package runner.
+- `apps/format-demo.js`: pretty-printer workbench.
+- `apps/react-tamagotchi.js`: standalone React Tamagotchi page.
+- `apps/runtime-example.js`: minimal runtime example page.
 - `pages/fixture-catalog.js`: fixture metadata, package mapping, and input
   defaults.
 - `pages/fixture-sources.js`: raw fixture/source snippets shown by the landing

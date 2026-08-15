@@ -1,8 +1,8 @@
 import { cp, mkdir, rm, stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const root = fileURLToPath(new URL("../../..", import.meta.url));
 const source = resolve(root, "benchmarks/browser/dist");
 const destination = resolve(root, "web/dist/benchmarks");
 if (!(await stat(source).catch(() => null))?.isDirectory()) {

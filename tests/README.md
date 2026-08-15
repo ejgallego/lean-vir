@@ -7,7 +7,9 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 - `benchmarks/` tests the repository benchmark harness without running a full
   performance campaign.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
-- `fixtures/` owns the Lean fixture host-oracle and Wasm comparison runner.
+- `fixture-runner.mjs` is the integration entry point for Lean fixture
+  host-oracle and Wasm comparison checks; their inputs live in root
+  `fixtures/`.
 - `runtime/` owns the JavaScript runtime smoke-test runner and its focused test
   cases.
 - `surface/` tests the report-analysis and rendering tools kept in `scripts/`.

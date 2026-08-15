@@ -7,7 +7,7 @@ on:
       - ".github/workflows/example-candidate.yml"
       - ".github/workflows/pages.yml"
       - "package.json"
-      - "scripts/install-benchmark-pages.mjs"
+      - "benchmarks/browser/scripts/install-pages.mjs"
       - "tests/browser/benchmark-pages.mjs"
       - "benchmarks/browser/**"
 

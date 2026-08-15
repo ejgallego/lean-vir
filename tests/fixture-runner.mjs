@@ -7,18 +7,18 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 
-import { createVirRuntime } from "../../web/src/vir-runtime.js";
+import { createVirRuntime } from "../web/src/vir-runtime.js";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-} from "../../scripts/irpkg-generator.mjs";
-import { mapWithLimit, runAsync } from "../../scripts/process-utils.mjs";
-import { elapsedSeconds, formatSeconds, timerStart } from "../../scripts/timing-utils.mjs";
+} from "../scripts/irpkg-generator.mjs";
+import { mapWithLimit, runAsync } from "../scripts/process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "../scripts/timing-utils.mjs";
 
-const root = new URL("../..", import.meta.url);
-const manifestPath = new URL("../../fixtures/manifest.json", import.meta.url);
-const buildDir = new URL("../../build/fixtures/", import.meta.url);
-const wasmPath = new URL("../../web/public/vir-upstream.wasm", import.meta.url);
+const root = new URL("..", import.meta.url);
+const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
+const buildDir = new URL("../build/fixtures/", import.meta.url);
+const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
@@ -27,7 +27,7 @@ const args = process.argv.slice(2);
 const scriptStart = timerStart();
 
 function usage() {
-  console.log(`Usage: node tests/fixtures/runner.mjs [--no-build]
+  console.log(`Usage: node tests/fixture-runner.mjs [--no-build]
 
 Run Lean fixture host-oracle checks against the WASI upstream interpreter.
 
@@ -50,7 +50,7 @@ if (args.includes("-h") || args.includes("--help")) {
 
 for (const arg of args) {
   if (arg !== "--no-build") {
-    throw new Error(`unknown argument: ${arg}; run node tests/fixtures/runner.mjs --help`);
+    throw new Error(`unknown argument: ${arg}; run node tests/fixture-runner.mjs --help`);
   }
 }
 
@@ -171,7 +171,7 @@ async function hostOracle(fixture) {
 
 async function fixtureSource(source) {
   if (!sourceCache.has(source)) {
-    sourceCache.set(source, readFile(new URL(`../../${source}`, import.meta.url), "utf8"));
+    sourceCache.set(source, readFile(new URL(`../${source}`, import.meta.url), "utf8"));
   }
   return sourceCache.get(source);
 }

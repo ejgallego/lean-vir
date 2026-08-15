@@ -15,6 +15,7 @@
     "stage": "node scripts/stage-artifact-set.mjs",
     "stage:illuminate": "node scripts/stage-illuminate-rehearsal.mjs",
     "build": "node scripts/build.mjs",
+    "install:pages": "node scripts/install-pages.mjs",
     "dev": "node scripts/build.mjs && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
     "report": "node scripts/collect-report.mjs",

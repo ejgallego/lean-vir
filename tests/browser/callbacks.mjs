@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { createProofSurfaceFixture } from "../../web/src/proof-surface-fixtures.js";
+import { createProofSurfaceFixture } from "../support/proof-surface-fixtures.mjs";
 import { basePath, distAssetPathContaining, evaluate } from "./harness.mjs";
 import {
   defaultPackageFile,
