@@ -254,7 +254,12 @@ async function runFixture(fixture) {
 
   const wasmStart = timerStart();
   const runtime = await instantiateWasm(generated.packagePath);
-  const wasm = runtime.call(fixture.entry);
+  let wasm;
+  try {
+    wasm = runtime.call(fixture.entry);
+  } finally {
+    runtime.dispose();
+  }
   const wasmSeconds = elapsedSeconds(wasmStart);
   const timing = {
     total: elapsedSeconds(start),

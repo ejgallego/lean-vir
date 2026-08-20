@@ -76,6 +76,9 @@ unrelated responsibilities.
 
 ## Maintenance Notes
 
+- Treat `apps/` as the imperative browser shell. Keep reusable parsing, state
+  transformations, and page configuration under `pages/` import-safe and
+  preferably pure so Node tests can exercise them without a DOM.
 - Keep application-facing imports under the package/SDK entry points above
   unless a new package export is intentional. The SDK artifact mirrors runtime,
   host, and React helper subdirectories under `js/` so internal relative
