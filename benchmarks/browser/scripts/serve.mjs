@@ -28,9 +28,10 @@ const server = createServer(async (request, response) => {
     const pathname = decodeURIComponent(
       new URL(request.url ?? "/", "http://local").pathname,
     );
-    const relative = normalize(
-      pathname === "/" ? "index.html" : pathname.replace(/^\/+/, ""),
-    );
+    const requested = pathname.endsWith("/")
+      ? `${pathname}index.html`
+      : pathname;
+    const relative = normalize(requested.replace(/^\/+/, ""));
     const file = resolve(join(root, relative));
     if (file !== root && !file.startsWith(root + sep))
       throw new Error("path escapes root");

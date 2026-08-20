@@ -67,9 +67,7 @@ for (const { example, variant } of deployments) {
     "../../web/dist",
     "--base-path",
     "/benchmarks/",
-    "--example",
     example,
-    "--variant",
     variant,
   ]);
 }
