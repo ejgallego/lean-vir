@@ -5,11 +5,11 @@ surface. It combines the exhaustive JavaScript boundary census, colocated
 API-group configuration, and available TypeScript-to-Lean comparisons in
 one searchable page.
 
-The current report covers 119 ordinary `@[vir_js]` declarations and 13
-`@[vir_js_explicit_conversion]` declarations. All 132 distinct targets have a
+The current report covers 120 ordinary `@[vir_js]` declarations and 13
+`@[vir_js_explicit_conversion]` declarations. All 133 distinct targets have a
 shipped provider; there are no missing providers and no provider-only targets.
-The same compiler scan finds 361 public executable Lean declarations that
-reach those targets through 2,884 concrete IR call paths. Every shipped target
+The same compiler scan finds 363 public executable Lean declarations that
+reach those targets through 2,894 concrete IR call paths. Every shipped target
 is reached by at least one public declaration.
 Generation indexes the complete configured TypeScript surface for 20 API
 groups before presenting the report. The reviewed `Document` analysis expands
@@ -116,7 +116,7 @@ entry, so partial property coverage cannot be mistaken for a faithful pair.
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a property operation that disagrees with its reviewed
 anchor, or an unclassified public accessor alias. The current six
-configurations assign all 132 shipped targets exactly once.
+configurations assign all 133 shipped targets exactly once.
 
 ## Data Flow
 
@@ -175,9 +175,9 @@ unmapped upstream entries.
 Use **Upstream libraries** to start from a library contract and inspect VIR's
 coverage. Expanding a mapped upstream entry shows its expected TypeScript
 declaration beside the nearest public Lean API type. Use **Public Lean API** for
-the reverse product surface: 361 public declarations, their elaborated types,
+the reverse product surface: 363 public declarations, their elaborated types,
 source locations, nearest upstream expectations, and exact compiler paths to
-host targets. Use **Host targets** for all 132 lower-level dispatch keys, their
+host targets. Use **Host targets** for all 133 lower-level dispatch keys, their
 providers and implementation boundaries. Reviewed mappings prefer the exact
 reviewed public declaration; other transitive callers remain available without
 being presented as reviewed matches.

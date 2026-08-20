@@ -15,14 +15,14 @@ assert.equal(report.format, "lean-vir-binding-explorer");
 assert.deepEqual(report.summary, {
   libraries: 6,
   apiGroups: 29,
-  targets: 132,
-  provided: 132,
+  targets: 133,
+  provided: 133,
   missingProvider: 0,
   runtimeOnly: 0,
   publicSurface: {
-    entries: 361,
-    targetEdges: 2884,
-    reachedTargets: 132,
+    entries: 363,
+    targetEdges: 2894,
+    reachedTargets: 133,
   },
   analysis: {
     externalGroups: 23,
@@ -50,9 +50,9 @@ assert.deepEqual(report.summary, {
 const roots = report.libraries.flatMap((library) =>
   library.apiGroups.map((root) => ({ library: library.id, ...root })));
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
-assert.equal(new Set(targets).size, 132, "every shipped target should occur exactly once");
+assert.equal(new Set(targets).size, 133, "every shipped target should occur exactly once");
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
-assert.equal(publicEntries.size, 361);
+assert.equal(publicEntries.size, 363);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.deepEqual(
@@ -167,6 +167,8 @@ assert.deepEqual(localCommands?.analysis, {
   status: "needs-input",
   scope: "local-upstream-contract-missing",
 });
+assert.ok(localCommands?.bindings.some((binding) =>
+  binding.target === "infoview.command.insertText"));
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
@@ -186,7 +188,7 @@ assert.equal(
 );
 
 assert.match(html, /<h1>Binding explorer<\/h1>/u);
-assert.match(html, /id="provided-metric">132\/132</u);
+assert.match(html, /id="provided-metric">133\/133</u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Complete surface analysis/u);
 assert.match(html, /Automatic analysis/u);
@@ -201,9 +203,9 @@ assert.match(html, /Reviewed type fidelity/u);
 assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
-assert.equal(JSON.parse(dataMatch[1]).summary.targets, 132);
+assert.equal(JSON.parse(dataMatch[1]).summary.targets, 133);
 const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
 assert.ok(scripts.length >= 2, "explorer should include data and interaction scripts");
 Function(scripts.at(-1)[1]);
 
-console.log("binding explorer smoke ok: 6 libraries, 29 API groups, 2104 upstream symbols, 132 unique targets");
+console.log("binding explorer smoke ok: 6 libraries, 29 API groups, 2104 upstream symbols, 133 unique targets");

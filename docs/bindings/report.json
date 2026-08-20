@@ -26,12 +26,12 @@
     {
       "id": "browser",
       "title": "Browser + React host map",
-      "targets": 128
+      "targets": 129
     },
     {
       "id": "node",
       "title": "Virtual Node host map",
-      "targets": 98
+      "targets": 99
     },
     {
       "id": "runtime-intrinsic",
@@ -42,14 +42,14 @@
   "summary": {
     "libraries": 6,
     "apiGroups": 29,
-    "targets": 132,
-    "provided": 132,
+    "targets": 133,
+    "provided": 133,
     "missingProvider": 0,
     "runtimeOnly": 0,
     "publicSurface": {
-      "entries": 361,
-      "targetEdges": 2884,
-      "reachedTargets": 132
+      "entries": 363,
+      "targetEdges": 2894,
+      "reachedTargets": 133
     },
     "analysis": {
       "externalGroups": 23,
@@ -2435,6 +2435,115 @@
           "target": "js.string",
           "path": [
             "Lean.Vir.Infoview.Clipboard.writeText",
+            "Lean.Vir.JsValue.ofString"
+          ]
+        }
+      ]
+    },
+    {
+      "declaration": "Lean.Vir.Infoview.Command.insertAtCursor",
+      "module": "Vir.Infoview.Surface",
+      "type": "Lean.Vir.Infoview.Surface → String → Lean.Vir.Browser.DomM Bool",
+      "source": {
+        "module": "Vir.Infoview.Surface",
+        "path": "Vir/Infoview/Surface.lean",
+        "startLine": 143,
+        "startColumn": 1,
+        "endLine": 146,
+        "endColumn": 33
+      },
+      "targets": [
+        {
+          "target": "infoview.command.insertText",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertAtCursor",
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.Command.insertTextJs"
+          ]
+        },
+        {
+          "target": "infoview.documentPosition",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertAtCursor",
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.DocumentPosition.toJs",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.documentPositionJs"
+          ]
+        },
+        {
+          "target": "js.bool.value",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertAtCursor",
+            "Lean.Vir.Infoview.Command.insertText",
+            "Lean.Vir.JsValue.toBool"
+          ]
+        },
+        {
+          "target": "js.nat",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertAtCursor",
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.DocumentPosition.toJs",
+            "Lean.Vir.JsValue.ofNat"
+          ]
+        },
+        {
+          "target": "js.string",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertAtCursor",
+            "Lean.Vir.Infoview.Command.insertText",
+            "Lean.Vir.JsValue.ofString"
+          ]
+        }
+      ]
+    },
+    {
+      "declaration": "Lean.Vir.Infoview.Command.insertText",
+      "module": "Vir.Infoview.Surface",
+      "type": "Lean.Vir.Infoview.DocumentPosition → String → Lean.Vir.Browser.DomM Bool",
+      "source": {
+        "module": "Vir.Infoview.Surface",
+        "path": "Vir/Infoview/Surface.lean",
+        "startLine": 136,
+        "startColumn": 1,
+        "endLine": 141,
+        "endColumn": 35
+      },
+      "targets": [
+        {
+          "target": "infoview.command.insertText",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.Command.insertTextJs"
+          ]
+        },
+        {
+          "target": "infoview.documentPosition",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.DocumentPosition.toJs",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.documentPositionJs"
+          ]
+        },
+        {
+          "target": "js.bool.value",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertText",
+            "Lean.Vir.JsValue.toBool"
+          ]
+        },
+        {
+          "target": "js.nat",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertText",
+            "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.DocumentPosition.toJs",
+            "Lean.Vir.JsValue.ofNat"
+          ]
+        },
+        {
+          "target": "js.string",
+          "path": [
+            "Lean.Vir.Infoview.Command.insertText",
             "Lean.Vir.JsValue.ofString"
           ]
         }
@@ -85103,7 +85212,7 @@
       },
       "summary": {
         "apiGroups": 2,
-        "bindings": 3,
+        "bindings": 4,
         "issues": 0
       },
       "apiGroups": [
@@ -85249,11 +85358,43 @@
           },
           "findingStatus": "none",
           "summary": {
-            "bindings": 2,
-            "provided": 2,
+            "bindings": 3,
+            "provided": 3,
             "issues": 0
           },
           "bindings": [
+            {
+              "target": "infoview.command.insertText",
+              "prefix": "infoview",
+              "status": "provided",
+              "providers": [
+                "browser",
+                "node"
+              ],
+              "boundaries": [
+                "hostResource"
+              ],
+              "visibility": "private",
+              "declarations": [
+                {
+                  "declaration": "_private.Vir.Infoview.Surface.0.Lean.Vir.Infoview.Command.insertTextJs",
+                  "module": "Vir.Infoview.Surface",
+                  "private": true,
+                  "marker": "vir_js",
+                  "boundary": "hostResource",
+                  "target": "infoview.command.insertText",
+                  "type": "Lean.Vir.Js Lean.Vir.Infoview.DocumentPosition → Lean.Vir.Js String → Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)",
+                  "source": {
+                    "module": "Vir.Infoview.Surface",
+                    "path": "Vir/Infoview/Surface.lean",
+                    "startLine": 123,
+                    "startColumn": 1,
+                    "endLine": 134,
+                    "endColumn": 45
+                  }
+                }
+              ]
+            },
             {
               "target": "infoview.command.revealPosition",
               "prefix": "infoview",
