@@ -6,7 +6,7 @@
     {
       "id": "default",
       "title": "Production raw DEFLATE",
-      "build": null,
+      "build": "lean-zip",
       "tests": [
         {
           "id": "browser-parity",

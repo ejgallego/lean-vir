@@ -4,7 +4,7 @@
   "id": "lean-zip",
   "title": "lean-zip raw DEFLATE",
   "summary": "Five browser backends · exact Lean bytes and independent inflate",
-  "lifecycle": "queued",
+  "lifecycle": "active",
   "packages": [
     {
       "id": "raw-deflate",

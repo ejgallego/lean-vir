@@ -113,6 +113,12 @@ assert.ok(
   buildList.stdout.split(/\r?\n/).includes(`prettyM\t${prettyMSetId}`),
   buildList.stdout,
 );
+assert.ok(
+  buildList.stdout.split(/\r?\n/).includes(
+    "lean-zip\tlean-zip-browser-set-0001",
+  ),
+  buildList.stdout,
+);
 
 const sourcePlan = spawnSync(
   process.execPath,
@@ -150,6 +156,7 @@ const candidateMatrix = spawnSync(
 assert.equal(candidateMatrix.status, 0, candidateMatrix.stderr);
 assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   include: [
+    { example: "lean-zip", variant: "default", build: "lean-zip" },
     { example: "prettyM", variant: "default", build: "prettyM" },
   ],
 });
@@ -160,7 +167,10 @@ const pagesPlan = spawnSync(
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(pagesPlan.status, 0, pagesPlan.stderr);
-assert.equal(pagesPlan.stdout, "prettyM\tdefault\tprettyM\n");
+assert.equal(
+  pagesPlan.stdout,
+  "lean-zip\tdefault\tlean-zip\nprettyM\tdefault\tprettyM\n",
+);
 
 const escapedOutput = spawnSync(
   process.execPath,

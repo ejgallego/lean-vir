@@ -82,7 +82,10 @@ test("derives Pages deployments from active canonical examples", async (t) => {
       catalog: fixture.catalog,
       database: fixture.database,
     }),
-    [{ example: "prettyM", variant: "default", build: "prettyM" }],
+    [
+      { example: "lean-zip", variant: "default", build: "lean-zip" },
+      { example: "prettyM", variant: "default", build: "prettyM" },
+    ],
   );
 });
 
