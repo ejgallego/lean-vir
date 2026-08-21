@@ -1,0 +1,352 @@
+# VIR Project Review
+
+Current snapshot: 2026-08-13 at
+`15a4c5d3512e5bacebb845654422b72214b5c584`.
+
+Original review baseline: 2026-07-30 at
+`b528eddb94a46e16f649b290958e4bd2bd1df08a`.
+
+## Executive Assessment
+
+VIR has moved from a technically credible proof of concept to a mature
+internal pilot platform. It now has a practical downstream Lake workflow,
+modular declaration packages, declaration-site interface diagnostics, an
+exact-commit SDK path, real-browser CI, a deployed analysis site, downstream
+Illuminate support, and measurement-backed control of its native runtime
+frontier.
+
+The central engineering proposition is established:
+
+- selected real Lean compiler IR runs through Lean's unmodified interpreter in
+  `wasm32-wasip1`;
+- downstream projects can mark exports and startup hooks, build dependency-
+  ordered package sets, and install a matching browser SDK;
+- the runtime boundary is explicit, tested, and quantitatively inspectable;
+- alternatives can now be compared through a shared browser benchmark
+  application rather than through architectural argument alone; and
+- a real-environment experiment gives a concrete case for a narrow upstream
+  declaration-provider seam.
+
+VIR is not yet a supported product. The remaining product uncertainty is no
+longer basic execution feasibility or browser CI. Two questions now dominate:
+the browser binding/lifecycle contract, and an authoritative comparison of the
+JavaScript, VIR, and FIR paths across cold load, warm speed, deployable size,
+memory, integration effort, and update model.
+
+The recommended next phase is therefore **binding and lifecycle convergence in
+parallel with a frozen JS/VIR/FIR comparison contract, followed by a
+deliberately scoped release and Lake/browser pilot**. Release work remains
+important, but should record the chosen contract and evidence model rather
+than prematurely deciding either.
+
+## Progress Since The Original Review
+
+The current `main` is 32 commits beyond the original review baseline. Across
+that delta, 317 files changed with approximately 59,200 additions and 4,500
+deletions. Four changes landed after the 2026-08-11 reassessment, changing 128
+files with approximately 11,400 additions and 3,700 deletions.
+
+Material gains include:
+
+1. **Modular package sets.** The `:vir` facet follows Lean module ownership,
+   emits dependency-first package members plus a descriptor, and validates and
+   installs the set atomically.
+2. **Earlier, shared diagnostics.** Unsupported exports, startup hooks, and
+   host imports are classified during elaboration at the declaration site,
+   while package generation retains final raw-metadata and package-wide
+   validation.
+3. **Measured declaration lookup.** Correct Lean-compatible name hashes and a
+   package-owned index reduced fresh-entry lookup by roughly 6.6x in the
+   independent acceptance run and halved the controlled Illuminate callback
+   mean.
+4. **Measured runtime frontier.** Surface and retained-size reports now price
+   each proposed native capability by exact closure gain and raw/gzip cost.
+5. **Broader runtime support.** The current catalog exposes 477 native entries
+   and supports measured scalar, string, `ByteArray`, and Float boundaries
+   required by current workloads.
+6. **Representative browser workloads.** Illuminate runtime support and a
+   standalone five-backend `Std.Format.prettyM` application exercise VIR
+   outside the original repository demos.
+7. **Real browser CI.** Chromium execution is part of normal CI, its startup
+   race is fixed, and Pages builds and deploys successfully from current
+   `main`.
+8. **Concrete upstream evidence.** The real-environment experiment showed why
+   a declaration-only runtime should not be required to construct Lean's full
+   compiler environment closure.
+9. **Lifecycle hardening landed.** PR #103 merged compositional ownership,
+   transactional rollback, GC-aware host resources, and browser/React replay
+   coverage. The implementation risk is lower even though the public contract
+   still needs independent consolidation.
+10. **More workload-driven breadth.** Float geometry, `ByteArray` interface
+    support, lean-zip deflate packages, and client-native extern manifests
+    landed, expanding fixture coverage to 101 cases and the runtime registry to
+    20 tests.
+11. **Reproducible benchmark artifacts.** PR #120 landed the generic example
+    catalog, exact source selection, candidate build/pack/import path, and
+    browser parity gate. The main candidate workflow is green.
+12. **Persistent interpreter state.** PR #131 now retains interpreter constant
+    and symbol caches across calls in one package generation. This removes a
+    lifecycle mismatch but requires browser performance evidence to be
+    refreshed against the current call model.
+13. **More inspectable extension policy.** Client-native manifests and the
+    generalized boundary explorer make workload-specific native additions
+    explicit without broadening general dynamic lookup.
+
+About half of the additions since 2026-08-06 belong to the deliberately
+standalone benchmark webapp. That extraction boundary is useful, but it also
+creates a new maintenance surface that needs an explicit owner or eventual
+repository split.
+
+## Current Evidence
+
+| Area | Current evidence | Assessment |
+| --- | --- | --- |
+| Core execution | Real compiler IR, unmodified upstream interpreter, strict Wasm link | Strong for the selected surface |
+| Differential coverage | 101 manifest fixtures; exact-head CI green | Strong and growing |
+| Runtime smoke | 20 tests across pure and Lean-backed groups | Strong |
+| Browser validation | Real Chromium in exact-head CI; Pages deployed | Strong |
+| Lake and SDK path | Modular `:vir` sets, `:virSdk`, exact-commit artifact verification, downstream dogfood | Pilot-ready; release unexercised |
+| Runnable Lean surface | Latest local report: 322,526 of 398,519 all-IR functions; 29,354 of 36,887 public constants | Quantified static coverage, not an interface promise; refresh in release evidence |
+| Native frontier | 477 explicit entries: 466 Lean-derived symbols and 11 VIR overrides | Strong maintenance control |
+| Release-size baseline | 2026-08-10: 723,398 bytes raw; 163,593 deterministic gzip | Refresh after recent native/package changes and use L-004 accounting before freeze |
+| Alternatives | Five-backend `prettyM` app plus Illuminate peer workload | Broad machinery; authoritative JS/VIR/FIR contract and campaigns still open |
+| Production dependency audit | 0 vulnerabilities | Clear |
+| Development dependency audit | 3 high and 1 low finding | Release hygiene work |
+| User validation | Maintainer-owned downstream examples and Illuminate workload | Useful dogfood; independent repeat use still weak |
+| Ownership and review | One primary human contributor; no submitted reviews on the ten latest merged PRs | Highest sustainability risk |
+
+The exact current-head GitHub evidence is:
+
+- [main CI run](https://github.com/ejgallego/lean-vir/actions/runs/31591589285);
+- [Pages build and deployment](https://github.com/ejgallego/lean-vir/actions/runs/31591589169).
+
+## Priority Findings
+
+### F1 — Binding ownership and lifecycle semantics are the next design gate
+
+Severity: **pre-release product gate**
+
+The runtime can already expose DOM, timer, animation, resource, callback,
+React, and application-specific host operations. Recent work shows that adding
+more operations is easier than defining one coherent ownership contract across
+all of them.
+
+[PR #103](https://github.com/ejgallego/lean-vir/pull/103) merged as `607ef30`.
+It makes ownership more compositional, transactional, GC-aware, and
+deterministic, and adds extensive React and real-browser lifetime coverage,
+while explicitly deferring static prevention of some callback-handle escape.
+
+[PR #101](https://github.com/ejgallego/lean-vir/pull/101) remains draft and its
+real-browser test catches an uncancelled animation frame. This is useful
+negative evidence: the current test boundary can detect a lifecycle contract
+violation before that API reaches `main`.
+
+[PR #124](https://github.com/ejgallego/lean-vir/pull/124) adds a green React
+Strict Mode callback-replay regression. Together these patches give better
+implementation evidence, but they do not decide which declaration, metadata,
+generated adapter, registry entry, or handwritten binding is authoritative.
+
+Recommendation:
+
+- identify the authoritative source for each binding signature and ownership
+  rule;
+- define owned, borrowed, retained, transferred, cancelled, and terminal
+  states independently of React-specific implementation details;
+- use representative DOM/resource and React/replay cases to validate the same
+  contract;
+- land only the surface whose creation, partial failure, cancellation, reload,
+  and disposal semantics are supportable.
+
+Tracked by
+[L-003](cards/active/L-003-binding-lifecycle-semantics.md).
+
+### F2 — JS/VIR/FIR comparison is now a product-decision gate
+
+Severity: **product-evidence gate**
+
+The all-hands' clearest feedback was the need to compare JavaScript, VIR, and
+FIR implementations well across load latency, speed, size, and related costs.
+This does not require a new benchmark from scratch. The current application
+already captures semantic parity, cold startup, resource-load wall time,
+artifact bytes, marshal/execute/decode/total phases, scaling, retained and
+isolated memory, repeated calls, and artifact identity.
+
+The gap is methodological. Equivalent **time to first correct result** must be
+split into the phases each backend actually pays. Cold, cached, and already-
+loaded paths must not be mixed. Size must distinguish complete first-app cost
+from incremental workload cost, because VIR can amortize one interpreter
+runtime across multiple packages. Integration and update cost require pilot
+evidence rather than a timing loop.
+
+The artifact-identity prerequisite is now substantially met: PR #120's
+producer-to-pack-to-import candidate path is merged and green. PR #131 changes
+the interpreter call lifecycle by retaining constant and symbol caches, so
+older fresh-interpreter measurements remain historical optimization evidence,
+not the baseline for the current browser scorecard.
+
+Recommendation:
+
+- freeze a multidimensional comparison contract and artifact identity before
+  accepting numeric claims;
+- use JavaScript, VIR, and FIR-native as the core choice, with VIR modes and
+  LLVM/Emscripten retained as diagnostic comparators;
+- publish raw and deterministic compressed size, first-use, warm/scaling,
+  memory, and workload-amortization views separately;
+- run controlled `prettyM` and Illuminate campaigns, leaving any incomplete
+  Illuminate run explicitly rehearsal-only; and
+- conclude with conditions favoring each path rather than one scalar winner.
+
+Tracked by
+[L-004](cards/active/L-004-js-vir-fir-comparison.md).
+
+### F3 — The first release should follow the semantics decision
+
+Severity: **sequencing decision, not an immediate blocker**
+
+There is still no tag or GitHub release. The exact-commit SDK path and
+downstream example make development and pilot preparation practical, so the
+absence of a tag no longer blocks learning. It still blocks a compatibility
+claim and a durable unauthenticated release-consumption rehearsal.
+
+Recommendation:
+
+- continue using exact-commit artifacts for binding and pilot learning;
+- do not freeze `v0.1.0` merely to close the release gap;
+- once L-003 resolves the claimed lifecycle surface, publish and consume the
+  smallest honest SDK and support contract;
+- use L-004's artifact accounting for the release size and comparison
+  snapshot.
+
+### F4 — The declaration-provider seam is ready for upstream feedback
+
+Severity: **bounded coordination opportunity**
+
+The real-environment experiment used Lean's public construction path and
+preserved identical package behavior. Compared with VIR's indexed provider, it
+added 3,449,983 stripped Wasm bytes (+524.8%), increased deterministic gzip by
+603,461 bytes (+401.8%), raised package loading by roughly 60%, and slowed
+steady fresh-entry execution by roughly 19%.
+
+This is enough to request feedback on a narrow caller-owned declaration
+provider while preserving the existing environment-backed entry point. It is
+not evidence for upstreaming `.irpkg`, browser bindings, host policy, or the
+separate cross-entry cache experiment.
+
+### F5 — Maintenance knowledge remains concentrated
+
+Severity: **organizational productization risk**
+
+The implementation is substantially more systematic, but the operating model
+has not caught up. Current local state contains 22 linked worktrees and 40
+branches. Six draft PRs remain open, and the latest merged work has no
+submitted GitHub review. Generated inventories and analysis reports reduce
+implicit code knowledge; they do not provide backup judgment or release
+ownership.
+
+Recommendation:
+
+- name the accountable maintainer, backup maintainer, pilot user, and VIR pilot
+  owner;
+- have someone other than the primary author review the binding/lifecycle
+  contract before it becomes a release promise;
+- name an owner or independent reviewer for the comparison protocol and
+  campaigns, not only for benchmark implementation;
+- keep benchmark application ownership explicit and reconsider extraction
+  once the comparison contract is stable.
+
+### F6 — Artifact production is ready; accepted comparison evidence is not
+
+Severity: **bounded implementation gap**
+
+The new benchmark application compares JavaScript, two VIR interfaces,
+FIR-native, and LLVM/Emscripten. It captures startup, phases, scaling,
+interaction, memory, repeated calls, artifact identities, and semantic parity.
+Illuminate is a second example behind the same shell.
+
+[PR #120](https://github.com/ejgallego/lean-vir/pull/120) merged the example
+catalog, exact source checkouts, FIR/VIR toolchain selection, v2 artifact-set
+production, candidate packing and re-import, and cross-backend parity
+validation. Its
+[candidate workflow](https://github.com/ejgallego/lean-vir/actions/runs/31515741653)
+is green on the merged commit. This closes the reproducible-artifact blocker
+identified on 2026-08-11.
+
+The remaining work is to approve the protocol, run it on a controlled machine,
+and retain the resulting report. Draft PRs #129 and #130 add owned/borrowed JSON
+lanes and a Verso search workload; they are promising extra comparison breadth
+but should not delay the first authoritative `prettyM` scorecard. Draft PR #128
+can expose the benchmark through Pages, but publication is not a substitute for
+controlled evidence.
+
+### F7 — Setup cost and development-tool hygiene remain open
+
+Severity: **near-term**
+
+The original clean setup reached approximately 15.8 GB peak RSS; a later Lean
+upgrade rebuild again reached roughly 16.1 GB. A second-machine and
+lower-parallelism result is still missing.
+
+Production dependencies audit cleanly. The full audit reports findings in
+Vite, PostCSS/nanoid, and esbuild. These affect development tooling rather than
+the packaged Lean/Wasm runtime, but should be resolved before a public tag.
+
+### F8 — User evidence still trails implementation evidence
+
+Severity: **pilot learning risk**
+
+`lean-vir-examples`, Illuminate, and the benchmark application are much better
+than synthetic feasibility demos. They remain driven by the same contributor
+and collaborators around the implementation. The next strong signal is a user
+who can repeat the Lake/browser workflow and explain why VIR is preferable to
+their actual fallback.
+
+## Product Boundary For The Next Phase
+
+Validated development use:
+
+- project-controlled, trusted packages;
+- exact-match Lean, package, runtime, and SDK revisions;
+- explicit calls and startup hooks;
+- modular package sets;
+- synchronous host imports;
+- the documented structural value subset; and
+- tested browser operations whose ownership behavior is understood.
+
+Under active design:
+
+- the canonical browser-binding definition and generation path;
+- resource and callback ownership across replay and partial failure;
+- cancellation and detached-handle semantics;
+- React concurrent rendering and callback escape;
+- which of those behaviors belong in the first supported SDK.
+
+Not promised:
+
+- arbitrary untrusted packages;
+- full `.olean`, raw `.ir`, or Lean environment loading;
+- Promise-valued host imports;
+- unrestricted native lookup;
+- complete DOM, React, or ProofWidgets APIs;
+- native execution speed; or
+- compatibility across unmatched revisions.
+
+## Post-Presentation Decisions And Requests
+
+The presentation is complete. Its primary feedback strengthens, rather than
+replaces, the existing sequence:
+
+1. Who owns and independently reviews the JS/VIR/FIR comparison protocol?
+2. Which machine, browser, cache/network profiles, `prettyM` inputs, and
+   Illuminate traces define the first accepted campaigns?
+3. Which concrete Lean/browser workflow should exercise the first pilot, and
+   what is its real JavaScript or FIR fallback?
+4. Which binding and lifecycle behavior does that workflow actually require?
+5. Who will review and own the browser boundary with the primary maintainer?
+6. Who will own the user outcome and support-cost record?
+7. Is Lean upstream receptive to the measured narrow declaration-provider
+   seam?
+
+The next decision gate has two parts: whether the binding/lifecycle contract is
+small and coherent enough to release, and whether the comparison evidence is
+fair enough to guide users among JS, VIR, and FIR. Whether VIR can execute Lean
+IR in a browser is already answered.
