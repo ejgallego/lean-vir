@@ -81,9 +81,10 @@ If a future Lean toolchain adds another constructor or a demo reaches one of
 those types, update the tracked Lean tag constants, the C++ enum mapping, and
 the direct Lean encoder and C++ decoder before the new demo can run.
 
-`build/fixtures/summary.json` also records imported IR declarations and native
-extern dependencies per fixture. Use it to see whether a new fixture is growing
-the package-backed imported closure or the explicit native boundary.
+`build/fixtures/summary.json` also records imported IR declarations, native
+extern dependencies, and initializer globals per fixture. Use it to see whether
+a new fixture is growing the package-backed imported closure, initializer
+surface, or explicit native boundary.
 
 ## Browser Entrypoints
 

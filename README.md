@@ -289,8 +289,8 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 - `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
   boundary sources.
 - `web/src/` contains runtime and host-binding code; browser page entry points
-  live under `web/src/apps/`, and reusable static tool templates live under
-  `web/tools/`.
+  live under `web/src/apps/`, reusable page helpers under `web/src/pages/`, and
+  reusable static tool templates under `web/tools/`.
 - `examples/` contains runnable applications and tutorials; `fixtures/`
   contains regression-only Lean and host inputs.
 - `benchmarks/harness/` owns repository-level benchmark runners and comparison

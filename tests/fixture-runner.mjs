@@ -393,6 +393,7 @@ const summary = {
       loadedDeclCount: result.diagnostics.loadedDecls.length,
       importedDecls: result.diagnostics.importedDecls,
       nativeExterns: result.diagnostics.nativeExterns,
+      initGlobals: result.diagnostics.initGlobals,
       missingDecls: result.diagnostics.missingDecls,
       missingNativeExterns: result.diagnostics.missingNativeExterns,
       unsupportedInitGlobals: result.diagnostics.unsupportedInitGlobals,

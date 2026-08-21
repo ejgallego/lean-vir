@@ -67,6 +67,26 @@ export async function smokeLanding(cdp, origin) {
   assert.equal(sorted, "[1, 2, 3, 4]");
 }
 
+export async function smokeRuntimeExample(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}runtime-example.html`);
+  const results = await waitForBrowserState(cdp, `(() => {
+    const text = document.querySelector("#runtime-example-output")?.textContent?.trim() ?? "";
+    if (text === "" || text === "Loading...") return { ready: false, value: text };
+    try {
+      return { ready: true, value: JSON.parse(text) };
+    } catch {
+      return { trap: true, error: text };
+    }
+  })()`, {
+    timeoutMessage: "runtime example did not produce results",
+    timeoutMs: 15000,
+  });
+  assert.equal(results.constNat, "192");
+  assert.equal(results.natToNat, "144");
+  assert.equal(results.natArrayToNat, "30");
+  assert.equal(results.leanToBrowserTitle, "Lean VIR host: runtime example");
+}
+
 export async function smokeRuntimeDemo(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}demo.html`);
   await waitForReady(cdp);
