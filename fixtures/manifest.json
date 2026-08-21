@@ -592,6 +592,34 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-platform-num-bits-wasm32",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.platformNumBitsScore",
+      "result": { "type": "Nat" },
+      "expect": {
+        "host": "64",
+        "wasm": "32",
+        "reason": "System.Platform.numBits reflects the execution target."
+      }
+    },
+    {
+      "id": "boundary-uint64-to-usize-wasm32",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint64ToUSizeTargetScore",
+      "result": { "type": "Nat" },
+      "expect": {
+        "host": "4294967296",
+        "wasm": "0",
+        "reason": "UInt64.toUSize narrows to the execution target's word size."
+      }
+    },
+    {
+      "id": "boundary-usize-ofnat-runtime-coherence",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.usizeOfNatRuntimeCoherenceScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-uint16-uint32-conversion",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint16UInt32ConversionScore",

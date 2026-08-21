@@ -12,8 +12,16 @@ debugging or another positive value to pin the worker count.
 
 Known unsupported fixtures can be tracked in `fixtures/manifest.json` so
 boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
-with per-fixture status, imported IR declarations, native externs, initializer
-globals, and missing-boundary diagnostics for CI and boundary debugging.
+with per-fixture status, expected host and Wasm values, expectation rationale,
+imported IR declarations, native externs, initializer globals, and
+missing-boundary diagnostics for CI and boundary debugging.
+
+The host interpreter remains the default oracle. When behavior intentionally
+depends on the execution target, an `expect` object must pin distinct decimal
+string values for both `host` and `wasm` and include a non-empty `reason`.
+These overrides are only for valid target semantics. Suspected compiler or
+runtime inconsistencies should retain the default host-oracle comparison so
+that a disagreement fails rather than being accepted as target-specific.
 
 The Lean-dependent runtime smoke also generates temporary packages with
 intentionally unsupported or ambiguous interface exports and asserts that
@@ -97,6 +105,9 @@ The current fixture surface covers:
   `shiftLeft`/`shiftRight`, small `Int` arithmetic, `USize` `sub`/`mul`/
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
   `Float.toUInt32`; the slide canvas smoke additionally covers `Float.sub`;
+- target-sensitive `System.Platform.numBits` and `UInt64.toUSize` behavior on
+  the 64-bit host and Wasm32 runtime, plus coherence between `USize.ofNat` and
+  an opaque runtime conversion on each target;
 - `Float.abs`/`sqrt`/`sin`/`cos`/`acos`/`atan2`/`cbrt`/`floor` over finite
   values, both signed zeros, infinities, NaN, inverse-cosine boundaries,
   `atan2` quadrants, positive and negative cube roots, and positive and

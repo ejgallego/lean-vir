@@ -8,6 +8,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
+import { fixtureExpectation } from "./support/fixture-expectations.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
@@ -223,19 +224,30 @@ async function generatePackage(fixture) {
 
 async function runFixture(fixture) {
   const start = timerStart();
-  const expectedStatus = fixture.expect?.status ?? "pass";
+  const expectation = fixtureExpectation(fixture);
   const hostStart = timerStart();
   const host = await hostOracle(fixture);
   const hostSeconds = elapsedSeconds(hostStart);
+  if (expectation.host !== null && host !== expectation.host) {
+    return {
+      status: "failed",
+      fixture,
+      expectation,
+      host,
+      detail: `host=${host} expected-host=${expectation.host}`,
+      timing: { total: elapsedSeconds(start), host: hostSeconds, package: 0, wasm: 0 },
+    };
+  }
   const packageStart = timerStart();
   const generated = await generatePackage(fixture);
   const packageSeconds = elapsedSeconds(packageStart);
 
   if (!generated.ok) {
-    if (expectedStatus === "unsupported") {
+    if (expectation.status === "unsupported") {
       return {
         status: "expected-unsupported",
         fixture,
+        expectation,
         host,
         diagnostics: generated.diagnostics,
         detail: `${generated.failure.kind}: ${generated.failure.detail}`,
@@ -245,6 +257,7 @@ async function runFixture(fixture) {
     return {
       status: "failed",
       fixture,
+      expectation,
       host,
       diagnostics: generated.diagnostics,
       detail: `${generated.failure.kind}: ${generated.failure.detail}`,
@@ -267,10 +280,11 @@ async function runFixture(fixture) {
     package: packageSeconds,
     wasm: wasmSeconds,
   };
-  if (expectedStatus === "unsupported") {
+  if (expectation.status === "unsupported") {
     return {
       status: "failed",
       fixture,
+      expectation,
       host,
       wasm,
       diagnostics: generated.diagnostics,
@@ -278,10 +292,26 @@ async function runFixture(fixture) {
       timing,
     };
   }
+  if (expectation.wasm !== null && wasm !== expectation.wasm) {
+    return {
+      status: "failed",
+      fixture,
+      expectation,
+      host,
+      wasm,
+      diagnostics: generated.diagnostics,
+      detail: `host=${host} wasm=${wasm} expected-wasm=${expectation.wasm}`,
+      timing,
+    };
+  }
+  if (expectation.wasm !== null) {
+    return { status: "passed", fixture, expectation, host, wasm, diagnostics: generated.diagnostics, timing };
+  }
   if (wasm !== host) {
     return {
       status: "failed",
       fixture,
+      expectation,
       host,
       wasm,
       diagnostics: generated.diagnostics,
@@ -289,7 +319,7 @@ async function runFixture(fixture) {
       timing,
     };
   }
-  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics, timing };
+  return { status: "passed", fixture, expectation, host, wasm, diagnostics: generated.diagnostics, timing };
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -358,7 +388,10 @@ let failed = 0;
 for (const result of results) {
   if (result.status === "passed") {
     passed++;
-    console.log(`PASS ${result.fixture.id}: ${result.wasm}`);
+    const value = result.expectation.wasm === null
+      ? result.wasm
+      : `host=${result.host} wasm=${result.wasm}`;
+    console.log(`PASS ${result.fixture.id}: ${value}`);
   } else if (result.status === "expected-unsupported") {
     unsupported++;
     console.log(`UNSUPPORTED ${result.fixture.id}: ${result.detail}`);
@@ -379,7 +412,10 @@ const summary = {
     id: result.fixture.id,
     entry: result.fixture.entry,
     status: result.status,
-    expectedStatus: result.fixture.expect?.status ?? "pass",
+    expectedStatus: result.expectation.status,
+    expectedHost: result.expectation.host,
+    expectedWasm: result.expectation.wasm,
+    expectationReason: result.expectation.reason,
     host: result.host,
     wasm: result.wasm,
     detail: result.detail,
