@@ -288,6 +288,13 @@
             },
             "entrypoint": "integration/lean-zip/export-raw-package.mjs",
             "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
             "files": {
               "BUILD.json": "lean-zip/fir-native/BUILD.json",
               "SHA256SUMS": "lean-zip/fir-native/SHA256SUMS",
