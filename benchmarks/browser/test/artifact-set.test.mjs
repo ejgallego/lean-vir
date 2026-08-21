@@ -82,6 +82,27 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   });
 });
 
+test("lean-zip FIR packages declare their Emscripten setup", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const expected = [
+    {
+      checkout: "producer",
+      command: "bash",
+      args: ["integration/lcnf-c-wasm/setup-emscripten.sh"],
+    },
+  ];
+  assert.deepEqual(
+    database.builds["lean-zip"].components["fir-native"].producer.setup,
+    expected,
+  );
+  assert.deepEqual(
+    database.builds["lean-zip"].components["fir-emscripten"].producer.setup,
+    [{ ...expected[0], checkout: "fir" }],
+  );
+});
+
 test("catalog build identity and artifact paths are example-neutral", async () => {
   const database = await readBuildDatabase(
     join(appRoot, "artifact-builds.json"),
