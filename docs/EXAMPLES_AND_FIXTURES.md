@@ -57,7 +57,9 @@ are exercised by automated tests and are not deployed as examples.
 
 `fixtures/manifest.json` is the executable test catalog. It may be large, but
 the landing page and example pages must not render it. Use `demo.html` or the
-package runner when diagnosing those cases locally.
+package runner when diagnosing those cases locally. Its shared version,
+fixture, and expectation contract lives in `fixtures/fixture-manifest.mjs` and
+is applied by the package generator, fixture runners, and browser catalog.
 
 ## Adding client code
 

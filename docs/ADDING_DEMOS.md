@@ -81,10 +81,12 @@ If a future Lean toolchain adds another constructor or a demo reaches one of
 those types, update the tracked Lean tag constants, the C++ enum mapping, and
 the direct Lean encoder and C++ decoder before the new demo can run.
 
-`build/fixtures/summary.json` also records imported IR declarations, native
-extern dependencies, and initializer globals per fixture. Use it to see whether
-a new fixture is growing the package-backed imported closure, initializer
-surface, or explicit native boundary.
+`build/fixtures/summary.json` schema version 2 records each fixture's declared
+host and Wasm expectations, phase timings, imported IR declarations, native
+extern dependencies, initializer globals, and structured missing dependencies.
+Missing-dependency entries retain the declaration name and their `via` path.
+Use the summary to see whether a new fixture is growing the package-backed
+imported closure, initializer surface, or explicit native boundary.
 
 ## Browser Entrypoints
 

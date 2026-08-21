@@ -9,7 +9,11 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
 - `fixture-runner.mjs` is the integration entry point for Lean fixture
   host-oracle and Wasm comparison checks; their inputs live in root
-  `fixtures/`.
+  `fixtures/`. The shared manifest and expectation contract lives beside those
+  inputs in `fixtures/fixture-manifest.mjs`; report diagnostics, immutable
+  runner configuration, result evaluation, summary construction, and the
+  cached runner context live under `support/`. The pure contracts have direct
+  coverage in the top-level `fixture-*.test.mjs` files.
 - `runtime/` owns the JavaScript runtime smoke-test runner and its focused test
   cases.
 - `surface/` tests the report-analysis and rendering tools kept in `scripts/`.
@@ -18,5 +22,7 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
   scenario helpers.
 
 Use the stable `npm run test:*` commands from the repository root.
+Run `npm run test:fixtures:unit` for the fixture support contracts without a
+Lean or Wasm build.
 Top-level files are focused integration entry points whose implementation
 dependencies remain with their owning library or script directory.

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 
+import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
 import { packageSpecs } from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
 import { runSync } from "./process-utils.mjs";
@@ -101,6 +102,7 @@ function targetsForSpec(spec, fixtures) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const manifestFixtures = validateFixtureManifest(manifest);
 const selectedPackageSpecs = args.packages.size === 0
   ? packageSpecs
   : packageSpecs.filter((spec) => args.packages.has(spec.id) || args.packages.has(spec.file));
@@ -125,7 +127,7 @@ if (args.copyPublic) {
 
 const packageTimings = [];
 for (const spec of selectedPackageSpecs) {
-  const { targets, packageTargets } = targetsForSpec(spec, manifest.fixtures ?? []);
+  const { targets, packageTargets } = targetsForSpec(spec, manifestFixtures);
   const packagePath = packagePathFor(spec);
   const reportPath = spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
   const packageStart = timerStart();

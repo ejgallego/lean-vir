@@ -36,6 +36,7 @@ asks for that machinery.
 - `npm run probe:upstream`
 - `npm test`
 - `npm run test:upstream`
+- `npm run test:fixtures:unit`
 - `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures`
 - `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build`
 - `CHROMIUM=/path/to/chromium npm run test:pages:browser`

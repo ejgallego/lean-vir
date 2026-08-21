@@ -8,13 +8,14 @@ compared against Lean's host IR interpreter with
 `tools/GeneratePackage.lean` and the `Vir/GeneratePackage/` library modules.
 The runner schedules fixtures in parallel using half of Node's reported
 `availableParallelism()` by default; set `VIR_FIXTURE_JOBS=1` for serial
-debugging or another positive value to pin the worker count.
+debugging or another positive integer to pin the worker count. Malformed worker
+limits fail before any build starts.
 
-Known unsupported fixtures can be tracked in `fixtures/manifest.json` so
-boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
-with per-fixture status, expected host and Wasm values, expectation rationale,
-imported IR declarations, native externs, initializer globals, and
-missing-boundary diagnostics for CI and boundary debugging.
+The runner writes `build/fixtures/summary.json` with per-fixture status,
+expected host and Wasm values, expectation rationale, imported IR declarations,
+native externs, initializer globals, and structured missing-boundary
+diagnostics for CI and boundary debugging. Each missing dependency records its
+name and any declaration path that reached it.
 
 The host interpreter remains the default oracle. When behavior intentionally
 depends on the execution target, an `expect` object must pin distinct decimal

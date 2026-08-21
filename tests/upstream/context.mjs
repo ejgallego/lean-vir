@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import {
   defaultPackageFile,
   hostPackageFile,
@@ -19,6 +20,7 @@ export async function createUpstreamSmokeContext() {
     new URL("../../fixtures/manifest.json", import.meta.url),
     "utf8",
   ));
+  validateFixtureManifest(fixtureManifest);
   const packageBytesByFile = new Map();
   for (const spec of packageSpecs) {
     packageBytesByFile.set(

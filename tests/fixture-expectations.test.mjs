@@ -8,11 +8,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { fixtureExpectation } from "./support/fixture-expectations.mjs";
+import {
+  fixtureExpectation,
+  validateFixtureManifest,
+} from "../fixtures/fixture-manifest.mjs";
 
 test("defaults to the host oracle", () => {
   assert.deepEqual(fixtureExpectation({ id: "same" }), {
-    status: "pass",
     host: null,
     wasm: null,
     reason: null,
@@ -24,21 +26,16 @@ test("accepts documented target-specific results", () => {
     id: "target-specific",
     expect: { host: "64", wasm: "32", reason: "The word size follows the target." },
   }), {
-    status: "pass",
     host: "64",
     wasm: "32",
     reason: "The word size follows the target.",
   });
 });
 
-test("rejects unknown expectation statuses", () => {
+test("rejects obsolete status expectations", () => {
   assert.throws(
-    () => fixtureExpectation({ id: "unknown", expect: { status: "mystery" } }),
-    /unknown expect\.status "mystery"/,
-  );
-  assert.throws(
-    () => fixtureExpectation({ id: "null-status", expect: { status: null } }),
-    /unknown expect\.status null/,
+    () => fixtureExpectation({ id: "unsupported", expect: { status: "unsupported" } }),
+    /unknown expect field status/,
   );
 });
 
@@ -65,6 +62,10 @@ test("rejects blank expectation reasons", () => {
     () => fixtureExpectation({ id: "blank-reason", expect: { reason: "   " } }),
     /expect\.reason must be a non-empty string/,
   );
+  assert.throws(
+    () => fixtureExpectation({ id: "orphan-reason", expect: { reason: "No override." } }),
+    /expect\.reason requires target-specific host and Wasm results/,
+  );
 });
 
 test("rejects one-sided and undocumented target expectations", () => {
@@ -75,13 +76,6 @@ test("rejects one-sided and undocumented target expectations", () => {
   assert.throws(
     () => fixtureExpectation({ id: "undocumented", expect: { host: "64", wasm: "32" } }),
     /require expect\.reason/,
-  );
-  assert.throws(
-    () => fixtureExpectation({
-      id: "unsupported-result",
-      expect: { status: "unsupported", host: "64", wasm: "32", reason: "Conflicting modes." },
-    }),
-    /unsupported fixtures cannot declare host and Wasm results/,
   );
 });
 
@@ -96,8 +90,8 @@ test("rejects malformed or redundant target results", () => {
   );
 });
 
-test("validates every checked-in fixture expectation", async () => {
+test("validates the complete checked-in fixture manifest", async () => {
   const manifestUrl = new URL("../fixtures/manifest.json", import.meta.url);
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8"));
-  for (const fixture of manifest.fixtures ?? []) fixtureExpectation(fixture);
+  assert.equal(validateFixtureManifest(manifest).length, 104);
 });

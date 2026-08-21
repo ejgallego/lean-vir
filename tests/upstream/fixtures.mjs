@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { fixtureExpectation } from "../../fixtures/fixture-manifest.mjs";
 import { VirRuntime } from "../../web/src/runtime/core.js";
-import { fixtureExpectation } from "../support/fixture-expectations.mjs";
 import { packageForFixture } from "./context.mjs";
 import { instantiateVirModule, loadIrPackageSet } from "./wasm-package.mjs";
 

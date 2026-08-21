@@ -9,6 +9,7 @@ import {
   hostPackageFile,
   packageFileByFixtureSource,
 } from "./browser-packages.js";
+import { validateFixtureManifest } from "../../../fixtures/fixture-manifest.mjs";
 import fixtureManifest from "../../../fixtures/manifest.json";
 
 export const maxFibInput = 17;
@@ -94,7 +95,7 @@ export const demoFixtures = [
   },
 ];
 
-export const manifestFixtures = (fixtureManifest.fixtures ?? []).map((fixture) => ({
+export const manifestFixtures = validateFixtureManifest(fixtureManifest).map((fixture) => ({
   ...fixture,
   packageFile: packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile,
   group: "manifest",
