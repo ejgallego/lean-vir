@@ -10,7 +10,7 @@ import {
   hostPackageFile,
   packageFiles,
   wasmPublicFile,
-} from "./pages/browser-packages.js";
+} from "../pages/browser-packages.js";
 import {
   createFixtureInputDefaults,
   fixtures,
@@ -19,11 +19,11 @@ import {
   maxSortItems,
   maxSortValue,
   sourceLabel,
-} from "./pages/fixture-catalog.js";
-import { sourceSnippetForFixture } from "./pages/fixture-sources.js";
-import { parseByteArrayInput, parseClampedNatInput, parseDelimitedNumberText } from "./pages/input-parsers.js";
-import { formatBytes, setReadyState } from "./pages/page-utils.js";
-import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
+} from "../pages/fixture-catalog.js";
+import { sourceSnippetForFixture } from "../pages/fixture-sources.js";
+import { parseByteArrayInput, parseClampedNatInput, parseDelimitedNumberText } from "../pages/input-parsers.js";
+import { formatBytes, setReadyState } from "../pages/page-utils.js";
+import { createVirRuntimeFactory, fetchBytes } from "../vir-runtime.js";
 
 const statusEl = document.querySelector("#status");
 const petMoodDisplay = document.querySelector("#pet-mood-display");

@@ -10,15 +10,15 @@ import {
   interfaceInputTag,
   isJsonInputTag,
   parseBoolText,
-} from "./pages/interface-inputs.js";
-import { formatInterfaceEffectPrefix } from "./runtime/interface-effects.js";
-import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./runtime/interface-manifest.js";
+} from "../pages/interface-inputs.js";
+import { formatInterfaceEffectPrefix } from "../runtime/interface-effects.js";
+import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "../runtime/interface-manifest.js";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
-import { defaultPackageFile, packagePresets, wasmPublicFile } from "./pages/browser-packages.js";
-import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "./pages/input-parsers.js";
-import { assetPathFor, errorMessage, formatBytes, setReadyState } from "./pages/page-utils.js";
-import { fetchBytes } from "./vir-runtime.js";
-import { INTERFACE_TAG } from "./runtime/interface-tags.js";
+import { defaultPackageFile, packagePresets, wasmPublicFile } from "../pages/browser-packages.js";
+import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "../pages/input-parsers.js";
+import { assetPathFor, errorMessage, formatBytes, setReadyState } from "../pages/page-utils.js";
+import { fetchBytes } from "../vir-runtime.js";
+import { INTERFACE_TAG } from "../runtime/interface-tags.js";
 
 const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");

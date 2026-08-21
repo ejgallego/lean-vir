@@ -4,19 +4,21 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
-import { createVirRuntime, fetchBytes } from "./vir-runtime.js";
+import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "../pages/browser-packages.js";
+import { createVirRuntime, fetchBytes } from "../vir-runtime.js";
 
 const output = document.querySelector("#runtime-example-output");
+let vir = null;
+let hostVir = null;
 
 try {
-  const vir = await createVirRuntime({
+  vir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
     irPackageSetBytes: [
       await fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`),
     ],
   });
-  const hostVir = await createVirRuntime({
+  hostVir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
     irPackageSetBytes: [
       await fetchBytes(`${import.meta.env.BASE_URL}${hostPackageFile}`),
@@ -39,4 +41,10 @@ try {
 } catch (error) {
   output.textContent = error instanceof Error ? error.stack : String(error);
   throw error;
+} finally {
+  try {
+    hostVir?.dispose();
+  } finally {
+    vir?.dispose();
+  }
 }

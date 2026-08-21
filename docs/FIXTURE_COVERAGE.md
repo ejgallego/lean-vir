@@ -12,8 +12,8 @@ debugging or another positive value to pin the worker count.
 
 Known unsupported fixtures can be tracked in `fixtures/manifest.json` so
 boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
-with per-fixture status, imported IR declarations, native externs, and
-missing-boundary diagnostics for CI and boundary debugging.
+with per-fixture status, imported IR declarations, native externs, initializer
+globals, and missing-boundary diagnostics for CI and boundary debugging.
 
 The Lean-dependent runtime smoke also generates temporary packages with
 intentionally unsupported or ambiguous interface exports and asserts that
