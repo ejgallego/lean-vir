@@ -24,7 +24,7 @@
     },
     "lean-zip-browser": {
       "kind": "git",
-      "repository": "https://github.com/kim-em/lean-zip",
+      "repository": "https://github.com/ejgallego/lean-zip",
       "revision": "273d0d6cd9cab77c7f3489b0b0b1f6e543315d21"
     },
     "lean-zip-common": {
