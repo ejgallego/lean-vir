@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 
 import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
-import { packageSpecs } from "./browser-package-config.mjs";
+import { packageFileForFixtureSource, packageSpecs } from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
 import { runSync } from "./process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
@@ -103,6 +103,7 @@ function targetsForSpec(spec, fixtures) {
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const manifestFixtures = validateFixtureManifest(manifest);
+for (const fixture of manifestFixtures) packageFileForFixtureSource(fixture.source);
 const selectedPackageSpecs = args.packages.size === 0
   ? packageSpecs
   : packageSpecs.filter((spec) => args.packages.has(spec.id) || args.packages.has(spec.file));

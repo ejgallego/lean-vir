@@ -20,7 +20,6 @@ export const {
   benchmarkArtifactPaths,
   generatedPublicFiles,
   packagePresets,
-  packageFileByFixtureSource,
   defaultPackageFile,
   hostPackageFile,
   prettyPackageFile,

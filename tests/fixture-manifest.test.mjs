@@ -44,6 +44,10 @@ test("fixture manifests reject malformed containers and versions", () => {
     () => validateFixtureManifest({ version: 1, fixtures: null }),
     /fixture manifest fixtures must be an array/,
   );
+  assert.throws(
+    () => validateFixtureManifest({ version: 1, fixtures: [], typo: true }),
+    /fixture manifest: unknown field typo/,
+  );
 });
 
 test("fixture manifests require unique portable ids", () => {
@@ -70,6 +74,9 @@ test("fixture manifests validate execution fields", () => {
     [fixture("missing-entry", { entry: null }), /entry must be a non-empty string/],
     [fixture("empty-roots", { roots: [] }), /roots must be a non-empty array/],
     [fixture("blank-root", { roots: [""] }), /root must be a non-empty string/],
+    [fixture("missing-result", { result: undefined }), /result must be an object/],
+    [fixture("array-result", { result: [] }), /result must be an object/],
+    [fixture("unknown-result", { result: { type: "Nat", typo: true } }), /result: unknown field typo/],
     [fixture("wrong-result", { result: { type: "String" } }), /result\.type must be Nat/],
     [fixture("wrong-unsafe", { unsafe: "yes" }), /unsafe must be a boolean/],
   ];
@@ -79,4 +86,14 @@ test("fixture manifests validate execution fields", () => {
       expected,
     );
   }
+});
+
+test("fixture manifests reject unknown fixture fields", () => {
+  assert.throws(
+    () => validateFixtureManifest({
+      version: 1,
+      fixtures: [fixture("unknown-field", { root: ["Fixture.run"] })],
+    }),
+    /fixture at index 0: unknown field root/,
+  );
 });

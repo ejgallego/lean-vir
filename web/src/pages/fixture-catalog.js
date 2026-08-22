@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import {
   defaultPackageFile,
   hostPackageFile,
-  packageFileByFixtureSource,
+  packageFileForFixtureSource,
 } from "./browser-packages.js";
 import { validateFixtureManifest } from "../../../fixtures/fixture-manifest.mjs";
 import fixtureManifest from "../../../fixtures/manifest.json";
@@ -97,7 +97,7 @@ export const demoFixtures = [
 
 export const manifestFixtures = validateFixtureManifest(fixtureManifest).map((fixture) => ({
   ...fixture,
-  packageFile: packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile,
+  packageFile: packageFileForFixtureSource(fixture.source),
   group: "manifest",
 }));
 

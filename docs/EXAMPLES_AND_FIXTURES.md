@@ -59,7 +59,10 @@ are exercised by automated tests and are not deployed as examples.
 the landing page and example pages must not render it. Use `demo.html` or the
 package runner when diagnosing those cases locally. Its shared version,
 fixture, and expectation contract lives in `fixtures/fixture-manifest.mjs` and
-is applied by the package generator, fixture runners, and browser catalog.
+is applied by the package generator, fixture runners, and browser catalog. Each
+manifest source must appear in exactly one package's `fixtureSources` list in
+`fixtures/browser-packages.json`; missing and duplicate assignments fail before
+package generation or fixture execution.
 
 ## Adding client code
 
@@ -68,6 +71,7 @@ is applied by the package generator, fixture runners, and browser catalog.
 3. Put conformance, regression, and stress cases under `fixtures/` and state
    the unique contract each case protects.
 4. Register package roots in `fixtures/browser-packages.json`; register
-   automated fixture calls in `fixtures/manifest.json`.
+   automated fixture calls in `fixtures/manifest.json`, and list each manifest
+   source in exactly one browser package's `fixtureSources`.
 5. Do not add a fixture to the landing page to make it discoverable. Add or
    improve developer documentation instead.

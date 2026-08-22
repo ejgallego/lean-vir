@@ -6,8 +6,17 @@ Author: Emilio J. Gallego Arias
 
 export const fixtureManifestVersion = 1;
 
+const manifestKeys = new Set(["version", "fixtures"]);
+const fixtureKeys = new Set(["id", "source", "entry", "roots", "result", "unsafe", "expect"]);
+const resultKeys = new Set(["type"]);
 const expectationKeys = new Set(["host", "wasm", "reason"]);
 const fixtureIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
+
+function rejectUnknownFields(value, allowedKeys, label, fieldLabel = "field") {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) throw new Error(`${label}: unknown ${fieldLabel} ${key}`);
+  }
+}
 
 function natExpectation(fixture, target) {
   const value = fixture.expect?.[target];
@@ -26,9 +35,7 @@ export function fixtureExpectation(fixture) {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error(`${fixture.id}: expect must be an object`);
   }
-  for (const key of Object.keys(raw)) {
-    if (!expectationKeys.has(key)) throw new Error(`${fixture.id}: unknown expect field ${key}`);
-  }
+  rejectUnknownFields(raw, expectationKeys, fixture.id, "expect field");
 
   const host = natExpectation(fixture, "host");
   const wasm = natExpectation(fixture, "wasm");
@@ -63,6 +70,7 @@ function validateFixture(fixture, index, ids) {
   if (fixture === null || typeof fixture !== "object" || Array.isArray(fixture)) {
     throw new Error(`fixture at index ${index} must be an object`);
   }
+  rejectUnknownFields(fixture, fixtureKeys, `fixture at index ${index}`);
   if (typeof fixture.id !== "string" || !fixtureIdPattern.test(fixture.id)) {
     throw new Error(`fixture at index ${index} id must be a lowercase filename-safe identifier`);
   }
@@ -79,7 +87,11 @@ function validateFixture(fixture, index, ids) {
     }
     for (const root of fixture.roots) requireNonEmptyString(root, `${fixture.id}: root`);
   }
-  if (fixture.result?.type !== "Nat") {
+  if (fixture.result === null || typeof fixture.result !== "object" || Array.isArray(fixture.result)) {
+    throw new Error(`${fixture.id}: result must be an object`);
+  }
+  rejectUnknownFields(fixture.result, resultKeys, `${fixture.id}: result`);
+  if (fixture.result.type !== "Nat") {
     throw new Error(`${fixture.id}: result.type must be Nat`);
   }
   if (fixture.unsafe !== undefined && typeof fixture.unsafe !== "boolean") {
@@ -92,6 +104,7 @@ export function validateFixtureManifest(manifest) {
   if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new Error("fixture manifest must be an object");
   }
+  rejectUnknownFields(manifest, manifestKeys, "fixture manifest");
   if (manifest.version !== fixtureManifestVersion) {
     throw new Error(
       `fixture manifest version must be ${fixtureManifestVersion}, got ${JSON.stringify(manifest.version)}`,

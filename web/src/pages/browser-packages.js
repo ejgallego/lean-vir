@@ -15,5 +15,5 @@ export const {
   hostPackageFile,
   prettyPackageFile,
   packagePresets,
-  packageFileByFixtureSource,
+  packageFileForFixtureSource,
 } = deriveBrowserPackageConfig(browserPackages);
