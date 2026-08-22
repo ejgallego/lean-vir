@@ -95,11 +95,15 @@ function materializeExamplePackages(database, catalog) {
   }
 }
 
-async function validateBuildVariants(database, catalog, appRoot) {
+export async function catalogVariantBuilds({ appRoot, catalog, database }) {
+  const variants = [];
   for (const example of catalog.examples) {
     const testPackage = await readExampleTestPackage(appRoot, example);
     for (const variant of testPackage.variants) {
-      if (variant.build === null) continue;
+      if (variant.build === null) {
+        variants.push({ example, variant, build: null });
+        continue;
+      }
       const build = database.builds[variant.build];
       if (
         !build ||
@@ -110,17 +114,21 @@ async function validateBuildVariants(database, catalog, appRoot) {
           `example variant ${example.id}/${variant.id} references invalid build ${variant.build}`,
         );
       }
+      variants.push({ example, variant, build });
     }
   }
+  return variants;
+}
+
+async function validateBuildVariants(database, catalog, appRoot) {
+  const variants = await catalogVariantBuilds({ appRoot, catalog, database });
+  const selectedBuilds = new Set(
+    variants
+      .filter(({ build }) => build !== null)
+      .map(({ variant }) => variant.build),
+  );
   for (const [buildId, build] of Object.entries(database.builds)) {
-    const example = catalog.examples.find(({ id }) => id === build.example.id);
-    const testPackage = example
-      ? await readExampleTestPackage(appRoot, example)
-      : null;
-    const variant = testPackage?.variants.find(
-      ({ id }) => id === build.example.variant,
-    );
-    if (!variant || variant.build !== buildId) {
+    if (!selectedBuilds.has(buildId)) {
       throw new Error(
         `build ${buildId} is not selected by example variant ${build.example.id}/${build.example.variant}`,
       );

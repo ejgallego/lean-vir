@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   copyFile,
@@ -14,6 +13,8 @@ import {
 } from "node:fs/promises";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { runSync } from "./process-utils.mjs";
 
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const defaultProducer = resolve(scriptRoot, "..");
@@ -91,19 +92,8 @@ function parseArgs(argv) {
   return options;
 }
 
-function run(command, args, { cwd, env = process.env, capture = false } = {}) {
-  const value = execFileSync(command, args, {
-    cwd,
-    env,
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function git(root, args) {
-  return run("git", ["-C", root, ...args], { capture: true });
+  return runSync("git", ["-C", root, ...args], { capture: true });
 }
 
 function gitIdentity(root, label) {
@@ -185,7 +175,7 @@ async function main() {
   await mkdir(join(output, "lean-vir/js"), { recursive: true });
   await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
   try {
-    run("npm", ["run", "build:demo:release"], {
+    runSync("npm", ["run", "build:demo:release"], {
       cwd: producer,
       env: {
         ...process.env,
@@ -198,20 +188,21 @@ async function main() {
         WASI_SDK_PATH: wasiSdk,
       },
     });
-    run("lake", ["build", "Vir", "vir_irpkg"], { cwd: producer });
-    run("lake", ["build", "Zip.Wasm.Entry"], { cwd: client });
+    runSync("lake", ["build", "Vir", "vir_irpkg"], { cwd: producer });
+    runSync("lake", ["build", "Zip.Wasm.Entry"], { cwd: client });
 
     const packageFile = "lean-zip.irpkg";
     const reportFile = "lean-zip.report.md";
-    run(
+    runSync(
       "lake",
       [
         "env",
         join(producer, ".lake/build/bin/vir_irpkg"),
         join(output, packageFile),
         join(output, reportFile),
-        "--target-marked",
+        "--target",
         join(producer, "fixtures/lean-zip/VirLeanZipAcceptance/Exports.lean"),
+        "VirLeanZipAcceptance.compressRaw",
       ],
       {
         cwd: client,
@@ -227,7 +218,7 @@ async function main() {
       },
     );
     await rm(join(output, reportFile));
-    run(
+    runSync(
       esbuild,
       [
         join(producer, "web/src/vir-runtime.js"),
@@ -317,8 +308,8 @@ async function main() {
       ),
     );
     await writeFile(join(output, "SHA256SUMS"), `${checksums.join("\n")}\n`);
-    run("sha256sum", ["--check", "SHA256SUMS"], { cwd: output });
-    run(process.execPath, ["smoke.mjs"], { cwd: output });
+    runSync("sha256sum", ["--check", "SHA256SUMS"], { cwd: output });
+    runSync(process.execPath, ["smoke.mjs"], { cwd: output });
     console.log(`exported VIR lean-zip browser package to ${output}`);
   } catch (error) {
     await rm(output, { recursive: true, force: true });

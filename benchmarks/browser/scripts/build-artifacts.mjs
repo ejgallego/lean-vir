@@ -32,7 +32,6 @@ import {
   fileRecords,
   inside,
   replaceDirectoryAtomically,
-  safeArchivePath,
   sha256,
   validateSeed,
   validateSha256Sums,

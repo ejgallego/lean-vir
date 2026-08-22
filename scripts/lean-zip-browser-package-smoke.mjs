@@ -25,6 +25,10 @@ const runtime = await createVirRuntime({
   irPackageSetBytes: [packageBytes],
 });
 try {
+  assert.deepEqual(
+    runtime.interfaceManifest.exports.map(({ entry }) => entry),
+    [build.entry],
+  );
   assert.notEqual(runtime.findManifestEntry(build.entry), null);
   const actual = runtime.call(build.entry, input, build.smoke.level);
   assert.ok(actual instanceof Uint8Array);

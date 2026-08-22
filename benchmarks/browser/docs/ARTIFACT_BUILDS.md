@@ -1,16 +1,18 @@
 # Source artifact builds
 
-`examples/<id>/example.json` is the canonical declaration of each example's
-VIR targets and exports. `artifact-builds.json` selects exact Git sources,
-including the Lean runtime source consumed by VIR, local checkout roles,
-producer dependencies, expected package files, artifact-set identity, and the
+`examples/<id>/example.json` declares each example's source-level VIR targets
+and exports. `artifact-builds.json` selects exact Git sources, including the
+Lean runtime source consumed by VIR, local checkout roles, producer
+dependencies, expected package files, artifact-set identity, and the
 provenance consumed by the packer. Generated candidate locks are ignored
-invocation-local integrity records, not committed consumer state. A VIR
-component names a `packageRef`, and every build binds an `example.id` plus
-`example.variant`. The driver resolves the package target and exports from the
-example descriptor and verifies that `tests.json` selects the same build before
-validating or building it. `prettyM/default` is the first record; it is not a
-default baked into the catalog tools.
+invocation-local integrity records, not committed consumer state. A standard
+`vir` component names a `packageRef`, and the driver resolves its target and
+exports directly from the example descriptor. A `package-command` component
+instead owns its repository-specific export driver while receiving the same
+verified source inputs. Every build binds an `example.id` plus
+`example.variant`, and the driver verifies that `tests.json` selects that build
+before validating or building it. `prettyM/default` is the first record; it is
+not a default baked into the catalog tools.
 
 Machine-specific paths are deliberately absent from the catalog. The usual
 local flow materializes the catalogued sources, then optionally replaces the
@@ -125,10 +127,9 @@ supplies verified checkout roots and a fresh output path. A producer must:
 5. return success only after its package-local smoke or differential checks
    pass.
 
-The VIR adapter is uniform across examples: every package reference becomes
-one `lake exe vir_irpkg` call over its declared target and exports. Clients do
-not provide shell commands. The other initial adapters use producer entry
-points that already exist:
+The standard VIR adapter is uniform across examples: every package reference
+becomes one `lake exe vir_irpkg` call over its declared target and exports. The
+other initial adapters use producer entry points that already exist:
 
 - FIR native: `integration/talos/artifact/package-pretty-format.sh OUTPUT`;
 - FIR LLVM: `integration/lcnf-c-wasm/package-prettyM-emscripten.sh OUTPUT`, with
