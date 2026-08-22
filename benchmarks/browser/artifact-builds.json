@@ -35,7 +35,7 @@
     "vir-lean-zip": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "baa8cc5e0d4742f8809c8a1ce4c0a346ab851c70"
+      "revision": "6c0e82398e7c4c27a0b9b8b0d0d5b5ff2dfaadde"
     },
     "vir-prettyM": {
       "kind": "git",
