@@ -192,10 +192,11 @@ The deployment from `main` follows the same layout:
 - [VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
 - [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
 
-The benchmark catalog currently deploys the verified `prettyM/default`
-candidate and its differential test package. The runnable-surface report tracks
-installed declarations with complete VIR closures; the size explorer breaks
-the release and debug Wasm artifacts down by section, object, and symbol.
+The benchmark catalog currently deploys the verified `prettyM/default` and
+`lean-zip/default` candidates with their differential test packages. The
+runnable-surface report tracks installed declarations with complete VIR
+closures; the size explorer breaks the release and debug Wasm artifacts down by
+section, object, and symbol.
 
 See [docs/SURFACE_ANALYSIS.md](docs/SURFACE_ANALYSIS.md) for local analysis,
 rendering, and serving commands.

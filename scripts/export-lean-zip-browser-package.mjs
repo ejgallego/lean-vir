@@ -45,7 +45,10 @@ function parseArgs(argv) {
     if (separator <= 0 || separator === value.length - 1) {
       throw new Error(`${option} requires NAME=PATH`);
     }
-    return { name: value.slice(0, separator), path: value.slice(separator + 1) };
+    return {
+      name: value.slice(0, separator),
+      path: value.slice(separator + 1),
+    };
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -54,13 +57,17 @@ function parseArgs(argv) {
       options.output = take(index++, argument);
     } else if (argument === "--checkout") {
       const { name, path } = assignment(take(index++, argument), argument);
-      if (!expectedRoles.has(name)) throw new Error(`unknown checkout role: ${name}`);
-      if (options.checkouts.has(name)) throw new Error(`duplicate checkout role: ${name}`);
+      if (!expectedRoles.has(name))
+        throw new Error(`unknown checkout role: ${name}`);
+      if (options.checkouts.has(name))
+        throw new Error(`duplicate checkout role: ${name}`);
       options.checkouts.set(name, path);
     } else if (argument === "--package") {
       const { name, path } = assignment(take(index++, argument), argument);
-      if (name !== "workload") throw new Error(`unknown dependency package: ${name}`);
-      if (options.packages.has(name)) throw new Error(`duplicate dependency package: ${name}`);
+      if (name !== "workload")
+        throw new Error(`unknown dependency package: ${name}`);
+      if (options.packages.has(name))
+        throw new Error(`duplicate dependency package: ${name}`);
       options.packages.set(name, path);
     } else if (argument === "--help" || argument === "-h") {
       usage();
@@ -70,9 +77,13 @@ function parseArgs(argv) {
     }
   }
   if (options.output === null) throw new Error("pass --output PATH");
-  options.checkouts.set("producer", options.checkouts.get("producer") ?? defaultProducer);
+  options.checkouts.set(
+    "producer",
+    options.checkouts.get("producer") ?? defaultProducer,
+  );
   for (const role of expectedRoles) {
-    if (!options.checkouts.has(role)) throw new Error(`missing checkout role: ${role}`);
+    if (!options.checkouts.has(role))
+      throw new Error(`missing checkout role: ${role}`);
   }
   if (!options.packages.has("workload")) {
     throw new Error("missing dependency package: workload");
@@ -124,8 +135,14 @@ async function main() {
   if ((await lstat(output).catch(() => null)) !== null) {
     throw new Error(`output directory already exists: ${output}`);
   }
-  const producer = await checkoutRoot(options.checkouts.get("producer"), "producer");
-  const runtime = await checkoutRoot(options.checkouts.get("runtime"), "runtime");
+  const producer = await checkoutRoot(
+    options.checkouts.get("producer"),
+    "producer",
+  );
+  const runtime = await checkoutRoot(
+    options.checkouts.get("runtime"),
+    "runtime",
+  );
   const client = await checkoutRoot(options.checkouts.get("client"), "client");
   const sourceIdentities = {
     vir: gitIdentity(producer, "VIR"),
@@ -133,16 +150,25 @@ async function main() {
     leanZip: gitIdentity(client, "lean-zip"),
   };
   const workload = await realpath(resolve(options.packages.get("workload")));
-  const workloadBuild = JSON.parse(await readFile(join(workload, "BUILD.json"), "utf8"));
+  const workloadBuild = JSON.parse(
+    await readFile(join(workload, "BUILD.json"), "utf8"),
+  );
   if (
     workloadBuild.kind !== "lean-zip/browser-benchmark-source" ||
     workloadBuild.source?.commit !== git(client, ["rev-parse", "HEAD"]) ||
     workloadBuild.source?.dirty !== false
   ) {
-    throw new Error("workload package does not match the exact clean lean-zip checkout");
+    throw new Error(
+      "workload package does not match the exact clean lean-zip checkout",
+    );
   }
-  for (const [root, label] of [[producer, "VIR"], [client, "lean-zip"]]) {
-    const toolchain = (await readFile(join(root, "lean-toolchain"), "utf8")).trim();
+  for (const [root, label] of [
+    [producer, "VIR"],
+    [client, "lean-zip"],
+  ]) {
+    const toolchain = (
+      await readFile(join(root, "lean-toolchain"), "utf8")
+    ).trim();
     if (toolchain !== "leanprover/lean4:v4.33.0") {
       throw new Error(`${label} must use Lean 4.33 final, got ${toolchain}`);
     }
@@ -164,7 +190,10 @@ async function main() {
       env: {
         ...process.env,
         LEAN4_SRC: runtime,
-        VIR_NATIVE_EXTERN_MANIFEST: join(client, "lean-vir-native-externs.json"),
+        VIR_NATIVE_EXTERN_MANIFEST: join(
+          client,
+          "lean-vir-native-externs.json",
+        ),
         VIR_SKIP_PACKAGES: "1",
         WASI_SDK_PATH: wasiSdk,
       },
@@ -191,7 +220,9 @@ async function main() {
           LEAN_PATH: [
             join(producer, ".lake/build/lib/lean"),
             process.env.LEAN_PATH,
-          ].filter(Boolean).join(delimiter),
+          ]
+            .filter(Boolean)
+            .join(delimiter),
         },
       },
     );
@@ -219,13 +250,23 @@ async function main() {
     );
 
     const oracle = JSON.parse(
-      await readFile(join(workload, workloadBuild.workload.nativeOracle), "utf8"),
+      await readFile(
+        join(workload, workloadBuild.workload.nativeOracle),
+        "utf8",
+      ),
     );
     const vector = oracle.vectors.find(({ id }) => id === "repeated-1k");
     const expected = vector?.expected.find(({ level }) => level === 6);
-    if (!vector || !expected) throw new Error("workload package omits the VIR smoke vector");
-    await copyFile(join(workload, vector.input.file), join(output, "smoke.input.bin"));
-    await copyFile(join(workload, expected.file), join(output, "smoke.expected.raw"));
+    if (!vector || !expected)
+      throw new Error("workload package omits the VIR smoke vector");
+    await copyFile(
+      join(workload, vector.input.file),
+      join(output, "smoke.input.bin"),
+    );
+    await copyFile(
+      join(workload, expected.file),
+      join(output, "smoke.expected.raw"),
+    );
 
     const payloadPaths = [
       "lean-vir/js/vir-runtime.js",
@@ -235,7 +276,9 @@ async function main() {
       "smoke.input.bin",
       "smoke.mjs",
     ];
-    const files = await Promise.all(payloadPaths.map((path) => fileRecord(output, path)));
+    const files = await Promise.all(
+      payloadPaths.map((path) => fileRecord(output, path)),
+    );
     const build = {
       schemaVersion: 1,
       kind: "vir/lean-zip-browser-package",
@@ -246,7 +289,9 @@ async function main() {
         profile: "client-native",
         nativeExternManifest: {
           sourceFile: "lean-vir-native-externs.json",
-          sha256: sha256(await readFile(join(client, "lean-vir-native-externs.json"))),
+          sha256: sha256(
+            await readFile(join(client, "lean-vir-native-externs.json")),
+          ),
         },
         wasiSdk: basename(wasiSdk),
         module: "lean-vir/js/vir-runtime.js",
@@ -260,10 +305,17 @@ async function main() {
       },
       files,
     };
-    await writeFile(join(output, "BUILD.json"), `${JSON.stringify(build, null, 2)}\n`);
+    await writeFile(
+      join(output, "BUILD.json"),
+      `${JSON.stringify(build, null, 2)}\n`,
+    );
     const checksumPaths = ["BUILD.json", ...payloadPaths];
-    const checksums = await Promise.all(checksumPaths.map(async (path) =>
-      `${sha256(await readFile(join(output, path)))}  ${path}`));
+    const checksums = await Promise.all(
+      checksumPaths.map(
+        async (path) =>
+          `${sha256(await readFile(join(output, path)))}  ${path}`,
+      ),
+    );
     await writeFile(join(output, "SHA256SUMS"), `${checksums.join("\n")}\n`);
     run("sha256sum", ["--check", "SHA256SUMS"], { cwd: output });
     run(process.execPath, ["smoke.mjs"], { cwd: output });

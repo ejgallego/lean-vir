@@ -16,12 +16,7 @@ import {
 const revisionPattern = /^[0-9a-f]{40}$/;
 const producerProtocol = "browser-benchmarks/source-package/v1";
 const artifactBoundary = "browser-benchmarks/bounded-runtime/v1";
-const adapters = new Set([
-  "vir",
-  "fir-native",
-  "fir-llvm",
-  "package-command",
-]);
+const adapters = new Set(["vir", "fir-native", "fir-llvm", "package-command"]);
 
 function source(database, sourceId, label) {
   const value = database.sources[sourceId];

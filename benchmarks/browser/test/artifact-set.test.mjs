@@ -12,6 +12,7 @@ import {
   safeArchivePath,
   sha256,
   sha256File,
+  validateSha256Sums,
   verifyArtifactSet,
 } from "../scripts/artifact-set-lib.mjs";
 import {
@@ -157,6 +158,41 @@ test("catalog accepts a repository-owned package command", async () => {
   assert.throws(
     () => validateBuildDatabase(candidate),
     /package command must declare its producer checkout/,
+  );
+});
+
+test("package checksums cover every declared file exactly once", () => {
+  const digest = "0".repeat(64);
+  assert.deepEqual(
+    validateSha256Sums(
+      `${digest}  payload.bin\n${digest}  BUILD.json\n`,
+      ["BUILD.json", "payload.bin"],
+    ),
+    ["BUILD.json", "payload.bin"],
+  );
+  assert.throws(
+    () =>
+      validateSha256Sums(`${digest}  BUILD.json\n`, [
+        "BUILD.json",
+        "payload.bin",
+      ]),
+    /must cover exactly the declared package files/,
+  );
+  assert.throws(
+    () =>
+      validateSha256Sums(
+        `${digest}  BUILD.json\n${digest}  extra.bin\n`,
+        ["BUILD.json"],
+      ),
+    /must cover exactly the declared package files/,
+  );
+  assert.throws(
+    () =>
+      validateSha256Sums(
+        `${digest}  BUILD.json\n${digest}  BUILD.json\n`,
+        ["BUILD.json"],
+      ),
+    /duplicate SHA256SUMS path/,
   );
 });
 

@@ -8,12 +8,8 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  readBuildDatabase,
-} from "../../benchmarks/browser/scripts/artifact-build-lib.mjs";
-import {
-  discoverExampleCatalog,
-} from "../../benchmarks/browser/scripts/example-catalog-lib.mjs";
+import { readBuildDatabase } from "../../benchmarks/browser/scripts/artifact-build-lib.mjs";
+import { discoverExampleCatalog } from "../../benchmarks/browser/scripts/example-catalog-lib.mjs";
 import {
   activePagesDeployments,
   parsePagesDeployment,

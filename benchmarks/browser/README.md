@@ -1,12 +1,13 @@
 # Lean browser benchmark catalog
 
 This directory is one standalone browser benchmark application. Its example
-selector currently exposes `Std.Format.prettyM` and the Illuminate player at
-the same level and through the same page structure. Each example supplies its
-own semantic contract, backend set, sampling controls, and studies while the
-application owns navigation, artifact status, report actions, plotting, and
-backend filtering. It has no runtime dependency on Verso, Reveal, Lake, or the
-parent VIR repository's source tree.
+selector currently exposes `Std.Format.prettyM`, lean-zip raw DEFLATE, and the
+Illuminate player at the same level and through the same page structure. Each
+example supplies its own semantic contract, backend set, sampling controls, and
+studies while the application owns navigation, artifact status, report actions,
+and shared presentation. The prettyM dashboard additionally provides plotting
+and backend filtering. The application has no runtime dependency on Verso,
+Reveal, Lake, or the parent VIR repository's source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by

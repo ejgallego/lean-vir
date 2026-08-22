@@ -35,6 +35,7 @@ import {
   safeArchivePath,
   sha256,
   validateSeed,
+  validateSha256Sums,
 } from "./artifact-set-lib.mjs";
 import { verifyGitCheckout } from "./git-checkout-lib.mjs";
 import { appRoot } from "./package-root.mjs";
@@ -422,13 +423,12 @@ async function validatePackageCommand(component, output) {
     throw new Error("package command manifest must be a JSON object");
   }
   const sums = await readFile(join(output, "SHA256SUMS"), "utf8");
-  for (const [index, line] of sums.trimEnd().split("\n").entries()) {
-    const match = line.match(/^[0-9a-f]{64}  (.+)$/);
-    if (!match) {
-      throw new Error(`invalid SHA256SUMS line ${index + 1}`);
-    }
-    safeArchivePath(match[1]);
-  }
+  validateSha256Sums(
+    sums,
+    Object.keys(component.producer.files).filter(
+      (path) => path !== "SHA256SUMS",
+    ),
+  );
   run("sha256sum", ["-c", "--quiet", "SHA256SUMS"], { cwd: output });
 }
 

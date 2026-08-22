@@ -16,31 +16,44 @@ export function parsePagesDeployment(value) {
   return { example: parts[0], variant: parts[1] };
 }
 
+async function resolvePagesVariant({ appRoot, database, example, variantId }) {
+  const testPackage = await readExampleTestPackage(appRoot, example);
+  if (testPackage.variants.length !== 1) {
+    throw new Error(`Pages example must declare one variant: ${example.id}`);
+  }
+  const variant =
+    variantId === undefined
+      ? testPackage.variants[0]
+      : testPackage.variants.find(({ id }) => id === variantId);
+  if (!variant) {
+    throw new Error(`unknown Pages variant: ${example.id}/${variantId}`);
+  }
+  if (variant.build === null) {
+    throw new Error(
+      `Pages deployment has no canonical build: ${example.id}/${variant.id}`,
+    );
+  }
+  const build = selectBuild(database, variant.build);
+  if (
+    build.example.id !== example.id ||
+    build.example.variant !== variant.id
+  ) {
+    throw new Error(
+      `Pages deployment build does not match ${example.id}/${variant.id}`,
+    );
+  }
+  return { variant, build };
+}
+
 export async function activePagesDeployments({ appRoot, catalog, database }) {
   const deployments = [];
   for (const example of catalog.examples) {
     if (example.lifecycle !== "active") continue;
-    const testPackage = await readExampleTestPackage(appRoot, example);
-    if (testPackage.variants.length !== 1) {
-      throw new Error(
-        `active Pages example must declare one variant: ${example.id}`,
-      );
-    }
-    const variant = testPackage.variants[0];
-    if (variant.build === null) {
-      throw new Error(
-        `active Pages example has no canonical build: ${example.id}/${variant.id}`,
-      );
-    }
-    const build = selectBuild(database, variant.build);
-    if (
-      build.example.id !== example.id ||
-      build.example.variant !== variant.id
-    ) {
-      throw new Error(
-        `active Pages build does not match ${example.id}/${variant.id}`,
-      );
-    }
+    const { variant } = await resolvePagesVariant({
+      appRoot,
+      database,
+      example,
+    });
     deployments.push({
       example: example.id,
       variant: variant.id,
@@ -104,34 +117,12 @@ export async function selectPagesCatalog({
     );
     if (!example)
       throw new Error(`unknown Pages example: ${deployment.example}`);
-    const testPackage = await readExampleTestPackage(appRoot, example);
-    const variant = testPackage.variants.find(
-      ({ id }) => id === deployment.variant,
-    );
-    if (!variant) {
-      throw new Error(
-        `unknown Pages variant: ${deployment.example}/${deployment.variant}`,
-      );
-    }
-    if (testPackage.variants.length !== 1) {
-      throw new Error(
-        `Pages deployment requires one staged variant for ${example.id}`,
-      );
-    }
-    if (variant.build === null) {
-      throw new Error(
-        `Pages deployment has no canonical build: ${example.id}/${variant.id}`,
-      );
-    }
-    const build = selectBuild(database, variant.build);
-    if (
-      build.example.id !== example.id ||
-      build.example.variant !== variant.id
-    ) {
-      throw new Error(
-        `Pages deployment build does not match ${example.id}/${variant.id}`,
-      );
-    }
+    const { variant, build } = await resolvePagesVariant({
+      appRoot,
+      database,
+      example,
+      variantId: deployment.variant,
+    });
     await verifyStagedDeployment(
       appRoot,
       artifactsRoot,
