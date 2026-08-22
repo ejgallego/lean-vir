@@ -34,7 +34,9 @@ test("surface schema accepts a complete version 3 identity", () => {
 test("surface schema exposes canonical shared report primitives", () => {
   assert.deepEqual(emptySurfaceCounts(), surfaceCounts());
   assert.deepEqual(["b", "a", "c"].sort(compareText), ["a", "b", "c"]);
+});
 
+test("surface size links validate their downstream contract", () => {
   const links = {
     format: SURFACE_SIZE_LINKS_FORMAT,
     version: CURRENT_SURFACE_SIZE_LINKS_VERSION,
@@ -48,6 +50,38 @@ test("surface schema exposes canonical shared report primitives", () => {
   assert.throws(
     () => validateSurfaceSizeLinks({ ...links, externs: null }),
     /field "externs" must be an array/,
+  );
+
+  const extern = {
+    name: "IO.monoNanosNow",
+    module: "Init.System.IO",
+    status: "missing",
+    primaryRoots: 1,
+    primaryPublicRoots: 1,
+    frontierCosts: [],
+    targets: ["lean_io_mono_nanos_now"],
+  };
+  assert.equal(
+    validateSurfaceSizeLinks({ ...links, externs: [extern] }).externs[0],
+    extern,
+  );
+  assert.throws(
+    () => validateSurfaceSizeLinks({ ...links, externs: [{ ...extern, targets: null }] }),
+    /invalid extern link "IO.monoNanosNow"/,
+  );
+  assert.throws(
+    () => validateSurfaceSizeLinks({
+      ...links,
+      externs: [{ ...extern, primaryRoots: "1" }],
+    }),
+    /invalid extern link "IO.monoNanosNow"/,
+  );
+  assert.throws(
+    () => validateSurfaceSizeLinks({
+      ...links,
+      externs: [extern, { ...extern, targets: ["lean_duplicate"] }],
+    }),
+    /extern names must contain unique non-empty strings/,
   );
 });
 

@@ -243,6 +243,10 @@ runnability decision.
 `npm run build:analysis-site` produces the complete deployed surface and size
 explorers. `npm run build:site` includes them in `web/dist/`.
 
+The surface renderer also writes the versioned `data/size-links.json` bridge
+consumed by the frontier-cost and Wasm-size reports. Regenerate it from the
+surface JSON rather than editing it directly.
+
 ## Measure size impact
 
 Primary-blocker counts estimate **pressure**, not bytes or unlocks. An

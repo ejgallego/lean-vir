@@ -166,15 +166,25 @@ export async function openChromiumPage(chromium) {
   const targets = await fetchJsonWithRetry(
     `http://127.0.0.1:${chromium.debugPort}/json/list`,
     chromium.child,
-    (candidates) => Array.isArray(candidates) && candidates.some((target) =>
-      target.type === "page" && target.webSocketDebuggerUrl),
+    (candidates) => Array.isArray(candidates) && candidates.some(isPageTarget),
   );
-  const pageTarget = targets.find((target) => target.type === "page");
+  const pageTarget = targets.find(isPageTarget);
   assert.ok(pageTarget?.webSocketDebuggerUrl, "Chromium did not expose a page DevTools target");
   const cdp = await openCdp(pageTarget.webSocketDebuggerUrl);
-  await cdp.send("Page.enable");
-  await cdp.send("Runtime.enable");
-  return cdp;
+  try {
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    return cdp;
+  } catch (error) {
+    cdp.close();
+    throw error;
+  }
+}
+
+function isPageTarget(target) {
+  return target?.type === "page"
+    && typeof target.webSocketDebuggerUrl === "string"
+    && target.webSocketDebuggerUrl.length > 0;
 }
 
 export async function openCdp(wsUrl) {

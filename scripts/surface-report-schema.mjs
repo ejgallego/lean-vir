@@ -91,6 +91,22 @@ export function validateSurfaceSizeLinks(value, { label = "surface size links" }
   if (!Array.isArray(value.externs)) {
     throw new Error(`${label}: field "externs" must be an array`);
   }
+  validateUniqueStrings(
+    value.externs.map((entry) => entry?.name),
+    `${label}: extern names`,
+  );
+  for (const entry of value.externs) {
+    if (typeof entry.module !== "string" || entry.module.length === 0
+        || !EXTERN_STATUSES.has(entry.status)
+        || !Number.isInteger(entry.primaryRoots) || entry.primaryRoots < 0
+        || !Number.isInteger(entry.primaryPublicRoots) || entry.primaryPublicRoots < 0
+        || entry.primaryPublicRoots > entry.primaryRoots
+        || !Array.isArray(entry.frontierCosts)
+        || !Array.isArray(entry.targets)
+        || entry.targets.some((target) => typeof target !== "string" || target.length === 0)) {
+      throw new Error(`${label}: invalid extern link ${JSON.stringify(entry.name)}`);
+    }
+  }
   return value;
 }
 
