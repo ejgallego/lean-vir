@@ -19,6 +19,7 @@ import { runSync } from "./process-utils.mjs";
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const defaultProducer = resolve(scriptRoot, "..");
 const expectedRoles = new Set(["producer", "runtime", "client"]);
+const packageEntry = "VirLeanZipAcceptance.compressRaw";
 
 function usage() {
   console.log(`Usage: scripts/export-lean-zip-browser-package.mjs [options]
@@ -202,7 +203,7 @@ async function main() {
         join(output, reportFile),
         "--target",
         join(producer, "fixtures/lean-zip/VirLeanZipAcceptance/Exports.lean"),
-        "VirLeanZipAcceptance.compressRaw",
+        packageEntry,
       ],
       {
         cwd: client,
@@ -274,7 +275,7 @@ async function main() {
       schemaVersion: 1,
       kind: "vir/lean-zip-browser-package",
       producerProtocol: "browser-benchmarks/source-package/v1",
-      entry: "VirLeanZipAcceptance.compressRaw",
+      entry: packageEntry,
       sources: sourceIdentities,
       runtime: {
         profile: "client-native",
