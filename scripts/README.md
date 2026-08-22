@@ -33,7 +33,8 @@ The documentation owners are:
 - The consolidated binding explorer uses the colocated `Vir/*.bindings.json`
   manifests and `scripts/generate-binding-explorer.mjs`; run
   `npm run generate:bindings` to refresh it and `npm run check:bindings` to
-  validate all layers.
+  validate all layers. Reproducible explorer and descriptor outputs live under
+  ignored `build/bindings/` and `build/type-descriptors/` paths.
 - Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
 - IR declaration payload tag values live in
   `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in

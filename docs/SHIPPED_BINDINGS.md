@@ -5,22 +5,19 @@ surface. It combines the exhaustive JavaScript boundary census, colocated
 API-group configuration, and available TypeScript-to-Lean comparisons in
 one searchable page.
 
-The current report covers 120 ordinary `@[vir_js]` declarations and 13
-`@[vir_js_explicit_conversion]` declarations. All 133 distinct targets have a
-shipped provider; there are no missing providers and no provider-only targets.
-The same compiler scan finds 363 public executable Lean declarations that
-reach those targets through 2,894 concrete IR call paths. Every shipped target
-is reached by at least one public declaration.
-Generation indexes the complete configured TypeScript surface for 20 API
-groups before presenting the report. The reviewed `Document` analysis expands
-its inheritance graph to 271 properties and methods: four members map to VIR's
-five shipped Document targets, and all five mappings pass their reviewed
-type-translation checks. The other 19 groups begin with automatic
-correspondence suggestions, not reviewed fidelity claims. Across those 20
-groups the explorer currently shows four reviewed members, 58 suggested
-members, one ambiguous member, and 2,003 upstream entries with no shipped
-target. Two local APIs still need a machine-readable upstream contract, and the
-React DOM root retains its narrower curated comparison.
+The report exhaustively scans ordinary `@[vir_js]` declarations and explicit
+conversion declarations. Every distinct target must have a shipped provider,
+provider-only targets are rejected, and every shipped target must be reachable
+from at least one public executable Lean declaration. Each public connection
+includes its concrete compiled-IR call path.
+
+Generation indexes every configured TypeScript API group before presenting the
+report. The reviewed `Document` analysis expands its inheritance graph and
+checks each authored operation mapping. Other external groups begin with
+automatic correspondence suggestions rather than reviewed fidelity claims.
+Local APIs without a machine-readable contract and narrower curated
+comparisons remain visibly distinct. Current counts and findings belong to the
+generated report rather than this documentation.
 
 ## Fidelity Contract
 
@@ -115,8 +112,8 @@ entry, so partial property coverage cannot be mistaken for a faithful pair.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a property operation that disagrees with its reviewed
-anchor, or an unclassified public accessor alias. The current six
-configurations assign all 133 shipped targets exactly once.
+anchor, or an unclassified public accessor alias. The library configurations
+assign every shipped target exactly once.
 
 ## Data Flow
 
@@ -146,7 +143,7 @@ reconciled targets + public call paths + API groups + comparisons
   -> one interactive library explorer
 ```
 
-Generate the consolidated tracked report with human-readable progress output:
+Generate the consolidated local report with human-readable progress output:
 
 ```bash
 npm run generate:bindings
@@ -158,10 +155,19 @@ Validate all layers and the explorer contract with:
 npm run check:bindings
 ```
 
-The Lean compiler inventory is an ignored intermediate under
+The Lean compiler inventory and type comparisons are generated under
 `build/type-descriptors/`. The consolidated machine report is
-`docs/bindings/report.json`; the primary human report is
-`docs/bindings/index.html`.
+`build/bindings/report.json`; the primary human report is
+`build/bindings/index.html`. These reproducible reports are ignored build
+artifacts, not commit material.
+
+Serve the repository root when source jumps are useful:
+
+```bash
+python3 -m http.server 4178 --bind 127.0.0.1
+```
+
+Then open `http://127.0.0.1:4178/build/bindings/index.html`.
 
 The explorer supports library, upstream-analysis, and finding filters; deep
 links; generated upstream TypeScript declarations; inherited-member
@@ -175,15 +181,14 @@ unmapped upstream entries.
 Use **Upstream libraries** to start from a library contract and inspect VIR's
 coverage. Expanding a mapped upstream entry shows its expected TypeScript
 declaration beside the nearest public Lean API type. Use **Public Lean API** for
-the reverse product surface: 363 public declarations, their elaborated types,
+the reverse product surface: public declarations, their elaborated types,
 source locations, nearest upstream expectations, and exact compiler paths to
-host targets. Use **Host targets** for all 133 lower-level dispatch keys, their
+host targets. Use **Host targets** for the lower-level dispatch keys, their
 providers and implementation boundaries. Reviewed mappings prefer the exact
 reviewed public declaration; other transitive callers remain available without
 being presented as reviewed matches.
 
-`docs/bindings/shipped-v1.coverage.json` and
-`docs/bindings/shipped-v1.dashboard.html` remain lower-level reconciliation
-artifacts while the consolidated view settles. Focused type-anchor HTML files
-likewise remain useful for generator debugging, but they are no longer the
-main entry point.
+`build/bindings/shipped-v1.coverage.json` and
+`build/bindings/shipped-v1.dashboard.html` are lower-level reconciliation
+artifacts. Focused type-anchor HTML files likewise remain useful for generator
+debugging, but they are not the main entry point.

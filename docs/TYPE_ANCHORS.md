@@ -28,7 +28,7 @@ npm run generate:type-descriptors
 The generator reads `docs/type-descriptors/vir-v1.types.d.ts`, merges the
 manual Lean-to-TypeScript links from
 `docs/type-descriptors/vir-v1.anchors.json`, and writes
-`docs/type-descriptors/vir-v1.json`.
+`build/type-descriptors/vir-v1.json`.
 
 Each generated symbol records:
 
@@ -50,10 +50,11 @@ npm run compare:type-anchors
 ```
 
 For normal package work, pass a real `.irpkg` with
-`scripts/check-type-anchors.mjs --irpkg <package.irpkg>`. The checked-in
-`vir-v1.manifest.json` fixture is itself generated from
-`vir-v1.fixture.lean` through the real package generator. The intermediate
-`.irpkg` and generator report stay under ignored `build/` paths.
+`scripts/check-type-anchors.mjs --irpkg <package.irpkg>`. The local
+`build/type-descriptors/vir-v1.manifest.json` fixture is generated from
+`vir-v1.fixture.lean` through the real package generator. The manifest,
+intermediate `.irpkg`, and generator report all stay under ignored `build/`
+paths.
 
 Anchors classify each relation as either `audit` or `coverageGap`. They may
 also carry a reviewed `portIntent` object. The first React DOM API-group intent
@@ -105,29 +106,27 @@ distinct upstream operation.
 
 ## Artifact Ownership
 
-The checked-in reports are generated review artifacts. Edit their authored
-inputs and regenerate them instead of editing descriptor, manifest, report,
-Markdown, or HTML output directly.
+Only the authored inputs are checked in. Descriptor, manifest, report,
+Markdown, and HTML outputs are reproducible local artifacts under ignored
+`build/` paths. Edit their inputs and regenerate them rather than editing the
+outputs directly.
 
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
-| Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
-| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `document-v1.json`, `document-v1.report.json` |
-| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+| Core fixture | `docs/type-descriptors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
+| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
+| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
-level shipped census. Its primary outputs are `docs/bindings/report.json` and
-`docs/bindings/index.html`; the compiler inventory remains under ignored
-`build/type-descriptors/` paths.
-
-Intermediate `.irpkg` and generator reports under `build/type-descriptors/`
-are ignored local artifacts.
+level shipped census. Its primary outputs are `build/bindings/report.json` and
+`build/bindings/index.html`. All binding and type-descriptor outputs are ignored
+local artifacts.
 
 ## Lower-level Output Contract
 
-The type-anchor pipeline has four lower-level outputs. They remain stable inputs
-and useful debugging views, while `docs/bindings/index.html` is the public human
-entry point.
+The type-anchor pipeline has four lower-level outputs. They remain stable
+machine contracts and useful debugging views, while `build/bindings/index.html`
+is the primary human entry point.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 
@@ -222,8 +221,8 @@ npm run check:react-dom-root-type-anchors
 ```
 
 The machine-facing output is
-`docs/type-descriptors/react-dom-root-v1.report.json`; the review page is
-`docs/type-descriptors/react-dom-root-v1.anchors.html`.
+`build/type-descriptors/react-dom-root-v1.report.json`; the review page is
+`build/type-descriptors/react-dom-root-v1.anchors.html`.
 
 ## DOM Document Audit
 
@@ -255,15 +254,15 @@ Render the standalone HTML report with:
 npm run render:type-anchors:html
 ```
 
-The generated `docs/type-descriptors/vir-v1.anchors.md` uses Blueprint-style
+The generated `build/type-descriptors/vir-v1.anchors.md` uses Blueprint-style
 `:::definition` blocks with `(lean := "...")` associations, TypeScript source
 links, and native hover text through `title` plus
 `data-vir-type-anchor-hover`. This is intentionally functional without adding a
 full Verso/Blueprint site target to this repository.
 
-The generated `docs/type-descriptors/vir-v1.anchors.html` remains useful for
+The generated `build/type-descriptors/vir-v1.anchors.html` remains useful for
 testing the focused renderer. Review the real shipped library surface through
-`docs/bindings/index.html`.
+`build/bindings/index.html`.
 
 Validate the core generated files and comparator smoke test with:
 

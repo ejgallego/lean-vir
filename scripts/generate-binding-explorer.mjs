@@ -546,7 +546,7 @@ function accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
   return issues;
 }
 
-async function buildReport(coverage, configs, typeScriptSurfaces) {
+async function buildReport(coverage, configs, typeScriptSurfaces, coveragePath) {
   if (coverage?.format !== "lean-vir-shipped-bindings-coverage" || coverage.version !== 1 ||
       !Array.isArray(coverage.bindings) || !Array.isArray(coverage.publicEntries)) {
     throw new Error("coverage input is not a shipped-bindings v1 report");
@@ -712,7 +712,7 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
     version: 1,
     generatedBy: "scripts/generate-binding-explorer.mjs",
     inputs: {
-      coverage: "docs/bindings/shipped-v1.coverage.json",
+      coverage: relative(repositoryRoot, coveragePath),
       configs: configs.map((config) => config.path).sort(),
     },
     lean: coverage.lean,
@@ -921,7 +921,7 @@ try {
     configs.push(config);
   }
   const typeScriptSurfaces = await generateTypeScriptSurfaces(configs);
-  const report = await buildReport(coverage, configs, typeScriptSurfaces);
+  const report = await buildReport(coverage, configs, typeScriptSurfaces, options.coverage);
   await emit(options.out, `${JSON.stringify(report, null, 2)}\n`, options.check);
   await emit(options.html, renderHtml(report), options.check);
   console.log("\nLean VIR binding explorer");

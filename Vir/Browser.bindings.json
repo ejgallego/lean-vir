@@ -33,7 +33,7 @@
       "targets": ["browser.document.*"],
       "lean": { "public": ["Lean.Vir.Browser.Document"] },
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" },
-      "comparison": { "report": "docs/type-descriptors/document-v1.report.json" },
+      "comparison": { "report": "build/type-descriptors/document-v1.report.json" },
       "mappings": [
         {
           "typescript": "Document.title",

@@ -86,6 +86,8 @@ The most useful generated diagnostics are:
 - `build/fixtures/*.report.md`
 - `build/vir-surface/*.json`
 - `build/vir-surface/*.md`
+- `build/bindings/index.html` and `build/bindings/report.json`
+- `build/type-descriptors/*.json`, `*.html`, and `*.md`
 
 The versioned `build/fixtures/summary.json` contract records fixture
 expectations, outcomes, phase timings, and structured package diagnostics.

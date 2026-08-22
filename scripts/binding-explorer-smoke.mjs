@@ -8,51 +8,79 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const report = JSON.parse(await readFile("docs/bindings/report.json", "utf8"));
-const html = await readFile("docs/bindings/index.html", "utf8");
-
-assert.equal(report.format, "lean-vir-binding-explorer");
-assert.deepEqual(report.summary, {
-  libraries: 6,
-  apiGroups: 29,
-  targets: 133,
-  provided: 133,
-  missingProvider: 0,
-  runtimeOnly: 0,
-  publicSurface: {
-    entries: 363,
-    targetEdges: 2894,
-    reachedTargets: 133,
-  },
-  analysis: {
-    externalGroups: 23,
-    complete: 1,
-    inProgress: 0,
-    automatic: 19,
-    curated: 1,
-    needsInput: 2,
-    notRun: 0,
-    notApplicable: 6,
-  },
-  semantic: { exact: 0, compatible: 7, weak: 2, missing: 3 },
-  upstreamSymbols: 2104,
-  coverage: {
-    groups: 20,
-    members: 2066,
-    reviewed: 4,
-    suggested: 58,
-    ambiguous: 1,
-    missing: 2003,
-  },
-  issues: { error: 0, warning: 2, gap: 19 },
-});
-
+const report = JSON.parse(await readFile("build/bindings/report.json", "utf8"));
+const html = await readFile("build/bindings/index.html", "utf8");
 const roots = report.libraries.flatMap((library) =>
   library.apiGroups.map((root) => ({ library: library.id, ...root })));
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
-assert.equal(new Set(targets).size, 133, "every shipped target should occur exactly once");
+const uniqueTargets = new Set(targets);
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
-assert.equal(publicEntries.size, 363);
+const publicTargetEdges = report.publicEntries.reduce(
+  (sum, entry) => sum + entry.targets.length,
+  0,
+);
+const reachedTargets = new Set(report.publicEntries.flatMap((entry) =>
+  entry.targets.map((target) => target.target)));
+const analysisCounts = countBy(roots.map((root) => root.analysis.status));
+const comparisons = roots.flatMap((root) => root.comparison === undefined ? [] : [root.comparison]);
+const semantic = Object.fromEntries(["exact", "compatible", "weak", "missing"].map((status) => [
+  status,
+  comparisons.reduce((sum, comparison) => sum + comparison.summary[status], 0),
+]));
+const coveredRoots = roots.filter((root) =>
+  ["complete", "in-progress", "automatic"].includes(root.analysis.status));
+const coverageMembers = coveredRoots.flatMap((root) => root.coverage.members);
+const coverageStatuses = countBy(coverageMembers.map((member) => member.status));
+const issueCounts = countBy(report.issues.map((issue) => issue.severity));
+
+assert.equal(report.format, "lean-vir-binding-explorer");
+assert.equal(report.summary.libraries, report.libraries.length);
+assert.equal(report.summary.apiGroups, roots.length);
+assert.equal(targets.length, uniqueTargets.size, "every shipped target should occur exactly once");
+assert.equal(report.summary.targets, uniqueTargets.size);
+assert.equal(
+  report.summary.provided,
+  roots.reduce((sum, root) => sum + root.bindings.filter((binding) =>
+    binding.status === "provided").length, 0),
+);
+assert.equal(report.summary.provided, report.summary.targets);
+assert.equal(report.summary.missingProvider, 0);
+assert.equal(report.summary.runtimeOnly, 0);
+assert.deepEqual(report.summary.publicSurface, {
+  entries: publicEntries.size,
+  targetEdges: publicTargetEdges,
+  reachedTargets: reachedTargets.size,
+});
+assert.equal(reachedTargets.size, uniqueTargets.size);
+assert.deepEqual(report.summary.analysis, {
+  externalGroups: roots.length - (analysisCounts["not-applicable"] ?? 0),
+  complete: analysisCounts.complete ?? 0,
+  inProgress: analysisCounts["in-progress"] ?? 0,
+  automatic: analysisCounts.automatic ?? 0,
+  curated: analysisCounts.curated ?? 0,
+  needsInput: analysisCounts["needs-input"] ?? 0,
+  notRun: analysisCounts["not-run"] ?? 0,
+  notApplicable: analysisCounts["not-applicable"] ?? 0,
+});
+assert.deepEqual(report.summary.semantic, semantic);
+assert.equal(
+  report.summary.upstreamSymbols,
+  roots.reduce((sum, root) => sum + (root.typescript?.symbols.length ?? 0), 0),
+);
+assert.deepEqual(report.summary.coverage, {
+  groups: coveredRoots.length,
+  members: coverageMembers.length,
+  reviewed: (coverageStatuses.exact ?? 0) + (coverageStatuses.compatible ?? 0) +
+    (coverageStatuses.weak ?? 0),
+  suggested: coverageStatuses.suggested ?? 0,
+  ambiguous: coverageStatuses.ambiguous ?? 0,
+  missing: coverageStatuses.missing ?? 0,
+});
+assert.deepEqual(report.summary.issues, {
+  error: issueCounts.error ?? 0,
+  warning: issueCounts.warning ?? 0,
+  gap: issueCounts.gap ?? 0,
+});
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.deepEqual(
@@ -188,7 +216,10 @@ assert.equal(
 );
 
 assert.match(html, /<h1>Binding explorer<\/h1>/u);
-assert.match(html, /id="provided-metric">133\/133</u);
+assert.match(
+  html,
+  new RegExp(`id="provided-metric">${report.summary.provided}/${report.summary.targets}`),
+);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Complete surface analysis/u);
 assert.match(html, /Automatic analysis/u);
@@ -203,9 +234,19 @@ assert.match(html, /Reviewed type fidelity/u);
 assert.match(html, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
-assert.equal(JSON.parse(dataMatch[1]).summary.targets, 133);
+assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);
 const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
 assert.ok(scripts.length >= 2, "explorer should include data and interaction scripts");
 Function(scripts.at(-1)[1]);
 
-console.log("binding explorer smoke ok: 6 libraries, 29 API groups, 2104 upstream symbols, 133 unique targets");
+console.log(
+  `binding explorer smoke ok: ${report.summary.libraries} libraries, ` +
+  `${report.summary.apiGroups} API groups, ${report.summary.upstreamSymbols} upstream symbols, ` +
+  `${report.summary.targets} unique targets`,
+);
+
+function countBy(values) {
+  const counts = {};
+  for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
+  return counts;
+}

@@ -87,7 +87,7 @@
           }
         ]
       },
-      "comparison": { "report": "docs/type-descriptors/react-dom-root-v1.report.json" },
+      "comparison": { "report": "build/type-descriptors/react-dom-root-v1.report.json" },
       "anchors": [
         {
           "id": "react_dom.root.resource",
