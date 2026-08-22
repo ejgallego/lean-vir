@@ -26,5 +26,6 @@ export const {
   leanPackageFile,
   boundaryPackageFile,
   packageFileForFixtureSource,
+  validateFixturePackageCoverage,
   publicArtifactPath,
 } = deriveBrowserPackageConfig(browserPackageConfig);

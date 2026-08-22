@@ -16,6 +16,7 @@ const packageKeys = new Set([
   "targets",
   "fixtureSources",
 ]);
+const targetKeys = new Set(["source", "roots", "packageOnly"]);
 const localPackageKeys = new Set(["file", "label"]);
 
 function requireObject(value, label) {
@@ -44,6 +45,47 @@ function validateStringArray(value, label) {
   }
 }
 
+function validateOptionalString(value, label) {
+  if (value !== undefined) requireNonEmptyString(value, label);
+}
+
+function validateTarget(target, packageId, index) {
+  const label = `${packageId}: target at index ${index}`;
+  requireObject(target, label);
+  rejectUnknownFields(target, targetKeys, label);
+  requireNonEmptyString(target.source, `${label} source`);
+  validateStringArray(target.roots, `${label} roots`);
+  if (target.packageOnly !== undefined && typeof target.packageOnly !== "boolean") {
+    throw new Error(`${label} packageOnly must be a boolean`);
+  }
+}
+
+function validatePackageSpec(spec, index) {
+  const label = `browser package at index ${index}`;
+  requireObject(spec, label);
+  rejectUnknownFields(spec, packageKeys, label);
+  requireNonEmptyString(spec.id, `${label} id`);
+  requireNonEmptyString(spec.file, `${label} file`);
+  validateOptionalString(spec.label, `${spec.id}: label`);
+  validateOptionalString(spec.report, `${spec.id}: report`);
+  validateStringArray(spec.fixtureSources, `${spec.id}: fixtureSources`);
+  validateStringArray(spec.lakeTargets, `${spec.id}: lakeTargets`);
+  if (spec.targets !== undefined && !Array.isArray(spec.targets)) {
+    throw new Error(`${spec.id}: targets must be an array`);
+  }
+  for (const [targetIndex, target] of (spec.targets ?? []).entries()) {
+    validateTarget(target, spec.id, targetIndex);
+  }
+}
+
+function validateLocalPackagePreset(preset, index) {
+  const label = `local browser package at index ${index}`;
+  requireObject(preset, label);
+  rejectUnknownFields(preset, localPackageKeys, label);
+  requireNonEmptyString(preset.file, `${label} file`);
+  validateOptionalString(preset.label, `${label} label`);
+}
+
 export function deriveBrowserPackageConfig(browserPackageConfig) {
   requireObject(browserPackageConfig, "browser package config");
   rejectUnknownFields(browserPackageConfig, configKeys, "browser package config");
@@ -70,19 +112,13 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const packageFileByFixtureSource = new Map();
 
   for (const [index, spec] of packageSpecs.entries()) {
-    const label = `browser package at index ${index}`;
-    requireObject(spec, label);
-    rejectUnknownFields(spec, packageKeys, label);
-    requireNonEmptyString(spec.id, `${label} id`);
-    requireNonEmptyString(spec.file, `${label} file`);
+    validatePackageSpec(spec, index);
     if (packageFileById.has(spec.id)) {
       throw new Error(`duplicate browser package id ${JSON.stringify(spec.id)}`);
     }
     if (artifactFiles.has(spec.file)) {
       throw new Error(`duplicate browser package file ${JSON.stringify(spec.file)}`);
     }
-    validateStringArray(spec.fixtureSources, `${spec.id}: fixtureSources`);
-    validateStringArray(spec.lakeTargets, `${spec.id}: lakeTargets`);
     packageFileById.set(spec.id, spec.file);
     artifactFiles.add(spec.file);
     for (const source of spec.fixtureSources ?? []) {
@@ -97,10 +133,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   }
 
   for (const [index, preset] of localPackagePresets.entries()) {
-    const label = `local browser package at index ${index}`;
-    requireObject(preset, label);
-    rejectUnknownFields(preset, localPackageKeys, label);
-    requireNonEmptyString(preset.file, `${label} file`);
+    validateLocalPackagePreset(preset, index);
     if (artifactFiles.has(preset.file)) {
       throw new Error(`duplicate browser package file ${JSON.stringify(preset.file)}`);
     }
@@ -152,12 +185,22 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     return file;
   }
 
+  function validateFixturePackageCoverage(fixtures) {
+    const manifestSources = new Set(fixtures.map((fixture) => fixture.source));
+    for (const source of manifestSources) packageFileForFixtureSource(source);
+    for (const source of packageFileByFixtureSource.keys()) {
+      if (!manifestSources.has(source)) {
+        throw new Error(`${source}: browser package assignment has no manifest fixtures`);
+      }
+    }
+    return fixtures;
+  }
+
   function publicArtifactPath(file) {
     return `web/public/${file}`;
   }
 
   return {
-    browserPackageConfig,
     wasmPublicFile,
     wasmDevPublicFile,
     packageSpecs,
@@ -172,6 +215,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     leanPackageFile,
     boundaryPackageFile,
     packageFileForFixtureSource,
+    validateFixturePackageCoverage,
     publicArtifactPath,
   };
 }

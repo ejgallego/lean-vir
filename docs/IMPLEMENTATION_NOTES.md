@@ -1,7 +1,8 @@
 # Implementation Notes
 
 This document owns architecture and implementation status. Command maps and CI
-shape live in `docs/HARNESS.md`; package config and manifest semantics live in
+shape live in `docs/HARNESS.md`; fixture and browser-package catalog semantics
+live in `docs/EXAMPLES_AND_FIXTURES.md`; interface-manifest semantics live in
 `docs/INTERFACE_PIPELINE.md`; package generator internals live in
 `docs/GENERATE_PACKAGE.md`.
 

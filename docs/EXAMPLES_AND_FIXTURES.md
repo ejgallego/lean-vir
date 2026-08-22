@@ -61,8 +61,10 @@ package runner when diagnosing those cases locally. Its shared version,
 fixture, and expectation contract lives in `fixtures/fixture-manifest.mjs` and
 is applied by the package generator, fixture runners, and browser catalog. Each
 manifest source must appear in exactly one package's `fixtureSources` list in
-`fixtures/browser-packages.json`; missing and duplicate assignments fail before
-package generation or fixture execution.
+`fixtures/browser-packages.json`; missing, duplicate, and stale assignments fail
+before package generation or fixture execution. A fixture's `entry` is always
+a package root. Its optional `roots` list contains only additional roots needed
+by that case and must not repeat the entry or another root.
 
 ## Adding client code
 

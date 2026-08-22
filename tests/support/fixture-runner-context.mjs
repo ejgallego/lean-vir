@@ -6,16 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import { readFile, writeFile } from "node:fs/promises";
 
-import { fixtureExpectation } from "../../fixtures/fixture-manifest.mjs";
+import { fixtureExpectation, fixtureRoots } from "../../fixtures/fixture-manifest.mjs";
 import { requireSuccessfulProcess, runAsync } from "../../scripts/process-utils.mjs";
 import { elapsedSeconds, timerStart } from "../../scripts/timing-utils.mjs";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import { classifyPackageFailure, packageDiagnostics } from "./fixture-diagnostics.mjs";
 import { evaluateFixtureRun } from "./fixture-result.mjs";
-
-function rootsFor(fixture) {
-  return fixture.roots?.length ? fixture.roots : [fixture.entry];
-}
 
 export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator }) {
   const sourceCache = new Map();
@@ -74,7 +70,7 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
       reportPath.pathname,
       "--target",
       fixture.source,
-      ...rootsFor(fixture),
+      ...fixtureRoots(fixture),
     ];
     const result = await runAsync(irpkgGenerator.path, args, {
       cwd: root,

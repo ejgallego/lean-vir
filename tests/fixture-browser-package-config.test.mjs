@@ -45,6 +45,7 @@ test("checked-in fixture sources have exactly one browser package", async () => 
   const sources = new Set(fixtures.map((fixture) => fixture.source));
 
   assert.equal(browserPackageConfigVersion, 1);
+  assert.equal(config.validateFixturePackageCoverage(fixtures), fixtures);
   for (const source of sources) {
     assert.match(config.packageFileForFixtureSource(source), /\.irpkg$/);
   }
@@ -65,6 +66,10 @@ test("browser package configs reject malformed containers and versions", () => {
   assert.throws(
     () => deriveBrowserPackageConfig(browserConfig({ packages: [] })),
     /packages must be a non-empty array/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(browserConfig({ localPackages: {} })),
+    /localPackages must be an array/,
   );
 });
 
@@ -124,6 +129,14 @@ test("fixture source package assignments are unique and total", () => {
     () => config.packageFileForFixtureSource("fixtures/Missing.lean"),
     /fixtures\/Missing\.lean: fixture source is not assigned to a browser package/,
   );
+  assert.throws(
+    () => config.validateFixturePackageCoverage([{ source: "fixtures/Missing.lean" }]),
+    /fixtures\/Missing\.lean: fixture source is not assigned to a browser package/,
+  );
+  assert.throws(
+    () => config.validateFixturePackageCoverage([]),
+    /fixtures\/Basic\.lean: browser package assignment has no manifest fixtures/,
+  );
 });
 
 test("browser package entries reject unknown and malformed fields", () => {
@@ -141,5 +154,64 @@ test("browser package entries reject unknown and malformed fields", () => {
         : spec),
     })),
     /fixtures-basic: fixtureSources must be an array/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(browserConfig({
+      packages: packages.map((spec) => spec.id === "fixtures-basic" ? { ...spec, id: "" } : spec),
+    })),
+    /browser package at index 0 id must be a non-empty string/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(browserConfig({
+      localPackages: [{ file: "local.irpkg", label: "" }],
+    })),
+    /local browser package at index 0 label must be a non-empty string/,
+  );
+});
+
+test("browser package targets validate their complete nested contract", () => {
+  const packages = browserConfig().packages;
+  function configWithTarget(target) {
+    return browserConfig({
+      packages: packages.map((spec) => spec.id === "fixtures-basic"
+        ? { ...spec, targets: [target] }
+        : spec),
+    });
+  }
+
+  assert.throws(
+    () => deriveBrowserPackageConfig(browserConfig({
+      packages: packages.map((spec) => spec.id === "fixtures-basic"
+        ? { ...spec, targets: {} }
+        : spec),
+    })),
+    /fixtures-basic: targets must be an array/,
+  );
+  assert.doesNotThrow(() => deriveBrowserPackageConfig(configWithTarget({
+    source: "examples/Fib.lean",
+    roots: ["fib"],
+    packageOnly: false,
+  })));
+  assert.throws(
+    () => deriveBrowserPackageConfig(configWithTarget({ source: "examples/Fib.lean", root: "fib" })),
+    /fixtures-basic: target at index 0: unknown field root/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(configWithTarget({ source: "", roots: [] })),
+    /target at index 0 source must be a non-empty string/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(configWithTarget({
+      source: "examples/Fib.lean",
+      roots: "fib",
+    })),
+    /target at index 0 roots must be an array/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(configWithTarget({
+      source: "examples/Fib.lean",
+      packageOnly: "yes",
+    })),
+    /target at index 0 packageOnly must be a boolean/,
   );
 });

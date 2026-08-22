@@ -277,8 +277,8 @@ changes.
 - Broad pre-merge check:
   `npm test`
 
-`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name, and roots by
-case-insensitive substring. For example:
+`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name, and additional
+roots by case-insensitive substring. For example:
 
 ```bash
 VIR_FIXTURE_FILTER=string npm run test:fixtures

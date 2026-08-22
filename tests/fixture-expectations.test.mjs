@@ -5,13 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  fixtureExpectation,
-  validateFixtureManifest,
-} from "../fixtures/fixture-manifest.mjs";
+import { fixtureExpectation } from "../fixtures/fixture-manifest.mjs";
 
 test("defaults to the host oracle", () => {
   assert.deepEqual(fixtureExpectation({ id: "same" }), {
@@ -88,10 +84,4 @@ test("rejects malformed or redundant target results", () => {
     () => fixtureExpectation({ id: "equal", expect: { host: "32", wasm: "32", reason: "Redundant." } }),
     /should use the default host-oracle comparison/,
   );
-});
-
-test("validates the complete checked-in fixture manifest", async () => {
-  const manifestUrl = new URL("../fixtures/manifest.json", import.meta.url);
-  const manifest = JSON.parse(await readFile(manifestUrl, "utf8"));
-  assert.equal(validateFixtureManifest(manifest).length, 104);
 });

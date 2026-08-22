@@ -6,8 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 
-import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
-import { packageFileForFixtureSource, packageSpecs } from "./browser-package-config.mjs";
+import { fixtureRoots, validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
+import { packageSpecs, validateFixturePackageCoverage } from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
 import { runSync } from "./process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
@@ -51,10 +51,6 @@ function parseArgs(argv) {
   return { packages, copyPublic };
 }
 
-function rootsFor(fixture) {
-  return fixture.roots?.length ? fixture.roots : [fixture.entry];
-}
-
 function addTarget(targets, source, roots) {
   const existing = targets.get(source) ?? [];
   targets.set(source, [...existing, ...roots]);
@@ -79,14 +75,10 @@ function publicPackagePathFor(spec) {
   return `web/public/${spec.file}`;
 }
 
-function packageFixtureSources(spec) {
-  return new Set(spec.fixtureSources ?? []);
-}
-
 function targetsForSpec(spec, fixtures) {
   const targets = new Map();
   const packageTargets = new Map();
-  const fixtureSources = packageFixtureSources(spec);
+  const fixtureSources = new Set(spec.fixtureSources ?? []);
 
   for (const target of spec.targets ?? []) {
     addTarget(target.packageOnly ? packageTargets : targets, target.source, target.roots ?? []);
@@ -94,7 +86,7 @@ function targetsForSpec(spec, fixtures) {
 
   for (const fixture of fixtures) {
     if (fixtureSources.has(fixture.source)) {
-      addTarget(targets, fixture.source, rootsFor(fixture));
+      addTarget(targets, fixture.source, fixtureRoots(fixture));
     }
   }
 
@@ -102,8 +94,7 @@ function targetsForSpec(spec, fixtures) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const manifestFixtures = validateFixtureManifest(manifest);
-for (const fixture of manifestFixtures) packageFileForFixtureSource(fixture.source);
+const manifestFixtures = validateFixturePackageCoverage(validateFixtureManifest(manifest));
 const selectedPackageSpecs = args.packages.size === 0
   ? packageSpecs
   : packageSpecs.filter((spec) => args.packages.has(spec.id) || args.packages.has(spec.file));

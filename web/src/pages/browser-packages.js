@@ -16,4 +16,5 @@ export const {
   prettyPackageFile,
   packagePresets,
   packageFileForFixtureSource,
+  validateFixturePackageCoverage,
 } = deriveBrowserPackageConfig(browserPackages);

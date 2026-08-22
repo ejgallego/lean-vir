@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  fixtureRoots,
   fixtureManifestVersion,
   validateFixtureManifest,
 } from "../fixtures/fixture-manifest.mjs";
@@ -26,6 +27,10 @@ test("fixture manifests expose their validated version and entries", () => {
   const fixtures = [fixture("valid-fixture"), fixture("nested.case_2")];
   assert.equal(fixtureManifestVersion, 1);
   assert.equal(validateFixtureManifest({ version: fixtureManifestVersion, fixtures }), fixtures);
+  assert.deepEqual(fixtureRoots(fixture("with-roots", { roots: ["Fixture.helper"] })), [
+    "Fixture.run",
+    "Fixture.helper",
+  ]);
 });
 
 test("fixture manifests reject malformed containers and versions", () => {
@@ -74,6 +79,8 @@ test("fixture manifests validate execution fields", () => {
     [fixture("missing-entry", { entry: null }), /entry must be a non-empty string/],
     [fixture("empty-roots", { roots: [] }), /roots must be a non-empty array/],
     [fixture("blank-root", { roots: [""] }), /root must be a non-empty string/],
+    [fixture("entry-root", { roots: ["Fixture.run"] }), /roots must not repeat entry/],
+    [fixture("duplicate-root", { roots: ["Fixture.helper", "Fixture.helper"] }), /duplicate root/],
     [fixture("missing-result", { result: undefined }), /result must be an object/],
     [fixture("array-result", { result: [] }), /result must be an object/],
     [fixture("unknown-result", { result: { type: "Nat", typo: true } }), /result: unknown field typo/],

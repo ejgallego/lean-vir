@@ -12,6 +12,7 @@ import {
   hostPackageFile,
   packageFileForFixtureSource,
   packageSpecs,
+  validateFixturePackageCoverage,
 } from "../../scripts/browser-package-config.mjs";
 
 export async function createUpstreamSmokeContext() {
@@ -20,7 +21,7 @@ export async function createUpstreamSmokeContext() {
     new URL("../../fixtures/manifest.json", import.meta.url),
     "utf8",
   ));
-  validateFixtureManifest(fixtureManifest);
+  validateFixturePackageCoverage(validateFixtureManifest(fixtureManifest));
   const packageBytesByFile = new Map();
   for (const spec of packageSpecs) {
     packageBytesByFile.set(

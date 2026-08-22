@@ -8,6 +8,7 @@ import {
   defaultPackageFile,
   hostPackageFile,
   packageFileForFixtureSource,
+  validateFixturePackageCoverage,
 } from "./browser-packages.js";
 import { validateFixtureManifest } from "../../../fixtures/fixture-manifest.mjs";
 import fixtureManifest from "../../../fixtures/manifest.json";
@@ -95,7 +96,11 @@ export const demoFixtures = [
   },
 ];
 
-export const manifestFixtures = validateFixtureManifest(fixtureManifest).map((fixture) => ({
+const validatedManifestFixtures = validateFixturePackageCoverage(
+  validateFixtureManifest(fixtureManifest),
+);
+
+export const manifestFixtures = validatedManifestFixtures.map((fixture) => ({
   ...fixture,
   packageFile: packageFileForFixtureSource(fixture.source),
   group: "manifest",

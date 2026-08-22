@@ -66,6 +66,10 @@ function requireNonEmptyString(value, label) {
   }
 }
 
+export function fixtureRoots(fixture) {
+  return [fixture.entry, ...(fixture.roots ?? [])];
+}
+
 function validateFixture(fixture, index, ids) {
   if (fixture === null || typeof fixture !== "object" || Array.isArray(fixture)) {
     throw new Error(`fixture at index ${index} must be an object`);
@@ -85,7 +89,17 @@ function validateFixture(fixture, index, ids) {
     if (!Array.isArray(fixture.roots) || fixture.roots.length === 0) {
       throw new Error(`${fixture.id}: roots must be a non-empty array`);
     }
-    for (const root of fixture.roots) requireNonEmptyString(root, `${fixture.id}: root`);
+    const roots = new Set();
+    for (const root of fixture.roots) {
+      requireNonEmptyString(root, `${fixture.id}: root`);
+      if (root === fixture.entry) {
+        throw new Error(`${fixture.id}: roots must not repeat entry`);
+      }
+      if (roots.has(root)) {
+        throw new Error(`${fixture.id}: duplicate root ${JSON.stringify(root)}`);
+      }
+      roots.add(root);
+    }
   }
   if (fixture.result === null || typeof fixture.result !== "object" || Array.isArray(fixture.result)) {
     throw new Error(`${fixture.id}: result must be an object`);
