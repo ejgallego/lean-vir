@@ -111,9 +111,6 @@ ownership diagrams.
   interpretation, and runtime control/candidate comparison rules.
 - [SURFACE_EXPERIMENTS.md](SURFACE_EXPERIMENTS.md): historical frontier
   findings and accepted or rejected runtime decisions.
-- [LEAN_ZIP_DEFLATE_PROBE.md](LEAN_ZIP_DEFLATE_PROBE.md): exact-toolchain
-  compatibility, package boundary, acceptance coverage, and performance
-  findings for lean-zip's raw-DEFLATE entry point.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 
