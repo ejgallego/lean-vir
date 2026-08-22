@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import test from "node:test";
 
 import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
@@ -9,8 +8,7 @@ import {
   validateExampleManifest,
   validateExampleTestPackage,
 } from "../scripts/example-catalog-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "../scripts/package-root.mjs";
 
 test("discovers compact example manifests", async () => {
   const catalog = await discoverExampleCatalog(appRoot);

@@ -6,14 +6,14 @@ import {
   verifyStagedArtifactSet,
 } from "./artifact-set-lib.mjs";
 import { readExampleTestPackage } from "./example-catalog-lib.mjs";
-
-const selectionPattern =
-  /^([a-zA-Z0-9][a-zA-Z0-9._-]*)=([a-zA-Z0-9][a-zA-Z0-9._-]*)$/;
+import { isIdentifier } from "./validation-utils.mjs";
 
 export function parsePagesDeployment(value) {
-  const match = selectionPattern.exec(value ?? "");
-  if (!match) throw new Error(`invalid Pages deployment: ${value}`);
-  return { example: match[1], variant: match[2] };
+  const parts = typeof value === "string" ? value.split("=") : [];
+  if (parts.length !== 2 || !parts.every(isIdentifier)) {
+    throw new Error(`invalid Pages deployment: ${value}`);
+  }
+  return { example: parts[0], variant: parts[1] };
 }
 
 async function verifyStagedDeployment(

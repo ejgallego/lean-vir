@@ -1,6 +1,5 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   inside,
@@ -8,8 +7,7 @@ import {
   safeArchivePath,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "./package-root.mjs";
 
 function usage() {
   console.log(`Usage: node scripts/stage-artifact-set.mjs [options] SET

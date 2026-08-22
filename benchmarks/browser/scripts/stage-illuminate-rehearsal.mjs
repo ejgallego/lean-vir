@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import {
   cp,
   mkdir,
@@ -8,15 +7,14 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   canonicalJson,
   replaceDirectoryAtomically,
   sha256,
 } from "./artifact-set-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "./package-root.mjs";
+import { runSync } from "./process-utils.mjs";
 
 function usage() {
   console.log(`Usage: node scripts/stage-illuminate-rehearsal.mjs --source PATH [options]
@@ -61,9 +59,7 @@ function parseArgs(argv) {
 }
 
 function git(source, args) {
-  return execFileSync("git", ["-C", source, ...args], {
-    encoding: "utf8",
-  }).trim();
+  return runSync("git", ["-C", source, ...args], { capture: true });
 }
 
 function gitOptional(source, args) {
@@ -92,10 +88,7 @@ async function verifyPackage(directory, files) {
       requireFile(join(directory, path)),
     ),
   );
-  execFileSync("sha256sum", ["--check", "SHA256SUMS"], {
-    cwd: directory,
-    stdio: "inherit",
-  });
+  runSync("sha256sum", ["--check", "SHA256SUMS"], { cwd: directory });
 }
 
 async function verifyVirSdk(virSdk) {

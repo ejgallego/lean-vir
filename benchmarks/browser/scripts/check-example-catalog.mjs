@@ -1,9 +1,5 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { discoverExampleCatalog } from "./example-catalog-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "./package-root.mjs";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`Usage: node scripts/check-example-catalog.mjs [--json]

@@ -2,10 +2,9 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "./package-root.mjs";
+
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
   const index = args.indexOf(name);

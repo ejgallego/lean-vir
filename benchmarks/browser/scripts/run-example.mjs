@@ -1,14 +1,10 @@
-import { spawnSync } from "node:child_process";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { readBuildDatabase } from "./artifact-build-lib.mjs";
 import {
   discoverExampleCatalog,
   readExampleTestPackage,
 } from "./example-catalog-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "./package-root.mjs";
+import { runSync } from "./process-utils.mjs";
 
 function usage() {
   console.log(`Usage: node scripts/run-example.mjs [options] EXAMPLE [VARIANT]
@@ -70,20 +66,14 @@ function parseArgs(argv) {
 }
 
 function run(command, args) {
-  const result = spawnSync(command, args, {
+  runSync(command, args, {
     cwd: appRoot,
-    stdio: "inherit",
     env: {
       ...process.env,
       BENCH_PORT:
         process.env.BENCH_PORT ?? String(19000 + (process.pid % 1000)),
     },
   });
-  if ((result.status ?? 1) !== 0) {
-    throw new Error(
-      `${command} ${args.join(" ")} failed with status ${result.status ?? 1}`,
-    );
-  }
 }
 
 async function main() {
