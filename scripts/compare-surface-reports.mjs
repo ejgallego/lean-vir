@@ -8,7 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isSha256, validateSurfaceReport } from "./surface-report-schema.mjs";
+import { compareText, isSha256, validateSurfaceReport } from "./surface-report-schema.mjs";
 
 const DELTA_FORMAT = "lean-vir-library-surface-delta";
 const DELTA_VERSION = 1;
@@ -389,10 +389,6 @@ function parentFolders(name) {
 
 function nameOrder(lhs, rhs) {
   return compareText(lhs.name, rhs.name);
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }
 
 function coverageRow(label, before, beforeTotal, after, afterTotal, added, removed) {

@@ -9,7 +9,12 @@ import test from "node:test";
 
 import {
   aggregateSurfaceDeclarations,
+  compareText,
+  CURRENT_SURFACE_SIZE_LINKS_VERSION,
+  emptySurfaceCounts,
+  SURFACE_SIZE_LINKS_FORMAT,
   validateSurfaceReport,
+  validateSurfaceSizeLinks,
 } from "../../scripts/surface-report-schema.mjs";
 import {
   emptySurfaceReportV3,
@@ -24,6 +29,26 @@ test("surface schema accepts a complete version 3 identity", () => {
   assert.equal(validateSurfaceReport(report), report);
   const blocked = singleDeclarationReport(true);
   assert.equal(validateSurfaceReport(blocked), blocked);
+});
+
+test("surface schema exposes canonical shared report primitives", () => {
+  assert.deepEqual(emptySurfaceCounts(), surfaceCounts());
+  assert.deepEqual(["b", "a", "c"].sort(compareText), ["a", "b", "c"]);
+
+  const links = {
+    format: SURFACE_SIZE_LINKS_FORMAT,
+    version: CURRENT_SURFACE_SIZE_LINKS_VERSION,
+    externs: [],
+  };
+  assert.equal(validateSurfaceSizeLinks(links), links);
+  assert.throws(
+    () => validateSurfaceSizeLinks({ ...links, version: 1 }, { label: "fixture" }),
+    /fixture: expected lean-vir-surface-size-links version 2/,
+  );
+  assert.throws(
+    () => validateSurfaceSizeLinks({ ...links, externs: null }),
+    /field "externs" must be an array/,
+  );
 });
 
 test("surface schema rejects inconsistent counts and native capability totals", () => {

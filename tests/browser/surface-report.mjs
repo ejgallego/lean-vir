@@ -13,10 +13,9 @@ import { spawnSync } from "node:child_process";
 
 import {
   evaluate,
-  fetchJsonWithRetry,
   launchChromium,
   navigate,
-  openCdp,
+  openChromiumPage,
 } from "./harness.mjs";
 import {
   nativeExternFixture,
@@ -59,17 +58,7 @@ try {
   );
 
   chromium = await launchChromium();
-  const targets = await fetchJsonWithRetry(
-    `http://127.0.0.1:${chromium.debugPort}/json/list`,
-    chromium.child,
-    (candidates) => Array.isArray(candidates) && candidates.some((target) =>
-      target.type === "page" && target.webSocketDebuggerUrl),
-  );
-  const pageTarget = targets.find((target) => target.type === "page");
-  assert.ok(pageTarget?.webSocketDebuggerUrl, "Chromium did not expose a page target");
-  const cdp = await openCdp(pageTarget.webSocketDebuggerUrl);
-  await cdp.send("Page.enable");
-  await cdp.send("Runtime.enable");
+  const cdp = await openChromiumPage(chromium);
   await cdp.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,

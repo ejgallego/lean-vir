@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { isSurfaceAbi } from "./surface-report-schema.mjs";
+import { compareText, isSurfaceAbi } from "./surface-report-schema.mjs";
 
 const FORMAT = "lean-vir-client-native-externs";
 const VERSION = 1;
@@ -87,8 +87,4 @@ function cSymbol(node, name) {
     throw new Error(`client-native extern ${JSON.stringify(name)} has no standard C symbol`);
   }
   return standard.value;
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }

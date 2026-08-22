@@ -162,6 +162,21 @@ export async function fetchJsonWithRetry(url, child, acceptJson = () => true) {
   throw lastError ?? new Error(`DevTools endpoint did not become available: ${url}`);
 }
 
+export async function openChromiumPage(chromium) {
+  const targets = await fetchJsonWithRetry(
+    `http://127.0.0.1:${chromium.debugPort}/json/list`,
+    chromium.child,
+    (candidates) => Array.isArray(candidates) && candidates.some((target) =>
+      target.type === "page" && target.webSocketDebuggerUrl),
+  );
+  const pageTarget = targets.find((target) => target.type === "page");
+  assert.ok(pageTarget?.webSocketDebuggerUrl, "Chromium did not expose a page DevTools target");
+  const cdp = await openCdp(pageTarget.webSocketDebuggerUrl);
+  await cdp.send("Page.enable");
+  await cdp.send("Runtime.enable");
+  return cdp;
+}
+
 export async function openCdp(wsUrl) {
   const ws = new WebSocket(wsUrl);
   await new Promise((resolveOpen, rejectOpen) => {

@@ -4,13 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import assert from "node:assert/strict";
-
 import {
   assertDistReady,
-  fetchJsonWithRetry,
   launchChromium,
-  openCdp,
+  openChromiumPage,
   serveDist,
 } from "./harness.mjs";
 import { browserRunnerCaseSpecs, browserRunnerFailureSpecs } from "./cases.mjs";
@@ -43,17 +40,7 @@ let chromium = null;
 
 try {
   chromium = await launchChromium();
-  const targets = await fetchJsonWithRetry(
-    `http://127.0.0.1:${chromium.debugPort}/json/list`,
-    chromium.child,
-    (candidates) => Array.isArray(candidates) && candidates.some((target) =>
-      target.type === "page" && target.webSocketDebuggerUrl),
-  );
-  const pageTarget = targets.find((target) => target.type === "page");
-  assert.ok(pageTarget?.webSocketDebuggerUrl, "Chromium did not expose a page DevTools target");
-  const cdp = await openCdp(pageTarget.webSocketDebuggerUrl);
-  await cdp.send("Page.enable");
-  await cdp.send("Runtime.enable");
+  const cdp = await openChromiumPage(chromium);
 
   await smokeLanding(cdp, server.origin);
   await smokeRuntimeExample(cdp, server.origin);
