@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { parseRunnerJobLimit } from "./runner-jobs.mjs";
+
 export function parseFixtureRunnerConfig({ argv = [], env = {}, parallelism = 1 } = {}) {
   const showHelp = argv.includes("-h") || argv.includes("--help");
   if (!showHelp) {
@@ -14,19 +16,12 @@ export function parseFixtureRunnerConfig({ argv = [], env = {}, parallelism = 1 
     }
   }
 
-  const jobsValue = env.VIR_FIXTURE_JOBS ?? "";
-  if (jobsValue !== "" && !/^[1-9]\d*$/.test(jobsValue)) {
-    throw new Error(`VIR_FIXTURE_JOBS must be a positive integer, got ${JSON.stringify(jobsValue)}`);
-  }
-  const parsedJobs = jobsValue === "" ? null : Number(jobsValue);
-  if (parsedJobs !== null && !Number.isSafeInteger(parsedJobs)) {
-    throw new Error(`VIR_FIXTURE_JOBS must be a safe positive integer, got ${JSON.stringify(jobsValue)}`);
-  }
+  const configuredJobs = parseRunnerJobLimit(env.VIR_FIXTURE_JOBS, "VIR_FIXTURE_JOBS");
   return Object.freeze({
     showHelp,
     fixtureFilter: env.VIR_FIXTURE_FILTER?.trim() ?? "",
     skipBuild: env.VIR_FIXTURE_SKIP_BUILD === "1" || argv.includes("--no-build"),
-    configuredJobs: parsedJobs,
+    configuredJobs,
     parallelism: Number.isInteger(parallelism) && parallelism > 0 ? parallelism : 1,
   });
 }
