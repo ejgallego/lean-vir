@@ -87,6 +87,12 @@ The most useful generated diagnostics are:
 - `build/vir-surface/*.json`
 - `build/vir-surface/*.md`
 
+The versioned `build/fixtures/summary.json` contract records fixture
+expectations, outcomes, phase timings, and structured package diagnostics.
+Schema version 2 records zero seconds for package or Wasm phases that were not
+reached, uses `null` for unavailable outcome values or diagnostics, and
+preserves missing-dependency paths as `{ name, via }` objects.
+
 Reference these reports in local notes or final summaries when they explain a
 failure, but keep them out of Git unless the maintainer asks for a tracked
 fixture/report change.
@@ -254,8 +260,9 @@ changes.
   same hook-backed `ReactTamagotchi.View` component as the browser React demo.
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
-- Fixture expectation parsing and target-specific manifest validation:
-  `npm run test:fixture-expectations`
+- Fixture expectation, report-diagnostic, and runner-configuration contracts
+  without a Lean or Wasm build:
+  `npm run test:fixtures:unit`
 - A single fixture or fixture family:
   `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`
 - A single fixture after `npm run build:demo` has already refreshed the WASM
@@ -270,8 +277,8 @@ changes.
 - Broad pre-merge check:
   `npm test`
 
-`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name, and roots by
-case-insensitive substring. For example:
+`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name, and additional
+roots by case-insensitive substring. For example:
 
 ```bash
 VIR_FIXTURE_FILTER=string npm run test:fixtures

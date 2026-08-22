@@ -42,7 +42,6 @@
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.nestedOptionSumScore",
       "roots": [
-        "Vir.Fixtures.ListOption.nestedOptionSumScore",
         "Vir.Fixtures.ListOption.classifySum",
         "Vir.Fixtures.ListOption.sumScore"
       ],
@@ -53,7 +52,6 @@
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.exceptOptionSumScore",
       "roots": [
-        "Vir.Fixtures.ListOption.exceptOptionSumScore",
         "Vir.Fixtures.ListOption.classifyExcept"
       ],
       "result": { "type": "Nat" }
@@ -285,7 +283,6 @@
       "source": "fixtures/ExprPrinter.lean",
       "entry": "Vir.Fixtures.ExprPrinter.sampleScore",
       "roots": [
-        "Vir.Fixtures.ExprPrinter.sampleScore",
         "Vir.Fixtures.ExprPrinter.constNatExpr",
         "Vir.Fixtures.ExprPrinter.twoLitExpr",
         "Vir.Fixtures.ExprPrinter.appExpr",
@@ -328,7 +325,6 @@
       "source": "fixtures/InterfaceShapes.lean",
       "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
       "roots": [
-        "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
         "Vir.Fixtures.InterfaceShapes.stringRoundtrip",
         "Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip",
         "Vir.Fixtures.InterfaceShapes.baseBoolFlip",

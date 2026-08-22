@@ -7,25 +7,36 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 
-import { createVirRuntime } from "../web/src/vir-runtime.js";
-import { fixtureExpectation } from "./support/fixture-expectations.mjs";
+import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
 } from "../scripts/irpkg-generator.mjs";
-import { mapWithLimit, runAsync } from "../scripts/process-utils.mjs";
+import {
+  mapWithLimit,
+  requireSuccessfulProcess,
+  runAsync,
+} from "../scripts/process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "../scripts/timing-utils.mjs";
+import {
+  fixtureJobCount,
+  fixtureMatchesFilter,
+  parseFixtureRunnerConfig,
+} from "./support/fixture-runner-config.mjs";
+import { createFixtureRunnerContext } from "./support/fixture-runner-context.mjs";
+import { fixtureSummary } from "./support/fixture-summary.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
 const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
-const sourceCache = new Map();
-let cachedWasmBytes = null;
-let irpkgGenerator = null;
-const args = process.argv.slice(2);
 const scriptStart = timerStart();
+const config = parseFixtureRunnerConfig({
+  argv: process.argv.slice(2),
+  env: process.env,
+  parallelism: availableParallelism(),
+});
 
 function usage() {
   console.log(`Usage: node tests/fixture-runner.mjs [--no-build]
@@ -44,301 +55,15 @@ Environment:
 `);
 }
 
-if (args.includes("-h") || args.includes("--help")) {
+if (config.showHelp) {
   usage();
   process.exit(0);
 }
 
-for (const arg of args) {
-  if (arg !== "--no-build") {
-    throw new Error(`unknown argument: ${arg}; run node tests/fixture-runner.mjs --help`);
-  }
-}
-
-function requireOk(result, command) {
-  if (!result.ok) {
-    throw new Error(`${command} failed with status ${result.status}\n${result.stderr}`);
-  }
-  return result;
-}
-
-function sanitizeId(id) {
-  return id.replace(/[^A-Za-z0-9_.-]/g, "_");
-}
-
-function rootsFor(fixture) {
-  return fixture.roots?.length ? fixture.roots : [fixture.entry];
-}
-
-function sectionLines(report, header) {
-  const lines = report.split("\n");
-  const start = lines.findIndex((line) => line.trim() === `## ${header}`);
-  if (start === -1) return [];
-  const out = [];
-  for (const line of lines.slice(start + 1)) {
-    if (line.startsWith("## ")) break;
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- `")) out.push(trimmed);
-  }
-  return out.filter((line) => line !== "- `None.`" && line !== "- None.");
-}
-
-function parseLoadedDecl(line) {
-  const match = line.match(/^- `([^`]+)` from `([^`]+)`$/);
-  if (!match) return null;
-  return { name: match[1], source: match[2], imported: match[2].startsWith("imported by ") };
-}
-
-function parseNativeExtern(line) {
-  const match = line.match(/^- `([^`]+)` -> `([^`]+)`$/);
-  if (!match) return null;
-  return { name: match[1], symbol: match[2] };
-}
-
-function parseInitGlobal(line) {
-  const match = line.match(/^- `([^`]+)` <- `([^`]+)`$/);
-  if (!match) return null;
-  return { name: match[1], initName: match[2] };
-}
-
-function parseBulletName(line) {
-  const match = line.match(/^- `([^`]+)`(?: \(via .+\))?$/);
-  return match?.[1] ?? line;
-}
-
-function packageDiagnostics(report) {
-  const loadedDecls = sectionLines(report, "Loaded IR Declarations").map(parseLoadedDecl).filter(Boolean);
-  const nativeExterns = sectionLines(report, "Native Extern Declarations").map(parseNativeExtern).filter(Boolean);
-  const initGlobals = sectionLines(report, "Initializer Globals").map(parseInitGlobal).filter(Boolean);
-  const missingDecls = sectionLines(report, "Missing IR Declarations");
-  const missingNativeExterns = sectionLines(report, "Missing Native Extern Registrations");
-  const unsupportedInitGlobals = sectionLines(report, "Unsupported Init Globals").map(parseBulletName);
-  return {
-    loadedDecls,
-    importedDecls: loadedDecls.filter((decl) => decl.imported),
-    nativeExterns,
-    initGlobals,
-    missingDecls,
-    missingNativeExterns,
-    unsupportedInitGlobals,
-  };
-}
-
-function classifyPackageFailure(report, stderr) {
-  const missingExterns = sectionLines(report, "Missing Native Extern Registrations");
-  if (missingExterns.length !== 0) {
-    return { kind: "missing-native-extern", detail: missingExterns.join(", ") };
-  }
-  const missingDecls = sectionLines(report, "Missing IR Declarations");
-  if (missingDecls.length !== 0) {
-    return { kind: "missing-ir-decl", detail: missingDecls.join(", ") };
-  }
-  const unsupportedInitGlobals = sectionLines(report, "Unsupported Init Globals").map(parseBulletName);
-  if (unsupportedInitGlobals.length !== 0) {
-    return { kind: "unsupported-init-global", detail: unsupportedInitGlobals.join(", ") };
-  }
-  if (stderr.includes("unsupported")) {
-    return { kind: "unsupported-ir-package", detail: stderr.trim().split("\n")[0] };
-  }
-  return { kind: "package-generation-failed", detail: stderr.trim().split("\n")[0] || "unknown failure" };
-}
-
-async function hostOracle(fixture) {
-  if (fixture.result?.type !== "Nat") {
-    throw new Error(`${fixture.id}: unsupported host result type ${fixture.result?.type}`);
-  }
-  const source = await fixtureSource(fixture.source);
-  const mainDecl = fixture.unsafe ? "unsafe def main : IO UInt32 := do" : "def main : IO UInt32 := do";
-  const hostSource = [
-    source,
-    "",
-    "set_option interpreter.prefer_native false",
-    mainDecl,
-    `  IO.println (toString ${fixture.entry})`,
-    "  return 0",
-    "",
-  ].join("\n");
-  const hostPath = new URL(`${sanitizeId(fixture.id)}.host.lean`, buildDir);
-  await writeFile(hostPath, hostSource);
-  const result = await runAsync("lean", ["--run", hostPath.pathname], { cwd: root, capture: true });
-  requireOk(result, `host oracle ${fixture.id}`);
-  const lines = result.stdout.trim().split("\n").filter(Boolean);
-  const value = lines.at(-1);
-  if (!/^\d+$/.test(value ?? "")) {
-    throw new Error(`${fixture.id}: host oracle did not print a Nat: ${result.stdout}`);
-  }
-  return value;
-}
-
-async function fixtureSource(source) {
-  if (!sourceCache.has(source)) {
-    sourceCache.set(source, readFile(new URL(`../${source}`, import.meta.url), "utf8"));
-  }
-  return sourceCache.get(source);
-}
-
-async function upstreamWasmBytes() {
-  cachedWasmBytes ??= readFile(wasmPath);
-  return cachedWasmBytes;
-}
-
-async function instantiateWasm(packagePath) {
-  const wasm = await upstreamWasmBytes();
-  const irPackage = await readFile(packagePath);
-  return createVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
-}
-
-async function generatePackage(fixture) {
-  if (irpkgGenerator === null) {
-    throw new Error("IR package generator was not prepared");
-  }
-  const id = sanitizeId(fixture.id);
-  const packagePath = new URL(`${id}.irpkg`, buildDir);
-  const reportPath = new URL(`${id}.report.md`, buildDir);
-  const args = [
-    packagePath.pathname,
-    reportPath.pathname,
-    "--target",
-    fixture.source,
-    ...rootsFor(fixture),
-  ];
-  const result = await runAsync(irpkgGenerator.path, args, {
-    cwd: root,
-    capture: true,
-    env: irpkgGenerator.env,
-  });
-  const report = await readFile(reportPath, "utf8").catch(() => "");
-  const diagnostics = packageDiagnostics(report);
-  if (!result.ok) {
-    return {
-      ok: false,
-      packagePath,
-      reportPath,
-      diagnostics,
-      failure: classifyPackageFailure(report, result.stderr),
-      stderr: result.stderr,
-    };
-  }
-  return { ok: true, packagePath, reportPath, diagnostics };
-}
-
-async function runFixture(fixture) {
-  const start = timerStart();
-  const expectation = fixtureExpectation(fixture);
-  const hostStart = timerStart();
-  const host = await hostOracle(fixture);
-  const hostSeconds = elapsedSeconds(hostStart);
-  if (expectation.host !== null && host !== expectation.host) {
-    return {
-      status: "failed",
-      fixture,
-      expectation,
-      host,
-      detail: `host=${host} expected-host=${expectation.host}`,
-      timing: { total: elapsedSeconds(start), host: hostSeconds, package: 0, wasm: 0 },
-    };
-  }
-  const packageStart = timerStart();
-  const generated = await generatePackage(fixture);
-  const packageSeconds = elapsedSeconds(packageStart);
-
-  if (!generated.ok) {
-    if (expectation.status === "unsupported") {
-      return {
-        status: "expected-unsupported",
-        fixture,
-        expectation,
-        host,
-        diagnostics: generated.diagnostics,
-        detail: `${generated.failure.kind}: ${generated.failure.detail}`,
-        timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
-      };
-    }
-    return {
-      status: "failed",
-      fixture,
-      expectation,
-      host,
-      diagnostics: generated.diagnostics,
-      detail: `${generated.failure.kind}: ${generated.failure.detail}`,
-      timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
-    };
-  }
-
-  const wasmStart = timerStart();
-  const runtime = await instantiateWasm(generated.packagePath);
-  let wasm;
-  try {
-    wasm = runtime.call(fixture.entry);
-  } finally {
-    runtime.dispose();
-  }
-  const wasmSeconds = elapsedSeconds(wasmStart);
-  const timing = {
-    total: elapsedSeconds(start),
-    host: hostSeconds,
-    package: packageSeconds,
-    wasm: wasmSeconds,
-  };
-  if (expectation.status === "unsupported") {
-    return {
-      status: "failed",
-      fixture,
-      expectation,
-      host,
-      wasm,
-      diagnostics: generated.diagnostics,
-      detail: "expected unsupported fixture passed",
-      timing,
-    };
-  }
-  if (expectation.wasm !== null && wasm !== expectation.wasm) {
-    return {
-      status: "failed",
-      fixture,
-      expectation,
-      host,
-      wasm,
-      diagnostics: generated.diagnostics,
-      detail: `host=${host} wasm=${wasm} expected-wasm=${expectation.wasm}`,
-      timing,
-    };
-  }
-  if (expectation.wasm !== null) {
-    return { status: "passed", fixture, expectation, host, wasm, diagnostics: generated.diagnostics, timing };
-  }
-  if (wasm !== host) {
-    return {
-      status: "failed",
-      fixture,
-      expectation,
-      host,
-      wasm,
-      diagnostics: generated.diagnostics,
-      detail: `host=${host} wasm=${wasm}`,
-      timing,
-    };
-  }
-  return { status: "passed", fixture, expectation, host, wasm, diagnostics: generated.diagnostics, timing };
-}
-
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const fixtureFilter = process.env.VIR_FIXTURE_FILTER?.trim() ?? "";
-const skipBuild =
-  process.env.VIR_FIXTURE_SKIP_BUILD === "1" ||
-  args.includes("--no-build");
-function fixtureMatchesFilter(fixture, filter) {
-  if (filter === "") return true;
-  const needle = filter.toLowerCase();
-  const haystack = [
-    fixture.id,
-    fixture.source,
-    fixture.entry,
-    ...(fixture.roots ?? []),
-  ].join("\n").toLowerCase();
-  return haystack.includes(needle);
-}
-const fixtures = (manifest.fixtures ?? []).filter((fixture) => fixtureMatchesFilter(fixture, fixtureFilter));
+const manifestFixtures = validateFixtureManifest(manifest);
+const { fixtureFilter, skipBuild } = config;
+const fixtures = manifestFixtures.filter((fixture) => fixtureMatchesFilter(fixture, fixtureFilter));
 if (fixtures.length === 0) {
   throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
 }
@@ -353,93 +78,47 @@ if (skipBuild) {
   console.log("fixture build: skipped (--no-build)");
 } else {
   const buildStart = timerStart();
-  requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
+  requireSuccessfulProcess(
+    await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
+    "npm run build:demo",
+  );
   buildSeconds = elapsedSeconds(buildStart);
 }
 const generatorStart = timerStart();
-irpkgGenerator = prepareVirIrpkgSync(root);
+const irpkgGenerator = prepareVirIrpkgSync(root);
 const generatorSeconds = elapsedSeconds(generatorStart);
 if (!irpkgGenerator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(irpkgGenerator)}`);
   process.exit(irpkgGenerator.status);
 }
+const fixtureRunner = createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator });
 
-function fixtureJobCount(total) {
-  const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);
-  if (Number.isInteger(configured) && configured > 0) {
-    return Math.min(configured, total);
-  }
-  return Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), total);
-}
-
-const jobs = fixtureJobCount(fixtures.length);
+const jobs = fixtureJobCount(fixtures.length, config);
 if (fixtureFilter !== "") {
-  console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
+  console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifestFixtures.length})`);
 }
 console.log(`fixture jobs: ${jobs}`);
 const fixtureRunStart = timerStart();
-const results = await mapWithLimit(fixtures, jobs, runFixture);
+const results = await mapWithLimit(fixtures, jobs, fixtureRunner.run);
 const fixtureRunSeconds = elapsedSeconds(fixtureRunStart);
-
-let passed = 0;
-let unsupported = 0;
-let failed = 0;
 
 for (const result of results) {
   if (result.status === "passed") {
-    passed++;
     const value = result.expectation.wasm === null
       ? result.wasm
       : `host=${result.host} wasm=${result.wasm}`;
     console.log(`PASS ${result.fixture.id}: ${value}`);
-  } else if (result.status === "expected-unsupported") {
-    unsupported++;
-    console.log(`UNSUPPORTED ${result.fixture.id}: ${result.detail}`);
   } else {
-    failed++;
     console.log(`FAIL ${result.fixture.id}: ${result.detail}`);
   }
 }
 
-const summary = {
-  version: 1,
-  totals: {
-    passed,
-    expectedUnsupported: unsupported,
-    failed,
-  },
-  fixtures: results.map((result) => ({
-    id: result.fixture.id,
-    entry: result.fixture.entry,
-    status: result.status,
-    expectedStatus: result.expectation.status,
-    expectedHost: result.expectation.host,
-    expectedWasm: result.expectation.wasm,
-    expectationReason: result.expectation.reason,
-    host: result.host,
-    wasm: result.wasm,
-    detail: result.detail,
-    timing: result.timing && {
-      totalSeconds: Number(result.timing.total.toFixed(3)),
-      hostSeconds: Number(result.timing.host.toFixed(3)),
-      packageSeconds: Number(result.timing.package.toFixed(3)),
-      wasmSeconds: Number(result.timing.wasm.toFixed(3)),
-    },
-    diagnostics: result.diagnostics && {
-      loadedDeclCount: result.diagnostics.loadedDecls.length,
-      importedDecls: result.diagnostics.importedDecls,
-      nativeExterns: result.diagnostics.nativeExterns,
-      initGlobals: result.diagnostics.initGlobals,
-      missingDecls: result.diagnostics.missingDecls,
-      missingNativeExterns: result.diagnostics.missingNativeExterns,
-      unsupportedInitGlobals: result.diagnostics.unsupportedInitGlobals,
-    },
-  })),
-};
+const summary = fixtureSummary(results);
+const { passed, failed } = summary.totals;
 await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log();
-console.log(`fixture summary: ${passed} passed, ${unsupported} expected unsupported, ${failed} failed`);
+console.log(`fixture summary: ${passed} passed, ${failed} failed`);
 const buildTiming = skipBuild ? "skipped" : `${formatSeconds(buildSeconds)}s`;
 const slowestFixtures = [...results]
   .sort((left, right) => (right.timing?.total ?? 0) - (left.timing?.total ?? 0))

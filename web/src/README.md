@@ -65,8 +65,8 @@ unrelated responsibilities.
 - `apps/format-demo.js`: pretty-printer workbench.
 - `apps/react-tamagotchi.js`: standalone React Tamagotchi page.
 - `apps/runtime-example.js`: minimal runtime example page.
-- `pages/fixture-catalog.js`: fixture metadata, package mapping, and input
-  defaults.
+- `pages/fixture-catalog.js`: fixture metadata, strict package resolution, and
+  input defaults.
 - `pages/fixture-sources.js`: raw fixture/source snippets shown by the landing
   page.
 - `pages/input-parsers.js`: shared input parsing for page controls.

@@ -7,8 +7,10 @@ Author: Emilio J. Gallego Arias
 import {
   defaultPackageFile,
   hostPackageFile,
-  packageFileByFixtureSource,
+  packageFileForFixtureSource,
+  validateFixturePackageCoverage,
 } from "./browser-packages.js";
+import { validateFixtureManifest } from "../../../fixtures/fixture-manifest.mjs";
 import fixtureManifest from "../../../fixtures/manifest.json";
 
 export const maxFibInput = 17;
@@ -94,9 +96,13 @@ export const demoFixtures = [
   },
 ];
 
-export const manifestFixtures = (fixtureManifest.fixtures ?? []).map((fixture) => ({
+const validatedManifestFixtures = validateFixturePackageCoverage(
+  validateFixtureManifest(fixtureManifest),
+);
+
+export const manifestFixtures = validatedManifestFixtures.map((fixture) => ({
   ...fixture,
-  packageFile: packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile,
+  packageFile: packageFileForFixtureSource(fixture.source),
   group: "manifest",
 }));
 

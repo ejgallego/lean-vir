@@ -67,6 +67,12 @@ export function runAsync(cmd, args, { cwd, capture = false, ...options } = {}) {
   });
 }
 
+export function requireSuccessfulProcess(result, command) {
+  if (!result.ok) {
+    throw new Error(`${command} failed with status ${result.status}\n${result.stderr}`);
+  }
+}
+
 export async function mapWithLimit(items, limit, fn) {
   if (items.length === 0) return [];
   const workerCount = Math.max(1, Math.min(limit, items.length));

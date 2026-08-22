@@ -31,8 +31,9 @@ The documentation owners are:
   `scripts/ir-codec-tags.mjs` and `scripts/check-ir-codec-tags.mjs`.
 - Object ABI linker flags live in `scripts/object-abi-linker-flags.mjs`, which
   consumes the shared runtime export-name manifest.
-- Browser package metadata lives in `scripts/browser-package-config.mjs`, and
-  reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
+- Canonical browser package metadata lives in `fixtures/browser-packages.json`;
+  `scripts/browser-package-config.mjs` exposes its validated derived values to
+  Node tooling. Reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 
 Call a lower-level script directly only when debugging that implementation or
 when a maintainer requests a narrow command.

@@ -20,12 +20,12 @@ export const {
   benchmarkArtifactPaths,
   generatedPublicFiles,
   packagePresets,
-  packageFileByFixtureSource,
   defaultPackageFile,
   hostPackageFile,
   prettyPackageFile,
   leanPackageFile,
   boundaryPackageFile,
   packageFileForFixtureSource,
+  validateFixturePackageCoverage,
   publicArtifactPath,
 } = deriveBrowserPackageConfig(browserPackageConfig);
