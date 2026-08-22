@@ -86,6 +86,8 @@ The most useful generated diagnostics are:
 - `build/fixtures/*.report.md`
 - `build/vir-surface/*.json`
 - `build/vir-surface/*.md`
+- `build/bindings/index.html` and `build/bindings/report.json`
+- `build/type-descriptors/*.json`, `*.html`, and `*.md`
 
 The versioned `build/fixtures/summary.json` contract records fixture
 expectations, outcomes, phase timings, and structured package diagnostics.
@@ -125,6 +127,7 @@ npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
 npm run generate:ir-codec-tags
+npm run check:bindings
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:client-native-externs
@@ -222,6 +225,8 @@ changes.
   `npm run check:api-coverage`; use
   `node scripts/check-api-coverage.mjs --write` only to materialize
   `build/analysis/api-coverage.tsv`
+- Lean `@[vir_js]`, explicit conversion, JavaScript provider, or host-boundary
+  policy changes: `npm run check:bindings`
 - IR package name/declaration tag changes:
   `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
   `npm run test:upstream`

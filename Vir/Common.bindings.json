@@ -1,0 +1,17 @@
+{
+  "$schema": "../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "common",
+  "title": "Common host helpers",
+  "description": "Small VIR-owned host calls used to exercise explicit JavaScript conversion boundaries.",
+  "lean": { "modules": ["Vir.Common"] },
+  "roots": [
+    {
+      "id": "common",
+      "title": "Common helpers",
+      "targets": ["common.*"],
+      "lean": { "public": ["Lean.Vir.Common"] },
+      "upstream": { "kind": "internal" }
+    }
+  ]
+}

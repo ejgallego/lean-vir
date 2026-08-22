@@ -1,0 +1,140 @@
+{
+  "$schema": "../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "browser",
+  "title": "Browser APIs",
+  "description": "DOM, events, canvas, animation, timers, and browser-owned values exposed by Vir.Browser.",
+  "lean": { "modules": ["Vir.Browser"] },
+  "roots": [
+    {
+      "id": "animation",
+      "title": "Animation frames",
+      "targets": ["browser.animation.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Animation"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["requestAnimationFrame", "cancelAnimationFrame"] }
+    },
+    {
+      "id": "canvas-2d",
+      "title": "Canvas 2D",
+      "targets": ["browser.canvas2d.*"],
+      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D"] }
+    },
+    {
+      "id": "console",
+      "title": "Console",
+      "targets": ["browser.console.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Console"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Console"] }
+    },
+    {
+      "id": "document",
+      "title": "Document",
+      "targets": ["browser.document.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Document"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" },
+      "comparison": { "report": "build/type-descriptors/document-v1.report.json" },
+      "mappings": [
+        {
+          "typescript": "Document.title",
+          "accessors": {
+            "get": { "target": "browser.document.getTitle", "lean": "Lean.Vir.Browser.Document.getTitle", "anchor": "document.title.get" },
+            "set": { "target": "browser.document.setTitle", "lean": "Lean.Vir.Browser.Document.setTitle", "anchor": "document.title.set" }
+          }
+        },
+        { "typescript": "Document.querySelector", "targets": ["browser.document.querySelector"], "lean": ["Lean.Vir.Browser.Document.querySelector"] },
+        { "typescript": "Document.querySelectorAll", "targets": ["browser.document.querySelectorAll"], "lean": ["Lean.Vir.Browser.Document.querySelectorAll"] },
+        { "typescript": "Document.createElement", "targets": ["browser.document.createElement"], "lean": ["Lean.Vir.Browser.Document.createElement"] }
+      ],
+      "anchors": [
+        {
+          "id": "document.title.get",
+          "category": "Document property",
+          "lean": "Lean.Vir.TypeAnchors.documentGetTitleCall",
+          "ts": "Document.title",
+          "target": "browser.document.getTitle",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "get", "effect": "dom", "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.title.set",
+          "category": "Document property",
+          "lean": "Lean.Vir.TypeAnchors.documentSetTitleCall",
+          "ts": "Document.title",
+          "target": "browser.document.setTitle",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "set", "effect": "dom", "resourceArguments": [0] }
+        },
+        {
+          "id": "document.querySelector",
+          "category": "Document selectors",
+          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+          "ts": "Document.querySelector",
+          "target": "browser.document.querySelector",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 4, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.querySelectorAll",
+          "category": "Document selectors",
+          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+          "ts": "Document.querySelectorAll",
+          "target": "browser.document.querySelectorAll",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 4, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "document.createElement",
+          "category": "Document creation",
+          "lean": "Lean.Vir.TypeAnchors.documentCreateElementCall",
+          "ts": "Document.createElement",
+          "target": "browser.document.createElement",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "overload": 2, "effect": "dom", "resourceArguments": [0], "resultRepresentation": "hostResource", "omittedOptionalParameters": ["options"] }
+        }
+      ]
+    },
+    {
+      "id": "element",
+      "title": "Element",
+      "targets": ["browser.element.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Element"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" }
+    },
+    {
+      "id": "event",
+      "title": "Events",
+      "targets": ["browser.event.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Event"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Event"] }
+    },
+    {
+      "id": "canvas-element",
+      "title": "HTML canvas element",
+      "targets": ["browser.htmlCanvasElement.*"],
+      "lean": { "public": ["Lean.Vir.Browser.HTMLCanvasElement"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["HTMLCanvasElement"] }
+    },
+    {
+      "id": "input-element",
+      "title": "HTML input element",
+      "targets": ["browser.htmlInputElement.*"],
+      "lean": { "public": ["Lean.Vir.Browser.HTMLInputElement"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["HTMLInputElement"] }
+    },
+    {
+      "id": "timers",
+      "title": "Timers",
+      "targets": ["browser.timer.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Timer"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] }
+    },
+    {
+      "id": "owned-primitives",
+      "title": "Browser-owned primitives",
+      "targets": ["js.float.owned", "js.string.owned"],
+      "lean": { "public": ["Lean.Vir.Browser.ownedFloat", "Lean.Vir.Browser.ownedString"] },
+      "upstream": { "kind": "internal" }
+    }
+  ]
+}

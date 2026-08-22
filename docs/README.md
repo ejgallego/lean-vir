@@ -12,6 +12,7 @@ ownership diagrams.
 
 - Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
+  [TYPE_ANCHORS.md](TYPE_ANCHORS.md),
   `Vir/InterfaceValidation.lean`,
   `Vir/Interface/Model.lean`,
   `Vir/Interface/Classify/Error.lean`,
@@ -53,6 +54,9 @@ ownership diagrams.
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md) owns the public Lean API inventory.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md) owns JavaScript host target behavior and
   resource cleanup rules.
+- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md) owns the consolidated library
+  explorer and exhaustive compiler/runtime reconciliation for shipped
+  JavaScript boundaries.
 - [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
   renderer details.
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns implementation paths, call-flow
@@ -90,6 +94,12 @@ ownership diagrams.
   fixture.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
+- [TYPE_ANCHORS.md](TYPE_ANCHORS.md): generated TypeScript descriptors,
+  compiler-backed Lean VIR comparison, and the React DOM root review seed.
+- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): the consolidated binding library
+  explorer, colocated API-group manifests, exhaustive `vir_js` inventory,
+  forward and reverse browsing, faithful boundary policy, and shipped provider
+  reconciliation.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary

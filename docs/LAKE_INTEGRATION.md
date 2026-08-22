@@ -42,7 +42,7 @@ def answer : Nat := 42
 
 @[vir_startup]
 def mount : DomM Unit := do
-  let some root ← Document.querySelector "#vir-slide-root" | pure ()
+  let some root ← Document.querySelectorString "#vir-slide-root" | pure ()
   Element.setTextContent root "This DOM was updated from Lean"
 
 end MySlides.Runtime

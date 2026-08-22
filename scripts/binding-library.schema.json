@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leanprover.github.io/lean-vir/schemas/binding-library-v1.json",
+  "title": "Lean VIR binding library",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "title", "description", "lean", "roots"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "$ref": "#/$defs/id" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "lean": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules"],
+      "properties": {
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "roots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/root" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "targets", "upstream"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "lean": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "public": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "upstream": { "$ref": "#/$defs/upstream" },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["report"],
+          "properties": {
+            "report": { "type": "string", "minLength": 1 }
+          }
+        },
+        "mappings": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/directMapping" },
+              { "$ref": "#/$defs/propertyMapping" }
+            ]
+          }
+        },
+        "anchors": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "directMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typescript", "targets"],
+      "properties": {
+        "typescript": { "type": "string", "minLength": 1 },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "lean": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "propertyMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typescript", "accessors"],
+      "properties": {
+        "typescript": { "type": "string", "minLength": 1 },
+        "accessors": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "get": { "$ref": "#/$defs/accessorOperation" },
+            "set": { "$ref": "#/$defs/accessorOperation" }
+          }
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "accessorOperation": {
+      "oneOf": [
+        { "$ref": "#/$defs/accessorMapping" },
+        { "$ref": "#/$defs/missingAccessor" }
+      ]
+    },
+    "accessorMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "lean", "anchor"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1 },
+        "lean": { "type": "string", "minLength": 1 },
+        "anchor": { "type": "string", "minLength": 1 }
+      }
+    },
+    "missingAccessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "note"],
+      "properties": {
+        "missing": { "const": true },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["typescript", "local", "internal"] },
+        "package": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "declarations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sourceUrl": { "type": "string", "minLength": 1 },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "dependencyDepth": { "type": "integer", "minimum": 0 },
+        "dependencyPolicy": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "docs": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
