@@ -166,6 +166,7 @@ npm run test:upstream:no-build
 npm run test:env-lookup:wasm-pair
 npm run test:infoview
 npm run test:runtime
+npm run test:runtime:unit
 npm run test:runtime:pure
 npm run test:runtime:lean
 npm run test:lake
@@ -237,6 +238,9 @@ changes.
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
   without Lean-dependent package generation:
   `npm run test:runtime:pure`
+- Runtime runner catalog, filtering, configuration, or scheduling policy without
+  generated Lean or Wasm artifacts:
+  `npm run test:runtime:unit`
 - Runtime package generation or SDK artifact import checks:
   `npm run test:runtime:lean`
 - Lake module/package facets, marked-module selection, or SDK installer changes:

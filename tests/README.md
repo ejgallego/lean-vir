@@ -14,8 +14,10 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
   runner configuration, result evaluation, summary construction, and the
   cached runner context live under `support/`. The pure contracts have direct
   coverage in the top-level `fixture-*.test.mjs` files.
-- `runtime/` owns the JavaScript runtime smoke-test runner and its focused test
-  cases.
+- `runtime/` owns the JavaScript runtime smoke-test runner, its immutable test
+  catalog and pure selection and scheduling policy, and its focused test cases.
+  Run `npm run test:runtime:unit` to check the runner contract without executing
+  the runtime smoke tests or building Lean artifacts.
 - `surface/` tests the report-analysis and rendering tools kept in `scripts/`.
 - `support/` contains helpers shared only by test suites.
 - `upstream/` owns the end-to-end upstream interpreter smoke test and its
