@@ -6,41 +6,17 @@ import {
   discoverExampleCatalog,
   readExampleTestPackage,
 } from "./example-catalog-lib.mjs";
+import {
+  exactObject,
+  identifier,
+  object,
+  string,
+} from "./validation-utils.mjs";
 
-const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
 const producerProtocol = "browser-benchmarks/source-package/v1";
 const artifactBoundary = "browser-benchmarks/bounded-runtime/v1";
 const adapters = new Set(["vir", "fir-native", "fir-llvm"]);
-
-function object(value, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-  return value;
-}
-
-function exactObject(value, properties, label) {
-  object(value, label);
-  const allowed = new Set(properties);
-  const unknown = Object.keys(value).find((property) => !allowed.has(property));
-  if (unknown) throw new Error(`${label} has unknown property ${unknown}`);
-  return value;
-}
-
-function identifier(value, label) {
-  if (typeof value !== "string" || !idPattern.test(value)) {
-    throw new Error(`${label} is not a safe identifier`);
-  }
-  return value;
-}
-
-function string(value, label) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`${label} must be a non-empty string`);
-  }
-  return value;
-}
 
 function source(database, sourceId, label) {
   const value = database.sources[sourceId];

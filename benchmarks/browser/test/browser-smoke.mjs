@@ -1,78 +1,22 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import {
+  collectPageErrors,
+  launchBenchmarkBrowser,
+  startBenchmarkServer,
+} from "./harness.mjs";
+
 const port = Number(process.env.BENCH_PORT ?? "18334");
-const url = `http://127.0.0.1:${port}`;
-const server = spawn(
-  process.execPath,
-  [join(appRoot, "scripts/serve.mjs"), "--port", String(port)],
-  {
-    cwd: appRoot,
-    stdio: ["ignore", "pipe", "pipe"],
-  },
-);
-
-async function waitForServer() {
-  let startupOutput = "";
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("benchmark server did not announce readiness")),
-      5_000,
-    );
-    const finish = (callback) => {
-      clearTimeout(timeout);
-      callback();
-    };
-    server.stdout.on("data", (chunk) => {
-      startupOutput += chunk;
-      if (startupOutput.includes(`at ${url}`)) finish(resolve);
-    });
-    server.stderr.on("data", (chunk) => {
-      startupOutput += chunk;
-    });
-    server.once("exit", (code) =>
-      finish(() =>
-        reject(
-          new Error(
-            `benchmark server exited with ${code} before readiness\n${startupOutput}`,
-          ),
-        ),
-      ),
-    );
-  });
-
-  let lastError;
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (server.exitCode !== null)
-      throw new Error(`server exited with ${server.exitCode}`);
-    try {
-      const response = await fetch(url);
-      if (response.ok) return;
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw lastError ?? new Error("benchmark server did not become ready");
-}
+const server = await startBenchmarkServer({ port });
+const url = server.origin;
+let browser = null;
 
 try {
-  await waitForServer();
-  const configuredChrome = process.env.CHROMIUM ?? "/usr/bin/google-chrome";
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: existsSync(configuredChrome) ? configuredChrome : undefined,
-  });
+  browser = await launchBenchmarkBrowser();
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
-  const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(String(error)));
+  const pageErrors = collectPageErrors(page);
   const smokeManifest = {
     schemaVersion: 2,
     kind: "browser-benchmarks/artifact-set",
@@ -277,8 +221,8 @@ try {
     .locator(".pretty-corpus-overlay header button", { hasText: "Close" })
     .click();
   assert.deepEqual(pageErrors, []);
-  await browser.close();
   console.log("PASS standalone five-backend prettyM benchmark webapp smoke");
 } finally {
-  server.kill("SIGTERM");
+  await browser?.close();
+  server.close();
 }
