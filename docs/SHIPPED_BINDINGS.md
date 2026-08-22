@@ -86,6 +86,60 @@ an automatic correspondence only proposes which upstream declaration to
 review. `Complete surface analysis` is reserved for API groups whose mappings
 and type translations have been reviewed.
 
+## Soundness-first Roadmap
+
+The upstream operation is the source of truth for the faithful binding layer.
+VIR should preserve JavaScript resources, nullability, optionality, overloads,
+receiver shape, effects, and ownership or retention behavior unless a reviewed
+representation rule says otherwise. Convenience conversions belong in a
+separate application-facing layer and do not count as the upstream binding.
+
+An incorrect public binding is a release-blocking defect. A missing upstream
+operation is a visible coverage gap, but it is not evidence that an existing
+binding is unsound. The explorer and CI keep those two conditions separate.
+
+Every binding repair or addition should satisfy these landing gates:
+
+1. **Boundary soundness.** Compiler validation accepts the host signature;
+   ordinary bindings contain no implicit Lean/JavaScript conversion.
+2. **Operation identity.** The API-group configuration maps one upstream
+   operation to its public Lean declaration and host target. Writable
+   properties classify getter and setter independently.
+3. **Runtime parity.** Every declared target has the intended shipped provider,
+   and provider-only targets are rejected. Resource lifetime behavior is
+   covered where the operation retains or returns host-owned values.
+4. **Type fidelity.** Reviewed intent accounts for resource representation,
+   nullability, unions, overload selection, omitted optional parameters,
+   effects, ownership, and callback retention. Weak or missing comparisons for
+   shipped operations require repair or an explicit reviewed limitation.
+5. **Regression evidence.** The consolidated gate reaches the target from a
+   public Lean declaration and exercises the relevant runtime behavior. The
+   generated explorer is then review evidence, not committed source.
+
+Before the first release, every API group containing a public shipped binding
+should move from an automatic suggestion or missing local contract to reviewed
+analysis or an explicit no-parity classification. Shipped operations should
+have no unclassified accessor aliases and no unresolved weak or missing type
+finding. Unimplemented upstream operations may remain clearly reported gaps.
+
+Land that work in small API-group slices, prioritizing existing exposed
+bindings over new surface:
+
+1. repair browser properties and methods that currently hide primitive or
+   nullable resource conversions;
+2. review input, event, canvas, timer, and callback lifetime surfaces;
+3. close or explicitly classify React root fidelity findings;
+4. provide machine-readable contracts for shipped local Infoview and
+   ProofWidgets operations;
+5. accept client binding requests and add new libraries only after the shipped
+   core has a reviewed baseline.
+
+Request planners, correspondence ranking, and future code generation should
+consume the same authored API-group configurations and generated machine
+report. They may propose work, but a suggestion never becomes reviewed
+coverage automatically. Generated declarations must target the faithful layer;
+conversion wrappers remain an explicit downstream policy choice.
+
 ## Library Configuration
 
 Each Lean source group that owns shipped bindings has a companion
