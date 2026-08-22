@@ -1,6 +1,6 @@
 # Browser benchmark catalog maintainer guide
 
-Last verified: 2026-08-14
+Last verified: 2026-08-20
 
 ## Purpose
 
@@ -38,6 +38,9 @@ See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 
 - `prettyM/default` is the active canonical example. Its build contains VIR,
   FIR-native, and FIR-LLVM components and exercises five browser backends.
+- `lean-zip/default` is the active real-client compression example. Its build
+  assembles the client-owned workload, VIR, FIR-native, and FIR C/Emscripten
+  packages and exercises five browser backends.
 - `illuminate/default` is the second real client and uses the same catalog,
   shell, variant selector, artifact root, and report workflow. It remains a
   local rehearsal until Illuminate and FIR expose complete canonical producer
@@ -53,8 +56,8 @@ See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
   candidates, re-imports them through the consumer path, runs differential
   tests, and uploads short-lived payloads.
 - The Pages workflow is the sole `main`-branch candidate builder. It builds and
-  uploads the canonical `prettyM/default` payload, admits it only after its
-  staged manifest and test-package digest match the catalog, and installs the
+  uploads every active canonical payload, admits each only after its staged
+  manifest and test-package digest match the catalog, and installs the
   filtered app under `web/dist/benchmarks/`.
 - Dashboard backend filters are presentation-only; exported JSON retains the
   complete report.
@@ -69,6 +72,7 @@ Run application commands from `benchmarks/browser/`:
 npm install
 npm run examples:check
 npm run example -- prettyM default --plan
+npm run example -- lean-zip default --plan
 npm run example -- prettyM default --materialize --prepare
 npm run test:unit
 npm run test:browser

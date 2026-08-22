@@ -139,6 +139,25 @@ checksums, and copies only the declared regular files into the seed. It does not
 rewrite producer bytes. FIR LLVM depends on FIR native because its producer
 validates exact output equivalence against that package.
 
+Client repositories that need their own Lake environment or assemble more than
+one source-owned file use the generic `package-command` adapter. Its executable
+entry point is invoked with a fresh caller-owned output directory and every
+resolved input explicitly:
+
+```text
+producer --output OUTPUT \
+  --checkout ROLE=EXACT_CLEAN_CHECKOUT ... \
+  --package COMPONENT=VALIDATED_DEPENDENCY ...
+```
+
+The `producer` checkout owns the entry point. The command must emit its declared
+JSON manifest and `SHA256SUMS`, verify its package-local correctness checks, and
+return only after the output is ready for consumption. The catalog driver then
+checks the sums, admits only declared regular files, and re-verifies every Git
+checkout before writing the source-build receipt. This is the escape hatch for
+repository-owned compilation context, not a place for application-specific
+staging logic.
+
 The generated `_artifacts/builds/<build-id>/BUILD.json` is a portable receipt.
 It records both the build-catalog and example-manifest digests, resolved source
 commits, adapters, staged file hashes, selected variant, and the digest of its
@@ -196,7 +215,8 @@ candidate-only lock, the hash-identified `EXAMPLE_TEST.json` differential
 report, and a `CANDIDATE.json` validation statement.
 
 `.github/workflows/example-candidate.yml` runs the same commands on relevant
-pull requests and explicit dispatches. On `main`, the Pages workflow runs this
-candidate path once, uploads the same short-lived payload, and deploys the
-admitted static application. Neither workflow compares candidate bytes across
-runs or updates repository state.
+pull requests and explicit dispatches. On `main`, the Pages workflow derives
+its plan from active canonical examples, gives each build a separate controlled
+source directory, builds and stages every candidate, uploads their short-lived
+payloads together, and deploys the admitted static application. Neither
+workflow compares candidate bytes across runs or updates repository state.

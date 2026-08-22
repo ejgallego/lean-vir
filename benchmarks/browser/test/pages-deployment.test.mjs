@@ -16,6 +16,7 @@ import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
 import { canonicalJson, fileRecord } from "../scripts/artifact-set-lib.mjs";
 import { discoverExampleCatalog } from "../scripts/example-catalog-lib.mjs";
 import {
+  activePagesDeployments,
   parsePagesDeployment,
   selectPagesCatalog,
 } from "../scripts/pages-deployment-lib.mjs";
@@ -72,6 +73,36 @@ test("admits a canonical staged example to Pages", async (t) => {
   assert.deepEqual(
     pagesCatalog.examples.map(({ id }) => id),
     ["prettyM"],
+  );
+});
+
+test("derives Pages deployments from active canonical examples", async (t) => {
+  const fixture = await stagedDeployment(t);
+  assert.deepEqual(
+    await activePagesDeployments({
+      appRoot,
+      catalog: fixture.catalog,
+      database: fixture.database,
+    }),
+    [
+      { example: "lean-zip", variant: "default", build: "lean-zip" },
+      { example: "prettyM", variant: "default", build: "prettyM" },
+    ],
+  );
+});
+
+test("rejects an active example without a canonical build", async (t) => {
+  const fixture = await stagedDeployment(t);
+  const catalog = structuredClone(fixture.catalog);
+  catalog.examples.find(({ id }) => id === "illuminate").lifecycle = "active";
+  await assert.rejects(
+    () =>
+      activePagesDeployments({
+        appRoot,
+        catalog,
+        database: fixture.database,
+      }),
+    /has no canonical build/,
   );
 });
 

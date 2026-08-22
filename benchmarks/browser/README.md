@@ -122,19 +122,26 @@ as a repository release lifecycle.
 ## GitHub Pages deployment
 
 GitHub Pages consumes a candidate generated inside its own build job; it does
-not require a pre-existing archive. After the candidate is staged, the
-deployment build is explicit:
+not require a pre-existing archive. `npm run pages:plan` lists the active
+canonical example, variant, and build records that the workflow will build.
+After those candidates are staged, the deployment build remains explicit and
+accepts every selected example:
 
 ```sh
-npm run build -- --deploy prettyM=default
+npm run pages:plan
+npm run build -- --deploy lean-zip=default --deploy prettyM=default
 ```
+
+Repeat `--deploy EXAMPLE=VARIANT` for every line in the plan.
 
 Deployment admission requires a canonical build, an exact example/variant and
 artifact-set identity, the canonical `tests.json` digest, and no missing,
 changed, extra, or symbolic-link artifact files. Only admitted example
 directories and artifacts are copied. The generated `examples/catalog.json`
-therefore exposes `prettyM/default` on Pages while Illuminate remains a local
-rehearsal.
+therefore exposes only active canonical examples. At present that is
+`lean-zip/default` and `prettyM/default`; changing Illuminate from rehearsal to
+active will add it to the same source-materialization, candidate, browser-test,
+and deployment loop.
 
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
@@ -142,14 +149,14 @@ fallback and reload once before starting the application. CI tests that path
 without server-supplied isolation and requires every backend and differential
 test declared by the admitted variant to pass.
 
-The artifact set is generic over Lean versions. Each candidate is a complete
-bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
-workload. The browser only observes the common semantic input/output and timing
+Artifact sets are generic over Lean versions. Each candidate is a complete
+bounded runtime carrying its own Lean version, runtime, adapter, and workload.
+The browser only observes the example's semantic input/output and timing
 contract. `artifact-builds.json` owns the current producer and workload pins.
-Five-backend parity is the compatibility gate; no cross-backend Lean heap
-values are exchanged.
+Backend parity is the compatibility gate; no cross-backend Lean heap values are
+exchanged.
 
-The current VIR package uses the producer-facing
+The current prettyM VIR package uses the producer-facing
 `VersoSlides.Pretty.*ForVir` export names. `example.json` is their canonical
 build declaration; `config.js` maps the same names to their browser roles. The
 application itself does not load Verso or depend on slide sources. Renaming

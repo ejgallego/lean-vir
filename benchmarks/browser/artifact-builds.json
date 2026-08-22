@@ -7,6 +7,11 @@
       "repository": "https://github.com/ejgallego/lean-fir",
       "revision": "298682a766d80e90053d3e76ee2f3e4af78a52aa"
     },
+    "fir-lean-zip": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-fir",
+      "revision": "b9f6adb4e6e0bf3262e66d16d33b45223e1960b1"
+    },
     "lean-4.33.0": {
       "kind": "git",
       "repository": "https://github.com/leanprover/lean4",
@@ -16,6 +21,21 @@
       "kind": "git",
       "repository": "https://github.com/leanprover/verso-slides",
       "revision": "c16a6f83b622dd8ebc2f4975d93b856b08dde444"
+    },
+    "lean-zip-browser": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-zip",
+      "revision": "273d0d6cd9cab77c7f3489b0b0b1f6e543315d21"
+    },
+    "lean-zip-common": {
+      "kind": "git",
+      "repository": "https://github.com/kim-em/lean-zip-common",
+      "revision": "4425bab1f9522307d77e8d485bc536149ba31c36"
+    },
+    "vir-lean-zip": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-vir",
+      "revision": "baa8cc5e0d4742f8809c8a1ce4c0a346ab851c70"
     },
     "vir-prettyM": {
       "kind": "git",
@@ -140,6 +160,186 @@
               "prettyM.manifest.json": "prettyM/lean-llvm/prettyM.manifest.json",
               "prettyM.mjs": "prettyM/lean-llvm/prettyM.mjs",
               "prettyM.wasm": "prettyM/lean-llvm/prettyM.wasm"
+            }
+          }
+        }
+      }
+    },
+    "lean-zip": {
+      "example": {
+        "id": "lean-zip",
+        "variant": "default"
+      },
+      "artifactSet": {
+        "setId": "lean-zip-browser-set-0001",
+        "benchmarkContract": {
+          "id": "lean-zip/raw-deflate/v1",
+          "input": "byte-array-and-compression-level/v1",
+          "output": "raw-deflate-byte-array/v1",
+          "timingPhases": ["prepare", "first-call", "steady"]
+        }
+      },
+      "checkouts": {
+        "fir": "fir-lean-zip",
+        "lean": "lean-4.33.0",
+        "lean-zip": "lean-zip-browser",
+        "vir": "vir-lean-zip",
+        "zip-common": "lean-zip-common"
+      },
+      "components": {
+        "workload": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "contract": "lean-zip/browser-benchmark-source/v1",
+            "oracle": "native-lean-build-time"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "producer": "lean-zip"
+            },
+            "entrypoint": "bench/catalog/export-browser-benchmark-source.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "npm",
+                "args": ["--prefix", "bench/web", "ci"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "lean-zip/workload/BUILD.json",
+              "SHA256SUMS": "lean-zip/workload/SHA256SUMS",
+              "smoke.mjs": "lean-zip/workload/smoke.mjs",
+              "workload/backend-worker.mjs": "lean-zip/workload/backend-worker.mjs",
+              "workload/catalog-controller.mjs": "lean-zip/workload/catalog-controller.mjs",
+              "workload/fflate.mjs": "lean-zip/workload/fflate.mjs",
+              "workload/native-oracle.json": "lean-zip/workload/native-oracle.json",
+              "workload/plan.json": "lean-zip/workload/plan.json",
+              "workload/protocol.mjs": "lean-zip/workload/protocol.mjs",
+              "workload/vectors/random-4k.input.bin": "lean-zip/workload/vectors/random-4k.input.bin",
+              "workload/vectors/random-4k.level-1.raw": "lean-zip/workload/vectors/random-4k.level-1.raw",
+              "workload/vectors/random-4k.level-6.raw": "lean-zip/workload/vectors/random-4k.level-6.raw",
+              "workload/vectors/repeated-1k.input.bin": "lean-zip/workload/vectors/repeated-1k.input.bin",
+              "workload/vectors/repeated-1k.level-1.raw": "lean-zip/workload/vectors/repeated-1k.level-1.raw",
+              "workload/vectors/repeated-1k.level-6.raw": "lean-zip/workload/vectors/repeated-1k.level-6.raw",
+              "workload/vectors/structured-16k.input.bin": "lean-zip/workload/vectors/structured-16k.input.bin",
+              "workload/vectors/structured-16k.level-1.raw": "lean-zip/workload/vectors/structured-16k.level-1.raw",
+              "workload/vectors/structured-16k.level-10.raw": "lean-zip/workload/vectors/structured-16k.level-10.raw",
+              "workload/vectors/structured-16k.level-6.raw": "lean-zip/workload/vectors/structured-16k.level-6.raw"
+            }
+          }
+        },
+        "vir": {
+          "dependencies": ["workload"],
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "compilerRoute": "lean-vir-ir-interpreter-wasm32-wasip1",
+            "entry": "VirLeanZipAcceptance.compressRaw"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "client": "lean-zip",
+              "producer": "vir",
+              "runtime": "lean"
+            },
+            "entrypoint": "scripts/export-lean-zip-browser-package.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "npm",
+                "args": ["ci"]
+              },
+              {
+                "checkout": "producer",
+                "command": "npm",
+                "args": ["run", "install:wasi"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "lean-zip/vir/BUILD.json",
+              "SHA256SUMS": "lean-zip/vir/SHA256SUMS",
+              "lean-vir/js/vir-runtime.js": "lean-zip/vir/lean-vir/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "lean-zip/vir/lean-vir/wasm/vir-upstream.wasm",
+              "lean-zip.irpkg": "lean-zip/vir/lean-zip.irpkg",
+              "smoke.expected.raw": "lean-zip/vir/smoke.expected.raw",
+              "smoke.input.bin": "lean-zip/vir/smoke.input.bin",
+              "smoke.mjs": "lean-zip/vir/smoke.mjs"
+            }
+          }
+        },
+        "fir-native": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "compilerRoute": "fir-resident-zero-import",
+            "runtimeContract": "fir.standard-libm/v2"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "client": "lean-zip",
+              "producer": "fir",
+              "zip-common": "zip-common"
+            },
+            "entrypoint": "integration/lean-zip/export-raw-package.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "lean-zip/fir-native/BUILD.json",
+              "SHA256SUMS": "lean-zip/fir-native/SHA256SUMS",
+              "lean-zip-byte-array-browser-adapter.mjs": "lean-zip/fir-native/lean-zip-byte-array-browser-adapter.mjs",
+              "lean-zip-raw-browser-adapter.mjs": "lean-zip/fir-native/lean-zip-raw-browser-adapter.mjs",
+              "lean-zip-raw.wasm": "lean-zip/fir-native/lean-zip-raw.wasm",
+              "lean-zip-raw.wasm.functions.json": "lean-zip/fir-native/lean-zip-raw.wasm.functions.json",
+              "lean-zip-raw.wasm.json": "lean-zip/fir-native/lean-zip-raw.wasm.json",
+              "smoke.mjs": "lean-zip/fir-native/smoke.mjs",
+              "standard-libm-runtime-contract.mjs": "lean-zip/fir-native/standard-libm-runtime-contract.mjs"
+            }
+          }
+        },
+        "fir-emscripten": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "compilerRoute": "final-lcnf-lean-c-llvm-emscripten",
+            "runtime": "full-lean"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "fir": "fir",
+              "producer": "lean-zip",
+              "zip-common": "zip-common"
+            },
+            "entrypoint": "bench/fir-c/package.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "fir",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "lean-zip/fir-emscripten/BUILD.json",
+              "SHA256SUMS": "lean-zip/fir-emscripten/SHA256SUMS",
+              "emscripten-loader.mjs": "lean-zip/fir-emscripten/emscripten-loader.mjs",
+              "lean-zip-emscripten-adapter.mjs": "lean-zip/fir-emscripten/lean-zip-emscripten-adapter.mjs",
+              "lean-zip-emscripten.manifest.json": "lean-zip/fir-emscripten/lean-zip-emscripten.manifest.json",
+              "lean-zip-emscripten.mjs": "lean-zip/fir-emscripten/lean-zip-emscripten.mjs",
+              "lean-zip-emscripten.wasm": "lean-zip/fir-emscripten/lean-zip-emscripten.wasm",
+              "smoke.mjs": "lean-zip/fir-emscripten/smoke.mjs"
             }
           }
         }

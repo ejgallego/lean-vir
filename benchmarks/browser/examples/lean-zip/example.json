@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-benchmarks/example",
+  "id": "lean-zip",
+  "title": "lean-zip raw DEFLATE",
+  "summary": "Five browser backends · exact Lean bytes and independent inflate",
+  "lifecycle": "active",
+  "packages": [
+    {
+      "id": "raw-deflate",
+      "target": "Zip/Wasm/Entry.lean",
+      "exports": ["Zip.Wasm.compressRaw"]
+    }
+  ],
+  "controller": "examples/lean-zip/controller.mjs",
+  "testPackage": "examples/lean-zip/tests.json"
+}
