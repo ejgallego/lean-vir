@@ -1,6 +1,6 @@
 # Browser benchmark catalog maintainer guide
 
-Last verified: 2026-08-14
+Last verified: 2026-08-22
 
 ## Purpose
 
@@ -33,6 +33,17 @@ directories.
 
 See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 `ARTIFACT_SETS.md` for the complete formats.
+
+## Shared infrastructure
+
+- `scripts/package-root.mjs` owns the movable application-root calculation.
+- `scripts/validation-utils.mjs` owns Node-side configuration validation, and
+  `scripts/process-utils.mjs` owns synchronous subprocess execution.
+- `scripts/browser-utils.mjs` owns Chromium selection for collectors and tests.
+- `test/harness.mjs` owns benchmark-server and browser-test lifecycle behavior.
+
+Keep browser-bundled manifest checks in `src/`; they deliberately do not import
+Node-side script infrastructure.
 
 ## Current state
 

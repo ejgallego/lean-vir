@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
+import { appRoot } from "../scripts/package-root.mjs";
 import {
   checkoutReceipt,
   parsePathAssignment,
@@ -11,7 +11,6 @@ import {
   resolveBuildCheckoutPaths,
 } from "../scripts/toolchain-config-lib.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const fixtureRoot = join(appRoot, "test-results/toolchain-config");
 
 const build = {

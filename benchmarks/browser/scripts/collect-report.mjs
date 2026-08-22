@@ -1,10 +1,8 @@
-import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { launchBenchmarkBrowser } from "./browser-utils.mjs";
+import { appRoot } from "./package-root.mjs";
 
 function parseArgs(argv) {
   const options = {
@@ -264,11 +262,7 @@ async function collectIsolatedRepeats(browser, url, backendIds, cycles) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const output = workspacePath(options.output);
-  const configuredChrome = process.env.CHROMIUM ?? "/usr/bin/google-chrome";
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: existsSync(configuredChrome) ? configuredChrome : undefined,
-  });
+  const browser = await launchBenchmarkBrowser();
   let results;
   let coldProfiles;
   let isolatedMemory;

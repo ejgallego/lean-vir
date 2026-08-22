@@ -7,8 +7,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
@@ -19,8 +18,7 @@ import {
   parsePagesDeployment,
   selectPagesCatalog,
 } from "../scripts/pages-deployment-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "../scripts/package-root.mjs";
 
 async function stagedDeployment(t) {
   const resultsRoot = join(appRoot, "test-results");

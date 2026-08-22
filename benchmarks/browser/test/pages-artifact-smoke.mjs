@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 import {
   fileRecord,
   verifyStagedArtifactSet,
 } from "../scripts/artifact-set-lib.mjs";
+import { appRoot } from "../scripts/package-root.mjs";
 import { parsePagesDeployment } from "../scripts/pages-deployment-lib.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = process.argv.slice(2);
 let directory = resolve(appRoot, "dist");
 const deployments = [];

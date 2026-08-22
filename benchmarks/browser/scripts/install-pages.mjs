@@ -2,9 +2,10 @@ import { cp, mkdir, rm, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const benchmarkRoot = fileURLToPath(new URL("..", import.meta.url));
+import { appRoot } from "./package-root.mjs";
+
 const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const source = resolve(benchmarkRoot, "dist");
+const source = resolve(appRoot, "dist");
 const destination = resolve(repositoryRoot, "web/dist/benchmarks");
 if (!(await stat(source).catch(() => null))?.isDirectory()) {
   throw new Error("benchmark Pages build is missing; run its build first");

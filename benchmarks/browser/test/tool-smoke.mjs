@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import { appRoot } from "../scripts/package-root.mjs";
+
 const buildDatabase = JSON.parse(
   readFileSync(join(appRoot, "artifact-builds.json"), "utf8"),
 );

@@ -1,6 +1,5 @@
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   canonicalJson,
@@ -18,9 +17,8 @@ import {
   checkoutSources,
   readBuildDatabase,
 } from "./artifact-build-lib.mjs";
+import { appRoot } from "./package-root.mjs";
 import { verifySourceBuildReceipt } from "./source-build-receipt-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function parseArgs(argv) {
   const options = {
@@ -98,7 +96,7 @@ async function main() {
     "write lockfile",
   );
   if (config.schemaVersion !== 2) {
-    throw new Error("unsupported artifact-set config or unsafe set ID");
+    throw new Error("unsupported artifact-set config");
   }
 
   await verifySourceBuildReceipt({

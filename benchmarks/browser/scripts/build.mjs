@@ -1,6 +1,5 @@
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import { readBuildDatabase } from "./artifact-build-lib.mjs";
 import { canonicalJson } from "./artifact-set-lib.mjs";
@@ -9,8 +8,8 @@ import {
   parsePagesDeployment,
   selectPagesCatalog,
 } from "./pages-deployment-lib.mjs";
+import { appRoot } from "./package-root.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const output = join(appRoot, "dist");
 const artifacts = join(appRoot, "artifacts");
 const deployments = [];

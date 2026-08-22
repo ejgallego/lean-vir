@@ -1,13 +1,10 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { readBuildDatabase } from "./artifact-build-lib.mjs";
 import {
   discoverExampleCatalog,
   readExampleTestPackage,
 } from "./example-catalog-lib.mjs";
+import { appRoot } from "./package-root.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const catalog = await discoverExampleCatalog(appRoot);
 const database = await readBuildDatabase(`${appRoot}/artifact-builds.json`);
 const include = [];

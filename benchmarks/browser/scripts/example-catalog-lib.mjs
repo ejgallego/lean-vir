@@ -2,7 +2,13 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+import {
+  exactProperties,
+  identifier,
+  object,
+  string,
+} from "./validation-utils.mjs";
+
 const lifecycles = new Set([
   "active",
   "candidate",
@@ -17,32 +23,6 @@ const lifecycleOrder = new Map([
   ["queued", 3],
   ["archived", 4],
 ]);
-
-function object(value, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-  return value;
-}
-
-function exactProperties(value, allowed, label) {
-  for (const property of Object.keys(value)) {
-    if (!allowed.has(property)) throw new Error(`${label} has unknown property ${property}`);
-  }
-}
-
-function string(value, label) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`${label} must be a non-empty string`);
-  }
-  return value;
-}
-
-function identifier(value, label) {
-  const selected = string(value, label);
-  if (!idPattern.test(selected)) throw new Error(`${label} is not a safe identifier`);
-  return selected;
-}
 
 function webPath(value, label) {
   const selected = string(value, label);

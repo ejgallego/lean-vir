@@ -1,7 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, relative, resolve } from "node:path";
 
 import {
   checkoutSources,
@@ -14,13 +12,13 @@ import {
   inside,
   readJson,
 } from "./artifact-set-lib.mjs";
+import { appRoot } from "./package-root.mjs";
+import { runSync } from "./process-utils.mjs";
 import {
   parsePathAssignment,
   readToolchainConfig,
   resolveBuildCheckoutPaths,
 } from "./toolchain-config-lib.mjs";
-
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function usage() {
   console.log(`Usage: node scripts/build-artifact-candidate.mjs [options] BUILD
@@ -81,18 +79,7 @@ function parseArgs(argv) {
 }
 
 function run(command, args, { capture = false } = {}) {
-  const result = spawnSync(command, args, {
-    cwd: appRoot,
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if ((result.status ?? 1) !== 0) {
-    const detail = capture && result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `${command} ${args.join(" ")} failed with status ${result.status ?? 1}${detail}`,
-    );
-  }
-  return capture ? result.stdout.trim() : "";
+  return runSync(command, args, { cwd: appRoot, capture });
 }
 
 async function main() {

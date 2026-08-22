@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -23,9 +22,9 @@ import {
   readBuildDatabase,
   validateBuildDatabase,
 } from "../scripts/artifact-build-lib.mjs";
+import { appRoot } from "../scripts/package-root.mjs";
 import { verifySourceBuildReceipt } from "../scripts/source-build-receipt-lib.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const scratch = join(appRoot, "test-results", "artifact-set-unit");
 const prettyMArtifactFiles = [
   "prettyM/lean-llvm/README.md",

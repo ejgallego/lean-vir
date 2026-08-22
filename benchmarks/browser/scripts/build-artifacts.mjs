@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   cp,
   lstat,
@@ -18,7 +17,6 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   artifactFiles,
@@ -38,6 +36,8 @@ import {
   validateSeed,
 } from "./artifact-set-lib.mjs";
 import { verifyGitCheckout } from "./git-checkout-lib.mjs";
+import { appRoot } from "./package-root.mjs";
+import { runSync } from "./process-utils.mjs";
 import {
   checkoutReceipt,
   parsePathAssignment,
@@ -45,7 +45,6 @@ import {
   resolveBuildCheckoutPaths,
 } from "./toolchain-config-lib.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildEnvironment = {
   ...process.env,
   NPM_CONFIG_CACHE:
@@ -133,19 +132,7 @@ function run(
   args,
   { cwd, env = buildEnvironment, capture = false } = {},
 ) {
-  const result = spawnSync(command, args, {
-    cwd,
-    env,
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if ((result.status ?? 1) !== 0) {
-    const detail = capture && result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `${command} ${args.join(" ")} failed with status ${result.status ?? 1}${detail}`,
-    );
-  }
-  return capture ? result.stdout.trim() : "";
+  return runSync(command, args, { cwd, env, capture });
 }
 
 function checkoutFor(component, role, resolvedCheckouts) {
