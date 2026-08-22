@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { resolve } from "node:path";
 
 import {
   discoverExampleCatalog,
   readExampleTestPackage,
 } from "../scripts/example-catalog-lib.mjs";
 import { canonicalJson, inside } from "../scripts/artifact-set-lib.mjs";
+import {
+  appRoot,
+  collectPageErrors,
+  launchBenchmarkBrowser,
+  startBenchmarkServer,
+} from "./harness.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = process.argv.slice(2);
 function takeOption(name) {
   const index = args.indexOf(name);
@@ -63,60 +64,22 @@ if (!variant) {
 const port = Number(
   process.env.BENCH_PORT ?? String(19000 + (process.pid % 1000)),
 );
-const origin = `http://127.0.0.1:${port}`;
+const server = await startBenchmarkServer({
+  port,
+  directory,
+  isolation: !staticHost,
+  label: "example server",
+});
+const { origin } = server;
 const query = new URLSearchParams({ example: exampleId, variant: variant.id });
 const url = `${origin}${basePath}?${query}`;
-const serverArguments = [
-  join(appRoot, "scripts/serve.mjs"),
-  "--port",
-  String(port),
-  "--directory",
-  directory,
-];
-if (staticHost) serverArguments.push("--no-isolation");
-const server = spawn(process.execPath, serverArguments, {
-  cwd: appRoot,
-  stdio: ["ignore", "pipe", "pipe"],
-});
-
-async function waitForServer() {
-  let output = "";
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error(`example server did not start\n${output}`)),
-      5_000,
-    );
-    const finish = (callback) => {
-      clearTimeout(timeout);
-      callback();
-    };
-    server.stdout.on("data", (chunk) => {
-      output += chunk;
-      if (output.includes(`at ${origin}`)) finish(resolve);
-    });
-    server.stderr.on("data", (chunk) => {
-      output += chunk;
-    });
-    server.once("exit", (code) =>
-      finish(() =>
-        reject(new Error(`example server exited with ${code}\n${output}`)),
-      ),
-    );
-  });
-}
 
 let browser = null;
 const results = [];
 try {
-  await waitForServer();
-  const configuredChrome = process.env.CHROMIUM ?? "/usr/bin/google-chrome";
-  browser = await chromium.launch({
-    headless: true,
-    executablePath: existsSync(configuredChrome) ? configuredChrome : undefined,
-  });
+  browser = await launchBenchmarkBrowser();
   const page = await browser.newPage();
-  const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(String(error)));
+  const pageErrors = collectPageErrors(page);
   await page.goto(url, {
     waitUntil: staticHost ? "domcontentloaded" : "networkidle",
   });
@@ -229,5 +192,5 @@ try {
   );
 } finally {
   if (browser) await browser.close();
-  server.kill("SIGTERM");
+  server.close();
 }

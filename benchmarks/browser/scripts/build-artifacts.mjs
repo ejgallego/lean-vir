@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   cp,
   lstat,
@@ -38,6 +37,7 @@ import {
   validateSeed,
 } from "./artifact-set-lib.mjs";
 import { verifyGitCheckout } from "./git-checkout-lib.mjs";
+import { runSync } from "./process-utils.mjs";
 import {
   checkoutReceipt,
   parsePathAssignment,
@@ -133,19 +133,7 @@ function run(
   args,
   { cwd, env = buildEnvironment, capture = false } = {},
 ) {
-  const result = spawnSync(command, args, {
-    cwd,
-    env,
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if ((result.status ?? 1) !== 0) {
-    const detail = capture && result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `${command} ${args.join(" ")} failed with status ${result.status ?? 1}${detail}`,
-    );
-  }
-  return capture ? result.stdout.trim() : "";
+  return runSync(command, args, { cwd, env, capture });
 }
 
 function checkoutFor(component, role, resolvedCheckouts) {

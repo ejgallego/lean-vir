@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import {
   mkdir,
@@ -18,6 +17,8 @@ import {
   sha256,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
+import { runSync } from "./process-utils.mjs";
+import { isIdentifier } from "./validation-utils.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -103,8 +104,7 @@ async function main() {
   const lock = await readJson(lockPath);
   if (
     lock.schemaVersion !== 2 ||
-    typeof lock.setId !== "string" ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(lock.setId)
+    !isIdentifier(lock.setId)
   ) {
     throw new Error("unsupported artifact-set lockfile");
   }
@@ -133,14 +133,11 @@ async function main() {
     console.log(`installed artifact set: ${relative(appRoot, destination)}`);
   }
 
-  const result = spawnSync(
+  runSync(
     process.execPath,
     [resolve(appRoot, "scripts/stage-artifact-set.mjs"), destination],
-    { cwd: appRoot, stdio: "inherit" },
+    { cwd: appRoot },
   );
-  if (result.status !== 0) {
-    throw new Error(`artifact staging failed with status ${result.status}`);
-  }
 }
 
 main().catch((error) => {

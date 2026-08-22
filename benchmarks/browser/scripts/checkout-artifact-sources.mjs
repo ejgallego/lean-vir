@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +8,7 @@ import {
 } from "./artifact-build-lib.mjs";
 import { inside } from "./artifact-set-lib.mjs";
 import { verifyGitCheckout } from "./git-checkout-lib.mjs";
+import { runSync } from "./process-utils.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -51,18 +51,7 @@ function parseArgs(argv) {
 }
 
 function run(command, args, { cwd, capture = false } = {}) {
-  const result = spawnSync(command, args, {
-    cwd,
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if ((result.status ?? 1) !== 0) {
-    const detail = capture && result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `${command} ${args.join(" ")} failed with status ${result.status ?? 1}${detail}`,
-    );
-  }
-  return capture ? result.stdout.trim() : "";
+  return runSync(command, args, { cwd, capture });
 }
 
 async function materializeCheckout(checkoutId, destination, source) {

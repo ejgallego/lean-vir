@@ -1,22 +1,13 @@
-import { spawnSync } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { runSync } from "./process-utils.mjs";
+
 function git(path, args) {
-  const result = spawnSync("git", ["-C", path, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if ((result.status ?? 1) !== 0) {
-    const detail = result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `git -C ${path} ${args.join(" ")} failed with status ${result.status ?? 1}${detail}`,
-    );
-  }
-  return result.stdout.trim();
+  return runSync("git", ["-C", path, ...args], { capture: true });
 }
 
-export function normalizedRepository(repository) {
+function normalizedRepository(repository) {
   const trimmed = repository.replace(/\/+$/, "").replace(/\.git$/, "");
   const githubScp = /^git@github\.com:(.+)$/.exec(trimmed);
   if (githubScp) return `https://github.com/${githubScp[1]}`;

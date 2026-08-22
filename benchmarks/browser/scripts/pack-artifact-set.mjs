@@ -98,7 +98,7 @@ async function main() {
     "write lockfile",
   );
   if (config.schemaVersion !== 2) {
-    throw new Error("unsupported artifact-set config or unsafe set ID");
+    throw new Error("unsupported artifact-set config");
   }
 
   await verifySourceBuildReceipt({

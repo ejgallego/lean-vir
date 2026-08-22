@@ -2,30 +2,13 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+import {
+  exactProperties,
+  identifier,
+  object,
+} from "./validation-utils.mjs";
+
 const toolchainNames = new Set(["vir", "fir"]);
-
-function object(value, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-  return value;
-}
-
-function exactProperties(value, allowed, label) {
-  for (const property of Object.keys(value)) {
-    if (!allowed.has(property)) {
-      throw new Error(`${label} has unknown property ${property}`);
-    }
-  }
-}
-
-function identifier(value, label) {
-  if (typeof value !== "string" || !idPattern.test(value)) {
-    throw new Error(`${label} is not a safe identifier`);
-  }
-  return value;
-}
 
 function configuredPaths(value, label, base) {
   const selected = object(value ?? {}, label);
@@ -54,7 +37,7 @@ export function parsePathAssignment(value, { defaultName = null, label }) {
   return { name, path: resolve(path) };
 }
 
-export function toolchainForAdapter(adapter) {
+function toolchainForAdapter(adapter) {
   if (adapter === "vir") return "vir";
   if (adapter === "fir-native" || adapter === "fir-llvm") return "fir";
   return null;
@@ -68,7 +51,7 @@ export function checkoutReceipt(checkout) {
   };
 }
 
-export function producerToolchainRoles(build) {
+function producerToolchainRoles(build) {
   const roles = new Map();
   for (const component of Object.values(build.components)) {
     const name = toolchainForAdapter(component.producer.adapter);

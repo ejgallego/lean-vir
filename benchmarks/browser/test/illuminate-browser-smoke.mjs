@@ -1,71 +1,30 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+import {
+  collectPageErrors,
+  launchBenchmarkBrowser,
+  startBenchmarkServer,
+} from "./harness.mjs";
+
 const port = Number(process.env.BENCH_PORT ?? "18448");
 const url = `http://127.0.0.1:${port}/?example=illuminate`;
-const configuredChrome = process.env.CHROMIUM ?? "/usr/bin/google-chrome";
-
-async function startServer() {
-  const server = spawn(
-    process.execPath,
-    [join(appRoot, "scripts/serve.mjs"), "--port", String(port)],
-    { cwd: appRoot, stdio: ["ignore", "pipe", "pipe"] },
-  );
-  let startupOutput = "";
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("benchmark server did not announce readiness")),
-      5_000,
-    );
-    const finish = (callback) => {
-      clearTimeout(timeout);
-      callback();
-    };
-    server.stdout.on("data", (chunk) => {
-      startupOutput += chunk;
-      if (startupOutput.includes(`at http://127.0.0.1:${port}`))
-        finish(resolve);
-    });
-    server.stderr.on("data", (chunk) => {
-      startupOutput += chunk;
-    });
-    server.once("exit", (code) =>
-      finish(() =>
-        reject(
-          new Error(
-            `benchmark server exited with ${code} before readiness\n${startupOutput}`,
-          ),
-        ),
-      ),
-    );
-  });
-  return server;
-}
 
 let server = null;
 try {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`server returned ${response.status}`);
 } catch {
-  server = await startServer();
+  server = await startBenchmarkServer({ port });
 }
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: existsSync(configuredChrome) ? configuredChrome : undefined,
-});
+let browser = null;
 
 try {
+  browser = await launchBenchmarkBrowser();
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
   page.setDefaultTimeout(120_000);
-  const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(String(error)));
+  const pageErrors = collectPageErrors(page);
   await page.goto(url, { waitUntil: "networkidle" });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
     example: "illuminate",
@@ -176,6 +135,6 @@ try {
   assert.deepEqual(pageErrors, []);
   console.log("PASS Illuminate JS/VIR/FIR plotting rehearsal smoke");
 } finally {
-  await browser.close();
-  server?.kill("SIGTERM");
+  await browser?.close();
+  server?.close();
 }
