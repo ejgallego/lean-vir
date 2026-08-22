@@ -73,6 +73,9 @@ When this repository owns both the catalog and a producer, update them in two
 commits: commit the producer change first, then pin that exact commit in
 `artifact-builds.json`. A rebase rewrites the producer commit, so refresh the
 catalog pin in the following commit before rebuilding or publishing artifacts.
+The producer commit must remain reachable after landing: preserve these commits
+with a merge commit, or land the producer separately before a squash or rebase
+merge and pin its resulting durable commit.
 
 CI and self-contained local builds materialize the exact sources into the
 ignored application-local directory with:
