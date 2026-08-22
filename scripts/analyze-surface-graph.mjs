@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 
 import {
   aggregateSurfaceDeclarations,
+  compareText,
   CURRENT_SURFACE_REPORT_VERSION,
   isSha256,
   isSurfaceAbi,
@@ -341,8 +342,4 @@ function formatPath(path) {
 
 function compareByModuleAndName(lhs, rhs) {
   return compareText(lhs.module, rhs.module) || compareText(lhs.name, rhs.name);
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }

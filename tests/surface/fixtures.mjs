@@ -4,20 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { SURFACE_REPORT_FORMAT } from "../../scripts/surface-report-schema.mjs";
+import {
+  emptySurfaceCounts,
+  SURFACE_REPORT_FORMAT,
+} from "../../scripts/surface-report-schema.mjs";
 
 export const TEST_SHA256 = "a".repeat(64);
 
 export function surfaceCounts(overrides = {}) {
   return {
-    total: 0,
-    runnable: 0,
-    blocked: 0,
-    publicTotal: 0,
-    publicRunnable: 0,
-    privateTotal: 0,
-    boxedTotal: 0,
-    generatedTotal: 0,
+    ...emptySurfaceCounts(),
     ...overrides,
   };
 }

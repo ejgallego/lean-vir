@@ -9,8 +9,15 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
+import { scriptSafeJson } from "./report-render-utils.mjs";
 import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
-import { validateSurfaceReport } from "./surface-report-schema.mjs";
+import {
+  compareText,
+  CURRENT_SURFACE_SIZE_LINKS_VERSION,
+  emptySurfaceCounts,
+  SURFACE_SIZE_LINKS_FORMAT,
+  validateSurfaceReport,
+} from "./surface-report-schema.mjs";
 
 const HTML_FORMAT = "lean-vir-surface-html";
 const HTML_VERSION = 6;
@@ -115,7 +122,7 @@ const moduleNames = [...new Set([
 
 const moduleRecords = moduleNames.map((name, id) => {
   const declarations = declarationsByModule.get(name) ?? [];
-  const counts = countsByModule.get(name) ?? emptyCounts();
+  const counts = countsByModule.get(name) ?? emptySurfaceCounts();
   return {
     id,
     name,
@@ -185,8 +192,8 @@ const blockerByName = new Map(
   report.primaryBlockers.map((summary) => [summary.blocker.name, summary]),
 );
 const sizeLinks = {
-  format: "lean-vir-surface-size-links",
-  version: 2,
+  format: SURFACE_SIZE_LINKS_FORMAT,
+  version: CURRENT_SURFACE_SIZE_LINKS_VERSION,
   externs: externs.map((declaration) => {
     const blocker = blockerByName.get(declaration.name);
     return {
@@ -248,19 +255,6 @@ async function writeOutput(relativePath, contents) {
   return Buffer.byteLength(contents);
 }
 
-function emptyCounts() {
-  return {
-    total: 0,
-    runnable: 0,
-    blocked: 0,
-    publicTotal: 0,
-    publicRunnable: 0,
-    privateTotal: 0,
-    boxedTotal: 0,
-    generatedTotal: 0,
-  };
-}
-
 function enrichBlockers(summaries) {
   const externByName = new Map(externs.map((declaration) => [declaration.name, declaration]));
   return summaries.map((summary) => ({
@@ -311,17 +305,6 @@ function frontierCostsByName(report) {
 
 function moduleFileName(id) {
   return `${String(id).padStart(6, "0")}.js`;
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
-}
-
-function scriptSafeJson(value) {
-  return JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029");
 }
 
 function formatBytes(bytes) {

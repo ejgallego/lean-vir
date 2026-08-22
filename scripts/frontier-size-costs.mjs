@@ -16,6 +16,8 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
+import { validateSurfaceSizeLinks } from "./surface-report-schema.mjs";
+
 const DEFAULT_ARTIFACT = "web/public/vir-upstream.wasm";
 const DEFAULT_OUTPUT_PREFIX = "build/frontier-size-costs/report";
 
@@ -105,11 +107,7 @@ function loadCandidates(args) {
 
 function readSurfaceLinks(path) {
   if (!path) return new Map();
-  const report = JSON.parse(readFileSync(path, "utf8"));
-  if (report.format !== "lean-vir-surface-size-links" || report.version !== 2 ||
-      !Array.isArray(report.externs)) {
-    throw new Error(`${path}: expected lean-vir-surface-size-links version 2`);
-  }
+  const report = validateSurfaceSizeLinks(JSON.parse(readFileSync(path, "utf8")), { label: path });
   return new Map(report.externs.map((entry) => [entry.name, entry]));
 }
 

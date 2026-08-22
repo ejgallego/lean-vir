@@ -16,6 +16,7 @@ import {
   parseClientNativeSurfaceProfile,
 } from "./client-native-surface-profile.mjs";
 import { runAsync } from "./process-utils.mjs";
+import { compareText } from "./surface-report-schema.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const exporter = join(repoRoot, "tools", "ExportSurfaceGraph.lean");
@@ -146,10 +147,6 @@ async function runChecked(command, args, cwd) {
 
 function toCamel(value) {
   return value.replace(/-([a-z])/g, (_, part) => part.toUpperCase());
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }
 
 function portableSourceLabel(project, sourcePath) {

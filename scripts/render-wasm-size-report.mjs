@@ -11,6 +11,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
+import { scriptSafeJson } from "./report-render-utils.mjs";
+import { validateSurfaceSizeLinks } from "./surface-report-schema.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 import {
   annotateRuntimeContextTree,
@@ -851,10 +853,7 @@ function parseArArchive(buffer) {
 
 async function readSurfaceLinks(path) {
   const links = JSON.parse(await readFile(path, "utf8"));
-  if (links?.format !== "lean-vir-surface-size-links" || links.version !== 2 || !Array.isArray(links.externs)) {
-    throw new Error(`invalid runnable-surface links file ${path}`);
-  }
-  return links;
+  return validateSurfaceSizeLinks(links, { label: `runnable-surface links file ${path}` });
 }
 
 async function readBuildIdentity(path) {
@@ -888,13 +887,6 @@ function firstLine(value) {
 function gitRevision() {
   const result = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
   return result.status === 0 ? result.stdout.trim() : null;
-}
-
-function scriptSafeJson(value) {
-  return JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029");
 }
 
 function formatBytes(bytes) {

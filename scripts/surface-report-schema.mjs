@@ -6,6 +6,8 @@ Author: Emilio J. Gallego Arias
 
 export const SURFACE_REPORT_FORMAT = "lean-vir-library-surface";
 export const CURRENT_SURFACE_REPORT_VERSION = 3;
+export const SURFACE_SIZE_LINKS_FORMAT = "lean-vir-surface-size-links";
+export const CURRENT_SURFACE_SIZE_LINKS_VERSION = 2;
 const SUPPORTED_SURFACE_REPORT_VERSIONS = [2, CURRENT_SURFACE_REPORT_VERSION];
 
 const COUNT_FIELDS = [
@@ -43,11 +45,11 @@ export function surfaceAbiMatchesCapability(abi, capability) {
 }
 
 export function aggregateSurfaceDeclarations(declarations) {
-  const counts = emptyCounts();
+  const counts = emptySurfaceCounts();
   const byModule = new Map();
   for (const declaration of declarations) {
     addDeclarationCount(counts, declaration);
-    const moduleCounts = byModule.get(declaration.module) ?? emptyCounts();
+    const moduleCounts = byModule.get(declaration.module) ?? emptySurfaceCounts();
     addDeclarationCount(moduleCounts, declaration);
     byModule.set(declaration.module, moduleCounts);
   }
@@ -60,7 +62,7 @@ export function aggregateSurfaceDeclarations(declarations) {
     const library = byLibrary.get(name) ?? {
       name,
       modulesWithFunctions: 0,
-      counts: emptyCounts(),
+      counts: emptySurfaceCounts(),
     };
     library.modulesWithFunctions += 1;
     addCounts(library.counts, module.counts);
@@ -69,6 +71,43 @@ export function aggregateSurfaceDeclarations(declarations) {
   const libraries = [...byLibrary.values()]
     .sort((lhs, rhs) => compareText(lhs.name, rhs.name));
   return { counts, modules, libraries };
+}
+
+export function emptySurfaceCounts() {
+  return Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0]));
+}
+
+export function compareText(lhs, rhs) {
+  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
+}
+
+export function validateSurfaceSizeLinks(value, { label = "surface size links" } = {}) {
+  if (value?.format !== SURFACE_SIZE_LINKS_FORMAT
+      || value.version !== CURRENT_SURFACE_SIZE_LINKS_VERSION) {
+    throw new Error(
+      `${label}: expected ${SURFACE_SIZE_LINKS_FORMAT} version ${CURRENT_SURFACE_SIZE_LINKS_VERSION}`,
+    );
+  }
+  if (!Array.isArray(value.externs)) {
+    throw new Error(`${label}: field "externs" must be an array`);
+  }
+  validateUniqueStrings(
+    value.externs.map((entry) => entry?.name),
+    `${label}: extern names`,
+  );
+  for (const entry of value.externs) {
+    if (typeof entry.module !== "string" || entry.module.length === 0
+        || !EXTERN_STATUSES.has(entry.status)
+        || !Number.isInteger(entry.primaryRoots) || entry.primaryRoots < 0
+        || !Number.isInteger(entry.primaryPublicRoots) || entry.primaryPublicRoots < 0
+        || entry.primaryPublicRoots > entry.primaryRoots
+        || !Array.isArray(entry.frontierCosts)
+        || !Array.isArray(entry.targets)
+        || entry.targets.some((target) => typeof target !== "string" || target.length === 0)) {
+      throw new Error(`${label}: invalid extern link ${JSON.stringify(entry.name)}`);
+    }
+  }
+  return value;
 }
 
 export function hasCompleteBlockerFrontier(report) {
@@ -446,10 +485,6 @@ function validateNamedCounts(actual, expected, kind, label, libraries = false) {
   }
 }
 
-function emptyCounts() {
-  return Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0]));
-}
-
 function addDeclarationCount(counts, declaration) {
   counts.total += 1;
   if (declaration.runnable) {
@@ -474,10 +509,6 @@ function addCounts(target, source) {
 
 function sameCounts(lhs, rhs) {
   return COUNT_FIELDS.every((field) => lhs[field] === rhs[field]);
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }
 
 function versionList(versions) {

@@ -9,6 +9,7 @@ import { join, resolve } from "node:path";
 
 import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
 import {
+  compareText,
   hasCompleteBlockerFrontier,
   validateSurfaceReport,
 } from "./surface-report-schema.mjs";
@@ -186,8 +187,4 @@ function formatNumber(value) {
 
 function formatMetric(value) {
   return typeof value === "number" ? formatNumber(value) : escapeHtml(value);
-}
-
-function compareText(lhs, rhs) {
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
 }
