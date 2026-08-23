@@ -8,18 +8,17 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { analyzeSurfaceGraph, renderTargetSurfaceMarkdown } from "./analyze-surface-graph.mjs";
 import {
   addClientNativeSurfaceCapabilities,
   parseClientNativeSurfaceProfile,
 } from "./client-native-surface-profile.mjs";
-import { runAsync } from "./process-utils.mjs";
+import { runAsync } from "../process-utils.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
 import { compareText } from "./surface-report-schema.mjs";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const exporter = join(repoRoot, "tools", "ExportSurfaceGraph.lean");
+const exporter = join(repositoryRoot, "tools", "ExportSurfaceGraph.lean");
 
 const options = parseArgs(process.argv.slice(2));
 const project = resolve(options.project);
@@ -46,14 +45,14 @@ try {
   const capabilitiesPath = join(temporary, "capabilities.json");
   const capabilityMarkdownPath = join(temporary, "capabilities.md");
   await runChecked(
-    join(repoRoot, ".lake", "build", "bin", "vir_surface"),
+    join(repositoryRoot, ".lake", "build", "bin", "vir_surface"),
     [
       capabilitiesPath,
       capabilityMarkdownPath,
       "--module", "Init.Prelude",
       "--root", "id",
     ],
-    repoRoot,
+    repositoryRoot,
   );
   let capabilities = JSON.parse(await readFile(capabilitiesPath, "utf8"));
   const supportRoots = [...new Set(

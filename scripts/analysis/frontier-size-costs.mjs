@@ -22,7 +22,7 @@ const DEFAULT_ARTIFACT = "web/public/vir-upstream.wasm";
 const DEFAULT_OUTPUT_PREFIX = "build/frontier-size-costs/report";
 
 function usage() {
-  console.log(`Usage: node scripts/frontier-size-costs.mjs [options] [EXTERN ...]
+  console.log(`Usage: node scripts/analysis/frontier-size-costs.mjs [options] [EXTERN ...]
 
 Measure exact stripped-Wasm size deltas for missing native externs or clusters.
 Each candidate uses the normal wrapper generator, registry, strict link, strip,
@@ -338,7 +338,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     main();
   } catch (error) {
     console.error(error instanceof Error ? error.stack : String(error));
-    console.error("Run node scripts/frontier-size-costs.mjs --help for usage.");
+    console.error("Run node scripts/analysis/frontier-size-costs.mjs --help for usage.");
     process.exit(1);
   }
 }

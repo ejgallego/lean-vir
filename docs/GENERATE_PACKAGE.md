@@ -10,8 +10,8 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `Vir.GeneratePackage.run`.
 - `tools/AnalyzeSurface.lean` scans installed Lean library IR against VIR's
   runtime capabilities; it does not generate a package.
-- `scripts/render-surface-report.mjs` turns a surface JSON report into a static,
-  lazily loaded HTML module browser.
+- `scripts/analysis/render-surface-report.mjs` turns a surface JSON report into
+  a static, lazily loaded HTML module browser.
 - `Vir/GeneratePackage.lean` is the public import shim for the split library.
 - `.lake/build/bin/vir_irpkg` is the Lake executable used by
   `scripts/packages/lean-to-irpkg.mjs`,

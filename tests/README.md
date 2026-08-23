@@ -22,7 +22,8 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
   catalog and pure selection and scheduling policy, and its focused test cases.
   Run `npm run test:runtime:unit` to check the runner contract without executing
   the runtime smoke tests or building Lean artifacts.
-- `surface/` tests the report-analysis and rendering tools kept in `scripts/`.
+- `surface/` tests the report-analysis and rendering tools under
+  `scripts/analysis/`.
 - `support/` contains helpers shared only by test suites.
 - `upstream/` owns the end-to-end upstream interpreter smoke test and its
   scenario helpers.

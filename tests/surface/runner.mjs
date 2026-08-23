@@ -91,7 +91,7 @@ try {
   assert.throws(
     () => runSync(
       process.execPath,
-      ["scripts/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
+      ["scripts/analysis/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
       { cwd: repoRoot, capture: true },
     ),
     /version 3 is missing closure metadata/,
@@ -103,7 +103,7 @@ try {
   assert.throws(
     () => runSync(
       process.execPath,
-      ["scripts/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
+      ["scripts/analysis/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
       { cwd: repoRoot, capture: true },
     ),
     /version 3 is missing runtime-capability policy/,
@@ -116,7 +116,7 @@ try {
   await writeFile(legacyReportPath, `${JSON.stringify(legacyReport)}\n`);
   runSync(
     process.execPath,
-    ["scripts/render-surface-report.mjs", legacyReportPath, legacyHtmlDir],
+    ["scripts/analysis/render-surface-report.mjs", legacyReportPath, legacyHtmlDir],
     { cwd: repoRoot, capture: true },
   );
   const legacyIndexContext = { globalThis: {} };
@@ -217,7 +217,7 @@ try {
   runSync(
     process.execPath,
     [
-      "scripts/capture-target-surface.mjs",
+      "scripts/analysis/capture-target-surface.mjs",
       "--project", repoRoot,
       "--source", sourcePath,
       "--module", "SurfaceSmoke",
@@ -240,7 +240,7 @@ try {
   assert.throws(
     () => runSync(
       process.execPath,
-      ["scripts/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
+      ["scripts/analysis/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
       { cwd: repoRoot, capture: true },
     ),
     /is missing its complete blocker set/,
@@ -257,7 +257,7 @@ try {
   runSync(
     process.execPath,
     [
-      "scripts/capture-target-surface.mjs",
+      "scripts/analysis/capture-target-surface.mjs",
       "--project", repoRoot,
       "--source", sourcePath,
       "--module", "SurfaceSmoke",
@@ -300,7 +300,7 @@ try {
   runSync(
     process.execPath,
     [
-      "scripts/render-surface-report.mjs", jsonPath, htmlDir,
+      "scripts/analysis/render-surface-report.mjs", jsonPath, htmlDir,
       "--frontier-costs", frontierCostsPath,
     ],
     { cwd: repoRoot, capture: true },
@@ -362,7 +362,7 @@ try {
   runSync(
     process.execPath,
     [
-      "scripts/render-surface-report.mjs", jsonPath, htmlDir,
+      "scripts/analysis/render-surface-report.mjs", jsonPath, htmlDir,
       "--frontier-costs", frontierCostsPath,
     ],
     { cwd: repoRoot, capture: true },
@@ -390,7 +390,7 @@ try {
 
   runSync(
     process.execPath,
-    ["scripts/render-surface-report.mjs", sourceJsonPath, sourceHtmlDir],
+    ["scripts/analysis/render-surface-report.mjs", sourceJsonPath, sourceHtmlDir],
     { cwd: repoRoot, capture: true },
   );
   const sourceIndexContext = { globalThis: {} };

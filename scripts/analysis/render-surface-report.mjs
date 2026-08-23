@@ -6,10 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import { readFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
+import { repositoryPath } from "../repository-paths.mjs";
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
-import { scriptSafeJson } from "./report-render-utils.mjs";
+import { scriptSafeJson, stageStaticReportShell } from "./report-render-utils.mjs";
 import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
 import {
   compareText,
@@ -21,7 +21,7 @@ import {
 
 const HTML_FORMAT = "lean-vir-surface-html";
 const HTML_VERSION = 6;
-const templateDir = fileURLToPath(new URL("../web/tools/surface-report/", import.meta.url));
+const templateDir = repositoryPath("web", "tools", "surface-report");
 
 const [inputArg, outputArg, ...rest] = process.argv.slice(2);
 let frontierCostsArg = null;
@@ -49,7 +49,6 @@ function usage() {
 const inputPath = resolve(inputArg);
 const outputDir = resolve(outputArg);
 const modulesDir = join(outputDir, "data", "modules");
-const assetsDir = join(outputDir, "assets");
 const report = JSON.parse(await readFile(inputPath, "utf8"));
 validateSurfaceReport(report, { label: inputPath });
 const frontierCosts = frontierCostsArg
@@ -66,10 +65,7 @@ const selectedDeclarationNames = report.selectedDeclarations ?? [];
 const costsByName = frontierCostsByName(frontierCosts);
 
 await rm(modulesDir, { recursive: true, force: true });
-await Promise.all([
-  mkdir(modulesDir, { recursive: true }),
-  mkdir(assetsDir, { recursive: true }),
-]);
+await mkdir(modulesDir, { recursive: true });
 
 const countsByModule = new Map(report.modules.map((module) => [module.name, module.counts]));
 const selectedDeclarationNameSet = new Set(selectedDeclarationNames);
@@ -211,10 +207,7 @@ const sizeLinks = {
 };
 bytesWritten += await writeOutput("data/size-links.json", `${JSON.stringify(sizeLinks)}\n`);
 
-for (const asset of ["app.js", "style.css"]) {
-  bytesWritten += await writeOutput(`assets/${asset}`, await readFile(join(templateDir, asset), "utf8"));
-}
-bytesWritten += await writeOutput("index.html", await readFile(join(templateDir, "index.html"), "utf8"));
+bytesWritten += await stageStaticReportShell(templateDir, outputDir);
 
 const manifest = {
   format: HTML_FORMAT,

@@ -32,7 +32,7 @@ const SECTION_NAMES = new Map([
 ]);
 
 function usage() {
-  console.log(`Usage: node scripts/wasm-size-report.mjs [options] [WASM ...]
+  console.log(`Usage: node scripts/analysis/wasm-size-report.mjs [options] [WASM ...]
 
 Emit Markdown size tables for WASM sections and, when a linker map is
 available, a code-area attribution table for the first WASM file.
@@ -403,7 +403,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     main();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    console.error("Run node scripts/wasm-size-report.mjs --help for usage.");
+    console.error("Run node scripts/analysis/wasm-size-report.mjs --help for usage.");
     process.exit(1);
   }
 }

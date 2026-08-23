@@ -65,7 +65,7 @@ test("target index rejects duplicate output slugs", async () => {
     const reportPath = join(temporary, "report.json");
     await writeFile(reportPath, `${JSON.stringify(reportFixture("Fir", true, ["IO.shared"]))}\n`);
     const result = spawnSync(process.execPath, [
-      "scripts/render-target-surface-index.mjs", join(temporary, "html"),
+      "scripts/analysis/render-target-surface-index.mjs", join(temporary, "html"),
       "same", "First", reportPath,
       "same", "Second", reportPath,
     ], { cwd: repoRoot, encoding: "utf8" });
@@ -79,7 +79,7 @@ test("target index rejects duplicate output slugs", async () => {
 function runIndex(output, args) {
   const result = spawnSync(
     process.execPath,
-    ["scripts/render-target-surface-index.mjs", output, ...args],
+    ["scripts/analysis/render-target-surface-index.mjs", output, ...args],
     { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);

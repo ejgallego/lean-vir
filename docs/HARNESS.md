@@ -432,6 +432,8 @@ logic into entry-point scripts or pages:
 - IR package, browser-package, and artifact tooling: `scripts/packages/`;
   shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`
 - Package-tooling contracts: `npm run test:packages:unit`
+- Surface, frontier-size, Wasm attribution, and report-rendering tooling:
+  `scripts/analysis/`; focused coverage: `tests/surface/`
 - Binding inventory, descriptor, comparison, and explorer tooling:
   `scripts/bindings/`; focused coverage: `tests/bindings/`
 - Browser page helpers: `web/src/pages/page-utils.js` and

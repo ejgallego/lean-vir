@@ -40,7 +40,7 @@ try {
   const rendered = spawnSync(
     process.execPath,
     [
-      "scripts/render-surface-report.mjs", reportPath, htmlDir,
+      "scripts/analysis/render-surface-report.mjs", reportPath, htmlDir,
       "--frontier-costs", frontierCostsPath,
     ],
     { cwd: root, encoding: "utf8" },
@@ -48,7 +48,7 @@ try {
   assert.equal(rendered.status, 0, `report rendering failed\n${rendered.stdout}\n${rendered.stderr}`);
   const multiRendered = spawnSync(
     process.execPath,
-    ["scripts/render-surface-report.mjs", multiReportPath, multiHtmlDir],
+    ["scripts/analysis/render-surface-report.mjs", multiReportPath, multiHtmlDir],
     { cwd: root, encoding: "utf8" },
   );
   assert.equal(

@@ -10,7 +10,7 @@ import test from "node:test";
 import {
   analyzeSurfaceGraph,
   renderTargetSurfaceMarkdown,
-} from "../../scripts/analyze-surface-graph.mjs";
+} from "../../scripts/analysis/analyze-surface-graph.mjs";
 import {
   emptySurfaceReportV3,
   nativeExternFixture,

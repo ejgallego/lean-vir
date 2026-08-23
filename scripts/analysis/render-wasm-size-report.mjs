@@ -8,10 +8,10 @@ Author: Emilio J. Gallego Arias
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
+import { repositoryPath } from "../repository-paths.mjs";
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
-import { scriptSafeJson } from "./report-render-utils.mjs";
+import { scriptSafeJson, stageStaticReportShell } from "./report-render-utils.mjs";
 import { validateSurfaceSizeLinks } from "./surface-report-schema.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 import {
@@ -30,7 +30,7 @@ import {
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
 const HTML_VERSION = 9;
-const templateDir = fileURLToPath(new URL("../web/tools/wasm-size-report/", import.meta.url));
+const templateDir = repositoryPath("web", "tools", "wasm-size-report");
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
 let surfaceLinksArg = null;
@@ -61,7 +61,6 @@ const releaseWasmPath = resolve(releaseWasmArg);
 const debugWasmPath = resolve(debugWasmArg);
 const mapPath = resolve(mapArg);
 const outputDir = resolve(outputArg);
-const assetsDir = join(outputDir, "assets");
 const dataDir = join(outputDir, "data");
 
 const releaseBinary = parseWasm(releaseWasmPath);
@@ -117,15 +116,10 @@ const payload = {
   },
 };
 
-await Promise.all([
-  mkdir(assetsDir, { recursive: true }),
-  mkdir(dataDir, { recursive: true }),
-]);
+await mkdir(dataDir, { recursive: true });
 
 await Promise.all([
-  writeFile(join(outputDir, "index.html"), await readFile(join(templateDir, "index.html"), "utf8")),
-  writeFile(join(assetsDir, "app.js"), await readFile(join(templateDir, "app.js"), "utf8")),
-  writeFile(join(assetsDir, "style.css"), await readFile(join(templateDir, "style.css"), "utf8")),
+  stageStaticReportShell(templateDir, outputDir),
   writeFile(join(dataDir, "index.js"), `globalThis.__virWasmSize=${scriptSafeJson(payload)};\n`),
 ]);
 

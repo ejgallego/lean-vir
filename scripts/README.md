@@ -28,6 +28,9 @@ The documentation owners are:
   distributable artifact policy live under `scripts/packages/`; reuse
   `scripts/packages/irpkg-generator.mjs` instead of invoking
   `lean --run tools/GeneratePackage.lean`.
+- Surface analysis, frontier-size measurement, Wasm attribution, and static
+  report generation live under `scripts/analysis/`; maintained presentation
+  assets remain under `web/tools/` and focused coverage under `tests/surface/`.
 - Shipped JavaScript binding inventory and report generation live in
   `tools/ExportVirJsInventory.lean` and
   `scripts/bindings/generate-shipped-bindings-report.mjs`. The compiler
