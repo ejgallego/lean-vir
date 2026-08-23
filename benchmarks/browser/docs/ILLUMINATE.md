@@ -10,8 +10,8 @@ The artifact set has three independently owned components:
    JavaScript player helpers, JavaScript trace oracle, and VIR typed-value
    projection.
 2. VIR consumes that validated workload package plus exact Illuminate and Lean
-   source checkouts. It builds the browser interpreter and a package containing
-   only `Illuminate.Animation.Vir.replayTraceTyped`.
+   source checkouts. It builds the browser interpreter and a package rooted at
+   the single exported entry `Illuminate.Animation.Vir.replayTraceTyped`.
 3. FIR consumes its pinned Illuminate source revision and exports the verified
    selection player, browser adapter, descriptor, checksums, and package smoke.
 

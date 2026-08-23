@@ -663,12 +663,12 @@ async function execute(kind, suppliedOptions) {
 
 async function boot() {
   renderBackends();
+  const artifactManifest = requireArtifactProvenance();
   const [
     runtimeModule,
     traceModule,
     javascriptTraceModule,
     examplesResponse,
-    receipt,
   ] = await Promise.all([
     import(new URL("vir/sdk/js/vir-runtime.js", artifactBase).href),
     import(new URL("workload/vir-player-trace.mjs", artifactBase).href),
@@ -677,7 +677,6 @@ async function boot() {
       if (!response.ok) throw new Error("failed to load Illuminate examples");
       return response.json();
     }),
-    requireArtifactProvenance(),
   ]);
   const selectionModule = await import(
     new URL(
@@ -686,8 +685,8 @@ async function boot() {
     ).href
   );
   examples = examplesResponse;
-  artifactProvenance = receipt;
-  renderArtifactSetNotes(receipt);
+  artifactProvenance = artifactManifest;
+  renderArtifactSetNotes(artifactManifest);
 
   const JavaScriptOracle = javascriptTraceModule.LegacyPlayerOracle;
   if (typeof JavaScriptOracle !== "function") {

@@ -8,6 +8,7 @@ This directory owns VIR's Illuminate browser package workflow:
 - `browser-package-smoke.mjs` is copied into that package and checks the real
   VIR interpreter, `.irpkg`, and typed player-trace entry.
 
-The exported Lean entry remains under `fixtures/illuminate/`. Generated source
-views, runtime bundles, packages, reports, and smoke inputs remain caller-owned
-or ignored artifacts and are not committed.
+The exported Lean entry remains under `fixtures/illuminate/`. The exporter
+deletes its temporary source view and package-generation report. Its
+checksummed output directory, including the runtime bundle, package, and smoke
+payload, is caller-owned and is not committed.
