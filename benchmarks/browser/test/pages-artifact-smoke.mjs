@@ -58,6 +58,7 @@ for (const path of [
   "coi-serviceworker.js",
   "src/bootstrap.js",
   "src/artifact-status.js",
+  "src/presentation.js",
   "examples/catalog.json",
   "examples/controller-contract.mjs",
 ]) {

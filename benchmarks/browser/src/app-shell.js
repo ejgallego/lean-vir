@@ -1,6 +1,7 @@
 // @ts-check
 
 import { requireArtifactManifestIdentity } from "./artifact-status.js";
+import { createReportPresentation } from "./presentation.js";
 
 const catalogUrl = new URL("../examples/catalog.json", import.meta.url);
 const catalogResponse = await fetch(catalogUrl, { cache: "no-store" });
@@ -24,6 +25,19 @@ const selectedModule = selected
   ? await import(new URL(`../${selected.controller}`, import.meta.url).href)
   : null;
 const view = selectedModule?.view ?? null;
+const reportPresentation = selected
+  ? createReportPresentation({
+      example: selected,
+      openButton: /** @type {HTMLButtonElement} */ (element("open-dashboard")),
+    })
+  : null;
+if (reportPresentation) {
+  element("clear-results").addEventListener(
+    "click",
+    () => reportPresentation.reset(),
+    true,
+  );
+}
 let controller = null;
 let artifactStatus = null;
 
@@ -245,6 +259,48 @@ function loadScript(url) {
   });
 }
 
+function observeControllerReports(value) {
+  if (!reportPresentation) return value;
+  /** @type {*} */
+  const observed = {
+    ready: value.ready,
+    getBackends: value.getBackends.bind(value),
+    async runStudy(studyId, options) {
+      const report = await value.runStudy(studyId, options);
+      reportPresentation.record(report, value.getBackends());
+      return report;
+    },
+  };
+  if (typeof value.dispose === "function") {
+    observed.dispose = value.dispose.bind(value);
+  }
+  return observed;
+}
+
+function bindStudyActions() {
+  const actions = element("study-actions");
+  actions.addEventListener(
+    "click",
+    (event) => {
+      if (!(event.target instanceof Element) || !controller) return;
+      const button = event.target.closest("button[data-study]");
+      if (!(button instanceof HTMLButtonElement) || !actions.contains(button)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      controller.runStudy(button.dataset.study ?? "").catch((error) => {
+        element("app-state").textContent = "Failed";
+        element("app-state").dataset.state = "failed";
+        element("app-progress").textContent =
+          error instanceof Error ? error.message : String(error);
+        console.error(error);
+      });
+    },
+    true,
+  );
+}
+
 async function boot() {
   if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
   const selectedView = requireView(selected, view);
@@ -307,13 +363,16 @@ async function boot() {
   if (typeof selectedModule.loadExample !== "function") {
     throw new Error(`${selected.id} controller module does not export loadExample()`);
   }
-  controller = await selectedModule.loadExample({
-    example: selected,
-    artifactBaseUrl,
-    testPackage,
-    testPackageIdentity,
-    variant,
-  });
+  controller = observeControllerReports(
+    await selectedModule.loadExample({
+      example: selected,
+      artifactBaseUrl,
+      testPackage,
+      testPackageIdentity,
+      variant,
+    }),
+  );
+  bindStudyActions();
   const readiness = await controller.ready;
   return { example: selected.id, ...readiness };
 }

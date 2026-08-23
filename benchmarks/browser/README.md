@@ -4,10 +4,12 @@ This directory is one standalone browser benchmark application. Its example
 selector currently exposes `Std.Format.prettyM`, lean-zip raw DEFLATE, and the
 Illuminate player at the same level and through the same page structure. Each
 example supplies its own semantic contract, backend set, sampling controls, and
-studies while the application owns navigation, artifact status, report actions,
-and shared presentation. The prettyM dashboard additionally provides plotting
-and backend filtering. The application has no runtime dependency on Verso,
-Reveal, Lake, or the parent VIR repository's source tree.
+studies while the application owns navigation, artifact status, report
+placement, and shared presentation. Every completed study can be compared
+through the same backend filter, metric selector, chart, and value table; an
+example may retain additional workload-specific report views. The application
+has no runtime dependency on Verso, Reveal, Lake, or the parent VIR repository's
+source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -181,11 +183,12 @@ supplies the required cross-origin isolation headers. `_headers` and
 worker covers hosts such as GitHub Pages that cannot configure those headers,
 with one reload before application startup.
 
-Backend selection in the report dashboard is presentation-only. The same
-selection follows the corpus, scaling, memory, repeated-call, and interaction
-views, while downloaded JSON always retains every backend in the source report.
-Exported runtime profiles retain artifact pathnames and hashes but omit URL
-origins and query strings. They intentionally retain browser user-agent data.
+Backend selection in every report view is presentation-only. The shared view
+normalizes example-owned report data without rewriting its source JSON, while
+downloaded JSON always retains every backend. Workload-specific views may add
+more detailed controls and own source-report import/export. Exported runtime
+profiles retain artifact pathnames and hashes but omit URL origins and query
+strings. They intentionally retain browser user-agent data.
 
 Run the browser regression with:
 
@@ -265,8 +268,9 @@ serve scripts, browser tests, package metadata, licensing files, documentation,
 and the artifact input contract are all contained here. The app uses only
 browser APIs and its own npm development dependency.
 
-The example controllers retain their workload-specific execution contracts.
-The shared shell is deliberately smaller: it defines the uniform example
-format, chooses the controller, and owns navigation. Illuminate supplies the
-concrete second-client requirements without forcing either engine into a
-lowest-common-denominator benchmark API.
+The example controllers retain their workload-specific execution and source
+report contracts. The shared shell defines the uniform example format, chooses
+the controller, owns navigation, and adapts completed reports to a compact
+comparison view. It does not force clients to replace richer report schemas or
+specialized analysis. Illuminate and lean-zip supply independent client shapes
+that keep this adapter honest.

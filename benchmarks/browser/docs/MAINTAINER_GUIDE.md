@@ -29,7 +29,8 @@ directories.
   generic stager atomically replaces only that example's artifact directory.
 - `browser-benchmarks/controller/v1` is the workload-independent browser
   controller boundary. The shared shell owns discovery, variants, artifact
-  status, controls, report placement, and backend filtering.
+  status, controls, and report placement; shared presentation owns backend
+  filtering.
 
 See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 `ARTIFACT_SETS.md` for the complete formats.
@@ -41,6 +42,9 @@ See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
   `scripts/process-utils.mjs` owns synchronous subprocess execution.
 - `scripts/browser-utils.mjs` owns Chromium selection for collectors and tests.
 - `test/harness.mjs` owns benchmark-server and browser-test lifecycle behavior.
+- `src/presentation.js` owns backend identity, source-report normalization, and
+  the shared comparison filter, chart, and table. Client controllers retain
+  their original report objects and may add specialized views.
 
 Keep browser-bundled manifest checks in `src/`; they deliberately do not import
 Node-side script infrastructure.
@@ -70,8 +74,8 @@ Node-side script infrastructure.
   uploads every active canonical payload, admits each only after its staged
   manifest and test-package digest match the catalog, and installs the
   filtered app under `web/dist/benchmarks/`.
-- Dashboard backend filters are presentation-only; exported JSON retains the
-  complete report.
+- Report-view backend filters are presentation-only; exported JSON retains the
+  complete source report.
 - Timings from an uncontrolled or loaded machine are observations, not accepted
   performance evidence.
 

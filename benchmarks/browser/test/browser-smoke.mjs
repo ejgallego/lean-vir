@@ -135,8 +135,12 @@ try {
     backends.every((backend) => backend.status === "ready"),
     backends,
   );
-  const report = await page.evaluate(() =>
-    window.__prettyBenchApp.runStudy("smoke"),
+  await page.locator('button[data-study="smoke"]').click();
+  await page.waitForFunction(
+    () => document.querySelector("#app-state")?.textContent === "Complete",
+  );
+  const report = await page.evaluate(
+    () => window.__prettyBenchApp.getReports().differential,
   );
   assert.equal(report.passed, true);
   assert.equal(report.parityCount, 1);
@@ -152,40 +156,40 @@ try {
   assert.equal(await page.locator(".report-card").count(), 1);
   assert.equal(await page.locator("#open-dashboard").isEnabled(), true);
   await page.locator("#open-dashboard").click();
-  await page.locator(".pretty-dashboard-overlay").waitFor({ state: "visible" });
+  await page.locator(".benchmark-report-overlay").waitFor({ state: "visible" });
   assert.equal(
-    await page.locator(".pretty-dashboard-overlay h2").textContent(),
-    "Pretty-printer benchmark results",
+    await page.locator(".benchmark-report-overlay h2").textContent(),
+    "Corpus · smoke-parity",
   );
   const dashboardFilters = page.locator(
-    ".pretty-dashboard-overlay input[data-backend-filter]",
+    ".benchmark-report-overlay input[data-backend-filter]",
   );
   assert.equal(await dashboardFilters.count(), 5);
   for (const id of ["js", "vir", "vir-format", "llvm"]) {
     await page
-      .locator(`.pretty-dashboard-overlay input[data-backend-filter="${id}"]`)
+      .locator(`.benchmark-report-overlay input[data-backend-filter="${id}"]`)
       .uncheck();
   }
   assert.equal(
     await page
-      .locator(".pretty-dashboard-overlay .pretty-backend-filter-summary")
+      .locator(".benchmark-report-overlay .benchmark-backend-filter-summary")
       .textContent(),
     "1 of 5 selected",
   );
   assert.equal(
     await page
-      .locator('.pretty-dashboard-overview-chart rect[fill="#d879c6"]')
+      .locator('.benchmark-report-chart rect[data-benchmark-backend="native"]')
       .count(),
     1,
   );
   assert.equal(
     await page
-      .locator('.pretty-dashboard-overview-chart rect[fill="#74a9ff"]')
+      .locator('.benchmark-report-chart rect[data-benchmark-backend="js"]')
       .count(),
     0,
   );
   await page
-    .locator(".pretty-dashboard-overlay header button", { hasText: "Close" })
+    .locator(".benchmark-report-overlay header button", { hasText: "Close" })
     .click();
   await page.locator(".report-card button", { hasText: "View report" }).click();
   await page.locator(".pretty-corpus-overlay").waitFor({ state: "visible" });
@@ -199,8 +203,11 @@ try {
     await page
       .locator('.pretty-corpus-overlay input[data-backend-filter="js"]')
       .isChecked(),
-    false,
+    true,
   );
+  await page
+    .locator('.pretty-corpus-overlay input[data-backend-filter="js"]')
+    .uncheck();
   assert.equal(
     await page.locator('tr[data-pretty-backend="native"]:visible').count(),
     2,
@@ -210,17 +217,40 @@ try {
     0,
   );
   await page
-    .locator(".pretty-corpus-overlay .pretty-backend-filter-actions button")
+    .locator(".pretty-corpus-overlay .benchmark-backend-filter-actions button")
     .click();
   assert.equal(
     await page
-      .locator(".pretty-corpus-overlay .pretty-backend-filter-summary")
+      .locator(".pretty-corpus-overlay .benchmark-backend-filter-summary")
       .textContent(),
     "5 of 5 selected",
   );
   await page
     .locator(".pretty-corpus-overlay header button", { hasText: "Close" })
     .click();
+  await page.locator("#repeat-cycles").fill("1");
+  await page.locator('button[data-study="repeated"]').click();
+  await page.waitForFunction(
+    () => document.querySelector("#app-state")?.textContent === "Complete",
+  );
+  await page.locator("#open-dashboard").click();
+  const repeated = page.locator(".benchmark-report-overlay");
+  await repeated.waitFor({ state: "visible" });
+  assert.equal(await repeated.locator("h2").textContent(), "Repeated calls");
+  await repeated
+    .locator(".benchmark-backend-filter-actions button", {
+      hasText: "Show all",
+    })
+    .click();
+  assert.equal(await repeated.locator("tbody tr").count(), 5);
+  assert.equal(
+    await repeated.locator(".benchmark-report-chart rect").count(),
+    5,
+  );
+  await repeated.locator("header button", { hasText: "Close" }).click();
+  await page.locator("#clear-results").click();
+  assert.equal(await page.locator("#open-dashboard").isDisabled(), true);
+  assert.equal(await page.locator(".report-card").count(), 0);
   assert.deepEqual(pageErrors, []);
   console.log("PASS standalone five-backend prettyM benchmark webapp smoke");
 } finally {

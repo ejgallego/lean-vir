@@ -310,7 +310,8 @@ body:has(.pretty-corpus-overlay) {
 }
 
 .pretty-dashboard-backends,
-.pretty-backend-filter {
+.pretty-backend-filter,
+.benchmark-backend-filter {
   display: flex;
   flex: 1 1 24rem;
   flex-wrap: wrap;
@@ -323,7 +324,8 @@ body:has(.pretty-corpus-overlay) {
 }
 
 .pretty-dashboard-backends legend,
-.pretty-backend-filter legend {
+.pretty-backend-filter legend,
+.benchmark-backend-filter legend {
   padding: 0 0.25rem;
   color: #b5c0ce;
   font-size: 0.72rem;
@@ -339,14 +341,14 @@ body:has(.pretty-corpus-overlay) {
   white-space: nowrap;
 }
 
-.pretty-backend-filter-options {
+.benchmark-backend-filter-options {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 0.35rem;
 }
 
-.pretty-backend-filter-option {
+.benchmark-backend-filter-option {
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
@@ -360,38 +362,38 @@ body:has(.pretty-corpus-overlay) {
   white-space: nowrap;
 }
 
-.pretty-backend-filter-option:has(input:checked) {
+.benchmark-backend-filter-option:has(input:checked) {
   color: #edf2f7;
   background: rgba(100, 145, 198, 0.12);
   border-color: #60758f;
 }
 
-.pretty-backend-filter-option input {
+.benchmark-backend-filter-option input {
   width: 0.85rem;
   height: 0.85rem;
   margin: 0;
   accent-color: #8cbbea;
 }
 
-.pretty-backend-filter-actions {
+.benchmark-backend-filter-actions {
   display: flex;
   align-items: center;
 }
 
-.pretty-backend-filter-actions button {
+.benchmark-backend-filter-actions button {
   min-height: 1.9rem;
   padding: 0.2rem 0.5rem;
   font-size: 0.72rem;
 }
 
-.pretty-backend-filter-summary {
+.benchmark-backend-filter-summary {
   align-self: center;
   color: #96a2b0;
   font-size: 0.7rem;
   white-space: nowrap;
 }
 
-.pretty-dashboard-swatch {
+.benchmark-backend-swatch {
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 50%;
@@ -559,6 +561,225 @@ body:has(.pretty-corpus-overlay) {
   }
 
   .pretty-backend-filter {
+    min-width: 100%;
+  }
+}
+
+body:has(.benchmark-report-overlay) {
+  overflow: hidden;
+}
+
+.benchmark-report-overlay {
+  position: fixed;
+  inset: 2vh 2vw;
+  z-index: 1200;
+  overflow: auto;
+  padding: 0 1.25rem 2rem;
+  color: #e5eaf0;
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgba(70, 119, 176, 0.14),
+      transparent 30rem
+    ),
+    rgba(18, 21, 27, 0.992);
+  border: 1px solid #3e4857;
+  border-radius: 0.8rem;
+  box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.72);
+  font:
+    0.82rem/1.45 Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  overscroll-behavior: contain;
+}
+
+.benchmark-report-overlay > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 -1.25rem 0.9rem;
+  padding: 0.9rem 1.25rem;
+  background: rgba(18, 21, 27, 0.97);
+  border-bottom: 1px solid #343d4a;
+  backdrop-filter: blur(14px);
+}
+
+.benchmark-report-overlay h2 {
+  margin: 0.05rem 0 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.015em;
+}
+
+.benchmark-report-overlay .bench-eyebrow {
+  margin: 0;
+}
+
+.benchmark-report-status {
+  display: block;
+  margin-top: 0.28rem;
+  color: #76bd86;
+  font-size: 0.76rem;
+}
+
+.benchmark-report-status[data-passed="false"] {
+  color: #df7478;
+}
+
+.benchmark-report-controls {
+  position: sticky;
+  top: 5.6rem;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.6rem 0 0.9rem;
+  padding: 0.65rem;
+  background: rgba(32, 38, 47, 0.97);
+  border: 1px solid #3c4858;
+  border-radius: 0.55rem;
+  box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
+}
+
+.benchmark-report-controls > label {
+  display: grid;
+  gap: 0.25rem;
+  color: #a9b4c0;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.benchmark-report-controls select {
+  min-width: 10rem;
+  min-height: 2.2rem;
+  padding: 0.2rem 0.45rem;
+  color: inherit;
+  background: #30343a;
+  border: 1px solid rgba(180, 180, 180, 0.35);
+  border-radius: 0.25rem;
+}
+
+.benchmark-backend-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-right: 0.35rem;
+}
+
+.benchmark-report-figure {
+  overflow: auto;
+  margin: 0;
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(180, 180, 180, 0.14);
+  border-radius: 0.55rem;
+}
+
+.benchmark-report-chart {
+  display: block;
+  width: 100%;
+  min-width: 48rem;
+  color: #c4ccd5;
+}
+
+.benchmark-report-chart text {
+  fill: currentColor;
+  font:
+    11px Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.benchmark-report-chart-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.benchmark-report-chart-empty {
+  fill: #8d98a6;
+}
+
+.benchmark-report-figure figcaption {
+  margin: 0.45rem 0.2rem 0;
+  color: #96a2b0;
+  font-size: 0.72rem;
+}
+
+.benchmark-report-table-shell {
+  overflow-x: auto;
+  margin-top: 0.9rem;
+  border: 1px solid #343d4a;
+  border-radius: 0.55rem;
+}
+
+.benchmark-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.benchmark-report-table th,
+.benchmark-report-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid rgba(180, 180, 180, 0.15);
+  text-align: left;
+}
+
+.benchmark-report-table thead th {
+  color: #b9c5d2;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.72rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.benchmark-report-table tbody th {
+  color: #d9e0e7;
+  font-weight: 500;
+}
+
+.benchmark-report-table td[data-passed="true"] {
+  color: #76bd86;
+}
+
+.benchmark-report-table td[data-passed="false"] {
+  color: #df7478;
+}
+
+.benchmark-report-notes {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.8rem;
+  color: #a7b0bc;
+  background: rgba(255, 255, 255, 0.018);
+  border-left: 3px solid #55677e;
+  font-size: 0.76rem;
+}
+
+.benchmark-report-notes p,
+.benchmark-report-notes ul {
+  margin: 0.25rem 0;
+}
+
+@media (max-width: 760px) {
+  .benchmark-report-overlay {
+    inset: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .benchmark-report-controls {
+    position: static;
+    align-items: stretch;
+  }
+
+  .pretty-backend-filter,
+  .benchmark-backend-filter {
     min-width: 100%;
   }
 }

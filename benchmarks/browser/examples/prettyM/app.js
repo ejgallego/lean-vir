@@ -36,15 +36,6 @@
   var running = false;
 
   /** @type {Record<string, string>} */
-  var backendColors = {
-    js: "#74a9ff",
-    vir: "#f0a35e",
-    "vir-format": "#77c879",
-    native: "#d879c6",
-    llvm: "#d7c45c",
-  };
-
-  /** @type {Record<string, string>} */
   var reportTitles = {
     differential: "Corpus",
     scaling: "Scaling",
@@ -94,7 +85,7 @@
       label.dataset.backend = backend.id;
       label.style.setProperty(
         "--backend-color",
-        backendColors[backend.id] || "#86b5e8",
+        globalThis.BenchmarkPresentation.backendColor(backend.id),
       );
       var input = document.createElement("input");
       input.type = "checkbox";
