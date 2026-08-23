@@ -11,11 +11,11 @@ import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
-import { pathExists } from "../file-utils.mjs";
-import { repositoryRoot } from "../repository-paths.mjs";
-import { virIrpkgLakeBuildArgs, virIrpkgPath } from "./irpkg-generator.mjs";
-import { runSync } from "../process-utils.mjs";
-import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
+import { pathExists } from "../../file-utils.mjs";
+import { runSync } from "../../process-utils.mjs";
+import { repositoryRoot } from "../../repository-paths.mjs";
+import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../irpkg-generator.mjs";
+import { createVirRuntime } from "../../../web/src/vir-runtime-node.js";
 
 const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");

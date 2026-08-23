@@ -437,6 +437,8 @@ logic into entry-point scripts or pages:
 - IR package, browser-package, and artifact tooling: `scripts/packages/`;
   shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`;
   focused and Lake integration checks: `tests/packages/`
+- Lean-zip acceptance and browser source-package producer:
+  `scripts/packages/lean-zip/`
 - Package-tooling contracts: `npm run test:packages:unit`
 - Native registry, wrapper, codec-tag, host-import, and ABI tooling:
   `scripts/native/`; pure registry contracts: `npm run test:native:unit`

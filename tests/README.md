@@ -18,7 +18,7 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
   extern manifest smoke test.
 - `packages/` owns direct contracts for repository package configuration,
   artifact layout, shared repository-path resolution, C++ package IR builders,
-  and Lake facet integration.
+  Lake facet integration, and repository-owned external-client producers.
 - `runtime/` owns the JavaScript runtime smoke-test runner, its immutable test
   catalog and pure selection and scheduling policy, focused test cases, and
   host-engine Wasm feature probes.

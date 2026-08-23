@@ -11,18 +11,17 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { basename, delimiter, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, delimiter, join, resolve } from "node:path";
 
-import { runSync } from "./process-utils.mjs";
+import { runSync } from "../../process-utils.mjs";
+import { repositoryRoot } from "../../repository-paths.mjs";
 
-const scriptRoot = dirname(fileURLToPath(import.meta.url));
-const defaultProducer = resolve(scriptRoot, "..");
+const defaultProducer = repositoryRoot;
 const expectedRoles = new Set(["producer", "runtime", "client"]);
 const packageEntry = "VirLeanZipAcceptance.compressRaw";
 
 function usage() {
-  console.log(`Usage: scripts/export-lean-zip-browser-package.mjs [options]
+  console.log(`Usage: node scripts/packages/lean-zip/export-browser-package.mjs [options]
 
 Build a client-native VIR runtime and lean-zip package into a fresh directory.
 
@@ -237,7 +236,7 @@ async function main() {
       join(output, "lean-vir/wasm/vir-upstream.wasm"),
     );
     await copyFile(
-      join(producer, "scripts/lean-zip-browser-package-smoke.mjs"),
+      join(producer, "scripts/packages/lean-zip/browser-package-smoke.mjs"),
       join(output, "smoke.mjs"),
     );
 

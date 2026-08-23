@@ -246,7 +246,7 @@
               "producer": "vir",
               "runtime": "lean"
             },
-            "entrypoint": "scripts/export-lean-zip-browser-package.mjs",
+            "entrypoint": "scripts/packages/lean-zip/export-browser-package.mjs",
             "manifest": "BUILD.json",
             "setup": [
               {

@@ -17,6 +17,9 @@ The documentation owners are:
 
 ## Implementation Ownership
 
+- Root-level scripts are reserved for repository-wide setup, build, doctor,
+  mailbox, pull-request, and shared utility responsibilities. Subsystem-specific
+  implementations live under their owner directory instead.
 - Runtime, browser, upstream, surface, and integration checks live under
   `tests/`; test-only shared helpers live under `tests/support/`.
 - Benchmark campaigns and their sampling, scheduling, reporting, and cache

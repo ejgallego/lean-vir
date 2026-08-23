@@ -69,7 +69,7 @@
     "check:boundary-registry": "node scripts/native/check-boundary-registry.mjs",
     "check:native-wrappers": "node scripts/native/inventory-native-wrappers.mjs --check",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
-    "accept:lean-zip": "node scripts/packages/lean-zip-acceptance.mjs",
+    "accept:lean-zip": "node scripts/packages/lean-zip/acceptance.mjs",
     "build": "npm run build:demo",
     "build:demo": "lake build Vir && npm run probe:upstream",
     "build:demo:release": "VIR_WASM_PROFILE=release npm run build:demo",
