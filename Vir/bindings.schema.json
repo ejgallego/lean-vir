@@ -24,6 +24,7 @@
         }
       }
     },
+    "generation": { "$ref": "#/$defs/generation" },
     "roots": {
       "type": "array",
       "minItems": 1,
@@ -32,6 +33,36 @@
   },
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output", "imports", "namespace", "effects", "resources", "members"],
+      "properties": {
+        "output": { "type": "string", "minLength": 1 },
+        "imports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "namespace": { "type": "string", "minLength": 1 },
+        "effects": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "root": {
       "type": "object",
       "additionalProperties": false,

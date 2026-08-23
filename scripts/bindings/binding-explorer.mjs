@@ -345,7 +345,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must use accessor mappings`);
     }
     if (mapping.accessors !== undefined) {
-      const readonly = /^readonly\s/u.test(symbol.display);
+      const readonly = symbol.access === "get" || /^readonly\s/u.test(symbol.display);
       if (mapping.accessors.get === undefined) {
         throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must classify its getter`);
       }

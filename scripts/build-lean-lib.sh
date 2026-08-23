@@ -84,6 +84,8 @@ build_module Vir/Host.lean
 build_module Vir/Runtime.lean
 build_module Vir/Js.lean
 build_module Vir/Common.lean
+build_module Vir/Browser/Types.lean
+build_module Vir/Browser/Generated.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
 build_module Vir/Examples/Style.lean

@@ -47,6 +47,8 @@ try {
   /** Method extraction fixture. */
   export interface Controls {
     label: string;
+    get text(): string;
+    set text(value: string | null);
     reset(value: string): void;
   }
 
@@ -240,6 +242,7 @@ declare function schedule(value: number): void;
   ]);
 
   const comparison = JSON.parse(await readFile(report, "utf8"));
+  const descriptorComparison = JSON.parse(await readFile(descriptors, "utf8"));
   const dependencyComparison = JSON.parse(await readFile(dependencyDescriptors, "utf8"));
   const ambientComparison = JSON.parse(await readFile(ambientDescriptors, "utf8"));
   assert.deepEqual(ambientComparison.symbols.map((symbol) => symbol.id), [
@@ -255,8 +258,22 @@ declare function schedule(value: number): void;
   );
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.value")?.kind,
     "property");
+  assert.deepEqual(
+    ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.value")?.accessors,
+    {
+      get: { kind: "primitive", name: "string" },
+      set: { kind: "primitive", name: "string" },
+    },
+  );
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "AmbientRoot.run")?.shape.kind,
     "union");
+  assert.deepEqual(
+    descriptorComparison.symbols.find((symbol) => symbol.id === "Demo.Controls.text")?.accessors,
+    {
+      get: { kind: "primitive", name: "string" },
+      set: { kind: "option", element: { kind: "primitive", name: "string" } },
+    },
+  );
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "schedule")?.shape.options.length, 2);
   assert.deepEqual(dependencyComparison.dependencies.unresolved, []);
   assert.deepEqual(

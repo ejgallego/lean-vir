@@ -428,17 +428,19 @@ function applyPortIntent(leanShape, tsSymbol, portIntent) {
         `reviewed ${portIntent.accessor} accessor intent requires a TypeScript property`,
       ));
     } else if (portIntent.accessor === "get") {
-      ts = { kind: "function", effect: "pure", args: [], result: ts };
+      const accessorType = tsSymbol.accessors?.get ?? ts;
+      ts = { kind: "function", effect: "pure", args: [], result: accessorType };
       diagnostics.push(diagnostic(
         "reviewed_property_getter",
         "Lean exposes the TypeScript property getter as a function",
         "info",
       ));
     } else {
+      const accessorType = tsSymbol.accessors?.set ?? ts;
       ts = {
         kind: "function",
         effect: "pure",
-        args: [{ name: "value", type: ts }],
+        args: [{ name: "value", type: accessorType }],
         result: { kind: "primitive", name: "void" },
       };
       diagnostics.push(diagnostic(

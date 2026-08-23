@@ -6,58 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import Vir.Common
 import Vir.Js
+import Vir.Browser.Generated
 
 namespace Lean.Vir.Browser
-
-/-- Browser/DOM effect used by Lean-authored browser code. -/
-@[irreducible] def DomM (α : Type) : Type :=
-  Lean.Vir.RuntimeM α
-
-namespace DomM
-
-/-- Runs a browser/DOM action at an exported `IO` boundary. -/
-def run (action : DomM α) : IO α :=
-  by
-    unfold DomM at action
-    exact action.run
-
-instance : Monad DomM where
-  pure value :=
-    by
-      unfold DomM
-      exact pure value
-  bind action next :=
-    by
-      unfold DomM at action
-      unfold DomM
-      exact action >>= fun value => by
-        unfold DomM at next
-        exact next value
-
-instance : MonadLift Lean.Vir.RuntimeM DomM where
-  monadLift action :=
-    by
-      unfold DomM
-      exact action
-
-instance : Nonempty (DomM α) :=
-  by
-    unfold DomM
-    infer_instance
-
-end DomM
-
-/--
-Browser DOM element object class.
-
-Lean code receives element values from `Document.querySelector` and passes them
-to `Element` or more-specific element APIs. The current `wasm32-wasip1` runtime
-represents this as a typed JavaScript object resource; Lean programs should not
-construct or persist assumptions about the resource representation.
-
-Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Element).
--/
-opaque Element : Type
 
 /--
 Browser event object class.
@@ -213,36 +164,6 @@ end Console
 namespace Document
 
 /--
-Reads the current document title through the JavaScript host.
-
-In a browser this returns `document.title`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
--/
-@[vir_js "browser.document.getTitle"]
-private opaque getTitleJs : DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary view of `document.title`. -/
-def getTitle : DomM (Lean.Vir.Js String) :=
-  getTitleJs
-
-/--
-Sets the current document title through the JavaScript host.
-
-In a browser this writes `document.title`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
--/
-@[vir_js "browser.document.setTitle"]
-private opaque setTitleJs (title : @& Lean.Vir.Js String) : DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `document.title`. -/
-def setTitle (title : @& Lean.Vir.Js String) : DomM Unit :=
-  setTitleJs title
-
-/--
 Returns the first element matching a CSS selector.
 
 In a browser this calls `document.querySelector(selector)`. In Node tests, use
@@ -337,84 +258,6 @@ def querySelectorAll
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
-
-/--
-Reads an element's serialized child markup as a JavaScript string resource.
-
-Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
--/
-@[vir_js "browser.element.getInnerHTML"]
-private opaque getInnerHTMLJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary getter for `Element.innerHTML`. -/
-def getInnerHTML
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getInnerHTMLJs element
-
-/--
-Replaces an element's child markup from a borrowed JavaScript string resource.
-
-The caller's string remains live after the call.
-
-Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
--/
-@[vir_js "browser.element.setInnerHTML"]
-private opaque setInnerHTMLJs
-    (element : @& Lean.Vir.Js Element)
-    (html : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `Element.innerHTML`. -/
-def setInnerHTML
-    (element : @& Lean.Vir.Js Element)
-    (html : @& Lean.Vir.Js String) :
-    DomM Unit :=
-  setInnerHTMLJs element html
-
-/--
-Reads an element's text content as a JavaScript string resource.
-
-Although `Node.textContent` is nullable for some node kinds, TypeScript narrows
-the `Element` getter to `string`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
--/
-@[vir_js "browser.element.getTextContent"]
-private opaque getTextContentJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary getter for `Element.textContent`. -/
-def getTextContent
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getTextContentJs element
-
-/--
-Sets an element's text content from a borrowed nullable JavaScript string.
-
-JavaScript treats `null` as the empty string for this property. The caller's
-nullable resource remains live after the call. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
--/
-@[vir_js "browser.element.setTextContent"]
-private opaque setTextContentJs
-    (element : @& Lean.Vir.Js Element)
-    (text : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `Element.textContent`. -/
-def setTextContent
-    (element : @& Lean.Vir.Js Element)
-    (text : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit :=
-  setTextContentJs element text
 
 /--
 Reads an element attribute through the JavaScript host.

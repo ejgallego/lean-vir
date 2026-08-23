@@ -1,14 +1,14 @@
 # Type Anchors
 
-This note documents the small TypeScript-to-Lean VIR descriptor anchor pipeline.
-The goal is reviewable, inexact correspondence data, not a complete type
-theory for TypeScript.
+This note documents the TypeScript-to-Lean VIR binding pipeline. It provides
+both reviewable correspondence data and a deliberately small, fail-closed Lean
+source generator; it is not a complete type theory for TypeScript.
 
-This is the review layer for a soft porting loop. Codex (or a person) can draft
-Lean bindings, regenerate the real Lean manifest, and use the report's stable
-diagnostic codes to decide what to revise. It is deliberately not a source-to-
-source binding generator yet. Once repeated, reviewed port intents become
-stable, a later generator can consume the same descriptor and intent data.
+The review layer remains useful for the unsupported surface: Codex (or a
+person) can propose policy, regenerate the real Lean manifest, and use stable
+diagnostic codes to decide what to revise. Once a mapping has explicit naming,
+effect, receiver, and ownership policy, the source generator can make its Lean
+type a deterministic function of the pinned TypeScript declaration.
 
 The exhaustive shipped-boundary gate and consolidated library explorer are
 documented in `SHIPPED_BINDINGS.md`. The gate proves that every compiled
@@ -37,11 +37,43 @@ Each generated symbol records:
 - `display`: compact TypeScript declaration text.
 - `hover`: JSDoc text for hovercards or native `title` hovers.
 - `shape`: normalized descriptor shape used by the comparator.
+- `accessors`: distinct getter and setter shapes for properties. This matters
+  for APIs such as `Element.textContent`, whose getter is `string` while its
+  setter accepts `string | null`.
 
-The generated descriptor JSON is a TypeScript-side index. It does not claim
-that the TypeScript declaration is the implementation source of truth. It says:
-for this symbol id, this is the authored TypeScript shape, this is where a
-reader can jump, and this is the text that should appear in a hover.
+The generated descriptor JSON is the TypeScript-side index. For reviewed
+generated members, its accessor or function shape is the binding type source
+of truth. For report-only members, it remains comparison input and does not by
+itself assert a Lean policy.
+
+## Generated Lean Bindings
+
+`Vir/Browser.bindings.json` contains the small amount of policy TypeScript
+cannot determine: the generated member set, Lean declaration and host-target
+names, global versus borrowed receivers, effects, resource ownership, and Lean
+names for resource marker types. It does not restate the selected TypeScript
+types.
+
+The initial shipped slice generates `Document.title`, `Element.innerHTML`, and
+`Element.textContent` into `Vir/Browser/Generated.lean`:
+
+```bash
+npm run generate:lean-bindings
+npm run check:lean-bindings
+```
+
+Generation reads the pinned `lib.dom.d.ts` through the same descriptor code as
+the explorer. TypeScript `string` becomes a JavaScript string resource,
+nullable `string` becomes `Js.Nullable String`, and the reviewed ownership
+policy determines borrowed arguments. Unsupported shapes, missing ownership
+policy, mismatched anchors, and stale checked-in output are errors. The
+generated module is imported by `Vir.Browser`, so this is the shipped binding
+surface rather than a report fixture.
+
+Convenience conversions are intentionally outside this generated faithful
+boundary. Callers may use `Lean.Vir.JsValue.ofString`,
+`Lean.Vir.JsValue.toString`, and similarly explicit helpers where their own API
+policy calls for Lean-owned values.
 
 The comparator reads descriptor JSON and a Lean VIR interface manifest:
 

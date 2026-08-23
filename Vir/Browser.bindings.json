@@ -4,7 +4,15 @@
   "id": "browser",
   "title": "Browser APIs",
   "description": "DOM, events, canvas, animation, timers, and browser-owned values exposed by Vir.Browser.",
-  "lean": { "modules": ["Vir.Browser"] },
+  "lean": { "modules": ["Vir.Browser", "Vir.Browser.Generated"] },
+  "generation": {
+    "output": "Vir/Browser/Generated.lean",
+    "imports": ["Vir.Browser.Types"],
+    "namespace": "Lean.Vir.Browser",
+    "effects": { "dom": "DomM" },
+    "resources": { "Element": "Element" },
+    "members": ["Document.title", "Element.innerHTML", "Element.textContent"]
+  },
   "roots": [
     {
       "id": "animation",

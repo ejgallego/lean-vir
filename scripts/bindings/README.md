@@ -1,10 +1,11 @@
 # Binding tooling
 
 This directory owns the shipped-JavaScript-binding inventory, TypeScript
-descriptor generation, Lean type-anchor comparison, and the consolidated
-binding explorer. Use the stable `npm run generate:*`, `npm run check:*`, and
-`npm run test:*` commands from the repository root rather than invoking these
-entry points directly during routine work.
+descriptor generation, faithful Lean declaration generation, Lean type-anchor
+comparison, and the consolidated binding explorer. Use the stable
+`npm run generate:*`, `npm run check:*`, and `npm run test:*` commands from the
+repository root rather than invoking these entry points directly during
+routine work.
 
 The `generate-*`, `check-*`, and `render-*` files are thin command entry points.
 Their sibling library modules expose reusable report and rendering functions
@@ -18,8 +19,10 @@ from `scripts/repository-paths.mjs`.
 
 Related ownership:
 
-- `Vir/*.bindings.json` and `Vir/bindings.schema.json`: authored binding maps
-  and their schema.
+- `Vir/*.bindings.json` and `Vir/bindings.schema.json`: authored binding maps,
+  code-generation policy, and their schema.
+- `Vir/*/Generated.lean`: checked-in generated declarations consumed by the
+  shipped Lean library.
 - `fixtures/type-anchors/`: authored comparison and package-generator inputs.
 - `tests/bindings/`: unit and end-to-end tool coverage.
 - `web/tools/binding-explorer/`: maintained static explorer presentation.

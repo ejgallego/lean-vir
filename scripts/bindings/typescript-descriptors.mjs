@@ -442,12 +442,21 @@ function mergeDeclarationSymbols(left, right) {
   }
   if (left.kind === "property" && right.kind === "property") {
     const sameShape = JSON.stringify(left.shape) === JSON.stringify(right.shape);
+    const accessors = { ...(left.accessors ?? {}) };
+    for (const [accessor, shape] of Object.entries(right.accessors ?? {})) {
+      if (accessors[accessor] !== undefined &&
+          JSON.stringify(accessors[accessor]) !== JSON.stringify(shape)) {
+        throw new Error(`conflicting TypeScript ${accessor} accessor types for ${left.id}`);
+      }
+      accessors[accessor] = shape;
+    }
     return {
       ...left,
       display: `${left.display}\n${right.display}`,
       hover: left.hover || right.hover,
       shape: sameShape ? left.shape : { kind: "union", options: [left.shape, right.shape] },
       access: left.access === right.access ? left.access : "get-set",
+      accessors,
     };
   }
   throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
@@ -514,34 +523,43 @@ function interfaceMemberSymbols(node, sourceFile, prefix) {
         functionShape(member.parameters, member.type, sourceFile, prefix),
       ));
     } else if (ts.isPropertySignature(member) && member.type !== undefined) {
+      const shape = normalizeTypeNode(member.type, sourceFile, prefix);
+      const readonly = member.modifiers?.some((modifier) =>
+        modifier.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false;
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.type, sourceFile, prefix),
-        member.questionToken !== undefined ? { optional: true } : {},
+        shape,
+        {
+          ...(member.questionToken !== undefined ? { optional: true } : {}),
+          access: readonly ? "get" : "get-set",
+          accessors: readonly ? { get: shape } : { get: shape, set: shape },
+        },
       ));
     } else if (ts.isGetAccessorDeclaration(member) && member.type !== undefined) {
+      const shape = normalizeTypeNode(member.type, sourceFile, prefix);
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.type, sourceFile, prefix),
-        { access: "get" },
+        shape,
+        { access: "get", accessors: { get: shape } },
       ));
     } else if (ts.isSetAccessorDeclaration(member) && member.parameters[0]?.type !== undefined) {
+      const shape = normalizeTypeNode(member.parameters[0].type, sourceFile, prefix);
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.parameters[0].type, sourceFile, prefix),
-        { access: "set" },
+        shape,
+        { access: "set", accessors: { set: shape } },
       ));
     }
   }
