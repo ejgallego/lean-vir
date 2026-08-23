@@ -1,0 +1,173 @@
+{
+  "$schema": "../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "react",
+  "title": "React",
+  "description": "React elements, properties, hooks, state, references, and React DOM roots.",
+  "lean": { "modules": ["Vir.React"] },
+  "roots": [
+    {
+      "id": "value-conversions",
+      "title": "React value conversions",
+      "targets": ["js.value.react.*"],
+      "lean": { "public": ["Lean.Vir.React.EventHandler", "Lean.Vir.React.Property"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "dependencies",
+      "title": "Hook dependencies",
+      "targets": ["react.deps.*"],
+      "lean": { "public": ["Lean.Vir.React.Hooks.DependencyList"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList"] }
+    },
+    {
+      "id": "element-type",
+      "title": "Element types",
+      "targets": ["react.elementType.*"],
+      "lean": { "public": ["Lean.Vir.React.ElementType"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ElementType"] }
+    },
+    {
+      "id": "nodes",
+      "title": "React nodes",
+      "targets": ["react.node.*"],
+      "lean": { "public": ["Lean.Vir.React.Node"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ReactNode", "React.createElement"] }
+    },
+    {
+      "id": "props",
+      "title": "React properties",
+      "targets": ["react.props.*"],
+      "lean": { "public": ["Lean.Vir.React.Props"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.Attributes", "React.DOMAttributes"] }
+    },
+    {
+      "id": "reducers",
+      "title": "Reducers",
+      "targets": ["react.reducer.*", "react.reducerState.*"],
+      "lean": { "public": ["Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerState"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.Reducer", "React.Dispatch"] }
+    },
+    {
+      "id": "references",
+      "title": "References",
+      "targets": ["react.ref.*"],
+      "lean": { "public": ["Lean.Vir.React.Ref"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.Ref", "React.RefObject"] }
+    },
+    {
+      "id": "react-dom-root",
+      "title": "React DOM root",
+      "description": "Root creation, rendering, unmounting, and the currently missing hydration/options surface.",
+      "targets": ["react.root.*"],
+      "lean": { "public": ["Lean.Vir.React.Root"] },
+      "upstream": {
+        "kind": "typescript",
+        "package": "@types/react-dom",
+        "version": "19.2.4",
+        "declarations": ["node_modules/@types/react-dom/client.d.ts"],
+        "sourceUrl": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts",
+        "roots": ["Root", "Root.render", "Root.unmount", "RootOptions", "createRoot", "hydrateRoot", "HydrationOptions"],
+        "dependencyDepth": 2,
+        "dependencyPolicy": [
+          { "id": "Element", "reason": "DOM elements cross the VIR boundary as host-owned resources.", "shape": { "kind": "resource", "name": "Element" } },
+          { "id": "DocumentFragment", "reason": "DOM document fragments cross the VIR boundary as host-owned resources.", "shape": { "kind": "resource", "name": "DocumentFragment" } },
+          { "id": "Document", "reason": "DOM documents cross the VIR boundary as host-owned resources.", "shape": { "kind": "resource", "name": "Document" } },
+          {
+            "id": "React.ReactNode",
+            "reason": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately.",
+            "source": { "path": "node_modules/@types/react/index.d.ts", "startLine": 436, "startColumn": 5, "endLine": 447, "endColumn": 38, "url": "https://unpkg.com/@types/react@19.2.18/index.d.ts" },
+            "shape": { "kind": "opaque", "name": "React.ReactNode", "abstract": true, "reason": "recursive ReactNode union deferred by reviewed dependency policy" }
+          },
+          {
+            "id": "React.Component",
+            "reason": "React component instances are outside the root-surface seed.",
+            "source": { "path": "node_modules/@types/react/index.d.ts", "startLine": 909, "startColumn": 5, "endLine": 1034, "endColumn": 6, "url": "https://unpkg.com/@types/react@19.2.18/index.d.ts" },
+            "shape": { "kind": "opaque", "name": "React.Component", "abstract": true, "reason": "component instance surface excluded from this seed" }
+          }
+        ]
+      },
+      "comparison": { "report": "build/type-descriptors/react-dom-root-v1.report.json" },
+      "anchors": [
+        {
+          "id": "react_dom.root.resource",
+          "category": "React DOM root",
+          "lean": "Lean.Vir.React.Root",
+          "ts": "Root",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "representation": "hostResource", "ownership": "hostOwned", "lifetime": "until unmount or runtime disposal" },
+          "note": "The TypeScript object interface is intentionally represented by a JavaScript-owned VIR resource."
+        },
+        {
+          "id": "react_dom.root.render",
+          "category": "React DOM root",
+          "lean": "Lean.Vir.React.Root.render",
+          "ts": "Root.render",
+          "target": "react.root.render",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed", "retention": "callbacks until rerender, unmount, or runtime disposal" }
+        },
+        {
+          "id": "react_dom.root.unmount",
+          "category": "React DOM root",
+          "lean": "Lean.Vir.React.Root.unmount",
+          "ts": "Root.unmount",
+          "target": "react.root.unmount",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed", "lifecycle": "release retained render state" }
+        },
+        {
+          "id": "react_dom.root.create",
+          "category": "React DOM root",
+          "lean": "Lean.Vir.React.Root.create",
+          "ts": "createRoot",
+          "target": "react.root.create",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "effect": "dom", "container": { "ownership": "borrowed", "acceptedTypes": ["Element"], "coverage": "subset" }, "resultOwnership": "hostOwned", "resultRepresentation": "hostResource", "omittedOptionalParameters": ["options"] },
+          "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument."
+        },
+        {
+          "id": "react_dom.root.options",
+          "category": "React DOM options",
+          "lean": "Lean.Vir.React.RootOptions",
+          "ts": "RootOptions",
+          "relation": "coverageGap",
+          "portIntent": { "disposition": "unsupported" },
+          "note": "Root creation options are an explicit coverage gap."
+        },
+        {
+          "id": "react_dom.hydration.entrypoint",
+          "category": "React DOM hydration",
+          "lean": "Lean.Vir.React.Root.hydrateRoot",
+          "ts": "hydrateRoot",
+          "relation": "coverageGap",
+          "portIntent": { "disposition": "unsupported" },
+          "note": "Hydration is not exposed by the current VIR React surface."
+        },
+        {
+          "id": "react_dom.hydration.options",
+          "category": "React DOM hydration",
+          "lean": "Lean.Vir.React.HydrationOptions",
+          "ts": "HydrationOptions",
+          "relation": "coverageGap",
+          "portIntent": { "disposition": "unsupported" },
+          "note": "Hydration options are paired with the unsupported hydration entry point."
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "title": "State",
+      "targets": ["react.state.*"],
+      "lean": { "public": ["Lean.Vir.React.State", "Lean.Vir.React.StateSetter"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.SetStateAction", "React.Dispatch"] }
+    },
+    {
+      "id": "hooks",
+      "title": "Hooks",
+      "targets": ["react.use*"],
+      "lean": { "public": ["Lean.Vir.React.Hooks"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.useEffect", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "../../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "infoview",
+  "title": "Infoview client surface",
+  "description": "Browser capabilities supplied to the Lean infoview and its editor-facing command bridge.",
+  "lean": { "modules": ["Vir.Infoview.Surface"] },
+  "roots": [
+    {
+      "id": "clipboard",
+      "title": "Clipboard",
+      "targets": ["infoview.clipboard.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.Clipboard"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Clipboard.writeText"] }
+    },
+    {
+      "id": "commands",
+      "title": "Editor commands",
+      "targets": ["infoview.command.*", "infoview.documentPosition"],
+      "lean": { "public": ["Lean.Vir.Infoview.Command", "Lean.Vir.Infoview.documentPosition"] },
+      "upstream": { "kind": "local" }
+    }
+  ]
+}

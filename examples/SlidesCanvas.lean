@@ -36,14 +36,14 @@ partial def drawFrame
 /-- Builds and starts the slide's DOM and canvas animation entirely from Lean. -/
 @[vir_startup]
 def mount : DomM Unit := do
-  match ← Document.querySelector "#vir-slide-root" with
+  match ← Document.querySelectorString "#vir-slide-root" with
   | none => pure ()
   | some root =>
-      let status ← Document.createElement "p"
+      let status ← Document.createElementString "p"
       Element.ClassList.add status "vir-slide-status"
       Element.setTextContent status "Starting Lean animation…"
       Element.appendChild root status
-      let canvasElement ← Document.createElement "canvas"
+      let canvasElement ← Document.createElementString "canvas"
       Element.ClassList.add canvasElement "vir-slide-canvas"
       Element.setAttribute canvasElement "role" "img"
       Element.setAttribute canvasElement "aria-label"

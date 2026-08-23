@@ -223,9 +223,9 @@ Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/A
 @[vir_js "browser.document.getTitle"]
 private opaque getTitleJs : DomM (Lean.Vir.Js String)
 
-def getTitle : DomM String := do
-  let title ← getTitleJs
-  Lean.Vir.JsValue.toString title
+/-- Faithful JavaScript-boundary view of `document.title`. -/
+def getTitle : DomM (Lean.Vir.Js String) :=
+  getTitleJs
 
 /--
 Sets the current document title through the JavaScript host.
@@ -238,9 +238,9 @@ Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/A
 @[vir_js "browser.document.setTitle"]
 private opaque setTitleJs (title : @& Lean.Vir.Js String) : DomM Unit
 
-def setTitle (title : @& String) : DomM Unit := do
-  let jsTitle ← Lean.Vir.JsValue.ofString title
-  setTitleJs jsTitle
+/-- Faithful JavaScript-boundary setter for `document.title`. -/
+def setTitle (title : @& Lean.Vir.Js String) : DomM Unit :=
+  setTitleJs title
 
 /--
 Returns the first element matching a CSS selector.
@@ -258,9 +258,18 @@ private opaque querySelectorNullable
     (selector : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js.Nullable Element)
 
-def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) := do
+/-- Faithful JavaScript-boundary view of `document.querySelector`. -/
+def querySelector
+    (selector : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable Element) :=
+  querySelectorNullable selector
+
+/-- Converts a Lean selector string and the nullable JavaScript result explicitly. -/
+def querySelectorString
+    (selector : @& String) :
+    DomM (Option (Lean.Vir.Js Element)) := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
-  Lean.Vir.Js.Nullable.toOption (← querySelectorNullable jsSelector)
+  Lean.Vir.Js.Nullable.toOption (← querySelector jsSelector)
 
 /--
 Returns the static list of elements matching a CSS selector.
@@ -277,16 +286,26 @@ private opaque querySelectorAllJs
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
 
 def querySelectorAll
+    (selector : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) :=
+  querySelectorAllJs selector
+
+/-- Converts a Lean selector string before calling `document.querySelectorAll`. -/
+def querySelectorAllString
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
-  querySelectorAllJs (← Lean.Vir.JsValue.ofString selector)
+  querySelectorAll (← Lean.Vir.JsValue.ofString selector)
 
 @[vir_js "browser.document.createElement"]
 private opaque createElementJs (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element)
 
-/-- Creates a DOM element with the given HTML tag name. -/
-def createElement (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
-  createElementJs (← Lean.Vir.JsValue.ofString tagName)
+/-- Faithful JavaScript-boundary view of `document.createElement`. -/
+def createElement (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element) :=
+  createElementJs tagName
+
+/-- Converts a Lean tag name before calling `document.createElement`. -/
+def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
+  createElement (← Lean.Vir.JsValue.ofString tagName)
 
 end Document
 

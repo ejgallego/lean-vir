@@ -68,6 +68,10 @@ lean_exe vir_surface where
   root := `tools.AnalyzeSurface
   supportInterpreter := true
 
+lean_exe vir_js_inventory where
+  root := `tools.ExportVirJsInventory
+  supportInterpreter := true
+
 private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath :=
   mod.filePath (mod.pkg.buildDir / "vir" / kind) ext
 

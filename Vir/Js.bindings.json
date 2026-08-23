@@ -1,0 +1,45 @@
+{
+  "$schema": "../scripts/binding-library.schema.json",
+  "version": 1,
+  "id": "javascript",
+  "title": "JavaScript values",
+  "description": "Core JavaScript resources, nullable values, collections, primitive conversions, and retained Lean references.",
+  "lean": { "modules": ["Vir.Js"] },
+  "roots": [
+    {
+      "id": "array",
+      "title": "Array",
+      "targets": ["js.array.*"],
+      "lean": { "public": ["Lean.Vir.Js.Array"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Array"] }
+    },
+    {
+      "id": "node-list",
+      "title": "NodeList",
+      "targets": ["js.nodeList.*"],
+      "lean": { "public": ["Lean.Vir.Js.NodeList"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["NodeList"] }
+    },
+    {
+      "id": "nullable",
+      "title": "Nullable values",
+      "targets": ["js.nullable.*"],
+      "lean": { "public": ["Lean.Vir.Js.Nullable"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "lean-reference",
+      "title": "Retained Lean references",
+      "targets": ["js.leanRef*"],
+      "lean": { "public": ["Lean.Vir.LeanRef"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "primitive-conversions",
+      "title": "Primitive conversions",
+      "targets": ["js.bool", "js.bool.value", "js.float", "js.float.value", "js.nat", "js.nat.value", "js.string", "js.string.value"],
+      "lean": { "public": ["Lean.Vir.JsValue"] },
+      "upstream": { "kind": "internal" }
+    }
+  ]
+}

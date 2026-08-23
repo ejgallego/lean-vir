@@ -23,6 +23,14 @@ import { INTERFACE_TAG } from "./interface-tags.js";
 const MAX_FINALIZER_ERRORS = 16;
 const MAX_FINALIZER_ERROR_MESSAGE_LENGTH = 2048;
 
+/** Host targets implemented directly by the object-handle dispatcher. */
+export const RUNTIME_INTRINSIC_HOST_TARGETS = Object.freeze({
+  leanRef: "js.leanRef",
+  leanRefValue: "js.leanRef.value",
+  leanRefRetain: "js.leanRef.retain",
+  leanRefRelease: "js.leanRef.release",
+});
+
 export class VirHostState {
   constructor({
     hostBindings = null,
@@ -228,7 +236,7 @@ export class VirHostState {
     if (argObjects.length !== entry.args.length) {
       throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
     }
-    if (entry.target === "js.leanRef" && entry.args.length === 1 &&
+    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRef && entry.args.length === 1 &&
         isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
       const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
       const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} result`);
@@ -246,7 +254,7 @@ export class VirHostState {
         );
       }
     }
-    if (entry.target === "js.leanRef.value" && entry.args.length === 1 &&
+    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefValue && entry.args.length === 1 &&
         isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
       const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
@@ -255,7 +263,7 @@ export class VirHostState {
       );
       return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
     }
-    if (entry.target === "js.leanRef.retain" && entry.args.length === 1 &&
+    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefRetain && entry.args.length === 1 &&
         isGenericJsResourceDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
       const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
@@ -276,7 +284,7 @@ export class VirHostState {
         );
       }
     }
-    if (entry.target === "js.leanRef.release" && entry.args.length === 1 &&
+    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefRelease && entry.args.length === 1 &&
         isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
       const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
