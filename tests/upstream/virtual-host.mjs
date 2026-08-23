@@ -12,7 +12,7 @@ import {
   ensureTamagotchiVirtualDom,
   ensureVirtualElements,
 } from "../support/virtual-fixtures.mjs";
-import { demoHostImportTargets } from "../../scripts/demo-host-import-targets.mjs";
+import { demoHostImportTargets } from "../../scripts/native/demo-host-import-targets.mjs";
 import {
   smokeVirtualReactAttributes,
   smokeVirtualReactChangeInput,

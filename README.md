@@ -303,9 +303,9 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 - `tests/` contains test-only runners, cases, and shared support grouped by the
   subsystem they exercise.
 - `scripts/` contains repository build, analysis, and maintainer tooling;
-  binding-audit, package/artifact, and report-analysis implementations are
-  grouped under `scripts/bindings/`, `scripts/packages/`, and
-  `scripts/analysis/` respectively.
+  binding-audit, package/artifact, report-analysis, and native-boundary
+  implementations are grouped under `scripts/bindings/`, `scripts/packages/`,
+  `scripts/analysis/`, and `scripts/native/` respectively.
   Generated sources, reports, packages, bundles, and site output stay
   under ignored `build/`, `web/public/`, or `web/dist/` paths.
 

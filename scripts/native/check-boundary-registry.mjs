@@ -5,7 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
+import { repositoryPath } from "../repository-paths.mjs";
 import { loadNativeExterns } from "./native-externs.mjs";
 import {
   generateNativeSymbolRegistry,
@@ -13,8 +15,10 @@ import {
   parseNativeSymbolRegistry,
 } from "./native-symbol-registry.mjs";
 
-const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
-const nativeRegistryPath = new URL("../build/generated/wasm/runtime/native_symbols_registry.inc", import.meta.url);
+const nativeSymbolsPath = repositoryPath("wasm", "upstream_shim", "runtime", "native_symbols.cpp");
+const nativeRegistryPath = repositoryPath(
+  "build", "generated", "wasm", "runtime", "native_symbols_registry.inc",
+);
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
   if (arg !== "--write") {
@@ -34,7 +38,7 @@ const nativeSymbols = await readFile(nativeSymbolsPath, "utf8");
 const nativeExterns = await loadNativeExterns();
 const generatedRegistry = generateNativeSymbolRegistry(nativeExterns);
 if (writeMode) {
-  await mkdir(new URL(".", nativeRegistryPath), { recursive: true });
+  await mkdir(dirname(nativeRegistryPath), { recursive: true });
   await writeFile(nativeRegistryPath, generatedRegistry);
 }
 

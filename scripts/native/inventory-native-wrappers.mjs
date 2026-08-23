@@ -7,13 +7,14 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { repositoryPath } from "../repository-paths.mjs";
 import { loadNativeExterns } from "./native-externs.mjs";
 import {
   generateNativeSymbolRegistry,
   parseNativeSymbolRegistry,
 } from "./native-symbol-registry.mjs";
 
-const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
+const nativeSymbolsPath = repositoryPath("wasm", "upstream_shim", "runtime", "native_symbols.cpp");
 
 // This is the complete handwritten boxed-wrapper exception set. Every entry
 // records why VIR needs an adapter instead of Lean's standard boxed wrapper.
@@ -45,7 +46,7 @@ const args = new Set(process.argv.slice(2));
 for (const arg of args) {
   if (!["--all", "--check", "--json"].includes(arg)) {
     console.error(`unknown argument: ${arg}`);
-    console.error("usage: node scripts/inventory-native-wrappers.mjs [--all] [--check] [--json]");
+    console.error("usage: node scripts/native/inventory-native-wrappers.mjs [--all] [--check] [--json]");
     process.exit(2);
   }
 }

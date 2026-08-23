@@ -45,12 +45,10 @@ The documentation owners are:
   under `scripts/bindings/`; their smoke coverage lives under `tests/bindings/`,
   authored comparison fixtures under `fixtures/type-anchors/`, and static
   explorer assets under `web/tools/binding-explorer/`.
-- Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
-- IR declaration payload tag values live in
-  `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in
-  `scripts/ir-codec-tags.mjs` and `scripts/check-ir-codec-tags.mjs`.
-- Object ABI linker flags live in `scripts/object-abi-linker-flags.mjs`, which
-  consumes the shared runtime export-name manifest.
+- Native registry generation, wrapper inspection, declaration-IR tag mapping,
+  demo host-import inventory, and object ABI linker flags live under
+  `scripts/native/`; focused pure contracts live under `tests/native/` and
+  implementation sources remain under `wasm/upstream_shim/`.
 - Canonical browser package metadata lives in `fixtures/browser-packages.json`;
   `scripts/packages/browser-package-config.mjs` exposes its validated derived
   values to Node tooling. Reusable SDK payload and artifact-bundle policy live

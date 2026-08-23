@@ -14,8 +14,9 @@ namespace PackageIRTags
 
 /-!
 These constants are the source of truth for the format-10 wire tags. The C++
-enum names and reserved slots are mapped in `scripts/ir-codec-tags.mjs`; the
-codec check validates both consumers and generates the ignored C++ header.
+enum names and reserved slots are mapped in
+`scripts/native/ir-codec-tags.mjs`; the codec check validates both consumers
+and generates the ignored C++ header.
 -/
 
 def nameAnonymous : Nat := 0

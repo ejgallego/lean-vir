@@ -47,8 +47,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   and current package/interface-manifest version constants used by generated
   bytes and metadata.
 - `Vir.GeneratePackage.PackageIRTags`: source of truth for package `Name` and
-  declaration-IR wire tag values. `scripts/ir-codec-tags.mjs` maps them to C++
-  enum names and reserved slots.
+  declaration-IR wire tag values. `scripts/native/ir-codec-tags.mjs` maps them
+  to C++ enum names and reserved slots.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures and attribute-time marker
   validation.
@@ -233,7 +233,7 @@ Version constants are intentionally small and explicit:
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.
 - `Vir/GeneratePackage/PackageIRTags.lean` owns the format-10 package `Name`
-  and declaration-IR tag assignments; `scripts/ir-codec-tags.mjs` maps the
+  and declaration-IR tag assignments; `scripts/native/ir-codec-tags.mjs` maps the
   C++ enum structure. `npm run check:ir-codec-tags` verifies the assignments
   and that the emitter/decoder use every non-reserved tag.
 

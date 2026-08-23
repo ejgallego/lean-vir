@@ -42,7 +42,7 @@ import {
   jsNatResourceValue,
   readRuntimeArtifacts,
 } from "./shared.mjs";
-import { demoHostImportTargets } from "../../scripts/demo-host-import-targets.mjs";
+import { demoHostImportTargets } from "../../scripts/native/demo-host-import-targets.mjs";
 import { invalidManifestCases } from "./manifest-invalid-cases.mjs";
 
 const { wasmBytes, defaultPackageBytes, hostPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();

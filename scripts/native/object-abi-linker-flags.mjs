@@ -5,7 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { OBJECT_ABI_EXPORTS } from "../web/src/runtime/object-abi-exports.js";
+import { OBJECT_ABI_EXPORTS } from "../../web/src/runtime/object-abi-exports.js";
 
 const seen = new Set();
 const duplicates = [];

@@ -6,10 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+
+import { repositoryRoot } from "../repository-paths.mjs";
 
 const execFileAsync = promisify(execFile);
-const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export async function loadNativeExterns() {
   await execFileAsync("lake", ["build", "vir_native_wrappers"], {

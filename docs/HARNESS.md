@@ -161,6 +161,7 @@ Tests:
 ```bash
 npm run test:tutorials
 npm run test:bench
+npm run test:native:unit
 npm run test:surface
 npm run test:surface:browser
 npm run test:package-ir-builders
@@ -190,10 +191,11 @@ compression results byte for byte, and independently inflates them. Add
 neither mode is stable performance evidence.
 
 `npm test` elaborates the copyable tutorials, then runs the artifact-cache,
-benchmark sampler, focused-identity, and paired-runner contract tests, package
-ABI and IR object-layout checks, IR codec tag consistency check, native extern
-metadata check, boundary registry check, native wrapper check, API coverage
-docs check, and Wasm extension probes. It then builds the demo artifacts once
+benchmark sampler, focused-identity, paired-runner, and native-registry
+contract tests, package ABI and IR object-layout checks, IR codec tag
+consistency check, native extern metadata check, boundary registry check,
+native wrapper check, API coverage docs check, and Wasm extension probes. It
+then builds the demo artifacts once
 and reuses them for a paired-runner
 control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
 tests, and the fixture suite. It is the default pre-merge signal for code
@@ -432,6 +434,8 @@ logic into entry-point scripts or pages:
 - IR package, browser-package, and artifact tooling: `scripts/packages/`;
   shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`
 - Package-tooling contracts: `npm run test:packages:unit`
+- Native registry, wrapper, codec-tag, host-import, and ABI tooling:
+  `scripts/native/`; pure registry contracts: `npm run test:native:unit`
 - Surface, frontier-size, Wasm attribution, and report-rendering tooling:
   `scripts/analysis/`; focused coverage: `tests/surface/`
 - Binding inventory, descriptor, comparison, and explorer tooling:

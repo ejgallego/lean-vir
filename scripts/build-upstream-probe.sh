@@ -552,7 +552,7 @@ exports=(
 )
 
 object_abi_export_flags="$obj_dir/object-abi-export-flags.txt"
-node scripts/object-abi-linker-flags.mjs > "$object_abi_export_flags"
+node scripts/native/object-abi-linker-flags.mjs > "$object_abi_export_flags"
 while IFS= read -r export_flag; do
   if [[ -n "$export_flag" ]]; then
     exports+=("$export_flag")
