@@ -7,16 +7,15 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 import {
   surfaceCounts,
   surfaceDefinition,
 } from "./fixtures.mjs";
-
-const repoRoot = resolve(import.meta.dirname, "../..");
 
 test("target index compares only compatible complete-frontier reports", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "vir-target-index-"));

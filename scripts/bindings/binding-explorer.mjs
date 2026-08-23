@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -11,7 +10,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
@@ -31,10 +30,10 @@ function parseArgs(argv) {
     else if (option === "--out") options.out = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     else if (option === "--html") options.html = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     else if (option === "--check") options.check = true;
-    else fail(`unknown option ${option}`);
+    else throw new Error(`unknown option ${option}`);
   }
   if (options.coverage === null || options.out === null || options.html === null) {
-    fail("usage: generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [--config-dir DIR] [--check]");
+    throw new Error("usage: generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [--config-dir DIR] [--check]");
   }
   return options;
 }
@@ -757,57 +756,54 @@ export function renderBindingExplorerHtml(template, report) {
 
 export async function runBindingExplorerCli(argv) {
   const options = parseArgs(argv);
-  try {
-    const coverage = await readJson(options.coverage);
-    const configPaths = await discoverConfigs(options.configDir);
-    if (configPaths.length === 0) throw new Error(`no *.bindings.json files found under ${relative(repositoryRoot, options.configDir)}`);
-    const configs = [];
-    const ids = new Set();
-    for (const path of configPaths) {
-      const config = validateConfig(await readJson(path), path);
-      if (ids.has(config.id)) throw new Error(`duplicate binding-library id ${config.id}`);
-      ids.add(config.id);
-      configs.push(config);
-    }
-    const typeScriptSurfaces = await generateTypeScriptSurfaces(configs);
-    const report = await buildBindingExplorerReport(coverage, configs, typeScriptSurfaces, options.coverage);
-    const outputOptions = {
-      check: options.check,
-      root: repositoryRoot,
-      staleHint: "rerun npm run generate:binding-explorer",
-    };
-    await Promise.all([
-      emitGeneratedFile(options.out, `${JSON.stringify(report, null, 2)}\n`, outputOptions),
-      emitGeneratedFile(
-        options.html,
-        renderBindingExplorerHtml(
-          await readFile(join(explorerAssetsDir, "index.html"), "utf8"),
-          report,
-        ),
-        outputOptions,
-      ),
-      ...["app.js", "style.css"].map(async (asset) =>
-        emitGeneratedFile(
-          join(dirname(options.html), "assets", asset),
-          await readFile(join(explorerAssetsDir, asset), "utf8"),
-          outputOptions,
-        )),
-    ]);
-    console.log("\nLean VIR binding explorer");
-    console.log(`  libraries: ${report.summary.libraries}`);
-    console.log(`  API groups: ${report.summary.apiGroups}`);
-    console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
-    console.log(`  upstream analysis: ${report.summary.analysis.complete} reviewed, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.notRun} not run`);
-    console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
-    console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
-    console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
-    console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
-    console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
-    console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);
-    if (report.summary.issues.error !== 0) {
-      fail(`binding explorer found ${report.summary.issues.error} binding-surface errors`);
-    }
-  } catch (error) {
-    fail(error.message);
+  const coverage = await readJson(options.coverage);
+  const configPaths = await discoverConfigs(options.configDir);
+  if (configPaths.length === 0) throw new Error(`no *.bindings.json files found under ${relative(repositoryRoot, options.configDir)}`);
+  const configs = [];
+  const ids = new Set();
+  for (const path of configPaths) {
+    const config = validateConfig(await readJson(path), path);
+    if (ids.has(config.id)) throw new Error(`duplicate binding-library id ${config.id}`);
+    ids.add(config.id);
+    configs.push(config);
   }
+  const typeScriptSurfaces = await generateTypeScriptSurfaces(configs);
+  const report = await buildBindingExplorerReport(coverage, configs, typeScriptSurfaces, options.coverage);
+  const outputOptions = {
+    check: options.check,
+    root: repositoryRoot,
+    staleHint: "rerun npm run generate:binding-explorer",
+  };
+  await Promise.all([
+    emitGeneratedFile(options.out, `${JSON.stringify(report, null, 2)}\n`, outputOptions),
+    emitGeneratedFile(
+      options.html,
+      renderBindingExplorerHtml(
+        await readFile(join(explorerAssetsDir, "index.html"), "utf8"),
+        report,
+      ),
+      outputOptions,
+    ),
+    ...["app.js", "style.css"].map(async (asset) =>
+      emitGeneratedFile(
+        join(dirname(options.html), "assets", asset),
+        await readFile(join(explorerAssetsDir, asset), "utf8"),
+        outputOptions,
+      )),
+  ]);
+  console.log("\nLean VIR binding explorer");
+  console.log(`  libraries: ${report.summary.libraries}`);
+  console.log(`  API groups: ${report.summary.apiGroups}`);
+  console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
+  console.log(`  upstream analysis: ${report.summary.analysis.complete} reviewed, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.notRun} not run`);
+  console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
+  console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
+  console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
+  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
+  console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
+  console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);
+  if (report.summary.issues.error !== 0) {
+    throw new Error(`binding explorer found ${report.summary.issues.error} binding-surface errors`);
+  }
+  return 0;
 }

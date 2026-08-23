@@ -6,5 +6,6 @@ Author: Emilio J. Gallego Arias
 */
 
 import { runBindingExplorerCli } from "./binding-explorer.mjs";
+import { runCliMain } from "./cli-main.mjs";
 
-await runBindingExplorerCli(process.argv.slice(2));
+await runCliMain(runBindingExplorerCli);

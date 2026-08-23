@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import {
@@ -139,7 +140,7 @@ const importedSummaries = results
 if (importedSummaries.length !== 0) {
   console.log(`imported IR deps: ${importedSummaries.join(", ")}`);
 }
-console.log(`wrote ${summaryPath.pathname}`);
+console.log(`wrote ${fileURLToPath(summaryPath)}`);
 
 if (failed !== 0) {
   process.exit(1);

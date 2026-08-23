@@ -8,12 +8,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 
 import { runSync } from "../../scripts/process-utils.mjs";
+import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const outputDir = await mkdtemp(join(tmpdir(), "vir-surface-smoke-"));
 const jsonPath = join(outputDir, "surface.json");
 const markdownPath = join(outputDir, "surface.md");

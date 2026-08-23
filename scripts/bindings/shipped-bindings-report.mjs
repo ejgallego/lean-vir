@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -10,7 +9,7 @@ import { relative, resolve } from "node:path";
 
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-resource.js";
 import {
   createBrowserHostBindings,
@@ -29,10 +28,10 @@ function parseArgs(argv) {
     else if (option === "--out") options.out = requiredValue(argv, ++index, option);
     else if (option === "--html") options.html = requiredValue(argv, ++index, option);
     else if (option === "--check") options.check = true;
-    else fail(`unknown option ${option}`);
+    else throw new Error(`unknown option ${option}`);
   }
   if (options.lean === null || options.out === null || options.html === null) {
-    fail("usage: generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [--check]");
+    throw new Error("usage: generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [--check]");
   }
   return Object.fromEntries(Object.entries(options).map(([key, value]) =>
     [key, typeof value === "string" ? resolve(root, value) : value]));
@@ -44,16 +43,18 @@ async function readInventory(path) {
       !Array.isArray(value.bindings) || value.summary?.declarations !== value.bindings.length ||
       !Array.isArray(value.publicEntries) ||
       value.summary?.publicEntries !== value.publicEntries.length) {
-    fail(`${relative(root, path)} is not a compiler-derived VIR JavaScript inventory`);
+    throw new Error(`${relative(root, path)} is not a compiler-derived VIR JavaScript inventory`);
   }
   const validBoundaries = new Set(["hostResource", "explicitConversion", "objectHandle"]);
   const declarations = new Set();
   for (const binding of value.bindings) {
     if (typeof binding.declaration !== "string" || typeof binding.target !== "string" ||
         typeof binding.type !== "string" || !validBoundaries.has(binding.boundary)) {
-      fail(`${relative(root, path)} contains an invalid binding entry`);
+      throw new Error(`${relative(root, path)} contains an invalid binding entry`);
     }
-    if (declarations.has(binding.declaration)) fail(`duplicate compiler declaration ${binding.declaration}`);
+    if (declarations.has(binding.declaration)) {
+      throw new Error(`duplicate compiler declaration ${binding.declaration}`);
+    }
     declarations.add(binding.declaration);
     const expectedBoundary = binding.marker === "vir_js_explicit_conversion"
       ? "explicitConversion"
@@ -61,7 +62,7 @@ async function readInventory(path) {
     if (expectedBoundary === "invalid" ||
         (expectedBoundary === "explicitConversion" && binding.boundary !== expectedBoundary) ||
         (expectedBoundary === null && binding.boundary === "explicitConversion")) {
-      fail(`${binding.declaration} has inconsistent marker and boundary metadata`);
+      throw new Error(`${binding.declaration} has inconsistent marker and boundary metadata`);
     }
   }
   let publicTargetEdges = 0;
@@ -70,13 +71,13 @@ async function readInventory(path) {
     if (typeof entry.declaration !== "string" || typeof entry.module !== "string" ||
         typeof entry.type !== "string" || !Array.isArray(entry.targets) ||
         entry.targets.length === 0) {
-      fail(`${relative(root, path)} contains an invalid public entry`);
+      throw new Error(`${relative(root, path)} contains an invalid public entry`);
     }
     for (const reached of entry.targets) {
       if (typeof reached.target !== "string" || !Array.isArray(reached.path) ||
           reached.path[0] !== entry.declaration ||
           reached.path.some((declaration) => typeof declaration !== "string")) {
-        fail(`${entry.declaration} contains invalid compiler reachability evidence`);
+        throw new Error(`${entry.declaration} contains invalid compiler reachability evidence`);
       }
       publicTargetEdges += 1;
       publicTargets.add(reached.target);
@@ -84,7 +85,7 @@ async function readInventory(path) {
   }
   if (value.summary.publicTargetEdges !== publicTargetEdges ||
       value.summary.publicTargets !== publicTargets.size) {
-    fail(`${relative(root, path)} has inconsistent public reachability counts`);
+    throw new Error(`${relative(root, path)} has inconsistent public reachability counts`);
   }
   return value;
 }
@@ -300,7 +301,7 @@ export async function runShippedBindingsReportCli(argv) {
   ]);
 
   if (report.summary.missingProvider !== 0 || report.summary.runtimeOnly !== 0) {
-    fail(
+    throw new Error(
       `shipped binding reconciliation found ${report.summary.missingProvider} missing providers and ` +
         `${report.summary.runtimeOnly} runtime-only targets`,
     );
@@ -317,4 +318,5 @@ export async function runShippedBindingsReportCli(argv) {
   console.log(`  public entry/target edges: ${report.summary.publicTargetEdges}`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(root, options.out)}`);
   console.log(`             ${options.check ? "validated" : "wrote"} ${relative(root, options.html)}`);
+  return 0;
 }

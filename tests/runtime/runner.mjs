@@ -5,9 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { availableParallelism } from "node:os";
-import { fileURLToPath } from "node:url";
 
 import { mapWithLimit, runAsync } from "../../scripts/process-utils.mjs";
+import { repositoryRoot as root } from "../../scripts/repository-paths.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "../../scripts/timing-utils.mjs";
 import {
   includesSerialRuntimeTests,
@@ -21,7 +21,6 @@ import {
   selectRuntimeTests,
 } from "./runner-core.mjs";
 
-const root = fileURLToPath(new URL("../..", import.meta.url));
 const config = parseRuntimeRunnerConfig({
   argv: process.argv.slice(2),
   env: process.env,

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -10,10 +9,10 @@ import { relative, resolve } from "node:path";
 
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
-  console.error(`usage: node scripts/bindings/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
+  console.log(`usage: node scripts/bindings/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
 
 Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
@@ -52,11 +51,9 @@ function parseArgs(argv) {
       case "-h":
       case "--help":
         usage();
-        process.exit(0);
+        return null;
       case "--anchors":
-        anchors = argv[index + 1];
-        if (!anchors || anchors.startsWith("--")) fail("--anchors requires a file");
-        index += 1;
+        anchors = requiredValue(argv, ++index, "--anchors");
         break;
       case "--api-group":
       case "--binding-root":
@@ -71,7 +68,7 @@ function parseArgs(argv) {
       case "--dependency-depth":
         dependencyDepth = Number(requiredValue(argv, ++index, "--dependency-depth"));
         if (!Number.isInteger(dependencyDepth) || dependencyDepth < 0) {
-          fail("--dependency-depth must be a non-negative integer");
+          throw new Error("--dependency-depth must be a non-negative integer");
         }
         break;
       case "--dependency-policy":
@@ -81,29 +78,29 @@ function parseArgs(argv) {
         sourceUrl = requiredValue(argv, ++index, "--source-url");
         break;
       case "--out":
-        out = argv[index + 1];
-        if (!out || out.startsWith("--")) fail("--out requires a file");
-        index += 1;
+        out = requiredValue(argv, ++index, "--out");
         break;
       case "--check":
         check = true;
         break;
       default:
-        if (arg.startsWith("--")) fail(`unknown option ${arg}`);
+        if (arg.startsWith("--")) throw new Error(`unknown option ${arg}`);
         files.push(arg);
         break;
     }
   }
   if (files.length === 0 && bindingRoot === null) {
-    fail("at least one TypeScript declaration file or --api-group is required");
+    throw new Error("at least one TypeScript declaration file or --api-group is required");
   }
   if (bindingRoot !== null &&
       (files.length !== 0 || anchors !== null || symbols.size !== 0 || symbolFiles.length !== 0 ||
        sourceUrl !== null || dependencyDepth !== 0 || dependencyPolicy !== null)) {
-    fail("--api-group supplies declarations, entry points, policy, and anchors; do not pass those options separately");
+    throw new Error("--api-group supplies declarations, entry points, policy, and anchors; do not pass those options separately");
   }
-  if (check && out === null) fail("--check requires --out");
-  if (sourceUrl !== null && files.length !== 1) fail("--source-url requires exactly one declaration file");
+  if (check && out === null) throw new Error("--check requires --out");
+  if (sourceUrl !== null && files.length !== 1) {
+    throw new Error("--source-url requires exactly one declaration file");
+  }
   return {
     files: files.map((file) => resolve(root, file)),
     bindingRoot,
@@ -121,7 +118,9 @@ function parseArgs(argv) {
 }
 
 export async function runTypeScriptDescriptorsCli(argv) {
-  const cli = await resolveBindingRoot(parseArgs(argv));
+  const parsed = parseArgs(argv);
+  if (parsed === null) return 0;
+  const cli = await resolveBindingRoot(parsed);
   const descriptor = await generateDescriptorFile(cli);
   const text = `${JSON.stringify(descriptor, null, 2)}\n`;
 
@@ -135,6 +134,7 @@ export async function runTypeScriptDescriptorsCli(argv) {
     });
     console.log(`${action} ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
   }
+  return 0;
 }
 
 export async function generateDescriptorFile({
@@ -218,23 +218,25 @@ async function resolveBindingRoot(options) {
   if (options.bindingRoot === null) return options;
   const separator = options.bindingRoot.lastIndexOf("#");
   if (separator <= 0 || separator === options.bindingRoot.length - 1) {
-    fail("--api-group must use FILE#ID syntax");
+    throw new Error("--api-group must use FILE#ID syntax");
   }
   const configPath = resolve(root, options.bindingRoot.slice(0, separator));
   const rootId = options.bindingRoot.slice(separator + 1);
   const config = JSON.parse(await readFile(configPath, "utf8"));
   if (config?.version !== 1 || !Array.isArray(config.roots)) {
-    fail(`${relative(root, configPath)} is not a binding-library v1 configuration`);
+    throw new Error(`${relative(root, configPath)} is not a binding-library v1 configuration`);
   }
   const binding = config.roots.find((entry) => entry?.id === rootId);
-  if (binding === undefined) fail(`${relative(root, configPath)} has no API group ${rootId}`);
+  if (binding === undefined) {
+    throw new Error(`${relative(root, configPath)} has no API group ${rootId}`);
+  }
   const upstream = binding.upstream;
   if (upstream?.kind !== "typescript" || !Array.isArray(upstream.declarations) ||
       !Array.isArray(upstream.roots)) {
-    fail(`API group ${config.id}/${rootId} does not define a TypeScript declaration surface`);
+    throw new Error(`API group ${config.id}/${rootId} does not define a TypeScript declaration surface`);
   }
   if (upstream.sourceUrl !== undefined && upstream.declarations.length !== 1) {
-    fail(`API group ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
+    throw new Error(`API group ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
   }
   return {
     ...options,

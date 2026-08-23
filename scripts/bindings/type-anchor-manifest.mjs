@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -7,15 +6,15 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 
 import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "../packages/irpkg-generator.mjs";
 import { readIrPackageFile } from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
-  console.error(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]
+  console.log(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]
 
 Generate a checked-in interface manifest fixture through the real VIR package
 generator. Generated .irpkg and report files stay under build/.
@@ -46,7 +45,7 @@ function parseArgs(argv) {
       case "-h":
       case "--help":
         usage();
-        process.exit(0);
+        return null;
       case "--source":
         source = resolve(root, requiredValue(argv, ++index, "--source"));
         break;
@@ -69,13 +68,13 @@ function parseArgs(argv) {
         check = true;
         break;
       default:
-        fail(`unknown option ${arg}`);
+        throw new Error(`unknown option ${arg}`);
     }
   }
-  if (source === null) fail("--source is required");
-  if (roots === null) fail("--roots is required");
-  if (out === null) fail("--out is required");
-  const stem = out.split("/").pop().replace(/\.manifest\.json$/u, "");
+  if (source === null) throw new Error("--source is required");
+  if (roots === null) throw new Error("--roots is required");
+  if (out === null) throw new Error("--out is required");
+  const stem = basename(out).replace(/\.manifest\.json$/u, "");
   packagePath ??= resolve(root, "build/type-descriptors", `${stem}.irpkg`);
   report ??= packagePath.replace(/\.irpkg$/u, ".report.md");
   return { source, roots, aliases, out, packagePath, report, check };
@@ -83,12 +82,15 @@ function parseArgs(argv) {
 
 export async function runTypeAnchorManifestCli(argv) {
   const cli = parseArgs(argv);
+  if (cli === null) return 0;
   const roots = await readLines(cli.roots);
-  if (roots.length === 0) fail(`${relative(root, cli.roots)} has no roots`);
+  if (roots.length === 0) {
+    throw new Error(`${relative(root, cli.roots)} has no roots`);
+  }
   const aliases = cli.aliases === null ? [] : await readAliases(cli.aliases);
 
   const generator = prepareVirIrpkgSync(root);
-  if (!generator.ok) fail(irpkgGeneratorFailureMessage(generator));
+  if (!generator.ok) throw new Error(irpkgGeneratorFailureMessage(generator));
 
   await mkdir(dirname(cli.packagePath), { recursive: true });
   await mkdir(dirname(cli.report), { recursive: true });
@@ -107,7 +109,7 @@ export async function runTypeAnchorManifestCli(argv) {
   if ((result.status ?? 1) !== 0) {
     process.stderr.write(result.stderr);
     process.stdout.write(result.stdout);
-    fail(`Lean anchor package generation failed; see ${relative(root, cli.report)}`);
+    throw new Error(`Lean anchor package generation failed; see ${relative(root, cli.report)}`);
   }
 
   const info = await readIrPackageFile(cli.packagePath);
@@ -119,6 +121,7 @@ export async function runTypeAnchorManifestCli(argv) {
     staleHint: "rerun the corresponding generation step without --check",
   });
   console.log(`${action} ${relative(root, cli.out)} (${manifest.exports.length} exports)`);
+  return 0;
 }
 
 async function readLines(path) {

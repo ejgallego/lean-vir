@@ -8,17 +8,20 @@ import { existsSync, mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { delimiter, join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 
 import { formatMs, parseBenchmarkSamples, requireBenchmarkSample } from "./bench-utils.mjs";
 import { runSync } from "../../scripts/process-utils.mjs";
+import {
+  repositoryPath,
+  repositoryRootUrl,
+} from "../../scripts/repository-paths.mjs";
 
-const root = new URL("../..", import.meta.url);
+const root = repositoryRootUrl;
 const benchWasm = "build/upstream-probe/vir-engine-bench.wasm";
 const sortInput = "7,3,9,1,4,1,5,2,8,6,0,10,12,11,13,14";
 const engineTimeoutMs = Number(process.env.VIR_ENGINE_TIMEOUT_MS ?? "20000");
 const wasmedgeTimeoutMs = Number(process.env.VIR_WASMEDGE_TIMEOUT_MS ?? "5000");
-const engineHome = fileURLToPath(new URL("../../.tools/engine-home", import.meta.url));
+const engineHome = repositoryPath(".tools", "engine-home");
 mkdirSync(join(engineHome, "cache"), { recursive: true });
 mkdirSync(join(engineHome, "config"), { recursive: true });
 mkdirSync(join(engineHome, "wasmer"), { recursive: true });
@@ -67,9 +70,9 @@ function engineEnv() {
     XDG_CONFIG_HOME: join(engineHome, "config"),
     WASMER_DIR: join(engineHome, "wasmer"),
     PATH: [
-      new URL(".tools/wasmtime", root).pathname,
-      new URL(".tools/wasmer/bin", root).pathname,
-      new URL(".tools/wasmedge/bin", root).pathname,
+      repositoryPath(".tools", "wasmtime"),
+      repositoryPath(".tools", "wasmer", "bin"),
+      repositoryPath(".tools", "wasmedge", "bin"),
       process.env.PATH ?? "",
     ].join(delimiter),
   };

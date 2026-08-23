@@ -7,14 +7,11 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 
-export function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
-}
-
 export function requiredValue(argv, index, option) {
   const value = argv[index];
-  if (!value || value.startsWith("--")) fail(`${option} requires a value`);
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${option} requires a value`);
+  }
   return value;
 }
 
@@ -26,7 +23,7 @@ export async function emitGeneratedFile(path, contents, {
   if (check) {
     const existing = await readFile(path, "utf8").catch(() => null);
     if (existing !== contents) {
-      fail(`${relative(root, path)} is stale; ${staleHint}`);
+      throw new Error(`${relative(root, path)} is stale; ${staleHint}`);
     }
     return "validated";
   }

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -10,7 +9,7 @@ import { relative, resolve } from "node:path";
 
 import { readIrPackageFile } from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
 
@@ -22,7 +21,7 @@ const statusRank = {
 };
 
 function usage() {
-  console.error(`usage: node scripts/bindings/check-type-anchors.mjs --descriptors FILE (--irpkg FILE | --manifest FILE) [options]
+  console.log(`usage: node scripts/bindings/check-type-anchors.mjs --descriptors FILE (--irpkg FILE | --manifest FILE) [options]
 
 Compare TypeScript descriptor JSON with Lean VIR interface descriptors.
 
@@ -54,7 +53,7 @@ function parseArgs(argv) {
       case "-h":
       case "--help":
         usage();
-        process.exit(0);
+        return null;
       case "--descriptors":
         descriptors = requiredValue(argv, ++index, "--descriptors");
         break;
@@ -80,12 +79,14 @@ function parseArgs(argv) {
         failOnErrors = true;
         break;
       default:
-        fail(`unknown option ${arg}`);
+        throw new Error(`unknown option ${arg}`);
     }
   }
-  if (descriptors === null) fail("--descriptors is required");
-  if ((irpkg === null) === (manifest === null)) fail("pass exactly one of --irpkg or --manifest");
-  if (check && out === null) fail("--check requires --out");
+  if (descriptors === null) throw new Error("--descriptors is required");
+  if ((irpkg === null) === (manifest === null)) {
+    throw new Error("pass exactly one of --irpkg or --manifest");
+  }
+  if (check && out === null) throw new Error("--check requires --out");
   return {
     descriptors: resolve(root, descriptors),
     irpkg: irpkg === null ? null : resolve(root, irpkg),
@@ -100,6 +101,7 @@ function parseArgs(argv) {
 
 export async function runTypeAnchorReportCli(argv) {
   const cli = parseArgs(argv);
+  if (cli === null) return 0;
   const report = await buildTypeAnchorReport(cli);
   const text = `${JSON.stringify(report, null, 2)}\n`;
 
@@ -116,12 +118,11 @@ export async function runTypeAnchorReportCli(argv) {
     printSummary(report);
   }
 
-  if (cli.strict && (report.summary.weak !== 0 || report.summary.missing !== 0)) {
-    process.exit(1);
-  }
-  if (cli.failOnErrors && report.diagnosticSummary.error !== 0) {
-    process.exit(1);
-  }
+  const strictFailure = cli.strict &&
+    (report.summary.weak !== 0 || report.summary.missing !== 0);
+  const diagnosticFailure = cli.failOnErrors &&
+    report.diagnosticSummary.error !== 0;
+  return strictFailure || diagnosticFailure ? 1 : 0;
 }
 
 export async function buildTypeAnchorReport({ descriptors, irpkg, manifest }) {

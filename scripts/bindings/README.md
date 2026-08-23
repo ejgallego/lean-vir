@@ -8,11 +8,13 @@ entry points directly during routine work.
 
 The `generate-*`, `check-*`, and `render-*` files are thin command entry points.
 Their sibling library modules expose reusable report and rendering functions
-without running a CLI when imported. Small argument and generated-output
-conventions are shared through `tool-utils.mjs`; domain logic stays with its
-own tool instead of growing a general repository harness. Repository-root
-resolution shared with other nested tooling comes from
-`scripts/repository-paths.mjs`.
+without running a CLI when imported. The entry points own error formatting and
+process exit status through `cli-main.mjs`; reusable modules throw errors or
+return an exit status instead of terminating their host process. Small
+argument and generated-output conventions are shared through `tool-utils.mjs`;
+domain logic stays with its own tool instead of growing a general repository
+harness. Repository-root resolution shared with other nested tooling comes
+from `scripts/repository-paths.mjs`.
 
 Related ownership:
 

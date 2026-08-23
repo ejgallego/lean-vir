@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { fixtureExpectation, fixtureRoots } from "../../fixtures/fixture-manifest.mjs";
 import { requireSuccessfulProcess, runAsync } from "../../scripts/process-utils.mjs";
@@ -41,7 +42,7 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
     ].join("\n");
     const hostPath = new URL(`${fixture.id}.host.lean`, buildDir);
     await writeFile(hostPath, hostSource);
-    const result = await runAsync("lean", ["--run", hostPath.pathname], { cwd: root, capture: true });
+    const result = await runAsync("lean", ["--run", fileURLToPath(hostPath)], { cwd: root, capture: true });
     requireSuccessfulProcess(result, `host oracle ${fixture.id}`);
     const lines = result.stdout.trim().split("\n").filter(Boolean);
     const value = lines.at(-1);
@@ -66,8 +67,8 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
     const packagePath = new URL(`${fixture.id}.irpkg`, buildDir);
     const reportPath = new URL(`${fixture.id}.report.md`, buildDir);
     const args = [
-      packagePath.pathname,
-      reportPath.pathname,
+      fileURLToPath(packagePath),
+      fileURLToPath(reportPath),
       "--target",
       fixture.source,
       ...fixtureRoots(fixture),

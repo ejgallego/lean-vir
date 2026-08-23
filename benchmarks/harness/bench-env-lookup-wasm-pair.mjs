@@ -8,7 +8,6 @@ Author: Emilio J. Gallego Arias
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { cpus } from "node:os";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
@@ -26,10 +25,14 @@ import {
 } from "./bench-utils.mjs";
 import { leanPackageFile, publicArtifactPath } from "../../scripts/packages/browser-package-config.mjs";
 import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
+import {
+  repositoryRoot,
+  repositoryRootUrl,
+} from "../../scripts/repository-paths.mjs";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
-const root = new URL("../..", import.meta.url);
-const rootPath = fileURLToPath(root);
+const root = repositoryRootUrl;
+const rootPath = repositoryRoot;
 const entryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));

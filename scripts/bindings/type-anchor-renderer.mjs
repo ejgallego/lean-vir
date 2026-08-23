@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*
 Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -8,10 +7,10 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { repositoryRoot as root } from "../repository-paths.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
-  console.error(`usage: node scripts/bindings/render-type-anchors.mjs --report FILE [options]
+  console.log(`usage: node scripts/bindings/render-type-anchors.mjs --report FILE [options]
 
 Render a Verso/Blueprint-friendly Markdown fragment for type anchors.
 
@@ -35,13 +34,15 @@ function parseArgs(argv) {
       case "-h":
       case "--help":
         usage();
-        process.exit(0);
+        return null;
       case "--report":
         report = requiredValue(argv, ++index, "--report");
         break;
       case "--format":
         format = requiredValue(argv, ++index, "--format");
-        if (!["markdown", "html"].includes(format)) fail("--format must be markdown or html");
+        if (!["markdown", "html"].includes(format)) {
+          throw new Error("--format must be markdown or html");
+        }
         break;
       case "--out":
         out = requiredValue(argv, ++index, "--out");
@@ -50,11 +51,11 @@ function parseArgs(argv) {
         check = true;
         break;
       default:
-        fail(`unknown option ${arg}`);
+        throw new Error(`unknown option ${arg}`);
     }
   }
-  if (report === null) fail("--report is required");
-  if (check && out === null) fail("--check requires --out");
+  if (report === null) throw new Error("--report is required");
+  if (check && out === null) throw new Error("--check requires --out");
   return {
     report: resolve(root, report),
     out: out === null ? null : resolve(root, out),
@@ -65,6 +66,7 @@ function parseArgs(argv) {
 
 export async function runTypeAnchorRendererCli(argv) {
   const cli = parseArgs(argv);
+  if (cli === null) return 0;
   const report = JSON.parse(await readFile(cli.report, "utf8"));
   const rendered = renderTypeAnchorReport(report, cli.format);
 
@@ -78,6 +80,7 @@ export async function runTypeAnchorRendererCli(argv) {
     });
     console.log(`${action} ${relative(root, cli.out)} (${report.results.length} anchors)`);
   }
+  return 0;
 }
 
 export function renderTypeAnchorReport(report, format = "markdown") {

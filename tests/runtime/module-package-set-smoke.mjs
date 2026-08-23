@@ -8,19 +8,19 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import {
   IR_PACKAGE_SECTION,
   readIrPackageInfo,
 } from "../../scripts/packages/irpkg-format.mjs";
+import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 import {
   createVirRuntime,
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime-node.js";
 
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const descriptorPath = resolve(
   repoRoot,
   ".lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg-set.json",
