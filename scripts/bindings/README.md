@@ -17,6 +17,11 @@ domain logic stays with its own tool instead of growing a general repository
 harness. Repository-root resolution shared with other nested tooling comes
 from `scripts/repository-paths.mjs`.
 
+`binding-modalities.mjs` is the shared TypeScript-to-Lean policy boundary. It
+combines descriptor shapes with a library ABI profile and justified exceptions
+to produce canonical operation IR. Lean source generation, comparator intent,
+and explorer modality explanations consume that same IR.
+
 Related ownership:
 
 - `Vir/*.bindings.json` and `Vir/bindings.schema.json`: authored binding maps,
@@ -27,3 +32,6 @@ Related ownership:
 - `tests/bindings/`: unit and end-to-end tool coverage.
 - `web/tools/binding-explorer/`: maintained static explorer presentation.
 - `build/bindings/` and `build/type-descriptors/`: ignored generated outputs.
+
+See `docs/BINDING_MODALITIES.md` for the inference rules, provenance contract,
+and fail-closed extension boundary.

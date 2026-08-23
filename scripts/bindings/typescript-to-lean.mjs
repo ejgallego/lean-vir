@@ -8,13 +8,20 @@ import { readFile } from "node:fs/promises";
 import { basename, relative, resolve } from "node:path";
 
 import { repositoryRoot } from "../repository-paths.mjs";
+import {
+  buildGeneratedOperations,
+  generatedOperationDocument,
+  validateGenerationProfile,
+} from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+
+export { leanType } from "./binding-modalities.mjs";
 
 function usage() {
   console.error(`usage: node scripts/bindings/generate-lean-bindings.mjs --config FILE [--check]
 
-Generate the configured faithful Lean host declarations from TypeScript declarations.
+Generate faithful Lean host declarations and canonical operation IR from TypeScript declarations.
 
 Options:
   --config FILE  Binding-library configuration containing a generation block.
@@ -59,22 +66,21 @@ function validateGenerationConfig(config, configPath) {
   const generation = config?.generation;
   if (config?.version !== 1 || !Array.isArray(config.roots) || generation === null ||
       typeof generation !== "object" || Array.isArray(generation) ||
-      !nonemptyString(generation.output) || !nonemptyString(generation.namespace) ||
+      !nonemptyString(generation.output) || !nonemptyString(generation.irOutput) ||
+      !nonemptyString(generation.namespace) ||
       !Array.isArray(generation.imports) || !generation.imports.every(nonemptyString) ||
       !Array.isArray(generation.members) || generation.members.length === 0 ||
       !generation.members.every(nonemptyString) ||
-      generation.effects === null || typeof generation.effects !== "object" ||
-      Array.isArray(generation.effects) ||
       generation.resources === null || typeof generation.resources !== "object" ||
       Array.isArray(generation.resources)) {
     throw new Error(`${label} does not define a valid Lean generation block`);
   }
+  validateGenerationProfile(generation, `${label} generation`);
   if (new Set(generation.members).size !== generation.members.length) {
     throw new Error(`${label} repeats a generated TypeScript member`);
   }
-  if (!Object.values(generation.effects).every(nonemptyString) ||
-      !Object.values(generation.resources).every(nonemptyString)) {
-    throw new Error(`${label} generation effects and resources must map to Lean names`);
+  if (!Object.values(generation.resources).every(nonemptyString)) {
+    throw new Error(`${label} generation resources must map to Lean names`);
   }
   for (const name of generation.namespace.split(".")) leanIdentifier(name, `${label} generation namespace`);
   for (const imported of generation.imports) {
@@ -83,174 +89,50 @@ function validateGenerationConfig(config, configPath) {
   return generation;
 }
 
-function anchorFor(root, operation, member, accessor) {
-  const anchor = (root.anchors ?? []).find((entry) => entry.id === operation.anchor);
-  if (anchor === undefined) {
-    throw new Error(`${member} ${accessor} references missing anchor ${operation.anchor}`);
-  }
-  const intent = anchor.portIntent;
-  if (anchor.ts !== member || anchor.target !== operation.target ||
-      anchor.relation !== "audit" || intent?.disposition !== "bind" ||
-      intent.accessor !== accessor) {
-    throw new Error(`${operation.anchor} is not a matching audited ${member} ${accessor}`);
-  }
-  return anchor;
-}
-
-function nullableResource(shape, generation, context) {
-  const element = leanType(shape.element, generation, context);
-  if (!element.resource || !element.lean.startsWith("Lean.Vir.Js ")) {
-    throw new Error(`${context} nullable values require a JavaScript resource element`);
-  }
-  return {
-    lean: `Lean.Vir.Js.Nullable ${element.lean.slice("Lean.Vir.Js ".length)}`,
-    resource: true,
-  };
-}
-
-export function leanType(shape, generation, context = "TypeScript shape") {
-  if (shape?.kind === "primitive" && shape.name === "string") {
-    return { lean: "Lean.Vir.Js String", resource: true };
-  }
-  if (shape?.kind === "primitive" && shape.name === "void") {
-    return { lean: "Unit", resource: false };
-  }
-  if (shape?.kind === "option") return nullableResource(shape, generation, context);
-  if (shape?.kind === "ref" && nonemptyString(generation.resources[shape.id])) {
-    return { lean: `Lean.Vir.Js ${generation.resources[shape.id]}`, resource: true };
-  }
-  throw new Error(`${context} has unsupported faithful translation ${JSON.stringify(shape)}`);
-}
-
-function receiverArgument(member, anchor, generation) {
-  const receiver = anchor.portIntent?.receiver;
-  if (receiver === undefined) return [];
-  if (receiver !== "borrowed") {
-    throw new Error(`${anchor.id} has unsupported receiver policy ${JSON.stringify(receiver)}`);
-  }
-  const owner = member.slice(0, member.lastIndexOf("."));
-  const resource = generation.resources[owner];
-  if (!nonemptyString(resource)) {
-    throw new Error(`${anchor.id} has no Lean resource mapping for receiver ${owner}`);
-  }
-  const ownerName = owner.slice(owner.lastIndexOf(".") + 1);
-  const name = leanIdentifier(ownerName[0].toLowerCase() + ownerName.slice(1), `${anchor.id} receiver name`);
-  return [{ name, type: `Lean.Vir.Js ${resource}`, borrowed: true }];
-}
-
-function operationName(operation, namespace) {
-  const prefix = `${namespace}.`;
-  if (!operation.lean.startsWith(prefix)) {
-    throw new Error(`${operation.lean} is outside generated namespace ${namespace}`);
-  }
-  const relativeName = operation.lean.slice(prefix.length);
-  const separator = relativeName.lastIndexOf(".");
-  if (separator <= 0 || separator === relativeName.length - 1) {
-    throw new Error(`${operation.lean} must name a declaration in a nested namespace`);
-  }
-  const nestedNamespace = relativeName.slice(0, separator);
-  for (const part of nestedNamespace.split(".")) leanIdentifier(part, `${operation.lean} namespace`);
-  return {
-    namespace: nestedNamespace,
-    name: leanIdentifier(relativeName.slice(separator + 1), `${operation.lean} declaration`),
-  };
-}
-
 function renderSignature(name, args, effect, result, prefix) {
   const effectResult = result === "Unit" ? result : `(${result})`;
   if (args.length === 0) return `${prefix}${name} : ${effect} ${effectResult}`;
   return `${prefix}${name}\n${args.map((arg) =>
-    `    (${arg.name} : ${arg.borrowed ? "@& " : ""}${arg.type})`).join("\n")} :\n    ${effect} ${effectResult}`;
+    `    (${arg.name} : ${arg.modalities.passing === "borrowed" ? "@& " : ""}${arg.type})`).join("\n")} :\n    ${effect} ${effectResult}`;
 }
 
-function sourceReference(symbol) {
-  const source = symbol.source;
+function sourceReference(source) {
   if (!source?.url) return source?.path ?? "the configured TypeScript declarations";
   return `${source.url}#L${source.startLine}`;
 }
 
-function renderOperation(member, symbol, accessor, operation, anchor, generation) {
-  const shape = symbol.accessors?.[accessor];
-  if (shape === undefined) {
-    throw new Error(`${member} does not define a ${accessor} accessor type`);
-  }
-  const effect = generation.effects[anchor.portIntent.effect];
-  if (!nonemptyString(effect)) {
-    throw new Error(`${anchor.id} has no Lean effect mapping for ${anchor.portIntent.effect}`);
-  }
-  const receiver = receiverArgument(member, anchor, generation);
-  const propertyName = leanIdentifier(
-    member.slice(member.lastIndexOf(".") + 1),
-    `${member} setter argument`,
-  );
-  let args = receiver;
-  let result;
-  if (accessor === "get") {
-    result = leanType(shape, generation, `${member} getter`);
-    if (result.resource && anchor.portIntent.resultRepresentation !== "hostResource") {
-      throw new Error(`${anchor.id} must classify its resource result as hostResource`);
-    }
-  } else if (accessor === "set") {
-    const value = leanType(shape, generation, `${member} setter`);
-    const resourceArguments = anchor.portIntent.resourceArguments ?? [];
-    if (value.resource && !resourceArguments.includes(0)) {
-      throw new Error(`${anchor.id} must classify setter argument 0 as a resource`);
-    }
-    args = [...receiver, { name: propertyName, type: value.lean, borrowed: value.resource }];
-    result = { lean: "Unit", resource: false };
-  } else {
-    throw new Error(`${member} has unsupported accessor ${accessor}`);
-  }
-  const leanName = operationName(operation, generation.namespace);
-  const rawName = `${leanName.name}Js`;
+function modalityLabel(argument) {
+  const modalities = argument.modalities;
+  return `${argument.name} ${modalities.representation}/${modalities.passing}/${modalities.retention}`;
+}
+
+function operationModalities(operation, profile) {
+  const receiver = operation.receiver.kind === "global"
+    ? `receiver global (${operation.receiver.typescriptType})`
+    : modalityLabel(operation.receiver.argument);
+  const arguments_ = operation.arguments.map(modalityLabel);
+  const result = `result ${operation.result.modalities.representation}/${operation.result.modalities.ownership}`;
+  return `ABI profile \`${profile.id}\`: ${[receiver, ...arguments_, result].join("; ")}.`;
+}
+
+function renderOperation(operation, profile) {
+  const args = [
+    ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
+    ...operation.arguments,
+  ];
+  const rawName = `${operation.lean.name}Js`;
   const call = [rawName, ...args.map((arg) => arg.name)].join(" ");
-  const source = sourceReference(symbol);
-  const accessorLabel = accessor === "get" ? "getter" : "setter";
+  const source = sourceReference(operation.typescript.source);
+  const accessorLabel = operation.typescript.accessor === "get" ? "getter" : "setter";
   return {
-    namespace: leanName.namespace,
-    name: leanName.name,
-    text: `/--\nGenerated faithful JavaScript boundary for the TypeScript \`${member}\` ${accessorLabel}.\nSource: ${source}\n\nThis declaration is generated; edit the TypeScript source or binding configuration.\n-/\n@[vir_js "${operation.target}"]\n${renderSignature(rawName, args, effect, result.lean, "private opaque ")}\n\n/-- Faithful generated ${accessorLabel} binding for TypeScript \`${member}\`. -/\n${renderSignature(leanName.name, args, effect, result.lean, "def ")} :=\n  ${call}`,
+    namespace: operation.lean.namespace,
+    text: `/--\nGenerated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${accessorLabel}.\nSource: ${source}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit the TypeScript source or binding configuration.\n-/\n@[vir_js "${operation.host.target}"]\n${renderSignature(rawName, args, operation.effect.lean, operation.result.lean, "private opaque ")}\n\n/-- Faithful generated ${accessorLabel} binding for TypeScript \`${operation.typescript.member}\`. -/\n${renderSignature(operation.lean.name, args, operation.effect.lean, operation.result.lean, "def ")} :=\n  ${call}`,
   };
 }
 
-export function renderLeanBindings(config, generation, descriptorsByRoot) {
-  const mappings = new Map();
-  for (const root of config.roots) {
-    for (const mapping of root.mappings ?? []) {
-      if (!generation.members.includes(mapping.typescript)) continue;
-      if (mappings.has(mapping.typescript)) {
-        throw new Error(`generated member ${mapping.typescript} is mapped by more than one API group`);
-      }
-      mappings.set(mapping.typescript, { root, mapping });
-    }
-  }
-  const declarations = [];
-  for (const member of [...generation.members].sort()) {
-    const entry = mappings.get(member);
-    if (entry === undefined) throw new Error(`generated member ${member} has no reviewed mapping`);
-    if (entry.mapping.accessors === undefined) {
-      throw new Error(`${member} is not a property accessor mapping; method generation is not supported yet`);
-    }
-    const descriptor = descriptorsByRoot.get(entry.root.id);
-    const symbol = descriptor?.symbols.find((candidate) => candidate.id === member);
-    if (symbol?.kind !== "property") throw new Error(`${member} is not a TypeScript property`);
-    if (symbol.optional === true) {
-      throw new Error(`${member} is optional; optional property generation is not supported yet`);
-    }
-    for (const accessor of ["get", "set"]) {
-      const operation = entry.mapping.accessors[accessor];
-      const accessorType = symbol.accessors?.[accessor];
-      if (accessorType !== undefined && (operation === undefined || operation.missing === true)) {
-        throw new Error(`${member} ${accessor} is part of the TypeScript surface but has no generated binding`);
-      }
-      if (accessorType === undefined && operation !== undefined && operation.missing !== true) {
-        throw new Error(`${member} maps a ${accessor} operation absent from the TypeScript surface`);
-      }
-      if (operation === undefined || operation.missing === true) continue;
-      const anchor = anchorFor(entry.root, operation, member, accessor);
-      declarations.push(renderOperation(member, symbol, accessor, operation, anchor, generation));
-    }
-  }
+export function renderLeanOperations(generation, operations) {
+  const declarations = operations.map((operation) =>
+    renderOperation(operation, generation.abiProfile));
   const byNamespace = new Map();
   for (const declaration of declarations) {
     const entries = byNamespace.get(declaration.namespace) ?? [];
@@ -263,6 +145,23 @@ export function renderLeanBindings(config, generation, descriptorsByRoot) {
       `namespace ${namespace}\n\n${entries.join("\n\n")}\n\nend ${namespace}`)
     .join("\n\n");
   return `/-\nCopyright (c) 2026 Lean FRO LLC. All rights reserved.\nReleased under Apache 2.0 license as described in the file LICENSE.\nAuthor: Emilio J. Gallego Arias\n-/\n\n-- Generated by scripts/bindings/generate-lean-bindings.mjs. Do not edit.\n\n${imports}\n\nnamespace ${generation.namespace}\n\n${bodies}\n\nend ${generation.namespace}\n`;
+}
+
+export function renderLeanBindings(config, generation, descriptorsByRoot) {
+  return renderLeanOperations(
+    generation,
+    buildGeneratedOperations(config, generation, descriptorsByRoot),
+  );
+}
+
+function generatedPath(path, extension, label) {
+  const output = resolve(repositoryRoot, path);
+  const relativeOutput = relative(repositoryRoot, output);
+  if (relativeOutput.startsWith("../") || relativeOutput === ".." ||
+      !relativeOutput.endsWith(extension)) {
+    throw new Error(`${label} must be a ${extension} file inside the repository: ${path}`);
+  }
+  return output;
 }
 
 export async function generateLeanBindings(configPath) {
@@ -280,6 +179,7 @@ export async function generateLeanBindings(configPath) {
       files: upstream.declarations.map((file) => resolve(repositoryRoot, file)),
       anchors: null,
       anchorsData: { version: 1, anchors: root.anchors ?? [] },
+      bindingContext: null,
       symbols: new Set(upstream.roots),
       symbolFiles: [],
       sourceUrl: upstream.sourceUrl ?? null,
@@ -288,25 +188,29 @@ export async function generateLeanBindings(configPath) {
       dependencyPolicyData: upstream.dependencyPolicy ?? null,
     }));
   }
-  const output = resolve(repositoryRoot, generation.output);
-  const relativeOutput = relative(repositoryRoot, output);
-  if (relativeOutput.startsWith("../") || relativeOutput === ".." || !relativeOutput.endsWith(".lean")) {
-    throw new Error(`generated output must be a .lean file inside the repository: ${generation.output}`);
-  }
+  const operations = buildGeneratedOperations(config, generation, descriptorsByRoot);
+  const document = generatedOperationDocument(config, generation, operations);
   return {
-    output,
-    text: renderLeanBindings(config, generation, descriptorsByRoot),
+    output: generatedPath(generation.output, ".lean", "generated output"),
+    text: renderLeanOperations(generation, operations),
+    irOutput: generatedPath(generation.irOutput, ".json", "operation IR output"),
+    irText: `${JSON.stringify(document, null, 2)}\n`,
     members: generation.members.length,
+    operations: operations.length,
   };
 }
 
 export async function runTypeScriptToLeanCli(argv) {
   const options = parseArgs(argv);
   const generated = await generateLeanBindings(options.config);
-  const action = await emitGeneratedFile(generated.output, generated.text, {
+  const sourceAction = await emitGeneratedFile(generated.output, generated.text, {
     check: options.check,
     root: repositoryRoot,
     staleHint: `run npm run generate:lean-bindings`,
   });
-  console.log(`${action} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(options.config)})`);
+  const irAction = await emitGeneratedFile(generated.irOutput, generated.irText, {
+    root: repositoryRoot,
+  });
+  console.log(`${sourceAction} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(options.config)})`);
+  console.log(`${irAction} ${relative(repositoryRoot, generated.irOutput)} (${generated.operations} operations with modality provenance)`);
 }

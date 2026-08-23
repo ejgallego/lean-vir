@@ -148,6 +148,15 @@ assert.deepEqual(documentRoot?.coverage.summary, {
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
 assert.equal(documentTitle?.status, "compatible");
+const documentTitleGetter = documentRoot?.comparison.results.find(
+  (result) => result.id === "document.title.get",
+);
+assert.equal(documentTitleGetter?.modalityContract.profile, "browser-dom-faithful-v1");
+assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "global");
+assert.deepEqual(documentTitleGetter?.modalityContract.result.modalities, {
+  representation: "js-resource",
+  ownership: "owned",
+});
 assert.deepEqual(documentTitle?.mapping.targets, [
   "browser.document.getTitle",
   "browser.document.setTitle",
@@ -348,6 +357,8 @@ assert.match(app, /function accessorDisplay\(symbol,accessor\)/u);
 assert.match(style, /\.workspace/u);
 assert.match(app, /Reviewed type fidelity/u);
 assert.match(app, /Upstream TypeScript surface/u);
+assert.match(app, /Derived ABI modalities/u);
+assert.match(style, /\.modality-contract/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
 assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);

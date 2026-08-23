@@ -611,6 +611,7 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
     ...(anchor.portIntent ? { portIntent: anchor.portIntent } : {}),
+    ...(anchor.modalityContract ? { modalityContract: anchor.modalityContract } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
     ...(tsSymbol ? { tsSymbol } : {}),
   };

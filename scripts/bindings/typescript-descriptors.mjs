@@ -9,6 +9,7 @@ import { relative, resolve } from "node:path";
 
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
+import { materializeGeneratedAnchors } from "./binding-modalities.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
@@ -114,6 +115,7 @@ function parseArgs(argv) {
     dependencyDepth,
     dependencyPolicy,
     dependencyPolicyData: null,
+    bindingContext: null,
   };
 }
 
@@ -147,6 +149,7 @@ export async function generateDescriptorFile({
   dependencyDepth,
   dependencyPolicy,
   dependencyPolicyData,
+  bindingContext = null,
 }) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
@@ -193,8 +196,16 @@ export async function generateDescriptorFile({
   const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
-  const anchorData = anchorsData ??
+  const rawAnchorData = anchorsData ??
     (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
+  const anchorData = bindingContext === null
+    ? rawAnchorData
+    : materializeGeneratedAnchors(
+      bindingContext.config,
+      bindingContext.root,
+      { symbols: selectedSymbols },
+      rawAnchorData,
+    );
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -246,6 +257,7 @@ async function resolveBindingRoot(options) {
     sourceUrl: upstream.sourceUrl ?? null,
     dependencyDepth: upstream.dependencyDepth ?? 0,
     dependencyPolicyData: upstream.dependencyPolicy ?? null,
+    bindingContext: { config, root: binding },
   };
 }
 

@@ -6,9 +6,11 @@ source generator; it is not a complete type theory for TypeScript.
 
 The review layer remains useful for the unsupported surface: Codex (or a
 person) can propose policy, regenerate the real Lean manifest, and use stable
-diagnostic codes to decide what to revise. Once a mapping has explicit naming,
-effect, receiver, and ownership policy, the source generator can make its Lean
-type a deterministic function of the pinned TypeScript declaration.
+diagnostic codes to decide what to revise. For supported operations, the source
+generator makes the Lean declaration a deterministic function of the pinned
+TypeScript declaration, a named library ABI profile, and justified exceptions.
+The modality model and operation IR are specified in
+`BINDING_MODALITIES.md`.
 
 The exhaustive shipped-boundary gate and consolidated library explorer are
 documented in `SHIPPED_BINDINGS.md`. The gate proves that every compiled
@@ -50,9 +52,9 @@ itself assert a Lean policy.
 
 `Vir/Browser.bindings.json` contains the small amount of policy TypeScript
 cannot determine: the generated member set, Lean declaration and host-target
-names, global versus borrowed receivers, effects, resource ownership, and Lean
-names for resource marker types. It does not restate the selected TypeScript
-types.
+names, a named ABI profile, Lean names for resource marker types, and any
+justified semantic exceptions. It does not restate selected TypeScript types or
+repeat derived modalities in generated-member anchors.
 
 The initial shipped slice generates `Document.title`, `Element.innerHTML`, and
 `Element.textContent` into `Vir/Browser/Generated.lean`:
@@ -63,12 +65,15 @@ npm run check:lean-bindings
 ```
 
 Generation reads the pinned `lib.dom.d.ts` through the same descriptor code as
-the explorer. TypeScript `string` becomes a JavaScript string resource,
-nullable `string` becomes `Js.Nullable String`, and the reviewed ownership
-policy determines borrowed arguments. Unsupported shapes, missing ownership
-policy, mismatched anchors, and stale checked-in output are errors. The
-generated module is imported by `Vir.Browser`, so this is the shipped binding
-surface rather than a report fixture.
+the explorer. It first emits canonical operation IR under ignored
+`build/bindings/`, then renders the checked-in Lean source and projects the
+comparator intent from that same record. TypeScript `string` becomes a
+JavaScript string resource, nullable `string` becomes `Js.Nullable String`, and
+the ABI profile determines ordinary argument, receiver, result, and effect
+modalities. Unsupported shapes, unsafe lifetimes, unmatched exceptions,
+mismatched anchors, and stale checked-in output are errors. The generated
+module is imported by `Vir.Browser`, so this is the shipped binding surface
+rather than a report fixture.
 
 Convenience conversions are intentionally outside this generated faithful
 boundary. Callers may use `Lean.Vir.JsValue.ofString`,
@@ -180,6 +185,8 @@ is the primary human entry point.
 - `results[].notes`, short explanations for non-exact matches;
 - `results[].relation`, either `audit` or `coverageGap`;
 - `results[].portIntent`, when the anchor has reviewed binding intent;
+- `results[].modalityContract`, when generated operation IR supplied the
+  derived ABI modalities and their provenance;
 - `results[].diagnostics[]`, stable `code`, `severity`, and `message` values;
 - `results[].leanDescriptor` and `results[].tsSymbol`, when found.
 

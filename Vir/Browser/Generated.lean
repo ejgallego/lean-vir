@@ -15,6 +15,7 @@ namespace Document
 /--
 Generated faithful JavaScript boundary for the TypeScript `Document.title` getter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -28,6 +29,7 @@ def getTitle : DomM (Lean.Vir.Js String) :=
 /--
 Generated faithful JavaScript boundary for the TypeScript `Document.title` setter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); title js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -49,6 +51,7 @@ namespace Element
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` getter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -66,6 +69,7 @@ def getInnerHTML
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` setter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; innerHTML js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -85,6 +89,7 @@ def setInnerHTML
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.textContent` getter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -102,6 +107,7 @@ def getTextContent
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.textContent` setter.
 Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; textContent js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/

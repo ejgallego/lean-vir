@@ -36,9 +36,10 @@
     "generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["output", "imports", "namespace", "effects", "resources", "members"],
+      "required": ["output", "irOutput", "imports", "namespace", "abiProfile", "resources", "members"],
       "properties": {
         "output": { "type": "string", "minLength": 1 },
+        "irOutput": { "type": "string", "minLength": 1 },
         "imports": {
           "type": "array",
           "minItems": 1,
@@ -46,11 +47,7 @@
           "items": { "type": "string", "minLength": 1 }
         },
         "namespace": { "type": "string", "minLength": 1 },
-        "effects": {
-          "type": "object",
-          "minProperties": 1,
-          "additionalProperties": { "type": "string", "minLength": 1 }
-        },
+        "abiProfile": { "$ref": "#/$defs/abiProfile" },
         "resources": {
           "type": "object",
           "additionalProperties": { "type": "string", "minLength": 1 }
@@ -60,6 +57,132 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "exceptions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/generationException" }
+        }
+      }
+    },
+    "abiProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effect", "types", "resource", "receiver"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
+        },
+        "types": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lean", "representation"],
+            "properties": {
+              "lean": { "type": "string", "minLength": 1 },
+              "representation": { "enum": ["immediate", "js-resource"] }
+            }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["constructor", "nullableConstructor", "argument", "result"],
+          "properties": {
+            "constructor": { "type": "string", "minLength": 1 },
+            "nullableConstructor": { "type": "string", "minLength": 1 },
+            "argument": { "$ref": "#/$defs/passingRetention" },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ownership"],
+              "properties": { "ownership": { "enum": ["owned", "borrowed"] } }
+            }
+          }
+        },
+        "receiver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default", "globalTypes"],
+          "properties": {
+            "default": { "$ref": "#/$defs/passingRetention" },
+            "globalTypes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "passingRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passing", "retention"],
+      "properties": {
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "modalityOverride": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "receiverOverride": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["global", "argument"] },
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "generationException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "anyOf": [
+        { "required": ["receiver"] },
+        { "required": ["arguments"] },
+        { "required": ["result"] },
+        { "required": ["effect"] }
+      ],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "receiver": { "$ref": "#/$defs/receiverOverride" },
+        "arguments": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/modalityOverride" }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ownership"],
+          "properties": { "ownership": { "enum": ["owned", "borrowed"] } }
+        },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
         }
       }
     },

@@ -8,6 +8,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildGeneratedOperations,
+  materializeGeneratedAnchors,
+} from "../../scripts/bindings/binding-modalities.mjs";
+import {
   leanType,
   renderLeanBindings,
 } from "../../scripts/bindings/typescript-to-lean.mjs";
@@ -16,13 +20,34 @@ const stringShape = { kind: "primitive", name: "string" };
 const nullableStringShape = { kind: "option", element: stringShape };
 const generation = {
   output: "Vir/Demo/Generated.lean",
+  irOutput: "build/bindings/demo.generated-operations.json",
   imports: ["Vir.Demo.Types"],
   namespace: "Lean.Vir.Demo",
-  effects: { dom: "DomM" },
+  abiProfile: {
+    id: "demo-faithful-v1",
+    effect: { id: "dom", lean: "DomM" },
+    types: {
+      string: { lean: "String", representation: "js-resource" },
+      void: { lean: "Unit", representation: "immediate" },
+    },
+    resource: {
+      constructor: "Lean.Vir.Js",
+      nullableConstructor: "Lean.Vir.Js.Nullable",
+      argument: { passing: "borrowed", retention: "call" },
+      result: { ownership: "owned" },
+    },
+    receiver: {
+      default: { passing: "borrowed", retention: "call" },
+      globalTypes: [],
+    },
+  },
   resources: { Widget: "Widget" },
   members: ["Widget.label"],
+  exceptions: {},
 };
 const config = {
+  id: "demo",
+  generation,
   roots: [{
     id: "widget",
     mappings: [{
@@ -43,52 +68,99 @@ const config = {
     anchors: [
       {
         id: "widget.label.get",
+        lean: "Lean.Vir.Demo.Widget.getLabel",
         ts: "Widget.label",
         target: "demo.widget.getLabel",
         relation: "audit",
-        portIntent: {
-          disposition: "bind",
-          accessor: "get",
-          receiver: "borrowed",
-          effect: "dom",
-          resultRepresentation: "hostResource",
-        },
+        portIntent: { disposition: "bind", accessor: "get" },
       },
       {
         id: "widget.label.set",
+        lean: "Lean.Vir.Demo.Widget.setLabel",
         ts: "Widget.label",
         target: "demo.widget.setLabel",
         relation: "audit",
-        portIntent: {
-          disposition: "bind",
-          accessor: "set",
-          receiver: "borrowed",
-          effect: "dom",
-          resourceArguments: [0],
-        },
+        portIntent: { disposition: "bind", accessor: "set" },
       },
     ],
   }],
 };
-const descriptors = new Map([[
-  "widget",
-  {
-    symbols: [{
-      id: "Widget.label",
-      kind: "property",
-      source: { path: "demo.d.ts", startLine: 4 },
-      accessors: { get: stringShape, set: nullableStringShape },
-    }],
-  },
-]]);
+const descriptor = {
+  symbols: [{
+    id: "Widget.label",
+    kind: "property",
+    source: { path: "demo.d.ts", startLine: 4 },
+    accessors: { get: stringShape, set: nullableStringShape },
+  }],
+};
+const descriptors = new Map([["widget", descriptor]]);
 
-test("TypeScript property accessor types determine generated Lean declarations", () => {
+test("TypeScript property shapes and an ABI profile determine Lean declarations", () => {
   const output = renderLeanBindings(config, generation, descriptors);
 
   assert.match(output, /private opaque getLabelJs\n    \(widget : @& Lean\.Vir\.Js Widget\) :\n    DomM \(Lean\.Vir\.Js String\)/u);
   assert.match(output, /private opaque setLabelJs\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(label : @& Lean\.Vir\.Js\.Nullable String\) :\n    DomM Unit/u);
   assert.match(output, /@\[vir_js "demo\.widget\.getLabel"\]/u);
+  assert.match(output, /ABI profile `demo-faithful-v1`/u);
   assert.doesNotMatch(output, /\(label : @& String\)/u);
+});
+
+test("operation IR records derived modalities and their provenance", () => {
+  const operations = buildGeneratedOperations(config, generation, descriptors);
+  const getter = operations.find((operation) => operation.id === "widget.label.get");
+  const setter = operations.find((operation) => operation.id === "widget.label.set");
+
+  assert.deepEqual(getter.receiver.argument.modalities, {
+    representation: "js-resource",
+    passing: "borrowed",
+    retention: "call",
+  });
+  assert.deepEqual(getter.result.modalities, {
+    representation: "js-resource",
+    ownership: "owned",
+  });
+  assert.deepEqual(setter.arguments[0].modalities, {
+    representation: "js-resource",
+    passing: "borrowed",
+    retention: "call",
+  });
+  assert.equal(
+    setter.arguments[0].provenance.retention.source,
+    "generation.abiProfile.resource.argument.retention",
+  );
+  assert.deepEqual(setter.result.modalities, {
+    representation: "immediate",
+    ownership: "value",
+  });
+});
+
+test("generated anchors project comparator intent from operation IR", () => {
+  const root = config.roots[0];
+  const materialized = materializeGeneratedAnchors(
+    config,
+    root,
+    descriptor,
+    { version: 1, anchors: root.anchors },
+  );
+  const getter = materialized.anchors.find((anchor) => anchor.id === "widget.label.get");
+  const setter = materialized.anchors.find((anchor) => anchor.id === "widget.label.set");
+
+  assert.deepEqual(getter.portIntent, {
+    disposition: "bind",
+    accessor: "get",
+    effect: "dom",
+    receiver: "borrowed",
+    resultRepresentation: "hostResource",
+  });
+  assert.deepEqual(setter.portIntent, {
+    disposition: "bind",
+    accessor: "set",
+    effect: "dom",
+    receiver: "borrowed",
+    resourceArguments: [0],
+  });
+  assert.equal(getter.modalityContract.profile, "demo-faithful-v1");
+  assert.equal(getter.modalityContract.source, "generated-operation-ir");
 });
 
 test("unsupported TypeScript shapes fail closed", () => {
@@ -98,13 +170,41 @@ test("unsupported TypeScript shapes fail closed", () => {
   );
 });
 
-test("resource ownership policy is required", () => {
-  const withoutResourcePolicy = structuredClone(config);
-  delete withoutResourcePolicy.roots[0].anchors[1].portIntent.resourceArguments;
+test("exceptions cannot retain a borrowed resource beyond the call", () => {
+  const unsafeGeneration = structuredClone(generation);
+  unsafeGeneration.exceptions["widget.label.set"] = {
+    reason: "The host stores this value.",
+    arguments: { label: { retention: "runtime" } },
+  };
 
   assert.throws(
-    () => renderLeanBindings(withoutResourcePolicy, generation, descriptors),
-    /classify setter argument 0 as a resource/u,
+    () => renderLeanBindings(config, unsafeGeneration, descriptors),
+    /cannot retain a borrowed resource beyond the call/u,
+  );
+});
+
+test("exceptions must contain a concrete, justified override", () => {
+  const emptyException = structuredClone(generation);
+  emptyException.exceptions["widget.label.get"] = { reason: "No policy change." };
+
+  assert.throws(
+    () => renderLeanBindings(config, emptyException, descriptors),
+    /must define an override/u,
+  );
+});
+
+test("anchors cannot author modalities derived by generation", () => {
+  const authored = structuredClone(config);
+  authored.roots[0].anchors[0].portIntent.receiver = "borrowed";
+
+  assert.throws(
+    () => materializeGeneratedAnchors(
+      authored,
+      authored.roots[0],
+      descriptor,
+      { version: 1, anchors: authored.roots[0].anchors },
+    ),
+    /authors derived modality field portIntent\.receiver/u,
   );
 });
 

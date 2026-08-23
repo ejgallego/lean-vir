@@ -7,11 +7,30 @@
   "lean": { "modules": ["Vir.Browser", "Vir.Browser.Generated"] },
   "generation": {
     "output": "Vir/Browser/Generated.lean",
+    "irOutput": "build/bindings/browser.generated-operations.json",
     "imports": ["Vir.Browser.Types"],
     "namespace": "Lean.Vir.Browser",
-    "effects": { "dom": "DomM" },
+    "abiProfile": {
+      "id": "browser-dom-faithful-v1",
+      "effect": { "id": "dom", "lean": "DomM" },
+      "types": {
+        "string": { "lean": "String", "representation": "js-resource" },
+        "void": { "lean": "Unit", "representation": "immediate" }
+      },
+      "resource": {
+        "constructor": "Lean.Vir.Js",
+        "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": {
+        "default": { "passing": "borrowed", "retention": "call" },
+        "globalTypes": ["Document"]
+      }
+    },
     "resources": { "Element": "Element" },
-    "members": ["Document.title", "Element.innerHTML", "Element.textContent"]
+    "members": ["Document.title", "Element.innerHTML", "Element.textContent"],
+    "exceptions": {}
   },
   "roots": [
     {
@@ -62,7 +81,7 @@
           "ts": "Document.title",
           "target": "browser.document.getTitle",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get", "effect": "dom", "resultRepresentation": "hostResource" }
+          "portIntent": { "disposition": "bind", "accessor": "get" }
         },
         {
           "id": "document.title.set",
@@ -71,7 +90,7 @@
           "ts": "Document.title",
           "target": "browser.document.setTitle",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set", "effect": "dom", "resourceArguments": [0] }
+          "portIntent": { "disposition": "bind", "accessor": "set" }
         },
         {
           "id": "document.querySelector",
@@ -145,7 +164,7 @@
           "ts": "Element.innerHTML",
           "target": "browser.element.getInnerHTML",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get", "receiver": "borrowed", "effect": "dom", "resultRepresentation": "hostResource" }
+          "portIntent": { "disposition": "bind", "accessor": "get" }
         },
         {
           "id": "element.innerHTML.set",
@@ -154,7 +173,7 @@
           "ts": "Element.innerHTML",
           "target": "browser.element.setInnerHTML",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set", "receiver": "borrowed", "effect": "dom", "resourceArguments": [0] }
+          "portIntent": { "disposition": "bind", "accessor": "set" }
         },
         {
           "id": "element.textContent.get",
@@ -163,7 +182,7 @@
           "ts": "Element.textContent",
           "target": "browser.element.getTextContent",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get", "receiver": "borrowed", "effect": "dom", "resultRepresentation": "hostResource" }
+          "portIntent": { "disposition": "bind", "accessor": "get" }
         },
         {
           "id": "element.textContent.set",
@@ -172,7 +191,7 @@
           "ts": "Element.textContent",
           "target": "browser.element.setTextContent",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set", "receiver": "borrowed", "effect": "dom", "resourceArguments": [0] }
+          "portIntent": { "disposition": "bind", "accessor": "set" }
         }
       ]
     },

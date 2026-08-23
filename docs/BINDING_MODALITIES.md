@@ -1,0 +1,142 @@
+# Generated Binding Modalities
+
+The binding generator treats a shipped Lean declaration as a deterministic
+translation of three reviewed inputs:
+
+```text
+pinned TypeScript declaration
+  + library ABI profile
+  + named, justified exceptions
+  = canonical operation IR
+  = Lean source + comparator intent + explorer explanation
+```
+
+This keeps TypeScript as the authority for API shape while making the host ABI
+choices explicit and reusable. An anchor still identifies which TypeScript
+operation, Lean declaration, and host target correspond; it does not repeat the
+modalities derived by generation.
+
+## Separate Questions
+
+Every operation answers separate representation, passing, and lifetime
+questions. Combining these into a single “ownership” label hides important
+differences.
+
+| Axis | Examples | Meaning |
+| --- | --- | --- |
+| Representation | `immediate`, `js-resource` | How a TypeScript value crosses the Lean/JavaScript boundary. |
+| Argument passing | `value`, `borrowed`, `owned`, `consumed` | What the callee receives for this invocation. `value` applies to immediate values; the other modes apply to resources. |
+| Argument retention | `call`, `until-release`, `runtime` | How long the host may retain a resource. |
+| Result ownership | `value`, `owned`, `borrowed` | Whether a result is immediate or which side owns the returned resource. |
+| Effect | for example `dom` / `DomM` | Which Lean host-effect carrier wraps the result. |
+
+A borrowed resource cannot have retention beyond `call`. The generator rejects
+that combination instead of emitting a declaration whose lifetime cannot be
+supported by `@&`.
+
+## ABI Profile
+
+Each generated library has a named `generation.abiProfile` in its
+`Vir/*.bindings.json` configuration. The browser profile currently says:
+
+- TypeScript `string` is represented faithfully as `Lean.Vir.Js String`;
+- TypeScript `void` is represented as immediate `Unit`;
+- nullable resources use `Lean.Vir.Js.Nullable`;
+- ordinary resource arguments and instance receivers are borrowed for one
+  call;
+- resource results are owned;
+- operations run in `DomM`;
+- `Document` is a host-global receiver, while `Element` is an explicit
+  borrowed receiver.
+
+The profile is library policy, not user convenience policy. In particular, it
+does not turn JavaScript strings into Lean-owned `String` values. Applications
+can add conversions at their own API layer.
+
+The normal property rules are therefore mechanical:
+
+| TypeScript position | Generated rule |
+| --- | --- |
+| `string` argument | `@& Lean.Vir.Js String`, retained for the call |
+| `string` result | `Lean.Vir.Js String`, owned result |
+| `string \| null` argument | `@& Lean.Vir.Js.Nullable String`, retained for the call |
+| instance receiver | profiled resource marker with receiver passing/lifetime |
+| configured host-global receiver | no Lean receiver argument |
+| `void` result | `Unit` |
+
+Unsupported TypeScript shapes fail generation. They are not silently converted
+to opaque Lean types.
+
+## Canonical Operation IR
+
+`npm run generate:lean-bindings` first creates a canonical operation record for
+each selected accessor. It then renders all downstream views from that record.
+The ignored debugging artifact is:
+
+```text
+build/bindings/browser.generated-operations.json
+```
+
+Each operation records:
+
+- the TypeScript member, accessor shape, and source location;
+- the host target and Lean declaration name;
+- the effect;
+- global or argument receiver policy;
+- every argument's Lean type, representation, passing, and retention;
+- the result's Lean type, representation, and ownership;
+- provenance for every derived choice;
+- the reason for any explicit exception.
+
+The checked-in `Vir/Browser/Generated.lean` declarations are rendered from this
+IR. The descriptor generator also projects comparator-compatible `portIntent`
+fields from it. Comparison results retain the complete `modalityContract`, and
+the binding explorer shows that contract in an expandable panel. This avoids
+three independently authored versions of the same policy.
+
+## Exceptions
+
+`generation.exceptions` is keyed by operation/anchor id. An exception must have
+a non-empty `reason` and may override only the receiver, named arguments,
+result ownership, or effect. Unknown operation ids, unknown argument names,
+unsupported fields, unsafe borrowed lifetimes, and exceptions on immediate
+values are errors.
+
+Exceptions are intended for semantics that TypeScript declarations do not
+express, such as a host retaining a callback until explicit release. They are
+not a place to restate ordinary profile defaults. The operation IR marks every
+override and its reason, so review can distinguish inference from policy.
+
+## Authored And Generated Ownership
+
+Authored configuration owns:
+
+- the pinned declaration inputs and selected member set;
+- correspondence among TypeScript operations, Lean names, and host targets;
+- resource marker names and the named ABI profile;
+- documented semantic exceptions.
+
+Generation owns:
+
+- Lean parameter and result types;
+- `@&` placement;
+- receiver, argument, result, and effect modalities;
+- generated Lean declarations;
+- comparator modality intent and explorer explanations.
+
+For generated operations, authored anchors are rejected if they include
+`effect`, `receiver`, `resourceArguments`, or `resultRepresentation`, because
+those are projections of the operation IR.
+
+## Current Boundary And Next Extension
+
+The implemented slice covers required property getters and setters. It already
+drives the shipped `Document.title`, `Element.innerHTML`, and
+`Element.textContent` declarations.
+
+Method generation should extend the same operation IR rather than add a second
+path. The next slice needs deterministic overload selection, optional/default
+parameter rules, and callback representation. Callback retention is then a
+named exception or a more specific ABI profile rule. Unions, structural
+records, generics, and overloaded methods remain fail-closed until their
+translation rules are explicit and tested.
