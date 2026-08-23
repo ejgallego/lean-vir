@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -23,8 +23,9 @@ import {
   surfaceDefinition,
   targetCaptureFixture,
 } from "../surface/fixtures.mjs";
+import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 
-const root = resolve(import.meta.dirname, "../..");
+const root = repositoryRoot;
 const temporary = await mkdtemp(join(tmpdir(), "vir-surface-browser-"));
 let chromium = null;
 

@@ -675,7 +675,7 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   switch (lean.kind) {
     case "array":
     case "option":
-      return childComparison(compareShapes(lean.element, ts.element, tsSymbols, seen));
+      return compareShapes(lean.element, ts.element, tsSymbols, seen);
     case "tuple":
       return compareSequence(lean.elements, ts.elements, tsSymbols, seen, "tuple element");
     case "record":
@@ -834,10 +834,6 @@ function compareSequence(left, right, tsSymbols, seen, label) {
 function compareNames(left, right, label) {
   const diagnostics = nameDiffDiagnostics(left ?? [], right ?? [], label);
   return comparison(diagnostics.length === 0 ? "exact" : "weak", diagnostics);
-}
-
-function childComparison(result) {
-  return result;
 }
 
 function combineChildResults(results, diagnostics) {

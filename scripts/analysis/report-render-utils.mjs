@@ -7,13 +7,6 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export function scriptSafeJson(value) {
-  return JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll("\u2028", "\\u2028")
-    .replaceAll("\u2029", "\\u2029");
-}
-
 export async function stageStaticReportShell(templateDir, outputDir) {
   const entries = [
     ["index.html", "index.html"],

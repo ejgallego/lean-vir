@@ -9,9 +9,10 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryPath } from "../repository-paths.mjs";
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
-import { scriptSafeJson, stageStaticReportShell } from "./report-render-utils.mjs";
+import { stageStaticReportShell } from "./report-render-utils.mjs";
 import { validateSurfaceSizeLinks } from "./surface-report-schema.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 import {

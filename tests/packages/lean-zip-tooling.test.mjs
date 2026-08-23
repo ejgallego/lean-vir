@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -14,19 +13,8 @@ import {
   repositoryRoot,
 } from "../../scripts/repository-paths.mjs";
 
-test("Lean-zip browser catalog names a loadable repository producer", async () => {
-  const catalog = JSON.parse(
-    await readFile(
-      repositoryPath("benchmarks", "browser", "artifact-builds.json"),
-      "utf8",
-    ),
-  );
-  const entrypoint = catalog.builds["lean-zip"].components.vir.producer.entrypoint;
-  assert.equal(
-    entrypoint,
-    "scripts/packages/lean-zip/export-browser-package.mjs",
-  );
-
+test("Lean-zip browser exporter loads from its package owner", () => {
+  const entrypoint = "scripts/packages/lean-zip/export-browser-package.mjs";
   const result = spawnSync(process.execPath, [entrypoint, "--help"], {
     cwd: repositoryRoot,
     encoding: "utf8",

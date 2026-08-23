@@ -5,8 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { readBuildDatabase } from "../../benchmarks/browser/scripts/artifact-build-lib.mjs";
 import { discoverExampleCatalog } from "../../benchmarks/browser/scripts/example-catalog-lib.mjs";
@@ -14,9 +13,12 @@ import {
   activePagesDeployments,
   parsePagesDeployment,
 } from "../../benchmarks/browser/scripts/pages-deployment-lib.mjs";
+import {
+  repositoryPath,
+  repositoryRoot,
+} from "../../scripts/repository-paths.mjs";
 
-const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-const benchmarkRoot = join(root, "benchmarks/browser");
+const benchmarkRoot = repositoryPath("benchmarks", "browser");
 const requested = process.argv.slice(2);
 if (requested.some((argument) => ["--help", "-h"].includes(argument))) {
   console.log(`Usage: node tests/browser/benchmark-pages.mjs [EXAMPLE=VARIANT ...]
@@ -39,8 +41,8 @@ const deployments = requested.length
 function run(script, args) {
   const result = spawnSync(
     "npm",
-    ["--prefix", "benchmarks/browser", "run", script, "--", ...args],
-    { stdio: "inherit" },
+    ["--prefix", benchmarkRoot, "run", script, "--", ...args],
+    { cwd: repositoryRoot, stdio: "inherit" },
   );
   if ((result.status ?? 1) !== 0) {
     throw new Error(

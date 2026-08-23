@@ -7,9 +7,10 @@ Author: Emilio J. Gallego Arias
 import { readFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 
+import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryPath } from "../repository-paths.mjs";
 import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
-import { scriptSafeJson, stageStaticReportShell } from "./report-render-utils.mjs";
+import { stageStaticReportShell } from "./report-render-utils.mjs";
 import { classifySurfaceBoundary } from "./surface-boundary-family.mjs";
 import {
   compareText,

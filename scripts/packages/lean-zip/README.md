@@ -5,7 +5,9 @@ This directory owns VIR's Lean-zip-specific package workflows:
 - `acceptance.mjs` compares native and VIR behavior for an external Lean-zip
   checkout through the stable `npm run accept:lean-zip` command.
 - `export-browser-package.mjs` implements the browser benchmark catalog's
-  repository-owned `package-command` producer contract.
+  repository-owned `package-command` producer contract for the current
+  checkout. Catalog entry points remain relative to their pinned producer
+  revisions.
 - `browser-package-smoke.mjs` is copied into each exported package and verifies
   its runtime, `.irpkg`, compressed bytes, and raw-DEFLATE round trip.
 

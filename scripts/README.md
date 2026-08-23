@@ -26,7 +26,8 @@ The documentation owners are:
   helpers live under `benchmarks/harness/`.
 - Child-process wrappers live in `scripts/process-utils.mjs`; generic
   filesystem and executable lookup helpers live in `scripts/file-utils.mjs`.
-  Nested tooling resolves the checkout through `scripts/repository-paths.mjs`.
+  Script-safe JSON encoding lives in `scripts/json-utils.mjs`. Nested tooling
+  resolves the checkout through `scripts/repository-paths.mjs`.
 - IR package generation, decoding, browser-package configuration, and
   distributable artifact policy live under `scripts/packages/`; reuse
   `scripts/packages/irpkg-generator.mjs` instead of invoking

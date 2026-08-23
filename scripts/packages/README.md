@@ -15,5 +15,6 @@ SDK/local bundle layout and publication policy lives in `artifact-bundle.mjs`.
 
 Lean-zip external-client acceptance, browser source-package export, and the
 package-local smoke payload live together under `lean-zip/`. The benchmark
-catalog refers directly to that internal producer path; `npm run
+catalog entry point is resolved inside its exact immutable producer revision,
+so a path move takes effect there only when that source pin advances. `npm run
 accept:lean-zip` remains the stable maintainer command.

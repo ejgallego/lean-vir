@@ -10,10 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  scriptSafeJson,
-  stageStaticReportShell,
-} from "../../scripts/analysis/report-render-utils.mjs";
+import { scriptSafeJson } from "../../scripts/json-utils.mjs";
+import { stageStaticReportShell } from "../../scripts/analysis/report-render-utils.mjs";
 
 test("scriptSafeJson prevents inline script termination and preserves JSON data", () => {
   const value = {

@@ -45,6 +45,7 @@ import {
   readToolchainConfig,
   resolveBuildCheckoutPaths,
 } from "./toolchain-config-lib.mjs";
+import { readVirPackageFile } from "./vir-package-reader.mjs";
 
 const buildEnvironment = {
   ...process.env,
@@ -334,15 +335,9 @@ async function validateFiles(componentId, component, output) {
 }
 
 async function validateVir(component, output, resolvedCheckouts) {
-  const vir = checkoutFor(component, "producer", resolvedCheckouts);
   const workload = checkoutFor(component, "workload", resolvedCheckouts);
   const packagePath = join(output, component.artifact.workload.file);
-  const body = run(
-    process.execPath,
-    ["scripts/packages/inspect-irpkg.mjs", "--json", packagePath],
-    { cwd: vir, capture: true },
-  );
-  const inspected = JSON.parse(body);
+  const inspected = await readVirPackageFile(packagePath);
   const metadata = inspected.manifest?.metadata;
   if (
     inspected.package?.version !== component.artifact.workload.packageFormat ||

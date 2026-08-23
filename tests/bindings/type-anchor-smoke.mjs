@@ -13,8 +13,9 @@ import { join } from "node:path";
 
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 
-const root = new URL("../..", import.meta.url).pathname;
+const root = repositoryRoot;
 const tmp = await mkdtemp(join(tmpdir(), "lean-vir-type-anchors-"));
 
 try {
