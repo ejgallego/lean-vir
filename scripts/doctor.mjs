@@ -9,7 +9,12 @@ import { constants as fsConstants } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { defaultPackageFile, publicArtifactPath, wasmDevPublicFile, wasmPublicFile } from "./browser-package-config.mjs";
+import {
+  defaultPackageFile,
+  publicArtifactPath,
+  wasmDevPublicFile,
+  wasmPublicFile,
+} from "./packages/browser-package-config.mjs";
 import { findChromiumExecutable, pathExists } from "./file-utils.mjs";
 
 const checks = [];

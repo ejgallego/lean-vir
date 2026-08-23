@@ -16,11 +16,12 @@ import {
   prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-} from "../../scripts/irpkg-generator.mjs";
+} from "../../scripts/packages/irpkg-generator.mjs";
+import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceTypeDescriptor,
@@ -165,7 +166,7 @@ export function generateIrPackage(source, packagePath) {
   ensureVirIrpkgBuilt();
   const generated = spawnSync(
     "node",
-    ["scripts/lean-to-irpkg.mjs", source, packagePath],
+    ["scripts/packages/lean-to-irpkg.mjs", source, packagePath],
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
@@ -207,7 +208,7 @@ export function runVirIrpkg(args) {
 
 function preparedVirIrpkg() {
   if (cachedVirIrpkg !== null) return cachedVirIrpkg;
-  const generator = prepareVirIrpkgSync(new URL("../..", import.meta.url));
+  const generator = prepareVirIrpkgSync(repositoryRootUrl);
   assert.equal(generator.ok, true, irpkgGeneratorFailureMessage(generator));
   cachedVirIrpkg = generator;
   return cachedVirIrpkg;
@@ -240,8 +241,8 @@ async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, p
   const generated = spawnSync(
     "node",
     roots === null
-      ? ["scripts/lean-to-irpkg.mjs", source, packagePath]
-      : ["scripts/lean-to-irpkg.mjs", source, packagePath, ...roots],
+      ? ["scripts/packages/lean-to-irpkg.mjs", source, packagePath]
+      : ["scripts/packages/lean-to-irpkg.mjs", source, packagePath, ...roots],
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.notEqual(generated.status, 0, `${source} unexpectedly generated successfully`);

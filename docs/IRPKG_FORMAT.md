@@ -94,7 +94,7 @@ when the package state is cleared.
 
 Package `Name` tags and IR declaration payload tag values live in
 `Vir/GeneratePackage/PackageIRTags.lean`. The mapping in
-`scripts/ir-codec-tags.mjs` generates
+`scripts/native/ir-codec-tags.mjs` generates
 `build/generated/wasm/package/package_ir_tags.h`. Name encoding is shared by the
 declaration, initializer-global, host-import, and export-summary sections; the
 other generated tag groups are specific to IR declarations.

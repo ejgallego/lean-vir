@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- Binding explorer template; data is injected by scripts/bindings/generate-binding-explorer.mjs. -->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Lean VIR binding explorer</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body><main>
+  <header><div><div class="eyebrow">Lean VIR · runtime coverage and API fidelity</div><h1>Binding explorer</h1><p class="lede">Every configured TypeScript API group is fully indexed before display. Automatic correspondence candidates are review leads; only reviewed mappings receive type-fidelity verdicts.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
+  <section class="metrics">
+    <article class="metric good"><strong id="provided-metric"></strong><span>runtime targets provided</span></article>
+    <article class="metric"><strong id="surface-metric"></strong><span>TypeScript surfaces fully indexed</span></article>
+    <article class="metric" id="findings-card"><strong id="findings-metric"></strong><span>member/type findings</span></article>
+    <article class="metric" id="automatic-card"><strong id="automatic-metric"></strong><span>automatic analyses need review</span></article>
+  </section>
+  <div class="scope" id="scope"></div>
+  <section class="workspace">
+    <div class="left">
+      <div class="view-tabs"><button class="view-tab" id="groups-view" type="button">Upstream libraries</button><button class="view-tab" id="public-view" type="button">Public Lean API</button><button class="view-tab" id="targets-view" type="button">Host targets</button></div>
+      <div class="toolbar"><input id="search" type="search" placeholder="Search library, API group, target, type…" aria-label="Search bindings"><select id="analysis"><option value="all">All analysis states</option><option value="complete">Complete surface analysis</option><option value="automatic">Automatic analysis · review needed</option><option value="in-progress">Analysis in progress</option><option value="curated">Curated comparison only</option><option value="needs-input">Upstream contract needs input</option><option value="not-run">Upstream analysis not run</option><option value="not-applicable">No upstream contract</option></select></div>
+      <div class="filters"><select id="library"><option value="all">All libraries</option></select><select id="issue"><option value="all">All findings</option><option value="error">Errors</option><option value="warning">Type warnings</option><option value="gap">Coverage gaps</option><option value="none">No findings</option></select></div>
+      <div class="result-head" id="count"></div><div id="results"></div>
+    </div>
+    <article class="detail" id="detail"></article>
+  </section>
+</main>
+<script id="report-data" type="application/json">__VIR_BINDING_REPORT__</script>
+<script src="assets/app.js"></script>
+</body>
+</html>

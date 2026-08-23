@@ -15,7 +15,7 @@ import {
   SURFACE_SIZE_LINKS_FORMAT,
   validateSurfaceReport,
   validateSurfaceSizeLinks,
-} from "../../scripts/surface-report-schema.mjs";
+} from "../../scripts/analysis/surface-report-schema.mjs";
 import {
   emptySurfaceReportV3,
   nativeExternFixture,

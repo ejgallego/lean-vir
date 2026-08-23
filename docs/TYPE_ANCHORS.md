@@ -25,9 +25,9 @@ compiler API:
 npm run generate:type-descriptors
 ```
 
-The generator reads `docs/type-descriptors/vir-v1.types.d.ts`, merges the
+The generator reads `fixtures/type-anchors/vir-v1.types.d.ts`, merges the
 manual Lean-to-TypeScript links from
-`docs/type-descriptors/vir-v1.anchors.json`, and writes
+`fixtures/type-anchors/vir-v1.anchors.json`, and writes
 `build/type-descriptors/vir-v1.json`.
 
 Each generated symbol records:
@@ -50,7 +50,7 @@ npm run compare:type-anchors
 ```
 
 For normal package work, pass a real `.irpkg` with
-`scripts/check-type-anchors.mjs --irpkg <package.irpkg>`. The local
+`scripts/bindings/check-type-anchors.mjs --irpkg <package.irpkg>`. The local
 `build/type-descriptors/vir-v1.manifest.json` fixture is generated from
 `vir-v1.fixture.lean` through the real package generator. The manifest,
 intermediate `.irpkg`, and generator report all stay under ignored `build/`
@@ -113,7 +113,7 @@ outputs directly.
 
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
-| Core fixture | `docs/type-descriptors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
+| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
 | React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 

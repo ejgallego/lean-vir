@@ -10,12 +10,12 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `Vir.GeneratePackage.run`.
 - `tools/AnalyzeSurface.lean` scans installed Lean library IR against VIR's
   runtime capabilities; it does not generate a package.
-- `scripts/render-surface-report.mjs` turns a surface JSON report into a static,
-  lazily loaded HTML module browser.
+- `scripts/analysis/render-surface-report.mjs` turns a surface JSON report into
+  a static, lazily loaded HTML module browser.
 - `Vir/GeneratePackage.lean` is the public import shim for the split library.
 - `.lake/build/bin/vir_irpkg` is the Lake executable used by
-  `scripts/lean-to-irpkg.mjs`, `scripts/generate-browser-package.mjs`, and the
-  fixture runner.
+  `scripts/packages/lean-to-irpkg.mjs`,
+  `scripts/packages/generate-browser-package.mjs`, and the fixture runner.
 
 Targets have one of five modes:
 
@@ -47,8 +47,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   and current package/interface-manifest version constants used by generated
   bytes and metadata.
 - `Vir.GeneratePackage.PackageIRTags`: source of truth for package `Name` and
-  declaration-IR wire tag values. `scripts/ir-codec-tags.mjs` maps them to C++
-  enum names and reserved slots.
+  declaration-IR wire tag values. `scripts/native/ir-codec-tags.mjs` maps them
+  to C++ enum names and reserved slots.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures and attribute-time marker
   validation.
@@ -227,13 +227,13 @@ Version constants are intentionally small and explicit:
 - `Vir.GeneratePackage.PackageFormat` owns the Lean generator's binary package,
   interface manifest, and package-set descriptor versions, plus the package-set
   format identifier.
-- `scripts/package-versions.mjs` owns the JavaScript-side expectations for
-  package format, interface manifest, and runtime ABI versions.
+- `scripts/packages/package-versions.mjs` owns the JavaScript-side expectations
+  for package format, interface manifest, and runtime ABI versions.
 - `npm run check:package-abi` verifies package magic, package-set descriptor
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.
 - `Vir/GeneratePackage/PackageIRTags.lean` owns the format-10 package `Name`
-  and declaration-IR tag assignments; `scripts/ir-codec-tags.mjs` maps the
+  and declaration-IR tag assignments; `scripts/native/ir-codec-tags.mjs` maps the
   C++ enum structure. `npm run check:ir-codec-tags` verifies the assignments
   and that the emitter/decoder use every non-reserved tag.
 

@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { resolve } from "node:path";
 
 import { sha256 } from "./bench-utils.mjs";
-import { IR_PACKAGE_SECTION } from "../../scripts/irpkg-format.mjs";
+import { IR_PACKAGE_SECTION } from "../../scripts/packages/irpkg-format.mjs";
 import { runSync } from "../../scripts/process-utils.mjs";
 
 // Keep this conservative and explicit: every shared local module loaded by an
@@ -19,9 +19,9 @@ const environmentLookupSharedHarnessPaths = [
   "benchmarks/harness/bench-differential.mjs",
   "benchmarks/harness/bench-env-lookup-contract.mjs",
   "benchmarks/harness/bench-utils.mjs",
-  "scripts/browser-package-config.mjs",
-  "scripts/irpkg-format.mjs",
-  "scripts/package-versions.mjs",
+  "scripts/packages/browser-package-config.mjs",
+  "scripts/packages/irpkg-format.mjs",
+  "scripts/packages/package-versions.mjs",
   "scripts/process-utils.mjs",
   "web/src/host-resource.js",
   "web/src/host/vir-host-resources.js",

@@ -145,8 +145,11 @@ other initial adapters use producer entry points that already exist:
 
 The builder validates package metadata against the catalog, verifies producer
 checksums, and copies only the declared regular files into the seed. It does not
-rewrite producer bytes. FIR LLVM depends on FIR native because its producer
-validates exact output equivalence against that package.
+rewrite producer bytes. VIR metadata admission uses the application's own
+read-only package reader rather than a command from the producer checkout, so
+producer script reorganizations cannot change validation. FIR LLVM depends on
+FIR native because its producer validates exact output equivalence against that
+package.
 
 Client repositories that need their own Lake environment or assemble more than
 one source-owned file use the generic `package-command` adapter. Its executable
@@ -166,6 +169,10 @@ checks the sums, admits only declared regular files, and re-verifies every Git
 checkout before writing the source-build receipt. This is the escape hatch for
 repository-owned compilation context, not a place for application-specific
 staging logic.
+
+Entry-point paths are relative to the named producer's exact source revision:
+moving a script in the current repository does not change an existing catalog
+entry until its source revision advances with the path.
 
 The generated `_artifacts/builds/<build-id>/BUILD.json` is a portable receipt.
 It records both the build-catalog and example-manifest digests, resolved source

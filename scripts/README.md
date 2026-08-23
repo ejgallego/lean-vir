@@ -17,33 +17,46 @@ The documentation owners are:
 
 ## Implementation Ownership
 
+- Root-level scripts are reserved for repository-wide setup, build, doctor,
+  mailbox, pull-request, and shared utility responsibilities. Subsystem-specific
+  implementations live under their owner directory instead.
 - Runtime, browser, upstream, surface, and integration checks live under
   `tests/`; test-only shared helpers live under `tests/support/`.
 - Benchmark campaigns and their sampling, scheduling, reporting, and cache
   helpers live under `benchmarks/harness/`.
-- Child-process wrappers live in `scripts/process-utils.mjs`; filesystem,
-  artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
-- IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
-  instead of invoking `lean --run tools/GeneratePackage.lean`.
+- Child-process wrappers live in `scripts/process-utils.mjs`; generic
+  filesystem and executable lookup helpers live in `scripts/file-utils.mjs`.
+  Script-safe JSON encoding lives in `scripts/json-utils.mjs`. Nested tooling
+  resolves the checkout through `scripts/repository-paths.mjs`.
+- IR package generation, decoding, browser-package configuration, and
+  distributable artifact policy live under `scripts/packages/`; reuse
+  `scripts/packages/irpkg-generator.mjs` instead of invoking
+  `lean --run tools/GeneratePackage.lean`.
+- Surface analysis, frontier-size measurement, Wasm attribution, and static
+  report generation live under `scripts/analysis/`; maintained presentation
+  assets remain under `web/tools/` and focused coverage under `tests/surface/`.
 - Shipped JavaScript binding inventory and report generation live in
   `tools/ExportVirJsInventory.lean` and
-  `scripts/generate-shipped-bindings-report.mjs`. The compiler inventory also
-  records every public executable declaration that transitively reaches a host
-  target, including the exact IR declaration path.
+  `scripts/bindings/generate-shipped-bindings-report.mjs`. The compiler
+  inventory also records every public executable declaration that transitively
+  reaches a host target, including the exact IR declaration path.
 - The consolidated binding explorer uses the colocated `Vir/*.bindings.json`
-  manifests and `scripts/generate-binding-explorer.mjs`; run
+  manifests and `scripts/bindings/generate-binding-explorer.mjs`; run
   `npm run generate:bindings` to refresh it and `npm run check:bindings` to
   validate all layers. Reproducible explorer and descriptor outputs live under
   ignored `build/bindings/` and `build/type-descriptors/` paths.
-- Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
-- IR declaration payload tag values live in
-  `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in
-  `scripts/ir-codec-tags.mjs` and `scripts/check-ir-codec-tags.mjs`.
-- Object ABI linker flags live in `scripts/object-abi-linker-flags.mjs`, which
-  consumes the shared runtime export-name manifest.
+- Binding and type-anchor implementations share their narrow CLI/output helpers
+  under `scripts/bindings/`; their smoke coverage lives under `tests/bindings/`,
+  authored comparison fixtures under `fixtures/type-anchors/`, and static
+  explorer assets under `web/tools/binding-explorer/`.
+- Native registry generation, wrapper inspection, declaration-IR tag mapping,
+  demo host-import inventory, and object ABI linker flags live under
+  `scripts/native/`; focused contracts live under `tests/native/` and
+  implementation sources remain under `wasm/upstream_shim/`.
 - Canonical browser package metadata lives in `fixtures/browser-packages.json`;
-  `scripts/browser-package-config.mjs` exposes its validated derived values to
-  Node tooling. Reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
+  `scripts/packages/browser-package-config.mjs` exposes its validated derived
+  values to Node tooling. Reusable SDK payload and artifact-bundle policy live
+  beside it under `scripts/packages/`.
 
 Call a lower-level script directly only when debugging that implementation or
 when a maintainer requests a narrow command.

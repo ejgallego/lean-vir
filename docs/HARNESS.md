@@ -126,6 +126,8 @@ npm run build:frontier-size-site
 npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
+npm run check:package
+npm run check:package-abi
 npm run generate:ir-codec-tags
 npm run check:bindings
 npm run check:ir-codec-tags
@@ -153,14 +155,19 @@ npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
 npm run inspect:native-wrappers
 npm run size:wasm
-node tests/fixture-runner.mjs --help
+node tests/fixtures/runner.mjs --help
 ```
 
 Tests:
 
 ```bash
+npm run test:mailbox
+npm run test:packages:unit
+npm run test:bindings:unit
+npm run test:fixtures:unit
 npm run test:tutorials
 npm run test:bench
+npm run test:native:unit
 npm run test:surface
 npm run test:surface:browser
 npm run test:package-ir-builders
@@ -189,15 +196,13 @@ compression results byte for byte, and independently inflates them. Add
 `--passes 1` for a shorter diagnostic run or `--profile` for attribution only;
 neither mode is stable performance evidence.
 
-`npm test` elaborates the copyable tutorials, then runs the artifact-cache,
-benchmark sampler, focused-identity, and paired-runner contract tests, package
-ABI and IR object-layout checks, IR codec tag consistency check, native extern
-metadata check, boundary registry check, native wrapper check, API coverage
-docs check, and Wasm extension probes. It then builds the demo artifacts once
-and reuses them for a paired-runner
+`npm test` begins with the mailbox, package, native-registry, fixture, tutorial,
+benchmark, and surface contract suites. It then runs package ABI, declaration
+IR, native-boundary, API-coverage, binding, Lake, and Wasm integration checks.
+Finally, it builds the demo artifacts and reuses them for a paired-runner
 control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
 tests, and the fixture suite. It is the default pre-merge signal for code
-changes.
+changes; `package.json` remains the exact command-order source of truth.
 
 ## Smallest Useful Check
 
@@ -419,15 +424,32 @@ workflow live in `docs/PERFORMANCE.md`.
 Keep focused checks and shared helpers in the split modules instead of copying
 logic into entry-point scripts or pages:
 
-- Runtime smoke tests: `tests/runtime/*.mjs`
+- Runtime smoke tests and host-engine Wasm probes: `tests/runtime/*.mjs`
 - Browser smoke cases and page suites: `tests/browser/*.mjs`
+- Fixture runner and pure contracts: `tests/fixtures/`; authored inputs:
+  `fixtures/`; shared test-only support: `tests/support/`
 - Process helpers: `scripts/process-utils.mjs`
 - Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and
   `benchmarks/harness/bench-utils.mjs`
-- Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
+- Filesystem and executable lookup helpers: `scripts/file-utils.mjs`
+- Repository-root resolution shared by nested tooling:
+  `scripts/repository-paths.mjs`
 - Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
-  `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`
-- IR package generator setup: `scripts/irpkg-generator.mjs`
+  `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`; focused contracts:
+  `tests/mailbox/`
+- IR package, browser-package, and artifact tooling: `scripts/packages/`;
+  shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`;
+  focused and Lake integration checks: `tests/packages/`
+- Lean-zip acceptance and browser source-package producer:
+  `scripts/packages/lean-zip/`
+- Package-tooling contracts: `npm run test:packages:unit`
+- Native registry, wrapper, codec-tag, host-import, and ABI tooling:
+  `scripts/native/`; pure registry contracts: `npm run test:native:unit`
+- Surface, frontier-size, Wasm attribution, and report-rendering tooling:
+  `scripts/analysis/`; focused coverage: `tests/surface/`
+- Binding inventory, descriptor, comparison, and explorer tooling:
+  `scripts/bindings/`; focused coverage: `tests/bindings/`
+- Infoview widget smoke coverage: `tests/infoview/`
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
 - Host resource and virtual binding internals:

@@ -8,6 +8,7 @@ import test from "node:test";
 import { launchBenchmarkBrowser } from "../scripts/browser-utils.mjs";
 import { appRoot } from "../scripts/package-root.mjs";
 import { runSync } from "../scripts/process-utils.mjs";
+import { readVirPackageInfo } from "../scripts/vir-package-reader.mjs";
 import {
   exactObject,
   identifier,
@@ -32,6 +33,21 @@ test("configuration validators share identifier and exact-object semantics", () 
   assert.throws(
     () => exactObject({ value: 1, typo: true }, ["value"], "config"),
     /config has unknown property typo/,
+  );
+});
+
+test("VIR package admission reads metadata without producer tooling", () => {
+  const manifest = {
+    version: 7,
+    metadata: { leanVersion: "4.33.0", leanGithash: "abc" },
+    exports: [{ entry: "Demo.run" }],
+  };
+  const inspected = readVirPackageInfo(virPackageBytes(10, manifest));
+  assert.equal(inspected.package.version, 10);
+  assert.deepEqual(inspected.manifest, manifest);
+  assert.throws(
+    () => readVirPackageInfo(virPackageBytes(10, manifest).subarray(0, -1)),
+    /exceeds package byte length/,
   );
 });
 
@@ -147,3 +163,36 @@ test("explicit Chromium paths are never silently replaced", async () => {
     else process.env.CHROMIUM = previous;
   }
 });
+
+function virPackageBytes(version, manifest) {
+  const encoder = new TextEncoder();
+  const magic = encoder.encode("lean-vir-ir-package");
+  const manifestBytes = encoder.encode(JSON.stringify(manifest));
+  const sectionCount = 5;
+  const headerBytes = 4 + magic.byteLength + 8 + 4 + sectionCount * 12;
+  const manifestSectionBytes = 4 + manifestBytes.byteLength;
+  const bytes = new Uint8Array(headerBytes + manifestSectionBytes);
+  writeU32(bytes, 0, magic.byteLength);
+  bytes.set(magic, 4);
+  let offset = 4 + magic.byteLength;
+  writeU32(bytes, offset, version);
+  writeU32(bytes, offset + 4, 1);
+  writeU32(bytes, offset + 8, sectionCount);
+  offset += 12;
+  for (let kind = 1; kind <= sectionCount; kind += 1) {
+    writeU32(bytes, offset, kind);
+    writeU32(bytes, offset + 4, headerBytes);
+    writeU32(bytes, offset + 8, kind === 5 ? manifestSectionBytes : 0);
+    offset += 12;
+  }
+  writeU32(bytes, headerBytes, manifestBytes.byteLength);
+  bytes.set(manifestBytes, headerBytes + 4);
+  return bytes;
+}
+
+function writeU32(bytes, offset, value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+  bytes[offset + 2] = (value >>> 16) & 0xff;
+  bytes[offset + 3] = (value >>> 24) & 0xff;
+}

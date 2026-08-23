@@ -1,5 +1,5 @@
 {
-  "$schema": "../scripts/binding-library.schema.json",
+  "$schema": "./bindings.schema.json",
   "version": 1,
   "id": "javascript",
   "title": "JavaScript values",

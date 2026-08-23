@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../../scripts/package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../../scripts/packages/package-versions.mjs";
 import {
   assert,
   assertManifestTypeDescriptorsRoundTrip,
@@ -76,7 +76,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshUInt64Bump._boxed"));
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshFloatScale._boxed"));
 
-  const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
+  const freshInspect = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", "--json", freshPackage], {
     encoding: "utf8",
   });
   assert.equal(freshInspect.status, 0, freshInspect.stderr || freshInspect.stdout);
@@ -90,7 +90,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   await writeRuntimeFixture(aliasSource, "AliasEdges.lean");
   const aliasGenerated = runVirIrpkg([aliasPackage, aliasReport, "--target-all", aliasSource]);
   assert.equal(aliasGenerated.status, 0, aliasGenerated.stderr || aliasGenerated.stdout);
-  const aliasInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", aliasPackage], {
+  const aliasInspect = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", "--json", aliasPackage], {
     encoding: "utf8",
   });
   assert.equal(aliasInspect.status, 0, aliasInspect.stderr || aliasInspect.stdout);

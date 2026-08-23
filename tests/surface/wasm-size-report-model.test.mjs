@@ -16,7 +16,7 @@ import {
   connectSurfaceLinks,
   countKind,
   indexSurfaceLinks,
-} from "../../scripts/wasm-size-report/model.mjs";
+} from "../../scripts/analysis/wasm-size-report/model.mjs";
 
 test("binary and section models retain sizes and account for framing bytes", () => {
   const report = {

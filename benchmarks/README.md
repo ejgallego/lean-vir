@@ -10,4 +10,5 @@ This directory owns performance campaigns and the tooling that runs them.
 
 Use the stable `npm run bench*` commands from the repository root. Focused
 contract tests for the repository harness live in `tests/benchmarks/`; generic
-build and package helpers remain under `scripts/`.
+build helpers remain under `scripts/`, while shared package models live under
+`scripts/packages/`.

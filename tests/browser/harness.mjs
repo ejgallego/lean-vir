@@ -13,9 +13,9 @@ import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { generatedPublicFiles } from "../../scripts/browser-package-config.mjs";
+import { generatedPublicFiles } from "../../scripts/packages/browser-package-config.mjs";
 import { pathExists, requireChromiumExecutable } from "../../scripts/file-utils.mjs";
-import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
+import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
 
 export const distRoot = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";

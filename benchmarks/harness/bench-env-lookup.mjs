@@ -23,7 +23,7 @@ import {
   publicArtifactPath,
   wasmDevPublicFile,
   wasmPublicFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
   formatMs,
@@ -34,12 +34,13 @@ import {
   sha256,
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
-import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
+import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
 import { runSync } from "../../scripts/process-utils.mjs";
+import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
 import { effectiveWasmBuildIdentity } from "../../scripts/wasm-build-identity.mjs";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
-const root = new URL("../..", import.meta.url);
+const root = repositoryRootUrl;
 const benchmarkEntryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));

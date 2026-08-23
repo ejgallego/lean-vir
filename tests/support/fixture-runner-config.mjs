@@ -11,7 +11,7 @@ export function parseFixtureRunnerConfig({ argv = [], env = {}, parallelism = 1 
   if (!showHelp) {
     for (const arg of argv) {
       if (arg !== "--no-build") {
-        throw new Error(`unknown argument: ${arg}; run node tests/fixture-runner.mjs --help`);
+        throw new Error(`unknown argument: ${arg}; run node tests/fixtures/runner.mjs --help`);
       }
     }
   }

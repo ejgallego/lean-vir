@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const docPath = path.join(root, "docs/API_COVERAGE.md");
-const tsvPath = path.join(root, "build/analysis/api-coverage.tsv");
+import { repositoryPath } from "./repository-paths.mjs";
+
+const docPath = repositoryPath("docs", "API_COVERAGE.md");
+const tsvPath = repositoryPath("build", "analysis", "api-coverage.tsv");
 
 const expectedColumns = [
   "id",
@@ -130,7 +130,7 @@ const rows = lines.slice(1).map((line, index) => {
 });
 
 if (args.has("--write")) {
-  await mkdir(path.dirname(tsvPath), { recursive: true });
+  await mkdir(dirname(tsvPath), { recursive: true });
   await writeFile(tsvPath, canonicalTsv);
   console.log(`wrote build/analysis/api-coverage.tsv from ${rows.length} docs rows`);
 } else {

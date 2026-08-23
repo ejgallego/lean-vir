@@ -17,7 +17,7 @@ import {
   prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
   formatMs,
@@ -35,13 +35,14 @@ import {
   ensureVirtualElementState,
 } from "../../web/src/vir-runtime-node.js";
 import { runSync } from "../../scripts/process-utils.mjs";
+import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
 import {
   balancedStdFormatAppend,
   stdFormat,
   taggedStdFormatChunks,
 } from "../../fixtures/js/std-format-values.mjs";
 
-const root = new URL("../..", import.meta.url);
+const root = repositoryRootUrl;
 
 const fibInput = 17;
 const fibIterations = 80;

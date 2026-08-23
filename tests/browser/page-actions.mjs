@@ -12,7 +12,7 @@ import {
   navigate,
   waitForReady,
 } from "./harness.mjs";
-import { hostPackageFile } from "../../scripts/browser-package-config.mjs";
+import { hostPackageFile } from "../../scripts/packages/browser-package-config.mjs";
 import { createDomTargetScript, inputValueHelperScript } from "./dom-scripts.mjs";
 import { runnerCaseFromManifest, runSelectedEntry } from "./dev-runner.mjs";
 

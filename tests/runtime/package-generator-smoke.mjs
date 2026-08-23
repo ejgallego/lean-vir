@@ -89,7 +89,7 @@ try {
 
   const inspectedEvalSource = spawnSync(
     "node",
-    ["scripts/inspect-irpkg.mjs", "--json", evalPackage],
+    ["scripts/packages/inspect-irpkg.mjs", "--json", evalPackage],
     { encoding: "utf8" },
   );
   assert.equal(
@@ -156,7 +156,7 @@ try {
   assert.equal(generatedMarked.status, 0, generatedMarked.stderr || generatedMarked.stdout);
   const inspectedMarked = spawnSync(
     "node",
-    ["scripts/inspect-irpkg.mjs", "--json", markedPackage],
+    ["scripts/packages/inspect-irpkg.mjs", "--json", markedPackage],
     { encoding: "utf8" },
   );
   assert.equal(inspectedMarked.status, 0, inspectedMarked.stderr || inspectedMarked.stdout);
@@ -208,7 +208,7 @@ try {
   );
   const inspectedExternFallback = spawnSync(
     "node",
-    ["scripts/inspect-irpkg.mjs", "--json", externFallbackPackage],
+    ["scripts/packages/inspect-irpkg.mjs", "--json", externFallbackPackage],
     { encoding: "utf8" },
   );
   assert.equal(
@@ -453,7 +453,7 @@ try {
   assert.equal(generatedSlides.status, 0, generatedSlides.stderr || generatedSlides.stdout);
   const inspectedSlides = spawnSync(
     "node",
-    ["scripts/inspect-irpkg.mjs", "--json", slidesPackage],
+    ["scripts/packages/inspect-irpkg.mjs", "--json", slidesPackage],
     { encoding: "utf8" },
   );
   assert.equal(inspectedSlides.status, 0, inspectedSlides.stderr || inspectedSlides.stdout);
@@ -540,7 +540,7 @@ try {
   const generated = runVirIrpkg([runtimePackage, runtimeReport, "--target-all", runtimeSource]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
-  const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", runtimePackage], {
+  const inspected = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", "--json", runtimePackage], {
     encoding: "utf8",
   });
   assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
@@ -586,7 +586,7 @@ try {
   const generatedHostSlots = runVirIrpkg([hostSlotPackage, hostSlotReport, "--target-all", hostSlotSource]);
   assert.equal(generatedHostSlots.status, 0, generatedHostSlots.stderr || generatedHostSlots.stdout);
 
-  const inspectedHostSlots = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", hostSlotPackage], {
+  const inspectedHostSlots = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", "--json", hostSlotPackage], {
     encoding: "utf8",
   });
   assert.equal(inspectedHostSlots.status, 0, inspectedHostSlots.stderr || inspectedHostSlots.stdout);

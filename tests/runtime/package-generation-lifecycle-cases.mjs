@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { fileURLToPath } from "node:url";
+
 import {
   createVirRuntimeFactory,
   createVirtualDocumentState,
@@ -16,7 +18,7 @@ import {
   writeRuntimeFixture,
 } from "./shared.mjs";
 
-const hostInteropSource = new URL("../../examples/HostInterop.lean", import.meta.url).pathname;
+const hostInteropSource = fileURLToPath(new URL("../../examples/HostInterop.lean", import.meta.url));
 const sharedStringImportName = "Lean.Vir.JsValue.ofString";
 const parserScoreEntry = "Vir.Fixtures.LeanParser.upstreamParserInputContextScore";
 

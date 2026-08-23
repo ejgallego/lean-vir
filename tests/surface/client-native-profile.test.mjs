@@ -10,7 +10,7 @@ import test from "node:test";
 import {
   addClientNativeSurfaceCapabilities,
   parseClientNativeSurfaceProfile,
-} from "../../scripts/client-native-surface-profile.mjs";
+} from "../../scripts/analysis/client-native-surface-profile.mjs";
 import { emptySurfaceReportV3 } from "./fixtures.mjs";
 
 const manifest = {

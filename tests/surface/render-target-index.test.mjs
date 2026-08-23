@@ -7,16 +7,15 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 import {
   surfaceCounts,
   surfaceDefinition,
 } from "./fixtures.mjs";
-
-const repoRoot = resolve(import.meta.dirname, "../..");
 
 test("target index compares only compatible complete-frontier reports", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "vir-target-index-"));
@@ -65,7 +64,7 @@ test("target index rejects duplicate output slugs", async () => {
     const reportPath = join(temporary, "report.json");
     await writeFile(reportPath, `${JSON.stringify(reportFixture("Fir", true, ["IO.shared"]))}\n`);
     const result = spawnSync(process.execPath, [
-      "scripts/render-target-surface-index.mjs", join(temporary, "html"),
+      "scripts/analysis/render-target-surface-index.mjs", join(temporary, "html"),
       "same", "First", reportPath,
       "same", "Second", reportPath,
     ], { cwd: repoRoot, encoding: "utf8" });
@@ -79,7 +78,7 @@ test("target index rejects duplicate output slugs", async () => {
 function runIndex(output, args) {
   const result = spawnSync(
     process.execPath,
-    ["scripts/render-target-surface-index.mjs", output, ...args],
+    ["scripts/analysis/render-target-surface-index.mjs", output, ...args],
     { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
