@@ -49,10 +49,9 @@ globals in module order only after every member is available.
 
 The same package encoder also supports focused developer packages through
 `npm run generate:irpkg`, backed by `scripts/packages/lean-to-irpkg.mjs`. That
-utility
-accepts explicit roots or packages
-public source definitions for a single Lean file. The `/dev.html` Vite entry
-point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
+utility accepts explicit roots, or it can package the public source definitions
+from a single Lean file. The `/dev.html` Vite entry point loads a served or
+uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
 go through `vir_call_resolved_objects`; package format 10 stores direct
 package-call summaries in a sectioned `.irpkg`, while

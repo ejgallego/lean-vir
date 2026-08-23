@@ -159,6 +159,10 @@ node tests/fixtures/runner.mjs --help
 Tests:
 
 ```bash
+npm run test:mailbox
+npm run test:packages:unit
+npm run test:bindings:unit
+npm run test:fixtures:unit
 npm run test:tutorials
 npm run test:bench
 npm run test:native:unit
@@ -190,16 +194,13 @@ compression results byte for byte, and independently inflates them. Add
 `--passes 1` for a shorter diagnostic run or `--profile` for attribution only;
 neither mode is stable performance evidence.
 
-`npm test` elaborates the copyable tutorials, then runs the artifact-cache,
-benchmark sampler, focused-identity, paired-runner, and native-registry
-contract tests, package ABI and IR object-layout checks, IR codec tag
-consistency check, native extern metadata check, boundary registry check,
-native wrapper check, API coverage docs check, and Wasm extension probes. It
-then builds the demo artifacts once
-and reuses them for a paired-runner
+`npm test` begins with the mailbox, package, native-registry, fixture, tutorial,
+benchmark, and surface contract suites. It then runs package ABI, declaration
+IR, native-boundary, API-coverage, binding, Lake, and Wasm integration checks.
+Finally, it builds the demo artifacts and reuses them for a paired-runner
 control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
 tests, and the fixture suite. It is the default pre-merge signal for code
-changes.
+changes; `package.json` remains the exact command-order source of truth.
 
 ## Smallest Useful Check
 

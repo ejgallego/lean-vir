@@ -11,6 +11,14 @@ import { copyFileWithDirs } from "../file-utils.mjs";
 import { runSync } from "../process-utils.mjs";
 
 export function artifactBundlePaths(repositoryRoot, artifactName) {
+  if (
+    typeof artifactName !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(artifactName)
+  ) {
+    throw new Error(
+      `artifact name must be a safe file name, got ${JSON.stringify(artifactName)}`,
+    );
+  }
   const archiveName = `${artifactName}.tar.gz`;
   const artifactRoot = join(repositoryRoot, "build", "artifacts");
   const publicDownloads = join(repositoryRoot, "web", "public", "downloads");
