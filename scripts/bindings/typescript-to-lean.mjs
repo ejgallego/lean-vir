@@ -4,10 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile } from "node:fs/promises";
 import { basename, relative, resolve } from "node:path";
 
 import { repositoryRoot } from "../repository-paths.mjs";
+import { loadBindingConfig } from "./binding-config.mjs";
 import {
   buildGeneratedOperations,
   generatedOperationDocument,
@@ -64,15 +64,7 @@ function leanIdentifier(value, context) {
 function validateGenerationConfig(config, configPath) {
   const label = relative(repositoryRoot, configPath);
   const generation = config?.generation;
-  if (config?.version !== 1 || !Array.isArray(config.roots) || generation === null ||
-      typeof generation !== "object" || Array.isArray(generation) ||
-      !nonemptyString(generation.output) || !nonemptyString(generation.irOutput) ||
-      !nonemptyString(generation.namespace) ||
-      !Array.isArray(generation.imports) || !generation.imports.every(nonemptyString) ||
-      !Array.isArray(generation.members) || generation.members.length === 0 ||
-      !generation.members.every(nonemptyString) ||
-      generation.resources === null || typeof generation.resources !== "object" ||
-      Array.isArray(generation.resources)) {
+  if (generation === undefined) {
     throw new Error(`${label} does not define a valid Lean generation block`);
   }
   validateGenerationProfile(generation, `${label} generation`);
@@ -165,7 +157,7 @@ function generatedPath(path, extension, label) {
 }
 
 export async function generateLeanBindings(configPath) {
-  const config = JSON.parse(await readFile(configPath, "utf8"));
+  const config = await loadBindingConfig(configPath);
   const generation = validateGenerationConfig(config, configPath);
   const requested = new Set(generation.members);
   const descriptorsByRoot = new Map();

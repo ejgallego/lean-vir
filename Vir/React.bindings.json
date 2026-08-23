@@ -95,7 +95,11 @@
           "lean": "Lean.Vir.React.Root",
           "ts": "Root",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "representation": "hostResource", "ownership": "hostOwned", "lifetime": "until unmount or runtime disposal" },
+          "portIntent": { "disposition": "bind", "representation": "hostResource" },
+          "advisorySemantics": [
+            { "topic": "ownership", "note": "The host is expected to own the root resource." },
+            { "topic": "lifetime", "note": "The root is expected to remain live until unmount or runtime disposal." }
+          ],
           "note": "The TypeScript object interface is intentionally represented by a JavaScript-owned VIR resource."
         },
         {
@@ -105,7 +109,10 @@
           "ts": "Root.render",
           "target": "react.root.render",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed", "retention": "callbacks until rerender, unmount, or runtime disposal" }
+          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed" },
+          "advisorySemantics": [
+            { "topic": "retention", "note": "Callbacks are expected to remain live until rerender, unmount, or runtime disposal." }
+          ]
         },
         {
           "id": "react_dom.root.unmount",
@@ -114,7 +121,10 @@
           "ts": "Root.unmount",
           "target": "react.root.unmount",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed", "lifecycle": "release retained render state" }
+          "portIntent": { "disposition": "bind", "effect": "dom", "receiver": "borrowed" },
+          "advisorySemantics": [
+            { "topic": "lifecycle", "note": "Unmount is expected to release retained render state." }
+          ]
         },
         {
           "id": "react_dom.root.create",
@@ -123,7 +133,11 @@
           "ts": "createRoot",
           "target": "react.root.create",
           "relation": "audit",
-          "portIntent": { "disposition": "bind", "effect": "dom", "container": { "ownership": "borrowed", "acceptedTypes": ["Element"], "coverage": "subset" }, "resultOwnership": "hostOwned", "resultRepresentation": "hostResource", "omittedOptionalParameters": ["options"] },
+          "portIntent": { "disposition": "bind", "effect": "dom", "resultRepresentation": "hostResource", "omittedOptionalParameters": ["options"] },
+          "advisorySemantics": [
+            { "topic": "container", "note": "The container is expected to be borrowed; VIR currently accepts only the Element subset of the TypeScript Container union." },
+            { "topic": "result-ownership", "note": "The host is expected to own the returned root resource." }
+          ],
           "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument."
         },
         {

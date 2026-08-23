@@ -17,6 +17,11 @@ domain logic stays with its own tool instead of growing a general repository
 harness. Repository-root resolution shared with other nested tooling comes
 from `scripts/repository-paths.mjs`.
 
+`binding-config.mjs` is the sole loader for `Vir/*.bindings.json` files. It
+executes `Vir/bindings.schema.json` before a descriptor, generator, or explorer
+uses the configuration, then applies the small cross-field checks that JSON
+Schema cannot express directly.
+
 `binding-modalities.mjs` is the shared TypeScript-to-Lean policy boundary. It
 combines descriptor shapes with a library ABI profile and justified exceptions
 to produce canonical operation IR. Lean source generation, comparator intent,

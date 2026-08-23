@@ -610,6 +610,7 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     ...(anchor.category ? { category: anchor.category } : {}),
     ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
+    ...(anchor.advisorySemantics ? { advisorySemantics: anchor.advisorySemantics } : {}),
     ...(anchor.portIntent ? { portIntent: anchor.portIntent } : {}),
     ...(anchor.modalityContract ? { modalityContract: anchor.modalityContract } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),

@@ -130,3 +130,29 @@ test("binding entry points propagate a returned nonzero status", async () => {
     await rm(temporary, { recursive: true, force: true });
   }
 });
+
+test("type anchor rendering distinguishes checked policy from advisory semantics", () => {
+  const result = {
+    id: "demo",
+    lean: "Demo.root",
+    ts: "Root",
+    status: "compatible",
+    relation: "audit",
+    notes: [],
+    diagnostics: [],
+    portIntent: { disposition: "bind", representation: "hostResource" },
+    advisorySemantics: [{
+      topic: "lifetime",
+      note: "Expected to remain live until release.",
+    }],
+  };
+  const report = {
+    summary: { exact: 0, compatible: 1, weak: 0, missing: 0 },
+    diagnosticSummary: { error: 0, warning: 0, info: 0 },
+    results: [result],
+  };
+
+  const html = renderTypeAnchorReport(report, "html");
+  assert.match(html, /Mechanically checked comparison policy/u);
+  assert.match(html, /Advisory semantics — not mechanically verified/u);
+});

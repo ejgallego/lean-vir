@@ -9,6 +9,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
+import { loadBindingConfig } from "./binding-config.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
@@ -76,67 +77,6 @@ async function discoverConfigs(directory) {
   }
   await visit(directory);
   return paths.sort();
-}
-
-function nonemptyString(value) {
-  return typeof value === "string" && value.length !== 0;
-}
-
-function validateConfig(value, path) {
-  const label = relative(repositoryRoot, path);
-  if (value?.version !== 1 || !nonemptyString(value.id) || !nonemptyString(value.title) ||
-      !nonemptyString(value.description) || !Array.isArray(value.lean?.modules) ||
-      value.lean.modules.length === 0 || !Array.isArray(value.roots) || value.roots.length === 0) {
-    throw new Error(`${label} is not a binding-library v1 configuration`);
-  }
-  const rootIds = new Set();
-  for (const [index, bindingRoot] of value.roots.entries()) {
-    if (!nonemptyString(bindingRoot?.id) || !nonemptyString(bindingRoot?.title) ||
-        !Array.isArray(bindingRoot.targets) || bindingRoot.targets.length === 0 ||
-        !["typescript", "local", "internal"].includes(bindingRoot.upstream?.kind)) {
-      throw new Error(`${label} roots[${index}] is invalid`);
-    }
-    if (rootIds.has(bindingRoot.id)) throw new Error(`${label} repeats root id ${bindingRoot.id}`);
-    rootIds.add(bindingRoot.id);
-    for (const pattern of bindingRoot.targets) validateTargetPattern(pattern, `${label} root ${bindingRoot.id}`);
-    if (bindingRoot.upstream.kind === "typescript" &&
-        (!Array.isArray(bindingRoot.upstream.declarations) || !Array.isArray(bindingRoot.upstream.roots))) {
-      throw new Error(`${label} root ${bindingRoot.id} must identify TypeScript declarations and roots`);
-    }
-    if (bindingRoot.anchors !== undefined && !Array.isArray(bindingRoot.anchors)) {
-      throw new Error(`${label} root ${bindingRoot.id} anchors must be an array`);
-    }
-    if (bindingRoot.mappings !== undefined && !Array.isArray(bindingRoot.mappings)) {
-      throw new Error(`${label} root ${bindingRoot.id} mappings must be an array`);
-    }
-    for (const [mappingIndex, mapping] of (bindingRoot.mappings ?? []).entries()) {
-      const direct = Array.isArray(mapping?.targets) && mapping.targets.length !== 0 &&
-        mapping.targets.every(nonemptyString) && mapping.accessors === undefined;
-      const accessorNames = mapping?.accessors && typeof mapping.accessors === "object" &&
-        !Array.isArray(mapping.accessors) ? Object.keys(mapping.accessors) : [];
-      const property = mapping?.targets === undefined && accessorNames.length !== 0 &&
-        accessorNames.every((accessor) => ["get", "set"].includes(accessor)) &&
-        accessorNames.every((accessor) => {
-          const operation = mapping.accessors[accessor];
-          return (nonemptyString(operation?.target) && nonemptyString(operation?.lean) &&
-            nonemptyString(operation?.anchor) && operation.missing === undefined) ||
-            (operation?.missing === true && nonemptyString(operation.note) &&
-              operation.target === undefined && operation.lean === undefined &&
-              operation.anchor === undefined);
-        });
-      if (!nonemptyString(mapping?.typescript) || (!direct && !property)) {
-        throw new Error(`${label} root ${bindingRoot.id} mappings[${mappingIndex}] is invalid`);
-      }
-    }
-  }
-  return { ...value, path: label };
-}
-
-function validateTargetPattern(pattern, context) {
-  if (!nonemptyString(pattern) || (pattern.includes("*") && !pattern.endsWith("*")) ||
-      pattern.slice(0, -1).includes("*")) {
-    throw new Error(`${context} has invalid target pattern ${JSON.stringify(pattern)}`);
-  }
 }
 
 function matchesPattern(target, pattern) {
@@ -787,7 +727,7 @@ export async function runBindingExplorerCli(argv) {
   const configs = [];
   const ids = new Set();
   for (const path of configPaths) {
-    const config = validateConfig(await readJson(path), path);
+    const config = await loadBindingConfig(path);
     if (ids.has(config.id)) throw new Error(`duplicate binding-library id ${config.id}`);
     ids.add(config.id);
     configs.push(config);

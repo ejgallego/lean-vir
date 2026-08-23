@@ -9,6 +9,7 @@ import { relative, resolve } from "node:path";
 
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
+import { loadBindingConfig } from "./binding-config.mjs";
 import { materializeGeneratedAnchors } from "./binding-modalities.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
@@ -233,10 +234,7 @@ async function resolveBindingRoot(options) {
   }
   const configPath = resolve(root, options.bindingRoot.slice(0, separator));
   const rootId = options.bindingRoot.slice(separator + 1);
-  const config = JSON.parse(await readFile(configPath, "utf8"));
-  if (config?.version !== 1 || !Array.isArray(config.roots)) {
-    throw new Error(`${relative(root, configPath)} is not a binding-library v1 configuration`);
-  }
+  const config = await loadBindingConfig(configPath);
   const binding = config.roots.find((entry) => entry?.id === rootId);
   if (binding === undefined) {
     throw new Error(`${relative(root, configPath)} has no API group ${rootId}`);

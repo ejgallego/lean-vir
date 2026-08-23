@@ -153,6 +153,11 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/Infoview/Surface.bindings.json`
 - `Vir/ProofWidgets/Rpc.bindings.json`
 
+The descriptor generator, Lean generator, and consolidated explorer all load
+these files through the same schema validator. Unknown fields and malformed
+nested anchors, mappings, ABI profiles, and dependency-policy entries therefore
+fail consistently at every configured entry point.
+
 A configuration identifies its compiled Lean modules and divides their targets
 into API groups. External groups name their declaration files and upstream
 entry points; internal groups explicitly state that they have no external
@@ -163,6 +168,10 @@ operations, or only `get` for a readonly property, with an exact host target,
 public Lean declaration, and comparison anchor for each shipped operation.
 An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
 entry, so partial property coverage cannot be mistaken for a faithful pair.
+Anchor `portIntent` contains only policy that the comparator mechanically
+checks. Lifecycle, retention, or ownership claims that are not yet derived from
+the operation IR use `advisorySemantics`; reports label those notes as not
+mechanically verified.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a property operation that disagrees with its reviewed

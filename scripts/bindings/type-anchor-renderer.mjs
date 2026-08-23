@@ -302,7 +302,8 @@ function renderHtmlAnchor(result) {
   const diagnostics = renderHtmlDiagnostics(result.diagnostics ?? []);
   const intent = result.portIntent === undefined
     ? ""
-    : `<section class="intent"><p class="pane-title">Reviewed port intent</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre></section>`;
+    : `<section class="intent"><p class="pane-title">Mechanically checked comparison policy</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre></section>`;
+  const advisory = renderHtmlAdvisorySemantics(result.advisorySemantics ?? []);
   return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
         <div class="anchor-head">
           <div class="name">
@@ -327,10 +328,18 @@ function renderHtmlAnchor(result) {
           </section>
         </div>
         ${intent}
+        ${advisory}
         ${diagnostics}
         ${notes}
         ${hover}
       </article>`;
+}
+
+function renderHtmlAdvisorySemantics(entries) {
+  if (entries.length === 0) return "";
+  const items = entries.map((entry) =>
+    `<li><code>${escapeHtml(entry.topic)}</code>: ${escapeHtml(entry.note)}</li>`).join("");
+  return `<section class="intent"><p class="pane-title">Advisory semantics — not mechanically verified</p><ul>${items}</ul></section>`;
 }
 
 function renderHtmlDiagnostics(diagnostics) {
@@ -360,7 +369,10 @@ function renderAnchor(result) {
     ts?.display ? `<pre><code>${escapeHtml(ts.display)}</code></pre>` : "",
     result.portIntent === undefined
       ? ""
-      : `<p>Reviewed port intent:</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre>`,
+      : `<p>Mechanically checked comparison policy:</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre>`,
+    (result.advisorySemantics ?? []).length === 0
+      ? ""
+      : `<p>Advisory semantics (not mechanically verified):</p><ul>${result.advisorySemantics.map((entry) => `<li><code>${escapeHtml(entry.topic)}</code>: ${escapeHtml(entry.note)}</li>`).join("")}</ul>`,
     diagnostics.length === 0 ? "" : `<ul>${diagnostics.join("")}</ul>`,
     result.note === undefined ? "" : `<p>${escapeHtml(result.note)}</p>`,
     "</div>",

@@ -139,9 +139,8 @@ function translatedType(lean, representation, provenance, resourceInner = null) 
   return { lean, representation, provenance, resourceInner };
 }
 
-function nullableResource(shape, generation, context) {
-  const profile = validateGenerationProfile(generation);
-  const element = leanType(shape.element, generation, context);
+function nullableResource(shape, generation, profile, context) {
+  const element = translateType(shape.element, generation, profile, context);
   if (element.representation !== "js-resource" || element.resourceInner === null) {
     throw new Error(`${context} nullable values require a JavaScript resource element`);
   }
@@ -159,8 +158,7 @@ function nullableResource(shape, generation, context) {
   );
 }
 
-export function leanType(shape, generation, context = "TypeScript shape") {
-  const profile = validateGenerationProfile(generation);
+function translateType(shape, generation, profile, context) {
   if (shape?.kind === "primitive") {
     const type = profile.types[shape.name];
     if (type !== undefined) {
@@ -186,7 +184,7 @@ export function leanType(shape, generation, context = "TypeScript shape") {
       );
     }
   }
-  if (shape?.kind === "option") return nullableResource(shape, generation, context);
+  if (shape?.kind === "option") return nullableResource(shape, generation, profile, context);
   if (shape?.kind === "ref" && nonemptyString(generation.resources?.[shape.id])) {
     const marker = generation.resources[shape.id];
     return translatedType(
@@ -205,12 +203,8 @@ export function leanType(shape, generation, context = "TypeScript shape") {
   throw new Error(`${context} has unsupported faithful translation ${JSON.stringify(shape)}`);
 }
 
-function publicType(type) {
-  return {
-    lean: type.lean,
-    modalities: { representation: type.representation },
-    provenance: { type: type.provenance },
-  };
+export function leanType(shape, generation, context = "TypeScript shape") {
+  return translateType(shape, generation, validateGenerationProfile(generation), context);
 }
 
 function exceptionFor(generation, operationId) {
@@ -251,8 +245,7 @@ function modalityArgument(name, role, type, defaults, provenanceBase, override =
   };
 }
 
-function receiverFor(member, anchor, generation, exception) {
-  const profile = validateGenerationProfile(generation);
+function receiverFor(member, anchor, generation, profile, exception) {
   const owner = member.slice(0, member.lastIndexOf("."));
   const configuredGlobal = profile.receiver.globalTypes.includes(owner);
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
@@ -305,8 +298,7 @@ function receiverFor(member, anchor, generation, exception) {
   };
 }
 
-function resultFor(type, generation, exception) {
-  const profile = validateGenerationProfile(generation);
+function resultFor(type, profile, exception) {
   const resource = type.representation === "js-resource";
   const ownership = exception?.result?.ownership ??
     (resource ? profile.resource.result.ownership : "value");
@@ -317,7 +309,7 @@ function resultFor(type, generation, exception) {
     throw new Error(`immediate result cannot override resource ownership`);
   }
   return {
-    ...publicType(type),
+    lean: type.lean,
     modalities: { representation: type.representation, ownership },
     provenance: {
       type: type.provenance,
@@ -349,8 +341,8 @@ function operationName(operation, namespace) {
   };
 }
 
-function anchorFor(root, operation, member, accessor) {
-  const anchor = (root.anchors ?? []).find((entry) => entry.id === operation.anchor);
+function anchorFor(anchorsById, operation, member, accessor) {
+  const anchor = anchorsById.get(operation.anchor);
   if (anchor === undefined) {
     throw new Error(`${member} ${accessor} references missing anchor ${operation.anchor}`);
   }
@@ -363,14 +355,23 @@ function anchorFor(root, operation, member, accessor) {
   return anchor;
 }
 
-function propertyOperation(config, root, mapping, symbol, accessor, operation, generation) {
-  const profile = validateGenerationProfile(generation);
+function propertyOperation(
+  config,
+  root,
+  mapping,
+  symbol,
+  accessor,
+  operation,
+  generation,
+  profile,
+  anchorsById,
+) {
   const member = mapping.typescript;
-  const anchor = anchorFor(root, operation, member, accessor);
+  const anchor = anchorFor(anchorsById, operation, member, accessor);
   const exception = exceptionFor(generation, anchor.id);
   const shape = symbol.accessors?.[accessor];
   const leanName = operationName(operation, generation.namespace);
-  const receiver = receiverFor(member, anchor, generation, exception);
+  const receiver = receiverFor(member, anchor, generation, profile, exception);
   const propertyName = leanIdentifier(
     member.slice(member.lastIndexOf(".") + 1),
     `${member} setter argument`,
@@ -378,9 +379,9 @@ function propertyOperation(config, root, mapping, symbol, accessor, operation, g
   const arguments_ = [];
   let result;
   if (accessor === "get") {
-    result = resultFor(leanType(shape, generation, `${member} getter`), generation, exception);
+    result = resultFor(translateType(shape, generation, profile, `${member} getter`), profile, exception);
   } else {
-    const value = leanType(shape, generation, `${member} setter`);
+    const value = translateType(shape, generation, profile, `${member} setter`);
     arguments_.push(modalityArgument(
       propertyName,
       "argument",
@@ -390,8 +391,13 @@ function propertyOperation(config, root, mapping, symbol, accessor, operation, g
       exception?.arguments?.[propertyName] ?? null,
     ));
     result = resultFor(
-      leanType({ kind: "primitive", name: "void" }, generation, `${member} setter result`),
-      generation,
+      translateType(
+        { kind: "primitive", name: "void" },
+        generation,
+        profile,
+        `${member} setter result`,
+      ),
+      profile,
       exception,
     );
   }
@@ -435,17 +441,23 @@ function propertyOperation(config, root, mapping, symbol, accessor, operation, g
 export function buildGeneratedOperations(config, generation, descriptorsByRoot, {
   validateExceptions = true,
 } = {}) {
-  validateGenerationProfile(generation, `${config.id} generation`);
+  const profile = validateGenerationProfile(generation, `${config.id} generation`);
+  const generatedMembers = new Set(generation.members);
   const mappings = new Map();
   for (const root of config.roots) {
+    const anchorsById = new Map((root.anchors ?? []).map((anchor) => [anchor.id, anchor]));
     for (const mapping of root.mappings ?? []) {
-      if (!generation.members.includes(mapping.typescript)) continue;
+      if (!generatedMembers.has(mapping.typescript)) continue;
       if (mappings.has(mapping.typescript)) {
         throw new Error(`generated member ${mapping.typescript} is mapped by more than one API group`);
       }
-      mappings.set(mapping.typescript, { root, mapping });
+      mappings.set(mapping.typescript, { root, mapping, anchorsById });
     }
   }
+  const symbolsByRoot = new Map([...descriptorsByRoot].map(([id, descriptor]) => [
+    id,
+    new Map(descriptor.symbols.map((symbol) => [symbol.id, symbol])),
+  ]));
   const operations = [];
   for (const member of [...generation.members].sort()) {
     const entry = mappings.get(member);
@@ -458,7 +470,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     if (entry.mapping.accessors === undefined) {
       throw new Error(`${member} is not a property accessor mapping; method generation is not supported yet`);
     }
-    const symbol = descriptor.symbols.find((candidate) => candidate.id === member);
+    const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (symbol?.kind !== "property") throw new Error(`${member} is not a TypeScript property`);
     if (symbol.optional === true) {
       throw new Error(`${member} is optional; optional property generation is not supported yet`);
@@ -481,6 +493,8 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
         accessor,
         operation,
         generation,
+        profile,
+        entry.anchorsById,
       ));
     }
   }

@@ -94,6 +94,13 @@ fields from it. Comparison results retain the complete `modalityContract`, and
 the binding explorer shows that contract in an expandable panel. This avoids
 three independently authored versions of the same policy.
 
+`portIntent` is reserved for transformations that the comparator actually
+checks. A reviewed observation about lifecycle, retention, or host ownership
+that is not yet enforced belongs in the anchor's `advisorySemantics` list. Both
+the focused report and consolidated explorer display such observations under
+an explicit “not mechanically verified” heading; they do not contribute to a
+type-fidelity verdict.
+
 ## Exceptions
 
 `generation.exceptions` is keyed by operation/anchor id. An exception must have

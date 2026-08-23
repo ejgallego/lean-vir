@@ -338,6 +338,14 @@ assert.equal(
   reactDomRoot?.comparison.results.find((result) => result.id === "react_dom.root.create")?.target,
   "react.root.create",
 );
+assert.deepEqual(
+  reactDomRoot?.comparison.results.find((result) =>
+    result.id === "react_dom.root.resource")?.advisorySemantics,
+  [
+    { topic: "ownership", note: "The host is expected to own the root resource." },
+    { topic: "lifetime", note: "The root is expected to remain live until unmount or runtime disposal." },
+  ],
+);
 
 assert.match(html, /<h1>Binding explorer<\/h1>/u);
 assert.match(html, /id="provided-metric"/u);
@@ -358,7 +366,9 @@ assert.match(style, /\.workspace/u);
 assert.match(app, /Reviewed type fidelity/u);
 assert.match(app, /Upstream TypeScript surface/u);
 assert.match(app, /Derived ABI modalities/u);
+assert.match(app, /Advisory semantics · not mechanically verified/u);
 assert.match(style, /\.modality-contract/u);
+assert.match(style, /\.advisory-semantics/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
 assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);
