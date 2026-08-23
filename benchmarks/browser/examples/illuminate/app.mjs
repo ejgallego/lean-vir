@@ -72,18 +72,11 @@ function renderArtifactSetNotes(manifest) {
   });
 }
 
-async function loadArtifactProvenance() {
-  const setResponse = await fetch(new URL("ARTIFACT_SET.json", artifactBase));
-  if (!setResponse.ok) {
-    throw new Error("failed to load Illuminate artifact provenance");
-  }
-  const manifest = await setResponse.json();
-  if (
-    manifest.schemaVersion !== 2 ||
-    manifest.kind !== "browser-benchmarks/artifact-set" ||
-    manifest.example?.id !== "illuminate"
-  ) {
-    throw new Error("unsupported Illuminate artifact-set manifest");
+function requireArtifactProvenance() {
+  const manifest =
+    globalThis.__benchmarkExampleContext?.artifactStatus?.manifest;
+  if (!manifest) {
+    throw new Error("Illuminate requires a verified artifact-set manifest");
   }
   return manifest;
 }
@@ -684,9 +677,9 @@ async function boot() {
       if (!response.ok) throw new Error("failed to load Illuminate examples");
       return response.json();
     }),
-    loadArtifactProvenance(),
+    requireArtifactProvenance(),
   ]);
-  const nativeModule = await import(
+  const selectionModule = await import(
     new URL(
       "selection/illuminate-selection-player-browser-adapter.mjs",
       artifactBase,
@@ -741,12 +734,13 @@ async function boot() {
   }
 
   try {
-    const native = await nativeModule.fetchIlluminateSelectionPlayerAdapter(
-      new URL("selection/illuminate-selection-player.wasm", artifactBase),
-    );
+    const selection =
+      await selectionModule.fetchIlluminateSelectionPlayerAdapter(
+        new URL("selection/illuminate-selection-player.wasm", artifactBase),
+      );
     backend("native").invoke = (animation, events) => {
       const totalStarted = performance.now();
-      const result = replaySelectionTrace(native, animation, events);
+      const result = replaySelectionTrace(selection, animation, events);
       const totalMs = performance.now() - totalStarted;
       return {
         value: result.ok

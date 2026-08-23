@@ -339,13 +339,6 @@ async function boot() {
     import.meta.url,
   );
   renderVariants(testPackage, variant);
-  globalThis.__benchmarkExampleContext = {
-    example: selected,
-    artifactBaseUrl,
-    testPackage,
-    testPackageIdentity,
-    variant,
-  };
   artifactStatus = await inspectArtifactStatus(
     selected,
     variant,
@@ -354,6 +347,14 @@ async function boot() {
     artifactBaseUrl,
   );
   showArtifactStatus(artifactStatus);
+  globalThis.__benchmarkExampleContext = {
+    example: selected,
+    artifactBaseUrl,
+    artifactStatus,
+    testPackage,
+    testPackageIdentity,
+    variant,
+  };
   for (const path of selectedView.bootstrap.artifactScripts) {
     await loadScript(new URL(path, artifactBaseUrl).href);
   }

@@ -218,7 +218,7 @@ export async function buildVirBrowserRuntime({
   return { wasiSdk: basename(wasiSdk) };
 }
 
-export async function readToolchain(root) {
+async function readToolchain(root) {
   return (await readFile(join(root, "lean-toolchain"), "utf8")).trim();
 }
 

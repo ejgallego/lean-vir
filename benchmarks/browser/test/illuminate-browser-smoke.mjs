@@ -26,8 +26,13 @@ try {
   page.setDefaultTimeout(120_000);
   const pageErrors = collectPageErrors(page);
   const requestedPaths = new Set();
+  let artifactManifestRequests = 0;
   page.on("request", (request) => {
-    requestedPaths.add(new URL(request.url()).pathname);
+    const path = new URL(request.url()).pathname;
+    requestedPaths.add(path);
+    if (path.endsWith("/artifacts/illuminate/ARTIFACT_SET.json")) {
+      artifactManifestRequests += 1;
+    }
   });
   await page.goto(url, { waitUntil: "networkidle" });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
@@ -91,6 +96,7 @@ try {
       "/artifacts/illuminate/workload/js-player-trace.mjs",
     ),
   );
+  assert.equal(artifactManifestRequests, 1);
   const buildNotes = await page.locator("#build-notes").textContent();
   assert.match(buildNotes, /Artifact set illuminate-player-set-0001/);
   assert.match(buildNotes, /illuminate\/browser-benchmark-source\/v1/);

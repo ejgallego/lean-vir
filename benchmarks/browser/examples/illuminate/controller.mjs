@@ -3,7 +3,7 @@ import { requireController } from "../controller-contract.mjs";
 export const view = {
   eyebrow: "Real client · browser Wasm",
   intro:
-    "Compare the production JavaScript player with typed VIR and FIR-native implementations over identical animations and event traces.",
+    "Compare the production JavaScript player with typed VIR and FIR's selection runtime over identical animations and event traces.",
   progress: "Loading verified artifacts…",
   artifacts: {
     copy: "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
