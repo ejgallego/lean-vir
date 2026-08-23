@@ -57,9 +57,9 @@ Node-side script infrastructure.
   assembles the client-owned workload, VIR, FIR-native, and FIR C/Emscripten
   packages and exercises five browser backends.
 - `illuminate/default` is the second real client and uses the same catalog,
-  shell, variant selector, artifact root, and report workflow. It remains a
-  local rehearsal until Illuminate and FIR expose complete canonical producer
-  entry points.
+  shell, variant selector, artifact root, candidate pipeline, and report
+  workflow. Its build combines the Illuminate workload package, VIR typed
+  trace package, and FIR selection package.
 - Every canonical candidate is built from exact clean revisions materialized
   below `_sources/` or selected through an explicit FIR/VIR toolchain config.
 - Source-build receipts bind the catalog, example, test package, producer
@@ -127,8 +127,3 @@ Before handing off a catalog, controller, or artifact change:
 - preserve prepare, execute, decode, and total phase boundaries;
 - keep generated binaries and reports ignored; and
 - record only portable source and artifact identities in generated receipts.
-
-## Remaining integration
-
-1. Add canonical Illuminate producer entry points and a clean catalog build,
-   then admit it to Pages and remove its application-local rehearsal stager.

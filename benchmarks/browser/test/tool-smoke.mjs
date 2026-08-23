@@ -63,18 +63,12 @@ const exampleList = spawnSync(
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(exampleList.status, 0, exampleList.stderr);
-assert.match(exampleList.stdout, /^illuminate\trehearsal\tIlluminate player$/m);
+assert.match(exampleList.stdout, /^illuminate\tactive\tIlluminate player$/m);
 assert.match(exampleList.stdout, /^prettyM\tactive\tStd\.Format\.prettyM$/m);
 
 const examplePlan = spawnSync(
   process.execPath,
-  [
-    "scripts/run-example.mjs",
-    "prettyM",
-    "default",
-    "--plan",
-    "--materialize",
-  ],
+  ["scripts/run-example.mjs", "prettyM", "default", "--plan", "--materialize"],
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(examplePlan.status, 0, examplePlan.stderr);
@@ -84,7 +78,10 @@ assert.match(
   /^test: smoke-parity · smoke · js, vir, vir-format, native, llvm · oracle js$/m,
 );
 assert.match(examplePlan.stdout, /^benchmark: suite \(not measured\)$/m);
-assert.match(examplePlan.stdout, /^sources: materialize catalogued revisions$/m);
+assert.match(
+  examplePlan.stdout,
+  /^sources: materialize catalogued revisions$/m,
+);
 
 const contradictoryExample = spawnSync(
   process.execPath,
@@ -114,9 +111,9 @@ assert.ok(
   buildList.stdout,
 );
 assert.ok(
-  buildList.stdout.split(/\r?\n/).includes(
-    "lean-zip\tlean-zip-browser-set-0001",
-  ),
+  buildList.stdout
+    .split(/\r?\n/)
+    .includes("lean-zip\tlean-zip-browser-set-0001"),
   buildList.stdout,
 );
 
@@ -126,9 +123,18 @@ const sourcePlan = spawnSync(
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(sourcePlan.status, 0, sourcePlan.stderr);
-assert.match(sourcePlan.stdout, /fir: https:\/\/github\.com\/ejgallego\/lean-fir/);
-assert.match(sourcePlan.stdout, /vir: https:\/\/github\.com\/ejgallego\/lean-vir/);
-assert.match(sourcePlan.stdout, /workload: https:\/\/github\.com\/leanprover\/verso-slides/);
+assert.match(
+  sourcePlan.stdout,
+  /fir: https:\/\/github\.com\/ejgallego\/lean-fir/,
+);
+assert.match(
+  sourcePlan.stdout,
+  /vir: https:\/\/github\.com\/ejgallego\/lean-vir/,
+);
+assert.match(
+  sourcePlan.stdout,
+  /workload: https:\/\/github\.com\/leanprover\/verso-slides/,
+);
 
 const candidatePlan = spawnSync(
   process.execPath,
@@ -156,6 +162,7 @@ const candidateMatrix = spawnSync(
 assert.equal(candidateMatrix.status, 0, candidateMatrix.stderr);
 assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
   include: [
+    { example: "illuminate", variant: "default", build: "illuminate" },
     { example: "lean-zip", variant: "default", build: "lean-zip" },
     { example: "prettyM", variant: "default", build: "prettyM" },
   ],
@@ -169,7 +176,7 @@ const pagesPlan = spawnSync(
 assert.equal(pagesPlan.status, 0, pagesPlan.stderr);
 assert.equal(
   pagesPlan.stdout,
-  "lean-zip\tdefault\tlean-zip\nprettyM\tdefault\tprettyM\n",
+  "illuminate\tdefault\tilluminate\nlean-zip\tdefault\tlean-zip\nprettyM\tdefault\tprettyM\n",
 );
 
 const escapedOutput = spawnSync(

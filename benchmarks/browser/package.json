@@ -13,7 +13,6 @@
     "artifacts:pack": "node scripts/pack-artifact-set.mjs",
     "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
     "stage": "node scripts/stage-artifact-set.mjs",
-    "stage:illuminate": "node scripts/stage-illuminate-rehearsal.mjs",
     "pages:plan": "node scripts/pages-deployment-plan.mjs",
     "build": "node scripts/build.mjs",
     "install:pages": "node scripts/install-pages.mjs",

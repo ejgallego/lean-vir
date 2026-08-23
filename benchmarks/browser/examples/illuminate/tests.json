@@ -6,7 +6,7 @@
     {
       "id": "default",
       "title": "Player trace replay",
-      "build": null,
+      "build": "illuminate",
       "tests": [
         {
           "id": "quick-parity",

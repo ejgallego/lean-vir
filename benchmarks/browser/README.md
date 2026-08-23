@@ -73,8 +73,8 @@ never committed. See
 FIR and VIR producer checkouts can be selected with `--toolchain`, an ignored
 `toolchains.local.json`, or `--toolchain-config`. Every selected checkout must
 still match the exact catalogued commit. These settings control generation;
-normal serving consumes already-built FIR packages staged by the candidate
-pipeline or an explicit local rehearsal.
+normal serving consumes already-built artifact sets staged by the candidate
+pipeline.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
@@ -128,7 +128,8 @@ accepts every selected example:
 
 ```sh
 npm run pages:plan
-npm run build -- --deploy lean-zip=default --deploy prettyM=default
+npm run build -- --deploy illuminate=default --deploy lean-zip=default \
+  --deploy prettyM=default
 ```
 
 Repeat `--deploy EXAMPLE=VARIANT` for every line in the plan.
@@ -137,10 +138,9 @@ Deployment admission requires a canonical build, an exact example/variant and
 artifact-set identity, the canonical `tests.json` digest, and no missing,
 changed, extra, or symbolic-link artifact files. Only admitted example
 directories and artifacts are copied. The generated `examples/catalog.json`
-therefore exposes only active canonical examples. At present that is
-`lean-zip/default` and `prettyM/default`; changing Illuminate from rehearsal to
-active will add it to the same source-materialization, candidate, browser-test,
-and deployment loop.
+therefore exposes only active canonical examples. Illuminate, lean-zip, and
+prettyM all use the same source-materialization, candidate, browser-test, and
+deployment loop.
 
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
@@ -198,42 +198,24 @@ npm test
 
 Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
 
-### Illuminate rehearsal
+### Illuminate
 
-The `Illuminate player` example in the common application compares the legacy
-JavaScript, typed VIR, and FIR-native implementations. It has the same
-artifact-status, backend, protocol, study, and result sections as `prettyM`.
-Until it gets its own canonical artifact-catalog record, stage its inputs as a
-local rehearsal:
+The `Illuminate player` example compares the production JavaScript player,
+typed VIR, and FIR's zero-import selection package. Its catalog record builds
+the Illuminate-owned source/oracle package first, passes that package to VIR's
+client compiler, and independently asks FIR to export its pinned selection
+package. The candidate pipeline validates and stages all three components as
+one artifact set.
 
 ```sh
-npm run stage:illuminate -- \
-  --source /path/to/illuminate \
-  --native-package /path/to/illuminate-player-package \
-  --selection-package /path/to/illuminate-selection-player-package \
-  --vir-sdk /path/to/extracted/lean-vir-sdk
-npm run test:illuminate
+npm run example -- illuminate default --materialize --prepare
 ```
 
-`--vir-sdk` can point directly at an extracted `lean-vir-sdk` CI artifact; when
-omitted, it defaults to the SDK under the Illuminate checkout. The stager
-verifies its manifest and file digests before copying it. The selection package
-is optional for older rehearsals; when present, the application prefers FIR's
-selection-v4 API, uses its bit-exact scalar tick entry, and materializes patch
-rows from the original host-owned animation. The full-action v3 package remains
-the producer-side semantic oracle.
-
-The canonical consumer-side adapter requires both producer-validated FIR
-packages. Once an Illuminate catalog record can be built, `artifacts:fetch`
-selects it from the artifact-set manifest and atomically stages only verified
-`illuminate/` members. The app uses selection v4 and loads that set manifest as
-provenance, while retaining `REHEARSAL.json` and v3-only compatibility for local
-rehearsals.
-
-The application and downloaded report display the exact staged build
-identities and mark all timings as non-authoritative. See
-`docs/ILLUMINATE_REHEARSAL.md` for refreshed build hashes, correctness status,
-and the remaining producer integration.
+The quick study is a differential gate over two representative animations and
+three trace lengths. The registered scaling study uses the same contract but
+does not make timings from an ordinary loaded machine into accepted evidence.
+See [`docs/ILLUMINATE.md`](docs/ILLUMINATE.md) for the component and source
+flow.
 
 ## Reproducible reports
 

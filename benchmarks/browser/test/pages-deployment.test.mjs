@@ -7,7 +7,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
@@ -66,6 +66,15 @@ async function stagedDeployment(t) {
   };
   const manifestPath = join(directory, "ARTIFACT_SET.json");
   await writeFile(manifestPath, canonicalJson(manifest));
+  const select = (selectedCatalog, ...deployments) =>
+    selectPagesCatalog({
+      appRoot,
+      artifactsRoot,
+      catalog: selectedCatalog,
+      database,
+      deployments: (deployments.length ? deployments : ["prettyM=default"])
+        .map(parsePagesDeployment),
+    });
   return {
     artifactsRoot,
     catalog,
@@ -74,16 +83,25 @@ async function stagedDeployment(t) {
     manifest,
     manifestPath,
     payloadPath,
-    select: (...deployments) =>
-      selectPagesCatalog({
-        appRoot,
-        artifactsRoot,
-        catalog,
-        database,
-        deployments: (deployments.length ? deployments : ["prettyM=default"])
-          .map(parsePagesDeployment),
-      }),
+    select: (...deployments) => select(catalog, ...deployments),
+    selectWithCatalog: select,
   };
+}
+
+async function catalogWithoutBuild(fixture, exampleId) {
+  const catalog = structuredClone(fixture.catalog);
+  const example = catalog.examples.find(({ id }) => id === exampleId);
+  const testPackage = JSON.parse(
+    await readFile(join(appRoot, example.testPackage), "utf8"),
+  );
+  testPackage.variants[0].build = null;
+  const testPackagePath = join(
+    fixture.artifactsRoot,
+    `${exampleId}-without-build.json`,
+  );
+  await writeFile(testPackagePath, canonicalJson(testPackage));
+  example.testPackage = relative(appRoot, testPackagePath);
+  return catalog;
 }
 
 test("admits a canonical staged example to Pages", async (t) => {
@@ -104,6 +122,7 @@ test("derives Pages deployments from active canonical examples", async (t) => {
       database: fixture.database,
     }),
     [
+      { example: "illuminate", variant: "default", build: "illuminate" },
       { example: "lean-zip", variant: "default", build: "lean-zip" },
       { example: "prettyM", variant: "default", build: "prettyM" },
     ],
@@ -112,8 +131,7 @@ test("derives Pages deployments from active canonical examples", async (t) => {
 
 test("rejects an active example without a canonical build", async (t) => {
   const fixture = await stagedDeployment(t);
-  const catalog = structuredClone(fixture.catalog);
-  catalog.examples.find(({ id }) => id === "illuminate").lifecycle = "active";
+  const catalog = await catalogWithoutBuild(fixture, "illuminate");
   await assert.rejects(
     () =>
       activePagesDeployments({
@@ -127,8 +145,9 @@ test("rejects an active example without a canonical build", async (t) => {
 
 test("rejects a Pages example without a canonical build", async (t) => {
   const fixture = await stagedDeployment(t);
+  const catalog = await catalogWithoutBuild(fixture, "illuminate");
   await assert.rejects(
-    () => fixture.select("illuminate=default"),
+    () => fixture.selectWithCatalog(catalog, "illuminate=default"),
     /has no canonical build/,
   );
 });

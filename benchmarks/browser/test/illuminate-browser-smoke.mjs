@@ -25,6 +25,10 @@ try {
   });
   page.setDefaultTimeout(120_000);
   const pageErrors = collectPageErrors(page);
+  const requestedPaths = new Set();
+  page.on("request", (request) => {
+    requestedPaths.add(new URL(request.url()).pathname);
+  });
   await page.goto(url, { waitUntil: "networkidle" });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
     example: "illuminate",
@@ -56,9 +60,17 @@ try {
   assert.deepEqual(
     await page.evaluate(() => {
       const status = window.__benchmarkApp.getArtifactStatus();
-      return { verified: status.verified, tone: status.tone, setId: status.setId };
+      return {
+        verified: status.verified,
+        tone: status.tone,
+        setId: status.setId,
+      };
     }),
-    { verified: false, tone: "rehearsal", setId: null },
+    {
+      verified: true,
+      tone: "verified",
+      setId: "illuminate-player-set-0001",
+    },
   );
   const backends = await page.evaluate(() =>
     window.__illuminateBenchApp.getBackends(),
@@ -73,20 +85,17 @@ try {
   );
   assert.equal(backends[0].label, "JavaScript oracle");
   assert.equal(backends[1].label, "Lean · VIR typed");
+  assert.equal(backends[2].label, "Lean · FIR selection");
   assert.ok(
-    ["Lean · FIR native", "Lean · FIR selection"].includes(backends[2].label),
+    requestedPaths.has(
+      "/artifacts/illuminate/workload/js-player-trace.mjs",
+    ),
   );
-  const usesSelection = backends[2].label === "Lean · FIR selection";
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Illuminate [0-9a-f]{8}/);
-  assert.match(buildNotes, /VIR [0-9a-f]{8}/);
-  assert.match(buildNotes, /FIR(?: selection)? [0-9a-f]{8}/);
-  assert.match(
-    buildNotes,
-    usesSelection
-      ? /fir\.illuminate-player\.browser\/v4/
-      : /fir\.illuminate-player\.browser\/v3/,
-  );
+  assert.match(buildNotes, /Artifact set illuminate-player-set-0001/);
+  assert.match(buildNotes, /illuminate\/browser-benchmark-source\/v1/);
+  assert.match(buildNotes, /Illuminate\.Animation\.Vir\.replayTraceTyped/);
+  assert.match(buildNotes, /fir\.illuminate-player\.complete-runtime\/v2/);
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
   const report = await page.evaluate(() =>
@@ -133,7 +142,7 @@ try {
     "totalMs",
   );
   assert.deepEqual(pageErrors, []);
-  console.log("PASS Illuminate JS/VIR/FIR plotting rehearsal smoke");
+  console.log("PASS canonical Illuminate JS/VIR/FIR plotting smoke");
 } finally {
   await Promise.all([browser?.close(), server?.close()]);
 }

@@ -4,15 +4,12 @@
   "id": "illuminate",
   "title": "Illuminate player",
   "summary": "Three backends · player trace parity and scaling",
-  "lifecycle": "rehearsal",
+  "lifecycle": "active",
   "packages": [
     {
       "id": "player",
-      "target": "src/Illuminate/Animation/Vir.lean",
-      "exports": [
-        "Illuminate.Animation.Vir.replayTrace",
-        "Illuminate.Animation.Vir.replayTraceTyped"
-      ]
+      "target": "fixtures/illuminate/VirIlluminateAcceptance/Exports.lean",
+      "exports": ["Illuminate.Animation.Vir.replayTraceTyped"]
     }
   ],
   "controller": "examples/illuminate/controller.mjs",

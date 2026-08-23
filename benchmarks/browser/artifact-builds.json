@@ -12,6 +12,21 @@
       "repository": "https://github.com/ejgallego/lean-fir",
       "revision": "b9f6adb4e6e0bf3262e66d16d33b45223e1960b1"
     },
+    "fir-illuminate": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-fir",
+      "revision": "1b1668f141c1c10d94b031feb822cdccfe8ee104"
+    },
+    "illuminate-browser": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/illuminate",
+      "revision": "9d75c7e5dfb833bac0c859bf7e1eb2a796d415f8"
+    },
+    "illuminate-fir": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/illuminate",
+      "revision": "6f16cdc3d4320c093b53a9d381b92bfbb689b2ce"
+    },
     "lean-4.33.0": {
       "kind": "git",
       "repository": "https://github.com/leanprover/lean4",
@@ -36,6 +51,11 @@
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
       "revision": "6259590afa7ba2550b10908c9a6448d5eac21d86"
+    },
+    "vir-illuminate": {
+      "kind": "git",
+      "repository": "https://github.com/ejgallego/lean-vir",
+      "revision": "c416498225e7be53a090c79eac6f0befa8f55fd3"
     },
     "vir-prettyM": {
       "kind": "git",
@@ -340,6 +360,129 @@
               "lean-zip-emscripten.mjs": "lean-zip/fir-emscripten/lean-zip-emscripten.mjs",
               "lean-zip-emscripten.wasm": "lean-zip/fir-emscripten/lean-zip-emscripten.wasm",
               "smoke.mjs": "lean-zip/fir-emscripten/smoke.mjs"
+            }
+          }
+        }
+      }
+    },
+    "illuminate": {
+      "example": {
+        "id": "illuminate",
+        "variant": "default"
+      },
+      "artifactSet": {
+        "setId": "illuminate-player-set-0001",
+        "benchmarkContract": {
+          "id": "illuminate/player-trace/v1",
+          "input": "player-animation-and-event-trace/v1",
+          "output": "normalized-frame-actions/v1",
+          "timingPhases": ["prepare", "execute", "decode", "total"]
+        }
+      },
+      "checkouts": {
+        "fir": "fir-illuminate",
+        "illuminate": "illuminate-browser",
+        "illuminate-fir": "illuminate-fir",
+        "lean": "lean-4.33.0",
+        "vir": "vir-illuminate"
+      },
+      "components": {
+        "workload": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "contract": "illuminate/browser-benchmark-source/v1",
+            "oracle": "production-javascript-player"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "producer": "illuminate"
+            },
+            "entrypoint": "scripts/export-browser-benchmark-source.mjs",
+            "manifest": "BUILD.json",
+            "files": {
+              "BUILD.json": "illuminate/workload/BUILD.json",
+              "SHA256SUMS": "illuminate/workload/SHA256SUMS",
+              "smoke.mjs": "illuminate/workload/smoke.mjs",
+              "workload/anim_core.js": "illuminate/workload/anim_core.js",
+              "workload/examples.json": "illuminate/workload/examples.json",
+              "workload/js-player-trace.mjs": "illuminate/workload/js-player-trace.mjs",
+              "workload/vir-player-trace.mjs": "illuminate/workload/vir-player-trace.mjs"
+            }
+          }
+        },
+        "vir": {
+          "dependencies": ["workload"],
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "compilerRoute": "lean-vir-ir-interpreter-wasm32-wasip1",
+            "entry": "Illuminate.Animation.Vir.replayTraceTyped"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "client": "illuminate",
+              "producer": "vir",
+              "runtime": "lean"
+            },
+            "entrypoint": "scripts/packages/illuminate/export-browser-package.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "npm",
+                "args": ["ci"]
+              },
+              {
+                "checkout": "producer",
+                "command": "npm",
+                "args": ["run", "install:wasi"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "illuminate/vir/BUILD.json",
+              "SHA256SUMS": "illuminate/vir/SHA256SUMS",
+              "lean-vir/js/vir-runtime.js": "illuminate/vir/sdk/js/vir-runtime.js",
+              "lean-vir/wasm/vir-upstream.wasm": "illuminate/vir/sdk/wasm/vir-upstream.wasm",
+              "module-set/Vir.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg",
+              "module-set/Vir.irpkg-set.json": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
+              "smoke.examples.json": "illuminate/vir/smoke.examples.json",
+              "smoke.mjs": "illuminate/vir/smoke.mjs",
+              "smoke.vir-player-trace.mjs": "illuminate/vir/smoke.vir-player-trace.mjs"
+            }
+          }
+        },
+        "selection": {
+          "artifact": {
+            "boundary": "browser-benchmarks/bounded-runtime/v1",
+            "compilerRoute": "fir-resident-zero-import",
+            "runtimeContract": "fir.illuminate-player.complete-runtime/v2"
+          },
+          "producer": {
+            "protocol": "browser-benchmarks/source-package/v1",
+            "adapter": "package-command",
+            "checkouts": {
+              "illuminate": "illuminate-fir",
+              "producer": "fir"
+            },
+            "entrypoint": "integration/illuminate-player/export-selection-package.mjs",
+            "manifest": "BUILD.json",
+            "setup": [
+              {
+                "checkout": "producer",
+                "command": "bash",
+                "args": ["integration/lcnf-c-wasm/setup-emscripten.sh"]
+              }
+            ],
+            "files": {
+              "BUILD.json": "illuminate/selection/BUILD.json",
+              "SHA256SUMS": "illuminate/selection/SHA256SUMS",
+              "illuminate-selection-player-browser-adapter.mjs": "illuminate/selection/illuminate-selection-player-browser-adapter.mjs",
+              "illuminate-selection-player.wasm": "illuminate/selection/illuminate-selection-player.wasm",
+              "illuminate-selection-player.wasm.json": "illuminate/selection/illuminate-selection-player.wasm.json",
+              "smoke.mjs": "illuminate/selection/smoke.mjs"
             }
           }
         }
