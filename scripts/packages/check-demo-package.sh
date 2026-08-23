@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 report="build/generated/fixtures-basic.report.md"
 

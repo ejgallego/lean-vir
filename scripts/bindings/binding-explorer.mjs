@@ -14,6 +14,22 @@ import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
+const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [options]";
+
+function usage() {
+  console.log(`${usageLine}
+
+Generate the consolidated Lean VIR binding explorer.
+
+Options:
+  --coverage FILE   Shipped-binding coverage report.
+  --config-dir DIR  Binding manifests directory. Defaults to Vir/.
+  --out FILE        Write the explorer report JSON to FILE.
+  --html FILE       Write the explorer HTML shell to FILE.
+  --check           Compare generated files with existing outputs.
+  -h, --help        Show this help.
+`);
+}
 
 function parseArgs(argv) {
   const options = {
@@ -25,7 +41,10 @@ function parseArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const option = argv[index];
-    if (option === "--coverage") options.coverage = resolve(repositoryRoot, requiredValue(argv, ++index, option));
+    if (option === "-h" || option === "--help") {
+      usage();
+      return null;
+    } else if (option === "--coverage") options.coverage = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     else if (option === "--config-dir") options.configDir = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     else if (option === "--out") options.out = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     else if (option === "--html") options.html = resolve(repositoryRoot, requiredValue(argv, ++index, option));
@@ -33,7 +52,7 @@ function parseArgs(argv) {
     else throw new Error(`unknown option ${option}`);
   }
   if (options.coverage === null || options.out === null || options.html === null) {
-    throw new Error("usage: generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [--config-dir DIR] [--check]");
+    throw new Error(usageLine);
   }
   return options;
 }
@@ -756,6 +775,7 @@ export function renderBindingExplorerHtml(template, report) {
 
 export async function runBindingExplorerCli(argv) {
   const options = parseArgs(argv);
+  if (options === null) return 0;
   const coverage = await readJson(options.coverage);
   const configPaths = await discoverConfigs(options.configDir);
   if (configPaths.length === 0) throw new Error(`no *.bindings.json files found under ${relative(repositoryRoot, options.configDir)}`);

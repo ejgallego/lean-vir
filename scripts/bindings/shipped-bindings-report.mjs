@@ -20,18 +20,37 @@ import {
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import { RUNTIME_INTRINSIC_HOST_TARGETS } from "../../web/src/runtime/host-state.js";
 
+const usageLine = "usage: node scripts/bindings/generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [options]";
+
+function usage() {
+  console.log(`${usageLine}
+
+Reconcile compiler-derived JavaScript bindings with runtime providers.
+
+Options:
+  --lean FILE  Compiler-derived VIR JavaScript inventory.
+  --out FILE   Write the coverage report JSON to FILE.
+  --html FILE  Write the coverage dashboard to FILE.
+  --check      Compare generated files with existing outputs.
+  -h, --help   Show this help.
+`);
+}
+
 function parseArgs(argv) {
   const options = { lean: null, out: null, html: null, check: false };
   for (let index = 0; index < argv.length; index += 1) {
     const option = argv[index];
-    if (option === "--lean") options.lean = requiredValue(argv, ++index, option);
+    if (option === "-h" || option === "--help") {
+      usage();
+      return null;
+    } else if (option === "--lean") options.lean = requiredValue(argv, ++index, option);
     else if (option === "--out") options.out = requiredValue(argv, ++index, option);
     else if (option === "--html") options.html = requiredValue(argv, ++index, option);
     else if (option === "--check") options.check = true;
     else throw new Error(`unknown option ${option}`);
   }
   if (options.lean === null || options.out === null || options.html === null) {
-    throw new Error("usage: generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [--check]");
+    throw new Error(usageLine);
   }
   return Object.fromEntries(Object.entries(options).map(([key, value]) =>
     [key, typeof value === "string" ? resolve(root, value) : value]));
@@ -288,6 +307,7 @@ export function renderShippedBindingsHtml(report) {
 
 export async function runShippedBindingsReportCli(argv) {
   const options = parseArgs(argv);
+  if (options === null) return 0;
   const inventory = await readInventory(options.lean);
   const report = buildShippedBindingsReport(inventory, collectProviders());
   const outputOptions = {

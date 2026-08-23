@@ -59,7 +59,7 @@
     "prepare:irpkg": "node scripts/packages/prepare-irpkg.mjs",
     "quickstart": "npm run prepare:irpkg -- examples/quickstart.virpkg.json && node scripts/packages/quickstart-url.mjs",
     "prepare:pages": "npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json examples/mergesort.virpkg.json",
-    "check:package": "bash scripts/check-demo-package.sh",
+    "check:package": "bash scripts/packages/check-demo-package.sh",
     "check:package-abi": "node scripts/packages/check-package-abi.mjs",
     "generate:ir-codec-tags": "node scripts/native/check-ir-codec-tags.mjs --write",
     "check:ir-codec-tags": "node scripts/native/check-ir-codec-tags.mjs",

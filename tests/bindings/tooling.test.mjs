@@ -10,6 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import {
   renderBindingExplorerHtml,
@@ -77,19 +78,26 @@ test("generated-file checks reject stale output without exiting", async () => {
 });
 
 test("binding entry points own help and error exit status", () => {
-  const script = repositoryPath(
-    "scripts",
-    "bindings",
-    "generate-ts-descriptors.mjs",
-  );
-  const help = spawnSync(process.execPath, [script, "--help"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-  });
-  assert.equal(help.status, 0, help.stderr);
-  assert.match(help.stdout, /Generate Lean VIR TypeScript descriptor JSON/u);
-  assert.equal(help.stderr, "");
+  const helpCases = [
+    ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR binding explorer/u],
+    ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
+    ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],
+    ["generate-ts-descriptors.mjs", /Generate Lean VIR TypeScript descriptor JSON/u],
+    ["render-type-anchors.mjs", /Render a Verso\/Blueprint-friendly Markdown fragment/u],
+    ["check-type-anchors.mjs", /Compare TypeScript descriptor JSON with Lean VIR interface descriptors/u],
+  ];
+  for (const [file, pattern] of helpCases) {
+    const script = repositoryPath("scripts", "bindings", file);
+    const help = spawnSync(process.execPath, [script, "--help"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    });
+    assert.equal(help.status, 0, `${file}: ${help.stderr}`);
+    assert.match(help.stdout, pattern, file);
+    assert.equal(help.stderr, "", file);
+  }
 
+  const script = repositoryPath("scripts", "bindings", "generate-ts-descriptors.mjs");
   const invalid = spawnSync(process.execPath, [script, "--unknown"], {
     cwd: repositoryRoot,
     encoding: "utf8",
@@ -97,4 +105,28 @@ test("binding entry points own help and error exit status", () => {
   assert.equal(invalid.status, 1, invalid.stdout);
   assert.equal(invalid.stdout, "");
   assert.match(invalid.stderr, /^error: unknown option --unknown\n$/u);
+});
+
+test("binding entry points propagate a returned nonzero status", async () => {
+  const temporary = await mkdtemp(join(tmpdir(), "vir-binding-cli-main-"));
+  try {
+    const entrypoint = join(temporary, "returned-status.mjs");
+    const cliMainUrl = pathToFileURL(
+      repositoryPath("scripts", "bindings", "cli-main.mjs"),
+    ).href;
+    await writeFile(
+      entrypoint,
+      `import { runCliMain } from ${JSON.stringify(cliMainUrl)};\n` +
+        "await runCliMain(async () => 7);\n",
+    );
+    const result = spawnSync(process.execPath, [entrypoint], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 7, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 });
