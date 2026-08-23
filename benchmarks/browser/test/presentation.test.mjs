@@ -37,6 +37,7 @@ test("lean-zip reports normalize without changing their producer schema", () => 
     study: "suite",
     passed: true,
     backendIds: ["vir", "fflate"],
+    examplePackage: { test: "browser-parity" },
     cells: [
       {
         vector: "repeated-1k",
@@ -63,11 +64,12 @@ test("lean-zip reports normalize without changing their producer schema", () => 
     ],
     caveats: ["Diagnostic timings only."],
   };
+  const source = structuredClone(report);
   const model = normalizeBenchmarkReport(report, [
     { id: "vir", label: "VIR" },
     { id: "fflate", label: "fflate" },
   ]);
-  assert.equal(model.title, "Compression comparison · suite");
+  assert.equal(model.title, "Compression comparison · suite · browser-parity");
   assert.deepEqual(
     model.metrics.map(({ id }) => id),
     ["outputBytes", "firstCallMs", "steadyMs"],
@@ -94,7 +96,7 @@ test("lean-zip reports normalize without changing their producer schema", () => 
       },
     ],
   );
-  assert.equal(report.cells[0].results[0].medianMs, 2.25);
+  assert.deepEqual(report, source);
 });
 
 test("pretty reports reuse the same workload and metric model", () => {
@@ -288,6 +290,45 @@ test("retained-memory reports preserve dimension identity and memory metrics", (
   });
 });
 
+test("repeated-call reports compare backend aggregates instead of raw cycles", () => {
+  const model = normalizeBenchmarkReport(
+    {
+      kind: "repeated",
+      passed: true,
+      backendIds: ["js", "vir"],
+      summaries: {
+        js: {
+          status: "ready",
+          timing: { totalMs: { median: 0.75 } },
+        },
+        vir: {
+          status: "ready",
+          timing: { totalMs: { median: 3.25 } },
+        },
+      },
+      scenarios: Array.from({ length: 160 }, (_, sequenceIndex) => ({
+        sequenceIndex,
+        backends: {},
+      })),
+    },
+    [
+      { id: "js", label: "JavaScript" },
+      { id: "vir", label: "VIR" },
+    ],
+  );
+  assert.deepEqual(
+    model.rows.map(({ groupId, backendId, metrics }) => ({
+      groupId,
+      backendId,
+      totalMs: metrics.totalMs,
+    })),
+    [
+      { groupId: "aggregate", backendId: "js", totalMs: 0.75 },
+      { groupId: "aggregate", backendId: "vir", totalMs: 3.25 },
+    ],
+  );
+});
+
 test("metric formatting keeps timing and size units explicit", () => {
   assert.equal(formatMetric(0.001, "ms"), "<0.01 ms");
   assert.equal(formatMetric(1.25, "ms"), "1.25 ms");
@@ -296,7 +337,23 @@ test("metric formatting keeps timing and size units explicit", () => {
 
 test("reports must carry the common backend identity boundary", () => {
   assert.throws(
-    () => normalizeBenchmarkReport({ kind: "custom" }, []),
+    () =>
+      normalizeBenchmarkReport(
+        { kind: "custom", passed: true, backendIds: [] },
+        [],
+      ),
     /identify its backends/,
+  );
+  assert.throws(
+    () => normalizeBenchmarkReport({ kind: "custom", backendIds: ["vir"] }, []),
+    /boolean passed/,
+  );
+  assert.throws(
+    () =>
+      normalizeBenchmarkReport(
+        { kind: "custom", passed: true, backendIds: ["vir", "vir"] },
+        [],
+      ),
+    /unique non-empty strings/,
   );
 });

@@ -4,11 +4,12 @@ This directory is one standalone browser benchmark application. Its example
 selector currently exposes `Std.Format.prettyM`, lean-zip raw DEFLATE, and the
 Illuminate player at the same level and through the same page structure. Each
 example supplies its own semantic contract, backend set, sampling controls, and
-studies while the application owns navigation, artifact status, report actions,
-and shared presentation. Every completed study can be compared through the same
-backend filter, metric selector, chart, and value table; an example may retain
-additional workload-specific report views. The application has no runtime
-dependency on Verso, Reveal, Lake, or the parent VIR repository's source tree.
+studies while the application owns navigation, artifact status, report
+placement, and shared presentation. Every completed study can be compared
+through the same backend filter, metric selector, chart, and value table; an
+example may retain additional workload-specific report views. The application
+has no runtime dependency on Verso, Reveal, Lake, or the parent VIR repository's
+source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -185,9 +186,9 @@ with one reload before application startup.
 Backend selection in every report view is presentation-only. The shared view
 normalizes example-owned report data without rewriting its source JSON, while
 downloaded JSON always retains every backend. Workload-specific views may add
-more detailed controls over the same report. Exported runtime profiles retain
-artifact pathnames and hashes but omit URL origins and query strings. They
-intentionally retain browser user-agent data.
+more detailed controls and own source-report import/export. Exported runtime
+profiles retain artifact pathnames and hashes but omit URL origins and query
+strings. They intentionally retain browser user-agent data.
 
 Run the browser regression with:
 

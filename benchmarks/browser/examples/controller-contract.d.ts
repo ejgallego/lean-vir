@@ -9,10 +9,20 @@ export interface BenchmarkReadiness {
   backendCount: number;
 }
 
+export interface BenchmarkReport {
+  kind: string;
+  passed: boolean;
+  backendIds: string[];
+  [field: string]: unknown;
+}
+
 export interface BenchmarkController {
   ready: Promise<BenchmarkReadiness>;
   getBackends(): BenchmarkBackend[];
-  runStudy(studyId: string, options?: Record<string, unknown>): Promise<unknown>;
+  runStudy(
+    studyId: string,
+    options?: Record<string, unknown>,
+  ): Promise<BenchmarkReport>;
   dispose?(): void;
 }
 

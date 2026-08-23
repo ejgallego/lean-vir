@@ -394,7 +394,13 @@ function reportTitle(report) {
     "lean-zip/browser-benchmark-report": "Compression comparison",
   };
   const title = titles[report.kind] ?? report.kind;
-  return report.study ? `${title} · ${report.study}` : title;
+  const qualifiers = [report.study, report.examplePackage?.test].filter(
+    (value, index, values) =>
+      typeof value === "string" &&
+      value.length > 0 &&
+      values.indexOf(value) === index,
+  );
+  return [title, ...qualifiers].join(" · ");
 }
 
 /**
@@ -407,18 +413,31 @@ export function normalizeBenchmarkReport(report, backends) {
   if (
     !report ||
     typeof report !== "object" ||
-    typeof report.kind !== "string"
+    typeof report.kind !== "string" ||
+    report.kind.length === 0
   ) {
-    throw new TypeError("benchmark report must have a string kind");
+    throw new TypeError("benchmark report must have a non-empty string kind");
   }
-  if (!Array.isArray(report.backendIds) || report.backendIds.length === 0) {
-    throw new TypeError("benchmark report must identify its backends");
+  if (typeof report.passed !== "boolean") {
+    throw new TypeError("benchmark report must have a boolean passed result");
+  }
+  if (
+    !Array.isArray(report.backendIds) ||
+    report.backendIds.length === 0 ||
+    report.backendIds.some((id) => typeof id !== "string" || id.length === 0) ||
+    new Set(report.backendIds).size !== report.backendIds.length
+  ) {
+    throw new TypeError(
+      "benchmark report must identify its backends with unique non-empty strings",
+    );
   }
   const labels = new Map(backends.map(({ id, label }) => [id, label]));
   let normalized;
-  if (Array.isArray(report.cells))
+  if (report.kind === "repeated") {
+    normalized = normalizeSummaries(report, labels);
+  } else if (Array.isArray(report.cells)) {
     normalized = normalizeLeanZip(report, labels);
-  else if (Array.isArray(report.scenarios)) {
+  } else if (Array.isArray(report.scenarios)) {
     normalized = normalizeScenarios(report, labels);
   } else if (Array.isArray(report.points)) {
     normalized = normalizeMemory(report, labels);
@@ -436,7 +455,7 @@ export function normalizeBenchmarkReport(report, backends) {
       .join("/"),
     title: reportTitle(report),
     generatedAt: report.generatedAt ?? report.startedAt ?? null,
-    passed: report.passed !== false,
+    passed: report.passed,
     backendIds: report.backendIds.slice(),
     backends: report.backendIds.map((id) => ({
       id,
@@ -485,6 +504,24 @@ function compactLabel(value, limit) {
   return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
 }
 
+/** @param {*[]} rows @param {number} limit */
+function selectWholeGroups(rows, limit) {
+  /** @type {Map<string, *[]>} */
+  const groups = new Map();
+  for (const row of rows) {
+    const group = groups.get(row.groupId) ?? [];
+    group.push(row);
+    groups.set(row.groupId, group);
+  }
+  const selected = [];
+  for (const group of groups.values()) {
+    if (selected.length > 0 && selected.length + group.length > limit) break;
+    selected.push(...group);
+    if (selected.length >= limit) break;
+  }
+  return selected;
+}
+
 /**
  * @param {SVGSVGElement} chart
  * @param {*} model
@@ -500,11 +537,26 @@ function renderChart(chart, model, selected, selectedMetric, note) {
       visible.has(row.backendId) &&
       finiteNumber(row.metrics[selectedMetric.id]) !== null,
   );
-  const plotted = rows.slice(0, 36);
   const width = 960;
   const labelWidth = 270;
   const barWidth = width - labelWidth - 120;
   const rowHeight = 27;
+  if (rows.some((row) => Number(row.metrics[selectedMetric.id]) < 0)) {
+    const height = 130;
+    chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    chart.style.height = `${height}px`;
+    const message = svg(chart, "text", {
+      x: String(width / 2),
+      y: String(height / 2),
+      "text-anchor": "middle",
+      class: "benchmark-report-chart-empty",
+    });
+    message.textContent = "Signed values are shown in the table";
+    note.textContent =
+      "The chart is omitted because a one-sided bar would hide the sign of this metric.";
+    return;
+  }
+  const plotted = selectWholeGroups(rows, 36);
   const height = Math.max(130, 62 + plotted.length * rowHeight);
   chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
   chart.style.height = `${height}px`;
@@ -552,11 +604,15 @@ function renderChart(chart, model, selected, selectedMetric, note) {
     });
     valueLabel.textContent = formatMetric(value, selectedMetric.unit);
   });
-  note.textContent =
-    rows.length > plotted.length
-      ? `Showing the first ${plotted.length} of ${rows.length} comparable ` +
-        "cells; the table includes all values."
-      : `${rows.length} comparable workload/backend cells.`;
+  if (rows.length > plotted.length) {
+    const plottedGroups = new Set(plotted.map((row) => row.groupId)).size;
+    const availableGroups = new Set(rows.map((row) => row.groupId)).size;
+    note.textContent =
+      `Showing ${plottedGroups} of ${availableGroups} complete workload groups; ` +
+      "the table includes all values.";
+  } else {
+    note.textContent = `${rows.length} comparable workload/backend cells.`;
+  }
 }
 
 /**
@@ -763,10 +819,10 @@ export function createReportPresentation(options) {
     closeButton.focus();
   }
 
-  document.addEventListener(
+  options.openButton.addEventListener(
     "click",
     (event) => {
-      if (event.target !== options.openButton || reports.size === 0) return;
+      if (reports.size === 0) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       open();
@@ -784,10 +840,7 @@ export function createReportPresentation(options) {
       reports.set(model.key, model);
       activeKey = model.key;
       options.openButton.disabled = false;
-      return model;
     },
-    open,
-    close,
     reset() {
       reports.clear();
       activeKey = null;
@@ -802,9 +855,6 @@ const presentationApi = Object.freeze({
   backendColor,
   createBackendFilter,
   createBackendSelection,
-  createReportPresentation,
-  formatMetric,
-  normalizeBenchmarkReport,
 });
 
 globalThis.BenchmarkPresentation = presentationApi;

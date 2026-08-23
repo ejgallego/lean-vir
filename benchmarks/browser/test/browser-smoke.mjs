@@ -159,7 +159,7 @@ try {
   await page.locator(".benchmark-report-overlay").waitFor({ state: "visible" });
   assert.equal(
     await page.locator(".benchmark-report-overlay h2").textContent(),
-    "Corpus",
+    "Corpus · smoke-parity",
   );
   const dashboardFilters = page.locator(
     ".benchmark-report-overlay input[data-backend-filter]",
@@ -177,11 +177,15 @@ try {
     "1 of 5 selected",
   );
   assert.equal(
-    await page.locator('.benchmark-report-chart rect[fill="#d879c6"]').count(),
+    await page
+      .locator('.benchmark-report-chart rect[data-benchmark-backend="native"]')
+      .count(),
     1,
   );
   assert.equal(
-    await page.locator('.benchmark-report-chart rect[fill="#74a9ff"]').count(),
+    await page
+      .locator('.benchmark-report-chart rect[data-benchmark-backend="js"]')
+      .count(),
     0,
   );
   await page
@@ -224,6 +228,26 @@ try {
   await page
     .locator(".pretty-corpus-overlay header button", { hasText: "Close" })
     .click();
+  await page.locator("#repeat-cycles").fill("1");
+  await page.locator('button[data-study="repeated"]').click();
+  await page.waitForFunction(
+    () => document.querySelector("#app-state")?.textContent === "Complete",
+  );
+  await page.locator("#open-dashboard").click();
+  const repeated = page.locator(".benchmark-report-overlay");
+  await repeated.waitFor({ state: "visible" });
+  assert.equal(await repeated.locator("h2").textContent(), "Repeated calls");
+  await repeated
+    .locator(".benchmark-backend-filter-actions button", {
+      hasText: "Show all",
+    })
+    .click();
+  assert.equal(await repeated.locator("tbody tr").count(), 5);
+  assert.equal(
+    await repeated.locator(".benchmark-report-chart rect").count(),
+    5,
+  );
+  await repeated.locator("header button", { hasText: "Close" }).click();
   await page.locator("#clear-results").click();
   assert.equal(await page.locator("#open-dashboard").isDisabled(), true);
   assert.equal(await page.locator(".report-card").count(), 0);

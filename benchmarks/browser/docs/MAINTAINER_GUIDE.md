@@ -29,7 +29,8 @@ directories.
   generic stager atomically replaces only that example's artifact directory.
 - `browser-benchmarks/controller/v1` is the workload-independent browser
   controller boundary. The shared shell owns discovery, variants, artifact
-  status, controls, report placement, and backend filtering.
+  status, controls, and report placement; shared presentation owns backend
+  filtering.
 
 See `benchmarks/browser/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 `ARTIFACT_SETS.md` for the complete formats.
