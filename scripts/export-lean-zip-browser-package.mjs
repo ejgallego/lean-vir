@@ -173,9 +173,9 @@ async function main() {
     throw new Error(`VIR esbuild is not installed: ${esbuild}`);
   }
 
-  await mkdir(join(output, "lean-vir/js"), { recursive: true });
-  await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
   try {
+    await mkdir(join(output, "lean-vir/js"), { recursive: true });
+    await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
     runSync("npm", ["run", "build:demo:release"], {
       cwd: producer,
       env: {

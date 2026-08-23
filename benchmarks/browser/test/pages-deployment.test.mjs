@@ -21,6 +21,26 @@ import {
 } from "../scripts/pages-deployment-lib.mjs";
 import { appRoot } from "../scripts/package-root.mjs";
 
+test("parses safe example and variant selections", () => {
+  assert.deepEqual(parsePagesDeployment("lean-zip=default"), {
+    example: "lean-zip",
+    variant: "default",
+  });
+  for (const value of [
+    undefined,
+    "",
+    "prettyM",
+    "prettyM=default=extra",
+    "../prettyM=default",
+    "prettyM=../default",
+  ]) {
+    assert.throws(
+      () => parsePagesDeployment(value),
+      /invalid Pages deployment/,
+    );
+  }
+});
+
 async function stagedDeployment(t) {
   const resultsRoot = join(appRoot, "test-results");
   await mkdir(resultsRoot, { recursive: true });
@@ -54,13 +74,14 @@ async function stagedDeployment(t) {
     manifest,
     manifestPath,
     payloadPath,
-    select: (deployment = "prettyM=default") =>
+    select: (...deployments) =>
       selectPagesCatalog({
         appRoot,
         artifactsRoot,
         catalog,
         database,
-        deployments: [parsePagesDeployment(deployment)],
+        deployments: (deployments.length ? deployments : ["prettyM=default"])
+          .map(parsePagesDeployment),
       }),
   };
 }
@@ -109,6 +130,14 @@ test("rejects a Pages example without a canonical build", async (t) => {
   await assert.rejects(
     () => fixture.select("illuminate=default"),
     /has no canonical build/,
+  );
+});
+
+test("rejects duplicate Pages example selections", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await assert.rejects(
+    () => fixture.select("prettyM=default", "prettyM=default"),
+    /duplicate Pages example: prettyM/,
   );
 });
 

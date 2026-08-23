@@ -1,11 +1,10 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { readBuildDatabase } from "./artifact-build-lib.mjs";
 import { discoverExampleCatalog } from "./example-catalog-lib.mjs";
+import { appRoot } from "./package-root.mjs";
 import { activePagesDeployments } from "./pages-deployment-lib.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 if (process.argv.length > 2) {
   console.log(`Usage: node scripts/pages-deployment-plan.mjs
 

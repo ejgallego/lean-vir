@@ -40,12 +40,13 @@ commands. Performance collection remains an explicit controlled-machine step.
 
 ## Responsibilities
 
-- load the JavaScript, VIR JSON, VIR typed-Format, native FIR Wasm, and
-  LLVM/Emscripten candidates;
-- verify exact rendered-text and styling parity;
-- collect marshal, execute, decode, and total timings;
-- run corpus, scaling, interaction, retained-memory, and repeated-call studies;
-- collect cold-start and isolated-runtime observations in fresh browser contexts;
+- discover self-contained examples and variants from the catalog;
+- load each admitted artifact set through its example controller;
+- run the differential tests and benchmark studies declared by that example;
+- preserve workload-defined inputs, correctness rules, timing phases, and
+  artifact provenance;
+- collect cold-start and isolated-runtime observations in fresh browser
+  contexts;
 - aggregate multiple fresh browser processes into campaign reports;
 - display reports and campaigns with a shared, non-destructive backend filter; and
 - import/export the complete JSON representation independently of the active
@@ -93,17 +94,12 @@ boundary.
 `artifacts:pack` consumes it with this layout:
 
 ```text
-prettyM/lean-vir/js/vir-runtime.js
-prettyM/lean-vir/wasm/vir-upstream.wasm
-prettyM/prettyM-vir.irpkg
-prettyM/lean-native/{BUILD.json,prettyM-browser-adapter.mjs,
-                     prettyM.wasm,prettyM.wasm.json}
-prettyM/lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
-                   prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
-                   prettyM.mjs,prettyM.wasm}
+<example-id>/<producer-declared package files>
 ```
 
-It writes a deterministic normalized tar, member checksums, an
+Every path and component is catalog-declared; the packer does not assume
+prettyM, lean-zip, or a fixed compiler route. It writes a deterministic
+normalized tar, member checksums, an
 `ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
@@ -176,14 +172,14 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
-not load or privilege either workload. Select an example there or use the
-direct links `?example=prettyM&variant=default` and
+not load or privilege any workload. Select an example there or use
+`?example=prettyM&variant=default`, `?example=lean-zip&variant=default`, or
 `?example=illuminate&variant=default`. Example variants are selected in the
-shared header rather than by workload-specific UI. The included server supplies
-the required cross-origin isolation headers. `_headers` and `.htaccess` are
-included for static hosts that consume them. The scoped service worker covers
-hosts such as GitHub Pages that cannot configure those headers, with one reload
-before application startup.
+shared header rather than by workload-specific UI. The included server
+supplies the required cross-origin isolation headers. `_headers` and
+`.htaccess` are included for static hosts that consume them. The scoped service
+worker covers hosts such as GitHub Pages that cannot configure those headers,
+with one reload before application startup.
 
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction
