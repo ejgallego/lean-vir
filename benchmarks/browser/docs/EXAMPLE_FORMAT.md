@@ -196,9 +196,19 @@ The returned controller implements `browser-benchmarks/controller/v1`:
 ```
 
 The controller owns workload-specific input generation, correctness checks,
-and report production. The shared shell owns discovery, navigation, controls,
-artifact status, and report placement. Keeping presentation in the controller
-means the compilation descriptor stays small and stable.
+and its source report. `runStudy()` returns that report with `kind`, `passed`,
+and `backendIds`; the existing differential test contract already checks the
+backend identity. The shared shell observes the returned report and adapts
+common numeric shapes to one backend filter, metric selector, chart, and value
+table. Current adapters cover scenario/backends reports, scaling
+`dimensions[].points`, retained-memory points, and lean-zip-style workload
+cells. The source object is not rewritten.
+
+An example may keep a specialized detailed view for data that does not fit the
+shared comparison. This is presentation layering, not a new producer or report
+schema: compilation descriptors remain small, client JSON remains
+downloadable, and adding a metric does not require changing the controller
+contract.
 
 ## Lifecycle
 

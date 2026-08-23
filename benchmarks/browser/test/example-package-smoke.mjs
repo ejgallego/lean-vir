@@ -171,6 +171,19 @@ try {
       report,
     });
   }
+  assert.equal(await page.locator("#open-dashboard").isEnabled(), true);
+  await page.locator("#open-dashboard").click();
+  const sharedReport = page.locator(".benchmark-report-overlay");
+  await sharedReport.waitFor({ state: "visible" });
+  assert.equal(
+    await sharedReport.locator("input[data-backend-filter]").count(),
+    results.at(-1).backends.length,
+  );
+  assert.ok(
+    await sharedReport.locator("select[data-metric-select] option").count(),
+  );
+  assert.ok(await sharedReport.locator(".benchmark-report-chart rect").count());
+  await sharedReport.locator("header button", { hasText: "Close" }).click();
   assert.deepEqual(pageErrors, []);
   if (output) {
     const outputPath = inside(appRoot, output, "write example test report");

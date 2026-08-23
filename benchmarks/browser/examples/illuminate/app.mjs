@@ -5,11 +5,6 @@ if (!(artifactBase instanceof URL)) {
   throw new Error("Illuminate requires the benchmark example context");
 }
 const typedVirEntry = "Illuminate.Animation.Vir.replayTraceTyped";
-const backendColors = {
-  js: "#74a9ff",
-  vir: "#f0a35e",
-  native: "#d879c6",
-};
 const phaseDefinitions = [
   { id: "totalMs", label: "Total" },
   { id: "prepareMs", label: "Prepare" },
@@ -151,7 +146,7 @@ function renderBackends() {
     label.dataset.backend = candidate.id;
     label.style.setProperty(
       "--backend-color",
-      backendColors[candidate.id] || "#86b5e8",
+      globalThis.BenchmarkPresentation.backendColor(candidate.id),
     );
     const input = document.createElement("input");
     input.type = "checkbox";
@@ -729,16 +724,16 @@ async function runComparison(kind, options = {}) {
   const workloadSpecs = Array.isArray(options.data?.workloads)
     ? options.data.workloads
     : [
-    {
-      id: "small",
-      title: "Pause-driven slide show",
-      eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30, 60, 120],
-    },
-    {
-      id: "parameter-heavy",
-      title: "Morphing arrows and final loop",
-      eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30],
-    },
+        {
+          id: "small",
+          title: "Pause-driven slide show",
+          eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30, 60, 120],
+        },
+        {
+          id: "parameter-heavy",
+          title: "Morphing arrows and final loop",
+          eventCounts: kind === "quick" ? [0, 1, 10] : [0, 1, 10, 30],
+        },
       ];
   const workloads = workloadSpecs.map((spec) => {
     const example = examples.find(

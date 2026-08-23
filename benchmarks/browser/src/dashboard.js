@@ -3,6 +3,13 @@
 (function () {
   "use strict";
 
+  var benchmarkPresentation = globalThis.BenchmarkPresentation;
+  if (!benchmarkPresentation) {
+    throw new Error("shared benchmark presentation is not loaded");
+  }
+  var prettyDashboardBackendSelection =
+    benchmarkPresentation.createBackendSelection();
+
   /** @type {*} */
   var prettyCampaignReport = null;
   /** @type {*} */
@@ -117,28 +124,9 @@
     }, 0);
   }
 
-  /** @type {Record<string, string>} */
-  var PRETTY_DASHBOARD_COLORS = {
-    js: "#74a9ff",
-    vir: "#f0a35e",
-    "vir-format": "#77c879",
-    native: "#d879c6",
-    llvm: "#d7c45c",
-  };
-
-  /** @type {Set<string>} */
-  var prettyDashboardSelectedBackends = new Set();
-
   /** @param {string[]} available */
   function prettyDashboardSelectedBackendIds(available) {
-    var selected = available.filter(function (id) {
-      return prettyDashboardSelectedBackends.has(id);
-    });
-    if (selected.length === 0) {
-      selected = available.slice();
-      prettyDashboardSelectedBackends = new Set(selected);
-    }
-    return selected;
+    return prettyDashboardBackendSelection.selected(available);
   }
 
   /**
@@ -147,85 +135,22 @@
    * @param {(selected: string[]) => void} onChange
    */
   function createPrettyBackendFilter(available, labelFor, onChange) {
-    var selected = new Set(prettyDashboardSelectedBackendIds(available));
-    var fieldset = document.createElement("fieldset");
-    fieldset.className = "pretty-backend-filter";
-    var legend = document.createElement("legend");
-    legend.textContent = "Visible backends";
-    var summary = document.createElement("span");
-    summary.className = "pretty-backend-filter-summary";
-    summary.setAttribute("aria-live", "polite");
-    var options = document.createElement("div");
-    options.className = "pretty-backend-filter-options";
-    var actions = document.createElement("div");
-    actions.className = "pretty-backend-filter-actions";
-    var selectAll = document.createElement("button");
-    selectAll.type = "button";
-    selectAll.textContent = "Show all";
-    actions.appendChild(selectAll);
-
-    /** @type {Map<string, HTMLInputElement>} */
-    var inputs = new Map();
-
-    function publish() {
-      prettyDashboardSelectedBackends = new Set(selected);
-      summary.textContent =
-        selected.size + " of " + available.length + " selected";
-      selectAll.disabled = selected.size === available.length;
-      onChange(
-        available.filter(function (id) {
-          return selected.has(id);
-        }),
-      );
-    }
-
-    available.forEach(function (id) {
-      var label = document.createElement("label");
-      label.className = "pretty-backend-filter-option";
-      var input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = id;
-      input.checked = selected.has(id);
-      input.dataset.backendFilter = id;
-      inputs.set(id, input);
-      var swatch = document.createElement("span");
-      swatch.className = "pretty-dashboard-swatch";
-      swatch.style.backgroundColor = prettyDashboardColor(id);
-      var name = document.createElement("span");
-      name.textContent = labelFor(id);
-      label.append(input, swatch, name);
-      options.appendChild(label);
-      input.addEventListener("change", function () {
-        if (input.checked) selected.add(id);
-        else selected.delete(id);
-        if (selected.size === 0) {
-          input.checked = true;
-          selected.add(id);
-        }
-        publish();
-      });
+    return benchmarkPresentation.createBackendFilter({
+      available: available,
+      labelFor: labelFor,
+      onChange: onChange,
+      selection: prettyDashboardBackendSelection,
+      className: "pretty-backend-filter",
     });
-    selectAll.addEventListener("click", function () {
-      selected = new Set(available);
-      inputs.forEach(function (input) {
-        input.checked = true;
-      });
-      publish();
-    });
-    summary.textContent =
-      selected.size + " of " + available.length + " selected";
-    selectAll.disabled = selected.size === available.length;
-    fieldset.append(legend, options, actions, summary);
-    return fieldset;
   }
 
   /** @param {HTMLElement} root @param {string[]} selected */
   function applyPrettyBackendVisibility(root, selected) {
-    var visible = new Set(selected);
-    root.querySelectorAll("[data-pretty-backend]").forEach(function (element) {
-      var node = /** @type {HTMLElement} */ (element);
-      node.hidden = !visible.has(node.dataset.prettyBackend || "");
-    });
+    benchmarkPresentation.applyBackendVisibility(
+      root,
+      selected,
+      "data-pretty-backend",
+    );
   }
 
   /** @return {string[]} */
@@ -321,7 +246,7 @@
 
   /** @param {string} id */
   function prettyDashboardColor(id) {
-    return PRETTY_DASHBOARD_COLORS[id] || "#a8a8a8";
+    return benchmarkPresentation.backendColor(id);
   }
 
   /** @param {string} label @param {string} value @param {string} note */
