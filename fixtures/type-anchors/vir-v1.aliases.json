@@ -5,7 +5,7 @@
       "lean": "Lean.Vir.React.Root",
       "type": "Lean.Vir.Js Lean.Vir.React.Root",
       "via": "Lean.Vir.TypeAnchors.reactRootIdentity",
-      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "source": "fixtures/type-anchors/vir-v1.fixture.lean",
       "descriptor": "resource"
     }
   ]

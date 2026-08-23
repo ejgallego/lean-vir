@@ -27,14 +27,18 @@ The documentation owners are:
   instead of invoking `lean --run tools/GeneratePackage.lean`.
 - Shipped JavaScript binding inventory and report generation live in
   `tools/ExportVirJsInventory.lean` and
-  `scripts/generate-shipped-bindings-report.mjs`. The compiler inventory also
-  records every public executable declaration that transitively reaches a host
-  target, including the exact IR declaration path.
+  `scripts/bindings/generate-shipped-bindings-report.mjs`. The compiler
+  inventory also records every public executable declaration that transitively
+  reaches a host target, including the exact IR declaration path.
 - The consolidated binding explorer uses the colocated `Vir/*.bindings.json`
-  manifests and `scripts/generate-binding-explorer.mjs`; run
+  manifests and `scripts/bindings/generate-binding-explorer.mjs`; run
   `npm run generate:bindings` to refresh it and `npm run check:bindings` to
   validate all layers. Reproducible explorer and descriptor outputs live under
   ignored `build/bindings/` and `build/type-descriptors/` paths.
+- Binding and type-anchor implementations share their narrow CLI/output helpers
+  under `scripts/bindings/`; their smoke coverage lives under `tests/bindings/`,
+  authored comparison fixtures under `fixtures/type-anchors/`, and static
+  explorer assets under `web/tools/binding-explorer/`.
 - Native wrapper inspection lives in `scripts/inventory-native-wrappers.mjs`.
 - IR declaration payload tag values live in
   `Vir/GeneratePackage/PackageIRTags.lean`; their generator and checker live in

@@ -6,6 +6,8 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 
 - `benchmarks/` tests the repository benchmark harness without running a full
   performance campaign.
+- `bindings/` owns direct unit coverage and end-to-end smoke checks for the
+  shipped-binding explorer and type-anchor tooling under `scripts/bindings/`.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
 - `fixture-runner.mjs` is the integration entry point for Lean fixture
   host-oracle and Wasm comparison checks; their inputs live in root

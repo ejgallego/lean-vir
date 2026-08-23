@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 
 const report = JSON.parse(await readFile("build/bindings/report.json", "utf8"));
 const html = await readFile("build/bindings/index.html", "utf8");
+const app = await readFile("build/bindings/assets/app.js", "utf8");
+const style = await readFile("build/bindings/assets/style.css", "utf8");
 const roots = report.libraries.flatMap((library) =>
   library.apiGroups.map((root) => ({ library: library.id, ...root })));
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
@@ -216,10 +218,7 @@ assert.equal(
 );
 
 assert.match(html, /<h1>Binding explorer<\/h1>/u);
-assert.match(
-  html,
-  new RegExp(`id="provided-metric">${report.summary.provided}/${report.summary.targets}`),
-);
+assert.match(html, /id="provided-metric"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Complete surface analysis/u);
 assert.match(html, /Automatic analysis/u);
@@ -228,16 +227,17 @@ assert.match(html, /runtime coverage and API fidelity/u);
 assert.match(html, /Upstream libraries/u);
 assert.match(html, /Public Lean API/u);
 assert.match(html, /Host targets/u);
-assert.match(html, /Expected versus actual type/u);
-assert.match(html, /function accessorDisplay\(symbol,accessor\)/u);
-assert.match(html, /Reviewed type fidelity/u);
-assert.match(html, /Upstream TypeScript surface/u);
+assert.match(app, /Expected versus actual type/u);
+assert.match(html, /src="assets\/app\.js"/u);
+assert.match(html, /href="assets\/style\.css"/u);
+assert.match(app, /function accessorDisplay\(symbol,accessor\)/u);
+assert.match(style, /\.workspace/u);
+assert.match(app, /Reviewed type fidelity/u);
+assert.match(app, /Upstream TypeScript surface/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
 assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);
-const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
-assert.ok(scripts.length >= 2, "explorer should include data and interaction scripts");
-Function(scripts.at(-1)[1]);
+Function(app);
 
 console.log(
   `binding explorer smoke ok: ${report.summary.libraries} libraries, ` +

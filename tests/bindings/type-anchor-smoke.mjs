@@ -11,10 +11,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { INTERFACE_MANIFEST_VERSION } from "../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
+import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = new URL("../..", import.meta.url).pathname;
 const tmp = await mkdtemp(join(tmpdir(), "lean-vir-type-anchors-"));
 
 try {
@@ -178,9 +178,9 @@ declare function schedule(value: number): void;
     },
   }, null, 2)}\n`);
 
-  run(["scripts/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
+  run(["scripts/bindings/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
   run([
-    "scripts/generate-ts-descriptors.mjs",
+    "scripts/bindings/generate-ts-descriptors.mjs",
     "--symbol", "AmbientRoot",
     "--symbol", "AmbientRoot.run",
     "--symbol", "schedule",
@@ -188,7 +188,7 @@ declare function schedule(value: number): void;
     ambientTypes,
   ]);
   run([
-    "scripts/generate-ts-descriptors.mjs",
+    "scripts/bindings/generate-ts-descriptors.mjs",
     "--symbol", "Demo.BoxFn",
     "--symbol", "Demo.ExternalFn",
     "--dependency-depth", "1",
@@ -196,16 +196,16 @@ declare function schedule(value: number): void;
     "--out", dependencyDescriptors,
     types,
   ]);
-  run(["scripts/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--out", report]);
-  runFailure(["scripts/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest]);
+  run(["scripts/bindings/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--out", report]);
+  runFailure(["scripts/bindings/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest]);
   runFailure([
-    "scripts/check-type-anchors.mjs",
+    "scripts/bindings/check-type-anchors.mjs",
     "--descriptors", descriptors,
     "--manifest", invalidAliasManifest,
   ]);
-  run(["scripts/render-type-anchors.mjs", "--report", report, "--out", rendered]);
+  run(["scripts/bindings/render-type-anchors.mjs", "--report", report, "--out", rendered]);
   run([
-    "scripts/render-type-anchors.mjs",
+    "scripts/bindings/render-type-anchors.mjs",
     "--format", "html",
     "--report", report,
     "--out", renderedHtml,

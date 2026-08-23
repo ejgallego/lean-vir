@@ -428,6 +428,8 @@ logic into entry-point scripts or pages:
 - Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
   `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`
 - IR package generator setup: `scripts/irpkg-generator.mjs`
+- Binding inventory, descriptor, comparison, and explorer tooling:
+  `scripts/bindings/`; focused coverage: `tests/bindings/`
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
 - Host resource and virtual binding internals:

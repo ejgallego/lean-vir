@@ -5,15 +5,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readIrPackageFile } from "./irpkg-format.mjs";
-import { validateInterfaceManifest } from "../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG as WIRE } from "../web/src/runtime/interface-tags.js";
+import { readIrPackageFile } from "../irpkg-format.mjs";
+import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const statusRank = {
   exact: 0,
@@ -23,7 +24,7 @@ const statusRank = {
 };
 
 function usage() {
-  console.error(`usage: node scripts/check-type-anchors.mjs --descriptors FILE (--irpkg FILE | --manifest FILE) [options]
+  console.error(`usage: node scripts/bindings/check-type-anchors.mjs --descriptors FILE (--irpkg FILE | --manifest FILE) [options]
 
 Compare TypeScript descriptor JSON with Lean VIR interface descriptors.
 
@@ -38,11 +39,6 @@ Options:
   --fail-on-errors    Exit nonzero on error-severity review diagnostics.
   -h, --help          Show this help.
 `);
-}
-
-function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
 }
 
 function parseArgs(argv) {
@@ -104,41 +100,33 @@ function parseArgs(argv) {
   };
 }
 
-function requiredValue(argv, index, option) {
-  const value = argv[index];
-  if (!value || value.startsWith("--")) fail(`${option} requires a value`);
-  return value;
-}
+export async function runTypeAnchorReportCli(argv) {
+  const cli = parseArgs(argv);
+  const report = await buildTypeAnchorReport(cli);
+  const text = `${JSON.stringify(report, null, 2)}\n`;
 
-const cli = parseArgs(process.argv.slice(2));
-const report = await buildReport(cli);
-const text = `${JSON.stringify(report, null, 2)}\n`;
-
-if (cli.out !== null) {
-  if (cli.check) {
-    const existing = await readFile(cli.out, "utf8");
-    if (existing.replace(/\r\n/g, "\n") !== text) {
-      fail(`${relative(root, cli.out)} is stale; rerun the corresponding comparison step without --check`);
-    }
-    console.log(`validated ${relative(root, cli.out)}`);
+  if (cli.out !== null) {
+    const action = await emitGeneratedFile(cli.out, text, {
+      check: cli.check,
+      root,
+      staleHint: "rerun the corresponding comparison step without --check",
+    });
+    console.log(`${action} ${relative(root, cli.out)} (${report.results.length} anchors)`);
+  } else if (cli.json) {
+    process.stdout.write(text);
   } else {
-    await writeFile(cli.out, text);
-    console.log(`wrote ${relative(root, cli.out)} (${report.results.length} anchors)`);
+    printSummary(report);
   }
-} else if (cli.json) {
-  process.stdout.write(text);
-} else {
-  printSummary(report);
+
+  if (cli.strict && (report.summary.weak !== 0 || report.summary.missing !== 0)) {
+    process.exit(1);
+  }
+  if (cli.failOnErrors && report.diagnosticSummary.error !== 0) {
+    process.exit(1);
+  }
 }
 
-if (cli.strict && (report.summary.weak !== 0 || report.summary.missing !== 0)) {
-  process.exit(1);
-}
-if (cli.failOnErrors && report.diagnosticSummary.error !== 0) {
-  process.exit(1);
-}
-
-async function buildReport({ descriptors, irpkg, manifest }) {
+export async function buildTypeAnchorReport({ descriptors, irpkg, manifest }) {
   const tsDescriptors = validateTsDescriptors(JSON.parse(await readFile(descriptors, "utf8")));
   const leanManifest = irpkg !== null
     ? (await readIrPackageFile(irpkg)).manifest
@@ -154,7 +142,7 @@ async function buildReport({ descriptors, irpkg, manifest }) {
   }
   return {
     version: 1,
-    generatedBy: "scripts/check-type-anchors.mjs",
+    generatedBy: "scripts/bindings/check-type-anchors.mjs",
     inputs: {
       descriptors: relative(root, descriptors),
       lean: irpkg === null ? relative(root, manifest) : relative(root, irpkg),

@@ -6,17 +6,18 @@ Author: Emilio J. Gallego Arias
 */
 
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
-import { readIrPackageFile } from "./irpkg-format.mjs";
+import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "../irpkg-generator.mjs";
+import { readIrPackageFile } from "../irpkg-format.mjs";
+import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
-  console.error(`usage: node scripts/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]
+  console.error(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]
 
 Generate a checked-in interface manifest fixture through the real VIR package
 generator. Generated .irpkg and report files stay under build/.
@@ -31,17 +32,6 @@ Options:
   --check         Compare generated manifest with --out instead of writing it.
   -h, --help      Show this help.
 `);
-}
-
-function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
-}
-
-function requiredValue(argv, index, option) {
-  const value = argv[index];
-  if (!value || value.startsWith("--")) fail(`${option} requires a value`);
-  return value;
 }
 
 function parseArgs(argv) {
@@ -93,46 +83,44 @@ function parseArgs(argv) {
   return { source, roots, aliases, out, packagePath, report, check };
 }
 
-const cli = parseArgs(process.argv.slice(2));
-const roots = await readLines(cli.roots);
-if (roots.length === 0) fail(`${relative(root, cli.roots)} has no roots`);
-const aliases = cli.aliases === null ? [] : await readAliases(cli.aliases);
+export async function runTypeAnchorManifestCli(argv) {
+  const cli = parseArgs(argv);
+  const roots = await readLines(cli.roots);
+  if (roots.length === 0) fail(`${relative(root, cli.roots)} has no roots`);
+  const aliases = cli.aliases === null ? [] : await readAliases(cli.aliases);
 
-const generator = prepareVirIrpkgSync(root);
-if (!generator.ok) fail(irpkgGeneratorFailureMessage(generator));
+  const generator = prepareVirIrpkgSync(root);
+  if (!generator.ok) fail(irpkgGeneratorFailureMessage(generator));
 
-await mkdir(dirname(cli.packagePath), { recursive: true });
-await mkdir(dirname(cli.report), { recursive: true });
-const result = spawnSync(generator.path, [
-  cli.packagePath,
-  cli.report,
-  "--target",
-  repoRelativePath(cli.source),
-  ...roots,
-], {
-  cwd: root,
-  env: generator.env,
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "pipe"],
-});
-if ((result.status ?? 1) !== 0) {
-  process.stderr.write(result.stderr);
-  process.stdout.write(result.stdout);
-  fail(`Lean anchor package generation failed; see ${relative(root, cli.report)}`);
-}
-
-const info = await readIrPackageFile(cli.packagePath);
-const manifest = normalizeManifest(info.manifest, aliases);
-const text = `${JSON.stringify(manifest, null, 2)}\n`;
-if (cli.check) {
-  const existing = await readFile(cli.out, "utf8");
-  if (existing.replace(/\r\n/g, "\n") !== text) {
-    fail(`${relative(root, cli.out)} is stale; rerun the corresponding generation step without --check`);
+  await mkdir(dirname(cli.packagePath), { recursive: true });
+  await mkdir(dirname(cli.report), { recursive: true });
+  const result = spawnSync(generator.path, [
+    cli.packagePath,
+    cli.report,
+    "--target",
+    repoRelativePath(cli.source),
+    ...roots,
+  ], {
+    cwd: root,
+    env: generator.env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if ((result.status ?? 1) !== 0) {
+    process.stderr.write(result.stderr);
+    process.stdout.write(result.stdout);
+    fail(`Lean anchor package generation failed; see ${relative(root, cli.report)}`);
   }
-  console.log(`validated ${relative(root, cli.out)}`);
-} else {
-  await writeFile(cli.out, text);
-  console.log(`wrote ${relative(root, cli.out)} (${manifest.exports.length} exports)`);
+
+  const info = await readIrPackageFile(cli.packagePath);
+  const manifest = normalizeTypeAnchorManifest(info.manifest, aliases);
+  const text = `${JSON.stringify(manifest, null, 2)}\n`;
+  const action = await emitGeneratedFile(cli.out, text, {
+    check: cli.check,
+    root,
+    staleHint: "rerun the corresponding generation step without --check",
+  });
+  console.log(`${action} ${relative(root, cli.out)} (${manifest.exports.length} exports)`);
 }
 
 async function readLines(path) {
@@ -150,7 +138,7 @@ async function readAliases(path) {
   return value.aliases;
 }
 
-function normalizeManifest(manifest, aliases) {
+export function normalizeTypeAnchorManifest(manifest, aliases) {
   const metadata = { ...manifest.metadata, generatedAt: "normalized" };
   if (Array.isArray(metadata.targets)) {
     metadata.targets = metadata.targets.map((target) => ({

@@ -5,17 +5,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
+import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
 
-const scriptPath = fileURLToPath(import.meta.url);
-const root = resolve(dirname(scriptPath), "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
-  console.error(`usage: node scripts/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
+  console.error(`usage: node scripts/bindings/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
 
 Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
@@ -35,11 +35,6 @@ Options:
   --check         Compare generated output with --out instead of writing it.
   -h, --help      Show this help.
 `);
-}
-
-function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
 }
 
 function parseArgs(argv) {
@@ -127,30 +122,20 @@ function parseArgs(argv) {
   };
 }
 
-function requiredValue(argv, index, option) {
-  const value = argv[index];
-  if (!value || value.startsWith("--")) fail(`${option} requires a value`);
-  return value;
-}
-
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === scriptPath) await main();
-
-async function main() {
-  const cli = await resolveBindingRoot(parseArgs(process.argv.slice(2)));
+export async function runTypeScriptDescriptorsCli(argv) {
+  const cli = await resolveBindingRoot(parseArgs(argv));
   const descriptor = await generateDescriptorFile(cli);
   const text = `${JSON.stringify(descriptor, null, 2)}\n`;
 
   if (cli.out === null) {
     process.stdout.write(text);
-  } else if (cli.check) {
-    const existing = await readFile(cli.out, "utf8");
-    if (existing.replace(/\r\n/g, "\n") !== text) {
-      fail(`${relative(root, cli.out)} is stale; rerun the corresponding generation step without --check`);
-    }
-    console.log(`validated ${relative(root, cli.out)}`);
   } else {
-    await writeFile(cli.out, text);
-    console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
+    const action = await emitGeneratedFile(cli.out, text, {
+      check: cli.check,
+      root,
+      staleHint: "rerun the corresponding generation step without --check",
+    });
+    console.log(`${action} ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
   }
 }
 
@@ -215,7 +200,7 @@ export async function generateDescriptorFile({
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
-    generator: "scripts/generate-ts-descriptors.mjs",
+    generator: "scripts/bindings/generate-ts-descriptors.mjs",
     sources: sourceFiles.map((sourceFile) => relative(root, sourceFile.fileName)).sort(),
     symbols: selectedSymbols,
     anchors: anchorData.anchors ?? [],

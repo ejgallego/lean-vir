@@ -286,21 +286,25 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 ## Repository Layout
 
-- `Vir/` and `tools/` contain the Lean library and package tools.
+- `Vir/` and `tools/` contain the Lean library and package tools; colocated
+  `Vir/*.bindings.json` manifests and `Vir/bindings.schema.json` describe the
+  shipped JavaScript boundary.
 - `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
   boundary sources.
 - `web/src/` contains runtime and host-binding code; browser page entry points
   live under `web/src/apps/`, reusable page helpers under `web/src/pages/`, and
   reusable static tool templates under `web/tools/`.
 - `examples/` contains runnable applications and tutorials; `fixtures/`
-  contains regression-only Lean and host inputs.
+  contains regression-only Lean and host inputs, including the authored
+  `type-anchors/` comparison fixtures.
 - `benchmarks/harness/` owns repository-level benchmark runners and comparison
   helpers; `benchmarks/browser/` is a standalone browser benchmark catalog with
   its own package, docs, tests, and ignored artifacts.
 - `tests/` contains test-only runners, cases, and shared support grouped by the
   subsystem they exercise.
 - `scripts/` contains repository build, packaging, analysis, and maintainer
-  tooling. Generated sources, reports, packages, bundles, and site output stay
+  tooling, with binding-audit tooling grouped under `scripts/bindings/`.
+  Generated sources, reports, packages, bundles, and site output stay
   under ignored `build/`, `web/public/`, or `web/dist/` paths.
 
 The default Lake target builds the core `Vir` library without browser tooling.

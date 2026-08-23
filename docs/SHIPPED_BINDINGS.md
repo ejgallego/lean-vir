@@ -144,7 +144,7 @@ conversion wrappers remain an explicit downstream policy choice.
 
 Each Lean source group that owns shipped bindings has a companion
 `*.bindings.json` file, validated against
-`scripts/binding-library.schema.json`:
+`Vir/bindings.schema.json`:
 
 - `Vir/Browser.bindings.json`
 - `Vir/Common.bindings.json`
