@@ -424,10 +424,14 @@ logic into entry-point scripts or pages:
 - Process helpers: `scripts/process-utils.mjs`
 - Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and
   `benchmarks/harness/bench-utils.mjs`
-- Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
+- Filesystem and executable lookup helpers: `scripts/file-utils.mjs`
+- Repository-root resolution shared by nested tooling:
+  `scripts/repository-paths.mjs`
 - Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
   `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`
-- IR package generator setup: `scripts/irpkg-generator.mjs`
+- IR package, browser-package, and artifact tooling: `scripts/packages/`;
+  shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`
+- Package-tooling contracts: `npm run test:packages:unit`
 - Binding inventory, descriptor, comparison, and explorer tooling:
   `scripts/bindings/`; focused coverage: `tests/bindings/`
 - Browser page helpers: `web/src/pages/page-utils.js` and

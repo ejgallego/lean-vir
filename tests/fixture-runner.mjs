@@ -11,7 +11,7 @@ import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-} from "../scripts/irpkg-generator.mjs";
+} from "../scripts/packages/irpkg-generator.mjs";
 import {
   mapWithLimit,
   requireSuccessfulProcess,

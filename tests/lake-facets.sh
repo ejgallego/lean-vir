@@ -109,7 +109,7 @@ lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
 assert_module_fixture_descriptor "$module_set"
 
-node "$repo/scripts/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
+node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
 node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
@@ -324,7 +324,7 @@ test -f "$module_package"
 test -f "$module_descriptor"
 test -f "$module_driver"
 
-node "$repo/scripts/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
+node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
 node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
@@ -333,7 +333,7 @@ node --input-type=module -e '
   if (entries["Smoke.Runtime.start"]?.startup !== true) process.exit(1);
 ' "$tmp/package.json"
 
-node "$repo/scripts/inspect-irpkg.mjs" --json "$module_package" > "$tmp/module-package.json"
+node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$module_package" > "$tmp/module-package.json"
 node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;

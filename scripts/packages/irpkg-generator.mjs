@@ -7,9 +7,10 @@ Author: Emilio J. Gallego Arias
 import { spawnSync } from "node:child_process";
 import { delimiter } from "node:path";
 
-import { elapsedSeconds, timerStart } from "./timing-utils.mjs";
+import { repositoryPath } from "../repository-paths.mjs";
+import { elapsedSeconds, timerStart } from "../timing-utils.mjs";
 
-export const virIrpkgPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url).pathname;
+export const virIrpkgPath = repositoryPath(".lake", "build", "bin", "vir_irpkg");
 
 export function virIrpkgLakeBuildArgs(lakeTargets = []) {
   return ["build", "Vir", "vir_irpkg", ...lakeTargets];

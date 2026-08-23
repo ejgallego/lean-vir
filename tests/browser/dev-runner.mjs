@@ -21,7 +21,7 @@ import {
   encodeInvalidMagicPackage,
   readIrPackageInfo,
   replaceIrPackageManifest,
-} from "../../scripts/irpkg-format.mjs";
+} from "../../scripts/packages/irpkg-format.mjs";
 
 const packageInfoCache = new Map();
 

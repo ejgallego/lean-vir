@@ -6,11 +6,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { relative, resolve } from "node:path";
+import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
   console.error(`usage: node scripts/bindings/render-type-anchors.mjs --report FILE [options]

@@ -25,7 +25,7 @@ import {
   packageFiles,
   packagePresets,
   prettyPackageFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import { packageInfoFor } from "./dev-runner.mjs";
 
 export async function smokeLanding(cdp, origin) {

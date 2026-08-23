@@ -6,9 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { deriveBrowserPackageConfig } from "../web/src/pages/browser-package-config.js";
+import { deriveBrowserPackageConfig } from "../../web/src/pages/browser-package-config.js";
 
-const configUrl = new URL("../fixtures/browser-packages.json", import.meta.url);
+const configUrl = new URL("../../fixtures/browser-packages.json", import.meta.url);
 
 const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8"));
 export const {

@@ -19,16 +19,16 @@ import {
   hostPackageFile,
   leanPackageFile,
   localPackageFiles,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import { assertDistReady, requiredDistFiles } from "./harness.mjs";
-import { isGeneratedPublicFile } from "../../scripts/file-utils.mjs";
-import { IR_PACKAGE_MAGIC } from "../../scripts/irpkg-format.mjs";
+import { isGeneratedPublicFile } from "../../scripts/packages/artifact-bundle.mjs";
+import { IR_PACKAGE_MAGIC } from "../../scripts/packages/irpkg-format.mjs";
 import {
   PACKAGE_FORMAT_VERSION,
   INTERFACE_MANIFEST_VERSION,
   RUNTIME_ABI_VERSION,
-} from "../../scripts/package-versions.mjs";
-import { sdkArchiveEntries } from "../../scripts/sdk-payloads.mjs";
+} from "../../scripts/packages/package-versions.mjs";
+import { sdkArchiveEntries } from "../../scripts/packages/sdk-payloads.mjs";
 
 const distDir = new URL("../../web/dist/", import.meta.url);
 const execFileAsync = promisify(execFile);

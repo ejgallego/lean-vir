@@ -9,6 +9,8 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 - `bindings/` owns direct unit coverage and end-to-end smoke checks for the
   shipped-binding explorer and type-anchor tooling under `scripts/bindings/`.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
+- `packages/` owns direct contracts for repository package configuration,
+  artifact layout, and shared repository-path resolution.
 - `fixture-runner.mjs` is the integration entry point for Lean fixture
   host-oracle and Wasm comparison checks; their inputs live in root
   `fixtures/`. The shared manifest and expectation contract lives beside those
@@ -28,5 +30,7 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 Use the stable `npm run test:*` commands from the repository root.
 Run `npm run test:fixtures:unit` for the fixture support contracts without a
 Lean or Wasm build.
+Run `npm run test:packages:unit` for package-tooling contracts without building
+Lean or distributable artifacts.
 Top-level files are focused integration entry points whose implementation
 dependencies remain with their owning library or script directory.

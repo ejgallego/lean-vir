@@ -11,9 +11,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { SDK_JS_MODULES } from "../../scripts/sdk-payloads.mjs";
+import { SDK_JS_MODULES } from "../../scripts/packages/sdk-payloads.mjs";
 
-const packaged = spawnSync(process.execPath, ["scripts/package-sdk-artifact.mjs"], {
+const packaged = spawnSync(process.execPath, ["scripts/packages/package-sdk-artifact.mjs"], {
   encoding: "utf8",
 });
 assert.equal(packaged.status, 0, packaged.stderr || packaged.stdout);

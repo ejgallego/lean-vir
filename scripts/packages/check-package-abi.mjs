@@ -8,23 +8,22 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
+import { repositoryRoot } from "../repository-paths.mjs";
+import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../../web/src/runtime/interface-tags.js";
 import {
   HOST_IMPORT_BOUNDARY,
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION as RUNTIME_INTERFACE_MANIFEST_VERSION,
-} from "../web/src/runtime/interface-manifest.js";
+} from "../../web/src/runtime/interface-manifest.js";
 import {
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
-} from "../web/src/vir-runtime.js";
+} from "../../web/src/vir-runtime.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
-
 async function readRepoText(path) {
-  return readFile(join(repoRoot, path), "utf8");
+  return readFile(join(repositoryRoot, path), "utf8");
 }
 
 function leanNatConstant(source, name) {

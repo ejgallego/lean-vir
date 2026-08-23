@@ -6,9 +6,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { relative, resolve } from "node:path";
 
+import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-resource.js";
 import {
@@ -19,8 +19,6 @@ import {
 } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import { RUNTIME_INTRINSIC_HOST_TARGETS } from "../../web/src/runtime/host-state.js";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function parseArgs(argv) {
   const options = { lean: null, out: null, html: null, check: false };

@@ -12,25 +12,25 @@ import {
   artifactBundlePaths,
   cleanArtifactBundle,
   copyArtifactMetadata,
-  preferredExecutablePath,
   removeUnexpectedGeneratedFiles,
   writeAndPublishArtifactArchive,
-} from "./file-utils.mjs";
+} from "./artifact-bundle.mjs";
+import { preferredExecutablePath } from "../file-utils.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
 import { generatedPublicFiles } from "./browser-package-config.mjs";
-import { runSync } from "./process-utils.mjs";
+import { runSync } from "../process-utils.mjs";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
 const artifactName = process.env.VIR_LOCAL_ARTIFACT_NAME ?? "lean-vir-local";
-const artifactPaths = artifactBundlePaths(repoRoot, artifactName);
-const localSite = join(repoRoot, "build", "local-site");
-const viteBin = await preferredExecutablePath(process.env.VITE ?? join(repoRoot, "node_modules", ".bin", "vite"), "vite");
+const artifactPaths = artifactBundlePaths(repositoryRoot, artifactName);
+const localSite = join(repositoryRoot, "build", "local-site");
+const viteBin = await preferredExecutablePath(process.env.VITE ?? join(repositoryRoot, "node_modules", ".bin", "vite"), "vite");
 const generatedPublicFileSet = new Set(generatedPublicFiles);
 
 await rm(localSite, { recursive: true, force: true });
 await cleanArtifactBundle(artifactPaths);
 
 runSync(viteBin, ["build", "--base", "./", "--outDir", "../build/local-site", "--emptyOutDir"], {
-  cwd: repoRoot,
+  cwd: repositoryRoot,
   stdio: "inherit",
 });
 
@@ -38,10 +38,10 @@ await rm(join(localSite, "downloads"), { recursive: true, force: true });
 await removeUnexpectedGeneratedFiles(localSite, generatedPublicFileSet);
 
 await cp(localSite, artifactPaths.bundleDir, { recursive: true });
-await copyArtifactMetadata(repoRoot, artifactPaths.bundleDir);
+await copyArtifactMetadata(repositoryRoot, artifactPaths.bundleDir);
 await writeFile(join(artifactPaths.bundleDir, "README.txt"), localBundleReadme());
 
-await writeAndPublishArtifactArchive(repoRoot, artifactPaths);
+await writeAndPublishArtifactArchive(repositoryRoot, artifactPaths);
 
 function localBundleReadme() {
   return `Lean VIR local bundle

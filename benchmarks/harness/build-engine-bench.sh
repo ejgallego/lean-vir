@@ -14,7 +14,7 @@ obj_dir="$out/obj"
 objects_file="$out/objects.txt"
 demo_package="$(
   node --input-type=module -e \
-    'import { defaultPackageFile, publicArtifactPath } from "./scripts/browser-package-config.mjs"; console.log(publicArtifactPath(defaultPackageFile));'
+    'import { defaultPackageFile, publicArtifactPath } from "./scripts/packages/browser-package-config.mjs"; console.log(publicArtifactPath(defaultPackageFile));'
 )"
 package_header="$out/vir_fixtures_basic_package.inc"
 bench_source="wasm/upstream_shim/bench/engine_bench.cpp"

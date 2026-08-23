@@ -17,7 +17,7 @@ import {
   prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
   formatMs,

@@ -33,7 +33,7 @@ echo "IR package generation succeeded."
 echo "Packages:"
 mapfile -t package_files < <(
   node --input-type=module -e \
-    'import { packageFiles } from "./scripts/browser-package-config.mjs"; for (const file of packageFiles) console.log(file);'
+    'import { packageFiles } from "./scripts/packages/browser-package-config.mjs"; for (const file of packageFiles) console.log(file);'
 )
 for package_file in "${package_files[@]}"; do
   package="build/generated/$package_file"

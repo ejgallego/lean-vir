@@ -32,7 +32,7 @@ import {
   ensureVirtualElementState,
   ensureVirtualElementStates,
 } from "../../web/src/vir-runtime-node.js";
-import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../../scripts/package-versions.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../../scripts/packages/package-versions.mjs";
 import {
   assert,
   assertInvalidManifest,

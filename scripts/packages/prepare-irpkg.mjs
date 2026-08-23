@@ -7,10 +7,10 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 
 import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
-import { runSync } from "./process-utils.mjs";
-import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
+import { runSync } from "../process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "../timing-utils.mjs";
 
-const root = new URL("..", import.meta.url).pathname;
 const configPaths = process.argv.slice(2);
 const scriptStart = timerStart();
 
@@ -24,7 +24,7 @@ for (const configPath of configPaths) {
   packages.push(await readPackageConfig(configPath));
 }
 
-const generator = prepareVirIrpkgSync(root);
+const generator = prepareVirIrpkgSync(repositoryRoot);
 if (!generator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(generator)}`);
   process.exit(generator.status);
@@ -37,7 +37,7 @@ for (const packageConfig of packages) {
     runSync(
       generator.path,
       [packageConfig.packagePath, packageConfig.reportPath, ...packageConfig.targetArgs],
-      { cwd: root, env: generator.env },
+      { cwd: repositoryRoot, env: generator.env },
     );
   } catch (error) {
     console.error(`error: package generation failed for ${packageConfig.source}`);

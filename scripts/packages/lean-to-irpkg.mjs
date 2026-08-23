@@ -13,8 +13,9 @@ import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
 } from "./irpkg-generator.mjs";
+import { repositoryRootUrl } from "../repository-paths.mjs";
 
-const root = new URL("..", import.meta.url);
+const root = repositoryRootUrl;
 const argv = process.argv.slice(2);
 
 function usage() {

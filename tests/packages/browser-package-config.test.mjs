@@ -8,11 +8,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
+import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import {
   browserPackageConfigVersion,
   deriveBrowserPackageConfig,
-} from "../web/src/pages/browser-package-config.js";
+} from "../../web/src/pages/browser-package-config.js";
 
 function packageSpec(id, overrides = {}) {
   return { id, file: `${id}.irpkg`, fixtureSources: [], ...overrides };
@@ -37,8 +37,8 @@ function browserConfig(overrides = {}) {
 
 test("checked-in fixture sources have exactly one browser package", async () => {
   const [rawBrowserConfig, rawFixtureManifest] = await Promise.all([
-    readFile(new URL("../fixtures/browser-packages.json", import.meta.url), "utf8"),
-    readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"),
+    readFile(new URL("../../fixtures/browser-packages.json", import.meta.url), "utf8"),
+    readFile(new URL("../../fixtures/manifest.json", import.meta.url), "utf8"),
   ]);
   const config = deriveBrowserPackageConfig(JSON.parse(rawBrowserConfig));
   const fixtures = validateFixtureManifest(JSON.parse(rawFixtureManifest));

@@ -8,13 +8,11 @@ Author: Emilio J. Gallego Arias
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "../irpkg-generator.mjs";
-import { readIrPackageFile } from "../irpkg-format.mjs";
+import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "../packages/irpkg-generator.mjs";
+import { readIrPackageFile } from "../packages/irpkg-format.mjs";
+import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 function usage() {
   console.error(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]

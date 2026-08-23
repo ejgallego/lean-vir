@@ -30,7 +30,7 @@ import {
 } from "./page-suites.mjs";
 import { smokeBrowserReactLifetimes } from "./react-lifetimes.mjs";
 import { smokeReactTamagotchi } from "./react-tamagotchi.mjs";
-import { packageFiles } from "../../scripts/browser-package-config.mjs";
+import { packageFiles } from "../../scripts/packages/browser-package-config.mjs";
 
 await assertDistReady();
 await prepareNegativePackages();

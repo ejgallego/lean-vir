@@ -339,7 +339,7 @@ async function validateVir(component, output, resolvedCheckouts) {
   const packagePath = join(output, component.artifact.workload.file);
   const body = run(
     process.execPath,
-    ["scripts/inspect-irpkg.mjs", "--json", packagePath],
+    ["scripts/packages/inspect-irpkg.mjs", "--json", packagePath],
     { cwd: vir, capture: true },
   );
   const inspected = JSON.parse(body);

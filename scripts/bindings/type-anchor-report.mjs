@@ -6,15 +6,13 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { relative, resolve } from "node:path";
 
-import { readIrPackageFile } from "../irpkg-format.mjs";
+import { readIrPackageFile } from "../packages/irpkg-format.mjs";
+import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const statusRank = {
   exact: 0,

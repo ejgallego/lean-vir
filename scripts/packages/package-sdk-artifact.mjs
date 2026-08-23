@@ -12,17 +12,17 @@ import { join } from "node:path";
 import {
   artifactBundlePaths,
   cleanArtifactBundle,
-  copyFileWithDirs,
   copyArtifactMetadata,
   writeAndPublishArtifactArchive,
-} from "./file-utils.mjs";
-import { runSync } from "./process-utils.mjs";
+} from "./artifact-bundle.mjs";
+import { copyFileWithDirs } from "../file-utils.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
+import { runSync } from "../process-utils.mjs";
 import { PACKAGE_VERSIONS } from "./package-versions.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
-const artifactPaths = artifactBundlePaths(repoRoot, artifactName);
+const artifactPaths = artifactBundlePaths(repositoryRoot, artifactName);
 
 async function sha256(path) {
   const bytes = await readFile(path);
@@ -33,7 +33,7 @@ await cleanArtifactBundle(artifactPaths);
 
 const files = [];
 for (const [destRel, sourceRel] of SDK_PAYLOADS) {
-  const source = join(repoRoot, sourceRel);
+  const source = join(repositoryRoot, sourceRel);
   const dest = join(artifactPaths.bundleDir, destRel);
   await copyFileWithDirs(source, dest);
   files.push({
@@ -43,13 +43,13 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   });
 }
 
-await copyArtifactMetadata(repoRoot, artifactPaths.bundleDir);
+await copyArtifactMetadata(repositoryRoot, artifactPaths.bundleDir);
 
-const packageJson = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
-const leanToolchain = (await readFile(join(repoRoot, "lean-toolchain"), "utf8")).trim();
-const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, capture: true });
-const gitStatus = runSync("git", ["status", "--short"], { cwd: repoRoot, capture: true });
-const leanVersion = runSync("lean", ["--version"], { cwd: repoRoot, capture: true });
+const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
+const leanToolchain = (await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")).trim();
+const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, capture: true });
+const gitStatus = runSync("git", ["status", "--short"], { cwd: repositoryRoot, capture: true });
+const leanVersion = runSync("lean", ["--version"], { cwd: repositoryRoot, capture: true });
 const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
@@ -149,4 +149,4 @@ from another lean_vir revision.
 `,
 );
 
-await writeAndPublishArtifactArchive(repoRoot, artifactPaths);
+await writeAndPublishArtifactArchive(repositoryRoot, artifactPaths);

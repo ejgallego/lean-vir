@@ -7,12 +7,11 @@ Author: Emilio J. Gallego Arias
 
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
+import { repositoryRoot } from "../repository-paths.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
 
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
 

@@ -6,20 +6,21 @@ Author: Emilio J. Gallego Arias
 
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 
-import { fixtureRoots, validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
+import { fixtureRoots, validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
+import { repositoryRootUrl } from "../repository-paths.mjs";
 import { packageSpecs, validateFixturePackageCoverage } from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
-import { runSync } from "./process-utils.mjs";
-import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
+import { runSync } from "../process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "../timing-utils.mjs";
 
-const root = new URL("..", import.meta.url);
-const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
+const root = repositoryRootUrl;
+const manifestPath = new URL("fixtures/manifest.json", repositoryRootUrl);
 const scriptStart = timerStart();
 const args = parseArgs(process.argv.slice(2));
 
 function usage() {
   return [
-    "usage: node scripts/generate-browser-package.mjs [--package <id-or-file>]... [--copy-public]",
+    "usage: node scripts/packages/generate-browser-package.mjs [--package <id-or-file>]... [--copy-public]",
     "",
     "When --package is omitted, all browser packages are generated.",
   ].join("\n");
@@ -112,9 +113,9 @@ if (!generator.ok) {
   process.exit(generator.status);
 }
 
-await mkdir(new URL("../build/generated/", import.meta.url), { recursive: true });
+await mkdir(new URL("build/generated/", repositoryRootUrl), { recursive: true });
 if (args.copyPublic) {
-  await mkdir(new URL("../web/public/", import.meta.url), { recursive: true });
+  await mkdir(new URL("web/public/", repositoryRootUrl), { recursive: true });
 }
 
 const packageTimings = [];
@@ -136,7 +137,7 @@ for (const spec of selectedPackageSpecs) {
     seconds: elapsedSeconds(packageStart),
   });
   if (args.copyPublic) {
-    await copyFile(new URL(`../${packagePath}`, import.meta.url), new URL(`../${publicPackagePathFor(spec)}`, import.meta.url));
+    await copyFile(new URL(packagePath, repositoryRootUrl), new URL(publicPackagePathFor(spec), repositoryRootUrl));
   }
 }
 

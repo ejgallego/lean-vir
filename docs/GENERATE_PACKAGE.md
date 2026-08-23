@@ -14,8 +14,8 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   lazily loaded HTML module browser.
 - `Vir/GeneratePackage.lean` is the public import shim for the split library.
 - `.lake/build/bin/vir_irpkg` is the Lake executable used by
-  `scripts/lean-to-irpkg.mjs`, `scripts/generate-browser-package.mjs`, and the
-  fixture runner.
+  `scripts/packages/lean-to-irpkg.mjs`,
+  `scripts/packages/generate-browser-package.mjs`, and the fixture runner.
 
 Targets have one of five modes:
 
@@ -227,8 +227,8 @@ Version constants are intentionally small and explicit:
 - `Vir.GeneratePackage.PackageFormat` owns the Lean generator's binary package,
   interface manifest, and package-set descriptor versions, plus the package-set
   format identifier.
-- `scripts/package-versions.mjs` owns the JavaScript-side expectations for
-  package format, interface manifest, and runtime ABI versions.
+- `scripts/packages/package-versions.mjs` owns the JavaScript-side expectations
+  for package format, interface manifest, and runtime ABI versions.
 - `npm run check:package-abi` verifies package magic, package-set descriptor
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.

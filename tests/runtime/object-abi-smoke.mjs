@@ -5,8 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { defaultPackageFile, publicArtifactPath } from "../../scripts/browser-package-config.mjs";
-import { PACKAGE_FORMAT_VERSION } from "../../scripts/package-versions.mjs";
+import { defaultPackageFile, publicArtifactPath } from "../../scripts/packages/browser-package-config.mjs";
+import { PACKAGE_FORMAT_VERSION } from "../../scripts/packages/package-versions.mjs";
 import {
   createHostResource,
   ExternrefResourceRoots,
@@ -638,7 +638,7 @@ roots.clear();
 assert.equal(roots.get(secondRootId), null);
 releaseHostResource(secondRootResource);
 assert.equal(roots.root(secondRootResource), 0);
-const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", defaultPackagePath], {
+const inspected = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", defaultPackagePath], {
   encoding: "utf8",
 });
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
@@ -655,7 +655,7 @@ assert.match(inspected.stdout, /next: Option<recursiveSelf Vir\.Fixtures\.Recurs
 assert.match(inspected.stdout, /arg json descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.MiniJson/);
 assert.match(inspected.stdout, /array\(items: List<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.MiniJson>\)/);
 
-const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", defaultPackagePath], {
+const inspectedJson = spawnSync("node", ["scripts/packages/inspect-irpkg.mjs", "--json", defaultPackagePath], {
   encoding: "utf8",
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);

@@ -7,18 +7,17 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
-import { pathExists } from "./file-utils.mjs";
+import { pathExists } from "../file-utils.mjs";
+import { repositoryRoot } from "../repository-paths.mjs";
 import { virIrpkgLakeBuildArgs, virIrpkgPath } from "./irpkg-generator.mjs";
-import { runSync } from "./process-utils.mjs";
-import { createVirRuntime } from "../web/src/vir-runtime-node.js";
+import { runSync } from "../process-utils.mjs";
+import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const fixtureRoot = join(repoRoot, "fixtures", "lean-zip");
+const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
 
 const { values, positionals } = parseArgs({
@@ -46,7 +45,7 @@ if (!Number.isSafeInteger(passes) || passes < 1) {
 
 const leanZipRoot = resolve(leanZipArgument);
 const wasmPath = resolve(
-  values.wasm ?? join(repoRoot, "web", "public", "vir-upstream.wasm"),
+  values.wasm ?? join(repositoryRoot, "web", "public", "vir-upstream.wasm"),
 );
 const lakefile = join(leanZipRoot, "lakefile.lean");
 const upperLevelProfiles = new Map([
@@ -104,9 +103,9 @@ for (const [path, message] of [
   if (!(await pathExists(path))) throw new Error(message);
 }
 
-runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repoRoot });
+runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repositoryRoot });
 const virLeanVersion = runSync("lean", ["--short-version"], {
-  cwd: repoRoot,
+  cwd: repositoryRoot,
   capture: true,
 });
 const leanZipLeanVersion = runSync("lake", ["env", "lean", "--short-version"], {
@@ -149,14 +148,14 @@ async function generateNativeOracle() {
     oracleOutput,
   ];
   if (values.profile) oracleArgs.push("--profile");
-  runSync("lake", oracleArgs, { cwd: repoRoot });
+  runSync("lake", oracleArgs, { cwd: repositoryRoot });
 }
 
 function externalLeanEnv() {
   return {
     ...process.env,
     LEAN_PATH: [
-      join(repoRoot, ".lake", "build", "lib", "lean"),
+      join(repositoryRoot, ".lake", "build", "lib", "lean"),
       process.env.LEAN_PATH,
     ]
       .filter(Boolean)

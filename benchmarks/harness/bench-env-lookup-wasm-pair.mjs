@@ -24,8 +24,8 @@ import {
   sha256,
   summarizePairedSamples,
 } from "./bench-utils.mjs";
-import { leanPackageFile, publicArtifactPath } from "../../scripts/browser-package-config.mjs";
-import { readIrPackageFile } from "../../scripts/irpkg-format.mjs";
+import { leanPackageFile, publicArtifactPath } from "../../scripts/packages/browser-package-config.mjs";
+import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
 
 const root = new URL("../..", import.meta.url);

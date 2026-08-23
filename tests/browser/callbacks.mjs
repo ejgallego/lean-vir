@@ -12,7 +12,7 @@ import {
   defaultPackageFile,
   hostPackageFile,
   wasmPublicFile,
-} from "../../scripts/browser-package-config.mjs";
+} from "../../scripts/packages/browser-package-config.mjs";
 import { runSelectedEntry } from "./dev-runner.mjs";
 import {
   clickSelector,

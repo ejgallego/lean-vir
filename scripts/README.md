@@ -21,10 +21,13 @@ The documentation owners are:
   `tests/`; test-only shared helpers live under `tests/support/`.
 - Benchmark campaigns and their sampling, scheduling, reporting, and cache
   helpers live under `benchmarks/harness/`.
-- Child-process wrappers live in `scripts/process-utils.mjs`; filesystem,
-  artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
-- IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
-  instead of invoking `lean --run tools/GeneratePackage.lean`.
+- Child-process wrappers live in `scripts/process-utils.mjs`; generic
+  filesystem and executable lookup helpers live in `scripts/file-utils.mjs`.
+  Nested tooling resolves the checkout through `scripts/repository-paths.mjs`.
+- IR package generation, decoding, browser-package configuration, and
+  distributable artifact policy live under `scripts/packages/`; reuse
+  `scripts/packages/irpkg-generator.mjs` instead of invoking
+  `lean --run tools/GeneratePackage.lean`.
 - Shipped JavaScript binding inventory and report generation live in
   `tools/ExportVirJsInventory.lean` and
   `scripts/bindings/generate-shipped-bindings-report.mjs`. The compiler
@@ -46,8 +49,9 @@ The documentation owners are:
 - Object ABI linker flags live in `scripts/object-abi-linker-flags.mjs`, which
   consumes the shared runtime export-name manifest.
 - Canonical browser package metadata lives in `fixtures/browser-packages.json`;
-  `scripts/browser-package-config.mjs` exposes its validated derived values to
-  Node tooling. Reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
+  `scripts/packages/browser-package-config.mjs` exposes its validated derived
+  values to Node tooling. Reusable SDK payload and artifact-bundle policy live
+  beside it under `scripts/packages/`.
 
 Call a lower-level script directly only when debugging that implementation or
 when a maintainer requests a narrow command.

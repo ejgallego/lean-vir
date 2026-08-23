@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { INTERFACE_MANIFEST_ARTIFACT, validateInterfaceManifest } from "../web/src/runtime/interface-manifest.js";
+import { INTERFACE_MANIFEST_ARTIFACT, validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { PACKAGE_FORMAT_VERSION } from "./package-versions.mjs";
 
 const textDecoder = new TextDecoder();
