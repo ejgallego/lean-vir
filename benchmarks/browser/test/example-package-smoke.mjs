@@ -69,6 +69,7 @@ const server = await startBenchmarkServer({
   directory,
   isolation: !staticHost,
   label: "example server",
+  readinessPath: basePath,
 });
 const { origin } = server;
 const query = new URLSearchParams({ example: exampleId, variant: variant.id });
