@@ -32,7 +32,6 @@
     "test:bindings:unit": "node --test tests/bindings/*.test.mjs",
     "generate:type-descriptors": "node scripts/bindings/generate-ts-descriptors.mjs --anchors fixtures/type-anchors/vir-v1.anchors.json --out build/type-descriptors/vir-v1.json fixtures/type-anchors/vir-v1.types.d.ts",
     "generate:lean-type-anchor-manifest": "node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source fixtures/type-anchors/vir-v1.fixture.lean --roots fixtures/type-anchors/vir-v1.roots.txt --aliases fixtures/type-anchors/vir-v1.aliases.json --package build/type-descriptors/vir-v1.irpkg --report build/type-descriptors/vir-v1.package.report.md --out build/type-descriptors/vir-v1.manifest.json",
-    "check:lean-type-anchor-manifest": "npm run generate:lean-type-anchor-manifest",
     "compare:type-anchors": "node scripts/bindings/check-type-anchors.mjs --fail-on-errors --descriptors build/type-descriptors/vir-v1.json --manifest build/type-descriptors/vir-v1.manifest.json --out build/type-descriptors/vir-v1.report.json",
     "render:type-anchors": "node scripts/bindings/render-type-anchors.mjs --report build/type-descriptors/vir-v1.report.json --out build/type-descriptors/vir-v1.anchors.md",
     "render:type-anchors:html": "node scripts/bindings/render-type-anchors.mjs --format html --report build/type-descriptors/vir-v1.report.json --out build/type-descriptors/vir-v1.anchors.html",

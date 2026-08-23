@@ -33,7 +33,7 @@ function usage() {
 }
 
 if (argv[0] === "--help" || argv[0] === "-h") {
-  console.error(usage());
+  console.log(usage());
   process.exit(0);
 }
 if (argv.length === 0) {

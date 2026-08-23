@@ -126,6 +126,8 @@ npm run build:frontier-size-site
 npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
+npm run check:package
+npm run check:package-abi
 npm run generate:ir-codec-tags
 npm run check:bindings
 npm run check:ir-codec-tags

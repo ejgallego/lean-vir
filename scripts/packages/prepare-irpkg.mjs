@@ -14,8 +14,19 @@ import { elapsedSeconds, formatSeconds, timerStart } from "../timing-utils.mjs";
 const configPaths = process.argv.slice(2);
 const scriptStart = timerStart();
 
+function usage() {
+  return `usage: npm run prepare:irpkg -- <config.json> [config.json ...]
+
+Generate browser-ready .irpkg files from one or more package configurations.`;
+}
+
+if (configPaths.some((arg) => arg === "--help" || arg === "-h")) {
+  console.log(usage());
+  process.exit(0);
+}
+
 if (configPaths.length === 0) {
-  console.error("usage: npm run prepare:irpkg -- <config.json> [config.json ...]");
+  console.error(usage());
   process.exit(2);
 }
 

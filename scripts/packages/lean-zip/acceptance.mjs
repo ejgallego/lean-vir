@@ -20,10 +20,24 @@ import { createVirRuntime } from "../../../web/src/vir-runtime-node.js";
 const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
 
+function usage() {
+  return `usage: npm run accept:lean-zip -- /path/to/lean-zip [options]
+
+Compare Lean-zip's native and VIR raw-DEFLATE behavior.
+
+Options:
+  --passes COUNT  Run COUNT acceptance passes. Defaults to 3.
+  --profile       Collect additional diagnostic attribution profiles.
+  --wasm PATH     Use an existing VIR Wasm runtime.
+  --keep          Preserve the temporary work directory.
+  -h, --help      Show this help.`;
+}
+
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
   allowPositionals: true,
   options: {
+    help: { type: "boolean", short: "h", default: false },
     keep: { type: "boolean", default: false },
     passes: { type: "string", default: "3" },
     profile: { type: "boolean", default: false },
@@ -31,11 +45,14 @@ const { values, positionals } = parseArgs({
   },
 });
 
+if (values.help) {
+  console.log(usage());
+  process.exit(0);
+}
+
 const leanZipArgument = positionals[0] ?? process.env.LEAN_ZIP_CHECKOUT;
 if (!leanZipArgument || positionals.length > 1) {
-  throw new Error(
-    "usage: npm run accept:lean-zip -- /path/to/lean-zip [--passes count] [--profile] [--wasm path] [--keep]",
-  );
+  throw new Error(usage());
 }
 
 const passes = Number(values.passes);

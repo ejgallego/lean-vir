@@ -10,9 +10,9 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {
-  console.error(`usage: npm run inspect:irpkg -- [--json] <package.irpkg>
+  return `usage: npm run inspect:irpkg -- [--json] <package.irpkg>
 
-Inspect one manifest-bearing Lean IR package without loading the browser.`);
+Inspect one manifest-bearing Lean IR package without loading the browser.`;
 }
 
 const args = process.argv.slice(2);
@@ -20,7 +20,7 @@ let json = false;
 const paths = [];
 for (const arg of args) {
   if (arg === "--help" || arg === "-h") {
-    usage();
+    console.log(usage());
     process.exit(0);
   } else if (arg === "--json") {
     json = true;
@@ -30,7 +30,7 @@ for (const arg of args) {
 }
 
 if (paths.length !== 1) {
-  usage();
+  console.error(usage());
   process.exit(2);
 }
 

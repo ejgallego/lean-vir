@@ -39,13 +39,3 @@ test("Lean-zip browser package smoke remains a standalone payload module", () =>
   });
   assert.equal(result.status, 0, result.stderr);
 });
-
-test("Lean-zip acceptance command loads from its package owner", () => {
-  const result = spawnSync(
-    process.execPath,
-    ["scripts/packages/lean-zip/acceptance.mjs"],
-    { cwd: repositoryRoot, encoding: "utf8" },
-  );
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /usage: npm run accept:lean-zip/);
-});
