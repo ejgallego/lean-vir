@@ -374,6 +374,28 @@ const emptyResourceCounts = {
 
 {
   const state = createVirtualDocumentState();
+  const [element] = ensureVirtualElementStates(state, "#inner-html-borrow", [
+    createVirtualElementState(),
+  ]);
+  const bindings = createVirtualDocumentHostBindings(state);
+  const elementResource = state.resources.resourceForValue(element);
+  const htmlResource = state.resources.resourceForValue("<strong>borrowed</strong>");
+  bindings["browser.element.setInnerHTML"](elementResource, htmlResource);
+  assert.equal(
+    state.resources.resolveResource(htmlResource, "JsString"),
+    "<strong>borrowed</strong>",
+    "Element.innerHTML must borrow rather than consume its string argument",
+  );
+  const result = bindings["browser.element.getInnerHTML"](elementResource);
+  assert.equal(state.resources.resolveResource(result, "JsString"), "<strong>borrowed</strong>");
+  state.resources.releaseResource(result);
+  state.resources.releaseResource(htmlResource);
+  state.resources.releaseResource(elementResource);
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
   const [element] = ensureVirtualElementStates(state, "#weakref-preflight", [
     createVirtualElementState(),
   ]);

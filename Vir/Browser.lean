@@ -338,24 +338,41 @@ def querySelectorAll
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
 
-/-- Reads an element's serialized child markup. -/
+/--
+Reads an element's serialized child markup as a JavaScript string resource.
+
+Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
+-/
 @[vir_js "browser.element.getInnerHTML"]
 private opaque getInnerHTMLJs
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String)
 
-def getInnerHTML (element : @& Lean.Vir.Js Element) : DomM String := do
-  Lean.Vir.JsValue.toString (← getInnerHTMLJs element)
+/-- Faithful JavaScript-boundary getter for `Element.innerHTML`. -/
+def getInnerHTML
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String) :=
+  getInnerHTMLJs element
 
-/-- Replaces an element's child markup. -/
+/--
+Replaces an element's child markup from a borrowed JavaScript string resource.
+
+The caller's string remains live after the call.
+
+Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
+-/
 @[vir_js "browser.element.setInnerHTML"]
 private opaque setInnerHTMLJs
     (element : @& Lean.Vir.Js Element)
     (html : @& Lean.Vir.Js String) :
     DomM Unit
 
-def setInnerHTML (element : @& Lean.Vir.Js Element) (html : @& String) : DomM Unit := do
-  setInnerHTMLJs element (← ownedString html)
+/-- Faithful JavaScript-boundary setter for `Element.innerHTML`. -/
+def setInnerHTML
+    (element : @& Lean.Vir.Js Element)
+    (html : @& Lean.Vir.Js String) :
+    DomM Unit :=
+  setInnerHTMLJs element html
 
 /--
 Reads an element's text content through the JavaScript host.

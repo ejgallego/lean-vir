@@ -485,19 +485,23 @@ function applyPortIntent(leanShape, tsSymbol, portIntent) {
     }
   }
 
-  if (tsSymbol.kind === "method" && typeof portIntent.receiver === "string") {
+  if (typeof portIntent.receiver === "string" &&
+      (tsSymbol.kind === "method" ||
+        (tsSymbol.kind === "property" && typeof portIntent.accessor === "string"))) {
     if (lean.kind === "function" && (lean.args ?? []).length !== 0) {
       lean = { ...lean, args: lean.args.slice(1) };
       diagnostics.push(diagnostic(
-        "reviewed_explicit_method_receiver",
-        `Lean exposes the TypeScript method receiver as an explicit ${portIntent.receiver} argument`,
+        tsSymbol.kind === "method"
+          ? "reviewed_explicit_method_receiver"
+          : "reviewed_explicit_property_receiver",
+        `Lean exposes the TypeScript member receiver as an explicit ${portIntent.receiver} argument`,
         "info",
       ));
     } else {
       mismatch = true;
       diagnostics.push(diagnostic(
         "port_intent_receiver_mismatch",
-        "reviewed method receiver intent has no corresponding Lean function argument",
+        "reviewed member receiver intent has no corresponding Lean function argument",
       ));
     }
   }

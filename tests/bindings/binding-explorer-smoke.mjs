@@ -85,6 +85,8 @@ assert.deepEqual(report.summary.issues, {
 });
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getInnerHTMLString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Element.setInnerHTMLString"), false);
 assert.deepEqual(
   publicEntries.get("Lean.Vir.Browser.HTMLCanvasElement.getContext2D")?.targets.find(
     (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
@@ -152,6 +154,50 @@ const documentQuerySelector = documentRoot?.coverage.members.find(
 );
 assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
+
+const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
+assert.deepEqual(elementRoot?.analysis, {
+  status: "in-progress",
+  scope: "complete-upstream-surface",
+});
+assert.deepEqual(elementRoot?.comparison.summary, {
+  exact: 0,
+  compatible: 2,
+  weak: 0,
+  missing: 0,
+});
+const elementInnerHTML = elementRoot?.coverage.members.find(
+  (member) => member.id === "Element.innerHTML",
+);
+assert.equal(elementInnerHTML?.status, "compatible");
+assert.deepEqual(elementInnerHTML?.mapping.targets, [
+  "browser.element.getInnerHTML",
+  "browser.element.setInnerHTML",
+]);
+assert.deepEqual(
+  elementRoot?.coverage.targetMappings.filter((mapping) =>
+    mapping.typescript === "Element.innerHTML"),
+  [
+    {
+      target: "browser.element.getInnerHTML",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Element.innerHTML",
+      lean: ["Lean.Vir.Browser.Element.getInnerHTML"],
+      anchors: ["element.innerHTML.get"],
+      accessor: "get",
+    },
+    {
+      target: "browser.element.setInnerHTML",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Element.innerHTML",
+      lean: ["Lean.Vir.Browser.Element.setInnerHTML"],
+      anchors: ["element.innerHTML.set"],
+      accessor: "set",
+    },
+  ],
+);
 
 const canvasElement = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");

@@ -99,7 +99,50 @@
       "title": "Element",
       "targets": ["browser.element.*"],
       "lean": { "public": ["Lean.Vir.Browser.Element"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" }
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
+      "comparison": { "report": "build/type-descriptors/element-v1.report.json" },
+      "mappings": [
+        { "typescript": "Element.querySelector", "targets": ["browser.element.querySelector"], "lean": ["Lean.Vir.Browser.Element.querySelector"] },
+        { "typescript": "Element.querySelectorAll", "targets": ["browser.element.querySelectorAll"], "lean": ["Lean.Vir.Browser.Element.querySelectorAll"] },
+        {
+          "typescript": "Element.innerHTML",
+          "accessors": {
+            "get": { "target": "browser.element.getInnerHTML", "lean": "Lean.Vir.Browser.Element.getInnerHTML", "anchor": "element.innerHTML.get" },
+            "set": { "target": "browser.element.setInnerHTML", "lean": "Lean.Vir.Browser.Element.setInnerHTML", "anchor": "element.innerHTML.set" }
+          }
+        },
+        { "typescript": "Element.textContent", "targets": ["browser.element.getTextContent", "browser.element.setTextContent"], "lean": ["Lean.Vir.Browser.Element.getTextContent", "Lean.Vir.Browser.Element.setTextContent"] },
+        { "typescript": "Element.getAttribute", "targets": ["browser.element.getAttribute"], "lean": ["Lean.Vir.Browser.Element.getAttribute"] },
+        { "typescript": "Element.setAttribute", "targets": ["browser.element.setAttribute"], "lean": ["Lean.Vir.Browser.Element.setAttribute"] },
+        { "typescript": "Element.appendChild", "targets": ["browser.element.appendChild"], "lean": ["Lean.Vir.Browser.Element.appendChild"] },
+        { "typescript": "Element.remove", "targets": ["browser.element.remove"], "lean": ["Lean.Vir.Browser.Element.remove"] },
+        { "typescript": "DOMTokenList.add", "targets": ["browser.element.classList.add"], "lean": ["Lean.Vir.Browser.Element.ClassList.add"] },
+        { "typescript": "DOMTokenList.remove", "targets": ["browser.element.classList.remove"], "lean": ["Lean.Vir.Browser.Element.ClassList.remove"] },
+        { "typescript": "DOMTokenList.toggle", "targets": ["browser.element.classList.toggle"], "lean": ["Lean.Vir.Browser.Element.ClassList.toggle"] },
+        { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.element.style.setProperty"], "lean": ["Lean.Vir.Browser.Element.Style.setProperty"] },
+        { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListener"] },
+        { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }
+      ],
+      "anchors": [
+        {
+          "id": "element.innerHTML.get",
+          "category": "Element property",
+          "lean": "Lean.Vir.TypeAnchors.elementGetInnerHTMLCall",
+          "ts": "Element.innerHTML",
+          "target": "browser.element.getInnerHTML",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "get", "receiver": "borrowed", "effect": "dom", "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "element.innerHTML.set",
+          "category": "Element property",
+          "lean": "Lean.Vir.TypeAnchors.elementSetInnerHTMLCall",
+          "ts": "Element.innerHTML",
+          "target": "browser.element.setInnerHTML",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "set", "receiver": "borrowed", "effect": "dom", "resourceArguments": [0] }
+        }
+      ]
     },
     {
       "id": "event",

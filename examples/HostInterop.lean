@@ -108,8 +108,9 @@ def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure ""
   | some element =>
-    Lean.Vir.Browser.Element.setInnerHTML element html
-    Lean.Vir.Browser.Element.getInnerHTML element
+    let jsHtml ← Lean.Vir.JsValue.ofString html
+    Lean.Vir.Browser.Element.setInnerHTML element jsHtml
+    Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Element.getInnerHTML element)
 
 def runtimeRefRoundTrip (value : Nat) : Lean.Vir.RuntimeM Nat := do
   let ref ← Lean.Vir.RuntimeRef.new value
