@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 lean_src="${LEAN4_SRC:-$repo_root/third_party/lean4-src}"
 lean_prefix="$(lean --print-prefix)"
 

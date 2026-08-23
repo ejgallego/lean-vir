@@ -11,7 +11,7 @@ import {
   fixtureRoots,
   fixtureManifestVersion,
   validateFixtureManifest,
-} from "../fixtures/fixture-manifest.mjs";
+} from "../../fixtures/fixture-manifest.mjs";
 
 function fixture(id, overrides = {}) {
   return {

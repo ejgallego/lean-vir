@@ -8,21 +8,17 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../scripts/packages/irpkg-generator.mjs";
+import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import {
+  repositoryPath,
+  repositoryRoot as repoRoot,
+} from "../../scripts/repository-paths.mjs";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const fixtureRoot = join(repoRoot, "fixtures", "client-native-extern");
+const fixtureRoot = repositoryPath("fixtures", "client-native-extern");
 const manifestPath = join(fixtureRoot, "lean-vir-native-externs.json");
-const wrapperTool = join(
-  repoRoot,
-  ".lake",
-  "build",
-  "bin",
-  "vir_native_wrappers",
-);
+const wrapperTool = repositoryPath(".lake", "build", "bin", "vir_native_wrappers");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {

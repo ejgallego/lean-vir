@@ -7,16 +7,16 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { requireSuccessfulProcess } from "../scripts/process-utils.mjs";
+import { requireSuccessfulProcess } from "../../scripts/process-utils.mjs";
 import {
   classifyPackageFailure,
   packageDiagnostics,
-} from "./support/fixture-diagnostics.mjs";
+} from "../support/fixture-diagnostics.mjs";
 import {
   fixtureJobCount,
   fixtureMatchesFilter,
   parseFixtureRunnerConfig,
-} from "./support/fixture-runner-config.mjs";
+} from "../support/fixture-runner-config.mjs";
 
 const report = [
   "# Package Report",

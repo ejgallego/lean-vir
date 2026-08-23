@@ -7,10 +7,11 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
-import { createVirRuntime } from "../web/src/vir-runtime-node.js";
+import { repositoryRootUrl as repoRoot } from "../../scripts/repository-paths.mjs";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 
-const buildDir = new URL("../build/infoview-smoke/", import.meta.url);
+const buildDir = new URL("build/infoview-smoke/", repoRoot);
 await mkdir(buildDir, { recursive: true });
 await writeFile(
   new URL("infoview-api-stub.mjs", buildDir),
@@ -29,7 +30,10 @@ await writeFile(
   new URL("infoview-react-dom-stub.mjs", buildDir),
   "export { createRoot } from 'react-dom/client';\n",
 );
-const widgetSource = await readFile(new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url), "utf8");
+const widgetSource = await readFile(
+  new URL("build/generated/infoview/vir-infoview-widget.js", repoRoot),
+  "utf8",
+);
 const smokeWidgetSource = widgetSource
   .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
   .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
@@ -56,10 +60,9 @@ const {
   validateWidgetUnmountEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
-const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
-const packageBytes = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
+const wasmBytes = await readFile(new URL("web/public/vir-upstream.wasm", repoRoot));
+const packageBytes = await readFile(new URL("web/public/demo-host.irpkg", repoRoot));
 const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [packageBytes] });
-const repoRoot = new URL("../", import.meta.url);
 let assetReadCount = 0;
 let assetStatCount = 0;
 let irPackageBuildCount = 0;

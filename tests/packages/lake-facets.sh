@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 repo="$(pwd -P)"
 sdk_version="$(node -p 'require("./package.json").version')"

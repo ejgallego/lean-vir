@@ -3,9 +3,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 
+import { repositoryPath } from "../../scripts/repository-paths.mjs";
 import {
   archiveThread,
   deliverMessage,
@@ -15,9 +16,9 @@ import {
   primaryCheckout,
   resolveMailbox,
   validateMessages,
-} from "../scripts/mailbox-lib.mjs";
+} from "../../scripts/mailbox-lib.mjs";
 
-const script = resolve(import.meta.dirname, "../scripts/mailbox.mjs");
+const script = repositoryPath("scripts", "mailbox.mjs");
 
 function message({
   id,
@@ -65,7 +66,7 @@ async function put(mailbox, id, source) {
 }
 
 test("documentation message examples conform to the protocol", () => {
-  const source = readFileSync(resolve(import.meta.dirname, "../docs/MAILBOX_PROTOCOL.md"), "utf8");
+  const source = readFileSync(repositoryPath("docs", "MAILBOX_PROTOCOL.md"), "utf8");
   const examples = [...source.matchAll(/```markdown\n(---\n[\s\S]*?\n---\n[\s\S]*?)\n```/g)]
     .map((match, index) => parseMessage(`${match[1]}\n`, `documentation example ${index + 1}`));
 

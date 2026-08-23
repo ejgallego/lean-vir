@@ -47,7 +47,7 @@ The documentation owners are:
   explorer assets under `web/tools/binding-explorer/`.
 - Native registry generation, wrapper inspection, declaration-IR tag mapping,
   demo host-import inventory, and object ABI linker flags live under
-  `scripts/native/`; focused pure contracts live under `tests/native/` and
+  `scripts/native/`; focused contracts live under `tests/native/` and
   implementation sources remain under `wasm/upstream_shim/`.
 - Canonical browser package metadata lives in `fixtures/browser-packages.json`;
   `scripts/packages/browser-package-config.mjs` exposes its validated derived

@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import { hasExternrefTableSupport } from "../web/src/vir-runtime.js";
+import { hasExternrefTableSupport } from "../../web/src/vir-runtime.js";
 
 const EXTERNREF_IDENTITY_MODULE = Uint8Array.from([
   0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,

@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fixtureExpectation } from "../fixtures/fixture-manifest.mjs";
+import { fixtureExpectation } from "../../fixtures/fixture-manifest.mjs";
 
 test("defaults to the host oracle", () => {
   assert.deepEqual(fixtureExpectation({ id: "same" }), {

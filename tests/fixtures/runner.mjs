@@ -7,29 +7,29 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 
-import { validateFixtureManifest } from "../fixtures/fixture-manifest.mjs";
+import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
-} from "../scripts/packages/irpkg-generator.mjs";
+} from "../../scripts/packages/irpkg-generator.mjs";
 import {
   mapWithLimit,
   requireSuccessfulProcess,
   runAsync,
-} from "../scripts/process-utils.mjs";
-import { elapsedSeconds, formatSeconds, timerStart } from "../scripts/timing-utils.mjs";
+} from "../../scripts/process-utils.mjs";
+import { repositoryRootUrl as root } from "../../scripts/repository-paths.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "../../scripts/timing-utils.mjs";
 import {
   fixtureJobCount,
   fixtureMatchesFilter,
   parseFixtureRunnerConfig,
-} from "./support/fixture-runner-config.mjs";
-import { createFixtureRunnerContext } from "./support/fixture-runner-context.mjs";
-import { fixtureSummary } from "./support/fixture-summary.mjs";
+} from "../support/fixture-runner-config.mjs";
+import { createFixtureRunnerContext } from "../support/fixture-runner-context.mjs";
+import { fixtureSummary } from "../support/fixture-summary.mjs";
 
-const root = new URL("..", import.meta.url);
-const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
-const buildDir = new URL("../build/fixtures/", import.meta.url);
-const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
+const manifestPath = new URL("fixtures/manifest.json", root);
+const buildDir = new URL("build/fixtures/", root);
+const wasmPath = new URL("web/public/vir-upstream.wasm", root);
 const summaryPath = new URL("summary.json", buildDir);
 const scriptStart = timerStart();
 const config = parseFixtureRunnerConfig({
@@ -39,7 +39,7 @@ const config = parseFixtureRunnerConfig({
 });
 
 function usage() {
-  console.log(`Usage: node tests/fixture-runner.mjs [--no-build]
+  console.log(`Usage: node tests/fixtures/runner.mjs [--no-build]
 
 Run Lean fixture host-oracle checks against the WASI upstream interpreter.
 

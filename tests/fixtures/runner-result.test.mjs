@@ -7,8 +7,8 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { evaluateFixtureRun } from "./support/fixture-result.mjs";
-import { fixtureSummary, fixtureSummaryVersion } from "./support/fixture-summary.mjs";
+import { evaluateFixtureRun } from "../support/fixture-result.mjs";
+import { fixtureSummary, fixtureSummaryVersion } from "../support/fixture-summary.mjs";
 
 const fixture = { id: "fixture", entry: "Fixture.run" };
 const passExpectation = { host: null, wasm: null, reason: null };

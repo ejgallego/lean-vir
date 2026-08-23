@@ -9,19 +9,19 @@ modules rather than making `scripts/` a mixed implementation-and-test folder.
 - `bindings/` owns direct unit coverage and end-to-end smoke checks for the
   shipped-binding explorer and type-anchor tooling under `scripts/bindings/`.
 - `browser/` owns the Chromium page-smoke runner and its browser-only helpers.
-- `native/` owns pure contracts for registry generation under
-  `scripts/native/`; build-backed boundary checks retain stable npm commands.
+- `fixtures/` owns the Lean host-oracle/Wasm comparison runner and its pure
+  contracts. Authored inputs and the manifest remain under root `fixtures/`;
+  test-only runner support remains under `support/`.
+- `infoview/` owns the generated widget's Node smoke test.
+- `mailbox/` owns protocol and CLI contracts for the local agent mailbox.
+- `native/` owns pure registry contracts and the build-backed client native
+  extern manifest smoke test.
 - `packages/` owns direct contracts for repository package configuration,
-  artifact layout, and shared repository-path resolution.
-- `fixture-runner.mjs` is the integration entry point for Lean fixture
-  host-oracle and Wasm comparison checks; their inputs live in root
-  `fixtures/`. The shared manifest and expectation contract lives beside those
-  inputs in `fixtures/fixture-manifest.mjs`; report diagnostics, immutable
-  runner configuration, result evaluation, summary construction, and the
-  cached runner context live under `support/`. The pure contracts have direct
-  coverage in the top-level `fixture-*.test.mjs` files.
+  artifact layout, shared repository-path resolution, C++ package IR builders,
+  and Lake facet integration.
 - `runtime/` owns the JavaScript runtime smoke-test runner, its immutable test
-  catalog and pure selection and scheduling policy, and its focused test cases.
+  catalog and pure selection and scheduling policy, focused test cases, and
+  host-engine Wasm feature probes.
   Run `npm run test:runtime:unit` to check the runner contract without executing
   the runtime smoke tests or building Lean artifacts.
 - `surface/` tests the report-analysis and rendering tools under
@@ -37,5 +37,5 @@ Run `npm run test:packages:unit` for package-tooling contracts without building
 Lean or distributable artifacts.
 Run `npm run test:native:unit` for native-registry contracts without building
 Lean or the Wasm shim.
-Top-level files are focused integration entry points whose implementation
-dependencies remain with their owning library or script directory.
+The test root contains only this ownership map; implementations are grouped by
+the subsystem they exercise.
