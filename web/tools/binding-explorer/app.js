@@ -11,11 +11,11 @@ const findingCount = report.summary.semantic.weak + report.summary.semantic.miss
 document.querySelector("#provided-metric").textContent =
   `${report.summary.provided}/${report.summary.targets}`;
 document.querySelector("#surface-metric").textContent =
-  `${analysis.complete + analysis.automatic}/${analysis.externalGroups}`;
+  `${analysis.complete + analysis.inProgress + analysis.automatic}/${analysis.externalGroups}`;
 document.querySelector("#findings-metric").textContent = String(findingCount);
 document.querySelector("#findings-card").classList.add(findingCount === 0 ? "good" : "warn");
-document.querySelector("#automatic-metric").textContent = String(analysis.automatic);
-document.querySelector("#automatic-card").classList.add(analysis.automatic === 0 ? "good" : "warn");
+document.querySelector("#automatic-metric").textContent = String(analysis.automatic + analysis.inProgress);
+document.querySelector("#automatic-card").classList.add(analysis.automatic + analysis.inProgress === 0 ? "good" : "warn");
 const scope = [
   `${report.summary.libraries} libraries`,
   `${report.summary.apiGroups} API groups`,
@@ -23,6 +23,7 @@ const scope = [
   `${report.summary.targets} compiler/runtime targets`,
   `${report.summary.publicSurface.targetEdges} compiler-proven API/target paths`,
   `${analysis.complete} external API group${analysis.complete === 1 ? "" : "s"} ${analysis.complete === 1 ? "has" : "have"} a complete upstream-surface analysis`,
+  `${analysis.inProgress} ${analysis.inProgress === 1 ? "has" : "have"} an upstream-surface analysis in progress`,
   `${analysis.automatic} ${analysis.automatic === 1 ? "has" : "have"} automatic mapping suggestions awaiting review`,
   `${analysis.curated} ${analysis.curated === 1 ? "has" : "have"} a curated comparison only`,
   `${analysis.needsInput} local API group${analysis.needsInput === 1 ? "" : "s"} need upstream contract input`,

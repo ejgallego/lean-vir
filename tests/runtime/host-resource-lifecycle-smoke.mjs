@@ -378,6 +378,7 @@ const emptyResourceCounts = {
     createVirtualElementState(),
   ]);
   const bindings = createVirtualDocumentHostBindings(state);
+  const common = createCommonHostBindings(state.resources);
   const elementResource = state.resources.resourceForValue(element);
   const htmlResource = state.resources.resourceForValue("<strong>borrowed</strong>");
   bindings["browser.element.setInnerHTML"](elementResource, htmlResource);
@@ -388,6 +389,28 @@ const emptyResourceCounts = {
   );
   const result = bindings["browser.element.getInnerHTML"](elementResource);
   assert.equal(state.resources.resolveResource(result, "JsString"), "<strong>borrowed</strong>");
+
+  const textResource = state.resources.resourceForValue("borrowed text");
+  const nullableText = common["js.nullable.of"](textResource);
+  bindings["browser.element.setTextContent"](elementResource, nullableText);
+  assert.doesNotThrow(
+    () => state.resources.resolveResource(nullableText, "JsNullable"),
+    "Element.textContent must borrow rather than consume its nullable string argument",
+  );
+  const textResult = bindings["browser.element.getTextContent"](elementResource);
+  assert.equal(state.resources.resolveResource(textResult, "JsString"), "borrowed text");
+
+  const nullText = common["js.nullable.null"]();
+  bindings["browser.element.setTextContent"](elementResource, nullText);
+  assert.equal(element.textContent, "", "assigning null to Element.textContent should clear its text");
+  const emptyResult = bindings["browser.element.getTextContent"](elementResource);
+  assert.equal(state.resources.resolveResource(emptyResult, "JsString"), "");
+
+  state.resources.releaseResource(emptyResult);
+  state.resources.releaseResource(nullText);
+  state.resources.releaseResource(textResult);
+  state.resources.releaseResource(nullableText);
+  state.resources.releaseResource(textResource);
   state.resources.releaseResource(result);
   state.resources.releaseResource(htmlResource);
   state.resources.releaseResource(elementResource);

@@ -10,6 +10,12 @@ Verso manual, keep this data in the documentation source as a named block or
 directive and update `scripts/check-api-coverage.mjs` to extract it there; do
 not move the source of truth back to a detached table.
 
+This table records whether an API is implemented and available through the
+runtime; it is not a type-fidelity audit. A `supported` row can still contain
+individual bindings awaiting semantic review against their upstream contract.
+Use the generated binding explorer for reviewed types, unmapped members, and
+binding findings.
+
 The columns are:
 
 - `id`: stable machine identifier, using dotted lowercase segments.

@@ -111,7 +111,13 @@
             "set": { "target": "browser.element.setInnerHTML", "lean": "Lean.Vir.Browser.Element.setInnerHTML", "anchor": "element.innerHTML.set" }
           }
         },
-        { "typescript": "Element.textContent", "targets": ["browser.element.getTextContent", "browser.element.setTextContent"], "lean": ["Lean.Vir.Browser.Element.getTextContent", "Lean.Vir.Browser.Element.setTextContent"] },
+        {
+          "typescript": "Element.textContent",
+          "accessors": {
+            "get": { "target": "browser.element.getTextContent", "lean": "Lean.Vir.Browser.Element.getTextContent", "anchor": "element.textContent.get" },
+            "set": { "target": "browser.element.setTextContent", "lean": "Lean.Vir.Browser.Element.setTextContent", "anchor": "element.textContent.set" }
+          }
+        },
         { "typescript": "Element.getAttribute", "targets": ["browser.element.getAttribute"], "lean": ["Lean.Vir.Browser.Element.getAttribute"] },
         { "typescript": "Element.setAttribute", "targets": ["browser.element.setAttribute"], "lean": ["Lean.Vir.Browser.Element.setAttribute"] },
         { "typescript": "Element.appendChild", "targets": ["browser.element.appendChild"], "lean": ["Lean.Vir.Browser.Element.appendChild"] },
@@ -139,6 +145,24 @@
           "lean": "Lean.Vir.TypeAnchors.elementSetInnerHTMLCall",
           "ts": "Element.innerHTML",
           "target": "browser.element.setInnerHTML",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "set", "receiver": "borrowed", "effect": "dom", "resourceArguments": [0] }
+        },
+        {
+          "id": "element.textContent.get",
+          "category": "Element property",
+          "lean": "Lean.Vir.TypeAnchors.elementGetTextContentCall",
+          "ts": "Element.textContent",
+          "target": "browser.element.getTextContent",
+          "relation": "audit",
+          "portIntent": { "disposition": "bind", "accessor": "get", "receiver": "borrowed", "effect": "dom", "resultRepresentation": "hostResource" }
+        },
+        {
+          "id": "element.textContent.set",
+          "category": "Element property",
+          "lean": "Lean.Vir.TypeAnchors.elementSetTextContentCall",
+          "ts": "Element.textContent",
+          "target": "browser.element.setTextContent",
           "relation": "audit",
           "portIntent": { "disposition": "bind", "accessor": "set", "receiver": "borrowed", "effect": "dom", "resourceArguments": [0] }
         }

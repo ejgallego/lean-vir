@@ -74,6 +74,7 @@ assert.deepEqual(report.summary.coverage, {
   members: coverageMembers.length,
   reviewed: (coverageStatuses.exact ?? 0) + (coverageStatuses.compatible ?? 0) +
     (coverageStatuses.weak ?? 0),
+  unreviewed: coverageStatuses.unreviewed ?? 0,
   suggested: coverageStatuses.suggested ?? 0,
   ambiguous: coverageStatuses.ambiguous ?? 0,
   missing: coverageStatuses.missing ?? 0,
@@ -87,6 +88,8 @@ assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), fals
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getInnerHTMLString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.setInnerHTMLString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getTextContentString"), false);
+assert.equal(publicEntries.has("Lean.Vir.Browser.Element.setTextContentString"), false);
 assert.deepEqual(
   publicEntries.get("Lean.Vir.Browser.HTMLCanvasElement.getContext2D")?.targets.find(
     (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
@@ -162,12 +165,52 @@ assert.deepEqual(elementRoot?.analysis, {
 });
 assert.deepEqual(elementRoot?.comparison.summary, {
   exact: 0,
-  compatible: 2,
+  compatible: 4,
   weak: 0,
   missing: 0,
 });
+assert.deepEqual(elementRoot?.coverage.summary, {
+  exact: 0,
+  compatible: 2,
+  weak: 0,
+  missing: 728,
+  unreviewed: 12,
+  mappedTargets: 16,
+});
 const elementInnerHTML = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.innerHTML",
+);
+const elementTextContent = elementRoot?.coverage.members.find(
+  (member) => member.id === "Element.textContent",
+);
+assert.equal(elementTextContent?.status, "compatible");
+assert.deepEqual(elementTextContent?.mapping.targets, [
+  "browser.element.getTextContent",
+  "browser.element.setTextContent",
+]);
+assert.deepEqual(
+  elementRoot?.coverage.targetMappings.filter((mapping) =>
+    mapping.typescript === "Element.textContent"),
+  [
+    {
+      target: "browser.element.getTextContent",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Element.textContent",
+      lean: ["Lean.Vir.Browser.Element.getTextContent"],
+      anchors: ["element.textContent.get"],
+      accessor: "get",
+    },
+    {
+      target: "browser.element.setTextContent",
+      status: "compatible",
+      source: "reviewed",
+      typescript: "Element.textContent",
+      lean: ["Lean.Vir.Browser.Element.setTextContent"],
+      anchors: ["element.textContent.set"],
+      accessor: "set",
+    },
+  ],
 );
 assert.equal(elementInnerHTML?.status, "compatible");
 assert.deepEqual(elementInnerHTML?.mapping.targets, [
@@ -268,6 +311,7 @@ assert.match(html, /id="provided-metric"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /Complete surface analysis/u);
 assert.match(html, /Automatic analysis/u);
+assert.match(app, /upstream-surface analysis in progress/u);
 assert.match(html, /Upstream contract needs input/u);
 assert.match(html, /runtime coverage and API fidelity/u);
 assert.match(html, /Upstream libraries/u);

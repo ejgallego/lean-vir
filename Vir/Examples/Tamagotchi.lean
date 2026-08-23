@@ -194,9 +194,10 @@ def withElement
   | none => pure ()
   | some element => f element
 
-def setText (selector text : String) : DomM Unit :=
-  withElement selector fun element =>
-    Lean.Vir.Browser.Element.setTextContent element text
+def setText (selector text : String) : DomM Unit := do
+  withElement selector fun element => do
+    let jsText ← Lean.Vir.JsValue.ofString text
+    Lean.Vir.Browser.Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
 
 def getAttribute (selector name : String) : DomM (Option String) := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with

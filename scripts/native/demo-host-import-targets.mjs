@@ -59,7 +59,6 @@ export const demoHostImportTargets = [
   "js.nullable.of",
   "js.nullable.value",
   "js.string",
-  "js.string.owned",
   "js.string.value",
   "js.value.proofwidgets.resolvedRef.value",
   "js.value.react.eventHandler",

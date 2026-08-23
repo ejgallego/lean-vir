@@ -19,6 +19,12 @@ private def bounceX (elapsed : Float) : Float :=
   let distanceMs := if phaseMs ≤ halfPeriodMs then phaseMs else periodMs - phaseMs
   Float.scaleB (UInt64.ofNat distanceMs).toFloat (-2)
 
+private def setTextContentString
+    (element : Lean.Vir.Js Element)
+    (text : String) : DomM Unit := do
+  let jsText ← Lean.Vir.JsValue.ofString text
+  Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
+
 partial def drawFrame
     (ctx : Lean.Vir.Js CanvasRenderingContext2D)
     (status : Lean.Vir.Js Element)
@@ -29,7 +35,7 @@ partial def drawFrame
   CanvasRenderingContext2D.clearRect ctx 0.0 0.0 640.0 360.0
   CanvasRenderingContext2D.fillRect ctx x 124.0 72.0 72.0
   CanvasRenderingContext2D.strokeRect ctx x 124.0 72.0 72.0
-  Element.setTextContent status s!"Lean animation frame: {frame}"
+  setTextContentString status s!"Lean animation frame: {frame}"
   let _ ← Animation.requestAnimationFrame (drawFrame ctx status (frame + 1) origin)
   pure ()
 
@@ -41,7 +47,7 @@ def mount : DomM Unit := do
   | some root =>
       let status ← Document.createElementString "p"
       Element.ClassList.add status "vir-slide-status"
-      Element.setTextContent status "Starting Lean animation…"
+      setTextContentString status "Starting Lean animation…"
       Element.appendChild root status
       let canvasElement ← Document.createElementString "canvas"
       Element.ClassList.add canvasElement "vir-slide-canvas"
@@ -50,12 +56,12 @@ def mount : DomM Unit := do
         "A blue rectangle bouncing horizontally across a canvas"
       Element.appendChild root canvasElement
       match ← HTMLCanvasElement.fromElement canvasElement with
-      | none => Element.setTextContent status "Lean could not initialize the canvas element"
+      | none => setTextContentString status "Lean could not initialize the canvas element"
       | some canvas =>
           HTMLCanvasElement.setWidth canvas 640
           HTMLCanvasElement.setHeight canvas 360
           match ← HTMLCanvasElement.getContext2D canvas with
-          | none => Element.setTextContent status "CanvasRenderingContext2D is unavailable"
+          | none => setTextContentString status "CanvasRenderingContext2D is unavailable"
           | some ctx =>
               CanvasRenderingContext2D.setFillStyle ctx "#2563eb"
               CanvasRenderingContext2D.setStrokeStyle ctx "#0f172a"

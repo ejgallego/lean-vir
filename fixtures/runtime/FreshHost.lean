@@ -8,13 +8,24 @@ def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do
   Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString s)
   Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
 
+private def setFreshText
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
+    (text : String) : Lean.Vir.Browser.DomM Unit := do
+  let jsText ← Lean.Vir.JsValue.ofString text
+  Lean.Vir.Browser.Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
+
+private def getFreshText
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
+    Lean.Vir.Browser.DomM String := do
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Element.getTextContent element)
+
 def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option String) := do
   match ← Lean.Vir.Browser.Document.querySelectorString "#fresh" with
   | none => pure ("", none)
   | some fresh =>
-      Lean.Vir.Browser.Element.setTextContent fresh s
+      setFreshText fresh s
       Lean.Vir.Browser.Element.setAttribute fresh "data-fresh" (s ++ "!")
-      let text ← Lean.Vir.Browser.Element.getTextContent fresh
+      let text ← getFreshText fresh
       let attr ← Lean.Vir.Browser.Element.getAttribute fresh "data-fresh"
       pure (text, attr)
 

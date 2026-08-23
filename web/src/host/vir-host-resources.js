@@ -35,7 +35,7 @@ import {
   setReactPropsProperty,
   setReactPropsRef,
 } from "../react/vir-react-node.js";
-import { createNullableValue } from "./vir-js-value-bindings.js";
+import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 import { takeCallbackLease } from "../runtime/callbacks.js";
 
@@ -425,10 +425,8 @@ export function createElementResourceHostBindings(resources, operations) {
       resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
       const target = resources.resolveResource(element, "Element");
-      return withConsumedResources(resources, [[text, "JsString"]], (resolvedText) => {
-        operations.setTextContent(target, resolvedText);
-        return undefined;
-      });
+      operations.setTextContent(target, nullablePayload(resources, text));
+      return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
       resources.adoptResourceForValue(createNullableValue(
