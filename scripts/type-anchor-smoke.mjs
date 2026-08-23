@@ -45,6 +45,7 @@ try {
 
   /** Method extraction fixture. */
   export interface Controls {
+    label: string;
     reset(value: string): void;
   }
 
@@ -101,6 +102,12 @@ declare function schedule(value: number): void;
         lean: "Demo.reset",
         ts: "Demo.Controls.reset",
         portIntent: { receiver: "borrowed", effect: "dom" },
+      },
+      {
+        id: "controls_label_get",
+        lean: "Demo.getLabel",
+        ts: "Demo.Controls.label",
+        portIntent: { accessor: "get", receiver: "borrowed", effect: "dom" },
       },
     ],
   }, null, 2)}\n`);
@@ -159,6 +166,26 @@ declare function schedule(value: number): void;
           { name: "value", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING } },
         ],
         result: { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT },
+        effect: "dom",
+      },
+      {
+        id: "getLabel",
+        jsName: "getLabel",
+        entry: "Demo.getLabel",
+        source: "Demo.lean",
+        startup: false,
+        args: [
+          {
+            name: "controls",
+            type: {
+              type: "Demo.Controls",
+              interfaceTag: INTERFACE_TAG.RESOURCE,
+              kind: "resource",
+              name: "Demo.Controls",
+            },
+          },
+        ],
+        result: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
         effect: "dom",
       },
     ],
@@ -241,14 +268,14 @@ declare function schedule(value: number): void;
   );
   assert.deepEqual(comparison.summary, {
     exact: 1,
-    compatible: 2,
+    compatible: 3,
     weak: 0,
     missing: 2,
   });
   assert.deepEqual(comparison.diagnosticSummary, {
     error: 1,
     warning: 0,
-    info: 5,
+    info: 8,
   });
   assert.equal(comparison.results.find((result) => result.id === "missing")?.diagnostics[0]?.code,
     "lean_descriptor_missing");
@@ -259,6 +286,10 @@ declare function schedule(value: number): void;
   assert.deepEqual(
     comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.diagnostics.map((item) => item.code),
     ["reviewed_explicit_method_receiver", "reviewed_effect", "primitive_representation_compatible"],
+  );
+  assert.deepEqual(
+    comparison.results.find((result) => result.ts === "Demo.Controls.label")?.diagnostics.map((item) => item.code),
+    ["reviewed_property_getter", "reviewed_explicit_property_receiver", "reviewed_effect"],
   );
   const markdown = await readFile(rendered, "utf8");
   assert.match(markdown, /href="types\.d\.ts#L3-L5"/);

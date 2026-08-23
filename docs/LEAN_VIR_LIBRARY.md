@@ -331,7 +331,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Element.querySelector` and `querySelectorAll` search below an existing element resource.
-- `Lean.Vir.Browser.Element.getInnerHTML` and `setInnerHTML` read or replace serialized child markup.
+- `Lean.Vir.Browser.Element.getInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
+  and `setInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
+  faithfully expose the `innerHTML` property; applications compose conversions
+  explicitly.
 - `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
 - `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`

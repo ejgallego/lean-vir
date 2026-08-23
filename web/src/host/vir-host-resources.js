@@ -418,10 +418,8 @@ export function createElementResourceHostBindings(resources, operations) {
       resources.resourceForValue(operations.getInnerHTML(resources.resolveResource(element, "Element"))),
     "browser.element.setInnerHTML": (element, html) => {
       const target = resources.resolveResource(element, "Element");
-      return withConsumedResources(resources, [[html, "JsString"]], (resolvedHtml) => {
-        operations.setInnerHTML(target, resolvedHtml);
-        return undefined;
-      });
+      operations.setInnerHTML(target, resources.resolveResource(html, "JsString"));
+      return undefined;
     },
     "browser.element.getTextContent": (element) =>
       resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
