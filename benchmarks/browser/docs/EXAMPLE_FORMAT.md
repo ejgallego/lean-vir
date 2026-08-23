@@ -127,10 +127,11 @@ deployment builder rejects multi-variant test packages until their artifact
 sets have a variant-aware static layout. Rehearsals with `build: null` remain
 available locally but are not included in the public catalog.
 
-## Uniform VIR compilation
+## VIR compilation routes
 
-The central catalog supplies the client's repository and exact revision. For
-every `packages` entry the harness performs the same operations:
+The central catalog supplies the client's repository and exact revision. The
+standard `vir` adapter resolves each referenced `packages` entry and performs
+the same operations:
 
 1. resolve a clean checkout at the catalogued revision;
 2. build the catalogued VIR runtime once;
@@ -142,11 +143,14 @@ Compilation stops at that package boundary. Candidate validation then packs
 and imports the complete artifact set and runs the shared browser tests,
 including the example controller's smoke study.
 
-Clients do not provide compilation commands. More than one package is allowed
-for declarations that cannot share one closure, but the compilation procedure
-is unchanged. FIR, LLVM, or other comparison artifacts use the common
-`browser-benchmarks/source-package/v1` output contract; their internal compiler
-commands remain producer-owned.
+More than one package is allowed for declarations that cannot share one
+closure, but the standard compilation procedure is unchanged. A client that
+requires its own Lake context or a repository-owned export driver instead uses
+the `package-command` adapter. That command receives exact checkout and
+dependency-package paths, owns the concrete wrapper and compilation command,
+and publishes the same `browser-benchmarks/source-package/v1` package contract.
+FIR, LLVM, and other comparison artifacts use that contract as well; their
+internal compiler commands remain producer-owned.
 
 Every packed payload path begins with `<example-id>/`, and the browser stages
 it under `artifacts/<example-id>/`. The shared stager replaces only that
@@ -203,3 +207,10 @@ means the compilation descriptor stays small and stable.
 - `rehearsal`: runnable only from explicitly local inputs.
 - `queued`: validator-visible but hidden from the runnable browser catalog.
 - `archived`: retained for provenance but hidden from the default catalog.
+
+Queued integrations may commit their descriptor, tests, and thin local
+controller before immutable producer revisions exist. They remain hidden and
+must keep `build: null`; workload engines still belong to the client-owned
+source package rather than being copied into this application. See
+[`LEAN_ZIP_INTEGRATION.md`](LEAN_ZIP_INTEGRATION.md) for a multi-producer
+example.

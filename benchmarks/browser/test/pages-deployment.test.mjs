@@ -15,10 +15,31 @@ import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
 import { canonicalJson, fileRecord } from "../scripts/artifact-set-lib.mjs";
 import { discoverExampleCatalog } from "../scripts/example-catalog-lib.mjs";
 import {
+  activePagesDeployments,
   parsePagesDeployment,
   selectPagesCatalog,
 } from "../scripts/pages-deployment-lib.mjs";
 import { appRoot } from "../scripts/package-root.mjs";
+
+test("parses safe example and variant selections", () => {
+  assert.deepEqual(parsePagesDeployment("lean-zip=default"), {
+    example: "lean-zip",
+    variant: "default",
+  });
+  for (const value of [
+    undefined,
+    "",
+    "prettyM",
+    "prettyM=default=extra",
+    "../prettyM=default",
+    "prettyM=../default",
+  ]) {
+    assert.throws(
+      () => parsePagesDeployment(value),
+      /invalid Pages deployment/,
+    );
+  }
+});
 
 async function stagedDeployment(t) {
   const resultsRoot = join(appRoot, "test-results");
@@ -53,13 +74,14 @@ async function stagedDeployment(t) {
     manifest,
     manifestPath,
     payloadPath,
-    select: (deployment = "prettyM=default") =>
+    select: (...deployments) =>
       selectPagesCatalog({
         appRoot,
         artifactsRoot,
         catalog,
         database,
-        deployments: [parsePagesDeployment(deployment)],
+        deployments: (deployments.length ? deployments : ["prettyM=default"])
+          .map(parsePagesDeployment),
       }),
   };
 }
@@ -73,11 +95,49 @@ test("admits a canonical staged example to Pages", async (t) => {
   );
 });
 
+test("derives Pages deployments from active canonical examples", async (t) => {
+  const fixture = await stagedDeployment(t);
+  assert.deepEqual(
+    await activePagesDeployments({
+      appRoot,
+      catalog: fixture.catalog,
+      database: fixture.database,
+    }),
+    [
+      { example: "lean-zip", variant: "default", build: "lean-zip" },
+      { example: "prettyM", variant: "default", build: "prettyM" },
+    ],
+  );
+});
+
+test("rejects an active example without a canonical build", async (t) => {
+  const fixture = await stagedDeployment(t);
+  const catalog = structuredClone(fixture.catalog);
+  catalog.examples.find(({ id }) => id === "illuminate").lifecycle = "active";
+  await assert.rejects(
+    () =>
+      activePagesDeployments({
+        appRoot,
+        catalog,
+        database: fixture.database,
+      }),
+    /has no canonical build/,
+  );
+});
+
 test("rejects a Pages example without a canonical build", async (t) => {
   const fixture = await stagedDeployment(t);
   await assert.rejects(
     () => fixture.select("illuminate=default"),
     /has no canonical build/,
+  );
+});
+
+test("rejects duplicate Pages example selections", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await assert.rejects(
+    () => fixture.select("prettyM=default", "prettyM=default"),
+    /duplicate Pages example: prettyM/,
   );
 });
 

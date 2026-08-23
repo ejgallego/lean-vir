@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
@@ -83,15 +84,29 @@ test("synchronous process runner captures output and reports stderr", () => {
   );
 });
 
-test("benchmark server helper waits for startup and shutdown", async () => {
+test("benchmark server helper waits for a configured path and shutdown", async () => {
   const port = 20_000 + (process.pid % 20_000);
-  const server = await startBenchmarkServer({ port, directory: appRoot });
+  const artifactsRoot = join(appRoot, "_artifacts");
+  await mkdir(artifactsRoot, { recursive: true });
+  const directory = await mkdtemp(join(artifactsRoot, "server-test-"));
+  const readinessPath = "/benchmarks/";
+  await mkdir(join(directory, "benchmarks"));
+  await writeFile(join(directory, "benchmarks/index.html"), "ready\n");
+  let server = null;
   try {
-    const response = await fetch(server.origin);
+    server = await startBenchmarkServer({
+      port,
+      directory,
+      readinessPath,
+    });
+    assert.equal((await fetch(server.origin)).status, 404);
+    const response = await fetch(new URL(readinessPath, server.origin));
     assert.equal(response.status, 200);
   } finally {
-    await server.close();
+    await server?.close();
+    await rm(directory, { recursive: true });
   }
+  assert.notEqual(server, null);
   await assert.rejects(fetch(server.origin));
 });
 

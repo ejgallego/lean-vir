@@ -41,7 +41,7 @@ try {
     null,
   );
   assert.equal(await page.locator("[data-example-content]:visible").count(), 0);
-  assert.equal(await page.locator("#example-nav a").count(), 2);
+  assert.equal(await page.locator("#example-nav a").count(), 3);
   assert.equal(
     await page.locator('#example-nav [aria-current="page"]').count(),
     0,
@@ -54,6 +54,7 @@ try {
     backendCount: 5,
   });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.examples), [
+    { id: "lean-zip", label: "lean-zip raw DEFLATE" },
     { id: "prettyM", label: "Std.Format.prettyM" },
     { id: "illuminate", label: "Illuminate player" },
   ]);

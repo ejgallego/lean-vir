@@ -178,8 +178,16 @@ npm run test:fixtures
 npm run test:fixtures:no-build
 npm run test:site
 npm run test:pages:browser
+npm run accept:lean-zip -- /path/to/lean-zip
 npm test
 ```
+
+`npm run accept:lean-zip -- /path/to/lean-zip` is an explicit external-client
+compatibility check for a lean-zip checkout using the same Lean toolchain as
+VIR. It builds a native oracle and a client-native VIR package, compares the
+compression results byte for byte, and independently inflates them. Add
+`--passes 1` for a shorter diagnostic run or `--profile` for attribution only;
+neither mode is stable performance evidence.
 
 `npm test` elaborates the copyable tutorials, then runs the artifact-cache,
 benchmark sampler, focused-identity, and paired-runner contract tests, package

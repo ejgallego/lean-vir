@@ -1,16 +1,18 @@
 # Source artifact builds
 
-`examples/<id>/example.json` is the canonical declaration of each example's
-VIR targets and exports. `artifact-builds.json` selects exact Git sources,
-including the Lean runtime source consumed by VIR, local checkout roles,
-producer dependencies, expected package files, artifact-set identity, and the
+`examples/<id>/example.json` declares each example's source-level VIR targets
+and exports. `artifact-builds.json` selects exact Git sources, including the
+Lean runtime source consumed by VIR, local checkout roles, producer
+dependencies, expected package files, artifact-set identity, and the
 provenance consumed by the packer. Generated candidate locks are ignored
-invocation-local integrity records, not committed consumer state. A VIR
-component names a `packageRef`, and every build binds an `example.id` plus
-`example.variant`. The driver resolves the package target and exports from the
-example descriptor and verifies that `tests.json` selects the same build before
-validating or building it. `prettyM/default` is the first record; it is not a
-default baked into the catalog tools.
+invocation-local integrity records, not committed consumer state. A standard
+`vir` component names a `packageRef`, and the driver resolves its target and
+exports directly from the example descriptor. A `package-command` component
+instead owns its repository-specific export driver while receiving the same
+verified source inputs. Every build binds an `example.id` plus
+`example.variant`, and the driver verifies that `tests.json` selects that build
+before validating or building it. `prettyM/default` is the first record; it is
+not a default baked into the catalog tools.
 
 Machine-specific paths are deliberately absent from the catalog. The usual
 local flow materializes the catalogued sources, then optionally replaces the
@@ -66,6 +68,14 @@ a Lean release.
 Producer source remains in its owning repository at the immutable catalogued
 commit. The artifact application contains only the source URL, commit, package
 contract, and output mapping. It never vendors producer source.
+
+When this repository owns both the catalog and a producer, update them in two
+commits: commit the producer change first, then pin that exact commit in
+`artifact-builds.json`. A rebase rewrites the producer commit, so refresh the
+catalog pin in the following commit before rebuilding or publishing artifacts.
+The producer commit must remain reachable after landing: preserve these commits
+with a merge commit, or land the producer separately before a squash or rebase
+merge and pin its resulting durable commit.
 
 CI and self-contained local builds materialize the exact sources into the
 ignored application-local directory with:
@@ -125,10 +135,9 @@ supplies verified checkout roots and a fresh output path. A producer must:
 5. return success only after its package-local smoke or differential checks
    pass.
 
-The VIR adapter is uniform across examples: every package reference becomes
-one `lake exe vir_irpkg` call over its declared target and exports. Clients do
-not provide shell commands. The other initial adapters use producer entry
-points that already exist:
+The standard VIR adapter is uniform across examples: every package reference
+becomes one `lake exe vir_irpkg` call over its declared target and exports. The
+other initial adapters use producer entry points that already exist:
 
 - FIR native: `integration/talos/artifact/package-pretty-format.sh OUTPUT`;
 - FIR LLVM: `integration/lcnf-c-wasm/package-prettyM-emscripten.sh OUTPUT`, with
@@ -138,6 +147,25 @@ The builder validates package metadata against the catalog, verifies producer
 checksums, and copies only the declared regular files into the seed. It does not
 rewrite producer bytes. FIR LLVM depends on FIR native because its producer
 validates exact output equivalence against that package.
+
+Client repositories that need their own Lake environment or assemble more than
+one source-owned file use the generic `package-command` adapter. Its executable
+entry point is invoked with a fresh caller-owned output directory and every
+resolved input explicitly:
+
+```text
+producer --output OUTPUT \
+  --checkout ROLE=EXACT_CLEAN_CHECKOUT ... \
+  --package COMPONENT=VALIDATED_DEPENDENCY ...
+```
+
+The `producer` checkout owns the entry point. The command must emit its declared
+JSON manifest and `SHA256SUMS`, verify its package-local correctness checks, and
+return only after the output is ready for consumption. The catalog driver then
+checks the sums, admits only declared regular files, and re-verifies every Git
+checkout before writing the source-build receipt. This is the escape hatch for
+repository-owned compilation context, not a place for application-specific
+staging logic.
 
 The generated `_artifacts/builds/<build-id>/BUILD.json` is a portable receipt.
 It records both the build-catalog and example-manifest digests, resolved source
@@ -196,7 +224,8 @@ candidate-only lock, the hash-identified `EXAMPLE_TEST.json` differential
 report, and a `CANDIDATE.json` validation statement.
 
 `.github/workflows/example-candidate.yml` runs the same commands on relevant
-pull requests and explicit dispatches. On `main`, the Pages workflow runs this
-candidate path once, uploads the same short-lived payload, and deploys the
-admitted static application. Neither workflow compares candidate bytes across
-runs or updates repository state.
+pull requests and explicit dispatches. On `main`, the Pages workflow derives
+its plan from active canonical examples, gives each build a separate controlled
+source directory, builds and stages every candidate, uploads their short-lived
+payloads together, and deploys the admitted static application. Neither
+workflow compares candidate bytes across runs or updates repository state.

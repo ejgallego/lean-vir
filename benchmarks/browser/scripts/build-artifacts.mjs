@@ -34,6 +34,7 @@ import {
   replaceDirectoryAtomically,
   sha256,
   validateSeed,
+  validateSha256Sums,
 } from "./artifact-set-lib.mjs";
 import { verifyGitCheckout } from "./git-checkout-lib.mjs";
 import { appRoot } from "./package-root.mjs";
@@ -273,6 +274,45 @@ async function buildFirLlvm(component, output, resolvedCheckouts, packages) {
   });
 }
 
+async function buildPackageCommand(
+  component,
+  output,
+  resolvedCheckouts,
+  packages,
+) {
+  const producer = checkoutFor(component, "producer", resolvedCheckouts);
+  const entrypoint = resolve(producer, component.producer.entrypoint);
+  const entrypointInfo = await lstat(entrypoint).catch(() => null);
+  if (!entrypointInfo?.isFile() || entrypointInfo.isSymbolicLink()) {
+    throw new Error(
+      `package producer entry point is not a regular file: ${entrypoint}`,
+    );
+  }
+  const physicalProducer = await realpath(producer);
+  const physicalEntrypoint = await realpath(entrypoint);
+  const localEntrypoint = relative(physicalProducer, physicalEntrypoint);
+  if (
+    localEntrypoint === ".." ||
+    localEntrypoint.startsWith(`..${sep}`) ||
+    isAbsolute(localEntrypoint)
+  ) {
+    throw new Error("package producer entry point escapes its checkout");
+  }
+
+  await resetOutput(output);
+  const args = ["--output", output];
+  for (const role of Object.keys(component.producer.checkouts).sort()) {
+    args.push(
+      "--checkout",
+      `${role}=${checkoutFor(component, role, resolvedCheckouts)}`,
+    );
+  }
+  for (const dependency of [...(component.dependencies ?? [])].sort()) {
+    args.push("--package", `${dependency}=${packages[dependency]}`);
+  }
+  run(entrypoint, args, { cwd: producer });
+}
+
 async function validateFiles(componentId, component, output) {
   const physicalOutput = await realpath(output);
   for (const packagePath of Object.keys(component.producer.files)) {
@@ -374,6 +414,23 @@ async function validateLlvm(component, output) {
   run("sha256sum", ["-c", "--quiet", "SHA256SUMS"], { cwd: output });
 }
 
+async function validatePackageCommand(component, output) {
+  const manifest = JSON.parse(
+    await readFile(join(output, component.producer.manifest), "utf8"),
+  );
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    throw new Error("package command manifest must be a JSON object");
+  }
+  const sums = await readFile(join(output, "SHA256SUMS"), "utf8");
+  validateSha256Sums(
+    sums,
+    Object.keys(component.producer.files).filter(
+      (path) => path !== "SHA256SUMS",
+    ),
+  );
+  run("sha256sum", ["-c", "--quiet", "SHA256SUMS"], { cwd: output });
+}
+
 async function validatePackage(
   componentId,
   component,
@@ -387,6 +444,8 @@ async function validatePackage(
     await validateNative(component, output, resolvedCheckouts);
   } else if (component.producer.adapter === "fir-llvm") {
     await validateLlvm(component, output);
+  } else if (component.producer.adapter === "package-command") {
+    await validatePackageCommand(component, output);
   }
 }
 
@@ -496,6 +555,13 @@ async function main() {
       await buildFirNative(component, output, resolvedCheckouts);
     } else if (component.producer.adapter === "fir-llvm") {
       await buildFirLlvm(component, output, resolvedCheckouts, packages);
+    } else if (component.producer.adapter === "package-command") {
+      await buildPackageCommand(
+        component,
+        output,
+        resolvedCheckouts,
+        packages,
+      );
     }
     await validatePackage(componentId, component, output, resolvedCheckouts);
     packages[componentId] = output;

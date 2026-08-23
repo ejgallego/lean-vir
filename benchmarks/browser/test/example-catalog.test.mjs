@@ -16,6 +16,7 @@ test("discovers compact example manifests", async () => {
   assert.deepEqual(
     catalog.examples.map(({ id, lifecycle }) => ({ id, lifecycle })),
     [
+      { id: "lean-zip", lifecycle: "active" },
       { id: "prettyM", lifecycle: "active" },
       { id: "illuminate", lifecycle: "rehearsal" },
     ],

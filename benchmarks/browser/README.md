@@ -1,12 +1,13 @@
 # Lean browser benchmark catalog
 
 This directory is one standalone browser benchmark application. Its example
-selector currently exposes `Std.Format.prettyM` and the Illuminate player at
-the same level and through the same page structure. Each example supplies its
-own semantic contract, backend set, sampling controls, and studies while the
-application owns navigation, artifact status, report actions, plotting, and
-backend filtering. It has no runtime dependency on Verso, Reveal, Lake, or the
-parent VIR repository's source tree.
+selector currently exposes `Std.Format.prettyM`, lean-zip raw DEFLATE, and the
+Illuminate player at the same level and through the same page structure. Each
+example supplies its own semantic contract, backend set, sampling controls, and
+studies while the application owns navigation, artifact status, report actions,
+and shared presentation. The prettyM dashboard additionally provides plotting
+and backend filtering. The application has no runtime dependency on Verso,
+Reveal, Lake, or the parent VIR repository's source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -39,12 +40,13 @@ commands. Performance collection remains an explicit controlled-machine step.
 
 ## Responsibilities
 
-- load the JavaScript, VIR JSON, VIR typed-Format, native FIR Wasm, and
-  LLVM/Emscripten candidates;
-- verify exact rendered-text and styling parity;
-- collect marshal, execute, decode, and total timings;
-- run corpus, scaling, interaction, retained-memory, and repeated-call studies;
-- collect cold-start and isolated-runtime observations in fresh browser contexts;
+- discover self-contained examples and variants from the catalog;
+- load each admitted artifact set through its example controller;
+- run the differential tests and benchmark studies declared by that example;
+- preserve workload-defined inputs, correctness rules, timing phases, and
+  artifact provenance;
+- collect cold-start and isolated-runtime observations in fresh browser
+  contexts;
 - aggregate multiple fresh browser processes into campaign reports;
 - display reports and campaigns with a shared, non-destructive backend filter; and
 - import/export the complete JSON representation independently of the active
@@ -92,17 +94,12 @@ boundary.
 `artifacts:pack` consumes it with this layout:
 
 ```text
-prettyM/lean-vir/js/vir-runtime.js
-prettyM/lean-vir/wasm/vir-upstream.wasm
-prettyM/prettyM-vir.irpkg
-prettyM/lean-native/{BUILD.json,prettyM-browser-adapter.mjs,
-                     prettyM.wasm,prettyM.wasm.json}
-prettyM/lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
-                   prettyM-emscripten-adapter.mjs,prettyM.manifest.json,
-                   prettyM.mjs,prettyM.wasm}
+<example-id>/<producer-declared package files>
 ```
 
-It writes a deterministic normalized tar, member checksums, an
+Every path and component is catalog-declared; the packer does not assume
+prettyM, lean-zip, or a fixed compiler route. It writes a deterministic
+normalized tar, member checksums, an
 `ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
 verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
@@ -122,19 +119,26 @@ as a repository release lifecycle.
 ## GitHub Pages deployment
 
 GitHub Pages consumes a candidate generated inside its own build job; it does
-not require a pre-existing archive. After the candidate is staged, the
-deployment build is explicit:
+not require a pre-existing archive. `npm run pages:plan` lists the active
+canonical example, variant, and build records that the workflow will build.
+After those candidates are staged, the deployment build remains explicit and
+accepts every selected example:
 
 ```sh
-npm run build -- --deploy prettyM=default
+npm run pages:plan
+npm run build -- --deploy lean-zip=default --deploy prettyM=default
 ```
+
+Repeat `--deploy EXAMPLE=VARIANT` for every line in the plan.
 
 Deployment admission requires a canonical build, an exact example/variant and
 artifact-set identity, the canonical `tests.json` digest, and no missing,
 changed, extra, or symbolic-link artifact files. Only admitted example
 directories and artifacts are copied. The generated `examples/catalog.json`
-therefore exposes `prettyM/default` on Pages while Illuminate remains a local
-rehearsal.
+therefore exposes only active canonical examples. At present that is
+`lean-zip/default` and `prettyM/default`; changing Illuminate from rehearsal to
+active will add it to the same source-materialization, candidate, browser-test,
+and deployment loop.
 
 The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
 hosts without configurable headers use the scoped `coi-serviceworker.js`
@@ -142,14 +146,14 @@ fallback and reload once before starting the application. CI tests that path
 without server-supplied isolation and requires every backend and differential
 test declared by the admitted variant to pass.
 
-The artifact set is generic over Lean versions. Each candidate is a complete
-bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
-workload. The browser only observes the common semantic input/output and timing
+Artifact sets are generic over Lean versions. Each candidate is a complete
+bounded runtime carrying its own Lean version, runtime, adapter, and workload.
+The browser only observes the example's semantic input/output and timing
 contract. `artifact-builds.json` owns the current producer and workload pins.
-Five-backend parity is the compatibility gate; no cross-backend Lean heap
-values are exchanged.
+Backend parity is the compatibility gate; no cross-backend Lean heap values are
+exchanged.
 
-The current VIR package uses the producer-facing
+The current prettyM VIR package uses the producer-facing
 `VersoSlides.Pretty.*ForVir` export names. `example.json` is their canonical
 build declaration; `config.js` maps the same names to their browser roles. The
 application itself does not load Verso or depend on slide sources. Renaming
@@ -168,14 +172,14 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
-not load or privilege either workload. Select an example there or use the
-direct links `?example=prettyM&variant=default` and
+not load or privilege any workload. Select an example there or use
+`?example=prettyM&variant=default`, `?example=lean-zip&variant=default`, or
 `?example=illuminate&variant=default`. Example variants are selected in the
-shared header rather than by workload-specific UI. The included server supplies
-the required cross-origin isolation headers. `_headers` and `.htaccess` are
-included for static hosts that consume them. The scoped service worker covers
-hosts such as GitHub Pages that cannot configure those headers, with one reload
-before application startup.
+shared header rather than by workload-specific UI. The included server
+supplies the required cross-origin isolation headers. `_headers` and
+`.htaccess` are included for static hosts that consume them. The scoped service
+worker covers hosts such as GitHub Pages that cannot configure those headers,
+with one reload before application startup.
 
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction

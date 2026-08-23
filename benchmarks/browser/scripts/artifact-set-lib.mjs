@@ -61,6 +61,35 @@ export function safeArchivePath(path) {
   return path;
 }
 
+export function validateSha256Sums(sums, expectedPaths) {
+  if (typeof sums !== "string" || sums.length === 0) {
+    throw new Error("SHA256SUMS must be non-empty text");
+  }
+  const body = sums.endsWith("\n") ? sums.slice(0, -1) : sums;
+  const actual = [];
+  const seen = new Set();
+  for (const [index, line] of body.split("\n").entries()) {
+    const match = line.match(/^[0-9a-f]{64}  (.+)$/);
+    if (!match) throw new Error(`invalid SHA256SUMS line ${index + 1}`);
+    const path = safeArchivePath(match[1]);
+    if (seen.has(path)) throw new Error(`duplicate SHA256SUMS path: ${path}`);
+    seen.add(path);
+    actual.push(path);
+  }
+
+  const expected = expectedPaths.map(safeArchivePath).sort();
+  actual.sort();
+  if (
+    actual.length !== expected.length ||
+    actual.some((path, index) => path !== expected[index])
+  ) {
+    throw new Error(
+      `SHA256SUMS must cover exactly the declared package files; expected ${expected.join(", ")}, got ${actual.join(", ")}`,
+    );
+  }
+  return actual;
+}
+
 export async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }

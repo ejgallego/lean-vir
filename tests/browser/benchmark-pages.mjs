@@ -5,23 +5,36 @@ Author: Emilio J. Gallego Arias
 */
 
 import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const [requestedExample, requestedVariant, extra] = process.argv.slice(2);
-if (extra || requestedExample === "--help" || requestedExample === "-h") {
-  console.log(`Usage: node tests/browser/benchmark-pages.mjs EXAMPLE VARIANT
+import { readBuildDatabase } from "../../benchmarks/browser/scripts/artifact-build-lib.mjs";
+import { discoverExampleCatalog } from "../../benchmarks/browser/scripts/example-catalog-lib.mjs";
+import {
+  activePagesDeployments,
+  parsePagesDeployment,
+} from "../../benchmarks/browser/scripts/pages-deployment-lib.mjs";
 
-Test the benchmark subtree installed below web/dist. EXAMPLE and VARIANT may
-instead be set with PAGES_BENCHMARK_EXAMPLE and PAGES_BENCHMARK_VARIANT.`);
-  process.exit(extra ? 1 : 0);
+const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+const benchmarkRoot = join(root, "benchmarks/browser");
+const requested = process.argv.slice(2);
+if (requested.some((argument) => ["--help", "-h"].includes(argument))) {
+  console.log(`Usage: node tests/browser/benchmark-pages.mjs [EXAMPLE=VARIANT ...]
+
+Test the benchmark subtree installed below web/dist. With no selections, test
+every active canonical Pages deployment from the source catalog.`);
+  process.exit(requested.length === 1 ? 0 : 1);
 }
 
-const example = requestedExample ?? process.env.PAGES_BENCHMARK_EXAMPLE;
-const variant = requestedVariant ?? process.env.PAGES_BENCHMARK_VARIANT;
-if (!example || !variant) {
-  throw new Error(
-    "benchmark Pages test requires an explicit example and variant",
-  );
-}
+const deployments = requested.length
+  ? requested.map(parsePagesDeployment)
+  : await activePagesDeployments({
+      appRoot: benchmarkRoot,
+      catalog: await discoverExampleCatalog(benchmarkRoot),
+      database: await readBuildDatabase(
+        join(benchmarkRoot, "artifact-builds.json"),
+      ),
+    });
 
 function run(script, args) {
   const result = spawnSync(
@@ -39,16 +52,18 @@ function run(script, args) {
 run("test:pages", [
   "--directory",
   "../../web/dist/benchmarks",
-  "--deploy",
-  `${example}=${variant}`,
+  ...deployments.flatMap(({ example, variant }) => [
+    "--deploy",
+    `${example}=${variant}`,
+  ]),
 ]);
-run("test:pages:browser", [
-  "--directory",
-  "../../web/dist",
-  "--base-path",
-  "/benchmarks/",
-  "--example",
-  example,
-  "--variant",
-  variant,
-]);
+for (const { example, variant } of deployments) {
+  run("test:pages:browser", [
+    "--directory",
+    "../../web/dist",
+    "--base-path",
+    "/benchmarks/",
+    example,
+    variant,
+  ]);
+}

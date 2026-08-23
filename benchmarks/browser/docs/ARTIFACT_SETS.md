@@ -14,8 +14,10 @@ Conceptually, a component is a dependent pair:
 
 The Lean version lives inside the component. The set does not require all
 components to share it. Nothing at the browser boundary passes Lean heap values
-between candidates; it passes the common compact Format model and compares
-rendered text plus complete styling events.
+between candidates. Each example defines its own semantic boundary: prettyM
+passes a compact Format model and compares rendered text plus complete styling
+events, while lean-zip passes byte arrays and compression levels and compares
+raw-DEFLATE results.
 
 ## Current prettyM roles
 

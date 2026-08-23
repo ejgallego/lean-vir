@@ -10,6 +10,7 @@ export async function startBenchmarkServer({
   directory = null,
   isolation = true,
   label = "benchmark server",
+  readinessPath = "/",
 }) {
   const origin = `http://127.0.0.1:${port}`;
   const args = [join(appRoot, "scripts/serve.mjs"), "--port", String(port)];
@@ -21,7 +22,7 @@ export async function startBenchmarkServer({
   });
 
   try {
-    await waitForServer(child, origin, label);
+    await waitForServer(child, new URL(readinessPath, origin), label);
   } catch (error) {
     await stopChild(child);
     throw error;
@@ -38,7 +39,8 @@ export function collectPageErrors(page) {
   return errors;
 }
 
-async function waitForServer(child, origin, label) {
+async function waitForServer(child, readinessUrl, label) {
+  const origin = readinessUrl.origin;
   let startupOutput = "";
   await new Promise((resolveReady, rejectReady) => {
     let settled = false;
@@ -92,7 +94,7 @@ async function waitForServer(child, origin, label) {
       );
     }
     try {
-      const response = await fetch(origin);
+      const response = await fetch(readinessUrl);
       if (response.ok) return;
       lastError = new Error(`${label} returned HTTP ${response.status}`);
     } catch (error) {
