@@ -13,6 +13,7 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildBindingExplorerReport,
   renderBindingExplorerHtml,
 } from "../../scripts/bindings/binding-explorer.mjs";
 import {
@@ -39,6 +40,77 @@ test("binding explorer rendering injects one script-safe report", () => {
     () => renderBindingExplorerHtml("no marker", {}),
     /exactly one report marker/u,
   );
+});
+
+test("reviewed method mappings require their named public declaration to reach the target", async () => {
+  const target = "demo.widget.render";
+  const coverage = {
+    format: "lean-vir-shipped-bindings-coverage",
+    version: 1,
+    lean: {},
+    providers: [],
+    summary: {
+      totalTargets: 1,
+      provided: 1,
+      missingProvider: 0,
+      runtimeOnly: 0,
+      publicEntries: 1,
+      publicTargetEdges: 1,
+      targetsReachedByPublicEntries: 1,
+    },
+    bindings: [{
+      target,
+      status: "provided",
+      declarations: [{ module: "Vir.Demo" }],
+      providers: ["demo"],
+    }],
+    publicEntries: [{
+      declaration: "Lean.Vir.Demo.Widget.other",
+      module: "Vir.Demo",
+      type: "Unit",
+      source: { path: "Vir/Demo.lean", startLine: 1 },
+      targets: [{ target, path: ["Lean.Vir.Demo.Widget.other"] }],
+    }],
+  };
+  const config = {
+    id: "demo",
+    title: "Demo",
+    description: "Demo bindings.",
+    path: "Vir/Demo.bindings.json",
+    lean: { modules: ["Vir.Demo"] },
+    roots: [{
+      id: "widget",
+      title: "Widget",
+      targets: ["demo.widget.*"],
+      lean: { public: ["Lean.Vir.Demo.Widget"] },
+      upstream: { kind: "typescript", roots: ["Widget"] },
+      mappings: [{
+        typescript: "Widget.render",
+        targets: [target],
+        lean: ["Lean.Vir.Demo.Widget.render"],
+      }],
+    }],
+  };
+  const typeScript = {
+    symbols: [{
+      id: "Widget.render",
+      kind: "method",
+      surfaceRoot: "Widget",
+      display: "render(): void;",
+    }],
+  };
+
+  const report = await buildBindingExplorerReport(
+    coverage,
+    [config],
+    new Map([["demo/widget", typeScript]]),
+    repositoryPath("build", "bindings", "demo.coverage.json"),
+  );
+
+  assert.ok(report.issues.some((entry) =>
+    entry.kind === "mapped-public-api-unreachable" &&
+    entry.declaration === "Lean.Vir.Demo.Widget.render" &&
+    entry.target === target));
 });
 
 test("type anchor rendering is a side-effect-free format choice", () => {

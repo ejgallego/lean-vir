@@ -56,8 +56,9 @@ names, a named ABI profile, Lean names for resource marker types, and any
 justified semantic exceptions. It does not restate selected TypeScript types or
 repeat derived modalities in generated-member anchors.
 
-The initial shipped slice generates `Document.title`, `Element.innerHTML`, and
-`Element.textContent` into `Vir/Browser/Generated.lean`:
+The initial shipped slice generates `Document.title`, `Element.innerHTML`,
+`Element.textContent`, `Element.getAttribute`, and `Element.setAttribute` into
+`Vir/Browser/Generated.lean`:
 
 ```bash
 npm run generate:lean-bindings
@@ -151,13 +152,15 @@ distinct upstream operation.
 
 ## Artifact Ownership
 
-Only the authored inputs are checked in. Descriptor, manifest, report,
-Markdown, and HTML outputs are reproducible local artifacts under ignored
-`build/` paths. Edit their inputs and regenerate them rather than editing the
+Authored inputs and shipped generated Lean declarations are checked in.
+Descriptor, manifest, report, Markdown, and HTML outputs are reproducible local
+artifacts under ignored `build/` paths. Edit the TypeScript/configuration inputs
+and regenerate checked-in Lean; never edit generated declarations or report
 outputs directly.
 
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
+| Shipped generated DOM bindings | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | checked-in `Vir/Browser/Generated.lean`; ignored `build/bindings/browser.generated-operations.json` |
 | Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
 | Shipped public Lean surface | Compiled `Vir` and `Vir.Infoview` modules | `build/type-descriptors/vir-js-shipped-v1.lean.json` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |

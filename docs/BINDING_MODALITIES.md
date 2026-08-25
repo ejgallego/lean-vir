@@ -120,6 +120,8 @@ represented by a supported translation rule or named in
 `omittedOptionalParameters`; the current generator implements the latter path.
 Missing policies, changed overload layouts, rest parameters, unknown parameter
 names, and unsupported parameter or result types fail generation.
+TypeScript parameter names that collide with Lean keywords are rendered as
+escaped Lean identifiers.
 
 The initial generated method slice is `Element.getAttribute` and
 `Element.setAttribute`. Both use `"only"`, omit no parameters, translate each

@@ -169,6 +169,18 @@ test("an explicit single-signature policy generates faithful methods and documen
   });
 });
 
+test("TypeScript parameter names that are Lean keywords are escaped", () => {
+  const keywordDescriptors = structuredClone(descriptors);
+  const method = keywordDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape.args[0].name = "namespace";
+
+  const output = renderLeanBindings(config, generation, keywordDescriptors);
+
+  assert.match(output, /\(«namespace» : @& Lean\.Vir\.Js String\)/u);
+  assert.match(output, /getAttributeJs widget «namespace»/u);
+});
+
 test("method generation fails closed without a matching signature policy", () => {
   const unreviewed = structuredClone(generation);
   delete unreviewed.methodPolicies["Widget.getAttribute"];

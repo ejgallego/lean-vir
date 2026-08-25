@@ -13,6 +13,7 @@ import {
   generatedOperationDocument,
   validateGenerationProfile,
 } from "./binding-modalities.mjs";
+import { validateLeanIdentifier } from "./lean-syntax.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
@@ -54,13 +55,6 @@ function nonemptyString(value) {
   return typeof value === "string" && value.length !== 0;
 }
 
-function leanIdentifier(value, context) {
-  if (!/^[A-Za-z_][A-Za-z0-9_']*$/u.test(value)) {
-    throw new Error(`${context} is not a supported Lean identifier: ${JSON.stringify(value)}`);
-  }
-  return value;
-}
-
 function validateGenerationConfig(config, configPath) {
   const label = relative(repositoryRoot, configPath);
   const generation = config?.generation;
@@ -74,9 +68,13 @@ function validateGenerationConfig(config, configPath) {
   if (!Object.values(generation.resources).every(nonemptyString)) {
     throw new Error(`${label} generation resources must map to Lean names`);
   }
-  for (const name of generation.namespace.split(".")) leanIdentifier(name, `${label} generation namespace`);
+  for (const name of generation.namespace.split(".")) {
+    validateLeanIdentifier(name, `${label} generation namespace`);
+  }
   for (const imported of generation.imports) {
-    for (const name of imported.split(".")) leanIdentifier(name, `${label} generated import`);
+    for (const name of imported.split(".")) {
+      validateLeanIdentifier(name, `${label} generated import`);
+    }
   }
   return generation;
 }

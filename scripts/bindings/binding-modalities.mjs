@@ -4,6 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  leanBinderIdentifier,
+  validateLeanIdentifier,
+} from "./lean-syntax.mjs";
+
 const derivedPortIntentFields = [
   "effect",
   "receiver",
@@ -17,13 +22,6 @@ function nonemptyString(value) {
 
 function object(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function leanIdentifier(value, context) {
-  if (!/^[A-Za-z_][A-Za-z0-9_']*$/u.test(value)) {
-    throw new Error(`${context} is not a supported Lean identifier: ${JSON.stringify(value)}`);
-  }
-  return value;
 }
 
 function validatePassing(value, context) {
@@ -290,7 +288,7 @@ function receiverFor(member, identity, generation, profile, exception) {
     throw new Error(`${identity.id} has no Lean resource mapping for receiver ${owner}`);
   }
   const ownerName = owner.slice(owner.lastIndexOf(".") + 1);
-  const name = leanIdentifier(
+  const name = leanBinderIdentifier(
     ownerName[0].toLowerCase() + ownerName.slice(1),
     `${identity.id} receiver name`,
   );
@@ -350,10 +348,15 @@ function operationName(operation, namespace) {
     throw new Error(`${operation.lean} must name a declaration in a nested namespace`);
   }
   const nestedNamespace = relativeName.slice(0, separator);
-  for (const part of nestedNamespace.split(".")) leanIdentifier(part, `${operation.lean} namespace`);
+  for (const part of nestedNamespace.split(".")) {
+    validateLeanIdentifier(part, `${operation.lean} namespace`);
+  }
   return {
     namespace: nestedNamespace,
-    name: leanIdentifier(relativeName.slice(separator + 1), `${operation.lean} declaration`),
+    name: validateLeanIdentifier(
+      relativeName.slice(separator + 1),
+      `${operation.lean} declaration`,
+    ),
   };
 }
 
@@ -388,8 +391,9 @@ function propertyOperation(
   const shape = symbol.accessors?.[accessor];
   const leanName = operationName(operation, generation.namespace);
   const receiver = receiverFor(member, anchor, generation, profile, exception);
-  const propertyName = leanIdentifier(
-    member.slice(member.lastIndexOf(".") + 1),
+  const propertyName = member.slice(member.lastIndexOf(".") + 1);
+  const propertyBinder = leanBinderIdentifier(
+    propertyName,
     `${member} setter argument`,
   );
   const arguments_ = [];
@@ -399,7 +403,7 @@ function propertyOperation(
   } else {
     const value = translateType(shape, generation, profile, `${member} setter`);
     arguments_.push(modalityArgument(
-      propertyName,
+      propertyBinder,
       "argument",
       value,
       profile.resource.argument,
@@ -417,7 +421,7 @@ function propertyOperation(
       exception,
     );
   }
-  const knownArgumentNames = new Set(arguments_.map((argument) => argument.name));
+  const knownArgumentNames = new Set(accessor === "set" ? [propertyName] : []);
   for (const name of Object.keys(exception?.arguments ?? {})) {
     if (!knownArgumentNames.has(name)) {
       throw new Error(`${anchor.id} exception references missing argument ${name}`);
@@ -509,7 +513,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile) {
       throw new Error(`${member} cannot omit an optional parameter before ${argument.name}`);
     }
     arguments_.push(modalityArgument(
-      leanIdentifier(argument.name, `${member} parameter`),
+      leanBinderIdentifier(argument.name, `${member} parameter`),
       "argument",
       translateType(argument.type, generation, profile, `${member} parameter ${argument.name}`),
       profile.resource.argument,

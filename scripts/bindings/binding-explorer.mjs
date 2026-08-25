@@ -692,24 +692,25 @@ function declarationMatchesSelector(declaration, selector) {
   return declaration === selector || declaration.startsWith(`${selector}.`);
 }
 
-function accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
+function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
   if (surfaceCoverage?.mode !== "reviewed") return [];
   const selectors = bindingRoot.lean?.public ?? [];
   const issues = [];
-  for (const mapping of surfaceCoverage.targetMappings.filter((entry) =>
-    entry.accessor !== undefined)) {
+  for (const mapping of surfaceCoverage.targetMappings) {
     const callers = publicByTarget.get(mapping.target) ?? [];
     for (const declaration of mapping.lean) {
       if (!callers.some((caller) => caller.entry.declaration === declaration)) {
         issues.push(issue(
           "mapped-public-api-unreachable",
           "error",
-          `${declaration} is the reviewed ${mapping.accessor} accessor for ${mapping.typescript}, but compiled IR does not reach ${mapping.target}`,
+          `${declaration} is the reviewed${mapping.accessor === undefined
+            ? "" : ` ${mapping.accessor} accessor`} binding for ${mapping.typescript}, but compiled IR does not reach ${mapping.target}`,
           { target: mapping.target, declaration, typescript: mapping.typescript,
-            accessor: mapping.accessor },
+            ...(mapping.accessor === undefined ? {} : { accessor: mapping.accessor }) },
         ));
       }
     }
+    if (mapping.accessor === undefined) continue;
     const reviewed = new Set(mapping.lean);
     for (const caller of callers) {
       if (reviewed.has(caller.entry.declaration) ||
@@ -850,7 +851,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
             : `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream entries have no automatic VIR mapping candidate`,
         ));
       }
-      issues.push(...accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget));
+      issues.push(...reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget));
       issues.push(...semanticIssues(comparison));
       if (comparison !== null) {
         for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
