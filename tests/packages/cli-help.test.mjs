@@ -31,3 +31,18 @@ test("package entry points provide clean help", () => {
     }
   }
 });
+
+test("lean-zip acceptance requires an explicit checkout argument", () => {
+  const script = "scripts/packages/lean-zip/acceptance.mjs";
+  const result = spawnSync(process.execPath, [script], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      LEAN_ZIP_CHECKOUT: "unused-lean-zip-checkout",
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /usage: npm run accept:lean-zip/u);
+  assert.doesNotMatch(result.stderr, /Lake configuration not found/u);
+});
