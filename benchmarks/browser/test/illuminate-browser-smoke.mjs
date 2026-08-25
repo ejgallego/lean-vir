@@ -1,21 +1,24 @@
 import assert from "node:assert/strict";
+import { join } from "node:path";
 
+import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
+import { appRoot } from "../scripts/package-root.mjs";
 import {
   collectPageErrors,
   launchBenchmarkBrowser,
   startBenchmarkServer,
 } from "./harness.mjs";
 
-const port = Number(process.env.BENCH_PORT ?? "18448");
-const url = `http://127.0.0.1:${port}/?example=illuminate`;
-
-let server = null;
-try {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`server returned ${response.status}`);
-} catch {
-  server = await startBenchmarkServer({ port });
-}
+const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
+const expectedSetId = database.builds.illuminate.artifactSet.setId;
+const port = Number(
+  process.env.BENCH_PORT ?? String(21000 + (process.pid % 1000)),
+);
+const server = await startBenchmarkServer({
+  port,
+  label: "Illuminate browser smoke server",
+});
+const url = `${server.origin}/?example=illuminate`;
 let browser = null;
 
 try {
@@ -25,6 +28,15 @@ try {
   });
   page.setDefaultTimeout(120_000);
   const pageErrors = collectPageErrors(page);
+  const requestedPaths = new Set();
+  let artifactManifestRequests = 0;
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    requestedPaths.add(path);
+    if (path.endsWith("/artifacts/illuminate/ARTIFACT_SET.json")) {
+      artifactManifestRequests += 1;
+    }
+  });
   await page.goto(url, { waitUntil: "networkidle" });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
     example: "illuminate",
@@ -56,9 +68,17 @@ try {
   assert.deepEqual(
     await page.evaluate(() => {
       const status = window.__benchmarkApp.getArtifactStatus();
-      return { verified: status.verified, tone: status.tone, setId: status.setId };
+      return {
+        verified: status.verified,
+        tone: status.tone,
+        setId: status.setId,
+      };
     }),
-    { verified: false, tone: "rehearsal", setId: null },
+    {
+      verified: true,
+      tone: "verified",
+      setId: expectedSetId,
+    },
   );
   const backends = await page.evaluate(() =>
     window.__illuminateBenchApp.getBackends(),
@@ -73,20 +93,16 @@ try {
   );
   assert.equal(backends[0].label, "JavaScript oracle");
   assert.equal(backends[1].label, "Lean · VIR typed");
+  assert.equal(backends[2].label, "Lean · FIR selection");
   assert.ok(
-    ["Lean · FIR native", "Lean · FIR selection"].includes(backends[2].label),
+    requestedPaths.has("/artifacts/illuminate/workload/js-player-trace.mjs"),
   );
-  const usesSelection = backends[2].label === "Lean · FIR selection";
+  assert.equal(artifactManifestRequests, 1);
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Illuminate [0-9a-f]{8}/);
-  assert.match(buildNotes, /VIR [0-9a-f]{8}/);
-  assert.match(buildNotes, /FIR(?: selection)? [0-9a-f]{8}/);
-  assert.match(
-    buildNotes,
-    usesSelection
-      ? /fir\.illuminate-player\.browser\/v4/
-      : /fir\.illuminate-player\.browser\/v3/,
-  );
+  assert.ok(buildNotes.includes(`Artifact set ${expectedSetId}`));
+  assert.match(buildNotes, /illuminate\/browser-benchmark-source\/v1/);
+  assert.match(buildNotes, /Illuminate\.Animation\.Vir\.replayTraceTyped/);
+  assert.match(buildNotes, /fir\.illuminate-player\.complete-runtime\/v2/);
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
   const report = await page.evaluate(() =>
@@ -133,7 +149,7 @@ try {
     "totalMs",
   );
   assert.deepEqual(pageErrors, []);
-  console.log("PASS Illuminate JS/VIR/FIR plotting rehearsal smoke");
+  console.log("PASS canonical Illuminate JS/VIR/FIR plotting smoke");
 } finally {
-  await Promise.all([browser?.close(), server?.close()]);
+  await Promise.all([browser?.close(), server.close()]);
 }

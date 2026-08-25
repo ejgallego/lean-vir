@@ -7,13 +7,16 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
 import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
 import { canonicalJson, fileRecord } from "../scripts/artifact-set-lib.mjs";
-import { discoverExampleCatalog } from "../scripts/example-catalog-lib.mjs";
+import {
+  catalogWithArtifactAvailability,
+  discoverExampleCatalog,
+} from "../scripts/example-catalog-lib.mjs";
 import {
   activePagesDeployments,
   parsePagesDeployment,
@@ -66,6 +69,22 @@ async function stagedDeployment(t) {
   };
   const manifestPath = join(directory, "ARTIFACT_SET.json");
   await writeFile(manifestPath, canonicalJson(manifest));
+  const select = async (selectedCatalog, ...deployments) => {
+    const availableCatalog = await catalogWithArtifactAvailability({
+      appRoot,
+      artifactsRoot,
+      database,
+      catalog: selectedCatalog,
+    });
+    return selectPagesCatalog({
+      appRoot,
+      catalog: availableCatalog,
+      database,
+      deployments: (deployments.length ? deployments : ["prettyM=default"]).map(
+        parsePagesDeployment,
+      ),
+    });
+  };
   return {
     artifactsRoot,
     catalog,
@@ -74,16 +93,25 @@ async function stagedDeployment(t) {
     manifest,
     manifestPath,
     payloadPath,
-    select: (...deployments) =>
-      selectPagesCatalog({
-        appRoot,
-        artifactsRoot,
-        catalog,
-        database,
-        deployments: (deployments.length ? deployments : ["prettyM=default"])
-          .map(parsePagesDeployment),
-      }),
+    select: (...deployments) => select(catalog, ...deployments),
+    selectWithCatalog: select,
   };
+}
+
+async function catalogWithoutBuild(fixture, exampleId) {
+  const catalog = structuredClone(fixture.catalog);
+  const example = catalog.examples.find(({ id }) => id === exampleId);
+  const testPackage = JSON.parse(
+    await readFile(join(appRoot, example.testPackage), "utf8"),
+  );
+  testPackage.variants[0].build = null;
+  const testPackagePath = join(
+    fixture.artifactsRoot,
+    `${exampleId}-without-build.json`,
+  );
+  await writeFile(testPackagePath, canonicalJson(testPackage));
+  example.testPackage = relative(appRoot, testPackagePath);
+  return catalog;
 }
 
 test("admits a canonical staged example to Pages", async (t) => {
@@ -95,6 +123,77 @@ test("admits a canonical staged example to Pages", async (t) => {
   );
 });
 
+test("marks only verified staged examples as ready", async (t) => {
+  const fixture = await stagedDeployment(t);
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
+    catalog: fixture.catalog,
+  });
+  assert.deepEqual(
+    Object.fromEntries(
+      catalog.examples.map(({ id, availability }) => [id, availability]),
+    ),
+    {
+      illuminate: {
+        status: "missing",
+        variant: "default",
+        build: "illuminate",
+        setId: fixture.database.builds.illuminate.artifactSet.setId,
+      },
+      "lean-zip": {
+        status: "missing",
+        variant: "default",
+        build: "lean-zip",
+        setId: fixture.database.builds["lean-zip"].artifactSet.setId,
+      },
+      prettyM: {
+        status: "ready",
+        variant: "default",
+        build: "prettyM",
+        setId: fixture.manifest.setId,
+      },
+    },
+  );
+});
+
+test("does not advertise an invalid staged example", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await writeFile(join(fixture.directory, "unexpected.bin"), "extra\n");
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
+    catalog: fixture.catalog,
+  });
+  const prettyM = catalog.examples.find(({ id }) => id === "prettyM");
+  assert.equal(prettyM.availability.status, "invalid");
+  assert.equal(prettyM.availability.variant, "default");
+  assert.match(prettyM.availability.reason, /unexpected member/);
+});
+
+test("does not admit a stale artifact set with matching tests", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await writeFile(
+    fixture.manifestPath,
+    canonicalJson({ ...fixture.manifest, setId: "prettyM-stale-set" }),
+  );
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
+    catalog: fixture.catalog,
+  });
+  const prettyM = catalog.examples.find(({ id }) => id === "prettyM");
+  assert.equal(prettyM.availability.status, "invalid");
+  assert.equal(
+    prettyM.availability.setId,
+    fixture.database.builds.prettyM.artifactSet.setId,
+  );
+  assert.match(prettyM.availability.reason, /expected artifact set.*found/);
+});
+
 test("derives Pages deployments from active canonical examples", async (t) => {
   const fixture = await stagedDeployment(t);
   assert.deepEqual(
@@ -104,6 +203,7 @@ test("derives Pages deployments from active canonical examples", async (t) => {
       database: fixture.database,
     }),
     [
+      { example: "illuminate", variant: "default", build: "illuminate" },
       { example: "lean-zip", variant: "default", build: "lean-zip" },
       { example: "prettyM", variant: "default", build: "prettyM" },
     ],
@@ -112,8 +212,7 @@ test("derives Pages deployments from active canonical examples", async (t) => {
 
 test("rejects an active example without a canonical build", async (t) => {
   const fixture = await stagedDeployment(t);
-  const catalog = structuredClone(fixture.catalog);
-  catalog.examples.find(({ id }) => id === "illuminate").lifecycle = "active";
+  const catalog = await catalogWithoutBuild(fixture, "illuminate");
   await assert.rejects(
     () =>
       activePagesDeployments({
@@ -127,8 +226,9 @@ test("rejects an active example without a canonical build", async (t) => {
 
 test("rejects a Pages example without a canonical build", async (t) => {
   const fixture = await stagedDeployment(t);
+  const catalog = await catalogWithoutBuild(fixture, "illuminate");
   await assert.rejects(
-    () => fixture.select("illuminate=default"),
+    () => fixture.selectWithCatalog(catalog, "illuminate=default"),
     /has no canonical build/,
   );
 });

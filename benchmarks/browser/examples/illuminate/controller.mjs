@@ -3,11 +3,10 @@ import { requireController } from "../controller-contract.mjs";
 export const view = {
   eyebrow: "Real client · browser Wasm",
   intro:
-    "Compare the production JavaScript player with typed VIR and FIR-native implementations over identical animations and event traces.",
-  progress: "Preparing rehearsal artifacts…",
+    "Compare the production JavaScript player with typed VIR and FIR's selection runtime over identical animations and event traces.",
+  progress: "Loading verified artifacts…",
   artifacts: {
-    copy:
-      "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
+    copy: "Correctness and packaging are validated, but timings from this loaded machine are not accepted as performance evidence.",
   },
   backendDescription:
     "JavaScript is the semantic oracle. VIR and FIR run the same typed replay contract and return normalized frame actions.",
@@ -34,7 +33,9 @@ export const view = {
 
 export async function loadExample(context) {
   if (context.example.id !== "illuminate") {
-    throw new Error(`Illuminate controller received example ${context.example.id}`);
+    throw new Error(
+      `Illuminate controller received example ${context.example.id}`,
+    );
   }
   await import("./app.mjs");
   return requireController(globalThis.__illuminateBenchApp, context.example.id);

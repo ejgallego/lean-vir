@@ -1,27 +1,27 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
-import {
-  copyFile,
-  lstat,
-  mkdir,
-  readFile,
-  realpath,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
-import { basename, delimiter, join, resolve } from "node:path";
+import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { delimiter, join } from "node:path";
 
 import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
+import {
+  buildVirBrowserRuntime,
+  checkoutRoot,
+  fileRecord,
+  gitIdentity,
+  parseProducerArguments,
+  readMatchingWorkloadPackage,
+  requireToolchain,
+  requireFreshOutput,
+  sha256,
+  writeChecksums,
+} from "../vir-client-package-lib.mjs";
 
 const defaultProducer = repositoryRoot;
-const expectedRoles = new Set(["producer", "runtime", "client"]);
 const packageEntry = "VirLeanZipAcceptance.compressRaw";
 
-function usage() {
-  console.log(`Usage: node scripts/packages/lean-zip/export-browser-package.mjs [options]
+const usage = `Usage: node scripts/packages/lean-zip/export-browser-package.mjs [options]
 
 Build a client-native VIR runtime and lean-zip package into a fresh directory.
 
@@ -29,102 +29,17 @@ Build a client-native VIR runtime and lean-zip package into a fresh directory.
   --checkout producer=PATH      exact VIR checkout
   --checkout runtime=PATH       exact Lean source checkout
   --checkout client=PATH        exact lean-zip checkout
-  --package workload=PATH       lean-zip source/oracle package`);
-}
-
-function parseArgs(argv) {
-  const options = { output: null, checkouts: new Map(), packages: new Map() };
-  const take = (index, option) => {
-    const value = argv[index + 1];
-    if (value === undefined || value.startsWith("--")) {
-      throw new Error(`${option} requires a value`);
-    }
-    return value;
-  };
-  const assignment = (value, option) => {
-    const separator = value.indexOf("=");
-    if (separator <= 0 || separator === value.length - 1) {
-      throw new Error(`${option} requires NAME=PATH`);
-    }
-    return {
-      name: value.slice(0, separator),
-      path: value.slice(separator + 1),
-    };
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-    if (argument === "--output") {
-      if (options.output !== null) throw new Error("duplicate --output");
-      options.output = take(index++, argument);
-    } else if (argument === "--checkout") {
-      const { name, path } = assignment(take(index++, argument), argument);
-      if (!expectedRoles.has(name))
-        throw new Error(`unknown checkout role: ${name}`);
-      if (options.checkouts.has(name))
-        throw new Error(`duplicate checkout role: ${name}`);
-      options.checkouts.set(name, path);
-    } else if (argument === "--package") {
-      const { name, path } = assignment(take(index++, argument), argument);
-      if (name !== "workload")
-        throw new Error(`unknown dependency package: ${name}`);
-      if (options.packages.has(name))
-        throw new Error(`duplicate dependency package: ${name}`);
-      options.packages.set(name, path);
-    } else if (argument === "--help" || argument === "-h") {
-      usage();
-      process.exit(0);
-    } else {
-      throw new Error(`unknown argument: ${argument}`);
-    }
-  }
-  if (options.output === null) throw new Error("pass --output PATH");
-  options.checkouts.set(
-    "producer",
-    options.checkouts.get("producer") ?? defaultProducer,
-  );
-  for (const role of expectedRoles) {
-    if (!options.checkouts.has(role))
-      throw new Error(`missing checkout role: ${role}`);
-  }
-  if (!options.packages.has("workload")) {
-    throw new Error("missing dependency package: workload");
-  }
-  return options;
-}
-
-function git(root, args) {
-  return runSync("git", ["-C", root, ...args], { capture: true });
-}
-
-function gitIdentity(root, label) {
-  const status = git(root, ["status", "--porcelain"]);
-  if (status !== "") throw new Error(`${label} checkout must be clean`);
-  return { commit: git(root, ["rev-parse", "HEAD"]), dirty: false };
-}
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-async function fileRecord(root, path) {
-  const bytes = await readFile(join(root, path));
-  return { path, byteLength: bytes.byteLength, sha256: sha256(bytes) };
-}
-
-async function checkoutRoot(path, role) {
-  const root = await realpath(resolve(path));
-  if (git(root, ["rev-parse", "--show-toplevel"]) !== root) {
-    throw new Error(`${role} must be a Git checkout root: ${root}`);
-  }
-  return root;
-}
+  --package workload=PATH       lean-zip source/oracle package`;
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const output = resolve(options.output);
-  if ((await lstat(output).catch(() => null)) !== null) {
-    throw new Error(`output directory already exists: ${output}`);
-  }
+  const options = parseProducerArguments(process.argv.slice(2), {
+    checkoutRoles: ["producer", "runtime", "client"],
+    packageRoles: ["workload"],
+    defaultProducer,
+    usage,
+  });
+  if (options === null) return;
+  const output = await requireFreshOutput(options.output);
   const producer = await checkoutRoot(
     options.checkouts.get("producer"),
     "producer",
@@ -139,56 +54,30 @@ async function main() {
     lean: gitIdentity(runtime, "Lean"),
     leanZip: gitIdentity(client, "lean-zip"),
   };
-  const workload = await realpath(resolve(options.packages.get("workload")));
-  const workloadBuild = JSON.parse(
-    await readFile(join(workload, "BUILD.json"), "utf8"),
-  );
-  if (
-    workloadBuild.kind !== "lean-zip/browser-benchmark-source" ||
-    workloadBuild.source?.commit !== git(client, ["rev-parse", "HEAD"]) ||
-    workloadBuild.source?.dirty !== false
-  ) {
-    throw new Error(
-      "workload package does not match the exact clean lean-zip checkout",
-    );
-  }
+  const { root: workload, build: workloadBuild } =
+    await readMatchingWorkloadPackage(options.packages.get("workload"), {
+      kind: "lean-zip/browser-benchmark-source",
+      source: sourceIdentities.leanZip,
+      label: "lean-zip",
+    });
   for (const [root, label] of [
     [producer, "VIR"],
     [client, "lean-zip"],
   ]) {
-    const toolchain = (
-      await readFile(join(root, "lean-toolchain"), "utf8")
-    ).trim();
-    if (toolchain !== "leanprover/lean4:v4.33.0") {
-      throw new Error(`${label} must use Lean 4.33 final, got ${toolchain}`);
-    }
+    await requireToolchain(root, label, "leanprover/lean4:v4.33.0");
   }
-  const wasiSdk = await realpath(join(producer, ".tools/wasi-sdk"));
-  if (!(await stat(join(wasiSdk, "bin/clang++")).catch(() => null))?.isFile()) {
-    throw new Error(`VIR WASI SDK is not installed: ${wasiSdk}`);
-  }
-  const esbuild = join(producer, "node_modules/.bin/esbuild");
-  if (!(await stat(esbuild).catch(() => null))?.isFile()) {
-    throw new Error(`VIR esbuild is not installed: ${esbuild}`);
-  }
-
   try {
-    await mkdir(join(output, "lean-vir/js"), { recursive: true });
-    await mkdir(join(output, "lean-vir/wasm"), { recursive: true });
-    runSync("npm", ["run", "build:demo:release"], {
-      cwd: producer,
-      env: {
-        ...process.env,
-        LEAN4_SRC: runtime,
+    const runtimeBuild = await buildVirBrowserRuntime({
+      producer,
+      runtime,
+      output,
+      environment: {
         VIR_NATIVE_EXTERN_MANIFEST: join(
           client,
           "lean-vir-native-externs.json",
         ),
-        VIR_SKIP_PACKAGES: "1",
-        WASI_SDK_PATH: wasiSdk,
       },
     });
-    runSync("lake", ["build", "Vir", "vir_irpkg"], { cwd: producer });
     runSync("lake", ["build", "Zip.Wasm.Entry"], { cwd: client });
 
     const packageFile = "lean-zip.irpkg";
@@ -218,23 +107,6 @@ async function main() {
       },
     );
     await rm(join(output, reportFile));
-    runSync(
-      esbuild,
-      [
-        join(producer, "web/src/vir-runtime.js"),
-        "--bundle",
-        "--format=esm",
-        "--platform=browser",
-        "--target=es2020",
-        "--minify",
-        `--outfile=${join(output, "lean-vir/js/vir-runtime.js")}`,
-      ],
-      { cwd: producer },
-    );
-    await copyFile(
-      join(producer, "web/public/vir-upstream.wasm"),
-      join(output, "lean-vir/wasm/vir-upstream.wasm"),
-    );
     await copyFile(
       join(producer, "scripts/packages/lean-zip/browser-package-smoke.mjs"),
       join(output, "smoke.mjs"),
@@ -284,7 +156,7 @@ async function main() {
             await readFile(join(client, "lean-vir-native-externs.json")),
           ),
         },
-        wasiSdk: basename(wasiSdk),
+        wasiSdk: runtimeBuild.wasiSdk,
         module: "lean-vir/js/vir-runtime.js",
         wasm: "lean-vir/wasm/vir-upstream.wasm",
       },
@@ -301,14 +173,7 @@ async function main() {
       `${JSON.stringify(build, null, 2)}\n`,
     );
     const checksumPaths = ["BUILD.json", ...payloadPaths];
-    const checksums = await Promise.all(
-      checksumPaths.map(
-        async (path) =>
-          `${sha256(await readFile(join(output, path)))}  ${path}`,
-      ),
-    );
-    await writeFile(join(output, "SHA256SUMS"), `${checksums.join("\n")}\n`);
-    runSync("sha256sum", ["--check", "SHA256SUMS"], { cwd: output });
+    await writeChecksums(output, checksumPaths);
     runSync(process.execPath, ["smoke.mjs"], { cwd: output });
     console.log(`exported VIR lean-zip browser package to ${output}`);
   } catch (error) {

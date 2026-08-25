@@ -104,6 +104,47 @@ test("lean-zip FIR packages declare their Emscripten setup", async () => {
   );
 });
 
+test("Illuminate assembles workload, VIR, and FIR selection packages", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const build = database.builds.illuminate;
+  assert.deepEqual(componentOrder(build), ["workload", "vir", "selection"]);
+  assert.deepEqual(build.components.vir.dependencies, ["workload"]);
+  assert.equal(
+    build.components.workload.producer.entrypoint,
+    "scripts/export-browser-benchmark-source.mjs",
+  );
+  assert.equal(
+    build.components.vir.producer.entrypoint,
+    "scripts/packages/illuminate/export-browser-package.mjs",
+  );
+  assert.equal(
+    build.components.selection.producer.entrypoint,
+    "integration/illuminate-player/export-selection-package.mjs",
+  );
+
+  const sources = checkoutSources(database, "illuminate");
+  assert.deepEqual(Object.keys(sources).sort(), [
+    "fir",
+    "illuminate",
+    "illuminate-fir",
+    "lean",
+    "vir",
+  ]);
+  for (const source of Object.values(sources)) {
+    assert.match(source.revision, /^[0-9a-f]{40}$/);
+  }
+
+  const config = artifactSetConfig(database, "illuminate");
+  assert.deepEqual(config.example, { id: "illuminate", variant: "default" });
+  assert.equal(config.setId, "illuminate-player-set-0001");
+  assert.equal(
+    config.benchmarkContract.id,
+    "illuminate/player-trace/v1",
+  );
+});
+
 test("catalog build identity and artifact paths are example-neutral", async () => {
   const database = await readBuildDatabase(
     join(appRoot, "artifact-builds.json"),

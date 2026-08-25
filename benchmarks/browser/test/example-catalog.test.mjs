@@ -16,9 +16,9 @@ test("discovers compact example manifests", async () => {
   assert.deepEqual(
     catalog.examples.map(({ id, lifecycle }) => ({ id, lifecycle })),
     [
+      { id: "illuminate", lifecycle: "active" },
       { id: "lean-zip", lifecycle: "active" },
       { id: "prettyM", lifecycle: "active" },
-      { id: "illuminate", lifecycle: "rehearsal" },
     ],
   );
   for (const example of catalog.examples) {
@@ -40,11 +40,29 @@ test("materializes the uniform VIR package into the artifact build", async () =>
   const catalog = await discoverExampleCatalog(appRoot);
   const example = catalog.examples.find(({ id }) => id === "prettyM");
   const packageSpec = example.packages.find(({ id }) => id === "prettyM");
-  const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
   const workload = database.builds.prettyM.components.vir.artifact.workload;
   assert.equal(workload.packageRef, packageSpec.id);
   assert.equal(workload.source.file, packageSpec.target);
   assert.deepEqual(workload.exports, packageSpec.exports);
+});
+
+test("keeps the Illuminate package entry aligned with its custom producer", async () => {
+  const catalog = await discoverExampleCatalog(appRoot);
+  const example = catalog.examples.find(({ id }) => id === "illuminate");
+  const packageSpec = example.packages.find(({ id }) => id === "player");
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  assert.equal(
+    packageSpec.target,
+    "fixtures/illuminate/VirIlluminateAcceptance/Exports.lean",
+  );
+  assert.deepEqual(packageSpec.exports, [
+    database.builds.illuminate.components.vir.artifact.entry,
+  ]);
 });
 
 test("rejects unsafe or command-shaped example declarations", () => {
@@ -55,9 +73,7 @@ test("rejects unsafe or command-shaped example declarations", () => {
     title: "Small",
     summary: "Small example",
     lifecycle: "candidate",
-    packages: [
-      { id: "main", target: "Small.lean", exports: ["Small.run"] },
-    ],
+    packages: [{ id: "main", target: "Small.lean", exports: ["Small.run"] }],
     controller: "examples/small/controller.mjs",
     testPackage: "examples/small/tests.json",
   };

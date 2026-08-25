@@ -20,6 +20,7 @@ but is not measured by this command.
   --toolchain [NAME=]PATH  forward a FIR/VIR toolchain selection
   --toolchain-config PATH  forward a toolchain config
   --prepare                run catalogued producer setup
+  --serve                  serve the validated example after staging it
   -h, --help               show this help`);
 }
 
@@ -30,6 +31,7 @@ function parseArgs(argv) {
     plan: false,
     testOnly: false,
     materialize: false,
+    serve: false,
     sourcesDir: null,
     candidateArgs: [],
   };
@@ -39,6 +41,7 @@ function parseArgs(argv) {
     if (argument === "--plan") options.plan = true;
     else if (argument === "--test-only") options.testOnly = true;
     else if (argument === "--materialize") options.materialize = true;
+    else if (argument === "--serve") options.serve = true;
     else if (argument === "--prepare") options.candidateArgs.push(argument);
     else if (
       ["--sources-dir", "--toolchain", "--toolchain-config"].includes(argument)
@@ -140,9 +143,11 @@ async function main() {
       variant.build,
       ...options.candidateArgs,
     ]);
+    if (options.serve) run("npm", ["run", "dev:partial"]);
     return;
   }
   run("npm", ["run", "test:example", "--", example.id, variant.id]);
+  if (options.serve) run("npm", ["run", "dev:partial"]);
 }
 
 main().catch((error) => {

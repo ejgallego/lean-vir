@@ -16,21 +16,27 @@ if (
 ) {
   throw new Error("unsupported example catalog");
 }
+for (const example of catalog.examples) requireAvailability(example);
 const examples = catalog.examples.filter(
   (example) => !["queued", "archived"].includes(example.lifecycle),
 );
 const selectedId = new URL(location.href).searchParams.get("example");
 const selected = examples.find((example) => example.id === selectedId) ?? null;
-const selectedModule = selected
-  ? await import(new URL(`../${selected.controller}`, import.meta.url).href)
-  : null;
+const selectedAvailability = selected ? requireAvailability(selected) : null;
+const selectedModule =
+  selectedAvailability?.status === "ready"
+    ? await import(new URL(`../${selected.controller}`, import.meta.url).href)
+    : null;
 const view = selectedModule?.view ?? null;
-const reportPresentation = selected
-  ? createReportPresentation({
-      example: selected,
-      openButton: /** @type {HTMLButtonElement} */ (element("open-dashboard")),
-    })
-  : null;
+const reportPresentation =
+  selectedAvailability?.status === "ready"
+    ? createReportPresentation({
+        example: selected,
+        openButton: /** @type {HTMLButtonElement} */ (
+          element("open-dashboard")
+        ),
+      })
+    : null;
 if (reportPresentation) {
   element("clear-results").addEventListener(
     "click",
@@ -40,6 +46,30 @@ if (reportPresentation) {
 }
 let controller = null;
 let artifactStatus = null;
+
+function requireAvailability(example) {
+  const availability = example?.availability;
+  if (
+    !availability ||
+    !["ready", "missing", "invalid"].includes(availability.status) ||
+    typeof availability.variant !== "string" ||
+    availability.variant.length === 0 ||
+    !(
+      availability.build === null ||
+      (typeof availability.build === "string" && availability.build.length > 0)
+    ) ||
+    !(
+      availability.setId === null ||
+      (typeof availability.setId === "string" && availability.setId.length > 0)
+    ) ||
+    (availability.status === "ready" &&
+      (typeof availability.setId !== "string" ||
+        availability.setId.length === 0))
+  ) {
+    throw new Error(`example ${example?.id ?? "unknown"} has no availability`);
+  }
+  return availability;
+}
 
 function element(id) {
   const found = document.querySelector(`#${id}`);
@@ -89,13 +119,25 @@ function renderNavigation() {
   const navigation = element("example-nav");
   for (const example of examples) {
     const link = document.createElement("a");
-    link.href = `./?example=${example.id}`;
+    const availability = requireAvailability(example);
+    if (availability.status === "ready") {
+      link.href = `./?example=${example.id}`;
+    } else {
+      link.setAttribute("aria-disabled", "true");
+    }
     link.dataset.example = example.id;
+    link.dataset.availability = availability.status;
     const label = document.createElement("strong");
     label.textContent = example.title;
     const summary = document.createElement("small");
     summary.textContent = example.summary;
     link.append(label, summary);
+    if (availability.status !== "ready") {
+      const badge = document.createElement("em");
+      badge.textContent =
+        availability.status === "invalid" ? "Artifacts invalid" : "Not staged";
+      link.appendChild(badge);
+    }
     if (example.id === selected?.id) link.setAttribute("aria-current", "page");
     navigation.appendChild(link);
   }
@@ -216,7 +258,37 @@ function renderShell() {
       "Choose a benchmark example. Every example uses the same application shell, artifact status, backend selection, protocol, studies, and report workflow.";
     element("app-state").textContent = "Choose an example";
     element("app-state").dataset.state = "ready";
-    element("app-progress").textContent = `${examples.length} examples available`;
+    const readyCount = examples.filter(
+      (example) => requireAvailability(example).status === "ready",
+    ).length;
+    element("app-progress").textContent =
+      `${readyCount} ready · ${examples.length - readyCount} unavailable`;
+    document.querySelectorAll("[data-example-content]").forEach((content) => {
+      /** @type {HTMLElement} */ (content).hidden = true;
+    });
+    return;
+  }
+
+  if (selectedAvailability.status !== "ready") {
+    document.documentElement.dataset.activeExample = selected.id;
+    document.title = `${selected.title} · Lean browser benchmarks`;
+    element("example-eyebrow").textContent = "Browser benchmark";
+    element("example-title").textContent = selected.title;
+    element("example-intro").textContent = selected.summary;
+    element("app-state").textContent =
+      selectedAvailability.status === "invalid"
+        ? "Artifacts invalid"
+        : "Not staged";
+    element("app-state").dataset.state = "unavailable";
+    element("app-progress").textContent =
+      `Build with: npm run example -- ${selected.id} ${selectedAvailability.variant} --materialize --prepare --serve`;
+    artifactStatus = {
+      verified: false,
+      tone: "unavailable",
+      heading: element("app-state").textContent,
+      copy: element("app-progress").textContent,
+      setId: null,
+    };
     document.querySelectorAll("[data-example-content]").forEach((content) => {
       /** @type {HTMLElement} */ (content).hidden = true;
     });
@@ -303,6 +375,14 @@ function bindStudyActions() {
 
 async function boot() {
   if (!selected) return { example: null, readyCount: 0, backendCount: 0 };
+  if (selectedAvailability.status !== "ready") {
+    return {
+      example: selected.id,
+      available: false,
+      readyCount: 0,
+      backendCount: 0,
+    };
+  }
   const selectedView = requireView(selected, view);
   const testPackageUrl = new URL(`../${selected.testPackage}`, import.meta.url);
   const testPackageResponse = await fetch(testPackageUrl, { cache: "no-store" });
@@ -339,13 +419,6 @@ async function boot() {
     import.meta.url,
   );
   renderVariants(testPackage, variant);
-  globalThis.__benchmarkExampleContext = {
-    example: selected,
-    artifactBaseUrl,
-    testPackage,
-    testPackageIdentity,
-    variant,
-  };
   artifactStatus = await inspectArtifactStatus(
     selected,
     variant,
@@ -354,6 +427,14 @@ async function boot() {
     artifactBaseUrl,
   );
   showArtifactStatus(artifactStatus);
+  globalThis.__benchmarkExampleContext = {
+    example: selected,
+    artifactBaseUrl,
+    artifactStatus,
+    testPackage,
+    testPackageIdentity,
+    variant,
+  };
   for (const path of selectedView.bootstrap.artifactScripts) {
     await loadScript(new URL(path, artifactBaseUrl).href);
   }

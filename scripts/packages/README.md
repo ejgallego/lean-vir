@@ -15,8 +15,10 @@ Shared process, filesystem, timing, and repository-path helpers remain one
 level above this directory because they serve multiple tooling owners. Shared
 SDK/local bundle layout and publication policy lives in `artifact-bundle.mjs`.
 
-Lean-zip external-client acceptance, browser source-package export, and the
-package-local smoke payload live together under `lean-zip/`. The benchmark
-catalog entry point is resolved inside its exact immutable producer revision,
-so a path move takes effect there only when that source pin advances. `npm run
-accept:lean-zip` remains the stable maintainer command.
+External-client browser exporters and their package-local smoke payloads live
+under their client owner directories, currently `illuminate/` and `lean-zip/`.
+Their common VIR runtime, source identity, argument, and checksum machinery is
+kept in `vir-client-package-lib.mjs`. Benchmark catalog entry points are
+resolved inside exact immutable producer revisions, so a path move takes effect
+only when the corresponding source pin advances. `npm run accept:lean-zip`
+remains the stable lean-zip maintainer command.

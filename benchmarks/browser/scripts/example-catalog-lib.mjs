@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { fileRecord, verifyStagedArtifactSet } from "./artifact-set-lib.mjs";
 import {
   exactProperties,
   identifier,
@@ -230,6 +231,129 @@ export async function readExampleTestPackage(appRoot, example) {
     JSON.parse(await readFile(path, "utf8")),
     example.id,
   );
+}
+
+function expectedArtifact(database, example, testPackage, variantId) {
+  const variant = testPackage.variants.find(({ id }) => id === variantId);
+  if (!variant) {
+    throw new Error(`example ${example.id} has no variant ${variantId}`);
+  }
+  if (variant.build === null) {
+    return { variant: variant.id, build: null, setId: null };
+  }
+  const build = database.builds[variant.build];
+  if (
+    !build ||
+    build.example.id !== example.id ||
+    build.example.variant !== variant.id
+  ) {
+    throw new Error(
+      `example ${example.id}/${variant.id} references invalid build ${variant.build}`,
+    );
+  }
+  return {
+    variant: variant.id,
+    build: variant.build,
+    setId: build.artifactSet.setId,
+  };
+}
+
+async function inspectArtifactAvailability(
+  appRoot,
+  artifactsRoot,
+  database,
+  example,
+) {
+  const testPackage = await readExampleTestPackage(appRoot, example);
+  let expected = expectedArtifact(
+    database,
+    example,
+    testPackage,
+    testPackage.variants[0].id,
+  );
+  const directory = resolve(artifactsRoot, example.id);
+  const directoryInfo = await stat(directory).catch(() => null);
+  if (!directoryInfo) {
+    return { status: "missing", ...expected };
+  }
+  if (!directoryInfo.isDirectory()) {
+    return {
+      status: "invalid",
+      ...expected,
+      reason: "staged artifact path is not a directory",
+    };
+  }
+  const manifestInfo = await stat(
+    resolve(directory, "ARTIFACT_SET.json"),
+  ).catch(() => null);
+  if (!manifestInfo?.isFile()) {
+    return {
+      status: "invalid",
+      ...expected,
+      reason: "staged artifact set omits ARTIFACT_SET.json",
+    };
+  }
+
+  try {
+    const manifest = await verifyStagedArtifactSet(directory);
+    expected = expectedArtifact(
+      database,
+      example,
+      testPackage,
+      manifest.example?.variant,
+    );
+    if (manifest.example?.id !== example.id) {
+      throw new Error("manifest does not match a declared example variant");
+    }
+    if (expected.setId !== null && manifest.setId !== expected.setId) {
+      throw new Error(
+        `expected artifact set ${expected.setId}, found ${manifest.setId}`,
+      );
+    }
+    const testPackageRecord = await fileRecord(
+      resolve(appRoot, example.testPackage),
+    );
+    if (
+      manifest.testPackage?.file !== example.testPackage ||
+      manifest.testPackage?.bytes !== testPackageRecord.bytes ||
+      manifest.testPackage?.sha256 !== testPackageRecord.sha256
+    ) {
+      throw new Error("manifest test package does not match the example");
+    }
+    return {
+      status: "ready",
+      ...expected,
+      setId: expected.setId ?? manifest.setId,
+    };
+  } catch (error) {
+    return {
+      status: "invalid",
+      ...expected,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function catalogWithArtifactAvailability({
+  appRoot,
+  artifactsRoot,
+  database,
+  catalog,
+}) {
+  return {
+    ...catalog,
+    examples: await Promise.all(
+      catalog.examples.map(async (example) => ({
+        ...example,
+        availability: await inspectArtifactAvailability(
+          appRoot,
+          artifactsRoot,
+          database,
+          example,
+        ),
+      })),
+    ),
+  };
 }
 
 export async function discoverExampleCatalog(appRoot) {

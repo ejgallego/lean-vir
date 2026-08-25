@@ -45,7 +45,7 @@ const clearResults = /** @type {HTMLButtonElement} */ (
 const backends = [
   { id: "js", label: "JavaScript oracle", status: "ready" },
   { id: "vir", label: "Lean · VIR typed", status: "loading" },
-  { id: "native", label: "Lean · FIR native", status: "loading" },
+  { id: "native", label: "Lean · FIR selection", status: "loading" },
 ];
 
 let latestReport = null;
@@ -53,42 +53,17 @@ let running = false;
 let artifactProvenance = null;
 let examples = [];
 
-function renderBuildNotes(receipt) {
-  const notes = /** @type {HTMLElement} */ (
-    document.querySelector("#build-notes")
-  );
-  const native = receipt.inputs.selection ?? receipt.inputs.native;
-  const vir = receipt.inputs.vir;
-  const source = receipt.source;
-  notes.replaceChildren();
-  [
-    `Illuminate ${source.commit.slice(0, 8)}${
-      source.dirty ? " + local changes" : ""
-    }`,
-    `VIR ${vir.sourceCommit.slice(0, 8)}${
-      vir.sourceDirty ? " · manifest records dirty" : ""
-    }`,
-    `FIR${receipt.inputs.selection ? " selection" : ""} ${native.fir.commit.slice(0, 8)} · ${
-      native.browserAdapter.apiVersion
-    } · ${native.wasm.byteLength.toLocaleString()} Wasm bytes`,
-  ].forEach((value) => {
-    const item = document.createElement("li");
-    item.textContent = value;
-    notes.appendChild(item);
-  });
-}
-
 function renderArtifactSetNotes(manifest) {
   const notes = /** @type {HTMLElement} */ (
     document.querySelector("#build-notes")
   );
   notes.replaceChildren();
+  const components = manifest.components ?? {};
   const values = [
     `Artifact set ${manifest.setId}`,
-    ...Object.entries(manifest.components ?? {}).map(
-      ([id, component]) =>
-        `${id} · Lean ${component.lean?.version ?? "not recorded"}`,
-    ),
+    `Workload · ${components.workload?.contract ?? "not recorded"}`,
+    `VIR · ${components.vir?.entry ?? "not recorded"}`,
+    `FIR selection · ${components.selection?.runtimeContract ?? "not recorded"}`,
   ];
   values.forEach((value) => {
     const item = document.createElement("li");
@@ -97,26 +72,13 @@ function renderArtifactSetNotes(manifest) {
   });
 }
 
-async function loadArtifactProvenance() {
-  const setResponse = await fetch(new URL("ARTIFACT_SET.json", artifactBase));
-  if (setResponse.ok) {
-    const manifest = await setResponse.json();
-    if (
-      manifest.schemaVersion !== 2 ||
-      manifest.kind !== "browser-benchmarks/artifact-set" ||
-      manifest.example?.id !== "illuminate"
-    ) {
-      throw new Error("unsupported Illuminate artifact-set manifest");
-    }
-    return manifest;
+function requireArtifactProvenance() {
+  const manifest =
+    globalThis.__benchmarkExampleContext?.artifactStatus?.manifest;
+  if (!manifest) {
+    throw new Error("Illuminate requires a verified artifact-set manifest");
   }
-  const rehearsalResponse = await fetch(
-    new URL("REHEARSAL.json", artifactBase),
-  );
-  if (!rehearsalResponse.ok) {
-    throw new Error("failed to load Illuminate artifact provenance");
-  }
-  return rehearsalResponse.json();
+  return manifest;
 }
 
 function setState(label, state, detail) {
@@ -267,7 +229,7 @@ function replaySelectionTrace(adapter, animation, events) {
     for (const event of events) {
       const dispatched =
         event.kind === "tick"
-          ? adapter.dispatchTick(created.player, event.timestamp)
+          ? adapter.dispatchTickTimed(created.player, event.timestamp)
           : adapter.dispatch(created.player, event);
       dispatches.push(dispatched);
       if (!dispatched.ok) return dispatched;
@@ -286,266 +248,10 @@ function replaySelectionTrace(adapter, animation, events) {
   }
 }
 
-// Adapted from Illuminate's Apache-2.0 `scripts/test-player-traces.mjs` oracle.
-class LegacyPlayerOracle {
-  constructor(data) {
-    this.data = data;
-    this.frame = 0;
-    this.currentStep = 0;
-    this.startTime = null;
-    this.pauseFrame = 0;
-    this.playing = false;
-    this.waitingForClick = false;
-    this.advancePending = false;
-    this.finished = false;
-    this.currentSegment = -1;
-    this.targetFrame = null;
-    this.loopAfterTarget = false;
-  }
-
-  playback() {
-    if (this.waitingForClick) return "waiting";
-    if (this.finished) return "finished";
-    if (!this.playing) return "paused";
-    if (this.advancePending) return "finishingLoop";
-    if (this.targetFrame !== null) return "playing";
-    if (this.data.steps[this.currentStep]?.loop) return "looping";
-    return "playing";
-  }
-
-  action() {
-    this.frame = globalThis.animClampFrame(this.frame, this.data.totalFrames);
-    const segmentValue = globalThis.animFindSegment(
-      this.data.segments,
-      this.frame,
-    );
-    const segment = this.data.segments.indexOf(segmentValue);
-    const localFrame = this.frame - segmentValue.sf;
-    const segmentChanged = segment !== this.currentSegment;
-    this.currentSegment = segment;
-    const values = segmentValue.params[localFrame] ?? [];
-    const updates = segmentValue.pmap.flatMap((binding, index) =>
-      values[index] === undefined
-        ? []
-        : [{ e: binding.e, a: binding.a, v: values[index] }],
-    );
-    return {
-      frame: this.frame,
-      step: this.currentStep,
-      segment,
-      localFrame,
-      segmentChanged,
-      updates,
-      playback: this.playback(),
-    };
-  }
-
-  advance() {
-    if (this.waitingForClick) {
-      this.waitingForClick = false;
-      this.startTime = null;
-      this.playing = true;
-      this.finished = false;
-      this.targetFrame = null;
-      this.loopAfterTarget = false;
-      return;
-    }
-    if (this.playing) {
-      const step = this.data.steps[this.currentStep];
-      if (step?.loop && this.currentStep + 1 < this.data.steps.length) {
-        this.advancePending = true;
-      } else {
-        this.playing = false;
-        this.pauseFrame = this.frame;
-        this.targetFrame = null;
-        this.loopAfterTarget = false;
-      }
-      return;
-    }
-    if (this.pauseFrame >= this.data.totalFrames - 1) {
-      this.pauseFrame = 0;
-      this.currentStep = 0;
-      this.frame = 0;
-    }
-    this.playing = true;
-    this.startTime = null;
-    this.finished = false;
-    this.targetFrame = null;
-    this.loopAfterTarget = false;
-  }
-
-  pause() {
-    this.startTime = null;
-    this.pauseFrame = this.frame;
-    this.playing = false;
-    this.waitingForClick = false;
-    this.advancePending = false;
-    this.finished = false;
-    this.targetFrame = null;
-    this.loopAfterTarget = false;
-  }
-
-  seek(requested) {
-    this.playing = false;
-    this.waitingForClick = false;
-    this.advancePending = false;
-    this.frame = globalThis.animClampFrame(requested, this.data.totalFrames);
-    this.pauseFrame = this.frame;
-    this.currentStep = globalThis.animFindCurrentStep(
-      this.data.steps,
-      this.frame,
-    );
-    this.finished = this.frame === this.data.totalFrames - 1;
-    this.targetFrame = null;
-    this.loopAfterTarget = false;
-  }
-
-  loopAt(requested) {
-    const frame = globalThis.animClampFrame(requested, this.data.totalFrames);
-    const step = globalThis.animFindCurrentStep(this.data.steps, frame);
-    const stepInfo = this.data.steps[step];
-    if (!stepInfo?.loop) {
-      this.seek(frame);
-      return;
-    }
-    this.frame = stepInfo.frame;
-    this.currentStep = step;
-    this.startTime = null;
-    this.pauseFrame = stepInfo.frame;
-    this.playing = true;
-    this.waitingForClick = false;
-    this.advancePending = false;
-    this.finished = false;
-    this.targetFrame = null;
-    this.loopAfterTarget = false;
-  }
-
-  playTo(requested, loopAfter) {
-    const target = globalThis.animClampFrame(requested, this.data.totalFrames);
-    if (target === this.frame) {
-      if (loopAfter) this.loopAt(target);
-      else this.pause();
-      return;
-    }
-    this.currentStep = globalThis.animFindCurrentStep(
-      this.data.steps,
-      this.frame,
-    );
-    this.startTime = null;
-    this.pauseFrame = this.frame;
-    this.playing = true;
-    this.waitingForClick = false;
-    this.advancePending = false;
-    this.finished = false;
-    this.targetFrame = target;
-    this.loopAfterTarget = loopAfter;
-  }
-
-  tick(timestamp) {
-    if (!this.playing || this.waitingForClick) return;
-    if (this.targetFrame !== null) {
-      if (this.startTime === null) this.startTime = timestamp;
-      const elapsed = globalThis.animComputeFrame(
-        this.startTime,
-        timestamp,
-        this.data.fps,
-        0,
-      );
-      const target = this.targetFrame;
-      const forward = target >= this.pauseFrame;
-      this.frame = forward
-        ? Math.min(target, this.pauseFrame + elapsed)
-        : this.pauseFrame - Math.min(elapsed, this.pauseFrame - target);
-      this.currentStep = globalThis.animFindCurrentStep(
-        this.data.steps,
-        this.frame,
-      );
-      if (this.frame === target) {
-        const loopAfter = this.loopAfterTarget;
-        this.startTime = null;
-        this.pauseFrame = this.frame;
-        this.playing = false;
-        this.targetFrame = null;
-        this.loopAfterTarget = false;
-        if (loopAfter) this.loopAt(this.frame);
-      }
-      return;
-    }
-    if (this.startTime === null) this.startTime = timestamp;
-    let frame = globalThis.animComputeFrame(
-      this.startTime,
-      timestamp,
-      this.data.fps,
-      this.pauseFrame,
-    );
-    const stepInfo = this.data.steps[this.currentStep];
-    let isLooping = Boolean(stepInfo?.loop);
-    if (isLooping) {
-      const stepStart = stepInfo.frame;
-      const stepEnd = globalThis.animFindStepEnd(
-        this.data.steps,
-        this.currentStep,
-        this.data.totalFrames,
-      );
-      const loop = globalThis.animWrapLoop(frame, stepStart, stepEnd);
-      if (loop.didCycle) {
-        if (this.advancePending) {
-          this.advancePending = false;
-          if (this.currentStep + 1 < this.data.steps.length) {
-            this.currentStep += 1;
-            frame = this.data.steps[this.currentStep].frame;
-            this.pauseFrame = frame;
-            this.startTime = null;
-            isLooping = false;
-          }
-        } else {
-          frame = loop.wrapped;
-          this.startTime = timestamp;
-          this.pauseFrame = stepStart;
-        }
-      }
-    }
-    if (frame >= this.data.totalFrames) {
-      frame = this.data.totalFrames - 1;
-      this.pauseFrame = frame;
-      this.playing = false;
-      this.finished = true;
-    }
-    if (!isLooping) {
-      const pause = globalThis.animCheckPauseSteps(
-        this.data.steps,
-        this.currentStep,
-        frame,
-      );
-      if (pause !== null) {
-        frame = pause.pauseAtFrame;
-        this.pauseFrame = frame;
-        this.waitingForClick = true;
-        this.currentStep = pause.pauseAtStep;
-        this.frame = frame;
-        return;
-      }
-      this.currentStep = globalThis.animFindCurrentStep(this.data.steps, frame);
-    }
-    this.frame = frame;
-  }
-
-  dispatch(event) {
-    if (event.kind === "advance") this.advance();
-    else if (event.kind === "pause") this.pause();
-    else if (event.kind === "seek") this.seek(event.frame);
-    else if (event.kind === "playTo") this.playTo(event.frame, event.loopAfter);
-    else if (event.kind === "loopAt") this.loopAt(event.frame);
-    else if (event.kind === "tick") this.tick(event.timestamp);
-    else throw new Error(`unknown oracle event: ${event.kind}`);
-    return this.action();
-  }
-}
-
-function invokeJavaScript(animation, events) {
+function invokeJavaScript(Oracle, animation, events) {
   const totalStarted = performance.now();
   const prepareStarted = performance.now();
-  const oracle = new LegacyPlayerOracle(animation);
+  const oracle = new Oracle(animation);
   const prepareMs = performance.now() - prepareStarted;
   const executeStarted = performance.now();
   const actions = [
@@ -565,39 +271,37 @@ function invokeJavaScript(animation, events) {
   };
 }
 
-function normalizeNativeTimings(result, totalMs) {
-  if (result.timings?.creation) {
-    const creation = result.timings.creation;
-    const dispatches = result.timings.dispatches || [];
-    return {
-      prepareMs:
-        Number(creation.instantiateMs || 0) +
-        Number(creation.projectMs || 0) +
-        Number(creation.animationEncodeMs || creation.selectionEncodeMs || 0) +
-        Number(creation.stateSlotMs || 0) +
-        dispatches.reduce(
-          (sum, timing) => sum + Number(timing.encodeMs || 0),
-          0,
-        ),
-      executeMs:
-        Number(creation.executeMs || 0) +
-        dispatches.reduce(
-          (sum, timing) => sum + Number(timing.executeMs || 0),
-          0,
-        ),
-      decodeMs:
-        Number(creation.decodeMs || 0) +
-        dispatches.reduce(
-          (sum, timing) => sum + Number(timing.decodeMs || 0),
-          0,
-        ),
-      totalMs,
-    };
+function normalizeSelectionTimings(result, totalMs) {
+  if (!result.ok) {
+    return { prepareMs: 0, executeMs: 0, decodeMs: 0, totalMs };
+  }
+  const creation = result.timings?.creation;
+  const dispatches = result.timings?.dispatches;
+  if (!creation || !Array.isArray(dispatches)) {
+    throw new Error("FIR selection result omitted its timing contract");
   }
   return {
-    prepareMs: Number(result.timings?.prepareMs || 0),
-    executeMs: Number(result.timings?.executeMs || 0),
-    decodeMs: Number(result.timings?.decodeMs || 0),
+    prepareMs:
+      Number(creation.instantiateMs || 0) +
+      Number(creation.projectMs || 0) +
+      Number(creation.selectionEncodeMs || 0) +
+      Number(creation.stateSlotMs || 0) +
+      dispatches.reduce(
+        (sum, timing) => sum + Number(timing.encodeMs || 0),
+        0,
+      ),
+    executeMs:
+      Number(creation.executeMs || 0) +
+      dispatches.reduce(
+        (sum, timing) => sum + Number(timing.executeMs || 0),
+        0,
+      ),
+    decodeMs:
+      Number(creation.decodeMs || 0) +
+      dispatches.reduce(
+        (sum, timing) => sum + Number(timing.decodeMs || 0),
+        0,
+      ),
     totalMs,
   };
 }
@@ -805,7 +509,7 @@ async function runComparison(kind, options = {}) {
       ariaLabel: "Illuminate player trace scaling report",
       pointNoun: "trace points",
       defaultPhase: "totalMs",
-      note: "Charts show interleaved warmed medians. Total is independently measured browser wall time; prepare, execute, and decode retain each backend's real boundary. This local rehearsal is not an accepted performance record.",
+      note: "Charts show interleaved warmed medians. Total is independently measured browser wall time; prepare, execute, and decode retain each backend's real boundary. Timings from this machine are exploratory, not accepted performance evidence.",
       pointColumns: [
         { key: "events", label: "Events" },
         { key: "frames", label: "Frames" },
@@ -850,14 +554,7 @@ async function runComparison(kind, options = {}) {
     ),
     dimensions,
     provenance: {
-      artifactSet:
-        artifactProvenance.kind === "browser-benchmarks/artifact-set"
-          ? artifactProvenance
-          : null,
-      rehearsal:
-        artifactProvenance.kind === "illuminate-player/local-rehearsal"
-          ? artifactProvenance
-          : null,
+      artifactSet: artifactProvenance,
       acceptedMeasurement: false,
     },
   };
@@ -873,7 +570,7 @@ function renderReport(report) {
   const summary = document.createElement("strong");
   summary.textContent = `${report.parityCount}/${report.scenarioCount} points agree`;
   const detail = document.createElement("p");
-  detail.textContent = `${report.samples} measured rounds · local rehearsal`;
+  detail.textContent = `${report.samples} measured rounds · exploratory timings`;
   const open = document.createElement("button");
   open.type = "button";
   open.textContent = "View report";
@@ -966,44 +663,37 @@ async function execute(kind, suppliedOptions) {
 
 async function boot() {
   renderBackends();
-  const [runtimeModule, traceModule, examplesResponse, receipt] =
-    await Promise.all([
-      import(new URL("vir/sdk/js/vir-runtime.js", artifactBase).href),
-      import(new URL("workload/vir-player-trace.mjs", artifactBase).href),
-      fetch(new URL("workload/examples.json", artifactBase)).then(
-        (response) => {
-          if (!response.ok)
-            throw new Error("failed to load Illuminate examples");
-          return response.json();
-        },
-      ),
-      loadArtifactProvenance(),
-    ]);
-  const selectionAvailable =
-    receipt.kind === "browser-benchmarks/artifact-set"
-      ? Boolean(
-          receipt.files?.[
-            "illuminate/selection/illuminate-selection-player-browser-adapter.mjs"
-          ],
-        )
-      : Boolean(receipt.inputs?.selection);
-  const nativeModule = await import(
+  const artifactManifest = requireArtifactProvenance();
+  const [
+    runtimeModule,
+    traceModule,
+    javascriptTraceModule,
+    examplesResponse,
+  ] = await Promise.all([
+    import(new URL("vir/sdk/js/vir-runtime.js", artifactBase).href),
+    import(new URL("workload/vir-player-trace.mjs", artifactBase).href),
+    import(new URL("workload/js-player-trace.mjs", artifactBase).href),
+    fetch(new URL("workload/examples.json", artifactBase)).then((response) => {
+      if (!response.ok) throw new Error("failed to load Illuminate examples");
+      return response.json();
+    }),
+  ]);
+  const selectionModule = await import(
     new URL(
-      selectionAvailable
-        ? "selection/illuminate-selection-player-browser-adapter.mjs"
-        : "native/illuminate-player-browser-adapter.mjs",
+      "selection/illuminate-selection-player-browser-adapter.mjs",
       artifactBase,
     ).href
   );
   examples = examplesResponse;
-  artifactProvenance = receipt;
-  if (receipt.kind === "browser-benchmarks/artifact-set") {
-    renderArtifactSetNotes(receipt);
-  } else {
-    renderBuildNotes(receipt);
-  }
+  artifactProvenance = artifactManifest;
+  renderArtifactSetNotes(artifactManifest);
 
-  backend("js").invoke = invokeJavaScript;
+  const JavaScriptOracle = javascriptTraceModule.LegacyPlayerOracle;
+  if (typeof JavaScriptOracle !== "function") {
+    throw new Error("Illuminate workload omitted its JavaScript trace oracle");
+  }
+  backend("js").invoke = (animation, events) =>
+    invokeJavaScript(JavaScriptOracle, animation, events);
   try {
     const runtime = await runtimeModule.createVirRuntime({
       wasmUrl: new URL("vir/sdk/wasm/vir-upstream.wasm", artifactBase),
@@ -1043,25 +733,19 @@ async function boot() {
   }
 
   try {
-    const native = selectionAvailable
-      ? await nativeModule.fetchIlluminateSelectionPlayerAdapter(
-          new URL("selection/illuminate-selection-player.wasm", artifactBase),
-        )
-      : await nativeModule.fetchIlluminatePlayerAdapter(
-          new URL("native/illuminate-player.wasm", artifactBase),
-        );
-    if (selectionAvailable) backend("native").label = "Lean · FIR selection";
+    const selection =
+      await selectionModule.fetchIlluminateSelectionPlayerAdapter(
+        new URL("selection/illuminate-selection-player.wasm", artifactBase),
+      );
     backend("native").invoke = (animation, events) => {
       const totalStarted = performance.now();
-      const result = selectionAvailable
-        ? replaySelectionTrace(native, animation, events)
-        : native.replayTrace(animation, events);
+      const result = replaySelectionTrace(selection, animation, events);
       const totalMs = performance.now() - totalStarted;
       return {
         value: result.ok
           ? { ok: true, actions: result.actions }
           : { ok: false, error: result.error },
-        timings: normalizeNativeTimings(result, totalMs),
+        timings: normalizeSelectionTimings(result, totalMs),
         rawTimings: result.timings,
       };
     };
@@ -1078,7 +762,7 @@ async function boot() {
   setState(
     readyCount === backends.length ? "Ready" : "Degraded",
     readyCount === backends.length ? "ready" : "failed",
-    `${readyCount}/${backends.length} backends available · rehearsal`,
+    `${readyCount}/${backends.length} backends available · verified artifacts`,
   );
   return { readyCount, backendCount: backends.length };
 }

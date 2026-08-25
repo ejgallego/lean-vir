@@ -204,6 +204,21 @@ footer {
   font-size: 0.72rem;
 }
 
+.example-nav a em {
+  margin-top: 0.25rem;
+  color: #d7c45c;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.example-nav a[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 html[data-active-example="catalog"] .bench-header {
   min-height: min(34rem, calc(100vh - 5rem));
   align-items: center;
@@ -219,6 +234,12 @@ html[data-active-example="catalog"] .example-nav a {
   color: #e9edf1;
   background: color-mix(in srgb, #8cbbea 16%, #181d24);
   border-color: color-mix(in srgb, #8cbbea 55%, #454e5e);
+}
+
+.example-nav a[aria-disabled="true"]:hover {
+  color: #aeb7c4;
+  background: #181d24;
+  border-color: #454e5e;
 }
 
 .variant-picker {
