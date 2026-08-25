@@ -13,7 +13,10 @@ import { runInNewContext } from "node:vm";
 
 import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
 import { canonicalJson, fileRecord } from "../scripts/artifact-set-lib.mjs";
-import { discoverExampleCatalog } from "../scripts/example-catalog-lib.mjs";
+import {
+  catalogWithArtifactAvailability,
+  discoverExampleCatalog,
+} from "../scripts/example-catalog-lib.mjs";
 import {
   activePagesDeployments,
   parsePagesDeployment,
@@ -72,8 +75,9 @@ async function stagedDeployment(t) {
       artifactsRoot,
       catalog: selectedCatalog,
       database,
-      deployments: (deployments.length ? deployments : ["prettyM=default"])
-        .map(parsePagesDeployment),
+      deployments: (deployments.length ? deployments : ["prettyM=default"]).map(
+        parsePagesDeployment,
+      ),
     });
   return {
     artifactsRoot,
@@ -111,6 +115,43 @@ test("admits a canonical staged example to Pages", async (t) => {
     pagesCatalog.examples.map(({ id }) => id),
     ["prettyM"],
   );
+});
+
+test("marks only verified staged examples as ready", async (t) => {
+  const fixture = await stagedDeployment(t);
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    catalog: fixture.catalog,
+  });
+  assert.deepEqual(
+    Object.fromEntries(
+      catalog.examples.map(({ id, availability }) => [id, availability]),
+    ),
+    {
+      illuminate: { status: "not-built", variant: "default" },
+      "lean-zip": { status: "not-built", variant: "default" },
+      prettyM: {
+        status: "ready",
+        variant: "default",
+        setId: fixture.manifest.setId,
+      },
+    },
+  );
+});
+
+test("does not advertise an invalid staged example", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await writeFile(join(fixture.directory, "unexpected.bin"), "extra\n");
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    catalog: fixture.catalog,
+  });
+  const prettyM = catalog.examples.find(({ id }) => id === "prettyM");
+  assert.equal(prettyM.availability.status, "invalid");
+  assert.equal(prettyM.availability.variant, "default");
+  assert.match(prettyM.availability.reason, /unexpected member/);
 });
 
 test("derives Pages deployments from active canonical examples", async (t) => {

@@ -91,6 +91,7 @@ npm run example -- lean-zip default --plan
 npm run example -- prettyM default --materialize --prepare
 npm run test:unit
 npm run test:browser
+npm run test:prettyM
 npm run test:illuminate
 npm run dev
 ```

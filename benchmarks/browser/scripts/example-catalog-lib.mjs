@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { fileRecord, verifyStagedArtifactSet } from "./artifact-set-lib.mjs";
 import {
   exactProperties,
   identifier,
@@ -230,6 +231,84 @@ export async function readExampleTestPackage(appRoot, example) {
     JSON.parse(await readFile(path, "utf8")),
     example.id,
   );
+}
+
+async function inspectArtifactAvailability(appRoot, artifactsRoot, example) {
+  const testPackage = await readExampleTestPackage(appRoot, example);
+  const defaultVariant = testPackage.variants[0].id;
+  const directory = resolve(artifactsRoot, example.id);
+  const directoryInfo = await stat(directory).catch(() => null);
+  if (!directoryInfo) {
+    return { status: "not-built", variant: defaultVariant };
+  }
+  if (!directoryInfo.isDirectory()) {
+    return {
+      status: "invalid",
+      variant: defaultVariant,
+      reason: "staged artifact path is not a directory",
+    };
+  }
+  const manifestInfo = await stat(
+    resolve(directory, "ARTIFACT_SET.json"),
+  ).catch(() => null);
+  if (!manifestInfo?.isFile()) {
+    return {
+      status: "invalid",
+      variant: defaultVariant,
+      reason: "staged artifact set omits ARTIFACT_SET.json",
+    };
+  }
+
+  try {
+    const manifest = await verifyStagedArtifactSet(directory);
+    const variant = testPackage.variants.find(
+      ({ id }) => id === manifest.example?.variant,
+    );
+    if (manifest.example?.id !== example.id || !variant) {
+      throw new Error("manifest does not match a declared example variant");
+    }
+    const testPackageRecord = await fileRecord(
+      resolve(appRoot, example.testPackage),
+    );
+    if (
+      manifest.testPackage?.file !== example.testPackage ||
+      manifest.testPackage?.bytes !== testPackageRecord.bytes ||
+      manifest.testPackage?.sha256 !== testPackageRecord.sha256
+    ) {
+      throw new Error("manifest test package does not match the example");
+    }
+    return {
+      status: "ready",
+      variant: variant.id,
+      setId: manifest.setId,
+    };
+  } catch (error) {
+    return {
+      status: "invalid",
+      variant: defaultVariant,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function catalogWithArtifactAvailability({
+  appRoot,
+  artifactsRoot,
+  catalog,
+}) {
+  return {
+    ...catalog,
+    examples: await Promise.all(
+      catalog.examples.map(async (example) => ({
+        ...example,
+        availability: await inspectArtifactAvailability(
+          appRoot,
+          artifactsRoot,
+          example,
+        ),
+      })),
+    ),
+  };
 }
 
 export async function discoverExampleCatalog(appRoot) {

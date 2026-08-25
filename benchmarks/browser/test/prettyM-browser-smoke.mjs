@@ -54,9 +54,9 @@ try {
     backendCount: 5,
   });
   assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.examples), [
+    { id: "illuminate", label: "Illuminate player" },
     { id: "lean-zip", label: "lean-zip raw DEFLATE" },
     { id: "prettyM", label: "Std.Format.prettyM" },
-    { id: "illuminate", label: "Illuminate player" },
   ]);
   assert.equal(
     await page

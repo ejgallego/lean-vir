@@ -183,6 +183,18 @@ supplies the required cross-origin isolation headers. `_headers` and
 worker covers hosts such as GitHub Pages that cannot configure those headers,
 with one reload before application startup.
 
+The generated catalog marks an example as ready only when its staged artifact
+set and test-package identity verify. Registered examples without local
+artifacts remain visible as **Not built**, but the application does not load
+their controller or request missing files. Build and stage one with:
+
+```sh
+npm run example -- lean-zip default --materialize --prepare
+```
+
+Then restart `npm run dev`. Its build summary lists ready, missing, and invalid
+examples explicitly.
+
 Backend selection in every report view is presentation-only. The shared view
 normalizes example-owned report data without rewriting its source JSON, while
 downloaded JSON always retains every backend. Workload-specific views may add

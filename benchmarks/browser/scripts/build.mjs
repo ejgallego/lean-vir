@@ -1,9 +1,12 @@
-import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { readBuildDatabase } from "./artifact-build-lib.mjs";
 import { canonicalJson } from "./artifact-set-lib.mjs";
-import { discoverExampleCatalog } from "./example-catalog-lib.mjs";
+import {
+  catalogWithArtifactAvailability,
+  discoverExampleCatalog,
+} from "./example-catalog-lib.mjs";
 import {
   parsePagesDeployment,
   selectPagesCatalog,
@@ -28,16 +31,8 @@ selected canonical variants whose staged artifacts match the catalog.`);
   } else throw new Error(`unknown argument: ${argument}`);
 }
 
-try {
-  if (!(await stat(artifacts)).isDirectory()) throw new Error();
-} catch {
-  throw new Error(
-    "missing staged artifacts; run npm run artifacts:fetch or npm run stage -- SET first",
-  );
-}
-
 const sourceCatalog = await discoverExampleCatalog(appRoot);
-const catalog = deployments.length
+const selectedCatalog = deployments.length
   ? await selectPagesCatalog({
       appRoot,
       artifactsRoot: artifacts,
@@ -46,6 +41,11 @@ const catalog = deployments.length
       deployments,
     })
   : sourceCatalog;
+const catalog = await catalogWithArtifactAvailability({
+  appRoot,
+  artifactsRoot: artifacts,
+  catalog: selectedCatalog,
+});
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -58,11 +58,10 @@ for (const path of ["src", "styles"]) {
   await cp(join(appRoot, path), join(output, path), { recursive: true });
 }
 if (deployments.length === 0) {
-  for (const path of ["artifacts", "examples"]) {
-    await cp(join(appRoot, path), join(output, path), { recursive: true });
-  }
+  await cp(join(appRoot, "examples"), join(output, "examples"), {
+    recursive: true,
+  });
 } else {
-  await mkdir(join(output, "artifacts"));
   await mkdir(join(output, "examples"));
   await cp(
     join(appRoot, "examples/controller-contract.mjs"),
@@ -74,19 +73,44 @@ if (deployments.length === 0) {
       resolve(output, "examples", example.id),
       { recursive: true },
     );
-    await cp(
-      resolve(artifacts, example.id),
-      resolve(output, "artifacts", example.id),
-      { recursive: true },
-    );
   }
+}
+await mkdir(join(output, "artifacts"));
+for (const example of catalog.examples) {
+  if (example.availability.status !== "ready") continue;
+  await cp(
+    resolve(artifacts, example.id),
+    resolve(output, "artifacts", example.id),
+    { recursive: true },
+  );
 }
 await writeFile(join(output, "examples/catalog.json"), canonicalJson(catalog));
 for (const path of ["_headers", ".htaccess", "coi-serviceworker.js"]) {
   await cp(join(appRoot, "static", path), join(output, path));
 }
-console.log(
-  `Built standalone Lean benchmark app at ${output}: ${catalog.examples
-    .map(({ id }) => id)
-    .join(", ")}`,
+console.log(`Built standalone Lean benchmark app at ${output}`);
+const ready = catalog.examples.filter(
+  ({ availability }) => availability.status === "ready",
 );
+console.log(
+  `Ready examples: ${
+    ready.length
+      ? ready
+          .map(
+            ({ id, availability }) =>
+              `${id}/${availability.variant} (${availability.setId})`,
+          )
+          .join(", ")
+      : "none"
+  }`,
+);
+for (const example of catalog.examples) {
+  if (example.availability.status === "ready") continue;
+  const detail =
+    example.availability.status === "invalid"
+      ? `invalid: ${example.availability.reason}`
+      : "not built";
+  console.log(
+    `Unavailable example: ${example.id}/${example.availability.variant} (${detail})`,
+  );
+}

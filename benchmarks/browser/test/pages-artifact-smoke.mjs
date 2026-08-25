@@ -95,6 +95,11 @@ for (const deployment of deployments) {
   });
   assert.equal(typeof manifest.setId, "string");
   assert.notEqual(manifest.setId.length, 0);
+  assert.deepEqual(example.availability, {
+    status: "ready",
+    variant: deployment.variant,
+    setId: manifest.setId,
+  });
   assert.deepEqual(manifest.testPackage, {
     file: example.testPackage,
     ...(await fileRecord(resolve(directory, example.testPackage))),
