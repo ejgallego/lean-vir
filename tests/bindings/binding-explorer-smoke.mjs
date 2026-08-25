@@ -90,6 +90,30 @@ assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getInnerHTMLString"), f
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.setInnerHTMLString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getTextContentString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.setTextContentString"), false);
+for (const [declaration, expectedType] of [
+  [
+    "Lean.Vir.Browser.Element.getInnerHTML",
+    "Lean.Vir.Js Lean.Vir.Browser.Element → Lean.Vir.Browser.DomM (Lean.Vir.Js String)",
+  ],
+  [
+    "Lean.Vir.Browser.Element.setInnerHTML",
+    "Lean.Vir.Js Lean.Vir.Browser.Element → Lean.Vir.Js String → Lean.Vir.Browser.DomM Unit",
+  ],
+  [
+    "Lean.Vir.Browser.Element.getTextContent",
+    "Lean.Vir.Js Lean.Vir.Browser.Element → Lean.Vir.Browser.DomM (Lean.Vir.Js String)",
+  ],
+  [
+    "Lean.Vir.Browser.Element.setTextContent",
+    "Lean.Vir.Js Lean.Vir.Browser.Element → Lean.Vir.Js.Nullable String → Lean.Vir.Browser.DomM Unit",
+  ],
+]) {
+  assert.equal(
+    publicEntries.get(declaration)?.type,
+    expectedType,
+    `${declaration} must preserve its faithful JavaScript-boundary type`,
+  );
+}
 assert.deepEqual(
   publicEntries.get("Lean.Vir.Browser.HTMLCanvasElement.getContext2D")?.targets.find(
     (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
