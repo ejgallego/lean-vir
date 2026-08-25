@@ -54,7 +54,7 @@ if (values.help) {
   process.exit(0);
 }
 
-const leanZipArgument = positionals[0] ?? process.env.LEAN_ZIP_CHECKOUT;
+const leanZipArgument = positionals[0];
 if (!leanZipArgument || positionals.length > 1) {
   throw new Error(usage());
 }
@@ -388,15 +388,13 @@ async function runAcceptance() {
         });
       }
 
-      const optimalExportNames = new Map([
-        ["fast", "VirLeanZipAcceptance.profileOptimalFast"],
-        ["exact", "VirLeanZipAcceptance.profileOptimalExact"],
-      ]);
       const optimalTargets = new Map(
-        acceptanceProfileContract.stages.map(({ kind, level }) => [
-          kind,
-          { exportName: optimalExportNames.get(kind), level },
-        ]),
+        acceptanceProfileContract.stages.map(
+          ({ kind, level, optimalExportName: exportName }) => [
+            kind,
+            { exportName, level },
+          ],
+        ),
       );
       for (const vector of manifest.profileOptimals) {
         const target = optimalTargets.get(vector.kind);

@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  acceptanceProfileContract,
   parseAcceptanceManifest,
 } from "../../scripts/packages/lean-zip/acceptance-manifest.mjs";
 
@@ -79,6 +80,21 @@ test("acceptance manifests parse typed baseline rows", () => {
 });
 
 test("acceptance manifests validate the complete profiling contract", () => {
+  assert.deepEqual(acceptanceProfileContract, {
+    corpus: "large-heterogeneous",
+    stages: [
+      {
+        level: 9,
+        kind: "fast",
+        optimalExportName: "VirLeanZipAcceptance.profileOptimalFast",
+      },
+      {
+        level: 10,
+        kind: "exact",
+        optimalExportName: "VirLeanZipAcceptance.profileOptimalExact",
+      },
+    ],
+  });
   const manifest = parseAcceptanceManifest(
     profileManifest(),
     { includeProfile: true },

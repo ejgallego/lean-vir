@@ -8,8 +8,16 @@ const artifactFilePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 export const acceptanceProfileContract = Object.freeze({
   corpus: "large-heterogeneous",
   stages: Object.freeze([
-    Object.freeze({ level: 9, kind: "fast" }),
-    Object.freeze({ level: 10, kind: "exact" }),
+    Object.freeze({
+      level: 9,
+      kind: "fast",
+      optimalExportName: "VirLeanZipAcceptance.profileOptimalFast",
+    }),
+    Object.freeze({
+      level: 10,
+      kind: "exact",
+      optimalExportName: "VirLeanZipAcceptance.profileOptimalExact",
+    }),
   ]),
 });
 

@@ -35,6 +35,13 @@ parser keeps the native fixture as the sole owner of cases while rejecting
 missing categories, invalid values, unsafe artifact names, duplicate vectors,
 and incomplete profiling groups before execution.
 
+The optional profiling contract is deliberately narrow. Every profiling row
+uses the `large-heterogeneous` input. Levels 9 and 10 must each have a
+`large-compress`, `profile-match`, and matching `profile-base` row. The
+`profile-optimal` rows pair `fast` with level 9 and `exact` with level 10. The
+runner rejects missing stages, different inputs, or matcher/base artifact
+mismatches before starting Wasm execution.
+
 Run this explicit check after changes to the interpreter, package generation,
 runtime ABI or value conversion, native lookup, or Lean-zip integration. It is
 not normally needed for documentation or mechanical layout changes. `--profile`
