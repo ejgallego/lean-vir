@@ -27,13 +27,14 @@ package generator separately selects the exports in
 exports over the oracle inputs.
 
 The runner requires native and VIR compression bytes and prescan decisions to
-match, independently inflates every compressed result, and checks that Wasm
-memory stabilizes over repeated matrix passes. This covers the external package
-boundary, declaration closure, interpreter behavior, native extern fallbacks,
-JavaScript value conversion, and repeated runtime calls together. The manifest
-parser keeps the native fixture as the sole owner of cases while rejecting
-missing categories, invalid values, unsafe artifact names, duplicate vectors,
-and incomplete profiling groups before execution.
+match and independently inflates every compressed result. When two or more
+matrix passes are requested, it also checks that Wasm memory stabilizes after
+the first pass. This covers the external package boundary, declaration closure,
+interpreter behavior, native extern fallbacks, JavaScript value conversion, and
+repeated runtime calls together. The manifest parser keeps the native fixture
+as the sole owner of cases while rejecting missing categories, invalid values,
+unsafe artifact names, duplicate vectors, and incomplete profiling groups
+before execution.
 
 The optional profiling contract is deliberately narrow. Every profiling row
 uses the `large-heterogeneous` input. Levels 9 and 10 must each have a

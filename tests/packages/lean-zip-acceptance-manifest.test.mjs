@@ -269,6 +269,10 @@ test("profiling rows share one corpus and input", () => {
       /profile stages reference different inputs/u,
     ],
     [
+      "profile-base\tlarge-heterogeneous\t10\t",
+      /level-10 profile stages reference different artifacts/u,
+    ],
+    [
       "profile-optimal\tlarge-heterogeneous\texact\t",
       /profile stages reference different inputs/u,
     ],
