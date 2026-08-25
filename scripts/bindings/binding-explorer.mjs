@@ -10,6 +10,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { loadBindingConfig } from "./binding-config.mjs";
+import { buildGeneratedOperations } from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
@@ -20,8 +21,6 @@ const generationDispositions = [
   "needs-annotation",
   "unsupported",
   "manual-exception",
-  "intentionally-excluded",
-  "convenience",
   "not-selected",
 ];
 const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [options]";
@@ -152,10 +151,11 @@ async function generateTypeScriptSurfaces(configs) {
   return surfaces;
 }
 
-function explorerTypeScriptSymbol({ shape: _shape, ...symbol }) {
+function explorerTypeScriptSymbol(symbol) {
   if (symbol.kind !== "interface") return symbol;
+  const { shape: _shape, ...presentation } = symbol;
   const header = symbol.display.slice(0, symbol.display.indexOf("{")).trim();
-  return { ...symbol, display: `${header} { … }` };
+  return { ...presentation, display: `${header} { … }` };
 }
 
 async function loadComparison(bindingRoot) {
@@ -480,6 +480,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   }
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
+  const generatedMembers = new Set(config.generation?.members ?? []);
   const resultsByTypeScript = new Map();
   const resultsById = new Map();
   for (const result of comparison?.results ?? []) {
@@ -542,6 +543,8 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     const results = mapping.accessors === undefined
       ? resultsByTypeScript.get(mapping.typescript) ?? []
       : mappedOperations.map((operation) => resultsById.get(operation.anchor));
+    const generatedCompatibility = generatedMembers.has(mapping.typescript) &&
+      results.length === 0 && mappedOperations.length !== 0;
     mappings.set(mapping.typescript, {
       ...mapping,
       operations,
@@ -549,7 +552,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       lean: mappedOperations.flatMap((operation) => operation.lean),
       status: operations.some((operation) => operation.missing === true)
         ? "missing"
-        : worstSemanticStatus(results),
+        : generatedCompatibility ? "compatible" : worstSemanticStatus(results),
       anchors: results.map((result) => result.id),
     });
   }
@@ -577,7 +580,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
         : [resultsById.get(operation.anchor)];
       return {
         target: operation.target,
-        status: worstSemanticStatus(operationResults),
+        status: generatedMembers.has(mapping.typescript) && operationResults.length === 0
+          ? "compatible"
+          : worstSemanticStatus(operationResults),
         source: "reviewed",
         typescript: mapping.typescript,
         lean: operation.lean,
@@ -793,6 +798,22 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   const libraries = [];
   const semanticSummary = Object.fromEntries(semanticStatuses.map((status) => [status, 0]));
   for (const config of configs) {
+    const generatedByGroup = new Map();
+    if (config.generation !== undefined) {
+      const descriptorsByRoot = new Map(config.roots.flatMap((bindingRoot) => {
+        const descriptor = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`);
+        return descriptor === undefined ? [] : [[bindingRoot.id, descriptor]];
+      }));
+      for (const operation of buildGeneratedOperations(
+        config,
+        config.generation,
+        descriptorsByRoot,
+      )) {
+        const operations = generatedByGroup.get(operation.group) ?? [];
+        operations.push(operation);
+        generatedByGroup.set(operation.group, operations);
+      }
+    }
     const libraryIssues = [];
     const roots = [];
     for (const bindingRoot of config.roots) {
@@ -860,6 +881,9 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         },
         bindings,
         ...(comparison === null ? {} : { comparison }),
+        ...(generatedByGroup.has(bindingRoot.id)
+          ? { generatedOperations: generatedByGroup.get(bindingRoot.id) }
+          : {}),
         workItems,
         issues: decoratedIssues,
       });

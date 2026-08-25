@@ -23,11 +23,13 @@ uses the configuration, then applies the small cross-field checks that JSON
 Schema cannot express directly.
 
 `binding-modalities.mjs` is the shared TypeScript-to-Lean policy boundary. It
-combines descriptor shapes with a library ABI profile and justified exceptions
-to produce canonical operation IR. Lean source generation, comparator intent,
-and report evidence consume that same IR. The interactive document presents an
-upstream-shaped reference to users and actionable generation dispositions to
-binding authors; convenience APIs do not count as upstream bindings.
+combines descriptor shapes with a library ABI profile, explicit method
+signature policies, and justified exceptions to produce canonical operation
+IR. Lean source generation, comparator intent, generated documentation, and
+report evidence consume that same IR. The interactive document presents an
+upstream-shaped reference with semantic TypeScript/Lean highlighting and
+actionable generation dispositions to binding authors; convenience APIs do not
+count as upstream bindings.
 
 Related ownership:
 

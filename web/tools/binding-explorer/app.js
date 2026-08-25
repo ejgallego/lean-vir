@@ -36,13 +36,78 @@ const escapeHtml = (value) => String(value ?? "").replace(
   /[&<>"]/gu,
   (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character],
 );
+const tokenPattern = /\s+|--[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*|\d+(?:\.\d+)?|=>|->|←|→|:=|::|@&|[?@&|:=<>{}()[\],.;*+\-/]/gu;
+const keywords = {
+  typescript: new Set(["interface", "extends", "readonly", "keyof", "typeof", "new", "get", "set", "declare"]),
+  lean: new Set(["def", "opaque", "private", "namespace", "end", "where", "do", "match", "with", "let", "if", "then", "else"]),
+};
+const primitiveTypes = {
+  typescript: new Set(["string", "number", "bigint", "boolean", "void", "null", "undefined", "unknown", "any", "never"]),
+  lean: new Set(["String", "Unit", "Nat", "Int", "Bool", "Float", "DomM", "Option"]),
+};
+
+function tokenClass(token, language) {
+  if (/^\s+$/u.test(token)) return null;
+  if (/^(?:--|\/\/|\/\*)/u.test(token)) return "comment";
+  if (/^"/u.test(token) || /^\d/u.test(token)) return "literal";
+  if (keywords[language].has(token)) return "keyword";
+  if (primitiveTypes[language].has(token) ||
+      (language === "lean" && /(?:^|\.)[A-Z][A-Za-z0-9_']*$/u.test(token))) return "type";
+  if (/^[A-Za-z_]/u.test(token)) return token.includes(".") ? "qualified" : "identifier";
+  if (/^(?:=>|->|←|→|:=|::|@&|[?@&|:=*+\-/])$/u.test(token)) return "operator";
+  return "punctuation";
+}
+
+function highlightCode(value, language) {
+  const source = String(value ?? "");
+  let cursor = 0;
+  let output = "";
+  for (const match of source.matchAll(tokenPattern)) {
+    output += escapeHtml(source.slice(cursor, match.index));
+    const token = match[0];
+    const classification = tokenClass(token, language);
+    output += classification === null
+      ? escapeHtml(token)
+      : '<span class="tok tok-' + classification + '">' + escapeHtml(token) + "</span>";
+    cursor = match.index + token.length;
+  }
+  return output + escapeHtml(source.slice(cursor));
+}
+
+function renderCode(value, language) {
+  return '<pre class="code code-' + language + '"><code>' +
+    highlightCode(value, language) + "</code></pre>";
+}
+
+function renderDocumentation(value, fallback = "No upstream declaration documentation.") {
+  const source = String(value || fallback);
+  const inline = (paragraph) => {
+    const pattern = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*/gu;
+    let cursor = 0;
+    let output = "";
+    for (const match of paragraph.matchAll(pattern)) {
+      output += escapeHtml(paragraph.slice(cursor, match.index));
+      if (match[1] !== undefined) {
+        output += '<a href="' + escapeHtml(match[2]) +
+          '" target="_blank" rel="noreferrer">' + escapeHtml(match[1]) + "</a>";
+      } else if (match[3] !== undefined) {
+        output += "<code>" + escapeHtml(match[3]) + "</code>";
+      } else {
+        output += "<strong>" + escapeHtml(match[4]) + "</strong>";
+      }
+      cursor = match.index + match[0].length;
+    }
+    return output + escapeHtml(paragraph.slice(cursor)).replaceAll("\n", "<br>");
+  };
+  return '<div class="documentation">' + source.split(/\n\s*\n/gu)
+    .map((paragraph) => "<p>" + inline(paragraph) + "</p>").join("") + "</div>";
+}
+
 const dispositionLabel = (value) => ({
   generated: "generated",
   "needs-annotation": "needs annotation",
   unsupported: "unsupported",
   "manual-exception": "manual exception",
-  "intentionally-excluded": "intentionally excluded",
-  convenience: "convenience",
   "not-selected": "not selected",
 })[value] ?? value;
 const availabilityLabel = (value) => ({
@@ -277,12 +342,12 @@ function renderLeanCards(targetIds, { showRuntime = false } = {}) {
     rendered.push(...declarations.map((item) =>
       '<article class="binding"><div class="card-head"><span class="card-title">' +
       escapeHtml(item.entry.declaration) + "</span>" +
-      sourceLink(item.entry.source, item.entry.module) + "</div><pre>" +
-      escapeHtml(item.entry.type) + "</pre>" +
+      sourceLink(item.entry.source, item.entry.module) + "</div>" +
+      renderCode(item.entry.type, "lean") +
       (showRuntime
         ? '<details><summary class="note">Compiled boundary evidence</summary><div class="badges">' +
           target.providers.map((provider) => '<span class="badge">' + escapeHtml(provider) + "</span>").join("") +
-          "</div><pre>" + escapeHtml(item.reach.path.join("\n→ ")) + "</pre></details>"
+          "</div>" + renderCode(item.reach.path.join("\n→ "), "lean") + "</details>"
         : "") + "</article>"));
   }
   return rendered.length
@@ -304,6 +369,42 @@ function symbolMatchesReferenceFilters(group, symbol) {
     (!query || groupHeaderMatches || searchText([symbol.id, symbol.display, symbol.hover]).includes(query));
 }
 
+function modalityText(argument) {
+  const mode = argument.modalities;
+  return argument.name + ": " + argument.type + " · " +
+    [mode.representation, mode.passing, mode.retention].join(" / ");
+}
+
+function renderGenerationPolicy(group, symbol) {
+  const operations = (group.generatedOperations ?? []).filter((operation) =>
+    operation.typescript.member === symbol.id);
+  if (operations.length === 0) return "";
+  return '<details class="generation-policy"><summary>Generated conversion policy</summary>' +
+    operations.map((operation) => {
+      const receiver = operation.receiver.kind === "global"
+        ? "receiver: host global " + operation.receiver.typescriptType
+        : modalityText(operation.receiver.argument);
+      const arguments_ = operation.arguments.map(modalityText);
+      const result = operation.result.modalities;
+      const signature = operation.typescript.signaturePolicy;
+      return '<article><div class="card-head"><span class="card-title">' +
+        escapeHtml(operation.host.target) + '</span><span class="badge">' +
+        escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
+        escapeHtml(operation.typescript.member) + '</span><span aria-hidden="true">→</span><span>' +
+        escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
+        [receiver, ...arguments_, "result: " + operation.result.lean + " · " +
+          [result.representation, result.ownership].join(" / ")]
+          .map(escapeHtml).join("</li><li>") + "</li></ul>" +
+        (signature === undefined ? "" : '<p class="policy-source">Signature: <code>' +
+          escapeHtml(String(signature.selection)) + "</code> · " +
+          escapeHtml(signature.provenance) +
+          (signature.omittedOptionalParameters.length === 0
+            ? " · no parameters omitted"
+            : " · omitted: " + escapeHtml(signature.omittedOptionalParameters.join(", "))) +
+          "</p>") + "</article>";
+    }).join("") + "</details>";
+}
+
 function renderUpstreamSymbol(group, symbol) {
   const member = coverageMember(group, symbol.id);
   const state = member?.generation;
@@ -315,16 +416,16 @@ function renderUpstreamSymbol(group, symbol) {
       escapeHtml(availabilityLabel(state.availability)) + "</span>"
     : "";
   const lean = state?.availability === "available"
-    ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div><pre>' +
-      escapeHtml(symbol.display) + '</pre></div><div class="pane"><div class="pane-title">Faithful Lean binding</div>' +
+    ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
+      renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">Faithful Lean binding</div>' +
       renderLeanCards(state.targets) + "</div></div>"
-    : "<pre>" + escapeHtml(symbol.display) + "</pre>" +
+    : renderCode(symbol.display, "typescript") +
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
-    availability + '</summary><div class="card-head"><p class="note">' +
-    escapeHtml(symbol.hover || "No upstream declaration documentation.") + "</p>" +
-    symbolSource(symbol) + "</div>" + lean + "</details>";
+    availability + '</summary><div class="card-head">' +
+    renderDocumentation(symbol.hover) +
+    symbolSource(symbol) + "</div>" + lean + renderGenerationPolicy(group, symbol) + "</details>";
 }
 
 function renderGroupDetail(group) {
@@ -374,10 +475,9 @@ function renderWorkItem(item) {
   const comparisons = item.member ? comparisonResults(group, item.member) : [];
   const evidence = symbol
     ? '<section class="section"><h3>Expected versus current</h3><div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div><article class="anchor"><div class="card-head"><span class="card-title">' +
-      escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div><pre>" +
-      escapeHtml(symbol.display) + '</pre><p class="note">' +
-      escapeHtml(symbol.hover || "No upstream declaration documentation.") +
-      '</p></article></div><div class="pane"><div class="pane-title">Current public Lean evidence</div>' +
+      escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div>" +
+      renderCode(symbol.display, "typescript") + renderDocumentation(symbol.hover) +
+      '</article></div><div class="pane"><div class="pane-title">Current public Lean evidence</div>' +
       renderLeanCards(targetIds, { showRuntime: true }) + "</div></div></section>"
     : targetIds.length
       ? '<section class="section"><h3>Current public Lean evidence</h3>' +

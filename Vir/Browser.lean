@@ -259,47 +259,26 @@ def querySelectorAll
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
 
-/--
-Reads an element attribute through the JavaScript host.
-
-In a browser this calls `element.getAttribute(name)`. The result is `none` when
-the attribute is absent. In Node tests, use the `lean-vir/vir-runtime-node`
-wrapper for virtual document state.
-
-Reference: [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute).
--/
-@[vir_js "browser.element.getAttribute"]
-private opaque getAttributeNullable
+/-- Converts a Lean-owned attribute name and result around the faithful `getAttribute` binding. -/
+def getAttributeString
     (element : @& Lean.Vir.Js Element)
-    (name : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable String)
-
-def getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String) := do
+    (name : @& String) :
+    DomM (Option String) := do
   let jsName ← Lean.Vir.JsValue.ofString name
-  match ← Lean.Vir.Js.Nullable.toOption (← getAttributeNullable element jsName) with
+  match ← Lean.Vir.Js.Nullable.toOption (← getAttribute element jsName) with
   | none => pure none
   | some value =>
       let text ← Lean.Vir.JsValue.toString value
       pure (some text)
 
-/--
-Sets an element attribute through the JavaScript host.
-
-In a browser this calls `element.setAttribute(name, value)`. In Node tests, use
-the `lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute).
--/
-@[vir_js "browser.element.setAttribute"]
-private opaque setAttributeJs
+/-- Converts Lean-owned attribute text around the faithful `setAttribute` binding. -/
+def setAttributeString
     (element : @& Lean.Vir.Js Element)
-    (name value : @& Lean.Vir.Js String) :
-    DomM Unit
-
-def setAttribute (element : @& Lean.Vir.Js Element) (name value : @& String) : DomM Unit := do
+    (name value : @& String) :
+    DomM Unit := do
   let jsName ← Lean.Vir.JsValue.ofString name
   let jsValue ← Lean.Vir.JsValue.ofString value
-  setAttributeJs element jsName jsValue
+  setAttribute element jsName jsValue
 
 /-- Appends `child` to `parent` and returns no ownership-bearing DOM value. -/
 @[vir_js "browser.element.appendChild"]

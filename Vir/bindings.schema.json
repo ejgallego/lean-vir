@@ -58,9 +58,31 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
+        "methodPolicies": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/methodPolicy" }
+        },
         "exceptions": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/generationException" }
+        }
+      }
+    },
+    "methodPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature"],
+      "properties": {
+        "signature": {
+          "oneOf": [
+            { "const": "only" },
+            { "type": "integer", "minimum": 0 }
+          ]
+        },
+        "omittedOptionalParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

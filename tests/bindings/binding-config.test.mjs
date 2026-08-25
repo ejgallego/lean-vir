@@ -89,3 +89,19 @@ test("generated members cannot also be manual exceptions", async () => {
     /marks generated member Document\.title as a manual exception/u,
   );
 });
+
+test("method policies are explicit, selected, and schema checked", async () => {
+  const unselected = structuredClone(browser);
+  unselected.generation.methodPolicies["Element.remove"] = { signature: "only" };
+  await assert.rejects(
+    validateBindingConfig(unselected, browserPath),
+    /defines a method policy for unselected member Element\.remove/u,
+  );
+
+  const vague = structuredClone(browser);
+  vague.generation.methodPolicies["Element.getAttribute"].signature = "best";
+  await assert.rejects(
+    validateBindingConfig(vague, browserPath),
+    /methodPolicies\/Element\.getAttribute\/signature.*must/u,
+  );
+});

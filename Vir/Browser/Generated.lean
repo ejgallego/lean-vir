@@ -22,7 +22,15 @@ This declaration is generated; edit the TypeScript source or binding configurati
 @[vir_js "browser.document.getTitle"]
 private opaque getTitleJs : DomM (Lean.Vir.Js String)
 
-/-- Faithful generated getter binding for TypeScript `Document.title`. -/
+/--
+Faithful generated getter binding for TypeScript `Document.title`.
+
+The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
+-/
 def getTitle : DomM (Lean.Vir.Js String) :=
   getTitleJs
 
@@ -38,7 +46,15 @@ private opaque setTitleJs
     (title : @& Lean.Vir.Js String) :
     DomM Unit
 
-/-- Faithful generated setter binding for TypeScript `Document.title`. -/
+/--
+Faithful generated setter binding for TypeScript `Document.title`.
+
+The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
+-/
 def setTitle
     (title : @& Lean.Vir.Js String) :
     DomM Unit :=
@@ -47,6 +63,34 @@ def setTitle
 end Document
 
 namespace Element
+
+/--
+Generated faithful JavaScript boundary for the TypeScript `Element.getAttribute` method.
+Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13681
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.getAttribute"]
+private opaque getAttributeJs
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable String)
+
+/--
+Faithful generated method binding for TypeScript `Element.getAttribute`.
+
+The **`getAttribute()`** method of the Element interface returns the value of a specified attribute on the element.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/getAttribute)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13681
+-/
+def getAttribute
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable String) :=
+  getAttributeJs element qualifiedName
 
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` getter.
@@ -60,7 +104,15 @@ private opaque getInnerHTMLJs
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String)
 
-/-- Faithful generated getter binding for TypeScript `Element.innerHTML`. -/
+/--
+Faithful generated getter binding for TypeScript `Element.innerHTML`.
+
+The **`innerHTML`** property of the Element interface gets or sets the HTML or XML markup contained within the element, omitting any shadow roots in both cases.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/innerHTML)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
+-/
 def getInnerHTML
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String) :=
@@ -79,12 +131,50 @@ private opaque setInnerHTMLJs
     (innerHTML : @& Lean.Vir.Js String) :
     DomM Unit
 
-/-- Faithful generated setter binding for TypeScript `Element.innerHTML`. -/
+/--
+Faithful generated setter binding for TypeScript `Element.innerHTML`.
+
+The **`innerHTML`** property of the Element interface gets or sets the HTML or XML markup contained within the element, omitting any shadow roots in both cases.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/innerHTML)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
+-/
 def setInnerHTML
     (element : @& Lean.Vir.Js Element)
     (innerHTML : @& Lean.Vir.Js String) :
     DomM Unit :=
   setInnerHTMLJs element innerHTML
+
+/--
+Generated faithful JavaScript boundary for the TypeScript `Element.setAttribute` method.
+Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13869
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.setAttribute"]
+private opaque setAttributeJs
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `Element.setAttribute`.
+
+The **`setAttribute()`** method of the Element interface sets the value of an attribute on the specified element. If the attribute already exists, the value is updated; otherwise a new attribute is added with the specified name and value.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/setAttribute)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13869
+-/
+def setAttribute
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js String) :
+    DomM Unit :=
+  setAttributeJs element qualifiedName value
 
 /--
 Generated faithful JavaScript boundary for the TypeScript `Element.textContent` getter.
@@ -98,7 +188,13 @@ private opaque getTextContentJs
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String)
 
-/-- Faithful generated getter binding for TypeScript `Element.textContent`. -/
+/--
+Faithful generated getter binding for TypeScript `Element.textContent`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Node/textContent)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
+-/
 def getTextContent
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String) :=
@@ -117,7 +213,13 @@ private opaque setTextContentJs
     (textContent : @& Lean.Vir.Js.Nullable String) :
     DomM Unit
 
-/-- Faithful generated setter binding for TypeScript `Element.textContent`. -/
+/--
+Faithful generated setter binding for TypeScript `Element.textContent`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Node/textContent)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
+-/
 def setTextContent
     (element : @& Lean.Vir.Js Element)
     (textContent : @& Lean.Vir.Js.Nullable String) :

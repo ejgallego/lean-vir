@@ -124,6 +124,22 @@ export function validateGenerationProfile(generation, context = "generation") {
   if (generation.exceptions !== undefined && !object(generation.exceptions)) {
     throw new Error(`${context} exceptions must be an object`);
   }
+  if (generation.methodPolicies !== undefined && !object(generation.methodPolicies)) {
+    throw new Error(`${context} methodPolicies must be an object`);
+  }
+  for (const [member, policy] of Object.entries(generation.methodPolicies ?? {})) {
+    if (!object(policy)) throw new Error(`${context} method policy ${member} must be an object`);
+    validateKeys(policy, ["signature", "omittedOptionalParameters"], `${context} method policy ${member}`);
+    if (policy.signature !== "only" &&
+        (!Number.isInteger(policy.signature) || policy.signature < 0)) {
+      throw new Error(`${context} method policy ${member} requires signature "only" or an overload index`);
+    }
+    const omitted = policy.omittedOptionalParameters ?? [];
+    if (!Array.isArray(omitted) || !omitted.every(nonemptyString) ||
+        new Set(omitted).size !== omitted.length) {
+      throw new Error(`${context} method policy ${member} has invalid omitted optional parameters`);
+    }
+  }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
     if (!nonemptyString(id)) throw new Error(`${context} exception id must be non-empty`);
     validateException(exception, `${context} exception ${id}`);
@@ -245,16 +261,16 @@ function modalityArgument(name, role, type, defaults, provenanceBase, override =
   };
 }
 
-function receiverFor(member, anchor, generation, profile, exception) {
+function receiverFor(member, identity, generation, profile, exception) {
   const owner = member.slice(0, member.lastIndexOf("."));
   const configuredGlobal = profile.receiver.globalTypes.includes(owner);
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
   if (!["global", "argument"].includes(kind)) {
-    throw new Error(`${anchor.id} receiver exception kind must be global or argument`);
+    throw new Error(`${identity.id} receiver exception kind must be global or argument`);
   }
   if (kind === "global") {
     if (exception?.receiver?.passing !== undefined || exception?.receiver?.retention !== undefined) {
-      throw new Error(`${anchor.id} global receiver cannot define passing or retention`);
+      throw new Error(`${identity.id} global receiver cannot define passing or retention`);
     }
     return {
       kind,
@@ -271,12 +287,12 @@ function receiverFor(member, anchor, generation, profile, exception) {
   }
   const marker = generation.resources?.[owner];
   if (!nonemptyString(marker)) {
-    throw new Error(`${anchor.id} has no Lean resource mapping for receiver ${owner}`);
+    throw new Error(`${identity.id} has no Lean resource mapping for receiver ${owner}`);
   }
   const ownerName = owner.slice(owner.lastIndexOf(".") + 1);
   const name = leanIdentifier(
     ownerName[0].toLowerCase() + ownerName.slice(1),
-    `${anchor.id} receiver name`,
+    `${identity.id} receiver name`,
   );
   const type = translatedType(
     `${profile.resource.constructor} ${marker}`,
@@ -417,10 +433,122 @@ function propertyOperation(
       accessor,
       shape,
       source: symbol.source,
+      display: symbol.display,
+      documentation: symbol.hover,
     },
     host: { target: operation.target },
     lean: {
       declaration: operation.lean,
+      namespace: leanName.namespace,
+      name: leanName.name,
+    },
+    effect: {
+      id: exception?.effect?.id ?? profile.effect.id,
+      lean: exception?.effect?.lean ?? profile.effect.lean,
+      provenance: exception?.effect === undefined
+        ? typeProvenance("generation.abiProfile.effect", `default ${profile.effect.id} effect`)
+        : typeProvenance("generation.exceptions", exception.reason),
+    },
+    receiver,
+    arguments: arguments_,
+    result,
+    ...(exception === null ? {} : { exception: { reason: exception.reason } }),
+  };
+}
+
+function selectedMethodShape(member, symbol, policy) {
+  if (policy === undefined) {
+    throw new Error(`${member} requires an explicit generation.methodPolicies entry`);
+  }
+  const signature = policy.signature;
+  if (signature === "only") {
+    if (symbol.shape?.kind !== "function") {
+      throw new Error(`${member} policy requires exactly one TypeScript signature`);
+    }
+    return { shape: symbol.shape, provenance: "generation.methodPolicies.signature=only" };
+  }
+  if (!Number.isInteger(signature) || signature < 0 || symbol.shape?.kind !== "union") {
+    throw new Error(`${member} policy selects overload ${signature}, but the descriptor is not overloaded`);
+  }
+  const shape = symbol.shape.options?.[signature];
+  if (shape?.kind !== "function") {
+    throw new Error(`${member} policy selects missing or non-function overload ${signature}`);
+  }
+  return { shape, provenance: `generation.methodPolicies.signature=${signature}` };
+}
+
+function methodOperation(config, root, mapping, symbol, generation, profile) {
+  const member = mapping.typescript;
+  if (mapping.targets?.length !== 1 || mapping.lean?.length !== 1) {
+    throw new Error(`${member} generation requires exactly one host target and one Lean declaration`);
+  }
+  const target = mapping.targets[0];
+  const operationId = target;
+  const policy = generation.methodPolicies?.[member];
+  const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
+  const omitted = new Set(policy.omittedOptionalParameters ?? []);
+  const knownParameters = new Set(shape.args.map((argument) => argument.name));
+  for (const name of omitted) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
+    if (argument.optional !== true) throw new Error(`${member} policy cannot omit required parameter ${name}`);
+  }
+  const exception = exceptionFor(generation, operationId);
+  const arguments_ = [];
+  let omittedTrailingParameter = false;
+  for (const argument of shape.args) {
+    if (argument.rest === true) throw new Error(`${member} rest parameter ${argument.name} is not supported`);
+    if (argument.optional === true) {
+      if (!omitted.has(argument.name)) {
+        throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission policy`);
+      }
+      omittedTrailingParameter = true;
+      continue;
+    }
+    if (omittedTrailingParameter) {
+      throw new Error(`${member} cannot omit an optional parameter before ${argument.name}`);
+    }
+    arguments_.push(modalityArgument(
+      leanIdentifier(argument.name, `${member} parameter`),
+      "argument",
+      translateType(argument.type, generation, profile, `${member} parameter ${argument.name}`),
+      profile.resource.argument,
+      "generation.abiProfile.resource.argument",
+      exception?.arguments?.[argument.name] ?? null,
+    ));
+  }
+  for (const name of Object.keys(exception?.arguments ?? {})) {
+    if (!knownParameters.has(name) || omitted.has(name)) {
+      throw new Error(`${operationId} exception references missing generated argument ${name}`);
+    }
+  }
+  const receiver = receiverFor(member, { id: operationId }, generation, profile, exception);
+  const leanName = operationName({ lean: mapping.lean[0] }, generation.namespace);
+  const result = resultFor(
+    translateType(shape.result, generation, profile, `${member} result`),
+    profile,
+    exception,
+  );
+  return {
+    id: operationId,
+    library: config.id,
+    group: root.id,
+    typescript: {
+      member,
+      kind: "method",
+      shape,
+      source: symbol.source,
+      display: symbol.display,
+      documentation: symbol.hover,
+      signaturePolicy: {
+        selection: policy.signature,
+        omittedOptionalParameters: [...omitted],
+        provenance: signatureProvenance,
+      },
+    },
+    host: { target },
+    lean: {
+      declaration: mapping.lean[0],
       namespace: leanName.namespace,
       name: leanName.name,
     },
@@ -467,10 +595,19 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       if (validateExceptions) throw new Error(`generated member ${member} has no TypeScript descriptor`);
       continue;
     }
-    if (entry.mapping.accessors === undefined) {
-      throw new Error(`${member} is not a property accessor mapping; method generation is not supported yet`);
-    }
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
+    if (entry.mapping.accessors === undefined) {
+      if (symbol?.kind !== "method") throw new Error(`${member} is not a TypeScript method`);
+      operations.push(methodOperation(
+        config,
+        entry.root,
+        entry.mapping,
+        symbol,
+        generation,
+        profile,
+      ));
+      continue;
+    }
     if (symbol?.kind !== "property") throw new Error(`${member} is not a TypeScript property`);
     if (symbol.optional === true) {
       throw new Error(`${member} is optional; optional property generation is not supported yet`);

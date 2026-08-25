@@ -341,8 +341,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`
 - `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js.Nullable String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
-- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
+- `Element.getAttributeString` and `setAttributeString` are explicit helpers
+  that convert Lean-owned strings around those faithful generated methods.
 - `Lean.Vir.Browser.Element.querySelector` and `querySelectorAll` search below an existing element resource.
 - `Lean.Vir.Browser.Element.getInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
   and `setInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`

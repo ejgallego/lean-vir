@@ -42,6 +42,11 @@ function validationMessage(label, errors) {
 function validateLibrarySemantics(config, label) {
   const rootIds = new Set();
   const generated = new Set(config.generation?.members ?? []);
+  for (const member of Object.keys(config.generation?.methodPolicies ?? {})) {
+    if (!generated.has(member)) {
+      throw new Error(`${label} defines a method policy for unselected member ${member}`);
+    }
+  }
   for (const root of config.roots) {
     if (rootIds.has(root.id)) throw new Error(`${label} repeats root id ${root.id}`);
     rootIds.add(root.id);

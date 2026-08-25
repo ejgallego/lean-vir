@@ -51,8 +51,8 @@ def mount : DomM Unit := do
       Element.appendChild root status
       let canvasElement ← Document.createElementString "canvas"
       Element.ClassList.add canvasElement "vir-slide-canvas"
-      Element.setAttribute canvasElement "role" "img"
-      Element.setAttribute canvasElement "aria-label"
+      Element.setAttributeString canvasElement "role" "img"
+      Element.setAttributeString canvasElement "aria-label"
         "A blue rectangle bouncing horizontally across a canvas"
       Element.appendChild root canvasElement
       match ← HTMLCanvasElement.fromElement canvasElement with

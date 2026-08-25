@@ -29,7 +29,11 @@
       }
     },
     "resources": { "Element": "Element" },
-    "members": ["Document.title", "Element.innerHTML", "Element.textContent"],
+    "members": ["Document.title", "Element.getAttribute", "Element.innerHTML", "Element.setAttribute", "Element.textContent"],
+    "methodPolicies": {
+      "Element.getAttribute": { "signature": "only" },
+      "Element.setAttribute": { "signature": "only" }
+    },
     "exceptions": {}
   },
   "roots": [

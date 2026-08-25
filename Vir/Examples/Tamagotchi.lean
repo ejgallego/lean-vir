@@ -202,11 +202,11 @@ def setText (selector text : String) : DomM Unit := do
 def getAttribute (selector name : String) : DomM (Option String) := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure none
-  | some element => Lean.Vir.Browser.Element.getAttribute element name
+  | some element => Lean.Vir.Browser.Element.getAttributeString element name
 
 def setAttribute (selector name value : String) : DomM Unit :=
   withElement selector fun element =>
-    Lean.Vir.Browser.Element.setAttribute element name value
+    Lean.Vir.Browser.Element.setAttributeString element name value
 
 def getChecked (selector : String) : DomM Bool := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with

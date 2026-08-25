@@ -70,7 +70,8 @@ to opaque Lean types.
 ## Canonical Operation IR
 
 `npm run generate:lean-bindings` first creates a canonical operation record for
-each selected accessor. It then renders all downstream views from that record.
+each selected property operation or method. It then renders all downstream
+views from that record.
 The ignored debugging artifact is:
 
 ```text
@@ -79,7 +80,8 @@ build/bindings/browser.generated-operations.json
 
 Each operation records:
 
-- the TypeScript member, accessor shape, and source location;
+- the TypeScript member, selected signature or accessor shape, source location,
+  display text, and upstream documentation;
 - the host target and Lean declaration name;
 - the effect;
 - global or argument receiver policy;
@@ -91,8 +93,49 @@ Each operation records:
 The checked-in `Vir/Browser/Generated.lean` declarations are rendered from this
 IR. The descriptor generator also projects comparator-compatible `portIntent`
 fields from it. Comparison results retain the complete `modalityContract`, and
-the binding explorer shows that contract in an expandable panel. This avoids
-three independently authored versions of the same policy.
+the binding explorer shows generated operations in an expandable conversion
+policy panel. This avoids three independently authored versions of the same
+policy.
+
+## Method Selection
+
+A selected TypeScript method must have a `generation.methodPolicies` entry.
+The policy separates API identity (the reviewed mapping) from signature
+selection:
+
+```json
+"methodPolicies": {
+  "Element.getAttribute": { "signature": "only" },
+  "Document.createElement": {
+    "signature": 2,
+    "omittedOptionalParameters": ["options"]
+  }
+}
+```
+
+`"signature": "only"` asserts that the declaration has exactly one function
+signature. An integer selects that zero-based overload explicitly. A required
+parameter cannot be omitted, and every optional parameter must either be
+represented by a supported translation rule or named in
+`omittedOptionalParameters`; the current generator implements the latter path.
+Missing policies, changed overload layouts, rest parameters, unknown parameter
+names, and unsupported parameter or result types fail generation.
+
+The initial generated method slice is `Element.getAttribute` and
+`Element.setAttribute`. Both use `"only"`, omit no parameters, translate each
+TypeScript `string` through the browser ABI profile to `Lean.Vir.Js String`,
+and derive receiver/result modalities from the same profile as properties.
+
+## Documentation Flow
+
+The TypeScript compiler extracts declaration display text, JSDoc, source
+locations, and documentation links into the descriptor. Generation copies
+those fields into operation IR and emits the JSDoc plus an upstream source link
+on the public Lean declaration. The explorer consumes the same descriptor and
+operation IR: it renders JSDoc paragraphs and links, TypeScript and Lean code
+with language-aware token classes, and the exact conversion policy that
+produced each generated declaration. No separate handwritten method
+documentation database is involved.
 
 `portIntent` is reserved for transformations that the comparator actually
 checks. A reviewed observation about lifecycle, retention, or host ownership
@@ -137,13 +180,12 @@ those are projections of the operation IR.
 
 ## Current Boundary And Next Extension
 
-The implemented slice covers required property getters and setters. It already
-drives the shipped `Document.title`, `Element.innerHTML`, and
-`Element.textContent` declarations.
+The implemented slice covers required property getters/setters and required,
+non-rest method parameters. It drives `Document.title`, `Element.innerHTML`,
+`Element.textContent`, `Element.getAttribute`, and `Element.setAttribute`.
 
-Method generation should extend the same operation IR rather than add a second
-path. The next slice needs deterministic overload selection, optional/default
-parameter rules, and callback representation. Callback retention is then a
-named exception or a more specific ABI profile rule. Unions, structural
-records, generics, and overloaded methods remain fail-closed until their
-translation rules are explicit and tested.
+The next method slices need explicit optional/default parameter translation and
+resource-result mappings for selectors. Callback representation and retention
+then require a named rule or justified exception. Structural records, generics,
+and unsupported unions remain fail-closed until their translations are explicit
+and tested.

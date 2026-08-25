@@ -95,8 +95,6 @@ assert.deepEqual(report.summary.generation, {
     "needs-annotation": dispositionCounts["needs-annotation"] ?? 0,
     unsupported: dispositionCounts.unsupported ?? 0,
     "manual-exception": dispositionCounts["manual-exception"] ?? 0,
-    "intentionally-excluded": dispositionCounts["intentionally-excluded"] ?? 0,
-    convenience: dispositionCounts.convenience ?? 0,
     "not-selected": dispositionCounts["not-selected"] ?? 0,
   },
   availability: {
@@ -106,7 +104,7 @@ assert.deepEqual(report.summary.generation, {
   },
   workItems: report.workItems.length,
 });
-assert.equal(report.summary.generation.disposition.generated, 3);
+assert.equal(report.summary.generation.disposition.generated, 5);
 assert.equal(report.summary.generation.disposition["not-selected"], 2003);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
@@ -240,15 +238,30 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 });
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
-  compatible: 2,
+  compatible: 4,
   weak: 0,
   missing: 728,
-  unreviewed: 12,
+  unreviewed: 10,
   mappedTargets: 16,
 });
 const elementInnerHTML = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.innerHTML",
 );
+const elementGetAttribute = elementRoot?.coverage.members.find(
+  (member) => member.id === "Element.getAttribute",
+);
+assert.equal(elementGetAttribute?.generation.disposition, "generated");
+assert.equal(elementGetAttribute?.generation.availability, "available");
+const generatedGetAttribute = elementRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "Element.getAttribute");
+assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "only");
+assert.match(generatedGetAttribute?.typescript.documentation, /MDN Reference/u);
+assert.equal(generatedGetAttribute?.arguments[0].type, "Lean.Vir.Js String");
+assert.equal(generatedGetAttribute?.result.lean, "Lean.Vir.Js.Nullable String");
+assert.match(app, /function highlightCode/u);
+assert.match(app, /Generated conversion policy/u);
+assert.match(style, /\.tok-keyword/u);
+assert.match(style, /\.generation-policy/u);
 const elementTextContent = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.textContent",
 );

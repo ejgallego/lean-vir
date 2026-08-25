@@ -107,6 +107,10 @@ function operationModalities(operation, profile) {
   return `ABI profile \`${profile.id}\`: ${[receiver, ...arguments_, result].join("; ")}.`;
 }
 
+function leanDocText(value) {
+  return String(value ?? "").replaceAll("-/", "- /").trim();
+}
+
 function renderOperation(operation, profile) {
   const args = [
     ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
@@ -115,10 +119,18 @@ function renderOperation(operation, profile) {
   const rawName = `${operation.lean.name}Js`;
   const call = [rawName, ...args.map((arg) => arg.name)].join(" ");
   const source = sourceReference(operation.typescript.source);
-  const accessorLabel = operation.typescript.accessor === "get" ? "getter" : "setter";
+  const operationLabel = operation.typescript.kind === "method"
+    ? "method"
+    : operation.typescript.accessor === "get" ? "getter" : "setter";
+  const upstreamDocumentation = leanDocText(operation.typescript.documentation);
+  const publicDocumentation = leanDocText([
+    `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
+    upstreamDocumentation,
+    `Upstream declaration: ${source}`,
+  ].filter(Boolean).join("\n\n"));
   return {
     namespace: operation.lean.namespace,
-    text: `/--\nGenerated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${accessorLabel}.\nSource: ${source}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit the TypeScript source or binding configuration.\n-/\n@[vir_js "${operation.host.target}"]\n${renderSignature(rawName, args, operation.effect.lean, operation.result.lean, "private opaque ")}\n\n/-- Faithful generated ${accessorLabel} binding for TypeScript \`${operation.typescript.member}\`. -/\n${renderSignature(operation.lean.name, args, operation.effect.lean, operation.result.lean, "def ")} :=\n  ${call}`,
+    text: `/--\nGenerated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.\nSource: ${source}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit the TypeScript source or binding configuration.\n-/\n@[vir_js "${operation.host.target}"]\n${renderSignature(rawName, args, operation.effect.lean, operation.result.lean, "private opaque ")}\n\n/--\n${publicDocumentation}\n-/\n${renderSignature(operation.lean.name, args, operation.effect.lean, operation.result.lean, "def ")} :=\n  ${call}`,
   };
 }
 

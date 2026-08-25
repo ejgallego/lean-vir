@@ -219,11 +219,13 @@ names in the comparison report.
 of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
 show the same report with usable links and hovers.
 
-`vir-v1.anchors.html` is a standalone focused report. It treats the
+`vir-v1.anchors.html` is a legacy standalone focused report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
-text. This focused renderer is static HTML: it does not yet provide client-side
-filtering or syntax highlighting.
+text. New binding work should use the consolidated explorer, whose upstream
+reference and author workbench provide filtering, semantic TypeScript/Lean
+highlighting, generated conversion policy, and documentation links. The
+focused renderer remains for fixture-level comparator tests.
 
 ## Match Status
 

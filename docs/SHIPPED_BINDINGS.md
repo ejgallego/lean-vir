@@ -79,8 +79,8 @@ Each upstream member has a generation record with three independent facts:
 - **provenance** records whether the current evidence comes from the generator,
   handwritten code, an automatic candidate, an annotation, or no implementation.
 - **disposition** is `generated`, `needs-annotation`, `unsupported`,
-  `manual-exception`, `intentionally-excluded`, `convenience`, or
-  `not-selected`.
+  `manual-exception`, or `not-selected`. Convenience wrappers are downstream
+  Lean APIs rather than upstream members, so they are not a member disposition.
 
 Only dispositions with an actionable diagnostic appear in the binding
 workbench. In particular, `not-selected` is not an error or author action.
@@ -88,6 +88,11 @@ Every work item names a diagnostic code, explains the evidence, and gives the
 next required action. Current handwritten mappings use `needs-annotation`
 until they move into generation or acquire a justified manual-exception
 annotation.
+
+A generated operation whose reviewed mapping has no legacy comparator anchor
+is `compatible` by generator evidence: the TypeScript shape, ABI policy, and
+emitted Lean type are one canonical operation record. Handwritten mappings
+still need comparator evidence or remain `unreviewed`.
 
 A **public Lean API** row is a public executable declaration in the measured
 `Vir` environment that reaches at least one JavaScript host target. It does not
@@ -146,8 +151,9 @@ upstream operations may remain visible in the reference without failing CI.
 Land that work in small API-group slices, prioritizing existing exposed
 bindings over new surface:
 
-1. generate DOM selectors and attributes and move primitive conversions to a
-   separate convenience layer;
+1. generate DOM selectors; attribute methods and their faithful string
+   boundaries are generated, with primitive conversions in a separate helper
+   layer;
 2. generate input, event, canvas, and timer operations;
 3. add fail-closed callback lifetime annotations;
 4. close or explicitly classify React root generation blockers;

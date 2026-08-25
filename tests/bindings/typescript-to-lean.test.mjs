@@ -42,7 +42,10 @@ const generation = {
     },
   },
   resources: { Widget: "Widget" },
-  members: ["Widget.label"],
+  members: ["Widget.getAttribute", "Widget.label"],
+  methodPolicies: {
+    "Widget.getAttribute": { signature: "only" },
+  },
   exceptions: {},
 };
 const config = {
@@ -64,6 +67,10 @@ const config = {
           anchor: "widget.label.set",
         },
       },
+    }, {
+      typescript: "Widget.getAttribute",
+      targets: ["demo.widget.getAttribute"],
+      lean: ["Lean.Vir.Demo.Widget.getAttribute"],
     }],
     anchors: [
       {
@@ -91,6 +98,18 @@ const descriptor = {
     kind: "property",
     source: { path: "demo.d.ts", startLine: 4 },
     accessors: { get: stringShape, set: nullableStringShape },
+  }, {
+    id: "Widget.getAttribute",
+    kind: "method",
+    source: { path: "demo.d.ts", startLine: 7 },
+    display: "getAttribute(name: string): string | null;",
+    hover: "Returns the named attribute.",
+    shape: {
+      kind: "function",
+      effect: "pure",
+      args: [{ name: "name", type: stringShape }],
+      result: nullableStringShape,
+    },
   }],
 };
 const descriptors = new Map([["widget", descriptor]]);
@@ -132,6 +151,60 @@ test("operation IR records derived modalities and their provenance", () => {
     representation: "immediate",
     ownership: "value",
   });
+});
+
+test("an explicit single-signature policy generates faithful methods and documentation", () => {
+  const output = renderLeanBindings(config, generation, descriptors);
+  const operations = buildGeneratedOperations(config, generation, descriptors);
+  const method = operations.find((operation) => operation.id === "demo.widget.getAttribute");
+
+  assert.match(output, /private opaque getAttributeJs\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(name : @& Lean\.Vir\.Js String\) :\n    DomM \(Lean\.Vir\.Js\.Nullable String\)/u);
+  assert.match(output, /Returns the named attribute\./u);
+  assert.equal(method.typescript.signaturePolicy.selection, "only");
+  assert.equal(method.typescript.documentation, "Returns the named attribute.");
+  assert.deepEqual(method.arguments[0].modalities, {
+    representation: "js-resource",
+    passing: "borrowed",
+    retention: "call",
+  });
+});
+
+test("method generation fails closed without a matching signature policy", () => {
+  const unreviewed = structuredClone(generation);
+  delete unreviewed.methodPolicies["Widget.getAttribute"];
+  assert.throws(
+    () => renderLeanBindings(config, unreviewed, descriptors),
+    /requires an explicit generation\.methodPolicies entry/u,
+  );
+
+  const overloadedDescriptors = structuredClone(descriptors);
+  const method = overloadedDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape = { kind: "union", options: [method.shape, method.shape] };
+  assert.throws(
+    () => renderLeanBindings(config, generation, overloadedDescriptors),
+    /requires exactly one TypeScript signature/u,
+  );
+});
+
+test("optional method parameters require an explicit trailing omission", () => {
+  const optionalGeneration = structuredClone(generation);
+  optionalGeneration.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = ["mode"];
+  const optionalDescriptors = structuredClone(descriptors);
+  const method = optionalDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape.args.push({ name: "mode", optional: true, type: stringShape });
+
+  const operation = buildGeneratedOperations(config, optionalGeneration, optionalDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  assert.deepEqual(operation.typescript.signaturePolicy.omittedOptionalParameters, ["mode"]);
+  assert.deepEqual(operation.arguments.map((argument) => argument.name), ["name"]);
+
+  method.shape.args.push({ name: "requiredAfter", type: stringShape });
+  assert.throws(
+    () => buildGeneratedOperations(config, optionalGeneration, optionalDescriptors),
+    /cannot omit an optional parameter before requiredAfter/u,
+  );
 });
 
 test("generated anchors project comparator intent from operation IR", () => {
