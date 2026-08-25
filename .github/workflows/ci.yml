@@ -27,6 +27,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:packages:unit
       - run: npm run test:tutorials
       - run: npm run check:bindings
       - run: npm run test:bench
