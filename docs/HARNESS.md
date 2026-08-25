@@ -194,7 +194,12 @@ compatibility check for a lean-zip checkout using the same Lean toolchain as
 VIR. It builds a native oracle and a client-native VIR package, compares the
 compression results byte for byte, and independently inflates them. Add
 `--passes 1` for a shorter diagnostic run or `--profile` for attribution only;
-neither mode is stable performance evidence.
+neither mode is stable performance evidence. Run it when interpreter, package,
+ABI, native-lookup, runtime-conversion, or Lean-zip integration changes need a
+real external-client check; documentation and mechanical layout changes do not
+normally require it. See the
+[Lean-zip package tooling notes](../scripts/packages/lean-zip/README.md) for the
+native-oracle/VIR boundary and the complete contract.
 
 `npm test` begins with the mailbox, package, native-registry, fixture, tutorial,
 benchmark, and surface contract suites. It then runs package ABI, declaration

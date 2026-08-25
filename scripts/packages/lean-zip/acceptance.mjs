@@ -16,6 +16,7 @@ import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
 import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../irpkg-generator.mjs";
 import { createVirRuntime } from "../../../web/src/vir-runtime-node.js";
+import { parseAcceptanceManifest } from "./acceptance-manifest.mjs";
 
 const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
@@ -195,81 +196,13 @@ function generateVirPackage() {
   );
 }
 
-function parseManifest(source) {
-  const compression = [];
-  const largeCompression = [];
-  const prescan = [];
-  const profileMatches = [];
-  const profileBases = [];
-  const profileOptimals = [];
-  for (const line of source.trim().split("\n")) {
-    const fields = line.split("\t");
-    if (
-      (fields[0] === "compress" || fields[0] === "large-compress") &&
-      fields.length === 5
-    ) {
-      const vector = {
-        name: fields[1],
-        level: Number(fields[2]),
-        inputFile: fields[3],
-        outputFile: fields[4],
-      };
-      (fields[0] === "compress" ? compression : largeCompression).push(vector);
-    } else if (fields[0] === "prescan" && fields.length === 4) {
-      if (fields[3] !== "true" && fields[3] !== "false") {
-        throw new Error(
-          `invalid native oracle prescan result: ${JSON.stringify(line)}`,
-        );
-      }
-      prescan.push({
-        name: fields[1],
-        inputFile: fields[2],
-        decision: fields[3] === "true",
-      });
-    } else if (fields[0] === "profile-match" && fields.length === 5) {
-      profileMatches.push({
-        corpus: fields[1],
-        level: Number(fields[2]),
-        inputFile: fields[3],
-        tokensFile: fields[4],
-      });
-    } else if (fields[0] === "profile-base" && fields.length === 6) {
-      profileBases.push({
-        corpus: fields[1],
-        level: Number(fields[2]),
-        inputFile: fields[3],
-        tokensFile: fields[4],
-        outputBytes: Number(fields[5]),
-      });
-    } else if (fields[0] === "profile-optimal" && fields.length === 5) {
-      profileOptimals.push({
-        corpus: fields[1],
-        kind: fields[2],
-        inputFile: fields[3],
-        outputFile: fields[4],
-      });
-    } else {
-      throw new Error(
-        `invalid native oracle manifest row: ${JSON.stringify(line)}`,
-      );
-    }
-  }
-  return {
-    compression,
-    largeCompression,
-    prescan,
-    profileMatches,
-    profileBases,
-    profileOptimals,
-  };
-}
-
 async function runAcceptance() {
   await generateNativeOracle();
   generateVirPackage();
 
-  const manifest = parseManifest(
+  const manifest = parseAcceptanceManifest(
     await readFile(join(oracleOutput, "manifest.tsv"), "utf8"),
+    { includeProfile: values.profile },
   );
   const wasmBytes = await readFile(wasmPath);
   const packageBytes = await readFile(packagePath);
@@ -391,22 +324,6 @@ async function runAcceptance() {
     }
 
     if (values.profile) {
-      assert.equal(
-        manifest.profileMatches.length,
-        2,
-        "expected level-9 and level-10 matcher profile rows",
-      );
-      assert.equal(
-        manifest.profileBases.length,
-        2,
-        "expected level-9 and level-10 base-preparation profile rows",
-      );
-      assert.equal(
-        manifest.profileOptimals.length,
-        2,
-        "expected fast and exact optimal profile rows",
-      );
-
       const profileTokens = new Map();
       for (const vector of manifest.profileMatches) {
         const source = await oracleFile(vector.inputFile);
@@ -519,14 +436,6 @@ async function runAcceptance() {
           timings,
         });
       }
-    } else {
-      assert.equal(
-        manifest.profileMatches.length +
-          manifest.profileBases.length +
-          manifest.profileOptimals.length,
-        0,
-        "native oracle emitted profile stages without --profile",
-      );
     }
 
     for (const vector of manifest.prescan) {
