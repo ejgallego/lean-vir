@@ -166,14 +166,14 @@ benchmark or dashboard APIs.
 
 ```sh
 npm install
-npm run dev
+npm run dev:partial
 ```
 
-`npm run dev` is deliberately strict: every active example must have the exact
-artifact-set ID selected by `artifact-builds.json`. It reports each missing or
-stale set and the canonical command that rebuilds it. When developing one
-producer or reviewing a deliberately incomplete checkout, use
-`npm run dev:partial` instead.
+`npm run dev:partial` serves the catalog from a fresh or deliberately
+incomplete checkout and disables examples whose exact artifacts are not
+staged. `npm run dev` is deliberately strict: every active example must have
+the artifact-set ID selected by `artifact-builds.json`. It reports each missing
+or stale set and the canonical command that rebuilds it.
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
 not load or privilege any workload. Select an example there or use

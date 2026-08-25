@@ -1,21 +1,24 @@
 import assert from "node:assert/strict";
+import { join } from "node:path";
 
+import { readBuildDatabase } from "../scripts/artifact-build-lib.mjs";
+import { appRoot } from "../scripts/package-root.mjs";
 import {
   collectPageErrors,
   launchBenchmarkBrowser,
   startBenchmarkServer,
 } from "./harness.mjs";
 
-const port = Number(process.env.BENCH_PORT ?? "18448");
-const url = `http://127.0.0.1:${port}/?example=illuminate`;
-
-let server = null;
-try {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`server returned ${response.status}`);
-} catch {
-  server = await startBenchmarkServer({ port });
-}
+const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
+const expectedSetId = database.builds.illuminate.artifactSet.setId;
+const port = Number(
+  process.env.BENCH_PORT ?? String(21000 + (process.pid % 1000)),
+);
+const server = await startBenchmarkServer({
+  port,
+  label: "Illuminate browser smoke server",
+});
+const url = `${server.origin}/?example=illuminate`;
 let browser = null;
 
 try {
@@ -74,7 +77,7 @@ try {
     {
       verified: true,
       tone: "verified",
-      setId: "illuminate-player-set-0001",
+      setId: expectedSetId,
     },
   );
   const backends = await page.evaluate(() =>
@@ -92,13 +95,11 @@ try {
   assert.equal(backends[1].label, "Lean · VIR typed");
   assert.equal(backends[2].label, "Lean · FIR selection");
   assert.ok(
-    requestedPaths.has(
-      "/artifacts/illuminate/workload/js-player-trace.mjs",
-    ),
+    requestedPaths.has("/artifacts/illuminate/workload/js-player-trace.mjs"),
   );
   assert.equal(artifactManifestRequests, 1);
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Artifact set illuminate-player-set-0001/);
+  assert.ok(buildNotes.includes(`Artifact set ${expectedSetId}`));
   assert.match(buildNotes, /illuminate\/browser-benchmark-source\/v1/);
   assert.match(buildNotes, /Illuminate\.Animation\.Vir\.replayTraceTyped/);
   assert.match(buildNotes, /fir\.illuminate-player\.complete-runtime\/v2/);
@@ -150,5 +151,5 @@ try {
   assert.deepEqual(pageErrors, []);
   console.log("PASS canonical Illuminate JS/VIR/FIR plotting smoke");
 } finally {
-  await Promise.all([browser?.close(), server?.close()]);
+  await Promise.all([browser?.close(), server.close()]);
 }

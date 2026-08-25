@@ -71,12 +71,15 @@ try {
     const unavailablePage = await browser.newPage();
     const unavailableErrors = collectPageErrors(unavailablePage);
     const artifactRequests = [];
+    const controllerRequests = [];
+    const controllerPath = new URL(example.controller, `${server.origin}/`)
+      .pathname;
     unavailablePage.on("request", (request) => {
-      if (
-        new URL(request.url()).pathname.startsWith(`/artifacts/${example.id}/`)
-      ) {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith(`/artifacts/${example.id}/`)) {
         artifactRequests.push(request.url());
       }
+      if (path === controllerPath) controllerRequests.push(request.url());
     });
     await unavailablePage.goto(
       `${server.origin}/?example=${encodeURIComponent(example.id)}`,
@@ -99,6 +102,7 @@ try {
       /Not staged|Artifacts invalid/,
     );
     assert.deepEqual(artifactRequests, []);
+    assert.deepEqual(controllerRequests, []);
     assert.deepEqual(unavailableErrors, []);
     await unavailablePage.close();
   }

@@ -27,8 +27,9 @@ npm run example -- illuminate default --materialize --prepare
 
 For prepared exact checkouts, `npm run artifacts:build -- illuminate` builds
 the three components and assembles `_artifacts/seed`. The generic pack and fetch
-commands then create, verify, and stage `illuminate-player-set-0001`; there is
-no Illuminate-specific stager or provenance format.
+commands then create, verify, and stage the artifact set selected by
+`artifact-builds.json`; there is no Illuminate-specific stager or provenance
+format.
 
 The quick gate exercises representative animations and trace lengths. FIR's
 package-local gate adds a broader differential corpus and a bounded-frontier

@@ -41,35 +41,35 @@ if (requireActive && deployments.length > 0) {
 
 const sourceCatalog = await discoverExampleCatalog(appRoot);
 const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
-const selectedCatalog = deployments.length
-  ? await selectPagesCatalog({
-      appRoot,
-      artifactsRoot: artifacts,
-      catalog: sourceCatalog,
-      database,
-      deployments,
-    })
-  : sourceCatalog;
-const catalog = await catalogWithArtifactAvailability({
+const availableCatalog = await catalogWithArtifactAvailability({
   appRoot,
   artifactsRoot: artifacts,
   database,
-  catalog: selectedCatalog,
+  catalog: sourceCatalog,
 });
+const catalog = deployments.length
+  ? await selectPagesCatalog({
+      appRoot,
+      catalog: availableCatalog,
+      database,
+      deployments,
+    })
+  : availableCatalog;
 
 const incompleteActive = catalog.examples.filter(
   ({ lifecycle, availability }) =>
     lifecycle === "active" && availability.status !== "ready",
 );
 if (requireActive && incompleteActive.length > 0) {
+  const details = incompleteActive
+    .map(
+      ({ id, availability }) =>
+        `- ${id}/${availability.variant}: ${availability.status}; expected ${availability.setId ?? "an explicitly staged rehearsal set"}\n` +
+        `  npm run example -- ${id} ${availability.variant} --materialize --prepare`,
+    )
+    .join("\n");
   throw new Error(
-    `active benchmark artifacts are incomplete:\n${incompleteActive
-      .map(
-        ({ id, availability }) =>
-          `- ${id}/${availability.variant}: ${availability.status}; expected ${availability.setId ?? "an explicitly staged rehearsal set"}\n` +
-          `  npm run example -- ${id} ${availability.variant} --materialize --prepare`,
-      )
-      .join("\n")}\nUse npm run dev:partial only when intentionally reviewing a subset.`,
+    `active benchmark artifacts are incomplete:\n${details}\nUse npm run dev:partial only when intentionally reviewing a subset.`,
   );
 }
 

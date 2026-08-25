@@ -69,16 +69,22 @@ async function stagedDeployment(t) {
   };
   const manifestPath = join(directory, "ARTIFACT_SET.json");
   await writeFile(manifestPath, canonicalJson(manifest));
-  const select = (selectedCatalog, ...deployments) =>
-    selectPagesCatalog({
+  const select = async (selectedCatalog, ...deployments) => {
+    const availableCatalog = await catalogWithArtifactAvailability({
       appRoot,
       artifactsRoot,
+      database,
       catalog: selectedCatalog,
+    });
+    return selectPagesCatalog({
+      appRoot,
+      catalog: availableCatalog,
       database,
       deployments: (deployments.length ? deployments : ["prettyM=default"]).map(
         parsePagesDeployment,
       ),
     });
+  };
   return {
     artifactsRoot,
     catalog,

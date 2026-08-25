@@ -1,7 +1,5 @@
 # Browser benchmark catalog maintainer guide
 
-Last verified: 2026-08-22
-
 ## Purpose
 
 `benchmarks/browser/` is a standalone browser benchmark catalog hosted in
