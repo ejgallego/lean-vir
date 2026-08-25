@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Common
 import Vir.Js
+import Vir.Runtime
 
 namespace Lean.Vir.Browser
 

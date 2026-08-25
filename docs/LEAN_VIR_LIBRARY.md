@@ -4,12 +4,13 @@
 JavaScript host while running through VIR's WASM interpreter. Those modules
 expose APIs in the `Lean.Vir.*` namespace.
 
-Reviewed browser properties may be generated directly from pinned TypeScript
-declarations. `Vir/Browser.bindings.json` supplies only the policy TypeScript
-does not encode—Lean and host names, a named ABI profile, resource marker names,
-and justified exceptions—and `Vir/Browser/Generated.lean` supplies the shipped
-raw declarations. The generator derives representation, passing, retention,
-result ownership, and effect in a canonical operation IR; see
+Reviewed browser properties and methods may be generated directly from pinned
+TypeScript declarations. `Vir/Browser.bindings.json` selects the generated
+members and method signatures, then supplies the policy TypeScript does not
+encode—Lean and host names, a named ABI profile, resource marker names, and
+justified exceptions. `Vir/Browser/Generated.lean` supplies the shipped raw
+declarations. The generator derives representation, passing, retention, result
+ownership, and effect in a canonical operation IR; see
 [BINDING_MODALITIES.md](BINDING_MODALITIES.md). Run
 `npm run check:lean-bindings` to reject drift. These generated boundaries
 preserve JavaScript resources; conversion to Lean-owned values is an explicit
