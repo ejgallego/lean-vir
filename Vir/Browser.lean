@@ -338,45 +338,67 @@ def querySelectorAll
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
 
-/-- Reads an element's serialized child markup. -/
+/--
+Reads an element's serialized child markup as a JavaScript string resource.
+
+Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
+-/
 @[vir_js "browser.element.getInnerHTML"]
 private opaque getInnerHTMLJs
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js String)
 
-def getInnerHTML (element : @& Lean.Vir.Js Element) : DomM String := do
-  Lean.Vir.JsValue.toString (← getInnerHTMLJs element)
+/-- Faithful JavaScript-boundary getter for `Element.innerHTML`. -/
+def getInnerHTML
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String) :=
+  getInnerHTMLJs element
 
-/-- Replaces an element's child markup. -/
+/--
+Replaces an element's child markup from a borrowed JavaScript string resource.
+
+The caller's string remains live after the call.
+
+Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
+-/
 @[vir_js "browser.element.setInnerHTML"]
 private opaque setInnerHTMLJs
     (element : @& Lean.Vir.Js Element)
     (html : @& Lean.Vir.Js String) :
     DomM Unit
 
-def setInnerHTML (element : @& Lean.Vir.Js Element) (html : @& String) : DomM Unit := do
-  setInnerHTMLJs element (← ownedString html)
+/-- Faithful JavaScript-boundary setter for `Element.innerHTML`. -/
+def setInnerHTML
+    (element : @& Lean.Vir.Js Element)
+    (html : @& Lean.Vir.Js String) :
+    DomM Unit :=
+  setInnerHTMLJs element html
 
 /--
-Reads an element's text content through the JavaScript host.
+Reads an element's text content as a JavaScript string resource.
 
-In a browser this reads `element.textContent` and returns the empty string when
-the property is `null`. In Node tests, use the `lean-vir/vir-runtime-node`
-wrapper for virtual document state.
+Although `Node.textContent` is nullable for some node kinds, TypeScript narrows
+the `Element` getter to `string`. In Node tests, use the
+`lean-vir/vir-runtime-node` wrapper for virtual document state.
 
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
 -/
 @[vir_js "browser.element.getTextContent"]
-private opaque getTextContentJs (element : @& Lean.Vir.Js Element) : DomM (Lean.Vir.Js String)
+private opaque getTextContentJs
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String)
 
-def getTextContent (element : @& Lean.Vir.Js Element) : DomM String := do
-  let text ← getTextContentJs element
-  Lean.Vir.JsValue.toString text
+/-- Faithful JavaScript-boundary getter for `Element.textContent`. -/
+def getTextContent
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String) :=
+  getTextContentJs element
 
 /--
-Sets an element's text content through the JavaScript host.
+Sets an element's text content from a borrowed nullable JavaScript string.
 
-In a browser this writes `element.textContent`. In Node tests, use the
+JavaScript treats `null` as the empty string for this property. The caller's
+nullable resource remains live after the call. In Node tests, use the
 `lean-vir/vir-runtime-node` wrapper for virtual document state.
 
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
@@ -384,12 +406,15 @@ Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web
 @[vir_js "browser.element.setTextContent"]
 private opaque setTextContentJs
     (element : @& Lean.Vir.Js Element)
-    (text : @& Lean.Vir.Js String) :
+    (text : @& Lean.Vir.Js.Nullable String) :
     DomM Unit
 
-def setTextContent (element : @& Lean.Vir.Js Element) (text : @& String) : DomM Unit := do
-  let jsText ← ownedString text
-  setTextContentJs element jsText
+/-- Faithful JavaScript-boundary setter for `Element.textContent`. -/
+def setTextContent
+    (element : @& Lean.Vir.Js Element)
+    (text : @& Lean.Vir.Js.Nullable String) :
+    DomM Unit :=
+  setTextContentJs element text
 
 /--
 Reads an element attribute through the JavaScript host.

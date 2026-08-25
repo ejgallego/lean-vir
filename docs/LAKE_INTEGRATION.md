@@ -43,7 +43,8 @@ def answer : Nat := 42
 @[vir_startup]
 def mount : DomM Unit := do
   let some root ← Document.querySelectorString "#vir-slide-root" | pure ()
-  Element.setTextContent root "This DOM was updated from Lean"
+  let text ← Lean.Vir.JsValue.ofString "This DOM was updated from Lean"
+  Element.setTextContent root (← Lean.Vir.Js.Nullable.ofJs text)
 
 end MySlides.Runtime
 ```

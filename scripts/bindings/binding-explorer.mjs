@@ -341,6 +341,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     if (mapping.accessors !== undefined && symbol.kind !== "property") {
       throw new Error(`${config.id}/${bindingRoot.id} maps accessors for non-property ${mapping.typescript}`);
     }
+    if (mapping.accessors === undefined && symbol.kind === "property") {
+      throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must use accessor mappings`);
+    }
     if (mapping.accessors !== undefined) {
       const readonly = /^readonly\s/u.test(symbol.display);
       if (mapping.accessors.get === undefined) {
@@ -750,6 +753,8 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         reviewed: coveredGroups.reduce((sum, entry) =>
           sum + entry.coverage.members.filter((member) =>
             ["exact", "compatible", "weak"].includes(member.status)).length, 0),
+        unreviewed: coveredGroups.reduce((sum, entry) =>
+          sum + entry.coverage.members.filter((member) => member.status === "unreviewed").length, 0),
         suggested: coveredGroups.reduce((sum, entry) =>
           sum + entry.coverage.members.filter((member) => member.status === "suggested").length, 0),
         ambiguous: coveredGroups.reduce((sum, entry) =>
@@ -815,9 +820,9 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  libraries: ${report.summary.libraries}`);
   console.log(`  API groups: ${report.summary.apiGroups}`);
   console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
-  console.log(`  upstream analysis: ${report.summary.analysis.complete} reviewed, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.notRun} not run`);
+  console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
-  console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
+  console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
   console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);

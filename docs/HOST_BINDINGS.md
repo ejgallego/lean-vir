@@ -96,16 +96,23 @@ conversions above their faithful `browser.*` host targets.
 `Lean.Vir.Browser.Element.*` targets query descendants, read and write text
 content, attributes, and `innerHTML`, append and remove elements, update
 `classList`, and set inline style properties through DOM element
-properties/methods. Replacing `innerHTML` detaches the old descendant DOM nodes;
-Lean callers should first replace any runtime state that holds handles to those
-descendants. Event listener targets retain Lean closures until the listener is
-removed or the runtime is disposed.
+properties/methods. The `innerHTML` property is exposed only as the faithful
+`getInnerHTML`/`setInnerHTML` pair over `Lean.Vir.Js String`; applications place
+`JsValue.toString` and `JsValue.ofString` at their own policy boundary. The
+setter borrows its JavaScript string argument and leaves it live. Replacing
+`innerHTML` detaches the old descendant DOM nodes; Lean callers should first
+replace any runtime state that holds handles to those descendants. Event
+listener targets retain Lean closures until the listener is removed or the
+runtime is disposed. The `textContent` property follows the same representation
+policy: its getter returns `Lean.Vir.Js String`, while its setter borrows a
+`Lean.Vir.Js.Nullable String`. Passing JavaScript `null` clears the text to the
+empty string.
 
 `Lean.Vir.Browser.HTMLCanvasElement.*` narrows canvas elements, reads and writes
 their bitmap size, and obtains a 2D context. `browser.canvas2d.*` covers
 rectangles, paths, fill/stroke styles, line width, save/restore, translation,
 and rotation. One-shot float and string arguments use owned resources that the
-receiving canvas or text binding consumes after the synchronous DOM call.
+receiving canvas binding consumes after the synchronous DOM call.
 
 `Lean.Vir.Browser.Event.target` and `currentTarget` return element resources
 when the event target is an element. `Event.key` returns the string-valued

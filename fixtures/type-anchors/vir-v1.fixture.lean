@@ -69,4 +69,26 @@ def documentCreateElementCall
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element) :=
   Lean.Vir.Browser.Document.createElement tagName
 
+def elementGetInnerHTMLCall
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
+  Lean.Vir.Browser.Element.getInnerHTML element
+
+def elementSetInnerHTMLCall
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
+    (html : Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.Browser.Element.setInnerHTML element html
+
+def elementGetTextContentCall
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
+  Lean.Vir.Browser.Element.getTextContent element
+
+def elementSetTextContentCall
+    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
+    (text : Lean.Vir.Js.Nullable String) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.Browser.Element.setTextContent element text
+
 end Lean.Vir.TypeAnchors

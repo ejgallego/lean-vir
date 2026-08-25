@@ -203,7 +203,7 @@ export function createVirtualDocumentHostBindings(
       },
       getTextContent: (target) => target.textContent,
       setTextContent: (target, text) => {
-        target.textContent = text;
+        target.textContent = text ?? "";
       },
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),

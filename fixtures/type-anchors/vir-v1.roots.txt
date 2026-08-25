@@ -10,3 +10,7 @@ Lean.Vir.TypeAnchors.documentSetTitleCall
 Lean.Vir.TypeAnchors.documentQuerySelectorCall
 Lean.Vir.TypeAnchors.documentQuerySelectorAllCall
 Lean.Vir.TypeAnchors.documentCreateElementCall
+Lean.Vir.TypeAnchors.elementGetInnerHTMLCall
+Lean.Vir.TypeAnchors.elementSetInnerHTMLCall
+Lean.Vir.TypeAnchors.elementGetTextContentCall
+Lean.Vir.TypeAnchors.elementSetTextContentCall

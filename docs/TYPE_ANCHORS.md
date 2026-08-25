@@ -63,10 +63,10 @@ representation, effects, borrowing, result ownership, callback retention, and
 lifetime boundaries.
 
 The comparator applies the narrow reviewed conventions it understands before
-comparing shapes. In this first slice that includes explicit Lean method
-receivers, host-resource results, effect annotations, and deliberately omitted
-optional parameters. The report records each application as an informational
-diagnostic, so intent never becomes an invisible suppression.
+comparing shapes. In this first slice that includes explicit Lean method and
+property receivers, host-resource results, effect annotations, and deliberately
+omitted optional parameters. The report records each application as an
+informational diagnostic, so intent never becomes an invisible suppression.
 
 Selected TypeScript surfaces can request bounded dependency closure with
 `--dependency-depth`. Declarations found in the selected source are included
@@ -115,6 +115,7 @@ outputs directly.
 | --- | --- | --- |
 | Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
+| DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
 | React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
@@ -238,6 +239,23 @@ coverage gaps in the consolidated explorer.
 npm run generate:document-type-descriptors
 npm run compare:document-type-anchors
 npm run check:document-type-anchors
+```
+
+## DOM Element Audit
+
+The Element API group indexes the complete `Element`, `DOMTokenList`, and
+`CSSStyleDeclaration` surfaces. Its first reviewed properties are `innerHTML`
+and `textContent`, each mapped as separate getter and setter operations with an
+explicit borrowed receiver. `innerHTML` preserves a JavaScript string resource
+in both directions. `textContent` preserves the JavaScript string result and
+the setter's `string | null` contract through `Js.Nullable String`; assigning
+`null` clears the text. The remaining shipped Element targets stay visibly
+mapped but awaiting semantic review.
+
+```bash
+npm run generate:element-type-descriptors
+npm run compare:element-type-anchors
+npm run check:element-type-anchors
 ```
 
 ## Verso Fragment

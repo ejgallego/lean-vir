@@ -56,11 +56,11 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(commonEchoImport?.boundary, "hostResource");
   assert.equal(commonEchoImport?.args[0]?.type?.type, "Js");
   assert.equal(commonEchoImport?.result?.type, "Js");
-  const ownedStringImport = hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "js.string.owned",
+  const nullableOfImport = hostRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "js.nullable.of",
   );
-  assert.equal(ownedStringImport?.effect, "runtime");
-  assert.equal(ownedStringImport?.boundary, "explicitConversion");
+  assert.equal(nullableOfImport?.effect, "runtime");
+  assert.equal(nullableOfImport?.boundary, "hostResource");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
   assert.equal(hostRuntime.call("freshReactValue"), "7");
