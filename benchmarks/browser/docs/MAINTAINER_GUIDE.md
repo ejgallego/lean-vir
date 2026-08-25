@@ -89,12 +89,18 @@ npm run examples:check
 npm run example -- prettyM default --plan
 npm run example -- lean-zip default --plan
 npm run example -- prettyM default --materialize --prepare
+npm run example -- illuminate default --materialize --prepare --serve
 npm run test:unit
 npm run test:browser
 npm run test:prettyM
 npm run test:illuminate
 npm run dev
+npm run dev:partial
 ```
+
+`npm run dev` requires exact staged artifacts for every active example.
+`npm run dev:partial` is the explicit escape hatch for reviewing one staged
+candidate; its catalog disables missing or stale examples.
 
 Existing clean FIR/VIR checkouts may replace materialized sources:
 

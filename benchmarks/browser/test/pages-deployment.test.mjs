@@ -122,6 +122,7 @@ test("marks only verified staged examples as ready", async (t) => {
   const catalog = await catalogWithArtifactAvailability({
     appRoot,
     artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
     catalog: fixture.catalog,
   });
   assert.deepEqual(
@@ -129,11 +130,22 @@ test("marks only verified staged examples as ready", async (t) => {
       catalog.examples.map(({ id, availability }) => [id, availability]),
     ),
     {
-      illuminate: { status: "not-built", variant: "default" },
-      "lean-zip": { status: "not-built", variant: "default" },
+      illuminate: {
+        status: "missing",
+        variant: "default",
+        build: "illuminate",
+        setId: fixture.database.builds.illuminate.artifactSet.setId,
+      },
+      "lean-zip": {
+        status: "missing",
+        variant: "default",
+        build: "lean-zip",
+        setId: fixture.database.builds["lean-zip"].artifactSet.setId,
+      },
       prettyM: {
         status: "ready",
         variant: "default",
+        build: "prettyM",
         setId: fixture.manifest.setId,
       },
     },
@@ -146,12 +158,34 @@ test("does not advertise an invalid staged example", async (t) => {
   const catalog = await catalogWithArtifactAvailability({
     appRoot,
     artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
     catalog: fixture.catalog,
   });
   const prettyM = catalog.examples.find(({ id }) => id === "prettyM");
   assert.equal(prettyM.availability.status, "invalid");
   assert.equal(prettyM.availability.variant, "default");
   assert.match(prettyM.availability.reason, /unexpected member/);
+});
+
+test("does not admit a stale artifact set with matching tests", async (t) => {
+  const fixture = await stagedDeployment(t);
+  await writeFile(
+    fixture.manifestPath,
+    canonicalJson({ ...fixture.manifest, setId: "prettyM-stale-set" }),
+  );
+  const catalog = await catalogWithArtifactAvailability({
+    appRoot,
+    artifactsRoot: fixture.artifactsRoot,
+    database: fixture.database,
+    catalog: fixture.catalog,
+  });
+  const prettyM = catalog.examples.find(({ id }) => id === "prettyM");
+  assert.equal(prettyM.availability.status, "invalid");
+  assert.equal(
+    prettyM.availability.setId,
+    fixture.database.builds.prettyM.artifactSet.setId,
+  );
+  assert.match(prettyM.availability.reason, /expected artifact set.*found/);
 });
 
 test("derives Pages deployments from active canonical examples", async (t) => {

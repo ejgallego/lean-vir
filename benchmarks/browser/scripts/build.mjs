@@ -16,36 +16,62 @@ import { appRoot } from "./package-root.mjs";
 const output = join(appRoot, "dist");
 const artifacts = join(appRoot, "artifacts");
 const deployments = [];
+let requireActive = false;
 for (let index = 2; index < process.argv.length; index += 1) {
   const argument = process.argv[index];
   if (argument === "--deploy") {
     const value = process.argv[++index];
     if (!value) throw new Error("--deploy requires EXAMPLE=VARIANT");
     deployments.push(parsePagesDeployment(value));
+  } else if (argument === "--require-active") {
+    requireActive = true;
   } else if (argument === "--help" || argument === "-h") {
-    console.log(`Usage: node scripts/build.mjs [--deploy EXAMPLE=VARIANT]...
+    console.log(`Usage: node scripts/build.mjs [--require-active]
+                              [--deploy EXAMPLE=VARIANT]...
 
 Build the standalone application. Pages deployments admit only explicitly
-selected canonical variants whose staged artifacts match the catalog.`);
+selected canonical variants whose staged artifacts match the catalog.
+--require-active refuses a partial local application.`);
     process.exit(0);
   } else throw new Error(`unknown argument: ${argument}`);
 }
+if (requireActive && deployments.length > 0) {
+  throw new Error("--require-active cannot be combined with --deploy");
+}
 
 const sourceCatalog = await discoverExampleCatalog(appRoot);
+const database = await readBuildDatabase(join(appRoot, "artifact-builds.json"));
 const selectedCatalog = deployments.length
   ? await selectPagesCatalog({
       appRoot,
       artifactsRoot: artifacts,
       catalog: sourceCatalog,
-      database: await readBuildDatabase(join(appRoot, "artifact-builds.json")),
+      database,
       deployments,
     })
   : sourceCatalog;
 const catalog = await catalogWithArtifactAvailability({
   appRoot,
   artifactsRoot: artifacts,
+  database,
   catalog: selectedCatalog,
 });
+
+const incompleteActive = catalog.examples.filter(
+  ({ lifecycle, availability }) =>
+    lifecycle === "active" && availability.status !== "ready",
+);
+if (requireActive && incompleteActive.length > 0) {
+  throw new Error(
+    `active benchmark artifacts are incomplete:\n${incompleteActive
+      .map(
+        ({ id, availability }) =>
+          `- ${id}/${availability.variant}: ${availability.status}; expected ${availability.setId ?? "an explicitly staged rehearsal set"}\n` +
+          `  npm run example -- ${id} ${availability.variant} --materialize --prepare`,
+      )
+      .join("\n")}\nUse npm run dev:partial only when intentionally reviewing a subset.`,
+  );
+}
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -109,7 +135,7 @@ for (const example of catalog.examples) {
   const detail =
     example.availability.status === "invalid"
       ? `invalid: ${example.availability.reason}`
-      : "not built";
+      : `missing; expected ${example.availability.setId ?? "a staged rehearsal set"}`;
   console.log(
     `Unavailable example: ${example.id}/${example.availability.variant} (${detail})`,
   );

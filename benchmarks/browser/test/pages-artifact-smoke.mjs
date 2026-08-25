@@ -98,6 +98,7 @@ for (const deployment of deployments) {
   assert.deepEqual(example.availability, {
     status: "ready",
     variant: deployment.variant,
+    build: tests.variants[0].build,
     setId: manifest.setId,
   });
   assert.deepEqual(manifest.testPackage, {

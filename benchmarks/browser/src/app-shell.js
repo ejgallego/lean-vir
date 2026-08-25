@@ -51,9 +51,17 @@ function requireAvailability(example) {
   const availability = example?.availability;
   if (
     !availability ||
-    !["ready", "not-built", "invalid"].includes(availability.status) ||
+    !["ready", "missing", "invalid"].includes(availability.status) ||
     typeof availability.variant !== "string" ||
     availability.variant.length === 0 ||
+    !(
+      availability.build === null ||
+      (typeof availability.build === "string" && availability.build.length > 0)
+    ) ||
+    !(
+      availability.setId === null ||
+      (typeof availability.setId === "string" && availability.setId.length > 0)
+    ) ||
     (availability.status === "ready" &&
       (typeof availability.setId !== "string" ||
         availability.setId.length === 0))
@@ -127,7 +135,7 @@ function renderNavigation() {
     if (availability.status !== "ready") {
       const badge = document.createElement("em");
       badge.textContent =
-        availability.status === "invalid" ? "Artifacts invalid" : "Not built";
+        availability.status === "invalid" ? "Artifacts invalid" : "Not staged";
       link.appendChild(badge);
     }
     if (example.id === selected?.id) link.setAttribute("aria-current", "page");
@@ -270,10 +278,10 @@ function renderShell() {
     element("app-state").textContent =
       selectedAvailability.status === "invalid"
         ? "Artifacts invalid"
-        : "Not built";
+        : "Not staged";
     element("app-state").dataset.state = "unavailable";
     element("app-progress").textContent =
-      `Build with: npm run example -- ${selected.id} ${selectedAvailability.variant} --materialize --prepare`;
+      `Build with: npm run example -- ${selected.id} ${selectedAvailability.variant} --materialize --prepare --serve`;
     artifactStatus = {
       verified: false,
       tone: "unavailable",

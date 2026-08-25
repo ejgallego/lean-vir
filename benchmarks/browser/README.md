@@ -166,12 +166,14 @@ benchmark or dashboard APIs.
 
 ```sh
 npm install
-npm run artifacts:fetch -- \
-  --lock /path/inside/this/app/to/artifact-set.lock.json \
-  --archive /path/inside/this/app/to/artifact-set.tar
-npm run build
 npm run dev
 ```
+
+`npm run dev` is deliberately strict: every active example must have the exact
+artifact-set ID selected by `artifact-builds.json`. It reports each missing or
+stale set and the canonical command that rebuilds it. When developing one
+producer or reviewing a deliberately incomplete checkout, use
+`npm run dev:partial` instead.
 
 Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
 not load or privilege any workload. Select an example there or use
@@ -184,16 +186,19 @@ worker covers hosts such as GitHub Pages that cannot configure those headers,
 with one reload before application startup.
 
 The generated catalog marks an example as ready only when its staged artifact
-set and test-package identity verify. Registered examples without local
-artifacts remain visible as **Not built**, but the application does not load
-their controller or request missing files. Build and stage one with:
+set ID, payload digests, and test-package identity match the canonical build.
+Registered examples without local artifacts remain visible as **Not staged**,
+but the application does not load their controller or request missing files.
+Build and stage one with:
 
 ```sh
-npm run example -- lean-zip default --materialize --prepare
+npm run example -- lean-zip default --materialize --prepare --serve
 ```
 
-Then restart `npm run dev`. Its build summary lists ready, missing, and invalid
-examples explicitly.
+This resolves the canonical source revisions, builds and validates the
+candidate, stages it, and serves the resulting partial catalog. Complete every
+active example and use `npm run dev` for the strict full-site view. The build
+summary lists the expected set ID for every ready, missing, or invalid example.
 
 Backend selection in every report view is presentation-only. The shared view
 normalizes example-owned report data without rewriting its source JSON, while

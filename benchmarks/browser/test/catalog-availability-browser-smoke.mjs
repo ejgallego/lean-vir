@@ -30,7 +30,7 @@ try {
   for (const example of catalog.examples) {
     const availability = example.availability;
     assert.ok(
-      ["ready", "not-built", "invalid"].includes(availability?.status),
+      ["ready", "missing", "invalid"].includes(availability?.status),
       `${example.id} omits artifact availability`,
     );
     const navigation = page.locator(
@@ -96,7 +96,7 @@ try {
     );
     assert.match(
       await unavailablePage.locator("#app-state").textContent(),
-      /Not built|Artifacts invalid/,
+      /Not staged|Artifacts invalid/,
     );
     assert.deepEqual(artifactRequests, []);
     assert.deepEqual(unavailableErrors, []);
