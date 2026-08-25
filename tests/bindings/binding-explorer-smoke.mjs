@@ -34,6 +34,11 @@ const coveredRoots = roots.filter((root) =>
 const coverageMembers = coveredRoots.flatMap((root) => root.coverage.members);
 const coverageStatuses = countBy(coverageMembers.map((member) => member.status));
 const issueCounts = countBy(report.issues.map((issue) => issue.severity));
+const generationMembers = roots.flatMap((root) => root.coverage?.members ?? []);
+const dispositionCounts = countBy(generationMembers.map((member) =>
+  member.generation.disposition));
+const availabilityCounts = countBy(generationMembers.map((member) =>
+  member.generation.availability));
 
 assert.equal(report.format, "lean-vir-binding-explorer");
 assert.equal(report.summary.libraries, report.libraries.length);
@@ -84,6 +89,27 @@ assert.deepEqual(report.summary.issues, {
   warning: issueCounts.warning ?? 0,
   gap: issueCounts.gap ?? 0,
 });
+assert.deepEqual(report.summary.generation, {
+  disposition: {
+    generated: dispositionCounts.generated ?? 0,
+    "needs-annotation": dispositionCounts["needs-annotation"] ?? 0,
+    unsupported: dispositionCounts.unsupported ?? 0,
+    "manual-exception": dispositionCounts["manual-exception"] ?? 0,
+    "intentionally-excluded": dispositionCounts["intentionally-excluded"] ?? 0,
+    convenience: dispositionCounts.convenience ?? 0,
+    "not-selected": dispositionCounts["not-selected"] ?? 0,
+  },
+  availability: {
+    available: availabilityCounts.available ?? 0,
+    candidate: availabilityCounts.candidate ?? 0,
+    "not-provided": availabilityCounts["not-provided"] ?? 0,
+  },
+  workItems: report.workItems.length,
+});
+assert.equal(report.summary.generation.disposition.generated, 3);
+assert.equal(report.summary.generation.disposition["not-selected"], 2003);
+assert.ok(report.workItems.every((item) =>
+  typeof item.code === "string" && typeof item.action === "string"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getInnerHTMLString"), false);
@@ -148,6 +174,13 @@ assert.deepEqual(documentRoot?.coverage.summary, {
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
 assert.equal(documentTitle?.status, "compatible");
+assert.deepEqual(documentTitle?.generation, {
+  disposition: "generated",
+  provenance: "generator",
+  availability: "available",
+  targets: ["browser.document.getTitle", "browser.document.setTitle"],
+  diagnostics: [],
+});
 const documentTitleGetter = documentRoot?.comparison.results.find(
   (result) => result.id === "document.title.get",
 );
@@ -190,6 +223,9 @@ const documentQuerySelector = documentRoot?.coverage.members.find(
 );
 assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
+assert.equal(documentQuerySelector?.generation.disposition, "needs-annotation");
+assert.equal(documentQuerySelector?.generation.provenance, "handwritten");
+assert.equal(documentQuerySelector?.generation.availability, "available");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -217,6 +253,7 @@ const elementTextContent = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.textContent",
 );
 assert.equal(elementTextContent?.status, "compatible");
+assert.equal(elementTextContent?.generation.disposition, "generated");
 assert.deepEqual(elementTextContent?.mapping.targets, [
   "browser.element.getTextContent",
   "browser.element.setTextContent",
@@ -246,6 +283,7 @@ assert.deepEqual(
   ],
 );
 assert.equal(elementInnerHTML?.status, "compatible");
+assert.equal(elementInnerHTML?.generation.disposition, "generated");
 assert.deepEqual(elementInnerHTML?.mapping.targets, [
   "browser.element.getInnerHTML",
   "browser.element.setInnerHTML",
@@ -312,6 +350,9 @@ assert.equal(
   )?.status,
   "unmatched",
 );
+assert.ok(report.workItems.some((item) =>
+  item.target === "browser.htmlCanvasElement.fromElement" &&
+  item.code === "upstream-identity-missing"));
 
 const localCommands = roots.find((root) =>
   root.library === "infoview" && root.id === "commands");
@@ -321,6 +362,8 @@ assert.deepEqual(localCommands?.analysis, {
 });
 assert.ok(localCommands?.bindings.some((binding) =>
   binding.target === "infoview.command.insertText"));
+assert.ok(localCommands?.workItems.some((item) =>
+  item.code === "local-upstream-contract-required"));
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
@@ -346,29 +389,25 @@ assert.deepEqual(
     { topic: "lifetime", note: "The root is expected to remain live until unmount or runtime disposal." },
   ],
 );
+assert.ok(reactDomRoot?.coverage.members.some((member) =>
+  member.id === "hydrateRoot" && member.generation.disposition === "unsupported"));
 
-assert.match(html, /<h1>Binding explorer<\/h1>/u);
-assert.match(html, /id="provided-metric"/u);
+assert.match(html, /<h1>Binding reference<\/h1>/u);
+assert.match(html, /id="available-metric"/u);
 assert.match(html, /id="search" type="search"/u);
-assert.match(html, /Complete surface analysis/u);
-assert.match(html, /Automatic analysis/u);
-assert.match(app, /upstream-surface analysis in progress/u);
-assert.match(html, /Upstream contract needs input/u);
-assert.match(html, /runtime coverage and API fidelity/u);
-assert.match(html, /Upstream libraries/u);
-assert.match(html, /Public Lean API/u);
-assert.match(html, /Host targets/u);
-assert.match(app, /Expected versus actual type/u);
+assert.match(html, /VIR binding reference/u);
+assert.match(html, /Binding workbench/u);
+assert.doesNotMatch(html, /Complete surface analysis/u);
+assert.doesNotMatch(html, /Public Lean API/u);
+assert.doesNotMatch(html, /Host targets/u);
+assert.match(app, /Expected versus current/u);
 assert.match(html, /src="assets\/app\.js"/u);
 assert.match(html, /href="assets\/style\.css"/u);
-assert.match(app, /function accessorDisplay\(symbol,accessor\)/u);
+assert.match(app, /function renderUpstreamSymbol\(group, symbol\)/u);
 assert.match(style, /\.workspace/u);
-assert.match(app, /Reviewed type fidelity/u);
-assert.match(app, /Upstream TypeScript surface/u);
-assert.match(app, /Derived ABI modalities/u);
-assert.match(app, /Advisory semantics · not mechanically verified/u);
-assert.match(style, /\.modality-contract/u);
-assert.match(style, /\.advisory-semantics/u);
+assert.match(app, /Required action/u);
+assert.match(app, /Unselected upstream entries are documentation coverage/u);
+assert.match(style, /\.work-item/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
 assert.ok(dataMatch, "explorer should embed its machine report");
 assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);

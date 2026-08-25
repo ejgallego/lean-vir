@@ -62,3 +62,30 @@ test("binding configuration rejects wildcards outside the target suffix", async 
     /must match pattern/u,
   );
 });
+
+test("binding configuration accepts justified manual exceptions", async () => {
+  const configured = structuredClone(browser);
+  configured.roots.find((root) => root.id === "document")
+    .mappings.find((mapping) => mapping.typescript === "Document.querySelector")
+    .manualException = { reason: "Method generation is not available in this release." };
+
+  const validated = await validateBindingConfig(configured, browserPath);
+  assert.equal(
+    validated.roots.find((root) => root.id === "document")
+      .mappings.find((mapping) => mapping.typescript === "Document.querySelector")
+      .manualException.reason,
+    "Method generation is not available in this release.",
+  );
+});
+
+test("generated members cannot also be manual exceptions", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document")
+    .mappings.find((mapping) => mapping.typescript === "Document.title")
+    .manualException = { reason: "Conflicting provenance." };
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /marks generated member Document\.title as a manual exception/u,
+  );
+});

@@ -2,7 +2,7 @@
 
 This directory owns the shipped-JavaScript-binding inventory, TypeScript
 descriptor generation, faithful Lean declaration generation, Lean type-anchor
-comparison, and the consolidated binding explorer. Use the stable
+comparison, and the consolidated binding reference/author workbench. Use the stable
 `npm run generate:*`, `npm run check:*`, and `npm run test:*` commands from the
 repository root rather than invoking these entry points directly during
 routine work.
@@ -25,7 +25,9 @@ Schema cannot express directly.
 `binding-modalities.mjs` is the shared TypeScript-to-Lean policy boundary. It
 combines descriptor shapes with a library ABI profile and justified exceptions
 to produce canonical operation IR. Lean source generation, comparator intent,
-and explorer modality explanations consume that same IR.
+and report evidence consume that same IR. The interactive document presents an
+upstream-shaped reference to users and actionable generation dispositions to
+binding authors; convenience APIs do not count as upstream bindings.
 
 Related ownership:
 

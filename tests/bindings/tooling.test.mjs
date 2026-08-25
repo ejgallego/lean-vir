@@ -79,7 +79,7 @@ test("generated-file checks reject stale output without exiting", async () => {
 
 test("binding entry points own help and error exit status", () => {
   const helpCases = [
-    ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR binding explorer/u],
+    ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR binding reference and author workbench/u],
     ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
     ["generate-lean-bindings.mjs", /Generate faithful Lean host declarations/u],
     ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],

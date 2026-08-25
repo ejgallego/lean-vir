@@ -186,6 +186,14 @@
         }
       }
     },
+    "manualException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
     "root": {
       "type": "object",
       "additionalProperties": false,
@@ -315,7 +323,8 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
-        "note": { "type": "string", "minLength": 1 }
+        "note": { "type": "string", "minLength": 1 },
+        "manualException": { "$ref": "#/$defs/manualException" }
       }
     },
     "propertyMapping": {
@@ -333,7 +342,8 @@
             "set": { "$ref": "#/$defs/accessorOperation" }
           }
         },
-        "note": { "type": "string", "minLength": 1 }
+        "note": { "type": "string", "minLength": 1 },
+        "manualException": { "$ref": "#/$defs/manualException" }
       }
     },
     "accessorOperation": {

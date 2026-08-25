@@ -41,9 +41,17 @@ function validationMessage(label, errors) {
 
 function validateLibrarySemantics(config, label) {
   const rootIds = new Set();
+  const generated = new Set(config.generation?.members ?? []);
   for (const root of config.roots) {
     if (rootIds.has(root.id)) throw new Error(`${label} repeats root id ${root.id}`);
     rootIds.add(root.id);
+    for (const mapping of root.mappings ?? []) {
+      if (mapping.manualException !== undefined && generated.has(mapping.typescript)) {
+        throw new Error(
+          `${label} marks generated member ${mapping.typescript} as a manual exception`,
+        );
+      }
+    }
   }
 }
 
