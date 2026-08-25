@@ -27,8 +27,17 @@ const profileRows = [
   "profile-optimal\tlarge-heterogeneous\texact\tlarge-heterogeneous.input.bin\tlarge-heterogeneous.optimal-exact.deflate.bin",
 ];
 
+const profileWholeRows = [
+  "large-compress\tlarge-heterogeneous\t9\tlarge-heterogeneous.input.bin\tlarge-heterogeneous.level-9.deflate.bin",
+  "large-compress\tlarge-heterogeneous\t10\tlarge-heterogeneous.input.bin\tlarge-heterogeneous.level-10.deflate.bin",
+];
+
 function manifestSource(rows = baselineRows, separator = "\n") {
   return `${rows.join(separator)}${separator}`;
+}
+
+function profileManifest(rows = profileRows, wholeRows = profileWholeRows) {
+  return manifestSource([...baselineRows, ...wholeRows, ...rows]);
 }
 
 test("acceptance manifests parse typed baseline rows", () => {
@@ -71,7 +80,7 @@ test("acceptance manifests parse typed baseline rows", () => {
 
 test("acceptance manifests validate the complete profiling contract", () => {
   const manifest = parseAcceptanceManifest(
-    manifestSource([...baselineRows, ...profileRows]),
+    profileManifest(),
     { includeProfile: true },
   );
   assert.deepEqual(
@@ -177,7 +186,7 @@ test("profiling rows must match the selected mode and each other", () => {
   assert.throws(
     () =>
       parseAcceptanceManifest(
-        manifestSource([...baselineRows, ...profileRows.slice(0, -1)]),
+        profileManifest(profileRows.slice(0, -1)),
         { includeProfile: true },
       ),
     /optimal profile must contain .* fast and exact rows/u,
@@ -191,9 +200,78 @@ test("profiling rows must match the selected mode and each other", () => {
   assert.throws(
     () =>
       parseAcceptanceManifest(
-        manifestSource([...baselineRows, ...mismatchedRows]),
+        profileManifest(mismatchedRows),
         { includeProfile: true },
       ),
     /level-10 profile stages reference different artifacts/u,
   );
+});
+
+test("profiling rows require matching whole-compression vectors", () => {
+  assert.throws(
+    () => parseAcceptanceManifest(profileManifest(profileRows, []), {
+      includeProfile: true,
+    }),
+    /whole-compression profile must contain large-heterogeneous levels 9 and 10/u,
+  );
+
+  const mismatchedWholeRows = profileWholeRows.map((row) =>
+    row.startsWith("large-compress\tlarge-heterogeneous\t10\t")
+      ? row.replace(
+          "large-heterogeneous.input.bin",
+          "other-large.input.bin",
+        )
+      : row,
+  );
+  assert.throws(
+    () =>
+      parseAcceptanceManifest(
+        profileManifest(profileRows, mismatchedWholeRows),
+        { includeProfile: true },
+      ),
+    /whole-compression profile references a different input/u,
+  );
+});
+
+test("profiling rows share one corpus and input", () => {
+  const wrongLevelRows = profileRows.map((row) =>
+    row.startsWith("profile-match\tlarge-heterogeneous\t9\t")
+      ? row.replace("\t9\t", "\t8\t")
+      : row,
+  );
+  assert.throws(
+    () =>
+      parseAcceptanceManifest(profileManifest(wrongLevelRows), {
+        includeProfile: true,
+      }),
+    /matcher profile must contain large-heterogeneous levels 9 and 10/u,
+  );
+
+  for (const [prefix, pattern] of [
+    [
+      "profile-match\tlarge-heterogeneous\t10\t",
+      /profile stages reference different inputs/u,
+    ],
+    [
+      "profile-optimal\tlarge-heterogeneous\texact\t",
+      /profile stages reference different inputs/u,
+    ],
+  ]) {
+    const mismatchedRows = profileRows.map((row) =>
+      row.startsWith(prefix)
+        ? row.replace(
+            "large-heterogeneous.input.bin",
+            "other-large.input.bin",
+          )
+        : row,
+    );
+    assert.throws(
+      () =>
+        parseAcceptanceManifest(profileManifest(mismatchedRows), {
+          includeProfile: true,
+        }),
+      pattern,
+      prefix,
+    );
+  }
 });

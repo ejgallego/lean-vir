@@ -16,7 +16,10 @@ import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
 import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../irpkg-generator.mjs";
 import { createVirRuntime } from "../../../web/src/vir-runtime-node.js";
-import { parseAcceptanceManifest } from "./acceptance-manifest.mjs";
+import {
+  acceptanceProfileContract,
+  parseAcceptanceManifest,
+} from "./acceptance-manifest.mjs";
 
 const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
 const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
@@ -385,22 +388,16 @@ async function runAcceptance() {
         });
       }
 
-      const optimalTargets = new Map([
-        [
-          "fast",
-          {
-            exportName: "VirLeanZipAcceptance.profileOptimalFast",
-            level: 9,
-          },
-        ],
-        [
-          "exact",
-          {
-            exportName: "VirLeanZipAcceptance.profileOptimalExact",
-            level: 10,
-          },
-        ],
+      const optimalExportNames = new Map([
+        ["fast", "VirLeanZipAcceptance.profileOptimalFast"],
+        ["exact", "VirLeanZipAcceptance.profileOptimalExact"],
       ]);
+      const optimalTargets = new Map(
+        acceptanceProfileContract.stages.map(({ kind, level }) => [
+          kind,
+          { exportName: optimalExportNames.get(kind), level },
+        ]),
+      );
       for (const vector of manifest.profileOptimals) {
         const target = optimalTargets.get(vector.kind);
         assert.ok(
@@ -528,8 +525,8 @@ async function runAcceptance() {
             `execute=${result.timings.executeMs.toFixed(2)}ms ${detail}`,
         );
       }
-      for (const level of [9, 10]) {
-        const corpus = "large-heterogeneous";
+      for (const { kind, level } of acceptanceProfileContract.stages) {
+        const { corpus } = acceptanceProfileContract;
         const matcher = stageProfileResults.find(
           (result) =>
             result.corpus === corpus &&
@@ -546,7 +543,7 @@ async function runAcceptance() {
           (result) =>
             result.corpus === corpus &&
             result.level === level &&
-            result.stage === (level === 9 ? "optimal-fast" : "optimal-exact"),
+            result.stage === `optimal-${kind}`,
         );
         const whole = profileResults.find(
           (result) => result.corpus === corpus && result.level === level,

@@ -5,9 +5,18 @@ Author: Emilio J. Gallego Arias
 */
 
 const artifactFilePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
-const profileCorpus = "large-heterogeneous";
-const profileLevels = [9, 10];
-const profileOptimalKinds = ["exact", "fast"];
+export const acceptanceProfileContract = Object.freeze({
+  corpus: "large-heterogeneous",
+  stages: Object.freeze([
+    Object.freeze({ level: 9, kind: "fast" }),
+    Object.freeze({ level: 10, kind: "exact" }),
+  ]),
+});
+
+const profileLevels = acceptanceProfileContract.stages.map(({ level }) => level);
+const profileOptimalKinds = acceptanceProfileContract.stages.map(
+  ({ kind }) => kind,
+);
 
 function invalidRow(line, reason) {
   throw new Error(
@@ -62,6 +71,7 @@ function requireUnique(rows, key, description) {
 
 function requireProfileContract(manifest) {
   const { profileMatches, profileBases, profileOptimals } = manifest;
+  const { corpus: profileCorpus } = acceptanceProfileContract;
   for (const [rows, description] of [
     [profileMatches, "matcher"],
     [profileBases, "base-preparation"],
@@ -75,19 +85,20 @@ function requireProfileContract(manifest) {
       levels.some((level, index) => level !== profileLevels[index])
     ) {
       throw new Error(
-        `native oracle ${description} profile must contain ${profileCorpus} levels 9 and 10`,
+        `native oracle ${description} profile must contain ${profileCorpus} levels ${profileLevels.join(" and ")}`,
       );
     }
   }
 
   const kinds = profileOptimals.map(({ kind }) => kind).sort();
+  const expectedKinds = [...profileOptimalKinds].sort();
   if (
     profileOptimals.some(({ corpus }) => corpus !== profileCorpus) ||
-    kinds.length !== profileOptimalKinds.length ||
-    kinds.some((kind, index) => kind !== profileOptimalKinds[index])
+    kinds.length !== expectedKinds.length ||
+    kinds.some((kind, index) => kind !== expectedKinds[index])
   ) {
     throw new Error(
-      `native oracle optimal profile must contain ${profileCorpus} fast and exact rows`,
+      `native oracle optimal profile must contain ${profileCorpus} ${profileOptimalKinds.join(" and ")} rows`,
     );
   }
 
@@ -111,6 +122,26 @@ function requireProfileContract(manifest) {
   }
   if (profileOptimals.some(({ inputFile }) => inputFile !== profileInput)) {
     throw new Error("native oracle profile stages reference different inputs");
+  }
+
+  const wholeCompressionByLevel = new Map(
+    manifest.largeCompression
+      .filter(({ name }) => name === profileCorpus)
+      .map((row) => [row.level, row]),
+  );
+  if (profileLevels.some((level) => !wholeCompressionByLevel.has(level))) {
+    throw new Error(
+      `native oracle whole-compression profile must contain ${profileCorpus} levels ${profileLevels.join(" and ")}`,
+    );
+  }
+  if (
+    profileLevels.some(
+      (level) => wholeCompressionByLevel.get(level).inputFile !== profileInput,
+    )
+  ) {
+    throw new Error(
+      "native oracle whole-compression profile references a different input",
+    );
   }
 }
 
@@ -194,7 +225,10 @@ export function parseAcceptanceManifest(
         requireFields(fields, 5, line);
         const kind = fields[2];
         if (!profileOptimalKinds.includes(kind)) {
-          invalidRow(line, "optimal profile kind must be fast or exact");
+          invalidRow(
+            line,
+            `optimal profile kind must be ${profileOptimalKinds.join(" or ")}`,
+          );
         }
         manifest.profileOptimals.push({
           corpus: requireLabel(fields[1], line, "profile corpus"),
