@@ -77,7 +77,7 @@
         {
           "id": "document.title.get",
           "category": "Document property",
-          "lean": "Lean.Vir.TypeAnchors.documentGetTitleCall",
+          "lean": "Lean.Vir.Browser.Document.getTitle",
           "ts": "Document.title",
           "target": "browser.document.getTitle",
           "relation": "audit",
@@ -86,7 +86,7 @@
         {
           "id": "document.title.set",
           "category": "Document property",
-          "lean": "Lean.Vir.TypeAnchors.documentSetTitleCall",
+          "lean": "Lean.Vir.Browser.Document.setTitle",
           "ts": "Document.title",
           "target": "browser.document.setTitle",
           "relation": "audit",
@@ -95,7 +95,7 @@
         {
           "id": "document.querySelector",
           "category": "Document selectors",
-          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorCall",
+          "lean": "Lean.Vir.Browser.Document.querySelector",
           "ts": "Document.querySelector",
           "target": "browser.document.querySelector",
           "relation": "audit",
@@ -104,7 +104,7 @@
         {
           "id": "document.querySelectorAll",
           "category": "Document selectors",
-          "lean": "Lean.Vir.TypeAnchors.documentQuerySelectorAllCall",
+          "lean": "Lean.Vir.Browser.Document.querySelectorAll",
           "ts": "Document.querySelectorAll",
           "target": "browser.document.querySelectorAll",
           "relation": "audit",
@@ -113,7 +113,7 @@
         {
           "id": "document.createElement",
           "category": "Document creation",
-          "lean": "Lean.Vir.TypeAnchors.documentCreateElementCall",
+          "lean": "Lean.Vir.Browser.Document.createElement",
           "ts": "Document.createElement",
           "target": "browser.document.createElement",
           "relation": "audit",
@@ -160,7 +160,7 @@
         {
           "id": "element.innerHTML.get",
           "category": "Element property",
-          "lean": "Lean.Vir.TypeAnchors.elementGetInnerHTMLCall",
+          "lean": "Lean.Vir.Browser.Element.getInnerHTML",
           "ts": "Element.innerHTML",
           "target": "browser.element.getInnerHTML",
           "relation": "audit",
@@ -169,7 +169,7 @@
         {
           "id": "element.innerHTML.set",
           "category": "Element property",
-          "lean": "Lean.Vir.TypeAnchors.elementSetInnerHTMLCall",
+          "lean": "Lean.Vir.Browser.Element.setInnerHTML",
           "ts": "Element.innerHTML",
           "target": "browser.element.setInnerHTML",
           "relation": "audit",
@@ -178,7 +178,7 @@
         {
           "id": "element.textContent.get",
           "category": "Element property",
-          "lean": "Lean.Vir.TypeAnchors.elementGetTextContentCall",
+          "lean": "Lean.Vir.Browser.Element.getTextContent",
           "ts": "Element.textContent",
           "target": "browser.element.getTextContent",
           "relation": "audit",
@@ -187,7 +187,7 @@
         {
           "id": "element.textContent.set",
           "category": "Element property",
-          "lean": "Lean.Vir.TypeAnchors.elementSetTextContentCall",
+          "lean": "Lean.Vir.Browser.Element.setTextContent",
           "ts": "Element.textContent",
           "target": "browser.element.setTextContent",
           "relation": "audit",

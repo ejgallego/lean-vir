@@ -80,18 +80,26 @@ boundary. Callers may use `Lean.Vir.JsValue.ofString`,
 `Lean.Vir.JsValue.toString`, and similarly explicit helpers where their own API
 policy calls for Lean-owned values.
 
-The comparator reads descriptor JSON and a Lean VIR interface manifest:
+The comparator reads descriptor JSON and one or more Lean inputs: an interface
+manifest or `.irpkg` for package exports, and the compiler-derived shipped
+public inventory for library declarations:
 
 ```bash
 npm run compare:type-anchors
 ```
 
 For normal package work, pass a real `.irpkg` with
-`scripts/bindings/check-type-anchors.mjs --irpkg <package.irpkg>`. The local
-`build/type-descriptors/vir-v1.manifest.json` fixture is generated from
-`vir-v1.fixture.lean` through the real package generator. The manifest,
-intermediate `.irpkg`, and generator report all stay under ignored `build/`
-paths.
+`scripts/bindings/check-type-anchors.mjs --irpkg <package.irpkg>`. Pass
+`--inventory build/type-descriptors/vir-js-shipped-v1.lean.json` when anchors
+name public declarations shipped by VIR. Each classifiable public entry in that
+inventory carries the compiler-derived function interface used for comparison;
+unsupported generic entries remain inventoried with `interface: null`.
+
+The local `build/type-descriptors/vir-v1.manifest.json` fixture is generated
+from `vir-v1.fixture.lean` through the real package generator. It now supplies
+only reviewed shapes that do not have a directly classifiable shipped public
+declaration. The manifest, inventory, intermediate `.irpkg`, and generator
+report all stay under ignored `build/` paths.
 
 Anchors classify each relation as either `audit` or `coverageGap`. They may
 also carry a reviewed `portIntent` object. The first React DOM API-group intent
@@ -151,8 +159,9 @@ outputs directly.
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
 | Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
-| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
-| DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
+| Shipped public Lean surface | Compiled `Vir` and `Vir.Infoview` modules | `build/type-descriptors/vir-js-shipped-v1.lean.json` |
+| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
+| DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
 | React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
@@ -162,9 +171,15 @@ local artifacts.
 
 ## Lower-level Output Contract
 
-The type-anchor pipeline has four lower-level outputs. They remain stable
+The type-anchor pipeline has five lower-level outputs. They remain stable
 machine contracts and useful debugging views, while `build/bindings/index.html`
 is the primary human entry point.
+
+`vir-js-shipped-v1.lean.json` is the compiler-derived Lean inventory. In
+addition to call-reachability evidence, classifiable `publicEntries[]` carry an
+`interface` with effect, ordered arguments, result, and nested VIR interface
+types. This is the Lean descriptor source for direct shipped-declaration
+anchors; the pretty-printed `type` remains human display data.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 

@@ -14,12 +14,12 @@ import {
   validateGenerationProfile,
 } from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
-import { emitGeneratedFile, fail, requiredValue } from "./tool-utils.mjs";
+import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 export { leanType } from "./binding-modalities.mjs";
 
 function usage() {
-  console.error(`usage: node scripts/bindings/generate-lean-bindings.mjs --config FILE [--check]
+  console.log(`usage: node scripts/bindings/generate-lean-bindings.mjs --config FILE [--check]
 
 Generate faithful Lean host declarations and canonical operation IR from TypeScript declarations.
 
@@ -37,16 +37,16 @@ function parseArgs(argv) {
     const option = argv[index];
     if (option === "-h" || option === "--help") {
       usage();
-      process.exit(0);
+      return null;
     } else if (option === "--config") {
       config = resolve(repositoryRoot, requiredValue(argv, ++index, option));
     } else if (option === "--check") {
       check = true;
     } else {
-      fail(`unknown option ${option}`);
+      throw new Error(`unknown option ${option}`);
     }
   }
-  if (config === null) fail("--config is required");
+  if (config === null) throw new Error("--config is required");
   return { config, check };
 }
 
@@ -194,6 +194,7 @@ export async function generateLeanBindings(configPath) {
 
 export async function runTypeScriptToLeanCli(argv) {
   const options = parseArgs(argv);
+  if (options === null) return 0;
   const generated = await generateLeanBindings(options.config);
   const sourceAction = await emitGeneratedFile(generated.output, generated.text, {
     check: options.check,
@@ -205,4 +206,5 @@ export async function runTypeScriptToLeanCli(argv) {
   });
   console.log(`${sourceAction} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(options.config)})`);
   console.log(`${irAction} ${relative(repositoryRoot, generated.irOutput)} (${generated.operations} operations with modality provenance)`);
+  return 0;
 }

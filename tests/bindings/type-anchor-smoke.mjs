@@ -23,6 +23,7 @@ try {
   const anchors = join(tmp, "anchors.json");
   const descriptors = join(tmp, "descriptors.json");
   const manifest = join(tmp, "manifest.json");
+  const inventory = join(tmp, "inventory.json");
   const invalidAliasManifest = join(tmp, "invalid-alias-manifest.json");
   const report = join(tmp, "report.json");
   const rendered = join(tmp, "anchors.md");
@@ -131,6 +132,12 @@ declare function schedule(value: number): void;
       },
     ],
   };
+  const controlsType = {
+    type: "Demo.Controls",
+    interfaceTag: INTERFACE_TAG.RESOURCE,
+    kind: "resource",
+    name: "Demo.Controls",
+  };
 
   const manifestValue = {
     version: INTERFACE_MANIFEST_VERSION,
@@ -151,27 +158,6 @@ declare function schedule(value: number): void;
         effect: "pure",
       },
       {
-        id: "reset",
-        jsName: "reset",
-        entry: "Demo.reset",
-        source: "Demo.lean",
-        startup: false,
-        args: [
-          {
-            name: "controls",
-            type: {
-              type: "Demo.Controls",
-              interfaceTag: INTERFACE_TAG.RESOURCE,
-              kind: "resource",
-              name: "Demo.Controls",
-            },
-          },
-          { name: "value", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING } },
-        ],
-        result: { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT },
-        effect: "dom",
-      },
-      {
         id: "getLabel",
         jsName: "getLabel",
         entry: "Demo.getLabel",
@@ -180,12 +166,7 @@ declare function schedule(value: number): void;
         args: [
           {
             name: "controls",
-            type: {
-              type: "Demo.Controls",
-              interfaceTag: INTERFACE_TAG.RESOURCE,
-              kind: "resource",
-              name: "Demo.Controls",
-            },
+            type: controlsType,
           },
         ],
         result: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
@@ -196,6 +177,27 @@ declare function schedule(value: number): void;
     diagnostics: [],
   };
   await writeFile(manifest, `${JSON.stringify(manifestValue, null, 2)}\n`);
+  await writeFile(inventory, `${JSON.stringify({
+    format: "lean-vir-js-inventory",
+    version: 1,
+    summary: { publicEntries: 1 },
+    publicEntries: [{
+      declaration: "Demo.reset",
+      module: "Demo",
+      type: "Demo.Controls → String → DemoM Unit",
+      source: { path: "Demo.lean", startLine: 12, endLine: 12 },
+      interface: {
+        kind: "function",
+        effect: "dom",
+        args: [
+          { name: "controls", type: controlsType },
+          { name: "value", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING } },
+        ],
+        result: { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT },
+      },
+      targets: [{ target: "demo.reset", path: ["Demo.reset"] }],
+    }],
+  }, null, 2)}\n`);
   await writeFile(invalidAliasManifest, `${JSON.stringify({
     ...manifestValue,
     metadata: {
@@ -226,8 +228,8 @@ declare function schedule(value: number): void;
     "--out", dependencyDescriptors,
     types,
   ]);
-  run(["scripts/bindings/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--out", report]);
-  runFailure(["scripts/bindings/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest]);
+  run(["scripts/bindings/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--inventory", inventory, "--out", report]);
+  runFailure(["scripts/bindings/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest, "--inventory", inventory]);
   runFailure([
     "scripts/bindings/check-type-anchors.mjs",
     "--descriptors", descriptors,
@@ -301,6 +303,9 @@ declare function schedule(value: number): void;
   assert.deepEqual(comparison.results.find((result) => result.id === "gap")?.portIntent,
     { disposition: "unsupported" });
   assert.equal(comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.tsSymbol.kind, "method");
+  assert.equal(comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.leanDescriptor.kind,
+    "public");
+  assert.match(comparison.inputs.shippedInventory, /inventory\.json$/u);
   assert.deepEqual(
     comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.diagnostics.map((item) => item.code),
     ["reviewed_explicit_method_receiver", "reviewed_effect", "primitive_representation_compatible"],

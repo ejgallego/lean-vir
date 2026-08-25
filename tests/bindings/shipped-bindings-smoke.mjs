@@ -52,6 +52,16 @@ assert.equal(report.summary.targetsReachedByPublicEntries, report.summary.totalT
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
+assert.deepEqual(publicEntries.get("Lean.Vir.Browser.Document.getTitle")?.interface, {
+  kind: "function",
+  effect: "dom",
+  args: [],
+  result: { type: "Js", interfaceTag: 23, kind: "resource", name: "Lean.Vir.Js" },
+});
+assert.deepEqual(
+  publicEntries.get("Lean.Vir.Browser.Element.setTextContent")?.interface?.args.map((arg) => arg.name),
+  ["element", "textContent"],
+);
 const publicCanvasContext = publicEntries.get(
   "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
 );

@@ -9,8 +9,9 @@ import Vir.React
 namespace Lean.Vir.TypeAnchors
 
 /-!
-Small descriptor-forcing wrappers for the checked type-anchor manifest. These
-are review fixtures, not application APIs.
+Descriptor-forcing wrappers for reviewed shapes that are not available as
+compiler-classified declarations in the shipped public inventory. These are
+review fixtures, not application APIs.
 -/
 
 def reactPropertyIdentity
@@ -43,52 +44,5 @@ def reactRootUnmountCall
     (root : Lean.Vir.Js Lean.Vir.React.Root) :
     Lean.Vir.Browser.DomM Unit :=
   Lean.Vir.React.Root.unmount root
-
-def documentGetTitleCall :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
-  Lean.Vir.Browser.Document.getTitle
-
-def documentSetTitleCall
-    (title : Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM Unit :=
-  Lean.Vir.Browser.Document.setTitle title
-
-def documentQuerySelectorCall
-    (selector : Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element) :=
-  Lean.Vir.Browser.Document.querySelector selector
-
-def documentQuerySelectorAllCall
-    (selector : Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM
-      (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element)) :=
-  Lean.Vir.Browser.Document.querySelectorAll selector
-
-def documentCreateElementCall
-    (tagName : Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element) :=
-  Lean.Vir.Browser.Document.createElement tagName
-
-def elementGetInnerHTMLCall
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
-  Lean.Vir.Browser.Element.getInnerHTML element
-
-def elementSetInnerHTMLCall
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
-    (html : Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM Unit :=
-  Lean.Vir.Browser.Element.setInnerHTML element html
-
-def elementGetTextContentCall
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js String) :=
-  Lean.Vir.Browser.Element.getTextContent element
-
-def elementSetTextContentCall
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
-    (text : Lean.Vir.Js.Nullable String) :
-    Lean.Vir.Browser.DomM Unit :=
-  Lean.Vir.Browser.Element.setTextContent element text
 
 end Lean.Vir.TypeAnchors

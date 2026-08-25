@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean.Meta
+import Vir.GeneratePackage.Interface.Encode
 import Vir.GeneratePackage.Json
 import Vir.GeneratePackage.Surface
 import Vir.HostValidation
@@ -142,6 +143,20 @@ private def reachableTargets (env : Environment) (root : Name) : Array ReachedTa
 private def publicEntryJson (entry : PublicEntry) : CoreM String := do
   let type ← prettyType entry.info
   let source ← declarationSourceJson entry.name
+  let interface :=
+    match ← Vir.Interface.analyzeExportInterface entry.info.type with
+    | .error _ => "null"
+    | .ok signature =>
+        let args := signature.args.map fun arg => jsonObject #[
+          ("name", jsonString arg.name),
+          ("type", arg.type.toJson)
+        ]
+        jsonObject #[
+          ("kind", jsonString "function"),
+          ("effect", jsonString signature.effect.label),
+          ("args", jsonArray args),
+          ("result", signature.result.toJson)
+        ]
   let targets := entry.targets.map fun reached => jsonObject #[
     ("target", jsonString reached.target),
     ("path", jsonArray (reached.path.map jsonName))
@@ -151,6 +166,7 @@ private def publicEntryJson (entry : PublicEntry) : CoreM String := do
     ("module", jsonName entry.moduleName),
     ("type", jsonString type),
     ("source", source),
+    ("interface", interface),
     ("targets", jsonArray targets)
   ]
 

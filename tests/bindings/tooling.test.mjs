@@ -81,6 +81,7 @@ test("binding entry points own help and error exit status", () => {
   const helpCases = [
     ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR binding explorer/u],
     ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
+    ["generate-lean-bindings.mjs", /Generate faithful Lean host declarations/u],
     ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],
     ["generate-ts-descriptors.mjs", /Generate Lean VIR TypeScript descriptor JSON/u],
     ["render-type-anchors.mjs", /Render a Verso\/Blueprint-friendly Markdown fragment/u],
