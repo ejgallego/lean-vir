@@ -145,7 +145,7 @@ assert.ok(report.summary.generation.disposition.generated > 0);
 assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
-assert.equal(report.workItems.length, 3);
+assert.equal(report.workItems.length, 0);
 assert.ok(report.workItems.every((item) => item.disposition !== "unsupported"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
@@ -318,19 +318,38 @@ assert.match(style, /\.generation-policy/u);
 const canvasRoot = roots.find((root) => root.library === "browser" && root.id === "canvas-2d");
 const canvasFillStyle = canvasRoot?.coverage.members.find((member) =>
   member.id === "CanvasRenderingContext2D.fillStyle");
-const generatedFillStyle = canvasRoot?.generatedOperations.find((operation) =>
-  operation.typescript.member === "CanvasRenderingContext2D.fillStyle");
-assert.equal(canvasFillStyle?.status, "missing");
+const generatedFillStyleGetter = canvasRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "CanvasRenderingContext2D.fillStyle" &&
+  operation.typescript.accessor === "get");
+const generatedFillStyleSetter = canvasRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "CanvasRenderingContext2D.fillStyle" &&
+  operation.typescript.accessor === "set");
+assert.equal(canvasFillStyle?.status, "compatible");
 assert.equal(canvasFillStyle?.generation.disposition, "generated");
-assert.equal(canvasFillStyle?.mapping.operations[0].missing, true);
+assert.equal(canvasFillStyle?.mapping.operations[0].accessor, "get");
 assert.equal(canvasFillStyle?.mapping.operations[1].accessor, "set");
-assert.ok(canvasRoot?.workItems.some((item) =>
-  item.member === "CanvasRenderingContext2D.fillStyle" &&
-  item.code === "upstream-accessor-missing" && item.accessor === "get"));
-assert.equal(generatedFillStyle?.receiver.argument.name, "ctx");
-assert.equal(generatedFillStyle?.arguments[0].name, "style");
-assert.equal(generatedFillStyle?.arguments[0].type, "Lean.Vir.Js String");
-assert.match(generatedFillStyle?.exception.reason, /string arm/u);
+assert.equal(canvasRoot?.workItems.length, 0);
+assert.equal(generatedFillStyleGetter?.receiver.argument.name, "ctx");
+assert.equal(generatedFillStyleGetter?.result.lean, "Lean.Vir.Js CanvasStyle");
+assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGradient, and CanvasPattern union/u);
+assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
+assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
+assert.ok(canvasRoot?.generatedOperations.some((operation) =>
+  operation.host.target === "browser.canvas2d.setFillStyle" &&
+  operation.protocol?.upstreamRelation.member === "CanvasRenderingContext2D.fillStyle" &&
+  operation.protocol?.upstreamRelation.accessor === "set"));
+
+const canvasLineWidth = canvasRoot?.coverage.members.find((member) =>
+  member.id === "CanvasRenderingContext2D.lineWidth");
+assert.equal(canvasLineWidth?.status, "compatible");
+assert.deepEqual(canvasLineWidth?.mapping.operations.map((operation) => operation.accessor),
+  ["get", "set"]);
+
+const canvasStrokeStyle = canvasRoot?.coverage.members.find((member) =>
+  member.id === "CanvasRenderingContext2D.strokeStyle");
+assert.equal(canvasStrokeStyle?.status, "compatible");
+assert.deepEqual(canvasStrokeStyle?.mapping.operations.map((operation) => operation.accessor),
+  ["get", "set"]);
 
 const canvasElementRoot = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");

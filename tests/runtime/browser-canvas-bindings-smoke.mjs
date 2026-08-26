@@ -102,6 +102,15 @@ canvasBindings["browser.canvas2d.stroke"](ctx);
 canvasBindings["browser.canvas2d.setFillStyle"](ctx, "#f80");
 canvasBindings["browser.canvas2d.setStrokeStyle"](ctx, "black");
 canvasBindings["browser.canvas2d.setLineWidth"](ctx, 2.25);
+assert.equal(canvasBindings["browser.canvas2d.getFillStyle"](ctx), "#f80");
+assert.equal(canvasBindings["browser.canvas2d.getStrokeStyle"](ctx), "black");
+assert.equal(canvasBindings["browser.canvas2d.getLineWidth"](ctx), 2.25);
+const gradient = { kind: "CanvasGradient" };
+const pattern = { kind: "CanvasPattern" };
+canvasBindings["browser.canvas2d.setFillStyleValue"](ctx, gradient);
+canvasBindings["browser.canvas2d.setStrokeStyleValue"](ctx, pattern);
+assert.equal(canvasBindings["browser.canvas2d.getFillStyle"](ctx), gradient);
+assert.equal(canvasBindings["browser.canvas2d.getStrokeStyle"](ctx), pattern);
 canvasBindings["browser.canvas2d.save"](ctx);
 canvasBindings["browser.canvas2d.translate"](ctx, 4, 8);
 canvasBindings["browser.canvas2d.rotate"](ctx, 0.5);
@@ -122,8 +131,8 @@ assert.deepEqual(canvasCalls, [
   ["rotate", 0.5],
   ["restore"],
 ]);
-assert.equal(ctx.fillStyle, "#f80");
-assert.equal(ctx.strokeStyle, "black");
+assert.equal(ctx.fillStyle, gradient);
+assert.equal(ctx.strokeStyle, pattern);
 assert.equal(ctx.lineWidth, 2.25);
 
 console.log("vir browser canvas bindings smoke ok");

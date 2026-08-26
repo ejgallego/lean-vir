@@ -206,14 +206,28 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
         value(ctx, "CanvasRenderingContext2D").arc(...args)),
     "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
     "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
+    "browser.canvas2d.getFillStyle": (ctx) =>
+      state.resourceForValue(value(ctx, "CanvasRenderingContext2D").fillStyle),
+    "browser.canvas2d.setFillStyleValue": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "CanvasStyle");
+      return undefined;
+    },
     "browser.canvas2d.setFillStyle": (ctx, style) => {
       value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+      return undefined;
+    },
+    "browser.canvas2d.getStrokeStyle": (ctx) =>
+      state.resourceForValue(value(ctx, "CanvasRenderingContext2D").strokeStyle),
+    "browser.canvas2d.setStrokeStyleValue": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "CanvasStyle");
       return undefined;
     },
     "browser.canvas2d.setStrokeStyle": (ctx, style) => {
       value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
       return undefined;
     },
+    "browser.canvas2d.getLineWidth": (ctx) =>
+      state.resourceForValue(Number(value(ctx, "CanvasRenderingContext2D").lineWidth)),
     "browser.canvas2d.setLineWidth": (ctx, width) =>
       withCanvasNumbers(state, [width], (resolvedWidth) => {
         value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;

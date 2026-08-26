@@ -74,6 +74,14 @@ opaque HTMLCanvasElement : Type
 /-- Browser two-dimensional canvas rendering context. -/
 opaque CanvasRenderingContext2D : Type
 
+/--
+JavaScript-owned canvas fill/stroke style value.
+
+This faithfully represents the string, `CanvasGradient`, and `CanvasPattern`
+arms of the browser union without choosing a Lean-side conversion policy.
+-/
+opaque CanvasStyle : Type
+
 /-- Browser timeout registration resource. -/
 opaque Timeout : Type
 

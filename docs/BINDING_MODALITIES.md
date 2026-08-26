@@ -111,8 +111,9 @@ Accessor mappings may set `receiverName` and setter `parameterName` to preserve
 existing Lean binder names without treating spelling as a semantic exception.
 Type or modality differences still require a justified
 `generation.exceptions` entry. Canvas `fillStyle` and `strokeStyle`, for
-example, explicitly generate only their string-valued setters while leaving
-their getters and gradient/pattern arms unsupported.
+example, use the opaque JavaScript-owned `CanvasStyle` marker for their faithful
+raw getter/setter pairs. Their existing string-valued setters are separately
+classified generated convenience adapters.
 
 ## Method Selection
 

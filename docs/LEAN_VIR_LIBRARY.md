@@ -370,7 +370,8 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.HTMLCanvasElement.fromElement`, `getWidth`, `setWidth`, `getHeight`, `setHeight`, and `getContext2D` narrow and configure canvas elements.
 - `Lean.Vir.Browser.CanvasRenderingContext2D.clearRect`, `fillRect`, and `strokeRect` accept ordinary Lean `Float` coordinates.
 - `Lean.Vir.Browser.CanvasRenderingContext2D.beginPath`, `closePath`, `moveTo`, `lineTo`, `arc`, `fill`, and `stroke` provide basic path drawing.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyle`, `setStrokeStyle`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure drawing state and transforms.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.getFillStyle`, `setFillStyleValue`, `getStrokeStyle`, and `setStrokeStyleValue` preserve the full JavaScript-owned `CanvasStyle` union; `setFillStyle` and `setStrokeStyle` are string conveniences.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.getLineWidth`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure numeric drawing state and transforms.
 - `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
 - `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
