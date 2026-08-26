@@ -454,8 +454,8 @@ function tooltipText(summary, provenance) {
   ].filter(Boolean).join("\n");
 }
 
-function semanticChip(label, tooltip, className = "") {
-  return '<span class="semantic-chip ' + escapeHtml(className) +
+function semanticText(label, tooltip, className = "") {
+  return '<span class="semantic-text ' + escapeHtml(className) +
     '" tabindex="0" data-tooltip="' + escapeHtml(tooltip) +
     '" aria-label="' + escapeHtml(label + ": " + tooltip) + '">' +
     escapeHtml(label) + "</span>";
@@ -463,10 +463,10 @@ function semanticChip(label, tooltip, className = "") {
 
 function renderSemanticLeanType(value, provenance = []) {
   const tooltip = tooltipText(String(value), provenance);
-  return '<code class="signature-type semantic-chip" tabindex="0" data-tooltip="' +
+  return '<span class="signature-type semantic-text" tabindex="0" data-tooltip="' +
     escapeHtml(tooltip) + '" aria-label="' +
     escapeHtml(shortLeanName(value) + ": " + tooltip) + '">' +
-    highlightCode(shortLeanName(value), "lean") + "</code>";
+    highlightCode(shortLeanName(value), "lean") + "</span>";
 }
 
 const modalityDescriptions = {
@@ -482,12 +482,24 @@ const modalityDescriptions = {
   value: "A plain value result without resource ownership.",
 };
 
-function renderModalityChips(modalities, provenance = {}) {
-  return Object.entries(modalities ?? {}).map(([kind, value]) => semanticChip(
-    String(value).replaceAll("-", " "),
-    tooltipText(modalityDescriptions[value] ?? String(value), provenance[kind]),
-    "mode-" + kind,
-  )).join("");
+function modalityTooltip(modalities, provenance = {}) {
+  return Object.entries(modalities ?? {}).map(([kind, value]) => tooltipText(
+    kind + ": " + (modalityDescriptions[value] ?? String(value)),
+    provenance[kind],
+  )).join("\n");
+}
+
+function renderSignatureAnnotation(role, modalities, provenance = {}) {
+  const values = role === "result"
+    ? [modalities.representation, modalities.ownership, "result"]
+    : [role === "argument" ? undefined : role, modalities.passing, modalities.retention];
+  const label = "-- " + values.filter(Boolean).map((value) =>
+    String(value).replaceAll("-", " ")).join(" · ");
+  return semanticText(
+    label,
+    modalityTooltip(modalities, provenance),
+    "signature-annotation",
+  );
 }
 
 function parenthesizeLeanArgument(value) {
@@ -500,60 +512,58 @@ function effectfulLeanType(operation) {
   return operation.effect.lean + " " + parenthesizeLeanArgument(operation.result.lean);
 }
 
-function renderSignatureArgument(role, argument) {
-  return '<div class="signature-row"><span class="signature-role">' +
-    escapeHtml(role) + '</span><code class="signature-name">' +
-    escapeHtml(argument.name) + '</code>' +
+function renderSignatureArgument(role, argument, nameWidth) {
+  return '<div class="signature-line"><code class="signature-expression">' +
+    escapeHtml("  (" + argument.name.padEnd(nameWidth) + " : ") +
     renderSemanticLeanType(argument.type, argument.provenance?.type) +
-    '<span class="signature-modalities">' +
-    renderModalityChips(argument.modalities, argument.provenance) + "</span></div>";
+    escapeHtml(")") + "</code>" +
+    renderSignatureAnnotation(role, argument.modalities, argument.provenance) + "</div>";
 }
 
-function renderReadableLeanSignature(operation) {
-  const parameters = [
+function renderReadableLeanSignature(operation, source) {
+  const arguments_ = [
     ...(operation.receiver.kind === "argument"
-      ? [renderSignatureArgument("receiver", operation.receiver.argument)]
+      ? [{ role: "receiver", argument: operation.receiver.argument }]
       : []),
-    ...operation.arguments.map((argument) => renderSignatureArgument(argument.role, argument)),
-  ].join("");
+    ...operation.arguments.map((argument) => ({ role: argument.role, argument })),
+  ];
+  const nameWidth = Math.max(1, ...arguments_.map((entry) => entry.argument.name.length));
+  const parameters = arguments_.map((entry) =>
+    renderSignatureArgument(entry.role, entry.argument, nameWidth)).join("");
   const receiverContext = operation.receiver.kind === "global"
-    ? '<div class="signature-context">' + semanticChip(
-      "host global · " + operation.receiver.typescriptType,
+    ? '<div class="signature-comment">' + semanticText(
+      "-- host global: " + operation.receiver.typescriptType,
       tooltipText(
         operation.receiver.typescriptType + " is supplied by the JavaScript host and is not a Lean parameter.",
         operation.receiver.provenance?.kind,
       ),
-      "mode-receiver",
+      "signature-annotation",
     ) + "</div>"
     : operation.receiver.kind === "none" && operation.receiver.typescriptType
-      ? '<div class="signature-context">' + semanticChip(
-        "receiver replaced by policy",
+      ? '<div class="signature-comment">' + semanticText(
+        "-- " + operation.receiver.typescriptType + " receiver replaced by policy",
         tooltipText(
           "The upstream " + operation.receiver.typescriptType + " receiver is not an emitted Lean parameter.",
           operation.receiver.provenance?.kind,
         ),
-        "mode-receiver",
+        "signature-annotation",
       ) + "</div>"
       : "";
   const exactResult = effectfulLeanType(operation);
-  return '<section class="readable-signature"><div class="signature-heading"><span>Readable Lean signature</span>' +
-    semanticChip(
-      shortLeanName(operation.effect.lean) + " · " + operation.effect.id + " effect",
-      tooltipText("The boundary returns through " + operation.effect.lean + ".", operation.effect.provenance),
-      "mode-effect",
-    ) + '</div><div class="signature-declaration semantic-chip" tabindex="0" data-tooltip="' +
+  return '<section class="readable-signature"><div class="signature-caption"><span>Lean signature</span>' +
+    source + '</div><div class="signature-source"><div class="signature-declaration semantic-text" tabindex="0" data-tooltip="' +
     escapeHtml(operation.lean.declaration) + '" aria-label="Lean declaration: ' +
     escapeHtml(operation.lean.declaration) + '">' +
     highlightCode(shortLeanName(operation.lean.declaration), "lean") + "</div>" +
-    receiverContext + '<div class="signature-grid">' + parameters +
-    '<div class="signature-row signature-result"><span class="signature-role">result</span>' +
-    '<code class="signature-name">:</code>' +
+    receiverContext + parameters +
+    '<div class="signature-line signature-result"><code class="signature-expression">' +
+    escapeHtml("  : ") +
     renderSemanticLeanType(exactResult, [
       operation.effect.provenance,
       ...(operation.result.provenance?.type ?? []),
-    ]) + '<span class="signature-modalities">' +
-    renderModalityChips(operation.result.modalities, operation.result.provenance) +
-    "</span></div></div></section>";
+    ]) + "</code>" +
+    renderSignatureAnnotation("result", operation.result.modalities, operation.result.provenance) +
+    "</div></div></section>";
 }
 
 function formatTypeScriptType(shape) {
@@ -598,10 +608,10 @@ function renderTransformationValue(value, language, state = "") {
 }
 
 function renderTransformationRow(from, to, note = "", state = "mapped") {
-  return '<div class="transformation-row"><div><span class="transformation-side">TypeScript</span>' +
-    renderTransformationValue(from, "typescript") + '</div><span class="transformation-arrow" aria-hidden="true">→</span><div><span class="transformation-side">Lean</span>' +
+  return '<div class="transformation-row"><div>' +
+    renderTransformationValue(from, "typescript") + '</div><span class="transformation-arrow" aria-hidden="true">→</span><div>' +
     renderTransformationValue(to, state === "mapped" ? "lean" : null, state) +
-    (note ? '<span class="transformation-note">' + escapeHtml(note) + "</span>" : "") +
+    (note ? '<span class="transformation-note"> · ' + escapeHtml(note) + "</span>" : "") +
     "</div></div>";
 }
 
@@ -704,7 +714,8 @@ function renderTypeTransformation(operation) {
     "result: " + shortLeanName(effectfulLeanType(operation)),
     operation.effect.id + " effect · " + Object.values(operation.result.modalities).join(" · "),
   ));
-  return '<section class="type-transformation"><div class="transformation-heading"><span>TypeScript → Lean</span><span>selected declaration shape and emitted boundary</span></div>' +
+  return '<section class="type-transformation"><div class="transformation-heading"><span>Type translation</span><span>selected TypeScript shape → emitted Lean boundary</span></div>' +
+    '<div class="transformation-columns"><span>TypeScript</span><span></span><span>Lean</span></div>' +
     '<div class="transformation-grid">' + rows.join("") + "</div></section>";
 }
 
@@ -720,16 +731,19 @@ function renderLeanCards(targetIds, { showRuntime = false } = {}) {
         ? target.operation
         : null;
       const signature = operation === null
-        ? renderCode(item.entry.type, "lean")
-        : renderReadableLeanSignature(operation) + renderTypeTransformation(operation) +
+        ? '<div class="card-head"><span class="card-title" title="' +
+          escapeHtml(item.entry.declaration) + '">' +
+          escapeHtml(shortLeanName(item.entry.declaration)) + "</span>" +
+          sourceLink(item.entry.source, item.entry.module) + "</div>" +
+          renderCode(item.entry.type, "lean")
+        : renderReadableLeanSignature(
+          operation,
+          sourceLink(item.entry.source, item.entry.module),
+        ) + renderTypeTransformation(operation) +
           '<details class="exact-type"><summary>Exact compiled Lean type</summary>' +
           renderCode(item.entry.type, "lean") + "</details>";
       return (
-      '<article class="binding"><div class="card-head"><span class="card-title" title="' +
-      escapeHtml(item.entry.declaration) + '">' +
-      escapeHtml(shortLeanName(item.entry.declaration)) + "</span>" +
-      sourceLink(item.entry.source, item.entry.module) + "</div>" +
-      signature +
+      '<article class="binding lean-binding">' + signature +
       (showRuntime
         ? '<details><summary class="note">Compiled boundary evidence</summary><div class="badges">' +
           target.providers.map((provider) => '<span class="badge">' + escapeHtml(provider) + "</span>").join("") +
