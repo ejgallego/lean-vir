@@ -39,7 +39,7 @@
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "Event"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
@@ -63,11 +63,21 @@
       "DOMTokenList.add": { "signature": "only", "fixedRestParameters": { "tokens": ["className"] } },
       "DOMTokenList.remove": { "signature": "only", "fixedRestParameters": { "tokens": ["className"] } },
       "DOMTokenList.toggle": { "signature": "only", "omittedOptionalParameters": ["force"] },
+      "Element.addEventListener": {
+        "signature": 1,
+        "omittedOptionalParameters": ["options"],
+        "parameterRenames": { "type": "event", "listener": "callback" }
+      },
       "Element.appendChild": { "signature": "only" },
       "Element.getAttribute": { "signature": "only" },
       "Element.querySelector": { "signature": 4 },
       "Element.querySelectorAll": { "signature": 4 },
       "Element.remove": { "signature": "only" },
+      "Element.removeEventListener": {
+        "signature": 1,
+        "omittedOptionalParameters": ["options"],
+        "omittedRequiredParameters": ["type"]
+      },
       "Element.setAttribute": { "signature": "only" },
       "Event.preventDefault": { "signature": "only" },
       "Event.stopPropagation": { "signature": "only" },
@@ -156,6 +166,27 @@
           }
         }
       },
+      "browser.element.addEventListener": {
+        "reason": "VIR specializes DOM listener registration to a Lean callback retained until an explicit revocable listener handle is consumed.",
+        "arguments": {
+          "callback": {
+            "role": "callback",
+            "passing": "owned",
+            "retention": "until-release",
+            "type": {
+              "lean": "Lean.Vir.Js Event → DomM Unit",
+              "representation": "callback"
+            }
+          }
+        },
+        "result": {
+          "type": {
+            "lean": "Lean.Vir.Js EventListener",
+            "representation": "js-resource",
+            "resourceInner": "EventListener"
+          }
+        }
+      },
       "browser.element.classList.add": {
         "reason": "The VIR host target flattens DOMTokenList access onto its owning Element resource and specializes the variadic token list to one token.",
         "receiver": {
@@ -220,6 +251,20 @@
           }
         }
       },
+      "browser.element.removeEventListener": {
+        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the revocable listener handle returned by registration; consuming it removes the listener and releases the callback.",
+        "receiver": { "kind": "none" },
+        "arguments": {
+          "listener": {
+            "passing": "consumed",
+            "type": {
+              "lean": "Lean.Vir.Js EventListener",
+              "representation": "js-resource",
+              "resourceInner": "EventListener"
+            }
+          }
+        }
+      },
       "browser.event.currentTarget": {
         "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
         "result": {
@@ -278,34 +323,6 @@
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "message", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "browser.element.listener.add",
-        "group": "element",
-        "target": "browser.element.addEventListener",
-        "lean": "Lean.Vir.Browser.Element.addEventListenerJs",
-        "marker": "vir_js",
-        "reason": "VIR returns a revocable listener resource so the retained callback has an explicit release operation.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "element", "role": "receiver", "type": { "lean": "Lean.Vir.Js Element", "representation": "js-resource", "resourceInner": "Element" } },
-          { "name": "event", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js Event → DomM Unit", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Lean.Vir.Js EventListener", "representation": "js-resource", "resourceInner": "EventListener" } }
-      },
-      {
-        "id": "browser.element.listener.remove",
-        "group": "element",
-        "target": "browser.element.removeEventListener",
-        "lean": "Lean.Vir.Browser.Element.removeEventListener",
-        "marker": "vir_js",
-        "reason": "Removing a VIR listener consumes its revocable registration resource and releases the retained callback.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "listener", "passing": "consumed", "type": { "lean": "Lean.Vir.Js EventListener", "representation": "js-resource", "resourceInner": "EventListener" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
@@ -608,7 +625,7 @@
         { "typescript": "DOMTokenList.remove", "targets": ["browser.element.classList.remove"], "lean": ["Lean.Vir.Browser.Element.ClassList.removeJs"] },
         { "typescript": "DOMTokenList.toggle", "targets": ["browser.element.classList.toggle"], "lean": ["Lean.Vir.Browser.Element.ClassList.toggleJs"] },
         { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.element.style.setProperty"], "lean": ["Lean.Vir.Browser.Element.Style.setPropertyJs"] },
-        { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListener"] },
+        { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
         { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }
       ],
       "anchors": [

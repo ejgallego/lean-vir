@@ -109,23 +109,38 @@ selection:
   "Document.createElement": {
     "signature": 2,
     "omittedOptionalParameters": ["options"]
+  },
+  "Element.removeEventListener": {
+    "signature": 1,
+    "omittedOptionalParameters": ["options"],
+    "omittedRequiredParameters": ["type"]
   }
 }
 ```
 
 `"signature": "only"` asserts that the declaration has exactly one function
 signature. An integer selects that zero-based overload explicitly. A required
-parameter cannot be omitted, and every optional parameter must either be
-represented by a supported translation rule or named in
-`omittedOptionalParameters`; the current generator implements the latter path.
-Missing policies, changed overload layouts, rest parameters, unknown parameter
-names, and unsupported parameter or result types fail generation.
+parameter can be omitted only by naming it in `omittedRequiredParameters` and
+providing a justified operation exception; this deliberately marks a reviewed
+signature projection rather than a faithful translation. Every optional
+parameter must either be represented by a supported translation rule or named
+in `omittedOptionalParameters`; the current generator implements the latter
+path. A rest parameter must be omitted explicitly or projected to one or more
+named fixed-arity Lean binders through `fixedRestParameters`. Parameter names
+can be preserved or changed explicitly with `parameterRenames`.
+
+Missing policies, changed overload layouts, unclassified rest parameters,
+unknown parameter names, unjustified required-parameter omissions, and
+unsupported parameter or result types fail generation.
 TypeScript parameter names that collide with Lean keywords are rendered as
 escaped Lean identifiers.
 
 The browser slice includes global functions, DOM methods, and properties.
-Selected overloads, omitted optional or rest parameters, callbacks, primitive
-resources, and receiver/result overrides are all recorded in the same IR.
+Selected overloads, parameter projections and renames, fixed-arity rest
+specializations, callbacks, primitive resources, and receiver/result overrides
+are all recorded in the same IR. In particular, the event-listener pair records
+registration as returning a revocable handle and removal as a receiver-free
+disposer that consumes that handle.
 
 ## Reviewed Protocol Operations
 
@@ -158,10 +173,11 @@ type-fidelity verdict.
 ## Exceptions
 
 `generation.exceptions` is keyed by operation/anchor id. An exception must have
-a non-empty `reason` and may override only the receiver, named arguments,
-result ownership, or effect. Unknown operation ids, unknown argument names,
-unsupported fields, unsafe borrowed lifetimes, and exceptions on immediate
-values are errors.
+a non-empty `reason` and may override only the receiver, named argument role,
+type or modalities, result ownership, or effect. A receiver may be projected
+away only through an explicit `kind: "none"` exception. Unknown operation ids,
+unknown generated argument names, unsupported fields, unsafe borrowed
+lifetimes, and exceptions on immediate values are errors.
 
 Exceptions are intended for semantics that TypeScript declarations do not
 express, such as a host retaining a callback until explicit release. They are

@@ -362,6 +362,89 @@ test("rest parameters require an explicit fixed-arity specialization", () => {
   );
 });
 
+test("reviewed method specializations can project a disposer signature", () => {
+  const disposerGeneration = structuredClone(generation);
+  disposerGeneration.methodPolicies["Widget.getAttribute"] = {
+    signature: "only",
+    omittedOptionalParameters: ["options"],
+    omittedRequiredParameters: ["type"],
+    parameterRenames: { listener: "subscription" },
+  };
+  disposerGeneration.exceptions["demo.widget.getAttribute"] = {
+    reason: "The demo consumes the registration handle returned by its paired operation.",
+    receiver: { kind: "none" },
+    arguments: {
+      subscription: {
+        passing: "consumed",
+        type: {
+          lean: "Lean.Vir.Js Widget",
+          representation: "js-resource",
+          resourceInner: "Widget",
+        },
+      },
+    },
+  };
+  const disposerDescriptors = structuredClone(descriptors);
+  const method = disposerDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape.args = [
+    { name: "type", type: stringShape },
+    { name: "listener", type: { kind: "ref", id: "Listener" } },
+    { name: "options", optional: true, type: stringShape },
+  ];
+  method.shape.result = { kind: "primitive", name: "void" };
+
+  const operation = buildGeneratedOperations(config, disposerGeneration, disposerDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  const output = renderLeanBindings(config, disposerGeneration, disposerDescriptors);
+  assert.equal(operation.receiver.kind, "none");
+  assert.deepEqual(operation.typescript.signaturePolicy.omittedRequiredParameters, ["type"]);
+  assert.deepEqual(operation.typescript.signaturePolicy.parameterRenames, {
+    listener: "subscription",
+  });
+  assert.deepEqual(operation.arguments.map((argument) => argument.name), ["subscription"]);
+  assert.equal(operation.arguments[0].modalities.passing, "consumed");
+  assert.match(output, /opaque getAttribute\n    \(subscription : Lean\.Vir\.Js Widget\) :\n    DomM Unit/u);
+
+  const unjustified = structuredClone(disposerGeneration);
+  delete unjustified.exceptions["demo.widget.getAttribute"];
+  assert.throws(
+    () => buildGeneratedOperations(config, unjustified, disposerDescriptors),
+    /required parameter omission requires a justified generation exception/u,
+  );
+});
+
+test("reviewed argument overrides can identify retained callbacks", () => {
+  const callbackGeneration = structuredClone(generation);
+  callbackGeneration.methodPolicies["Widget.getAttribute"].parameterRenames = {
+    name: "callback",
+  };
+  callbackGeneration.exceptions["demo.widget.getAttribute"] = {
+    reason: "The demo retains this callback until its paired disposer runs.",
+    arguments: {
+      callback: {
+        role: "callback",
+        passing: "owned",
+        retention: "until-release",
+        type: {
+          lean: "Lean.Vir.Js Widget → DomM Unit",
+          representation: "callback",
+        },
+      },
+    },
+  };
+
+  const operation = buildGeneratedOperations(config, callbackGeneration, descriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  assert.equal(operation.arguments[0].name, "callback");
+  assert.equal(operation.arguments[0].role, "callback");
+  assert.deepEqual(operation.arguments[0].modalities, {
+    representation: "callback",
+    passing: "owned",
+    retention: "until-release",
+  });
+});
+
 test("generated anchors project comparator intent from operation IR", () => {
   const root = config.roots[0];
   const materialized = materializeGeneratedAnchors(

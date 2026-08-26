@@ -244,7 +244,7 @@ assert.equal(documentQuerySelector?.generation.availability, "available");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
-  status: "in-progress",
+  status: "complete",
   scope: "complete-upstream-surface",
 });
 assert.deepEqual(elementRoot?.comparison.summary, {
@@ -255,10 +255,10 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 });
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
-  compatible: 12,
+  compatible: 14,
   weak: 0,
   missing: 728,
-  unreviewed: 2,
+  unreviewed: 0,
   mappedTargets: 16,
 });
 const elementInnerHTML = elementRoot?.coverage.members.find(
@@ -275,6 +275,19 @@ assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "only"
 assert.match(generatedGetAttribute?.typescript.documentation, /MDN Reference/u);
 assert.equal(generatedGetAttribute?.arguments[0].type, "Lean.Vir.Js String");
 assert.equal(generatedGetAttribute?.result.lean, "Lean.Vir.Js.Nullable String");
+const generatedAddEventListener = elementRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "Element.addEventListener");
+const generatedRemoveEventListener = elementRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "Element.removeEventListener");
+assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
+assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
+assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
+assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
+assert.deepEqual(
+  generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
+  ["type"],
+);
+assert.equal(generatedRemoveEventListener?.arguments[0].modalities.passing, "consumed");
 assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);

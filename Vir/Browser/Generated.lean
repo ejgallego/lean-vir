@@ -489,6 +489,23 @@ end Document
 namespace Element
 
 /--
+Generated reviewed method specialization of TypeScript `Element.addEventListener`.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13915
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `Element.addEventListener` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.addEventListener"]
+opaque addEventListenerJs
+    (element : @& Lean.Vir.Js Element)
+    (event : @& Lean.Vir.Js String)
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    DomM (Lean.Vir.Js EventListener)
+
+/--
 Generated reviewed method specialization of TypeScript `Element.appendChild`.
 
 The **`appendChild()`** method of the Node interface adds a node to the end of the list of children of a specified parent node.
@@ -627,6 +644,21 @@ opaque remove
     DomM Unit
 
 /--
+Generated reviewed method specialization of TypeScript `Element.removeEventListener`.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13917
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `Element.removeEventListener` method.
+ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.removeEventListener"]
+opaque removeEventListener
+    (listener : Lean.Vir.Js EventListener) :
+    DomM Unit
+
+/--
 Faithful generated method binding for TypeScript `Element.setAttribute`.
 
 The **`setAttribute()`** method of the Element interface sets the value of an attribute on the specified element. If the attribute already exists, the value is updated; otherwise a new attribute is added with the specified name and value.
@@ -680,42 +712,6 @@ This declaration is generated; edit the TypeScript source or binding configurati
 opaque setTextContent
     (element : @& Lean.Vir.Js Element)
     (textContent : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `browser.element.listener.add`.
-
-VIR returns a revocable listener resource so the retained callback has an explicit release operation.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.element.addEventListener"]
-opaque addEventListenerJs
-    (element : @& Lean.Vir.Js Element)
-    (event : @& Lean.Vir.Js String)
-    (callback : Lean.Vir.Js Event → DomM Unit) :
-    DomM (Lean.Vir.Js EventListener)
-
-/--
-Generated binding for reviewed VIR protocol `browser.element.listener.remove`.
-
-Removing a VIR listener consumes its revocable registration resource and releases the retained callback.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.element.removeEventListener"]
-opaque removeEventListener
-    (listener : Lean.Vir.Js EventListener) :
     DomM Unit
 
 end Element

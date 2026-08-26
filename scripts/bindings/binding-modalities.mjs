@@ -63,9 +63,12 @@ function validateModalityOverride(value, context, { receiver = false } = {}) {
     value,
     receiver
       ? ["kind", "passing", "retention", "name", "type"]
-      : ["passing", "retention", "type"],
+      : ["role", "passing", "retention", "type"],
     context,
   );
+  if (!receiver && value.role !== undefined && !["argument", "callback"].includes(value.role)) {
+    throw new Error(`${context} role must be argument or callback`);
+  }
   if (value.passing !== undefined) validatePassing(value.passing, context);
   if (value.retention !== undefined) validateRetention(value.retention, context);
   if (value.type !== undefined) validateTypeOverride(value.type, `${context} type`);
@@ -157,7 +160,14 @@ export function validateGenerationProfile(generation, context = "generation") {
     if (!object(policy)) throw new Error(`${context} method policy ${member} must be an object`);
     validateKeys(
       policy,
-      ["signature", "omittedOptionalParameters", "omittedRestParameters", "fixedRestParameters"],
+      [
+        "signature",
+        "omittedOptionalParameters",
+        "omittedRequiredParameters",
+        "omittedRestParameters",
+        "fixedRestParameters",
+        "parameterRenames",
+      ],
       `${context} method policy ${member}`,
     );
     if (policy.signature !== "only" &&
@@ -168,6 +178,11 @@ export function validateGenerationProfile(generation, context = "generation") {
     if (!Array.isArray(omitted) || !omitted.every(nonemptyString) ||
         new Set(omitted).size !== omitted.length) {
       throw new Error(`${context} method policy ${member} has invalid omitted optional parameters`);
+    }
+    const omittedRequired = policy.omittedRequiredParameters ?? [];
+    if (!Array.isArray(omittedRequired) || !omittedRequired.every(nonemptyString) ||
+        new Set(omittedRequired).size !== omittedRequired.length) {
+      throw new Error(`${context} method policy ${member} has invalid omitted required parameters`);
     }
     const omittedRest = policy.omittedRestParameters ?? [];
     if (!Array.isArray(omittedRest) || !omittedRest.every(nonemptyString) ||
@@ -180,6 +195,12 @@ export function validateGenerationProfile(generation, context = "generation") {
       Array.isArray(names) && names.length !== 0 && names.every(nonemptyString) &&
       new Set(names).size === names.length)) {
       throw new Error(`${context} method policy ${member} has invalid fixed rest parameters`);
+    }
+    const parameterRenames = policy.parameterRenames ?? {};
+    if (!object(parameterRenames) || !Object.keys(parameterRenames).every(nonemptyString) ||
+        !Object.values(parameterRenames).every(nonemptyString) ||
+        new Set(Object.values(parameterRenames)).size !== Object.keys(parameterRenames).length) {
+      throw new Error(`${context} method policy ${member} has invalid parameter renames`);
     }
   }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
@@ -332,8 +353,21 @@ function receiverFor(member, identity, generation, profile, exception) {
   const owner = member.slice(0, member.lastIndexOf("."));
   const configuredGlobal = profile.receiver.globalTypes.includes(owner);
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
-  if (!["global", "argument"].includes(kind)) {
-    throw new Error(`${identity.id} receiver exception kind must be global or argument`);
+  if (!["global", "argument", "none"].includes(kind)) {
+    throw new Error(`${identity.id} receiver exception kind must be global, argument, or none`);
+  }
+  if (kind === "none") {
+    if (["passing", "retention", "name", "type"].some((field) =>
+      exception?.receiver?.[field] !== undefined)) {
+      throw new Error(`${identity.id} absent receiver cannot define a name, type, or modalities`);
+    }
+    return {
+      kind,
+      typescriptType: owner,
+      provenance: {
+        kind: typeProvenance("generation.exceptions", exception.reason),
+      },
+    };
   }
   if (kind === "global") {
     if (exception?.receiver?.passing !== undefined || exception?.receiver?.retention !== undefined) {
@@ -586,8 +620,11 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const policy = generation.methodPolicies?.[member];
   const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
   const omitted = new Set(policy.omittedOptionalParameters ?? []);
+  const omittedRequired = new Set(policy.omittedRequiredParameters ?? []);
   const omittedRest = new Set(policy.omittedRestParameters ?? []);
   const fixedRest = policy.fixedRestParameters ?? {};
+  const parameterRenames = policy.parameterRenames ?? {};
+  const exception = exceptionFor(generation, operationId);
   for (const name of omitted) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
@@ -601,6 +638,16 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       throw new Error(`${member} policy cannot both omit and fix rest parameter ${name}`);
     }
   }
+  for (const name of omittedRequired) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy omits missing required parameter ${name}`);
+    if (argument.optional === true || argument.rest === true) {
+      throw new Error(`${member} policy cannot required-omit optional or rest parameter ${name}`);
+    }
+  }
+  if (omittedRequired.size !== 0 && exception === null) {
+    throw new Error(`${member} required parameter omission requires a justified generation exception`);
+  }
   for (const name of Object.keys(fixedRest)) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy fixes missing rest parameter ${name}`);
@@ -609,7 +656,17 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       throw new Error(`${member} fixed rest parameter ${name} must have an array element type`);
     }
   }
-  const exception = exceptionFor(generation, operationId);
+  for (const [name, renamed] of Object.entries(parameterRenames)) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy renames missing parameter ${name}`);
+    if (argument.rest === true) {
+      throw new Error(`${member} policy must name fixed rest binders in fixedRestParameters`);
+    }
+    if (omitted.has(name) || omittedRequired.has(name)) {
+      throw new Error(`${member} policy cannot rename omitted parameter ${name}`);
+    }
+    leanBinderIdentifier(renamed, `${member} renamed parameter`);
+  }
   const arguments_ = [];
   const knownParameters = new Set();
   function addArgument(name, typeShape) {
@@ -619,7 +676,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     knownParameters.add(name);
     arguments_.push(modalityArgument(
       leanBinderIdentifier(name, `${member} parameter`),
-      "argument",
+      exception?.arguments?.[name]?.role ?? "argument",
       operationType(
         typeShape,
         exception?.arguments?.[name],
@@ -643,6 +700,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       for (const name of fixedNames) addArgument(name, argument.type.element);
       continue;
     }
+    if (omittedRequired.has(argument.name)) continue;
     if (argument.optional === true) {
       if (!omitted.has(argument.name)) {
         throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission policy`);
@@ -653,10 +711,10 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     if (omittedTrailingParameter) {
       throw new Error(`${member} cannot omit an optional parameter before ${argument.name}`);
     }
-    addArgument(argument.name, argument.type);
+    addArgument(parameterRenames[argument.name] ?? argument.name, argument.type);
   }
   for (const name of Object.keys(exception?.arguments ?? {})) {
-    if (!knownParameters.has(name) || omitted.has(name) || omittedRest.has(name)) {
+    if (!knownParameters.has(name)) {
       throw new Error(`${operationId} exception references missing generated argument ${name}`);
     }
   }
@@ -691,8 +749,10 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       signaturePolicy: {
         selection: policy.signature,
         omittedOptionalParameters: [...omitted],
+        omittedRequiredParameters: [...omittedRequired],
         omittedRestParameters: [...omittedRest],
         fixedRestParameters: structuredClone(fixedRest),
+        parameterRenames: structuredClone(parameterRenames),
         provenance: signatureProvenance,
       },
     },

@@ -142,6 +142,11 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
+        "omittedRequiredParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "omittedRestParameters": {
           "type": "array",
           "uniqueItems": true,
@@ -156,6 +161,11 @@
             "uniqueItems": true,
             "items": { "type": "string", "minLength": 1 }
           }
+        },
+        "parameterRenames": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": { "type": "string", "minLength": 1 }
         }
       }
     },
@@ -232,6 +242,7 @@
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {
+        "role": { "enum": ["argument", "callback"] },
         "passing": { "enum": ["borrowed", "owned", "consumed"] },
         "retention": { "enum": ["call", "until-release", "runtime"] },
         "type": { "$ref": "#/$defs/leanTypeOverride" }

@@ -87,10 +87,10 @@ test("binding configuration rejects manual declaration exceptions", async () => 
 
 test("method policies are explicit, selected, and schema checked", async () => {
   const unselected = structuredClone(browser);
-  unselected.generation.methodPolicies["Element.addEventListener"] = { signature: "only" };
+  unselected.generation.methodPolicies["Element.closest"] = { signature: "only" };
   await assert.rejects(
     validateBindingConfig(unselected, browserPath),
-    /defines a method policy for unselected member Element\.addEventListener/u,
+    /defines a method policy for unselected member Element\.closest/u,
   );
 
   const vague = structuredClone(browser);
