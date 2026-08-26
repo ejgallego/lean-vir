@@ -349,7 +349,7 @@ function modalityArgument(
   };
 }
 
-function receiverFor(member, identity, generation, profile, exception) {
+function receiverFor(member, identity, generation, profile, exception, defaultName = undefined) {
   const owner = member.slice(0, member.lastIndexOf("."));
   const configuredGlobal = profile.receiver.globalTypes.includes(owner);
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
@@ -388,7 +388,7 @@ function receiverFor(member, identity, generation, profile, exception) {
   }
   const ownerName = owner.slice(owner.lastIndexOf(".") + 1);
   const name = leanBinderIdentifier(
-    exception?.receiver?.name ?? ownerName[0].toLowerCase() + ownerName.slice(1),
+    exception?.receiver?.name ?? defaultName ?? ownerName[0].toLowerCase() + ownerName.slice(1),
     `${identity.id} receiver name`,
   );
   const marker = generation.resources?.[owner];
@@ -509,10 +509,24 @@ function propertyOperation(
   const exception = exceptionFor(generation, anchor.id);
   const shape = symbol.accessors?.[accessor];
   const leanName = operationName(operation, generation.namespace);
-  const receiver = receiverFor(member, anchor, generation, profile, exception);
+  if (accessor === "get" && operation.parameterName !== undefined) {
+    throw new Error(`${member} getter cannot define a setter parameter name`);
+  }
+  const receiver = receiverFor(
+    member,
+    anchor,
+    generation,
+    profile,
+    exception,
+    operation.receiverName,
+  );
+  if (operation.receiverName !== undefined && receiver.kind !== "argument") {
+    throw new Error(`${member} ${accessor} cannot name an absent receiver`);
+  }
   const propertyName = member.slice(member.lastIndexOf(".") + 1);
+  const propertyParameterName = operation.parameterName ?? propertyName;
   const propertyBinder = leanBinderIdentifier(
-    propertyName,
+    propertyParameterName,
     `${member} setter argument`,
   );
   const arguments_ = [];
@@ -526,7 +540,7 @@ function propertyOperation(
   } else {
     const value = operationType(
       shape,
-      exception?.arguments?.[propertyName],
+      exception?.arguments?.[propertyParameterName],
       generation,
       profile,
       `${member} setter`,
@@ -537,7 +551,7 @@ function propertyOperation(
       value,
       profile.resource.argument,
       "generation.abiProfile.resource.argument",
-      exception?.arguments?.[propertyName] ?? null,
+      exception?.arguments?.[propertyParameterName] ?? null,
     ));
     result = resultFor(
       translateType(
@@ -550,7 +564,7 @@ function propertyOperation(
       exception,
     );
   }
-  const knownArgumentNames = new Set(accessor === "set" ? [propertyName] : []);
+  const knownArgumentNames = new Set(accessor === "set" ? [propertyParameterName] : []);
   for (const name of Object.keys(exception?.arguments ?? {})) {
     if (!knownArgumentNames.has(name)) {
       throw new Error(`${anchor.id} exception references missing argument ${name}`);
@@ -853,7 +867,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     for (const accessor of ["get", "set"]) {
       const operation = entry.mapping.accessors[accessor];
       const accessorType = symbol.accessors?.[accessor];
-      if (accessorType !== undefined && (operation === undefined || operation.missing === true)) {
+      if (accessorType !== undefined && operation === undefined) {
         throw new Error(`${member} ${accessor} is part of the TypeScript surface but has no generated binding`);
       }
       if (accessorType === undefined && operation !== undefined && operation.missing !== true) {

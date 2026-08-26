@@ -292,6 +292,23 @@ assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);
 assert.match(style, /\.generation-policy/u);
+
+const canvasRoot = roots.find((root) => root.library === "browser" && root.id === "canvas-2d");
+const canvasFillStyle = canvasRoot?.coverage.members.find((member) =>
+  member.id === "CanvasRenderingContext2D.fillStyle");
+const generatedFillStyle = canvasRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "CanvasRenderingContext2D.fillStyle");
+assert.equal(canvasFillStyle?.status, "missing");
+assert.equal(canvasFillStyle?.generation.disposition, "generated");
+assert.equal(canvasFillStyle?.mapping.operations[0].missing, true);
+assert.equal(canvasFillStyle?.mapping.operations[1].accessor, "set");
+assert.ok(canvasRoot?.workItems.some((item) =>
+  item.member === "CanvasRenderingContext2D.fillStyle" &&
+  item.code === "upstream-accessor-missing" && item.accessor === "get"));
+assert.equal(generatedFillStyle?.receiver.argument.name, "ctx");
+assert.equal(generatedFillStyle?.arguments[0].name, "style");
+assert.equal(generatedFillStyle?.arguments[0].type, "Lean.Vir.Js String");
+assert.match(generatedFillStyle?.exception.reason, /string arm/u);
 const elementTextContent = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.textContent",
 );

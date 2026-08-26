@@ -97,6 +97,22 @@ the binding explorer shows generated operations in an expandable conversion
 policy panel. This avoids three independently authored versions of the same
 policy.
 
+## Property Selection
+
+A writable TypeScript property has independent getter and setter operations.
+Selecting the property normally requires mappings for both. When VIR ships
+only one direction, the other accessor must use an explicit missing-accessor
+mapping with `missing: true` and a non-empty `note`; silently dropping it fails
+generation. The missing direction remains a visible upstream coverage gap and
+an author-workbench action.
+
+Accessor mappings may set `receiverName` and setter `parameterName` to preserve
+existing Lean binder names without treating spelling as a semantic exception.
+Type or modality differences still require a justified
+`generation.exceptions` entry. Canvas `fillStyle` and `strokeStyle`, for
+example, explicitly generate only their string-valued setters while leaving
+their getters and gradient/pattern arms unsupported.
+
 ## Method Selection
 
 A selected TypeScript method must have a `generation.methodPolicies` entry.
@@ -207,12 +223,13 @@ those are projections of the operation IR.
 
 ## Current Boundary And Next Extension
 
-The implemented slice covers required property getters/setters and required,
-non-rest method parameters. It drives `Document.title`, `Element.innerHTML`,
-`Element.textContent`, `Element.getAttribute`, and `Element.setAttribute`.
+The implemented translation covers full and partial properties, selected
+overloads, explicit optional and required parameter projections, fixed-arity
+rest specializations, parameter renames, resource-result mappings, and retained
+callback/disposer lifecycles. These rules derive the current Document, Element,
+Canvas 2D, animation-frame, and React root slices while retaining explicit
+reasons for every specialization.
 
-The next method slices need explicit optional/default parameter translation and
-resource-result mappings for selectors. Callback representation and retention
-then require a named rule or justified exception. Structural records, generics,
-and unsupported unions remain fail-closed until their translations are explicit
-and tested.
+Literal or fixed arguments such as the `"2d"` context selector, structural
+records, generic containers, and broader union translations remain fail-closed
+until their policies are explicit and tested.

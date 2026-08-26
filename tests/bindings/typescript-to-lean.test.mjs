@@ -528,3 +528,26 @@ test("selected TypeScript accessors cannot be silently omitted", () => {
     /set is part of the TypeScript surface but has no generated binding/u,
   );
 });
+
+test("selected properties can explicitly leave one accessor unshipped", () => {
+  const partial = structuredClone(config);
+  const property = partial.roots[0].mappings[0];
+  property.accessors.get = {
+    missing: true,
+    note: "The demo does not yet ship this getter.",
+  };
+  property.accessors.set.receiverName = "self";
+  property.accessors.set.parameterName = "value";
+
+  const operations = buildGeneratedOperations(partial, generation, descriptors);
+  const setter = operations.find((operation) => operation.id === "widget.label.set");
+  const output = renderLeanBindings(partial, generation, descriptors);
+  assert.equal(operations.some((operation) => operation.id === "widget.label.get"), false);
+  assert.equal(setter.receiver.argument.name, "self");
+  assert.equal(setter.arguments[0].name, "value");
+  assert.doesNotMatch(output, /opaque getLabel/u);
+  assert.match(
+    output,
+    /opaque setLabel\n    \(self : @& Lean\.Vir\.Js Widget\)\n    \(value : @& Lean\.Vir\.Js\.Nullable String\)/u,
+  );
+});

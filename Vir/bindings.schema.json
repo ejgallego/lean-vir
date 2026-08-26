@@ -471,7 +471,9 @@
       "properties": {
         "target": { "type": "string", "minLength": 1 },
         "lean": { "type": "string", "minLength": 1 },
-        "anchor": { "type": "string", "minLength": 1 }
+        "anchor": { "type": "string", "minLength": 1 },
+        "receiverName": { "type": "string", "minLength": 1 },
+        "parameterName": { "type": "string", "minLength": 1 }
       }
     },
     "missingAccessor": {

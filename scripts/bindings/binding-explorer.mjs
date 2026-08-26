@@ -314,6 +314,17 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
     provenance = "none";
   }
 
+  for (const operation of member.mapping?.operations ?? []) {
+    if (operation.missing !== true) continue;
+    diagnostics.push({
+      code: "upstream-accessor-missing",
+      severity: "action",
+      accessor: operation.accessor,
+      message: operation.note,
+      action: `Add the ${operation.accessor} binding or keep this coverage gap explicitly reviewed.`,
+    });
+  }
+
   for (const result of comparisonResults) {
     if (result.relation !== "audit" || !["weak", "missing"].includes(result.status)) continue;
     diagnostics.push({

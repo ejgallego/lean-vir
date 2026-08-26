@@ -166,6 +166,24 @@ opaque fillRectJs
     DomM Unit
 
 /--
+Generated reviewed setter specialization of TypeScript `CanvasRenderingContext2D.fillStyle`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/fillStyle)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `CanvasRenderingContext2D.fillStyle` setter.
+ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.setFillStyle"]
+opaque setFillStyleJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (style : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
 Faithful generated method binding for TypeScript `CanvasRenderingContext2D.lineTo`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/lineTo)
@@ -182,6 +200,24 @@ opaque lineToJs
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated setter binding for TypeScript `CanvasRenderingContext2D.lineWidth`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/lineWidth)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.lineWidth` setter.
+ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.setLineWidth"]
+opaque setLineWidthJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (width : @& Lean.Vir.Js Float) :
     DomM Unit
 
 /--
@@ -294,6 +330,24 @@ opaque strokeRectJs
     DomM Unit
 
 /--
+Generated reviewed setter specialization of TypeScript `CanvasRenderingContext2D.strokeStyle`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/strokeStyle)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `CanvasRenderingContext2D.strokeStyle` setter.
+ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.setStrokeStyle"]
+opaque setStrokeStyleJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (style : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
 Faithful generated method binding for TypeScript `CanvasRenderingContext2D.translate`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/translate)
@@ -310,60 +364,6 @@ opaque translateJs
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float) :
-    DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `browser.canvas.fillStyleString`.
-
-This host protocol is the string arm of CanvasRenderingContext2D.fillStyle's string-or-gradient-or-pattern union.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setFillStyle"]
-opaque setFillStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `browser.canvas.strokeStyleString`.
-
-This host protocol is the string arm of CanvasRenderingContext2D.strokeStyle's string-or-gradient-or-pattern union.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setStrokeStyle"]
-opaque setStrokeStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `browser.canvas.lineWidth`.
-
-This protocol is the setter operation for CanvasRenderingContext2D.lineWidth; the getter is not yet shipped.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setLineWidth"]
-opaque setLineWidthJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (width : @& Lean.Vir.Js Float) :
     DomM Unit
 
 end CanvasRenderingContext2D

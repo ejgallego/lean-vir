@@ -39,7 +39,7 @@
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "Event"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
@@ -114,6 +114,30 @@
             "lean": "Lean.Vir.Js AnimationFrame",
             "representation": "js-resource",
             "resourceInner": "AnimationFrame"
+          }
+        }
+      },
+      "browser.canvas2d.setFillStyle": {
+        "reason": "VIR exposes the string arm of CanvasRenderingContext2D.fillStyle and leaves gradient and pattern values unsupported.",
+        "arguments": {
+          "style": {
+            "type": {
+              "lean": "Lean.Vir.Js String",
+              "representation": "js-resource",
+              "resourceInner": "String"
+            }
+          }
+        }
+      },
+      "browser.canvas2d.setStrokeStyle": {
+        "reason": "VIR exposes the string arm of CanvasRenderingContext2D.strokeStyle and leaves gradient and pattern values unsupported.",
+        "arguments": {
+          "style": {
+            "type": {
+              "lean": "Lean.Vir.Js String",
+              "representation": "js-resource",
+              "resourceInner": "String"
+            }
           }
         }
       },
@@ -366,48 +390,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Nullable CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } }
       },
       {
-        "id": "browser.canvas.fillStyleString",
-        "group": "canvas-2d",
-        "target": "browser.canvas2d.setFillStyle",
-        "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleJs",
-        "marker": "vir_js",
-        "reason": "This host protocol is the string arm of CanvasRenderingContext2D.fillStyle's string-or-gradient-or-pattern union.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
-          { "name": "style", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "browser.canvas.strokeStyleString",
-        "group": "canvas-2d",
-        "target": "browser.canvas2d.setStrokeStyle",
-        "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleJs",
-        "marker": "vir_js",
-        "reason": "This host protocol is the string arm of CanvasRenderingContext2D.strokeStyle's string-or-gradient-or-pattern union.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
-          { "name": "style", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "browser.canvas.lineWidth",
-        "group": "canvas-2d",
-        "target": "browser.canvas2d.setLineWidth",
-        "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setLineWidthJs",
-        "marker": "vir_js",
-        "reason": "This protocol is the setter operation for CanvasRenderingContext2D.lineWidth; the getter is not yet shipped.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
-          { "name": "width", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "browser.event.formValue",
         "group": "event",
         "target": "browser.event.formValue",
@@ -509,13 +491,34 @@
         { "typescript": "CanvasRenderingContext2D.closePath", "targets": ["browser.canvas2d.closePath"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.closePath"] },
         { "typescript": "CanvasRenderingContext2D.fill", "targets": ["browser.canvas2d.fill"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.fill"] },
         { "typescript": "CanvasRenderingContext2D.fillRect", "targets": ["browser.canvas2d.fillRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.fillRectJs"] },
+        {
+          "typescript": "CanvasRenderingContext2D.fillStyle",
+          "accessors": {
+            "get": { "missing": true, "note": "VIR does not yet ship the fillStyle getter." },
+            "set": { "target": "browser.canvas2d.setFillStyle", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleJs", "receiverName": "ctx", "parameterName": "style" }
+          }
+        },
         { "typescript": "CanvasRenderingContext2D.lineTo", "targets": ["browser.canvas2d.lineTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.lineToJs"] },
+        {
+          "typescript": "CanvasRenderingContext2D.lineWidth",
+          "accessors": {
+            "get": { "missing": true, "note": "VIR does not yet ship the lineWidth getter." },
+            "set": { "target": "browser.canvas2d.setLineWidth", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setLineWidthJs", "receiverName": "ctx", "parameterName": "width" }
+          }
+        },
         { "typescript": "CanvasRenderingContext2D.moveTo", "targets": ["browser.canvas2d.moveTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.moveToJs"] },
         { "typescript": "CanvasRenderingContext2D.restore", "targets": ["browser.canvas2d.restore"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.restore"] },
         { "typescript": "CanvasRenderingContext2D.rotate", "targets": ["browser.canvas2d.rotate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.rotateJs"] },
         { "typescript": "CanvasRenderingContext2D.save", "targets": ["browser.canvas2d.save"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.save"] },
         { "typescript": "CanvasRenderingContext2D.stroke", "targets": ["browser.canvas2d.stroke"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.stroke"] },
         { "typescript": "CanvasRenderingContext2D.strokeRect", "targets": ["browser.canvas2d.strokeRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.strokeRectJs"] },
+        {
+          "typescript": "CanvasRenderingContext2D.strokeStyle",
+          "accessors": {
+            "get": { "missing": true, "note": "VIR does not yet ship the strokeStyle getter." },
+            "set": { "target": "browser.canvas2d.setStrokeStyle", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleJs", "receiverName": "ctx", "parameterName": "style" }
+          }
+        },
         { "typescript": "CanvasRenderingContext2D.translate", "targets": ["browser.canvas2d.translate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.translateJs"] }
       ]
     },
