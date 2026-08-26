@@ -145,6 +145,11 @@ assertEqual(
   INTERFACE_MANIFEST_VERSION,
   "interface manifest version mismatch",
 );
+assertEqual(
+  leanNatConstant(packageFormat, "currentRuntimeAbiVersion"),
+  RUNTIME_ABI_VERSION,
+  "runtime ABI version mismatch in Lean",
+);
 if (RUNTIME_INTERFACE_MANIFEST_VERSION !== INTERFACE_MANIFEST_VERSION) {
   throw new Error(
     "runtime interface manifest version mismatch: " +
@@ -182,6 +187,21 @@ assertEqual(
   leanNatConstant(lakefileSource, "virPackageSetVersion"),
   IR_PACKAGE_SET_VERSION,
   "Lake package-set descriptor version mismatch",
+);
+assertEqual(
+  leanNatConstant(lakefileSource, "virPackageFormatVersion"),
+  PACKAGE_FORMAT_VERSION,
+  "Lake package format version mismatch",
+);
+assertEqual(
+  leanNatConstant(lakefileSource, "virInterfaceManifestVersion"),
+  INTERFACE_MANIFEST_VERSION,
+  "Lake interface manifest version mismatch",
+);
+assertEqual(
+  leanNatConstant(lakefileSource, "virRuntimeAbiVersion"),
+  RUNTIME_ABI_VERSION,
+  "Lake runtime ABI version mismatch",
 );
 
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");

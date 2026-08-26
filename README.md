@@ -9,9 +9,10 @@ For downstream Lake packages, the preferred workflow is:
 1. add `lean_vir` as a pinned Lake dependency;
 2. mark browser exports with `@[vir_export]` and startup hooks with
    `@[vir_startup]`;
-3. build the module's `.irpkg` with its `:vir` facet and install the matching
-   browser SDK with `:virSdk`;
-4. load the package and call `runStartupEntries()` from the browser host.
+3. list one or more program modules in `vir-web-assets.json` and make the
+   application's normal target depend on `@:virWebAssets`;
+4. serve the resulting one-SDK/many-program directory and call
+   `runStartupEntries()` for the selected program.
 
 See
 [Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
@@ -29,7 +30,7 @@ require lean_vir from git
   "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
 ```
 
-Then mark exports directly in Lean and build the containing module:
+Then mark exports directly in Lean:
 
 ```lean
 import Vir
@@ -58,9 +59,29 @@ how to make that IR available. The `:vir` build repeats marker checks for raw
 metadata and reports generated boxed-boundary, package-wide, or unresolved
 dependency problems.
 
+List the program in the application root's `vir-web-assets.json`:
+
+```json
+{
+  "format": "lean-vir-web-assets-config",
+  "version": 1,
+  "programs": [
+    {"id": "slides", "package": "my_slides", "module": "MySlides.Runtime"}
+  ]
+}
+```
+
+Attach the root package facet to the application's ordinary target and build
+that target:
+
+```lean
+lean_exe my_slides where
+  root := `Main
+  needs := #[`@:virWebAssets]
+```
+
 ```bash
-lake build +MySlides.Runtime:vir
-lake build :virSdk
+lake build my_slides
 ```
 
 When the dependency is pinned to an unreleased commit rather than a release
@@ -70,9 +91,11 @@ tag, request the SDK artifact built from that same commit:
 VIR_SDK_COMMIT=<same-commit> lake build :virSdk
 ```
 
-The module facet writes a package-set descriptor, root member, reached
-dependency members, and report under `.lake/build/vir/module-sets/`; the package
-facet installs the versioned browser SDK. `vir.runStartupEntries()`
+The application facet builds each module's package set, installs one matching
+SDK, checks source/ABI compatibility and digests, and stages everything under
+`.lake/build/vir/web-assets/` with a `VIR_WEB_ASSETS.json` discovery manifest.
+The lower-level `+Module:vir` and `:virSdk` facets remain available for custom
+artifact workflows. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely

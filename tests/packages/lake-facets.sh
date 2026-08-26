@@ -10,21 +10,29 @@ cd "$(dirname "$0")/../.."
 
 repo="$(pwd -P)"
 sdk_version="$(node -p 'require("./package.json").version')"
+repo_commit="$(git rev-parse HEAD)"
+lean_toolchain="$(tr -d '\n' < lean-toolchain)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
 write_sdk_manifest() {
   local sdk_dir="$1"
   local commit="$2"
-  local hash="$3"
+  local js_hash="$3"
+  local wasm_hash="$4"
   printf '%s\n' \
     '{' \
     '  "name": "lean-vir-sdk",' \
     "  \"version\": \"$sdk_version\"," \
     "  \"gitCommit\": \"$commit\"," \
+    "  \"leanToolchain\": \"$lean_toolchain\"," \
+    '  "leanVersion": "Lean 4 smoke",' \
+    '  "packageFormatVersion": 10,' \
+    '  "manifestVersion": 7,' \
     '  "runtimeAbiVersion": 1,' \
     '  "files": [' \
-    "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$hash\"}" \
+    "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$js_hash\"}," \
+    "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\"}" \
     '  ]' \
     '}' > "$sdk_dir/lean-vir-artifact.json"
 }
@@ -35,6 +43,9 @@ assert_module_fixture_descriptor() {
     const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
     if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
     if (descriptor.version !== 1) process.exit(1);
+    if (descriptor.compatibility?.packageFormatVersion !== 10) process.exit(1);
+    if (descriptor.compatibility?.manifestVersion !== 7) process.exit(1);
+    if (descriptor.compatibility?.runtimeAbiVersion !== 1) process.exit(1);
     const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
     const expected = [
       ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
@@ -118,7 +129,8 @@ node --input-type=module -e '
   if (manifest.exports[0]?.startup !== true) process.exit(1);
 ' "$tmp/canvas-package.json"
 
-mkdir -p "$tmp/Smoke" "$tmp/sdk-source/lean-vir-sdk/js"
+mkdir -p "$tmp/Smoke" "$tmp/dep/Dep" "$tmp/sdk-source/lean-vir-sdk/js" \
+  "$tmp/sdk-source/lean-vir-sdk/wasm"
 
 printf '%s\n' \
   'import Lake' \
@@ -127,11 +139,41 @@ printf '%s\n' \
   'package vir_lake_smoke' \
   '' \
   "require lean_vir from \"$repo\"" \
+  'require smoke_dep from "dep"' \
   '' \
   '@[default_target]' \
-  'lean_lib Smoke' > "$tmp/lakefile.lean"
+  'lean_lib Smoke' \
+  '' \
+  'lean_exe smoke_app where' \
+  '  root := `Main' \
+  '  needs := #[`@:virWebAssets]' > "$tmp/lakefile.lean"
 
 cp lean-toolchain "$tmp/lean-toolchain"
+
+printf '%s\n' \
+  'import Lake' \
+  'open Lake DSL' \
+  '' \
+  'package smoke_dep' \
+  '' \
+  "require lean_vir from \"$repo\"" \
+  '' \
+  '@[default_target]' \
+  'lean_lib SmokeDep where' \
+  '  roots := #[`Dep.Widget]' > "$tmp/dep/lakefile.lean"
+
+cp lean-toolchain "$tmp/dep/lean-toolchain"
+
+printf '%s\n' \
+  'def main : IO Unit := pure ()' > "$tmp/Main.lean"
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'public meta import Vir.Attributes' \
+  '' \
+  '@[vir_export]' \
+  'public def Dep.Widget.value : Nat := 77' > "$tmp/dep/Dep/Widget.lean"
 
 printf '%s\n' \
   'import Vir' \
@@ -253,14 +295,17 @@ printf '%s\n' \
   '  Smoke.OpaqueDependency.environmentHome' > "$tmp/Smoke/DeferredRuntime.lean"
 
 printf '%s\n' 'export const smoke = true;' > "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js"
+printf '%s\n' 'fake-wasm' > "$tmp/sdk-source/lean-vir-sdk/wasm/vir-upstream.wasm"
 sdk_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
-write_sdk_manifest "$tmp/sdk-source/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash"
+wasm_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/wasm/vir-upstream.wasm" | cut -d' ' -f1)"
+write_sdk_manifest "$tmp/sdk-source/lean-vir-sdk" "$repo_commit" "$sdk_hash" "$wasm_hash"
 tar -czf "$tmp/lean-vir-sdk.tar.gz" -C "$tmp/sdk-source" lean-vir-sdk
 
-mkdir -p "$tmp/sdk-bad/lean-vir-sdk/js" "$tmp/existing-sdk"
+mkdir -p "$tmp/sdk-bad/lean-vir-sdk/js" "$tmp/sdk-bad/lean-vir-sdk/wasm" "$tmp/existing-sdk"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-bad/lean-vir-sdk/js/vir-runtime.js"
-write_sdk_manifest "$tmp/sdk-bad/lean-vir-sdk" "lake-facet-smoke" \
-  "0000000000000000000000000000000000000000000000000000000000000000"
+printf '%s\n' 'fake-wasm' > "$tmp/sdk-bad/lean-vir-sdk/wasm/vir-upstream.wasm"
+write_sdk_manifest "$tmp/sdk-bad/lean-vir-sdk" "$repo_commit" \
+  "0000000000000000000000000000000000000000000000000000000000000000" "$wasm_hash"
 tar -czf "$tmp/lean-vir-sdk-bad.tar.gz" -C "$tmp/sdk-bad" lean-vir-sdk
 printf '%s\n' 'keep-existing-sdk' > "$tmp/existing-sdk/marker.txt"
 
@@ -284,6 +329,96 @@ lake -d "$tmp" build Smoke.InterfaceClassifier
 lake -d "$tmp" build Smoke.PackagePipeline
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
+
+printf '%s\n' \
+  '{' \
+  '  "format": "lean-vir-web-assets-config",' \
+  '  "version": 1,' \
+  '  "programs": [' \
+  '    {"id": "runtime", "package": "vir_lake_smoke", "module": "Smoke.Runtime"}' \
+  '  ]' \
+  '}' > "$tmp/vir-web-assets.json"
+
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
+
+web_assets="$tmp/.lake/build/vir/web-assets"
+web_manifest="$web_assets/VIR_WEB_ASSETS.json"
+test -f "$web_manifest"
+test -f "$web_assets/sdk/js/vir-runtime.js"
+test -f "$web_assets/sdk/wasm/vir-upstream.wasm"
+test -f "$web_assets/programs/runtime/Runtime.irpkg-set.json"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  if (manifest.format !== "lean-vir-web-assets" || manifest.version !== 1) process.exit(1);
+  if (manifest.sdk?.gitCommit !== process.argv[2]) process.exit(1);
+  if (manifest.sdk?.runtimeModule !== "sdk/js/vir-runtime.js") process.exit(1);
+  if (manifest.sdk?.wasm !== "sdk/wasm/vir-upstream.wasm") process.exit(1);
+  if (manifest.programs?.length !== 1) process.exit(1);
+  if (manifest.programs[0]?.module !== "Smoke.Runtime") process.exit(1);
+  if (!manifest.programs[0]?.files?.every(({ sha256 }) => /^[0-9a-f]{64}$/.test(sha256))) process.exit(1);
+' "$web_manifest" "$repo_commit"
+
+sdk_stage_time="$(stat -c '%y' "$web_assets/sdk/js/vir-runtime.js")"
+runtime_stage_time="$(stat -c '%y' "$web_assets/programs/runtime/Runtime.irpkg")"
+
+printf '%s\n' \
+  '{' \
+  '  "format": "lean-vir-web-assets-config",' \
+  '  "version": 1,' \
+  '  "programs": [' \
+  '    {"id": "runtime", "package": "vir_lake_smoke", "module": "Smoke.Runtime"},' \
+  '    {"id": "widget", "package": "smoke_dep", "module": "Dep.Widget"}' \
+  '  ]' \
+  '}' > "$tmp/vir-web-assets.json"
+
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
+test "$(stat -c '%y' "$web_assets/sdk/js/vir-runtime.js")" = "$sdk_stage_time"
+test "$(stat -c '%y' "$web_assets/programs/runtime/Runtime.irpkg")" = "$runtime_stage_time"
+test -f "$web_assets/programs/widget/Widget.irpkg-set.json"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const programs = Object.fromEntries(manifest.programs.map((program) => [program.id, program]));
+  if (manifest.programs.length !== 2) process.exit(1);
+  if (programs.runtime?.package !== "vir_lake_smoke") process.exit(1);
+  if (programs.widget?.package !== "smoke_dep") process.exit(1);
+  if (programs.widget?.descriptor !== "programs/widget/Widget.irpkg-set.json") process.exit(1);
+' "$web_manifest"
+
+widget_hash="$(sha256sum "$web_assets/programs/widget/Widget.irpkg" | cut -d' ' -f1)"
+printf '%s\n' \
+  'module' \
+  '' \
+  'public meta import Vir.Attributes' \
+  '' \
+  '@[vir_export]' \
+  'public def Dep.Widget.value : Nat := 78' > "$tmp/dep/Dep/Widget.lean"
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
+test "$(stat -c '%y' "$web_assets/sdk/js/vir-runtime.js")" = "$sdk_stage_time"
+test "$(stat -c '%y' "$web_assets/programs/runtime/Runtime.irpkg")" = "$runtime_stage_time"
+test "$(sha256sum "$web_assets/programs/widget/Widget.irpkg" | cut -d' ' -f1)" != "$widget_hash"
+
+mkdir -p "$tmp/sdk-mismatch-source"
+cp -R "$tmp/sdk-source/lean-vir-sdk" "$tmp/sdk-mismatch-source/lean-vir-sdk"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const manifest = JSON.parse(fs.readFileSync(path, "utf8"));
+  manifest.packageFormatVersion = 999;
+  fs.writeFileSync(path, `${JSON.stringify(manifest)}\n`);
+' "$tmp/sdk-mismatch-source/lean-vir-sdk/lean-vir-artifact.json"
+tar -czf "$tmp/lean-vir-sdk-mismatch.tar.gz" -C "$tmp/sdk-mismatch-source" lean-vir-sdk
+if VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk-mismatch.tar.gz" lake -d "$tmp" build smoke_app \
+    > "$tmp/web-mismatch.stdout" 2> "$tmp/web-mismatch.stderr"; then
+  echo "mismatched SDK unexpectedly composed into VIR web assets" >&2
+  exit 1
+fi
+cat "$tmp/web-mismatch.stdout" "$tmp/web-mismatch.stderr" > "$tmp/web-mismatch.output"
+grep -q 'SDK manifest package format mismatch: expected 10, got 999' "$tmp/web-mismatch.output"
+test ! -e "$web_manifest"
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
+test -f "$web_manifest"
 
 if lake -d "$tmp" build +Smoke.DeferredRuntime:vir \
     > "$tmp/deferred-runtime.stdout" 2> "$tmp/deferred-runtime.stderr"; then
@@ -370,13 +505,19 @@ rm -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 grep -q 'smoke = true' "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
 
-mkdir -p "$tmp/sdk-source-2/lean-vir-sdk/js"
+mkdir -p "$tmp/sdk-source-2/lean-vir-sdk/js" "$tmp/sdk-source-2/lean-vir-sdk/wasm"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js"
+printf '%s\n' 'fake-wasm-2' > "$tmp/sdk-source-2/lean-vir-sdk/wasm/vir-upstream.wasm"
 sdk_hash="$(sha256sum "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
-write_sdk_manifest "$tmp/sdk-source-2/lean-vir-sdk" "lake-facet-smoke-2" "$sdk_hash"
+wasm_hash="$(sha256sum "$tmp/sdk-source-2/lean-vir-sdk/wasm/vir-upstream.wasm" | cut -d' ' -f1)"
+write_sdk_manifest "$tmp/sdk-source-2/lean-vir-sdk" "$repo_commit" "$sdk_hash" "$wasm_hash"
 tar -czf "$tmp/lean-vir-sdk-2.tar.gz" -C "$tmp/sdk-source-2" lean-vir-sdk
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk-2.tar.gz" lake -d "$tmp" build :virSdk
 grep -q 'smoke = false' "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
+
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk-2.tar.gz" lake -d "$tmp" build smoke_app
+grep -q 'smoke = false' "$web_assets/sdk/js/vir-runtime.js"
+test -f "$web_manifest"
 
 echo "VIR Lake facet smoke ok"

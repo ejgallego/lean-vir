@@ -2,6 +2,7 @@ import Lake
 open Lake DSL
 
 package lean_vir where
+  version := v!"0.1.0"
   releaseRepo := "https://github.com/ejgallego/lean-vir"
 
 def npmCmd : String :=
@@ -60,6 +61,10 @@ lean_exe vir_fetch_sdk where
   root := `tools.VirFetchSdk
   supportInterpreter := true
 
+lean_exe vir_web_assets where
+  root := `tools.VirWebAssets
+  supportInterpreter := true
+
 lean_exe vir_native_wrappers where
   root := `tools.GenerateNativeWrappers
   supportInterpreter := true
@@ -80,6 +85,45 @@ private def virSdkVersion : String := "0.1.0"
 private def virPackageSetFormat : String := "lean-vir-ir-package-set"
 
 private def virPackageSetVersion : Nat := 1
+
+private def virPackageFormatVersion : Nat := 10
+
+private def virInterfaceManifestVersion : Nat := 7
+
+private def virRuntimeAbiVersion : Nat := 1
+
+private def virWebAssetsConfigFormat : String := "lean-vir-web-assets-config"
+
+private def virWebAssetsConfigVersion : Nat := 1
+
+private structure VirSourceIdentity where
+  version : String
+  commit? : Option String
+
+private def virGitCommit? (dir : System.FilePath) : IO (Option String) := do
+  try
+    let output ← IO.Process.output {
+      cmd := "git"
+      args := #["-C", dir.toString, "rev-parse", "--show-toplevel", "HEAD"]
+    }
+    let lines := output.stdout.splitOn "\n"
+    let some root := lines[0]? | return none
+    let some commit := lines[1]? | return none
+    let root := (System.FilePath.mk root.trimAscii.toString).normalize
+    let commit := commit.trimAscii.toString
+    if output.exitCode == 0 && root == dir.normalize && !commit.isEmpty then
+      return some commit
+    return none
+  catch _ =>
+    return none
+
+private def virSourceIdentity : FetchM VirSourceIdentity := do
+  let some virPkg ← findPackageByName? `lean_vir
+    | error "the VIR facets require the `lean_vir` package in this workspace"
+  return {
+    version := virPkg.version.toString
+    commit? := ← virGitCommit? virPkg.dir
+  }
 
 private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
   match json.getObjVal? field with
@@ -103,6 +147,31 @@ private def virPackageSetComplete
     | return false
   if version != virPackageSetVersion then
     return false
+  let .ok compatibility := descriptor.getObjVal? "compatibility"
+    | return false
+  let .ok packageFormatJson := compatibility.getObjVal? "packageFormatVersion"
+    | return false
+  let .ok packageFormat := packageFormatJson.getNat?
+    | return false
+  if packageFormat != virPackageFormatVersion then
+    return false
+  let .ok manifestVersionJson := compatibility.getObjVal? "manifestVersion"
+    | return false
+  let .ok manifestVersion := manifestVersionJson.getNat?
+    | return false
+  if manifestVersion != virInterfaceManifestVersion then
+    return false
+  let .ok runtimeAbiJson := compatibility.getObjVal? "runtimeAbiVersion"
+    | return false
+  let .ok runtimeAbi := runtimeAbiJson.getNat?
+    | return false
+  if runtimeAbi != virRuntimeAbiVersion then
+    return false
+  for field in #["leanVersion", "leanToolchain", "leanGithash"] do
+    let some value := virJsonStringField? compatibility field
+      | return false
+    if value.isEmpty then
+      return false
   let .ok packagesJson := descriptor.getObjVal? "packages"
     | return false
   let .ok packages := packagesJson.getArr?
@@ -215,6 +284,9 @@ Install and verify the matching VIR browser SDK under the package build
 directory.
 -/
 package_facet virSdk (pkg : Package) : System.FilePath := do
+  let identity ← virSourceIdentity
+  if identity.version != virSdkVersion then
+    error s!"lean_vir package version {identity.version} does not match SDK contract {virSdkVersion}"
   let fetcherJob ← vir_fetch_sdk.fetch
   let sdkDir := pkg.buildDir / "vir" / "sdk"
   let manifestPath := sdkDir / "lean-vir-artifact.json"
@@ -224,24 +296,32 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   let commit? ← IO.getEnv "VIR_SDK_COMMIT"
   let expectCommit? ← IO.getEnv "VIR_SDK_EXPECT_COMMIT"
   let repo? ← IO.getEnv "VIR_SDK_REPO"
+  if let some configured := expectCommit? then
+    if let some derived := identity.commit? then
+      if configured != derived then
+        error s!"VIR_SDK_EXPECT_COMMIT={configured} does not match lean_vir at {derived}"
+  let expectedCommit? := identity.commit?.orElse fun _ => expectCommit?
   let sourceConfig := String.intercalate "\n" [
     s!"archive={archive?.getD ""}",
     s!"url={url?.getD ""}",
     s!"tag={tag?.getD ""}",
     s!"commit={commit?.getD ""}",
-    s!"expectCommit={expectCommit?.getD ""}",
+    s!"expectCommit={expectedCommit?.getD ""}",
     s!"repo={repo?.getD ""}"
   ]
   fetcherJob.mapM fun fetcher => do
     addTrace (← computeTrace fetcher)
-    addPureTrace virSdkVersion "VIR SDK version"
+    addPureTrace identity.version "VIR SDK version"
+    if let some commit := identity.commit? then
+      addPureTrace commit "lean_vir source revision"
     addPureTrace sourceConfig "VIR SDK source"
     if let some archive := archive? then
       addTrace (← computeTrace (System.FilePath.mk archive))
     if ← manifestPath.pathExists then
       let verification ← IO.Process.output {
         cmd := fetcher.toString
-        args := #["--verify-installed", sdkDir.toString, "--expect-version", virSdkVersion]
+        args := #["--verify-installed", sdkDir.toString, "--expect-version", identity.version] ++
+          (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[]
         env := ← getAugmentedEnv
       }
       if verification.exitCode != 0 then
@@ -250,7 +330,133 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       createParentDirs manifestPath
       proc {
         cmd := fetcher.toString
-        args := #["--out", sdkDir.toString]
+        args := #["--out", sdkDir.toString, "--expect-version", identity.version] ++
+          (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[]
         env := ← getAugmentedEnv
       }
     return manifestPath
+
+private structure VirWebProgramConfig where
+  id : String
+  package? : Option Lean.Name
+  moduleName : Lean.Name
+
+private def virRequiredJsonString (source : String) (json : Lean.Json) (field : String) : IO String := do
+  match json.getObjVal? field >>= Lean.Json.getStr? with
+  | .ok value => pure value
+  | .error err => throw <| IO.userError s!"invalid {source} field `{field}`: {err}"
+
+private def virOptionalJsonString (source : String) (json : Lean.Json) (field : String) : IO (Option String) := do
+  match json.getObjVal? field with
+  | .error _ => pure none
+  | .ok value =>
+      match value.getStr? with
+      | .ok text => pure (some text)
+      | .error err => throw <| IO.userError s!"invalid {source} field `{field}`: {err}"
+
+private def virReadWebAssetsConfig (path : System.FilePath) : IO (Array VirWebProgramConfig) := do
+  unless (← path.pathExists) do
+    throw <| IO.userError s!"missing VIR web-assets configuration: {path}"
+  let .ok json := Lean.Json.parse (← IO.FS.readFile path)
+    | throw <| IO.userError s!"failed to parse {path}"
+  let format ← virRequiredJsonString path.toString json "format"
+  if format != virWebAssetsConfigFormat then
+    throw <| IO.userError s!"unsupported VIR web-assets configuration format: {format}"
+  let .ok versionJson := json.getObjVal? "version"
+    | throw <| IO.userError "VIR web-assets configuration is missing `version`"
+  let .ok version := versionJson.getNat?
+    | throw <| IO.userError "VIR web-assets configuration `version` must be a natural number"
+  if version != virWebAssetsConfigVersion then
+    throw <| IO.userError s!"unsupported VIR web-assets configuration version: {version}"
+  let .ok programsJson := json.getObjVal? "programs" >>= Lean.Json.getArr?
+    | throw <| IO.userError "VIR web-assets configuration `programs` must be an array"
+  if programsJson.isEmpty then
+    throw <| IO.userError "VIR web-assets configuration must contain at least one program"
+  let mut programs : Array VirWebProgramConfig := #[]
+  let mut ids : Array String := #[]
+  for programJson in programsJson do
+    let moduleString ← virRequiredJsonString "VIR web-assets program" programJson "module"
+    let moduleName := moduleString.toName
+    if moduleName.isAnonymous then
+      throw <| IO.userError "VIR web-assets program `module` must be a Lean module name"
+    let id := (← virOptionalJsonString "VIR web-assets program" programJson "id").getD moduleString
+    if ids.contains id then
+      throw <| IO.userError s!"duplicate VIR web-assets program id: {id}"
+    ids := ids.push id
+    let package? := (← virOptionalJsonString "VIR web-assets program" programJson "package").map
+      String.toName
+    programs := programs.push { id, package?, moduleName }
+  return programs
+
+private structure VirResolvedWebProgram where
+  config : VirWebProgramConfig
+  module : Module
+
+private def virResolveWebProgram (config : VirWebProgramConfig) : FetchM VirResolvedWebProgram := do
+  let module ← match config.package? with
+  | some packageName =>
+      let some programPkg ← findPackageByName? packageName
+        | error s!"VIR web-assets package `{packageName}` was not found"
+      let some module := programPkg.findTargetModule? config.moduleName
+        | error s!"VIR web-assets module `{config.moduleName}` was not found in package `{packageName}`"
+      pure module
+  | none =>
+      let modules ← findModules config.moduleName
+      if modules.isEmpty then
+        error s!"VIR web-assets module `{config.moduleName}` was not found"
+      else if modules.size > 1 then
+        error s!"VIR web-assets module `{config.moduleName}` is ambiguous; add its `package`"
+      else
+        let some module := modules[0]?
+          | error s!"VIR web-assets module `{config.moduleName}` was not found"
+        pure module
+  return { config, module }
+
+/--
+Compose the root application's `vir-web-assets.json` into one deployable
+directory containing one matching SDK and one or more VIR package sets.
+-/
+package_facet virWebAssets (pkg : Package) : System.FilePath := do
+  let identity ← virSourceIdentity
+  let configPath := pkg.dir / "vir-web-assets.json"
+  let configs ← virReadWebAssetsConfig configPath
+  let programs ← configs.mapM virResolveWebProgram
+  let composerJob ← vir_web_assets.fetch
+  let sdkJob ← pkg.fetchFacetJob `virSdk
+  let descriptorJobs ← programs.mapM fun program => program.module.fetchFacetJob `vir
+  let descriptorsJob := Job.collectArray descriptorJobs "VIR web programs"
+  let sdkManifest := pkg.buildDir / "vir" / "sdk" / "lean-vir-artifact.json"
+  let outputDir := pkg.buildDir / "vir" / "web-assets"
+  let outputManifest := outputDir / "VIR_WEB_ASSETS.json"
+  composerJob.bindM fun composer =>
+    sdkJob.bindM fun _ =>
+      descriptorsJob.mapM fun _ => do
+        addTrace (← computeTrace composer)
+        addTrace (← computeTrace configPath)
+        addTrace (← computeTrace sdkManifest)
+        addPureTrace identity.version "lean_vir version"
+        if let some commit := identity.commit? then
+          addPureTrace commit "lean_vir source revision"
+        let mut args := #[
+          "--out", outputDir.toString,
+          "--sdk-manifest", sdkManifest.toString,
+          "--vir-version", identity.version,
+          "--vir-commit", identity.commit?.getD "",
+          "--host-package", pkg.baseName.toString
+        ]
+        for program in programs do
+          let descriptor := virModuleOutput program.module "module-sets" "irpkg-set.json"
+          addTrace (← computeTrace descriptor)
+          args := args ++ #[
+            "--program",
+            program.config.id,
+            program.module.pkg.baseName.toString,
+            program.module.name.toString,
+            descriptor.toString
+          ]
+        proc {
+          cmd := composer.toString
+          args
+          env := ← getAugmentedEnv
+        }
+        return outputManifest

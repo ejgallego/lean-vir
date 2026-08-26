@@ -1,8 +1,9 @@
 # Lake Integration
 
 VIR provides a module facet for compiling marked Lean declarations into a
-browser-loadable `.irpkg`, plus a package facet for installing the matching
-JavaScript/Wasm SDK. This is intentionally a focused browser-program workflow,
+browser-loadable package set, a package facet for installing the matching
+JavaScript/Wasm SDK, and an application facet for composing several package
+sets with one SDK. This is intentionally a focused browser-program workflow,
 not a general Lean-to-Wasm compiler.
 
 ## Add The Lake Dependency
@@ -173,14 +174,90 @@ facet removes the previous descriptor, root, and root-specific shard directory,
 so a failed generation cannot leave an old descriptor advertising stale or
 partially replaced members.
 
-An executable or renderer that consumes the package should declare the facet as
-a build dependency:
+The `+Module:vir` facet is the producer primitive. It is useful on its own for
+inspection and custom artifact workflows. Applications should normally use the
+application composition described below instead of wiring one producer
+directly into an executable.
+
+## Compose Application Web Assets
+
+Add `vir-web-assets.json` at the root of the application package. Each entry
+selects an existing `+Module:vir` producer. Use `package` when the module belongs
+to a dependency or when its name would otherwise be ambiguous; `id` is the
+stable URL directory name and defaults to the module name.
+
+```json
+{
+  "format": "lean-vir-web-assets-config",
+  "version": 1,
+  "programs": [
+    {
+      "id": "slides",
+      "package": "my_slides",
+      "module": "MySlides.Runtime"
+    },
+    {
+      "id": "widgets",
+      "package": "some_dependency",
+      "module": "Widgets.Runtime"
+    }
+  ]
+}
+```
+
+Make the root package's `virWebAssets` facet a dependency of the normal
+application target:
 
 ```lean
 lean_exe my_slides where
   root := `Main
-  needs := #[`+MySlides.Runtime:vir]
+  needs := #[`@:virWebAssets]
 ```
+
+Then the ordinary build produces the executable and its web assets together:
+
+```bash
+lake build my_slides
+```
+
+The facet resolves and builds every listed module facet, installs exactly one
+SDK owned by the root application, verifies source and ABI compatibility, and
+writes:
+
+```text
+.lake/build/vir/web-assets/
+  VIR_WEB_ASSETS.json
+  sdk/
+    lean-vir-artifact.json
+    js/...
+    wasm/...
+  programs/
+    slides/
+      Runtime.irpkg-set.json
+      Runtime.irpkg
+      Runtime.parts/...
+    widgets/
+      Runtime.irpkg-set.json
+      Runtime.irpkg
+```
+
+`VIR_WEB_ASSETS.json` records the `lean_vir` version and source revision, SDK
+identity and entry points, each program's package/module identity and
+compatibility tuple, and SHA-256/size records for every staged payload. Program
+descriptors retain their relative member layout. A version, package format,
+interface manifest, runtime ABI, Lean toolchain, source revision, missing file,
+or digest mismatch stops composition and removes the discovery manifest so a
+partially updated directory is not advertised as valid.
+
+The staging step is incremental. Changing one program rebuilds and restages
+that program without reinstalling or recopying the SDK or unrelated programs.
+Changing the selected SDK revalidates all programs and replaces only the SDK
+subtree. Removing a program from the configuration removes its owned staging
+directory.
+
+The application can copy or serve this one directory without running npm,
+selecting an SDK revision in nested packages, or teaching its renderer about
+Lake's dependency build directories.
 
 A Verso Slides integration can expose configuration shaped like:
 
@@ -188,12 +265,11 @@ A Verso Slides integration can expose configuration shaped like:
 vir := some { module := `MySlides.Runtime }
 ```
 
-That integration should copy the generated `.irpkg` and SDK beside the
-presentation, create its mount element, wait for Reveal initialization, load
-the runtime, and call `vir.runStartupEntries()`. It should call `vir.dispose()`
-during page teardown and render initialization failures visibly. This is the
-integration contract; Verso still needs to land the corresponding renderer
-configuration.
+That integration should depend on `@:virWebAssets`, copy the one composed
+directory beside the presentation, create its mount element, wait for Reveal
+initialization, load the selected program, and call
+`vir.runStartupEntries()`. It should call `vir.dispose()` during page teardown
+and render initialization failures visibly.
 
 ## Install The Browser SDK
 
@@ -209,9 +285,11 @@ an unreleased revision, select the exact pinned commit:
 VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
 ```
 
-The commit fetch checks that the downloaded artifact was built from that exact
-revision. The installer also checks the SDK version, runtime ABI, non-empty
-source commit, and every manifest checksum. GitHub Actions artifact downloads
+The facet derives the expected version and Git commit directly from the
+resolved `lean_vir` dependency. `VIR_SDK_COMMIT` selects the unreleased artifact;
+clients do not need a separate expected-revision setting. The installer checks
+the SDK version, runtime ABI, non-empty source commit, and every manifest
+checksum. GitHub Actions artifact downloads
 require `GITHUB_TOKEN` or an authenticated `gh` CLI. Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
 archive without network access. Lake tracks the selected source and local
@@ -235,6 +313,18 @@ vir.runStartupEntries();
 Publish the descriptor together with every referenced `.irpkg`, preserving
 their relative layout. The runtime resolves each member relative to the served
 descriptor URL.
+
+## Runtime Sharing Model
+
+Several composed programs can share the SDK bytes and one compiled
+`WebAssembly.Module`. Create one `VirRuntimeFactory` from the staged SDK and use
+it to create a separate runtime instance for each program. This avoids repeated
+Wasm compilation while preserving separate Lean heaps and startup state.
+
+One live Wasm instance and Lean heap still load exactly one package set. A
+single `+Root:vir` package set already includes the reached dependency cone for
+that root. Loading several independent roots into one live instance is a
+different future design; `virWebAssets` does not merge package sets or heaps.
 
 `runStartupEntries()` invokes startup hooks in manifest order and records each
 one only after it succeeds. Calling it again skips completed hooks; if a hook
