@@ -205,10 +205,12 @@ export async function generateLeanBindings(configPath) {
       requested.has(mapping.typescript));
     const hasUpstreamAdapter = (generation.protocolOperations ?? []).some((operation) =>
       operation.group === root.id && operation.upstreamRelation.kind === "upstream-adapter");
-    if (!hasSelectedMember && !hasUpstreamAdapter) continue;
+    const hasLocalContract = (generation.protocolOperations ?? []).some((operation) =>
+      operation.group === root.id && operation.upstreamRelation.kind === "local-contract");
+    if (!hasSelectedMember && !hasUpstreamAdapter && !hasLocalContract) continue;
     const upstream = root.upstream;
-    if (upstream?.kind !== "typescript") {
-      throw new Error(`${config.id}/${root.id} does not define a TypeScript declaration surface`);
+    if (!["typescript", "local"].includes(upstream?.kind)) {
+      throw new Error(`${config.id}/${root.id} does not define a declaration surface`);
     }
     descriptorsByRoot.set(root.id, await generateDescriptorFile({
       files: upstream.declarations.map((file) => resolve(repositoryRoot, file)),

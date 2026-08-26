@@ -145,7 +145,7 @@ assert.ok(report.summary.generation.disposition.generated > 0);
 assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
-assert.equal(report.workItems.length, 5);
+assert.equal(report.workItems.length, 3);
 assert.ok(report.workItems.every((item) => item.disposition !== "unsupported"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
@@ -432,13 +432,27 @@ assert.ok(canvasElement?.generatedOperations.some((operation) =>
 const localCommands = roots.find((root) =>
   root.library === "infoview" && root.id === "commands");
 assert.deepEqual(localCommands?.analysis, {
-  status: "needs-input",
-  scope: "local-upstream-contract-missing",
+  status: "complete",
+  scope: "complete-upstream-surface",
 });
 assert.ok(localCommands?.bindings.some((binding) =>
   binding.target === "infoview.command.insertText"));
-assert.ok(localCommands?.workItems.some((item) =>
-  item.code === "local-upstream-contract-required"));
+assert.equal(localCommands?.coverage.summary.compatible, 3);
+assert.equal(localCommands?.coverage.summary.missing, 0);
+assert.equal(localCommands?.workItems.length, 0);
+assert.ok(localCommands?.generatedOperations.every((operation) =>
+  operation.protocol.upstreamRelation.kind === "local-contract" &&
+  typeof operation.protocol.upstreamRelation.member === "string"));
+
+const localRpcReferences = roots.find((root) =>
+  root.library === "proofwidgets" && root.id === "rpc-references");
+assert.deepEqual(localRpcReferences?.analysis, {
+  status: "complete",
+  scope: "complete-upstream-surface",
+});
+assert.equal(localRpcReferences?.coverage.summary.compatible, 5);
+assert.equal(localRpcReferences?.coverage.summary.missing, 0);
+assert.equal(localRpcReferences?.workItems.length, 0);
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {

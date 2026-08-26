@@ -116,7 +116,7 @@ function renderDocumentation(value, fallback = "No upstream declaration document
 
 const dispositionLabel = (value) => ({
   generated: "generated",
-  adapted: "reviewed adapter",
+  adapted: "reviewed protocol",
   "needs-annotation": "needs annotation",
   unsupported: "unsupported",
   "not-selected": "not selected",

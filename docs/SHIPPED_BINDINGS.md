@@ -86,8 +86,9 @@ Each upstream member has a generation record with three independent facts:
   direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
   annotation, or no implementation. This is distinct from declaration
   provenance: all shipped host declarations are generated.
-- **disposition** is `generated`, `needs-annotation`, `unsupported`, or
-  `not-selected`. Convenience wrappers are downstream
+- **disposition** is `generated`, `adapted`, `needs-annotation`, `unsupported`,
+  or `not-selected`. `adapted` means a reviewed protocol is linked to an
+  upstream or local declaration member. Convenience wrappers are downstream
   Lean APIs rather than upstream members, so they are not a member disposition.
 
 Only dispositions with an actionable diagnostic appear in the binding
@@ -182,6 +183,18 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/React.bindings.json`
 - `Vir/Infoview/Surface.bindings.json`
 - `Vir/ProofWidgets/Rpc.bindings.json`
+
+Local host protocols use declaration syntax too:
+
+- `Vir/Infoview/Surface.contract.d.ts`
+- `Vir/ProofWidgets/Rpc.contract.d.ts`
+
+Every local protocol operation names the exact declaration member it
+implements. The generator rejects missing members, while the explorer verifies
+that the contract covers every generated target and that its public Lean entry
+point reaches that target. The reviewed protocol still owns ABI-specific effect,
+resource, callback, and conversion policy that cannot be inferred from the
+local declaration alone.
 
 The descriptor generator, Lean generator, and consolidated explorer all load
 these files through the same schema validator. Unknown fields and malformed

@@ -941,6 +941,14 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     if (root.upstream.kind === "typescript" && relation.kind === "local-contract") {
       throw new Error(`generated protocol ${protocol.id} in a TypeScript group cannot be classified local-contract`);
     }
+    if (relation.kind === "local-contract") {
+      const symbols = symbolsByRoot.get(protocol.group);
+      if (symbols !== undefined || validateExceptions) {
+        if (!symbols?.has(relation.member)) {
+          throw new Error(`generated protocol ${protocol.id} references missing local contract member ${relation.member}`);
+        }
+      }
+    }
     if (relation.kind === "upstream-adapter") {
       if (root.upstream.kind !== "typescript") {
         throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);

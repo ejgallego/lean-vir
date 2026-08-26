@@ -28,7 +28,7 @@
         "id": "proofwidgets.rpc.ref-base", "group": "rpc-references", "target": "proofwidgets.rpc.ref",
         "lean": "Lean.Vir.ProofWidgets.rpcRefBaseJs", "marker": "vir_js",
         "reason": "Constructs the base host-side ProofWidgets reference descriptor from explicit JavaScript strings.",
-        "upstreamRelation": { "kind": "local-contract" },
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.ref" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "id", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
@@ -43,7 +43,7 @@
         "id": "proofwidgets.rpc.ref-finish", "group": "rpc-references", "target": "proofwidgets.rpc.ref.finish",
         "lean": "Lean.Vir.ProofWidgets.rpcRefFinishJs", "marker": "vir_js",
         "reason": "Completes a host-side ProofWidgets reference with optional server state and contextual text.",
-        "upstreamRelation": { "kind": "local-contract" },
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.finishRef" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "ref", "role": "receiver", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } },
@@ -57,7 +57,7 @@
         "id": "proofwidgets.rpc.resolved-value", "group": "rpc-references", "target": "js.value.proofwidgets.resolvedRef.value",
         "lean": "Lean.Vir.ProofWidgets.Rpc.resolvedRefValueJs", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly decodes the fixed ResolvedRef record returned by the ProofWidgets host protocol.",
-        "upstreamRelation": { "kind": "local-contract" },
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.resolvedRefValue" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [{ "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.ResolvedRef", "representation": "js-resource", "resourceInner": "ProofWidgets.ResolvedRef" } }],
         "result": { "type": { "lean": "ProofWidgets.ResolvedRef", "representation": "lean-owned" } }
@@ -66,7 +66,7 @@
         "id": "proofwidgets.rpc.inspect", "group": "rpc-references", "target": "proofwidgets.rpc.inspectRef",
         "lean": "Lean.Vir.ProofWidgets.Rpc.inspectRefJs", "marker": "vir_js",
         "reason": "Asks the host whether a ProofWidgets reference can be inspected.",
-        "upstreamRelation": { "kind": "local-contract" },
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.inspectRef" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [{ "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } }],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
@@ -75,7 +75,7 @@
         "id": "proofwidgets.rpc.resolve", "group": "rpc-references", "target": "proofwidgets.rpc.resolveRef",
         "lean": "Lean.Vir.ProofWidgets.Rpc.resolveRefJs", "marker": "vir_js",
         "reason": "Starts a one-shot host resolution and retains the callback until resolution or runtime disposal.",
-        "upstreamRelation": { "kind": "local-contract" },
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.resolveRef" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [
           { "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } },
@@ -91,7 +91,11 @@
       "title": "RPC references",
       "targets": ["proofwidgets.rpc.*", "js.value.proofwidgets.*"],
       "lean": { "public": ["Lean.Vir.ProofWidgets.Rpc"] },
-      "upstream": { "kind": "local" }
+      "upstream": {
+        "kind": "local",
+        "declarations": ["Vir/ProofWidgets/Rpc.contract.d.ts"],
+        "roots": ["ProofWidgetsRpcHost"]
+      }
     }
   ]
 }

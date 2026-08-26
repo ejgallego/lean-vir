@@ -15,6 +15,8 @@ import {
 
 const browserPath = new URL("../../Vir/Browser.bindings.json", import.meta.url).pathname;
 const browser = JSON.parse(await readFile(browserPath, "utf8"));
+const infoviewPath = new URL("../../Vir/Infoview/Surface.bindings.json", import.meta.url).pathname;
+const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
@@ -39,6 +41,16 @@ test("binding configuration requires a TypeScript declaration surface", async ()
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
+    /must have required property 'declarations'/u,
+  );
+});
+
+test("binding configuration requires a local declaration contract", async () => {
+  const invalid = structuredClone(infoview);
+  delete invalid.roots.find((root) => root.id === "commands").upstream.declarations;
+
+  await assert.rejects(
+    validateBindingConfig(invalid, infoviewPath),
     /must have required property 'declarations'/u,
   );
 });
@@ -108,5 +120,16 @@ test("reviewed protocols require a machine-readable upstream relation", async ()
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
     /must have required property 'upstreamRelation'/u,
+  );
+});
+
+test("local protocol relations identify their declaration member", async () => {
+  const invalid = structuredClone(infoview);
+  delete invalid.generation.protocolOperations.find((operation) =>
+    operation.upstreamRelation.kind === "local-contract").upstreamRelation.member;
+
+  await assert.rejects(
+    validateBindingConfig(invalid, infoviewPath),
+    /must have required property 'member'/u,
   );
 });

@@ -117,8 +117,11 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind"],
-          "properties": { "kind": { "const": "local-contract" } }
+          "required": ["kind", "member"],
+          "properties": {
+            "kind": { "const": "local-contract" },
+            "member": { "type": "string", "minLength": 1 }
+          }
         },
         {
           "type": "object",
@@ -537,6 +540,13 @@
         {
           "if": {
             "properties": { "kind": { "const": "typescript" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["declarations", "roots"] }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "local" } },
             "required": ["kind"]
           },
           "then": { "required": ["declarations", "roots"] }

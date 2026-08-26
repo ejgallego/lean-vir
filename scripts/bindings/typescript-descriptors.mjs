@@ -240,9 +240,9 @@ async function resolveBindingRoot(options) {
     throw new Error(`${relative(root, configPath)} has no API group ${rootId}`);
   }
   const upstream = binding.upstream;
-  if (upstream?.kind !== "typescript" || !Array.isArray(upstream.declarations) ||
+  if (!["typescript", "local"].includes(upstream?.kind) || !Array.isArray(upstream.declarations) ||
       !Array.isArray(upstream.roots)) {
-    throw new Error(`API group ${config.id}/${rootId} does not define a TypeScript declaration surface`);
+    throw new Error(`API group ${config.id}/${rootId} does not define a declaration surface`);
   }
   if (upstream.sourceUrl !== undefined && upstream.declarations.length !== 1) {
     throw new Error(`API group ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
