@@ -196,7 +196,7 @@ function printSectionReport(report) {
   console.log();
 }
 
-function mapAreaFor(input) {
+export function mapAreaFor(input) {
   if (input === "<internal>") return "Linker/internal glue";
   if (input.includes("libc++.a(") || input.includes("libc++abi.a(")) return "WASI SDK C++ runtime";
   if (input.includes("libc.a(") || input.includes("crt1-")) return "WASI libc / startup";
@@ -205,6 +205,27 @@ function mapAreaFor(input) {
       input === "build/upstream-probe/obj/ir_interpreter.o") {
     return "Lean upstream IR interpreter";
   }
+  if (input.includes("obj/lean/src/runtime/")) return "Lean C runtime";
+  if (input.includes("obj/lean/src/kernel/")) return "Lean kernel support";
+  if (input.includes("obj/lean/src/util/")) return "Lean utility support";
+  if (input.includes("obj/lean/stage0/stdlib/Lean/")) return "Lean generated library support";
+  if (input.includes("obj/vir/wasm/upstream_shim/runtime/native_symbols.cpp.o")) {
+    return "VIR native extern wrappers";
+  }
+  if (input.includes("obj/vir/wasm/upstream_shim/runtime/native_symbol_lookup.cpp.o")) {
+    return "VIR native extern registry";
+  }
+  if (input.includes("obj/vir/wasm/upstream_shim/package/")) {
+    return "VIR package loader and metadata";
+  }
+  if (input.includes("obj/vir/wasm/upstream_shim/abi/")) return "VIR JS/WASM ABI";
+  if (input.includes("obj/vir/wasm/upstream_shim/interpreter/")) {
+    return "VIR upstream interpreter bridge";
+  }
+  if (input.includes("obj/vir/wasm/upstream_shim/runtime/")) {
+    return "VIR runtime/platform shim";
+  }
+  if (input.includes("obj/vir/wasm/upstream_shim/")) return "VIR WASI/JS shim and package ABI";
   if (input.includes("third_party_lean4-src_src_runtime_")) return "Lean C runtime";
   if (input.endsWith("/native_support.o") || input === "build/upstream-probe/obj/native_support.o") {
     return "Lean compiled native support";
@@ -222,10 +243,20 @@ function mapAreaFor(input) {
   return "Other";
 }
 
-function mapDetailFor(input) {
+export function mapDetailFor(input) {
   if (input === "<internal>") return "<internal>";
   const archiveMember = input.match(/([^/]+\.a)\(([^)]+)\)$/);
   if (archiveMember) return `${archiveMember[1]}(${archiveMember[2]})`;
+  const normalized = input.replaceAll("\\", "/");
+  for (const [marker, prefix] of [
+    ["obj/lean/src/", "Lean/"],
+    ["obj/lean/stage0/stdlib/", "Lean stage0/"],
+    ["obj/vir/wasm/upstream_shim/", "VIR/"],
+    ["obj/vir/", "VIR project/"],
+  ]) {
+    const index = normalized.lastIndexOf(marker);
+    if (index !== -1) return prefix + normalized.slice(index + marker.length);
+  }
   return input.split("/").at(-1);
 }
 

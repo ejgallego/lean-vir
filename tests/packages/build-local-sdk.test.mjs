@@ -148,7 +148,7 @@ test("bounds local SDK object names below a deeply nested consumer cache", () =>
     virRoot,
     source: join(movedLeanRoot, "stage0", "stdlib", "Lean", "Data", "KVMap.c"),
   });
-  assert.equal(basename(movedLeanObject), basename(paths[0]));
+  assert.equal(movedLeanObject, paths[0]);
 
   const sameBasenameA = objectPath({
     objectRoot,
