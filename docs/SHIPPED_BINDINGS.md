@@ -91,7 +91,9 @@ Each upstream member has a generation record with three independent facts:
   Lean APIs rather than upstream members, so they are not a member disposition.
 
 Only dispositions with an actionable diagnostic appear in the binding
-workbench. In particular, `not-selected` is not an error or author action.
+workbench. In particular, `not-selected` is not an error or author action, and
+an explicitly `unsupported` upstream member remains a visible reference/roadmap
+gap without becoming immediate binding-author work.
 Every work item names a diagnostic code, explains the evidence, and gives the
 next required action. Reviewed protocols may still use `needs-annotation`
 until their upstream identity and direct TypeScript lowering are fully

@@ -289,12 +289,6 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
   } else if (unsupported !== undefined) {
     disposition = "unsupported";
     provenance = "annotation";
-    diagnostics.push({
-      code: "unsupported-upstream-operation",
-      severity: "action",
-      message: unsupported.note ?? "The binding configuration explicitly marks this operation unsupported.",
-      action: "Extend the generator and runtime policy before selecting this operation.",
-    });
   } else if (confirmedTargets.length !== 0) {
     disposition = "needs-annotation";
     provenance = "reviewed-protocol";
@@ -474,7 +468,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
   const representedAnchors = new Set(items.flatMap((item) =>
     item.anchor === undefined ? [] : [item.anchor]));
   issues.filter((entry) =>
-    ["type-fidelity", "coverage-gap", "missing-descriptor"].includes(entry.kind) &&
+    ["type-fidelity", "missing-descriptor"].includes(entry.kind) &&
     entry.anchor !== undefined && !representedAnchors.has(entry.anchor))
     .forEach((entry) => {
       items.push({
@@ -483,20 +477,16 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
         group: bindingRoot.id,
         subject: "comparison-anchor",
         anchor: entry.anchor,
-        disposition: entry.kind === "coverage-gap" ? "unsupported" : "needs-annotation",
+        disposition: "needs-annotation",
         provenance: "comparison",
         severity: entry.severity,
         code: entry.kind === "type-fidelity"
           ? "type-translation-limited"
-          : entry.kind === "coverage-gap"
-            ? "upstream-operation-unsupported"
-            : "type-translation-missing",
+          : "type-translation-missing",
         message: entry.message,
         action: entry.kind === "type-fidelity"
           ? "Review the generated specialization and improve the type translation policy."
-          : entry.kind === "coverage-gap"
-            ? "Add the upstream operation when it enters the supported binding scope."
-            : "Provide the missing TypeScript or Lean descriptor before generation.",
+          : "Provide the missing TypeScript or Lean descriptor before generation.",
         ...(entry.target === undefined ? {} : { target: entry.target }),
       });
       representedAnchors.add(entry.anchor);

@@ -145,6 +145,8 @@ assert.ok(report.summary.generation.disposition.generated > 0);
 assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
+assert.equal(report.workItems.length, 5);
+assert.ok(report.workItems.every((item) => item.disposition !== "unsupported"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Element.getInnerHTMLString"), false);
@@ -475,6 +477,10 @@ assert.ok(reactDomRoot?.comparison.results.some((result) =>
   result.id === "react_dom.hydration.entrypoint" &&
   result.status === "missing" &&
   result.portIntent.disposition === "unsupported"));
+assert.equal(reactDomRoot?.workItems.length, 0);
+assert.ok(reactDomRoot?.coverage.members.filter((member) =>
+  member.generation.disposition === "unsupported").every((member) =>
+    member.generation.diagnostics.length === 0));
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="available-metric"/u);
