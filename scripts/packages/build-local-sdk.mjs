@@ -18,6 +18,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { copyFileWithDirs } from "../file-utils.mjs";
 import { runSync } from "../process-utils.mjs";
@@ -107,15 +108,14 @@ async function syncTrackedSource(source, destination) {
   }
 }
 
-function leanToolchainRef(toolchain) {
+function validateAutomaticLeanToolchain(toolchain) {
   const prefix = "leanprover/lean4:";
   if (!toolchain.startsWith(prefix) || toolchain.length === prefix.length) {
     throw new Error(
-      `automatic Lean source acquisition requires ${prefix}<tag>, got ${toolchain}; ` +
+      `automatic Lean source acquisition requires ${prefix}<toolchain>, got ${toolchain}; ` +
         "set LEAN4_SRC to an exact Lean source checkout",
     );
   }
-  return toolchain.slice(prefix.length);
 }
 
 async function exactLeanSource(path, expectedCommit) {
@@ -126,10 +126,24 @@ async function exactLeanSource(path, expectedCommit) {
   }
 }
 
-async function acquireLeanSource(cache, toolchain, expectedCommit) {
-  const configured = process.env.LEAN4_SRC;
-  if (configured !== undefined && configured.length !== 0) {
-    const source = resolve(configured);
+export async function acquireLeanSource(
+  cache,
+  toolchain,
+  expectedCommit,
+  {
+    configuredSource = process.env.LEAN4_SRC,
+    repository = "https://github.com/leanprover/lean4.git",
+  } = {},
+) {
+  if (!/^[0-9a-f]{40}$/u.test(expectedCommit)) {
+    throw new Error(`invalid exact Lean git hash: ${expectedCommit}`);
+  }
+  if (
+    configuredSource !== undefined &&
+    configuredSource !== null &&
+    configuredSource.length !== 0
+  ) {
+    const source = resolve(configuredSource);
     if (!(await exactLeanSource(source, expectedCommit))) {
       throw new Error(
         `LEAN4_SRC must be the exact Lean checkout ${expectedCommit}: ${source}`,
@@ -143,20 +157,15 @@ async function acquireLeanSource(cache, toolchain, expectedCommit) {
     `lean4-${safeCachePart(expectedCommit, "Lean git hash")}`,
   );
   if (!(await exactLeanSource(source, expectedCommit))) {
+    validateAutomaticLeanToolchain(toolchain);
+    await mkdir(cache, { recursive: true });
     await rm(source, { recursive: true, force: true });
-    runSync(
-      "git",
-      [
-        "clone",
-        "--depth",
-        "1",
-        "--branch",
-        leanToolchainRef(toolchain),
-        "https://github.com/leanprover/lean4.git",
-        source,
-      ],
-      { cwd: cache },
-    );
+    runSync("git", ["init", "--quiet", source], { cwd: cache });
+    git(source, ["remote", "add", "origin", repository]);
+    git(source, ["fetch", "--depth", "1", "origin", expectedCommit], {
+      capture: false,
+    });
+    git(source, ["checkout", "--quiet", "--detach", expectedCommit]);
   }
   if (!(await exactLeanSource(source, expectedCommit))) {
     const actual = git(source, ["rev-parse", "HEAD"]);
@@ -291,11 +300,16 @@ async function buildLocalSdk(options) {
   );
 }
 
-try {
-  await buildLocalSdk(parseArgs(process.argv.slice(2)));
-} catch (error) {
-  console.error(
-    `error: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exitCode = 1;
+if (
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  try {
+    await buildLocalSdk(parseArgs(process.argv.slice(2)));
+  } catch (error) {
+    console.error(
+      `error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exitCode = 1;
+  }
 }

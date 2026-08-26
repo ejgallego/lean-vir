@@ -358,8 +358,9 @@ in the consumer's compiler. It caches the Lean source, build tree, and WASI SDK
 under `.lake/build/vir/sdk-build-cache/`. The first build therefore needs Git,
 Node/npm, and network access. Set `LEAN4_SRC` to an existing exact Lean source
 checkout or `WASI_SDK_PATH` to an existing WASI SDK to reuse local tools. This
-path changes SDK acquisition; it does not relax the program/SDK Lean toolchain,
-version, or Git-hash checks.
+path fetches the exact Lean githash reported by the consumer compiler; it does
+not treat the Elan toolchain token as a Git branch. It changes SDK acquisition,
+but does not relax the program/SDK Lean toolchain, version, or Git-hash checks.
 
 Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
