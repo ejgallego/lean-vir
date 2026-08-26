@@ -41,6 +41,11 @@ export const runtimeTests = Object.freeze([
   { id: "package-set-descriptor", file: "package-set-descriptor-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "package-generator-smoke.mjs", group: "lean" },
   {
+    id: "cross-package-one-runtime",
+    file: "cross-package-one-runtime-smoke.mjs",
+    group: "lean",
+  },
+  {
     id: "interpreter-constant-cache",
     file: "interpreter-constant-cache-smoke.mjs",
     group: "lean",

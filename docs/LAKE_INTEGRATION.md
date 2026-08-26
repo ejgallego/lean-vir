@@ -391,6 +391,17 @@ single `+Root:vir` package set already includes the reached dependency cone for
 that root. Loading several independent roots into one live instance is a
 different future design; `virWebAssets` does not merge package sets or heaps.
 
+For one application spanning several Lake packages, select one explicit
+application-owned root. That root imports and calls each dependency
+contribution, owns the public `@[vir_export]` wrappers, and owns the
+`@[vir_startup]` wrapper that determines initialization order. An annotation on
+an imported declaration is not promoted into the selected root's interface;
+the root must retain and expose that declaration explicitly. The resulting one
+package set can then be loaded with one `createRuntime` call and one startup
+sequence. The
+[cross-package runtime regression](../tests/runtime/cross-package-one-runtime-smoke.mjs)
+locks this application-root contract without adding a runtime primitive.
+
 `runStartupEntries()` invokes startup hooks in manifest order and records each
 one only after it succeeds. Calling it again skips completed hooks; if a hook
 throws, a retry resumes at that hook without repeating earlier successful
