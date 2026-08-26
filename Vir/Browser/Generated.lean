@@ -13,13 +13,13 @@ namespace Lean.Vir.Browser
 namespace Animation
 
 /--
-Faithful generated function binding for TypeScript `cancelAnimationFrame`.
+Generated reviewed function specialization of TypeScript `cancelAnimationFrame`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/DedicatedWorkerGlobalScope/cancelAnimationFrame)
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated faithful JavaScript boundary for the TypeScript `cancelAnimationFrame` function.
+Generated reviewed JavaScript boundary specialization for the TypeScript `cancelAnimationFrame` function.
 ABI profile `browser-dom-faithful-v1`: receiver none; handle js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -30,13 +30,13 @@ opaque cancelAnimationFrame
     DomM Unit
 
 /--
-Faithful generated function binding for TypeScript `requestAnimationFrame`.
+Generated reviewed function specialization of TypeScript `requestAnimationFrame`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/DedicatedWorkerGlobalScope/requestAnimationFrame)
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated faithful JavaScript boundary for the TypeScript `requestAnimationFrame` function.
+Generated reviewed JavaScript boundary specialization for the TypeScript `requestAnimationFrame` function.
 ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -392,7 +392,7 @@ end Console
 namespace Document
 
 /--
-Faithful generated method binding for TypeScript `Document.createElement`.
+Generated reviewed method specialization of TypeScript `Document.createElement`.
 
 In an HTML document, the **`document.createElement()`** method creates the HTML element specified by localName, or an HTMLUnknownElement if localName isn't recognized.
 
@@ -400,7 +400,7 @@ In an HTML document, the **`document.createElement()`** method creates the HTML 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12929
 
-Generated faithful JavaScript boundary for the TypeScript `Document.createElement` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Document.createElement` method.
 ABI profile `browser-dom-faithful-v1`: receiver global (Document); tagName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -411,7 +411,7 @@ opaque createElement
     DomM (Lean.Vir.Js Element)
 
 /--
-Faithful generated method binding for TypeScript `Document.querySelector`.
+Generated reviewed method specialization of TypeScript `Document.querySelector`.
 
 Returns the first element that is a descendant of node that matches selectors.
 
@@ -419,7 +419,7 @@ Returns the first element that is a descendant of node that matches selectors.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-Generated faithful JavaScript boundary for the TypeScript `Document.querySelector` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Document.querySelector` method.
 ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -430,7 +430,7 @@ opaque querySelector
     DomM (Lean.Vir.Js.Nullable Element)
 
 /--
-Faithful generated method binding for TypeScript `Document.querySelectorAll`.
+Generated reviewed method specialization of TypeScript `Document.querySelectorAll`.
 
 Returns all element descendants of node that match selectors.
 
@@ -438,7 +438,7 @@ Returns all element descendants of node that match selectors.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-Generated faithful JavaScript boundary for the TypeScript `Document.querySelectorAll` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Document.querySelectorAll` method.
 ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -489,7 +489,7 @@ end Document
 namespace Element
 
 /--
-Faithful generated method binding for TypeScript `Element.appendChild`.
+Generated reviewed method specialization of TypeScript `Element.appendChild`.
 
 The **`appendChild()`** method of the Node interface adds a node to the end of the list of children of a specified parent node.
 
@@ -497,7 +497,7 @@ The **`appendChild()`** method of the Node interface adds a node to the end of t
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L26125
 
-Generated faithful JavaScript boundary for the TypeScript `Element.appendChild` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Element.appendChild` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -568,7 +568,7 @@ opaque setInnerHTML
     DomM Unit
 
 /--
-Faithful generated method binding for TypeScript `Element.querySelector`.
+Generated reviewed method specialization of TypeScript `Element.querySelector`.
 
 Returns the first element that is a descendant of node that matches selectors.
 
@@ -576,7 +576,7 @@ Returns the first element that is a descendant of node that matches selectors.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-Generated faithful JavaScript boundary for the TypeScript `Element.querySelector` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Element.querySelector` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -588,7 +588,7 @@ opaque querySelector
     DomM (Lean.Vir.Js.Nullable Element)
 
 /--
-Faithful generated method binding for TypeScript `Element.querySelectorAll`.
+Generated reviewed method specialization of TypeScript `Element.querySelectorAll`.
 
 Returns all element descendants of node that match selectors.
 
@@ -596,7 +596,7 @@ Returns all element descendants of node that match selectors.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-Generated faithful JavaScript boundary for the TypeScript `Element.querySelectorAll` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Element.querySelectorAll` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -723,7 +723,7 @@ end Element
 namespace Element.ClassList
 
 /--
-Faithful generated method binding for TypeScript `DOMTokenList.toggle`.
+Generated reviewed method specialization of TypeScript `DOMTokenList.toggle`.
 
 The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
 
@@ -731,7 +731,7 @@ The **`toggle()`** method of the DOMTokenList interface removes an existing toke
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
 
-Generated faithful JavaScript boundary for the TypeScript `DOMTokenList.toggle` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `DOMTokenList.toggle` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -783,7 +783,7 @@ end Element.ClassList
 namespace Element.Style
 
 /--
-Faithful generated method binding for TypeScript `CSSStyleDeclaration.setProperty`.
+Generated reviewed method specialization of TypeScript `CSSStyleDeclaration.setProperty`.
 
 The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
 
@@ -791,7 +791,7 @@ The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value fo
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
 
-Generated faithful JavaScript boundary for the TypeScript `CSSStyleDeclaration.setProperty` method.
+Generated reviewed JavaScript boundary specialization for the TypeScript `CSSStyleDeclaration.setProperty` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -808,7 +808,7 @@ end Element.Style
 namespace Event
 
 /--
-Faithful generated getter binding for TypeScript `Event.currentTarget`.
+Generated reviewed getter specialization of TypeScript `Event.currentTarget`.
 
 The **`currentTarget`** read-only property of the Event interface identifies the element to which the event handler has been attached.
 
@@ -816,7 +816,7 @@ The **`currentTarget`** read-only property of the Event interface identifies the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated faithful JavaScript boundary for the TypeScript `Event.currentTarget` getter.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Event.currentTarget` getter.
 ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -865,7 +865,7 @@ opaque stopPropagation
     DomM Unit
 
 /--
-Faithful generated getter binding for TypeScript `Event.target`.
+Generated reviewed getter specialization of TypeScript `Event.target`.
 
 The read-only **`target`** property of the Event interface is a reference to the object onto which the event was dispatched. It is different from Event.currentTarget when the event handler is called during the bubbling or capturing phase of the event.
 
@@ -873,7 +873,7 @@ The read-only **`target`** property of the Event interface is a reference to the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated faithful JavaScript boundary for the TypeScript `Event.target` getter.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Event.target` getter.
 ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.

@@ -16,6 +16,9 @@ document.querySelector("#available-metric").textContent = String(
 document.querySelector("#generated-metric").textContent = String(
   generation.boundaries.targets,
 );
+document.querySelector("#direct-metric").textContent = String(
+  generation.boundaries.typescriptDerived,
+);
 document.querySelector("#work-metric").textContent = String(generation.workItems);
 document.querySelector("#work-card").classList.add(
   generation.workItems === 0 ? "good" : "warn",
@@ -29,7 +32,9 @@ document.querySelector("#scope").replaceChildren(
     `${report.summary.targets} compiled host targets, ` +
     `${report.summary.provided} with runtime providers. ` +
     `${generation.boundaries.targets} are generated and ` +
-    `${generation.boundaries.handwrittenDeclarations} declarations are handwritten. ` +
+    `${generation.boundaries.handwrittenDeclarations} declarations are handwritten: ` +
+    `${generation.boundaries.typescriptDerived} boundaries are TypeScript-derived and ` +
+    `${generation.boundaries.reviewedProtocols} are reviewed VIR protocols. ` +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
 );

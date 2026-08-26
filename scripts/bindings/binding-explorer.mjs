@@ -431,6 +431,36 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
       action: "Provide a declaration contract before generating or auditing its bindings.",
     });
   }
+  const representedAnchors = new Set(items.flatMap((item) =>
+    item.anchor === undefined ? [] : [item.anchor]));
+  issues.filter((entry) =>
+    ["type-fidelity", "coverage-gap", "missing-descriptor"].includes(entry.kind) &&
+    entry.anchor !== undefined && !representedAnchors.has(entry.anchor))
+    .forEach((entry) => {
+      items.push({
+        id: `${config.id}/${bindingRoot.id}/comparison/${entry.anchor}/${entry.kind}`,
+        library: config.id,
+        group: bindingRoot.id,
+        subject: "comparison-anchor",
+        anchor: entry.anchor,
+        disposition: entry.kind === "coverage-gap" ? "unsupported" : "needs-annotation",
+        provenance: "comparison",
+        severity: entry.severity,
+        code: entry.kind === "type-fidelity"
+          ? "type-translation-limited"
+          : entry.kind === "coverage-gap"
+            ? "upstream-operation-unsupported"
+            : "type-translation-missing",
+        message: entry.message,
+        action: entry.kind === "type-fidelity"
+          ? "Review the generated specialization and improve the type translation policy."
+          : entry.kind === "coverage-gap"
+            ? "Add the upstream operation when it enters the supported binding scope."
+            : "Provide the missing TypeScript or Lean descriptor before generation.",
+        ...(entry.target === undefined ? {} : { target: entry.target }),
+      });
+      representedAnchors.add(entry.anchor);
+    });
   const structuralIssueKinds = new Set([
     "missing-provider",
     "runtime-only",
@@ -914,6 +944,10 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   const workItems = apiGroups.flatMap((entry) => entry.workItems);
   const generatedOperations = apiGroups.flatMap((entry) => entry.generatedOperations ?? []);
   const generatedTargets = new Set(generatedOperations.map((operation) => operation.host.target));
+  const typescriptDerivedOperations = generatedOperations.filter((operation) =>
+    operation.typescript.kind !== "protocol");
+  const reviewedProtocolOperations = generatedOperations.filter((operation) =>
+    operation.typescript.kind === "protocol");
   const generatedSources = new Set(configs.flatMap((config) =>
     config.generation === undefined ? [] : [config.generation.output]));
   const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
@@ -922,6 +956,8 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     boundaries: {
       operations: generatedOperations.length,
       targets: generatedTargets.size,
+      typescriptDerived: typescriptDerivedOperations.length,
+      reviewedProtocols: reviewedProtocolOperations.length,
       handwrittenDeclarations: handwrittenDeclarations.length,
     },
     disposition: Object.fromEntries(generationDispositions.map((status) => [
@@ -1055,8 +1091,8 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
-  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
-  console.log(`  upstream lowering: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
+  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols, ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
+  console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author workbench: ${report.summary.generation.workItems} actions`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
   console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);

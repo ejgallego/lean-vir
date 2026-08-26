@@ -128,6 +128,7 @@ function renderOperation(operation, profile) {
     ...operation.arguments,
   ];
   const source = sourceReference(operation.typescript.source);
+  const specialized = operation.exception !== undefined;
   const operationLabel = operation.typescript.kind === "method"
     ? "method"
     : operation.typescript.kind === "function"
@@ -139,7 +140,9 @@ function renderOperation(operation, profile) {
   const publicDocumentation = leanDocText([
     operation.typescript.kind === "protocol"
       ? `Generated binding for reviewed VIR protocol \`${operation.typescript.member}\`.`
-      : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
+      : specialized
+        ? `Generated reviewed ${operationLabel} specialization of TypeScript \`${operation.typescript.member}\`.`
+        : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
     upstreamDocumentation,
     operation.typescript.kind === "protocol"
       ? "Binding contract: `generation.protocolOperations`."
@@ -149,7 +152,9 @@ function renderOperation(operation, profile) {
   const typeParameters = operation.typeParameters ?? [];
   const boundarySummary = operation.typescript.kind === "protocol"
     ? "Generated reviewed VIR protocol boundary."
-    : `Generated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`;
+    : specialized
+      ? `Generated reviewed JavaScript boundary specialization for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`
+      : `Generated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`;
   return {
     namespace: operation.lean.namespace,
     text: `/--\n${publicDocumentation}\n\n${boundarySummary}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, "opaque ")}`,

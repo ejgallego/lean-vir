@@ -94,6 +94,12 @@ assert.deepEqual(report.summary.generation, {
     operations: roots.reduce((sum, root) => sum + (root.generatedOperations?.length ?? 0), 0),
     targets: new Set(roots.flatMap((root) =>
       (root.generatedOperations ?? []).map((operation) => operation.host.target))).size,
+    typescriptDerived: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.typescript.kind !== "protocol").length, 0),
+    reviewedProtocols: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.typescript.kind === "protocol").length, 0),
     handwrittenDeclarations: 0,
   },
   disposition: {
@@ -110,6 +116,11 @@ assert.deepEqual(report.summary.generation, {
   workItems: report.workItems.length,
 });
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
+assert.equal(
+  report.summary.generation.boundaries.typescriptDerived +
+    report.summary.generation.boundaries.reviewedProtocols,
+  report.summary.generation.boundaries.operations,
+);
 assert.ok(report.summary.generation.disposition.generated > 0);
 assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
@@ -368,8 +379,8 @@ assert.ok(localCommands?.workItems.some((item) =>
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
-  status: "curated",
-  scope: "selected-symbol-comparison",
+  status: "complete",
+  scope: "complete-upstream-surface",
 });
 assert.equal(reactDomRoot?.findingStatus, "warning");
 assert.deepEqual(reactDomRoot?.comparison.summary, {
@@ -390,11 +401,14 @@ assert.deepEqual(
     { topic: "lifetime", note: "The root is expected to remain live until unmount or runtime disposal." },
   ],
 );
-assert.ok(reactDomRoot?.coverage.members.some((member) =>
-  member.id === "hydrateRoot" && member.generation.disposition === "unsupported"));
+assert.ok(reactDomRoot?.comparison.results.some((result) =>
+  result.id === "react_dom.hydration.entrypoint" &&
+  result.status === "missing" &&
+  result.portIntent.disposition === "unsupported"));
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="available-metric"/u);
+assert.match(html, /id="direct-metric"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /VIR binding reference/u);
 assert.match(html, /Binding workbench/u);

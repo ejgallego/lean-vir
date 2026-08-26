@@ -26,7 +26,10 @@ report. Unselected upstream entries remain ordinary documentation coverage;
 they are not findings. Authored mappings are confirmed shipped bindings and
 name-based candidates require an identity annotation. Every compiled host
 declaration must come from a configured generated output; the report displays
-the generated/handwritten boundary count explicitly.
+the generated/handwritten boundary count explicitly. It also separates
+operations derived from selected TypeScript declarations from reviewed VIR
+protocol operations, so migration progress does not conflate generated source
+with direct upstream lowering.
 
 ## Fidelity Contract
 

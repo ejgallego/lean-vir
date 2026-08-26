@@ -250,6 +250,30 @@ test("an explicit single-signature policy generates faithful methods and documen
   });
 });
 
+test("generated exceptions are documented as reviewed specializations", () => {
+  const specialized = structuredClone(generation);
+  specialized.exceptions["demo.widget.getAttribute"] = {
+    reason: "The demo specializes the result representation.",
+    result: {
+      type: {
+        lean: "Lean.Vir.Js String",
+        representation: "js-resource",
+        resourceInner: "String",
+      },
+    },
+  };
+  const output = renderLeanBindings(config, specialized, descriptors);
+
+  assert.match(
+    output,
+    /Generated reviewed method specialization of TypeScript `Widget\.getAttribute`\./u,
+  );
+  assert.doesNotMatch(
+    output,
+    /Faithful generated method binding for TypeScript `Widget\.getAttribute`\./u,
+  );
+});
+
 test("TypeScript parameter names that are Lean keywords are escaped", () => {
   const keywordDescriptors = structuredClone(descriptors);
   const method = keywordDescriptors.get("widget").symbols.find((symbol) =>

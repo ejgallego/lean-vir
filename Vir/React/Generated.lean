@@ -558,39 +558,52 @@ end React.Ref
 namespace React.Root
 
 /--
-Generated binding for reviewed VIR protocol `react.root.create`.
+Generated reviewed method specialization of TypeScript `Root.render`.
 
-Specializes React DOM createRoot to an Element container and omits RootOptions.
+Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62
 
-Binding contract: `generation.protocolOperations`.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Root.render` method.
+ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children callback/owned/until-release; result immediate/value.
 
-Generated reviewed VIR protocol boundary.
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "react.root.render"]
+opaque render
+    (root : @& Lean.Vir.Js Lean.Vir.React.Root)
+    (children : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.Browser.DomM Unit
+
+/--
+Generated reviewed method specialization of TypeScript `Root.unmount`.
+
+Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L63
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `Root.unmount` method.
+ABI profile `vir-react-protocol-v1`: root js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "react.root.unmount"]
+opaque unmount
+    (root : Lean.Vir.Js Lean.Vir.React.Root) :
+    Lean.Vir.Browser.DomM Unit
+
+/--
+Generated reviewed function specialization of TypeScript `createRoot`.
+
+createRoot lets you create a root to display React components inside a browser DOM node.
+
+Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L86
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `createRoot` function.
 ABI profile `vir-react-protocol-v1`: receiver none; container js-resource/borrowed/call; result js-resource/owned.
 
-This declaration is generated; edit the binding configuration.
+This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.root.create"]
 opaque create
     (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
-
-/--
-Generated binding for reviewed VIR protocol `react.root.render`.
-
-VIR evaluates and retains a render-safe Lean node construction action at the React root boundary.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; node callback/owned/until-release; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.render"]
-opaque render
-    (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (node : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
-    Lean.Vir.Browser.DomM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.root.render-component`.
@@ -645,23 +658,6 @@ opaque renderComponentIntoSelectorThunkJs
     (selector : @& Lean.Vir.Js String)
     (component : Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `react.root.unmount`.
-
-Unmounts a React root and releases callbacks retained by its current render.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/consumed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.unmount"]
-opaque unmount
-    (root : Lean.Vir.Js Lean.Vir.React.Root) :
-    Lean.Vir.Browser.DomM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.root.unmount-selector`.

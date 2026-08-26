@@ -21,8 +21,47 @@
       },
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
     },
-    "resources": {},
-    "members": [],
+    "resources": { "Root": "Lean.Vir.React.Root" },
+    "members": ["Root.render", "Root.unmount", "createRoot"],
+    "methodPolicies": {
+      "Root.render": { "signature": "only" },
+      "Root.unmount": { "signature": "only" },
+      "createRoot": { "signature": "only", "omittedOptionalParameters": ["options"] }
+    },
+    "exceptions": {
+      "react.root.create": {
+        "reason": "VIR specializes the TypeScript Container union to Element and omits RootOptions.",
+        "arguments": {
+          "container": {
+            "type": {
+              "lean": "Lean.Vir.Js Lean.Vir.Browser.Element",
+              "representation": "js-resource",
+              "resourceInner": "Lean.Vir.Browser.Element"
+            }
+          }
+        },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
+      },
+      "react.root.render": {
+        "reason": "VIR represents ReactNode as a retained render-safe Lean construction action.",
+        "arguments": {
+          "children": {
+            "passing": "owned",
+            "retention": "until-release",
+            "type": {
+              "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)",
+              "representation": "callback"
+            }
+          }
+        },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
+      },
+      "react.root.unmount": {
+        "reason": "Unmount consumes the root resource and releases callbacks retained by its current render.",
+        "receiver": { "passing": "consumed" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
+      }
+    },
     "protocolOperations": [
       {
         "id": "react.property.to-js", "group": "value-conversions", "target": "js.value.react.property",
@@ -312,25 +351,6 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
-        "id": "react.root.create", "group": "react-dom-root", "target": "react.root.create",
-        "lean": "Lean.Vir.React.Root.create", "marker": "vir_js",
-        "reason": "Specializes React DOM createRoot to an Element container and omits RootOptions.",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [{ "name": "container", "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.Element", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.Element" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } }
-      },
-      {
-        "id": "react.root.render", "group": "react-dom-root", "target": "react.root.render",
-        "lean": "Lean.Vir.React.Root.render", "marker": "vir_js",
-        "reason": "VIR evaluates and retains a render-safe Lean node construction action at the React root boundary.",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [
-          { "name": "root", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } },
-          { "name": "node", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "react.root.render-component", "group": "react-dom-root", "target": "react.root.renderComponent",
         "lean": "Lean.Vir.React.Root.renderComponentThunk", "marker": "vir_js",
         "reason": "Retains a Lean-authored component thunk as a real React function component until rerender or unmount.",
@@ -362,14 +382,6 @@
           { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
-      },
-      {
-        "id": "react.root.unmount", "group": "react-dom-root", "target": "react.root.unmount",
-        "lean": "Lean.Vir.React.Root.unmount", "marker": "vir_js",
-        "reason": "Unmounts a React root and releases callbacks retained by its current render.",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [{ "name": "root", "role": "receiver", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } }],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "react.root.unmount-selector", "group": "react-dom-root", "target": "react.root.unmountSelector",
@@ -463,6 +475,23 @@
           }
         ]
       },
+      "mappings": [
+        {
+          "typescript": "createRoot",
+          "targets": ["react.root.create"],
+          "lean": ["Lean.Vir.React.Root.create"]
+        },
+        {
+          "typescript": "Root.render",
+          "targets": ["react.root.render"],
+          "lean": ["Lean.Vir.React.Root.render"]
+        },
+        {
+          "typescript": "Root.unmount",
+          "targets": ["react.root.unmount"],
+          "lean": ["Lean.Vir.React.Root.unmount"]
+        }
+      ],
       "comparison": { "report": "build/type-descriptors/react-dom-root-v1.report.json" },
       "anchors": [
         {
