@@ -62,6 +62,10 @@ function tokenClass(token, language) {
   if (/^(?:--|\/\/|\/\*)/u.test(token)) return "comment";
   if (/^"/u.test(token) || /^\d/u.test(token)) return "literal";
   if (keywords[language].has(token)) return "keyword";
+  if (language === "lean" && /^(?:Lean\.Vir\.)?Js(?:\.[A-Za-z][A-Za-z0-9_']*)?$/u.test(token)) {
+    return "representation";
+  }
+  if (language === "lean" && /(?:^|\.)(?:DomM|RuntimeM|ReactM)$/u.test(token)) return "effect";
   if (primitiveTypes[language].has(token) ||
       (language === "lean" && /(?:^|\.)[A-Z][A-Za-z0-9_']*$/u.test(token))) return "type";
   if (/^[A-Za-z_]/u.test(token)) return token.includes(".") ? "qualified" : "identifier";
@@ -424,6 +428,286 @@ function preferredPublicEntries(target) {
     .sort((left, right) => left.entry.declaration.localeCompare(right.entry.declaration));
 }
 
+function shortLeanName(value) {
+  let display = String(value ?? "");
+  for (const [prefix, replacement] of [
+    ["Lean.Vir.Browser.", ""],
+    ["Lean.Vir.React.", ""],
+    ["Lean.Vir.ProofWidgets.", ""],
+    ["Lean.Vir.Infoview.", ""],
+    ["Lean.Vir.Common.", ""],
+    ["Lean.Vir.Js.", "Js."],
+    ["Lean.Vir.Js", "Js"],
+    ["Lean.Vir.", ""],
+  ]) display = display.replaceAll(prefix, replacement);
+  return display;
+}
+
+function tooltipText(summary, provenance) {
+  const evidence = Array.isArray(provenance) ? provenance : [provenance];
+  return [
+    summary,
+    ...evidence.flatMap((entry) => entry === undefined ? [] : [
+      entry.detail,
+      entry.source ? "Policy source: " + entry.source : undefined,
+    ]),
+  ].filter(Boolean).join("\n");
+}
+
+function semanticChip(label, tooltip, className = "") {
+  return '<span class="semantic-chip ' + escapeHtml(className) +
+    '" tabindex="0" data-tooltip="' + escapeHtml(tooltip) +
+    '" aria-label="' + escapeHtml(label + ": " + tooltip) + '">' +
+    escapeHtml(label) + "</span>";
+}
+
+function renderSemanticLeanType(value, provenance = []) {
+  const tooltip = tooltipText(String(value), provenance);
+  return '<code class="signature-type semantic-chip" tabindex="0" data-tooltip="' +
+    escapeHtml(tooltip) + '" aria-label="' +
+    escapeHtml(shortLeanName(value) + ": " + tooltip) + '">' +
+    highlightCode(shortLeanName(value), "lean") + "</code>";
+}
+
+const modalityDescriptions = {
+  "js-resource": "A JavaScript value represented by an opaque Lean resource handle.",
+  immediate: "An immediate Lean value; no JavaScript resource handle is involved.",
+  callback: "A Lean callback crossing the JavaScript boundary.",
+  borrowed: "Borrowed by the host for this boundary call.",
+  owned: "Ownership transfers across this boundary.",
+  consumed: "Consumed by this call and unavailable afterward.",
+  call: "The host may retain this value only for the duration of the call.",
+  "until-release": "The host retains this value until the matching release operation.",
+  retained: "The host retains this value after the call.",
+  value: "A plain value result without resource ownership.",
+};
+
+function renderModalityChips(modalities, provenance = {}) {
+  return Object.entries(modalities ?? {}).map(([kind, value]) => semanticChip(
+    String(value).replaceAll("-", " "),
+    tooltipText(modalityDescriptions[value] ?? String(value), provenance[kind]),
+    "mode-" + kind,
+  )).join("");
+}
+
+function parenthesizeLeanArgument(value) {
+  return /\s|→/u.test(value) && !(value.startsWith("(") && value.endsWith(")"))
+    ? "(" + value + ")"
+    : value;
+}
+
+function effectfulLeanType(operation) {
+  return operation.effect.lean + " " + parenthesizeLeanArgument(operation.result.lean);
+}
+
+function renderSignatureArgument(role, argument) {
+  return '<div class="signature-row"><span class="signature-role">' +
+    escapeHtml(role) + '</span><code class="signature-name">' +
+    escapeHtml(argument.name) + '</code>' +
+    renderSemanticLeanType(argument.type, argument.provenance?.type) +
+    '<span class="signature-modalities">' +
+    renderModalityChips(argument.modalities, argument.provenance) + "</span></div>";
+}
+
+function renderReadableLeanSignature(operation) {
+  const parameters = [
+    ...(operation.receiver.kind === "argument"
+      ? [renderSignatureArgument("receiver", operation.receiver.argument)]
+      : []),
+    ...operation.arguments.map((argument) => renderSignatureArgument(argument.role, argument)),
+  ].join("");
+  const receiverContext = operation.receiver.kind === "global"
+    ? '<div class="signature-context">' + semanticChip(
+      "host global · " + operation.receiver.typescriptType,
+      tooltipText(
+        operation.receiver.typescriptType + " is supplied by the JavaScript host and is not a Lean parameter.",
+        operation.receiver.provenance?.kind,
+      ),
+      "mode-receiver",
+    ) + "</div>"
+    : operation.receiver.kind === "none" && operation.receiver.typescriptType
+      ? '<div class="signature-context">' + semanticChip(
+        "receiver replaced by policy",
+        tooltipText(
+          "The upstream " + operation.receiver.typescriptType + " receiver is not an emitted Lean parameter.",
+          operation.receiver.provenance?.kind,
+        ),
+        "mode-receiver",
+      ) + "</div>"
+      : "";
+  const exactResult = effectfulLeanType(operation);
+  return '<section class="readable-signature"><div class="signature-heading"><span>Readable Lean signature</span>' +
+    semanticChip(
+      shortLeanName(operation.effect.lean) + " · " + operation.effect.id + " effect",
+      tooltipText("The boundary returns through " + operation.effect.lean + ".", operation.effect.provenance),
+      "mode-effect",
+    ) + '</div><div class="signature-declaration semantic-chip" tabindex="0" data-tooltip="' +
+    escapeHtml(operation.lean.declaration) + '" aria-label="Lean declaration: ' +
+    escapeHtml(operation.lean.declaration) + '">' +
+    highlightCode(shortLeanName(operation.lean.declaration), "lean") + "</div>" +
+    receiverContext + '<div class="signature-grid">' + parameters +
+    '<div class="signature-row signature-result"><span class="signature-role">result</span>' +
+    '<code class="signature-name">:</code>' +
+    renderSemanticLeanType(exactResult, [
+      operation.effect.provenance,
+      ...(operation.result.provenance?.type ?? []),
+    ]) + '<span class="signature-modalities">' +
+    renderModalityChips(operation.result.modalities, operation.result.provenance) +
+    "</span></div></div></section>";
+}
+
+function formatTypeScriptType(shape) {
+  if (shape === undefined || shape === null) return "unknown";
+  switch (shape.kind) {
+  case "primitive":
+    return shape.name;
+  case "opaque":
+    return shape.name;
+  case "literal":
+    return JSON.stringify(shape.value);
+  case "ref":
+    return shape.id + (shape.args?.length
+      ? "<" + shape.args.map(formatTypeScriptType).join(", ") + ">"
+      : "");
+  case "array": {
+    const element = formatTypeScriptType(shape.element);
+    return (shape.element?.kind === "union" ? "(" + element + ")" : element) + "[]";
+  }
+  case "option":
+    return formatTypeScriptType(shape.element) + " | null";
+  case "union":
+    return shape.options.map(formatTypeScriptType).join(" | ");
+  case "function":
+    return "(" + (shape.args ?? []).map((argument) =>
+      (argument.rest ? "..." : "") + argument.name + (argument.optional ? "?" : "") +
+      ": " + formatTypeScriptType(argument.type)).join(", ") + ") => " +
+      formatTypeScriptType(shape.result);
+  default:
+    return shape.name ?? shape.id ?? shape.kind;
+  }
+}
+
+function formatTypeScriptParameter(argument) {
+  return (argument.rest ? "..." : "") + argument.name +
+    (argument.optional ? "?" : "") + ": " + formatTypeScriptType(argument.type);
+}
+
+function renderTransformationValue(value, language, state = "") {
+  return '<code class="transformation-value ' + escapeHtml(state) + '">' +
+    (language === null ? escapeHtml(value) : highlightCode(value, language)) + "</code>";
+}
+
+function renderTransformationRow(from, to, note = "", state = "mapped") {
+  return '<div class="transformation-row"><div><span class="transformation-side">TypeScript</span>' +
+    renderTransformationValue(from, "typescript") + '</div><span class="transformation-arrow" aria-hidden="true">→</span><div><span class="transformation-side">Lean</span>' +
+    renderTransformationValue(to, state === "mapped" ? "lean" : null, state) +
+    (note ? '<span class="transformation-note">' + escapeHtml(note) + "</span>" : "") +
+    "</div></div>";
+}
+
+function renderTypeTransformation(operation) {
+  if (operation.typescript.kind === "protocol") return "";
+  const rows = [];
+  if (operation.receiver.typescriptType) {
+    const leanReceiver = operation.receiver.kind === "argument"
+      ? operation.receiver.argument.name + ": " + shortLeanName(operation.receiver.argument.type)
+      : operation.receiver.kind === "global"
+        ? "host global · no Lean parameter"
+        : "no Lean receiver";
+    rows.push(renderTransformationRow(
+      "this: " + operation.receiver.typescriptType,
+      leanReceiver,
+      operation.receiver.kind === "argument" ? "explicit borrowed receiver" :
+        operation.receiver.kind === "global" ? "provided by the host" : "reviewed specialization",
+      operation.receiver.kind === "argument" ? "mapped" : "policy",
+    ));
+  }
+  const usedLeanArguments = new Set();
+  if (operation.typescript.kind === "property" && operation.typescript.accessor === "set") {
+    const argument = operation.arguments[0];
+    if (argument !== undefined) {
+      usedLeanArguments.add(argument.name);
+      rows.push(renderTransformationRow(
+        "value: " + formatTypeScriptType(operation.typescript.shape),
+        argument.name + ": " + shortLeanName(argument.type),
+        "property setter value",
+      ));
+    }
+  } else if (operation.typescript.shape?.kind === "function") {
+    const policy = operation.typescript.signaturePolicy ?? {};
+    const omitted = new Set([
+      ...(policy.omittedOptionalParameters ?? []),
+      ...(policy.omittedRequiredParameters ?? []),
+      ...(policy.omittedRestParameters ?? []),
+    ]);
+    for (const argument of operation.typescript.shape.args ?? []) {
+      if (Object.hasOwn(policy.fixedArguments ?? {}, argument.name)) {
+        rows.push(renderTransformationRow(
+          formatTypeScriptParameter(argument),
+          "host literal " + JSON.stringify(policy.fixedArguments[argument.name]),
+          "fixed by reviewed signature policy",
+          "policy",
+        ));
+        continue;
+      }
+      const fixedRest = policy.fixedRestParameters?.[argument.name];
+      if (fixedRest !== undefined) {
+        for (const name of fixedRest) {
+          const emitted = operation.arguments.find((entry) => entry.name === name);
+          if (emitted === undefined) continue;
+          usedLeanArguments.add(emitted.name);
+          rows.push(renderTransformationRow(
+            formatTypeScriptParameter(argument),
+            emitted.name + ": " + shortLeanName(emitted.type),
+            "fixed-arity specialization",
+          ));
+        }
+        continue;
+      }
+      if (omitted.has(argument.name)) {
+        rows.push(renderTransformationRow(
+          formatTypeScriptParameter(argument),
+          "omitted by reviewed policy",
+          argument.optional ? "optional upstream parameter" : "reviewed specialization",
+          "omitted",
+        ));
+        continue;
+      }
+      const emittedName = policy.parameterRenames?.[argument.name] ?? argument.name;
+      const emitted = operation.arguments.find((entry) => entry.name === emittedName);
+      if (emitted !== undefined) {
+        usedLeanArguments.add(emitted.name);
+        rows.push(renderTransformationRow(
+          formatTypeScriptParameter(argument),
+          emitted.name + ": " + shortLeanName(emitted.type),
+          emitted.role === "callback" ? "retained callback policy" : "faithful representation",
+        ));
+      }
+    }
+  }
+  for (const argument of operation.arguments) {
+    if (usedLeanArguments.has(argument.name)) continue;
+    rows.push(renderTransformationRow(
+      "VIR policy",
+      argument.name + ": " + shortLeanName(argument.type),
+      "policy-authored boundary argument",
+      "policy",
+    ));
+  }
+  const typeScriptResult = operation.typescript.kind === "property"
+    ? operation.typescript.accessor === "set"
+      ? "void"
+      : formatTypeScriptType(operation.typescript.shape)
+    : formatTypeScriptType(operation.typescript.shape?.result);
+  rows.push(renderTransformationRow(
+    "result: " + typeScriptResult,
+    "result: " + shortLeanName(effectfulLeanType(operation)),
+    operation.effect.id + " effect · " + Object.values(operation.result.modalities).join(" · "),
+  ));
+  return '<section class="type-transformation"><div class="transformation-heading"><span>TypeScript → Lean</span><span>selected declaration shape and emitted boundary</span></div>' +
+    '<div class="transformation-grid">' + rows.join("") + "</div></section>";
+}
+
 function renderLeanCards(targetIds, { showRuntime = false } = {}) {
   const rendered = [];
   for (const id of targetIds) {
@@ -431,16 +715,27 @@ function renderLeanCards(targetIds, { showRuntime = false } = {}) {
     if (target === undefined) continue;
     const declarations = preferredPublicEntries(target);
     if (declarations.length === 0) continue;
-    rendered.push(...declarations.map((item) =>
-      '<article class="binding"><div class="card-head"><span class="card-title">' +
-      escapeHtml(item.entry.declaration) + "</span>" +
+    rendered.push(...declarations.map((item) => {
+      const operation = target.operation?.lean.declaration === item.entry.declaration
+        ? target.operation
+        : null;
+      const signature = operation === null
+        ? renderCode(item.entry.type, "lean")
+        : renderReadableLeanSignature(operation) + renderTypeTransformation(operation) +
+          '<details class="exact-type"><summary>Exact compiled Lean type</summary>' +
+          renderCode(item.entry.type, "lean") + "</details>";
+      return (
+      '<article class="binding"><div class="card-head"><span class="card-title" title="' +
+      escapeHtml(item.entry.declaration) + '">' +
+      escapeHtml(shortLeanName(item.entry.declaration)) + "</span>" +
       sourceLink(item.entry.source, item.entry.module) + "</div>" +
-      renderCode(item.entry.type, "lean") +
+      signature +
       (showRuntime
         ? '<details><summary class="note">Compiled boundary evidence</summary><div class="badges">' +
           target.providers.map((provider) => '<span class="badge">' + escapeHtml(provider) + "</span>").join("") +
           "</div>" + renderCode(item.reach.path.join("\n→ "), "lean") + "</details>"
-        : "") + "</article>"));
+        : "") + "</article>");
+    }));
   }
   return rendered.length
     ? rendered.join("")

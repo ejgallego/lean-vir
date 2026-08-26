@@ -292,6 +292,15 @@ themes. It omits descriptor dependencies that are not configured upstream
 roots or members. Types referenced by signatures remain part of the declaration
 rather than a heuristic "related types" section.
 
+Generated boundaries lead with a structured Lean signature derived from the
+canonical operation IR. Receiver, argument, result, effect, representation,
+passing, retention, and ownership annotations are interactive and expose their
+policy provenance on hover or keyboard focus. For TypeScript-derived operations,
+the same card aligns the selected TypeScript shape with the emitted Lean
+boundary, including omitted or host-fixed parameters. The fully qualified
+compiler type remains available under **Exact compiled Lean type**; namespace
+elision affects presentation only.
+
 Use **Upstream reference** to browse the upstream hierarchy. A confirmed
 entry shows its TypeScript declaration beside the corresponding public Lean
 type. Candidates remain labeled unconfirmed and are not displayed as bindings.
