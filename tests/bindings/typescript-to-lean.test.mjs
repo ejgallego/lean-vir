@@ -53,6 +53,7 @@ const config = {
   generation,
   roots: [{
     id: "widget",
+    upstream: { kind: "typescript" },
     mappings: [{
       typescript: "Widget.label",
       accessors: {
@@ -164,6 +165,7 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     lean: "Lean.Vir.Demo.Widget.subscribe",
     marker: "vir_js",
     reason: "The host retains the callback until the subscription is released.",
+    upstreamRelation: { kind: "upstream-adapter", member: "Widget.getAttribute" },
     typeParameters: ["α"],
     effect: { id: "dom", lean: "DomM" },
     arguments: [{
@@ -189,8 +191,8 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
       },
     },
   }];
-  const output = renderLeanBindings(config, protocolGeneration, new Map());
-  const [operation] = buildGeneratedOperations(config, protocolGeneration, new Map());
+  const output = renderLeanBindings(config, protocolGeneration, descriptors);
+  const [operation] = buildGeneratedOperations(config, protocolGeneration, descriptors);
 
   assert.match(output, /opaque subscribe\n    \{α : Type\}\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(callback : Lean\.Vir\.Js α → DomM Unit\)/u);
   assert.deepEqual(operation.arguments[1].modalities, {
@@ -232,6 +234,17 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     resultRepresentation: "hostResource",
   });
   assert.equal(anchor.modalityContract.protocol.reason, protocolGeneration.protocolOperations[0].reason);
+  assert.deepEqual(operation.protocol.upstreamRelation, {
+    kind: "upstream-adapter",
+    member: "Widget.getAttribute",
+  });
+
+  const missingMember = structuredClone(protocolGeneration);
+  missingMember.protocolOperations[0].upstreamRelation.member = "Widget.missing";
+  assert.throws(
+    () => buildGeneratedOperations(config, missingMember, descriptors),
+    /adapts missing TypeScript member Widget\.missing/u,
+  );
 });
 
 test("an explicit single-signature policy generates faithful methods and documentation", () => {

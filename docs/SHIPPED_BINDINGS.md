@@ -27,9 +27,12 @@ they are not findings. Authored mappings are confirmed shipped bindings and
 name-based candidates require an identity annotation. Every compiled host
 declaration must come from a configured generated output; the report displays
 the generated/handwritten boundary count explicitly. It also separates
-operations derived from selected TypeScript declarations from reviewed VIR
-protocol operations, so migration progress does not conflate generated source
-with direct upstream lowering.
+operations derived from selected TypeScript declarations from reviewed
+protocol operations. Protocols are further classified as named upstream
+adapters, VIR-owned operations, local-contract operations, or unclassified
+author debt, so migration progress does not conflate generated source with
+direct upstream lowering and intentional convenience APIs do not create false
+correspondence actions.
 
 ## Fidelity Contract
 
@@ -142,9 +145,9 @@ Every binding repair or addition should satisfy these landing gates:
    independently.
 4. **Runtime parity.** Every generated target has its intended shipped provider,
    and provider-only targets are rejected.
-5. **Explicit exceptions.** TypeScript deviations and VIR-owned protocols are
-   generated from structured, justified operation records; handwritten host
-   declarations are rejected.
+5. **Explicit exceptions.** TypeScript deviations and protocols are generated
+   from structured, justified operation records. Every protocol declares its
+   upstream relation; handwritten host declarations are rejected.
 6. **Compiled evidence.** The consolidated gate reaches every target from a
    public Lean declaration and exercises relevant lifetime behavior.
 

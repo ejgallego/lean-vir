@@ -26,7 +26,9 @@ Schema cannot express directly.
 combines descriptor shapes with a library ABI profile, explicit method
 signature policies, and justified exceptions to produce canonical operation
 IR. Lean source generation, comparator intent, generated documentation, and
-report evidence consume that same IR. The interactive document presents an
+report evidence consume that same IR. Structured protocols additionally state
+whether they adapt a named TypeScript member, are VIR-owned, follow a local
+contract, or still need classification. The interactive document presents an
 upstream-shaped reference with semantic TypeScript/Lean highlighting and
 actionable generation dispositions to binding authors; convenience APIs do not
 count as upstream bindings.

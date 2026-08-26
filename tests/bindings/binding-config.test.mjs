@@ -100,3 +100,13 @@ test("method policies are explicit, selected, and schema checked", async () => {
     /methodPolicies\/Element\.getAttribute\/signature.*must/u,
   );
 });
+
+test("reviewed protocols require a machine-readable upstream relation", async () => {
+  const invalid = structuredClone(browser);
+  delete invalid.generation.protocolOperations[0].upstreamRelation;
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /must have required property 'upstreamRelation'/u,
+  );
+});

@@ -28,6 +28,7 @@
         "id": "common.echo-string", "group": "common", "target": "common.echoString",
         "lean": "Lean.Vir.Common.echoStringJs", "marker": "vir_js",
         "reason": "VIR-owned smoke-test protocol that round-trips a JavaScript string resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
         "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
@@ -36,6 +37,7 @@
         "id": "common.add-nat", "group": "common", "target": "common.addNat",
         "lean": "Lean.Vir.Common.addNatJs", "marker": "vir_js",
         "reason": "VIR-owned smoke-test protocol that adds two JavaScript number resources interpreted as natural numbers.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "lhs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },

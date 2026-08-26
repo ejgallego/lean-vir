@@ -102,8 +102,23 @@ assert.deepEqual(report.summary.generation, {
         operation.typescript.kind === "protocol").length, 0),
     handwrittenDeclarations: 0,
   },
+  protocolRelations: {
+    upstreamAdapters: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.protocol?.upstreamRelation.kind === "upstream-adapter").length, 0),
+    virOwned: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.protocol?.upstreamRelation.kind === "vir-owned").length, 0),
+    localContracts: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.protocol?.upstreamRelation.kind === "local-contract").length, 0),
+    unclassified: roots.reduce((sum, root) =>
+      sum + (root.generatedOperations ?? []).filter((operation) =>
+        operation.protocol?.upstreamRelation.kind === "unclassified").length, 0),
+  },
   disposition: {
     generated: dispositionCounts.generated ?? 0,
+    adapted: dispositionCounts.adapted ?? 0,
     "needs-annotation": dispositionCounts["needs-annotation"] ?? 0,
     unsupported: dispositionCounts.unsupported ?? 0,
     "not-selected": dispositionCounts["not-selected"] ?? 0,
@@ -115,6 +130,11 @@ assert.deepEqual(report.summary.generation, {
   },
   workItems: report.workItems.length,
 });
+assert.equal(
+  Object.values(report.summary.generation.protocolRelations).reduce((sum, count) => sum + count, 0),
+  report.summary.generation.boundaries.reviewedProtocols,
+);
+assert.equal(report.summary.generation.protocolRelations.unclassified, 0);
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
   report.summary.generation.boundaries.typescriptDerived +

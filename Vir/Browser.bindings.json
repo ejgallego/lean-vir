@@ -27,7 +27,7 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": ["Document"]
+        "globalTypes": ["Console", "Document"]
       }
     },
     "resources": {
@@ -39,7 +39,7 @@
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "Event"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
@@ -56,6 +56,7 @@
       "CanvasRenderingContext2D.stroke": { "signature": 0 },
       "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
       "CanvasRenderingContext2D.translate": { "signature": "only" },
+      "Console.log": { "signature": "only", "fixedRestParameters": { "data": ["message"] } },
       "CSSStyleDeclaration.setProperty": { "signature": "only", "omittedOptionalParameters": ["priority"] },
       "Document.createElement": { "signature": 2, "omittedOptionalParameters": ["options"] },
       "Document.querySelector": { "signature": 4 },
@@ -145,6 +146,19 @@
             }
           }
         }
+      },
+      "browser.console.log": {
+        "reason": "VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary.",
+        "arguments": {
+          "message": {
+            "type": {
+              "lean": "Lean.Vir.Js String",
+              "representation": "js-resource",
+              "resourceInner": "String"
+            }
+          }
+        },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" }
       },
       "browser.document.createElement": {
         "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the common Element resource marker.",
@@ -327,6 +341,7 @@
         "lean": "Lean.Vir.Browser.Internal.ownedString",
         "marker": "vir_js_explicit_conversion",
         "reason": "Browser convenience wrappers require an owned JavaScript string resource before calling a consuming or asynchronous host protocol.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "value", "type": { "lean": "String", "representation": "lean-owned" } }
@@ -340,24 +355,12 @@
         "lean": "Lean.Vir.Browser.Internal.ownedFloat",
         "marker": "vir_js_explicit_conversion",
         "reason": "Canvas convenience wrappers require an owned JavaScript number resource for a generated raw canvas operation.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
           { "name": "value", "type": { "lean": "Float", "representation": "immediate" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
-      },
-      {
-        "id": "browser.console.logOneString",
-        "group": "console",
-        "target": "browser.console.log",
-        "lean": "Lean.Vir.Browser.Console.logJs",
-        "marker": "vir_js",
-        "reason": "The shipped console protocol deliberately exposes the common single-string logging case rather than TypeScript's variadic unknown-value surface.",
-        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [
-          { "name": "message", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "browser.input.fromElement",
@@ -366,6 +369,7 @@
         "lean": "Lean.Vir.Browser.HTMLInputElement.fromElementNullable",
         "marker": "vir_js",
         "reason": "This checked host-resource narrowing has no corresponding JavaScript method.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "element", "type": { "lean": "Lean.Vir.Js Element", "representation": "js-resource", "resourceInner": "Element" } }
@@ -379,6 +383,7 @@
         "lean": "Lean.Vir.Browser.HTMLCanvasElement.fromElementNullable",
         "marker": "vir_js",
         "reason": "This checked host-resource narrowing has no corresponding JavaScript method.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "element", "type": { "lean": "Lean.Vir.Js Element", "representation": "js-resource", "resourceInner": "Element" } }
@@ -392,6 +397,7 @@
         "lean": "Lean.Vir.Browser.Event.formValueNullable",
         "marker": "vir_js",
         "reason": "This local protocol extracts the common value property from supported form-control event targets.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "event", "type": { "lean": "Lean.Vir.Js Event", "representation": "js-resource", "resourceInner": "Event" } }
@@ -405,6 +411,7 @@
         "lean": "Lean.Vir.Browser.Timer.setTimeoutJs",
         "marker": "vir_js",
         "reason": "VIR represents the numeric timeout id as a revocable resource and retains the callback until firing or cancellation.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
@@ -419,6 +426,7 @@
         "lean": "Lean.Vir.Browser.Timer.clearTimeout",
         "marker": "vir_js",
         "reason": "Cancellation consumes the revocable timeout resource and releases its retained callback.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "timeout", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
@@ -432,6 +440,7 @@
         "lean": "Lean.Vir.Browser.Timer.setIntervalJs",
         "marker": "vir_js",
         "reason": "VIR represents the numeric interval id as a revocable resource and retains the callback until cancellation.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
@@ -446,6 +455,7 @@
         "lean": "Lean.Vir.Browser.Timer.clearInterval",
         "marker": "vir_js",
         "reason": "Cancellation consumes the revocable interval resource and releases its retained callback.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "interval", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
@@ -523,7 +533,14 @@
       "title": "Console",
       "targets": ["browser.console.*"],
       "lean": { "public": ["Lean.Vir.Browser.Console"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Console"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Console"] },
+      "mappings": [
+        {
+          "typescript": "Console.log",
+          "targets": ["browser.console.log"],
+          "lean": ["Lean.Vir.Browser.Console.logJs"]
+        }
+      ]
     },
     {
       "id": "document",

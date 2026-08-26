@@ -921,6 +921,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
   }
   const groups = new Set(config.roots.map((root) => root.id));
+  const rootsById = new Map(config.roots.map((root) => [root.id, root]));
   const operationIds = new Set(operations.map((operation) => operation.id));
   const targets = new Set(operations.map((operation) => operation.host.target));
   for (const protocol of generation.protocolOperations ?? []) {
@@ -929,6 +930,37 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     if (operationIds.has(protocol.id)) throw new Error(`generated operation id ${protocol.id} is repeated`);
     if (targets.has(protocol.target)) throw new Error(`generated host target ${protocol.target} is repeated`);
+    const root = rootsById.get(protocol.group);
+    const relation = protocol.upstreamRelation;
+    if (root.upstream.kind === "internal" && relation.kind !== "vir-owned") {
+      throw new Error(`generated protocol ${protocol.id} in an internal group must be classified vir-owned`);
+    }
+    if (root.upstream.kind === "local" && relation.kind !== "local-contract") {
+      throw new Error(`generated protocol ${protocol.id} in a local group must be classified local-contract`);
+    }
+    if (root.upstream.kind === "typescript" && relation.kind === "local-contract") {
+      throw new Error(`generated protocol ${protocol.id} in a TypeScript group cannot be classified local-contract`);
+    }
+    if (relation.kind === "upstream-adapter") {
+      if (root.upstream.kind !== "typescript") {
+        throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);
+      }
+      const symbols = symbolsByRoot.get(protocol.group);
+      // Descriptor generation materializes one API group at a time. Full
+      // generation and the explorer always validate every named adapter.
+      if (symbols !== undefined || validateExceptions) {
+        if (!symbols?.has(relation.member)) {
+          throw new Error(`generated protocol ${protocol.id} adapts missing TypeScript member ${relation.member}`);
+        }
+        const symbol = symbols.get(relation.member);
+        if (relation.accessor !== undefined && symbol.kind !== "property") {
+          throw new Error(`generated protocol ${protocol.id} classifies an accessor for non-property ${relation.member}`);
+        }
+        if (relation.accessor !== undefined && symbol.accessors?.[relation.accessor] === undefined) {
+          throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
+        }
+      }
+    }
     const typeParameters = protocol.typeParameters ?? [];
     if (new Set(typeParameters).size !== typeParameters.length) {
       throw new Error(`generated protocol ${protocol.id} repeats a type parameter`);
@@ -982,7 +1014,10 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
         documentation: protocol.documentation ?? protocol.reason,
         source: null,
       },
-      protocol: { reason: protocol.reason },
+      protocol: {
+        reason: protocol.reason,
+        upstreamRelation: structuredClone(protocol.upstreamRelation),
+      },
       host: { target: protocol.target, marker: protocol.marker },
       lean: {
         declaration: protocol.lean,

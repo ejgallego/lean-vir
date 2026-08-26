@@ -371,16 +371,18 @@ end CanvasRenderingContext2D
 namespace Console
 
 /--
-Generated binding for reviewed VIR protocol `browser.console.logOneString`.
+Generated reviewed method specialization of TypeScript `Console.log`.
 
-The shipped console protocol deliberately exposes the common single-string logging case rather than TypeScript's variadic unknown-value surface.
+The **`console.log()`** static method outputs a message to the console.
 
-Binding contract: `generation.protocolOperations`.
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/console/log_static)
 
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; message js-resource/borrowed/call; result immediate/value.
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-This declaration is generated; edit the binding configuration.
+Generated reviewed JavaScript boundary specialization for the TypeScript `Console.log` method.
+ABI profile `browser-dom-faithful-v1`: receiver global (Console); message js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.console.log"]
 opaque logJs

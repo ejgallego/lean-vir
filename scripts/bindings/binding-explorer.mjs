@@ -18,6 +18,7 @@ const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
 const generationDispositions = [
   "generated",
+  "adapted",
   "needs-annotation",
   "unsupported",
   "not-selected",
@@ -261,6 +262,10 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
   const confirmedTargets = [...new Set([...mappedTargets, ...auditedTargets])].sort();
   const candidateTargets = [...new Set(targetMappings.filter((mapping) =>
     mapping.source === "automatic").map((mapping) => mapping.target))].sort();
+  const adaptedTargets = [...new Set(targetMappings.filter((mapping) =>
+    mapping.source === "protocol-relation" &&
+    mapping.relation.kind === "upstream-adapter" &&
+    mapping.typescript === symbol.id).map((mapping) => mapping.target))].sort();
   const unsupported = comparisonResults.find((result) =>
     result.portIntent?.disposition === "unsupported");
   const diagnostics = [];
@@ -278,6 +283,9 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
         action: "Regenerate the Lean source and reconcile its compiled target.",
       });
     }
+  } else if (adaptedTargets.length !== 0) {
+    disposition = "adapted";
+    provenance = "reviewed-protocol";
   } else if (unsupported !== undefined) {
     disposition = "unsupported";
     provenance = "annotation";
@@ -339,10 +347,10 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
   return {
     disposition,
     provenance,
-    availability: confirmedTargets.length !== 0
+    availability: confirmedTargets.length !== 0 || adaptedTargets.length !== 0
       ? "available"
       : candidateTargets.length !== 0 ? "candidate" : "not-provided",
-    targets: confirmedTargets,
+    targets: [...new Set([...confirmedTargets, ...adaptedTargets])].sort(),
     ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
     diagnostics,
   };
@@ -394,7 +402,7 @@ function decorateGenerationCoverage(config, bindingRoot, typeScript, surfaceCove
   };
 }
 
-function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
+function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedOperations) {
   const items = [];
   for (const member of surfaceCoverage?.members ?? []) {
     member.generation.diagnostics.forEach((diagnostic, index) => items.push({
@@ -426,6 +434,27 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
       code: "upstream-identity-missing",
       message: "This shipped target has no upstream correspondence candidate.",
       action: "Identify its upstream operation or classify it as an explicit no-parity operation.",
+    });
+  }
+  for (const operation of generatedOperations) {
+    if (operation.protocol?.upstreamRelation.kind !== "unclassified") continue;
+    const represented = items.some((item) =>
+      item.target === operation.host.target ||
+      item.targets?.includes(operation.host.target) ||
+      item.candidateTargets?.includes(operation.host.target));
+    if (represented) continue;
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/target/${operation.host.target}/protocol-classification-required`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "host-target",
+      target: operation.host.target,
+      disposition: "needs-annotation",
+      provenance: "generated-protocol",
+      severity: "action",
+      code: "protocol-classification-required",
+      message: "This generated protocol has not been classified against its upstream API.",
+      action: "Name the adapted upstream member or classify the operation as VIR-owned.",
     });
   }
   if (bindingRoot.upstream.kind === "local") {
@@ -498,7 +527,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
 
 function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison, generatedOperations = []) {
   if (!Array.isArray(bindingRoot.mappings)) {
-    return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings);
+    return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, generatedOperations);
   }
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
@@ -628,13 +657,42 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   };
 }
 
-function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings) {
+function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, generatedOperations) {
   const roots = new Set(bindingRoot.upstream.roots);
   const members = typeScript.symbols.filter((symbol) =>
     symbol.surfaceRoot !== undefined || (roots.has(symbol.id) && symbol.kind !== "interface"));
-  const targetMappings = bindings.map((binding) => suggestTargetMapping(binding.target, members));
+  const relationsByTarget = new Map(generatedOperations
+    .filter((operation) => operation.typescript.kind === "protocol")
+    .map((operation) => [operation.host.target, operation.protocol.upstreamRelation]));
+  const targetMappings = bindings.map((binding) => {
+    const relation = relationsByTarget.get(binding.target);
+    if (relation?.kind === "upstream-adapter") {
+      return {
+        target: binding.target,
+        status: "compatible",
+        source: "protocol-relation",
+        typescript: relation.member,
+        relation,
+        candidates: [],
+      };
+    }
+    if (relation?.kind === "vir-owned") {
+      return {
+        target: binding.target,
+        status: "no-parity",
+        source: "protocol-relation",
+        relation,
+        candidates: [],
+      };
+    }
+    return suggestTargetMapping(binding.target, members);
+  });
   const mappedMembers = new Map();
   for (const mapping of targetMappings) {
+    if (mapping.source === "protocol-relation" && mapping.typescript !== undefined) {
+      mappedMembers.set(mapping.typescript, "compatible");
+      continue;
+    }
     for (const candidate of mapping.candidates) {
       const previous = mappedMembers.get(candidate.typescript);
       const status = mapping.status === "suggested" ? "suggested" : "ambiguous";
@@ -655,9 +713,11 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings) {
     unreviewed: coveredMembers.filter((member) => member.status !== "missing").length,
     suggested: coveredMembers.filter((member) => member.status === "suggested").length,
     ambiguous: coveredMembers.filter((member) => member.status === "ambiguous").length,
-    mappedTargets: targetMappings.filter((mapping) => mapping.status === "suggested").length,
+    mappedTargets: targetMappings.filter((mapping) =>
+      ["compatible", "suggested"].includes(mapping.status)).length,
     ambiguousTargets: targetMappings.filter((mapping) => mapping.status === "ambiguous").length,
     unmatchedTargets: targetMappings.filter((mapping) => mapping.status === "unmatched").length,
+    noParityTargets: targetMappings.filter((mapping) => mapping.status === "no-parity").length,
   };
   return { mode: "automatic", summary, members: coveredMembers, targetMappings };
 }
@@ -907,7 +967,13 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         }
       }
       const decoratedIssues = issues.map((entry) => ({ library: config.id, group: bindingRoot.id, ...entry }));
-      const workItems = groupWorkItems(config, bindingRoot, surfaceCoverage, issues);
+      const workItems = groupWorkItems(
+        config,
+        bindingRoot,
+        surfaceCoverage,
+        issues,
+        generatedByGroup.get(bindingRoot.id) ?? [],
+      );
       libraryIssues.push(...decoratedIssues);
       allIssues.push(...decoratedIssues);
       roots.push({
@@ -959,6 +1025,16 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     operation.typescript.kind !== "protocol");
   const reviewedProtocolOperations = generatedOperations.filter((operation) =>
     operation.typescript.kind === "protocol");
+  const protocolRelations = {
+    upstreamAdapters: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "upstream-adapter").length,
+    virOwned: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "vir-owned").length,
+    localContracts: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "local-contract").length,
+    unclassified: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "unclassified").length,
+  };
   const generatedSources = new Set(configs.flatMap((config) =>
     config.generation === undefined ? [] : [config.generation.output]));
   const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
@@ -971,6 +1047,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       reviewedProtocols: reviewedProtocolOperations.length,
       handwrittenDeclarations: handwrittenDeclarations.length,
     },
+    protocolRelations,
     disposition: Object.fromEntries(generationDispositions.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
@@ -1102,8 +1179,8 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
-  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols, ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
-  console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
+  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
+  console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed adapters, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author workbench: ${report.summary.generation.workItems} actions`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
   console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);

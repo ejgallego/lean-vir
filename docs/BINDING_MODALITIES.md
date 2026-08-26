@@ -70,7 +70,7 @@ to opaque Lean types.
 ## Canonical Operation IR
 
 `npm run generate:lean-bindings` creates a canonical operation record for every
-selected TypeScript operation and every reviewed VIR-owned protocol operation.
+selected TypeScript operation and every reviewed protocol operation.
 It then renders all downstream views from those records. Ignored debugging
 artifacts are written per library under:
 
@@ -88,7 +88,8 @@ Each operation records:
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
 - provenance for every derived choice;
-- the reason for any explicit exception.
+- the reason for any explicit exception;
+- a protocol's machine-readable upstream relation.
 
 The checked-in `Vir/**/Generated.lean` declarations are rendered from this IR.
 The descriptor generator also projects comparator-compatible `portIntent`
@@ -170,6 +171,19 @@ conveniences, and replay-safe React callbacks. These are authored as structured
 declarations. Protocol records carry their type parameters, complete Lean
 types, representation, passing, retention, effect, target, and justification.
 The generator emits them through the same declaration and modality pipeline.
+
+Every protocol also declares exactly one `upstreamRelation`:
+
+- `upstream-adapter` names the TypeScript member whose behavior it adapts;
+- `vir-owned` records that no one-to-one upstream declaration exists;
+- `local-contract` identifies an operation governed by a repository-local API;
+- `unclassified` is temporary author debt and remains visible in the workbench.
+
+Generation validates adapter member names against the configured TypeScript
+descriptor and rejects relation kinds inconsistent with internal or local API
+groups. The explorer reports each class separately, confirms upstream members
+served by reviewed adapters, and reserves correspondence actions for genuinely
+unclassified operations.
 
 ## Documentation Flow
 

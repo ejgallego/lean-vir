@@ -201,7 +201,11 @@ export async function generateLeanBindings(configPath) {
   const requested = new Set(generation.members);
   const descriptorsByRoot = new Map();
   for (const root of config.roots) {
-    if (!(root.mappings ?? []).some((mapping) => requested.has(mapping.typescript))) continue;
+    const hasSelectedMember = (root.mappings ?? []).some((mapping) =>
+      requested.has(mapping.typescript));
+    const hasUpstreamAdapter = (generation.protocolOperations ?? []).some((operation) =>
+      operation.group === root.id && operation.upstreamRelation.kind === "upstream-adapter");
+    if (!hasSelectedMember && !hasUpstreamAdapter) continue;
     const upstream = root.upstream;
     if (upstream?.kind !== "typescript") {
       throw new Error(`${config.id}/${root.id} does not define a TypeScript declaration surface`);

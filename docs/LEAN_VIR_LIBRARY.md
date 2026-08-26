@@ -8,7 +8,9 @@ All shipped JavaScript host declarations are generated from the companion
 `Vir/**/*.bindings.json` manifests. Browser properties and methods are lowered
 directly from pinned TypeScript declarations where supported. VIR-owned or
 ABI-special operations use structured reviewed protocol records in the same
-manifests. Generated files live under `Vir/**/Generated.lean`; authored modules
+manifests; each record identifies a named upstream adapter, a VIR-owned
+operation, a local contract, or outstanding classification work. Generated
+files live under `Vir/**/Generated.lean`; authored modules
 contain reusable types and higher-level Lean APIs, but no host declarations.
 The generator derives or records representation, passing, retention, result
 ownership, and effect in a canonical operation IR; see

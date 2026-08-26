@@ -34,7 +34,11 @@ document.querySelector("#scope").replaceChildren(
     `${generation.boundaries.targets} are generated and ` +
     `${generation.boundaries.handwrittenDeclarations} declarations are handwritten: ` +
     `${generation.boundaries.typescriptDerived} boundaries are TypeScript-derived and ` +
-    `${generation.boundaries.reviewedProtocols} are reviewed VIR protocols. ` +
+    `${generation.boundaries.reviewedProtocols} are reviewed VIR protocols ` +
+    `(${generation.protocolRelations.upstreamAdapters} upstream adapters, ` +
+    `${generation.protocolRelations.virOwned} VIR-owned operations, ` +
+    `${generation.protocolRelations.localContracts} local-contract operations, ` +
+    `${generation.protocolRelations.unclassified} unclassified). ` +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
 );
@@ -112,6 +116,7 @@ function renderDocumentation(value, fallback = "No upstream declaration document
 
 const dispositionLabel = (value) => ({
   generated: "generated",
+  adapted: "reviewed adapter",
   "needs-annotation": "needs annotation",
   unsupported: "unsupported",
   "not-selected": "not selected",
@@ -383,20 +388,24 @@ function modalityText(argument) {
 
 function renderGenerationPolicy(group, symbol) {
   const operations = (group.generatedOperations ?? []).filter((operation) =>
-    operation.typescript.member === symbol.id);
+    operation.typescript.member === symbol.id ||
+    operation.protocol?.upstreamRelation.member === symbol.id);
   if (operations.length === 0) return "";
   return '<details class="generation-policy"><summary>Generated conversion policy</summary>' +
     operations.map((operation) => {
       const receiver = operation.receiver.kind === "global"
         ? "receiver: host global " + operation.receiver.typescriptType
-        : modalityText(operation.receiver.argument);
+        : operation.receiver.kind === "argument"
+          ? modalityText(operation.receiver.argument)
+          : "receiver: none";
       const arguments_ = operation.arguments.map(modalityText);
       const result = operation.result.modalities;
       const signature = operation.typescript.signaturePolicy;
       return '<article><div class="card-head"><span class="card-title">' +
         escapeHtml(operation.host.target) + '</span><span class="badge">' +
         escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
-        escapeHtml(operation.typescript.member) + '</span><span aria-hidden="true">→</span><span>' +
+        escapeHtml(operation.protocol?.upstreamRelation.member ?? operation.typescript.member) +
+        '</span><span aria-hidden="true">→</span><span>' +
         escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
         [receiver, ...arguments_, "result: " + operation.result.lean + " · " +
           [result.representation, result.ownership].join(" / ")]
@@ -407,7 +416,11 @@ function renderGenerationPolicy(group, symbol) {
           (signature.omittedOptionalParameters.length === 0
             ? " · no parameters omitted"
             : " · omitted: " + escapeHtml(signature.omittedOptionalParameters.join(", "))) +
-          "</p>") + "</article>";
+          "</p>") +
+        (operation.protocol === undefined ? "" : '<p class="policy-source"><b>Reviewed protocol:</b> ' +
+          escapeHtml(operation.protocol.reason) + "</p>") +
+        (operation.exception === undefined ? "" : '<p class="policy-source"><b>Reviewed specialization:</b> ' +
+          escapeHtml(operation.exception.reason) + "</p>") + "</article>";
     }).join("") + "</details>";
 }
 

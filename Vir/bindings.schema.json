@@ -75,7 +75,7 @@
     "protocolOperation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "group", "target", "lean", "marker", "reason", "effect", "arguments", "result"],
+      "required": ["id", "group", "target", "lean", "marker", "reason", "upstreamRelation", "effect", "arguments", "result"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "group": { "$ref": "#/$defs/id" },
@@ -83,6 +83,7 @@
         "lean": { "type": "string", "minLength": 1 },
         "marker": { "enum": ["vir_js", "vir_js_explicit_conversion"] },
         "reason": { "type": "string", "minLength": 1 },
+        "upstreamRelation": { "$ref": "#/$defs/protocolUpstreamRelation" },
         "documentation": { "type": "string", "minLength": 1 },
         "typeParameters": {
           "type": "array",
@@ -104,6 +105,38 @@
         },
         "result": { "$ref": "#/$defs/protocolResult" }
       }
+    },
+    "protocolUpstreamRelation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "vir-owned" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "local-contract" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "member"],
+          "properties": {
+            "kind": { "const": "upstream-adapter" },
+            "member": { "type": "string", "minLength": 1 },
+            "accessor": { "enum": ["get", "set"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "unclassified" } }
+        }
+      ]
     },
     "protocolArgument": {
       "type": "object",
