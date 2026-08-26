@@ -255,10 +255,10 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 });
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
-  compatible: 10,
+  compatible: 12,
   weak: 0,
   missing: 728,
-  unreviewed: 4,
+  unreviewed: 2,
   mappedTargets: 16,
 });
 const elementInnerHTML = elementRoot?.coverage.members.find(

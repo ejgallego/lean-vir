@@ -723,6 +723,46 @@ end Element
 namespace Element.ClassList
 
 /--
+Generated reviewed method specialization of TypeScript `DOMTokenList.add`.
+
+The **`add()`** method of the DOMTokenList interface adds the given tokens to the list, omitting any that are already present.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/add)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `DOMTokenList.add` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.classList.add"]
+opaque addJs
+    (element : @& Lean.Vir.Js Element)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated reviewed method specialization of TypeScript `DOMTokenList.remove`.
+
+The **`remove()`** method of the DOMTokenList interface removes the specified tokens from the list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/remove)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `DOMTokenList.remove` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.classList.remove"]
+opaque removeJs
+    (element : @& Lean.Vir.Js Element)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
 Generated reviewed method specialization of TypeScript `DOMTokenList.toggle`.
 
 The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
@@ -741,42 +781,6 @@ opaque toggleJs
     (element : @& Lean.Vir.Js Element)
     (token : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `browser.element.classList.addOne`.
-
-This lower-level host protocol implements one DOMTokenList token; the authored Lean convenience layer chooses the single-token operation explicitly.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.element.classList.add"]
-opaque addJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `browser.element.classList.removeOne`.
-
-This lower-level host protocol implements one DOMTokenList token; the authored Lean convenience layer chooses the single-token operation explicitly.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.element.classList.remove"]
-opaque removeJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
-    DomM Unit
 
 end Element.ClassList
 

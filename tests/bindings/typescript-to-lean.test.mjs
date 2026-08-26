@@ -324,6 +324,44 @@ test("optional method parameters require an explicit trailing omission", () => {
   );
 });
 
+test("rest parameters require an explicit fixed-arity specialization", () => {
+  const restGeneration = structuredClone(generation);
+  restGeneration.methodPolicies["Widget.getAttribute"] = {
+    signature: "only",
+    fixedRestParameters: { tokens: ["className"] },
+  };
+  const restDescriptors = structuredClone(descriptors);
+  const method = restDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape.args = [{
+    name: "tokens",
+    rest: true,
+    type: { kind: "array", element: stringShape },
+  }];
+
+  const operation = buildGeneratedOperations(config, restGeneration, restDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  const output = renderLeanBindings(config, restGeneration, restDescriptors);
+  assert.deepEqual(operation.typescript.signaturePolicy.fixedRestParameters, {
+    tokens: ["className"],
+  });
+  assert.deepEqual(operation.arguments.map((argument) => argument.name), ["className"]);
+  assert.match(output, /\(className : @& Lean\.Vir\.Js String\)/u);
+
+  const conflicting = structuredClone(restGeneration);
+  conflicting.methodPolicies["Widget.getAttribute"].omittedRestParameters = ["tokens"];
+  assert.throws(
+    () => buildGeneratedOperations(config, conflicting, restDescriptors),
+    /cannot both omit and fix rest parameter tokens/u,
+  );
+
+  method.shape.args[0].rest = false;
+  assert.throws(
+    () => buildGeneratedOperations(config, restGeneration, restDescriptors),
+    /cannot fix non-rest parameter tokens/u,
+  );
+});
+
 test("generated anchors project comparator intent from operation IR", () => {
   const root = config.roots[0];
   const materialized = materializeGeneratedAnchors(

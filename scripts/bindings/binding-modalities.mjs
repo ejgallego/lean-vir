@@ -157,7 +157,7 @@ export function validateGenerationProfile(generation, context = "generation") {
     if (!object(policy)) throw new Error(`${context} method policy ${member} must be an object`);
     validateKeys(
       policy,
-      ["signature", "omittedOptionalParameters", "omittedRestParameters"],
+      ["signature", "omittedOptionalParameters", "omittedRestParameters", "fixedRestParameters"],
       `${context} method policy ${member}`,
     );
     if (policy.signature !== "only" &&
@@ -173,6 +173,13 @@ export function validateGenerationProfile(generation, context = "generation") {
     if (!Array.isArray(omittedRest) || !omittedRest.every(nonemptyString) ||
         new Set(omittedRest).size !== omittedRest.length) {
       throw new Error(`${context} method policy ${member} has invalid omitted rest parameters`);
+    }
+    const fixedRest = policy.fixedRestParameters ?? {};
+    if (!object(fixedRest) || !Object.keys(fixedRest).every(nonemptyString) ||
+        !Object.values(fixedRest).every((names) =>
+      Array.isArray(names) && names.length !== 0 && names.every(nonemptyString) &&
+      new Set(names).size === names.length)) {
+      throw new Error(`${context} method policy ${member} has invalid fixed rest parameters`);
     }
   }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
@@ -580,7 +587,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
   const omitted = new Set(policy.omittedOptionalParameters ?? []);
   const omittedRest = new Set(policy.omittedRestParameters ?? []);
-  const knownParameters = new Set(shape.args.map((argument) => argument.name));
+  const fixedRest = policy.fixedRestParameters ?? {};
   for (const name of omitted) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
@@ -590,15 +597,50 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing rest parameter ${name}`);
     if (argument.rest !== true) throw new Error(`${member} policy cannot rest-omit non-rest parameter ${name}`);
+    if (fixedRest[name] !== undefined) {
+      throw new Error(`${member} policy cannot both omit and fix rest parameter ${name}`);
+    }
+  }
+  for (const name of Object.keys(fixedRest)) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy fixes missing rest parameter ${name}`);
+    if (argument.rest !== true) throw new Error(`${member} policy cannot fix non-rest parameter ${name}`);
+    if (argument.type?.kind !== "array") {
+      throw new Error(`${member} fixed rest parameter ${name} must have an array element type`);
+    }
   }
   const exception = exceptionFor(generation, operationId);
   const arguments_ = [];
+  const knownParameters = new Set();
+  function addArgument(name, typeShape) {
+    if (knownParameters.has(name)) {
+      throw new Error(`${member} generates duplicate parameter ${name}`);
+    }
+    knownParameters.add(name);
+    arguments_.push(modalityArgument(
+      leanBinderIdentifier(name, `${member} parameter`),
+      "argument",
+      operationType(
+        typeShape,
+        exception?.arguments?.[name],
+        generation,
+        profile,
+        `${member} parameter ${name}`,
+      ),
+      profile.resource.argument,
+      "generation.abiProfile.resource.argument",
+      exception?.arguments?.[name] ?? null,
+    ));
+  }
   let omittedTrailingParameter = false;
   for (const argument of shape.args) {
     if (argument.rest === true) {
-      if (!omittedRest.has(argument.name)) {
-        throw new Error(`${member} rest parameter ${argument.name} requires an explicit omission policy`);
+      if (omittedRest.has(argument.name)) continue;
+      const fixedNames = fixedRest[argument.name];
+      if (fixedNames === undefined) {
+        throw new Error(`${member} rest parameter ${argument.name} requires an explicit omission or fixed-arity policy`);
       }
+      for (const name of fixedNames) addArgument(name, argument.type.element);
       continue;
     }
     if (argument.optional === true) {
@@ -611,20 +653,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     if (omittedTrailingParameter) {
       throw new Error(`${member} cannot omit an optional parameter before ${argument.name}`);
     }
-    arguments_.push(modalityArgument(
-      leanBinderIdentifier(argument.name, `${member} parameter`),
-      "argument",
-      operationType(
-        argument.type,
-        exception?.arguments?.[argument.name],
-        generation,
-        profile,
-        `${member} parameter ${argument.name}`,
-      ),
-      profile.resource.argument,
-      "generation.abiProfile.resource.argument",
-      exception?.arguments?.[argument.name] ?? null,
-    ));
+    addArgument(argument.name, argument.type);
   }
   for (const name of Object.keys(exception?.arguments ?? {})) {
     if (!knownParameters.has(name) || omitted.has(name) || omittedRest.has(name)) {
@@ -663,6 +692,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
         selection: policy.signature,
         omittedOptionalParameters: [...omitted],
         omittedRestParameters: [...omittedRest],
+        fixedRestParameters: structuredClone(fixedRest),
         provenance: signatureProvenance,
       },
     },
