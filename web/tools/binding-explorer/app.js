@@ -615,7 +615,7 @@ function renderTransformationRow(from, to, note = "", state = "mapped") {
     "</div></div>";
 }
 
-function renderTypeTransformation(operation) {
+function renderTypeTransformation(operation, { showHeading = true } = {}) {
   if (operation.typescript.kind === "protocol") return "";
   const rows = [];
   if (operation.receiver.typescriptType) {
@@ -714,12 +714,19 @@ function renderTypeTransformation(operation) {
     "result: " + shortLeanName(effectfulLeanType(operation)),
     operation.effect.id + " effect · " + Object.values(operation.result.modalities).join(" · "),
   ));
-  return '<section class="type-transformation"><div class="transformation-heading"><span>Type translation</span><span>selected TypeScript shape → emitted Lean boundary</span></div>' +
+  return '<section class="type-transformation">' +
+    (showHeading
+      ? '<div class="transformation-heading"><span>Type translation</span><span>selected TypeScript shape → emitted Lean boundary</span></div>'
+      : "") +
     '<div class="transformation-columns"><span>TypeScript</span><span></span><span>Lean</span></div>' +
     '<div class="transformation-grid">' + rows.join("") + "</div></section>";
 }
 
-function renderLeanCards(targetIds, { showRuntime = false } = {}) {
+function renderLeanCards(targetIds, {
+  showRuntime = false,
+  showTranslation = true,
+  showExact = true,
+} = {}) {
   const rendered = [];
   for (const id of targetIds) {
     const target = targetById.get(id);
@@ -739,9 +746,11 @@ function renderLeanCards(targetIds, { showRuntime = false } = {}) {
         : renderReadableLeanSignature(
           operation,
           sourceLink(item.entry.source, item.entry.module),
-        ) + renderTypeTransformation(operation) +
-          '<details class="exact-type"><summary>Exact compiled Lean type</summary>' +
-          renderCode(item.entry.type, "lean") + "</details>";
+        ) + (showTranslation ? renderTypeTransformation(operation) : "") +
+          (showExact
+            ? '<details class="exact-type"><summary>Exact compiled Lean type</summary>' +
+              renderCode(item.entry.type, "lean") + "</details>"
+            : "");
       return (
       '<article class="binding lean-binding">' + signature +
       (showRuntime
@@ -866,6 +875,110 @@ function renderGroupDetail(group) {
       : '<div class="empty">No upstream entries match these filters.</div>') + "</section>";
 }
 
+function contractOriginLabel(operation) {
+  return ({
+    "typescript-derived": "Upstream TypeScript",
+    "upstream-adapter": "Upstream API",
+    "vir-owned": "VIR-owned contract",
+    "local-contract": "Local TypeScript contract",
+    unclassified: "Source contract",
+  })[boundaryEvidence(operation)] ?? "Source contract";
+}
+
+function renderContractOrigin(operation, symbol) {
+  const label = contractOriginLabel(operation);
+  if (symbol !== undefined) {
+    return '<div class="contract-origin"><div class="contract-caption"><span>' +
+      escapeHtml(label) + "</span>" + symbolSource(symbol) +
+      '</div><div class="contract-title">' + escapeHtml(symbol.id) + "</div>" +
+      renderCode(symbol.display, "typescript") + renderDocumentation(symbol.hover) + "</div>";
+  }
+  if (operation !== null && operation !== undefined) {
+    return '<div class="contract-origin"><div class="contract-caption"><span>' +
+      escapeHtml(label) + '</span></div><div class="contract-title">' +
+      escapeHtml(operation.typescript.display ?? operation.typescript.member) + "</div>" +
+      renderDocumentation(operation.typescript.documentation) + "</div>";
+  }
+  return '<div class="contract-origin"><div class="contract-caption"><span>Source contract</span></div>' +
+    '<p class="note">No canonical source contract was recorded.</p></div>';
+}
+
+function renderTranslationDisclosure(operation) {
+  if (operation === null || operation.typescript.kind === "protocol") return "";
+  return '<details class="translation-details"><summary><span>Type translation</span>' +
+    '<span>parameter mapping and reviewed policy choices</span></summary>' +
+    renderTypeTransformation(operation, { showHeading: false }) + "</details>";
+}
+
+function renderBindingContract(target, operation, symbol) {
+  return '<div class="binding-contract">' + renderContractOrigin(operation, symbol) +
+    '<div class="contract-arrow"><span>maps to</span><b aria-hidden="true">→</b></div>' +
+    '<div class="contract-lean">' + renderLeanCards([target.target], {
+      showTranslation: false,
+      showExact: false,
+    }) + "</div></div>" + renderTranslationDisclosure(operation);
+}
+
+function signaturePolicySummary(signature) {
+  if (signature === undefined) return undefined;
+  return "Signature " + signature.selection + " · " + signature.provenance +
+    (signature.omittedOptionalParameters.length === 0
+      ? " · no optional parameters omitted"
+      : " · omitted optional parameters: " + signature.omittedOptionalParameters.join(", "));
+}
+
+function renderGenerationDecisions(operation) {
+  if (operation === null) {
+    return '<section class="evidence-unit"><h4>Generation decisions</h4>' +
+      '<p class="note">No canonical generated operation was recorded.</p></section>';
+  }
+  const decisions = [
+    signaturePolicySummary(operation.typescript.signaturePolicy),
+    operation.protocol === undefined
+      ? undefined
+      : boundaryEvidenceLabel(operation.protocol.upstreamRelation.kind) + ": " +
+        operation.protocol.reason,
+    operation.exception === undefined
+      ? undefined
+      : "Reviewed specialization: " + operation.exception.reason,
+  ].filter(Boolean);
+  return '<section class="evidence-unit"><h4>Generation decisions</h4>' +
+    (decisions.length
+      ? '<ul class="evidence-list"><li>' + decisions.map(escapeHtml).join("</li><li>") + "</li></ul>"
+      : '<p class="note">The ABI profile supplied all generation decisions.</p>') +
+    '<p class="evidence-hint">Hover the Lean signature for field-level modality provenance.</p></section>';
+}
+
+function renderCompiledEvidence(target) {
+  const declarations = preferredPublicEntries(target);
+  const runtime = '<section class="evidence-unit"><h4>Runtime providers</h4><div class="badges">' +
+    (target.providers.length
+      ? target.providers.map((provider) => '<span class="badge">' +
+        escapeHtml(provider) + "</span>").join("")
+      : '<span class="pill missing-provider">missing provider</span>') + "</div></section>";
+  const compiled = declarations.length
+    ? '<section class="evidence-unit compiled-evidence"><h4>Compiled public declaration' +
+      (declarations.length === 1 ? "" : "s") + "</h4>" +
+      declarations.map((item) => '<article class="compiled-record"><div class="card-head"><div class="contract-title">' +
+        escapeHtml(shortLeanName(item.entry.declaration)) + "</div>" +
+        sourceLink(item.entry.source, item.entry.module) + "</div>" +
+        renderCode(item.entry.type, "lean") + '<div class="evidence-subtitle">Public reachability</div>' +
+        renderCode(item.reach.path.join("\n→ "), "lean") + "</article>").join("") + "</section>"
+    : '<section class="evidence-unit"><h4>Compiled public declaration</h4>' +
+      '<p class="note">No confirmed public Lean declaration reaches this target.</p></section>';
+  return runtime + compiled;
+}
+
+function renderImplementationEvidence(target, operation) {
+  const declarations = preferredPublicEntries(target).length;
+  const summary = target.providers.length + " runtime " +
+    (target.providers.length === 1 ? "provider" : "providers") + " · " +
+    declarations + " public " + (declarations === 1 ? "declaration" : "declarations");
+  return '<details class="implementation-evidence"><summary><span>Implementation evidence</span><span>' +
+    escapeHtml(summary) + '</span></summary><div class="implementation-evidence-body">' +
+    renderGenerationDecisions(operation) + renderCompiledEvidence(target) + "</div></details>";
+}
+
 function renderInventoryDetail(target) {
   if (target === undefined) {
     elements.detail.innerHTML = '<div class="empty">Select a shipped boundary.</div>';
@@ -878,25 +991,16 @@ function renderInventoryDetail(target) {
   const symbol = upstreamMember === undefined
     ? undefined
     : target.group.typescript?.symbols.find((entry) => entry.id === upstreamMember);
-  const upstream = symbol === undefined
-    ? '<div class="empty">This boundary has no one-to-one upstream declaration.</div>'
-    : '<article class="anchor"><div class="card-head"><span class="card-title">' +
-      escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div>" +
-      renderCode(symbol.display, "typescript") + renderDocumentation(symbol.hover) + "</article>";
   elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
     escapeHtml(evidence) + '">' + escapeHtml(boundaryEvidenceLabel(evidence)) +
-    '</span><span class="badge">' + escapeHtml(target.status) + "</span>" +
-    target.providers.map((provider) => '<span class="badge">' + escapeHtml(provider) +
-      " provider</span>").join("") + "</div><h2>" + escapeHtml(target.target) +
+    "</span>" + (target.status === "provided"
+      ? ""
+      : '<span class="pill ' + escapeHtml(target.status) + '">' +
+        escapeHtml(target.status) + "</span>") + "</div><h2>" + escapeHtml(target.target) +
     '</h2><p class="note">' + escapeHtml(target.group.library.title + " · " +
-      target.group.title) + '</p><section class="section"><h3>Public Lean boundary</h3>' +
-    renderLeanCards([target.target], { showRuntime: true }) +
-    '</section><section class="section"><h3>Upstream or local declaration</h3>' + upstream +
-    '</section><section class="section"><h3>Generation evidence</h3>' +
-    (operation === null
-      ? '<div class="empty">No canonical generated operation was recorded.</div>'
-      : '<div class="generation-policy">' + renderOperationPolicy(operation) + "</div>") +
-    "</section>";
+      target.group.title) + '</p><section class="section"><h3>Binding contract</h3>' +
+    renderBindingContract(target, operation, symbol) + '</section><section class="section">' +
+    renderImplementationEvidence(target, operation) + "</section>";
 }
 
 function comparisonResults(group, member) {
