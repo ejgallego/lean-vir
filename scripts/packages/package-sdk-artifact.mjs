@@ -18,6 +18,7 @@ import {
 import { copyFileWithDirs } from "../file-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { runSync } from "../process-utils.mjs";
+import { parseLeanBuildIdentity } from "./lean-build-identity.mjs";
 import { PACKAGE_VERSIONS } from "./package-versions.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
@@ -45,11 +46,25 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
 
 await copyArtifactMetadata(repositoryRoot, artifactPaths.bundleDir);
 
-const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
-const leanToolchain = (await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")).trim();
-const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, capture: true });
-const gitStatus = runSync("git", ["status", "--short"], { cwd: repositoryRoot, capture: true });
-const leanVersion = runSync("lean", ["--version"], { cwd: repositoryRoot, capture: true });
+const packageJson = JSON.parse(
+  await readFile(join(repositoryRoot, "package.json"), "utf8"),
+);
+const leanToolchain = (
+  await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")
+).trim();
+const gitCommit = runSync("git", ["rev-parse", "HEAD"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const gitStatus = runSync("git", ["status", "--short"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const leanVersion = runSync("lean", ["--version"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const leanBuildIdentity = parseLeanBuildIdentity(leanVersion);
 const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
@@ -57,11 +72,15 @@ const artifactManifest = {
   gitDirty: gitStatus.length !== 0,
   leanToolchain,
   leanVersion,
+  ...leanBuildIdentity,
   ...PACKAGE_VERSIONS,
   generatedAt: new Date().toISOString(),
   files,
 };
-await writeFile(join(artifactPaths.bundleDir, "lean-vir-artifact.json"), `${JSON.stringify(artifactManifest, null, 2)}\n`);
+await writeFile(
+  join(artifactPaths.bundleDir, "lean-vir-artifact.json"),
+  `${JSON.stringify(artifactManifest, null, 2)}\n`,
+);
 await writeFile(
   join(artifactPaths.bundleDir, "README.txt"),
   `Lean VIR SDK

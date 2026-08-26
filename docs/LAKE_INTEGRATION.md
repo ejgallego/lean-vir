@@ -184,7 +184,8 @@ directly into an executable.
 Add `vir-web-assets.json` at the root of the application package. Each entry
 selects an existing `+Module:vir` producer. Use `package` when the module belongs
 to a dependency or when its name would otherwise be ambiguous; `id` is the
-stable URL directory name and defaults to the module name.
+stable URL directory name and defaults to the module name. An explicit `id`
+must be a URL-safe slug containing only letters, digits, `.`, `_`, or `-`.
 
 ```json
 {
@@ -259,6 +260,48 @@ The application can copy or serve this one directory without running npm,
 selecting an SDK revision in nested packages, or teaching its renderer about
 Lake's dependency build directories.
 
+All entry-point and program paths in `VIR_WEB_ASSETS.json` are relative to that
+manifest. A browser host can load one manifest, compile the shared Wasm module
+once, and create an isolated runtime for each selected program:
+
+```js
+const manifestUrl = new URL(
+  "./vir/VIR_WEB_ASSETS.json",
+  window.location.href,
+);
+const assets = await fetch(manifestUrl).then((response) => {
+  if (!response.ok) throw new Error(`failed to load VIR assets: ${response.status}`);
+  return response.json();
+});
+
+if (assets.format !== "lean-vir-web-assets" || assets.version !== 1) {
+  throw new Error("unsupported VIR web-assets manifest");
+}
+
+const runtimeModuleUrl = new URL(assets.sdk.runtimeModule, manifestUrl);
+const { createVirRuntimeFactory } = await import(runtimeModuleUrl.href);
+const factory = createVirRuntimeFactory({
+  wasmUrl: new URL(assets.sdk.wasm, manifestUrl),
+});
+
+async function createProgramRuntime(id) {
+  const program = assets.programs.find((candidate) => candidate.id === id);
+  if (!program) throw new Error(`unknown VIR program: ${id}`);
+  return factory.createRuntime({
+    irPackageSetUrl: new URL(program.descriptor, manifestUrl),
+  });
+}
+
+const slides = await createProgramRuntime("slides");
+slides.runStartupEntries();
+
+const widgets = await createProgramRuntime("widgets");
+widgets.runStartupEntries();
+```
+
+The two runtimes above share the factory's compiled `WebAssembly.Module`, but
+own separate Wasm instances, Lean heaps, host resources, and startup state.
+
 A Verso Slides integration can expose configuration shaped like:
 
 ```lean
@@ -282,12 +325,13 @@ under `.lake/build/vir/sdk/`. The corresponding GitHub release must exist; for
 an unreleased revision, select the exact pinned commit:
 
 ```bash
-VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
+VIR_SDK_COMMIT=<lean-vir-revision> lake build my_slides
 ```
 
 The facet derives the expected version and Git commit directly from the
 resolved `lean_vir` dependency. `VIR_SDK_COMMIT` selects the unreleased artifact;
-clients do not need a separate expected-revision setting. The installer checks
+keep it set on each application build until that revision has a tagged release.
+Clients do not need a separate expected-revision setting. The installer checks
 the SDK version, runtime ABI, non-empty source commit, and every manifest
 checksum. GitHub Actions artifact downloads
 require `GITHUB_TOKEN` or an authenticated `gh` CLI. Set

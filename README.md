@@ -88,8 +88,11 @@ When the dependency is pinned to an unreleased commit rather than a release
 tag, request the SDK artifact built from that same commit:
 
 ```bash
-VIR_SDK_COMMIT=<same-commit> lake build :virSdk
+VIR_SDK_COMMIT=<same-commit> lake build my_slides
 ```
+
+Keep that selection on each application build until the corresponding tagged
+release exists.
 
 The application facet builds each module's package set, installs one matching
 SDK, checks source/ABI compatibility and digests, and stages everything under
@@ -246,10 +249,10 @@ manifest:
 npm run build:sdk-artifact
 ```
 
-Client Lake packages should normally install the matching SDK with
-`lake build :virSdk`, as shown above. The lower-level package executable remains
-available for explicit artifact-management workflows. The first complete
-client is
+Client Lake applications should normally receive the matching SDK through their
+ordinary target's `@:virWebAssets` dependency, as shown above. The standalone
+`:virSdk` facet and lower-level package executable remain available for explicit
+artifact-management workflows. The first complete client is
 [ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
 
 ```bash

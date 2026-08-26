@@ -30,16 +30,20 @@ structure Options where
   virCommit : String := ""
   hostPackage : String := ""
   programs : Array ProgramArg := #[]
+  verifyInstalled : Bool := false
 
 def usage : String :=
   "usage: vir_web_assets --out DIR --sdk-manifest FILE --vir-version VERSION " ++
   "--vir-commit COMMIT --host-package PACKAGE " ++
-  "[--program ID PACKAGE MODULE DESCRIPTOR]..."
+  "[--program ID PACKAGE MODULE DESCRIPTOR]...\n" ++
+  "       vir_web_assets --verify-installed DIR"
 
 partial def parseArgs (args : List String) (opts : Options := {}) : Except String Options :=
   match args with
   | [] =>
-      if opts.virVersion.isEmpty then
+      if opts.verifyInstalled then
+        .ok opts
+      else if opts.virVersion.isEmpty then
         .error s!"missing --vir-version\n\n{usage}"
       else if opts.hostPackage.isEmpty then
         .error s!"missing --host-package\n\n{usage}"
@@ -53,6 +57,8 @@ partial def parseArgs (args : List String) (opts : Options := {}) : Except Strin
   | "--vir-version" :: value :: rest => parseArgs rest { opts with virVersion := value }
   | "--vir-commit" :: value :: rest => parseArgs rest { opts with virCommit := value }
   | "--host-package" :: value :: rest => parseArgs rest { opts with hostPackage := value }
+  | "--verify-installed" :: value :: rest =>
+      parseArgs rest { opts with out := FilePath.mk value, verifyInstalled := true }
   | "--program" :: id :: packageName :: moduleName :: descriptor :: rest =>
       parseArgs rest { opts with programs := opts.programs.push {
         id
@@ -76,14 +82,6 @@ def jsonField (source : String) (json : Json) (field : String)
   | .ok value => pure value
   | .error err => throw <| IO.userError s!"invalid {source} field `{field}`: {err}"
 
-def optionalJsonString (source : String) (json : Json) (field : String) : IO (Option String) := do
-  match json.getObjVal? field with
-  | .error _ => pure none
-  | .ok value =>
-      match value.getStr? with
-      | .ok text => pure (some text)
-      | .error err => throw <| IO.userError s!"invalid {source} field `{field}`: {err}"
-
 def validatedRelativePath (source path : String) : IO FilePath := do
   if path.isEmpty then
     throw <| IO.userError s!"{source} path must be non-empty"
@@ -96,10 +94,13 @@ def validatedRelativePath (source path : String) : IO FilePath := do
     throw <| IO.userError s!"{source} path must not contain empty, '.', or '..' components: {path}"
   return filePath.normalize
 
+def isProgramIdChar (char : Char) : Bool :=
+  char.isAlphanum || char == '.' || char == '_' || char == '-'
+
 def validateProgramId (id : String) : IO Unit := do
-  let path ← validatedRelativePath "program id" id
-  if path.components.length != 1 then
-    throw <| IO.userError s!"program id must be one safe path component: {id}"
+  if id.isEmpty || id == "." || id == ".." || !id.all isProgramIdChar then
+    throw <| IO.userError <|
+      s!"program id must be a URL-safe slug using letters, digits, '.', '_', or '-': {id}"
 
 def run (cmd : String) (args : Array String) : IO String := do
   let out ← IO.Process.output { cmd, args }
@@ -144,24 +145,17 @@ structure Compatibility where
   leanToolchain : String
   leanGithash : String
 
-def readCompatibility (source : String) (json : Json) : IO Compatibility := do
+def readCompatibility
+    (source : String)
+    (json : Json)
+    (leanVersionField : String := "leanVersion") : IO Compatibility := do
   return {
     packageFormatVersion := ← jsonField source json "packageFormatVersion" Json.getNat?
     manifestVersion := ← jsonField source json "manifestVersion" Json.getNat?
     runtimeAbiVersion := ← jsonField source json "runtimeAbiVersion" Json.getNat?
-    leanVersion := ← jsonField source json "leanVersion" Json.getStr?
+    leanVersion := ← jsonField source json leanVersionField Json.getStr?
     leanToolchain := ← jsonField source json "leanToolchain" Json.getStr?
     leanGithash := ← jsonField source json "leanGithash" Json.getStr?
-  }
-
-def readSdkCompatibility (source : String) (json : Json) : IO Compatibility := do
-  return {
-    packageFormatVersion := ← jsonField source json "packageFormatVersion" Json.getNat?
-    manifestVersion := ← jsonField source json "manifestVersion" Json.getNat?
-    runtimeAbiVersion := ← jsonField source json "runtimeAbiVersion" Json.getNat?
-    leanVersion := ← jsonField source json "leanVersion" Json.getStr?
-    leanToolchain := ← jsonField source json "leanToolchain" Json.getStr?
-    leanGithash := (← optionalJsonString source json "leanGithash").getD ""
   }
 
 def Compatibility.toJson (compatibility : Compatibility) : String :=
@@ -184,9 +178,28 @@ def validateCompatibility (source : String) (compatibility : Compatibility) : IO
   if compatibility.runtimeAbiVersion != currentRuntimeAbiVersion then
     throw <| IO.userError <| s!"{source} runtime ABI mismatch: expected " ++
       s!"{currentRuntimeAbiVersion}, got {compatibility.runtimeAbiVersion}"
+  if compatibility.leanVersion.isEmpty then
+    throw <| IO.userError s!"{source} Lean version must not be empty"
+  if compatibility.leanToolchain.isEmpty then
+    throw <| IO.userError s!"{source} Lean toolchain must not be empty"
+  if compatibility.leanGithash.isEmpty then
+    throw <| IO.userError s!"{source} Lean git hash must not be empty"
 
 def normalizedLeanToolchain (toolchain : String) : String :=
   toolchain.replace ":v" ":"
+
+def validateProgramCompatibility
+    (source : String)
+    (program sdk : Compatibility) : IO Unit := do
+  if normalizedLeanToolchain program.leanToolchain != normalizedLeanToolchain sdk.leanToolchain then
+    throw <| IO.userError <| s!"Lean toolchain mismatch for {source}: " ++
+      s!"program is {program.leanToolchain}, SDK is {sdk.leanToolchain}"
+  if program.leanVersion != sdk.leanVersion then
+    throw <| IO.userError <| s!"Lean version mismatch for {source}: " ++
+      s!"program is {program.leanVersion}, SDK is {sdk.leanVersion}"
+  if program.leanGithash != sdk.leanGithash then
+    throw <| IO.userError <| s!"Lean git hash mismatch for {source}: " ++
+      s!"program is {program.leanGithash}, SDK is {sdk.leanGithash}"
 
 structure SdkInfo where
   version : String
@@ -209,7 +222,7 @@ def readSdk (opts : Options) : IO SdkInfo := do
     throw <| IO.userError "SDK manifest gitCommit must not be empty"
   if !opts.virCommit.isEmpty && gitCommit != opts.virCommit then
     throw <| IO.userError s!"SDK source mismatch: lean_vir is {opts.virCommit}, SDK is {gitCommit}"
-  let compatibility ← readSdkCompatibility source manifest
+  let compatibility ← readCompatibility source manifest "leanVersionString"
   validateCompatibility source compatibility
   let fileJsons ← jsonField source manifest "files" Json.getArr?
   let sdkDir := opts.sdkManifest.parent.getD "."
@@ -283,6 +296,104 @@ def readProgram (arg : ProgramArg) : IO ProgramInfo := do
     files := files.push (← inspectFile (descriptorDir / relPath) relPathString)
   return { arg, descriptorName, compatibility, files }
 
+def verifyListedFile (root : FilePath) (source : String) (json : Json) : IO AssetFile := do
+  let relPathString ← jsonField source json "path" Json.getStr?
+  let relPath ← validatedRelativePath source relPathString
+  let expectedHash ← jsonField source json "sha256" Json.getStr?
+  let expectedByteSize ← jsonField source json "byteSize" Json.getNat?
+  let file ← inspectFile (root / relPath) relPathString
+  if file.sha256 != expectedHash then
+    throw <| IO.userError <| s!"{source} checksum mismatch for {relPathString}: expected " ++
+      s!"{expectedHash}, got {file.sha256}"
+  if file.byteSize != expectedByteSize then
+    throw <| IO.userError <| s!"{source} byte-size mismatch for {relPathString}: expected " ++
+      s!"{expectedByteSize}, got {file.byteSize}"
+  return file
+
+def verifyListedFiles (root : FilePath) (source : String) (json : Json) : IO (Array AssetFile) := do
+  let fileJsons ← jsonField source json "files" Json.getArr?
+  if fileJsons.isEmpty then
+    throw <| IO.userError s!"{source} must list at least one file"
+  let mut files := #[]
+  let mut paths : Array String := #[]
+  for fileJson in fileJsons do
+    let file ← verifyListedFile root source fileJson
+    if paths.contains file.path then
+      throw <| IO.userError s!"{source} contains duplicate file path: {file.path}"
+    paths := paths.push file.path
+    files := files.push file
+  return files
+
+def verifyInstalled (out : FilePath) : IO Unit := do
+  let manifestPath := out / "VIR_WEB_ASSETS.json"
+  let manifest ← readJsonFile manifestPath
+  let source := "VIR web-assets manifest"
+  let format ← jsonField source manifest "format" Json.getStr?
+  if format != webAssetsFormat then
+    throw <| IO.userError s!"{source} format mismatch: expected {webAssetsFormat}, got {format}"
+  let version ← jsonField source manifest "version" Json.getNat?
+  if version != currentWebAssetsVersion then
+    throw <| IO.userError <| s!"{source} version mismatch: expected " ++
+      s!"{currentWebAssetsVersion}, got {version}"
+  let hostPackage ← jsonField source manifest "hostPackage" Json.getStr?
+  if hostPackage.isEmpty then
+    throw <| IO.userError s!"{source} host package must not be empty"
+  let virJson ← jsonField source manifest "vir" pure
+  let virVersion ← jsonField "VIR identity" virJson "version" Json.getStr?
+  if virVersion.isEmpty then
+    throw <| IO.userError "VIR identity version must not be empty"
+  discard <| jsonField "VIR identity" virJson "gitCommit" Json.getStr?
+  let sdkJson ← jsonField source manifest "sdk" pure
+  let sdkCompatibilityJson ← jsonField "staged SDK" sdkJson "compatibility" pure
+  let sdkCompatibility ← readCompatibility "staged SDK" sdkCompatibilityJson
+  validateCompatibility "staged SDK" sdkCompatibility
+  let sdkFiles ← verifyListedFiles out "staged SDK" sdkJson
+  let sdkPaths := sdkFiles.map (·.path)
+  for field in #["manifest", "runtimeModule", "wasm"] do
+    let path ← jsonField "staged SDK" sdkJson field Json.getStr?
+    discard <| validatedRelativePath s!"staged SDK {field}" path
+    unless sdkPaths.contains path do
+      throw <| IO.userError s!"staged SDK {field} is not listed in its files: {path}"
+  for file in sdkFiles do
+    unless file.path.startsWith "sdk/" do
+      throw <| IO.userError s!"staged SDK file must be under sdk/: {file.path}"
+  let programJsons ← jsonField source manifest "programs" Json.getArr?
+  if programJsons.isEmpty then
+    throw <| IO.userError s!"{source} must contain at least one program"
+  let mut ids : Array String := #[]
+  let mut allPaths := sdkPaths
+  for programJson in programJsons do
+    let id ← jsonField "staged program" programJson "id" Json.getStr?
+    validateProgramId id
+    if ids.contains id then
+      throw <| IO.userError s!"duplicate staged program id: {id}"
+    ids := ids.push id
+    let packageName ← jsonField "staged program" programJson "package" Json.getStr?
+    let moduleName ← jsonField "staged program" programJson "module" Json.getStr?
+    if packageName.isEmpty || moduleName.isEmpty then
+      throw <| IO.userError s!"staged program {id} must name its package and module"
+    let compatibilityJson ← jsonField s!"staged program {id}" programJson "compatibility" pure
+    let compatibility ← readCompatibility s!"staged program {id}" compatibilityJson
+    validateCompatibility s!"staged program {id}" compatibility
+    validateProgramCompatibility s!"staged program {id}" compatibility sdkCompatibility
+    let files ← verifyListedFiles out s!"staged program {id}" programJson
+    let paths := files.map (·.path)
+    let pathPrefix := s!"programs/{id}/"
+    for path in paths do
+      unless path.startsWith pathPrefix do
+        throw <| IO.userError s!"staged program {id} file must be under {pathPrefix}: {path}"
+      if allPaths.contains path then
+        throw <| IO.userError s!"duplicate staged web-assets file path: {path}"
+      allPaths := allPaths.push path
+    let descriptor ← jsonField s!"staged program {id}" programJson "descriptor" Json.getStr?
+    discard <| validatedRelativePath s!"staged program {id} descriptor" descriptor
+    unless paths.contains descriptor do
+      throw <| IO.userError s!"staged program {id} descriptor is not listed in its files: {descriptor}"
+
+def removePathIfExists (path : FilePath) : IO Unit := do
+  if ← path.pathExists then
+    if ← path.isDir then IO.FS.removeDirAll path else IO.FS.removeFile path
+
 def copyFileIfChanged (source dest : FilePath) (expectedHash : String) : IO Unit := do
   let unchanged ← if ← dest.pathExists then
     if ← dest.isDir then pure false else pure ((← sha256 dest) == expectedHash)
@@ -290,8 +401,7 @@ def copyFileIfChanged (source dest : FilePath) (expectedHash : String) : IO Unit
     pure false
   if unchanged then
     return
-  if ← dest.pathExists then
-    if ← dest.isDir then IO.FS.removeDirAll dest else IO.FS.removeFile dest
+  removePathIfExists dest
   if let some parent := dest.parent then
     IO.FS.createDirAll parent
   IO.FS.writeBinFile dest (← IO.FS.readBinFile source)
@@ -371,47 +481,48 @@ def manifestJson (opts : Options) (sdk : SdkInfo) (programs : Array ProgramInfo)
     ("programs", jsonArray <| programs.map ProgramInfo.toJson)
   ] ++ "\n"
 
-def writeTextIfChanged (path : FilePath) (content : String) : IO Unit := do
-  let unchanged ← if ← path.pathExists then
-    if ← path.isDir then pure false else pure ((← IO.FS.readFile path) == content)
-  else
-    pure false
-  if unchanged then
-    return
-  if ← path.pathExists then
-    if ← path.isDir then IO.FS.removeDirAll path else IO.FS.removeFile path
+def writeTextAtomically (path : FilePath) (content : String) : IO Unit := do
+  let tmp := FilePath.mk s!"{path}.tmp"
+  removePathIfExists tmp
   if let some parent := path.parent then
     IO.FS.createDirAll parent
-  IO.FS.writeFile path content
+  try
+    IO.FS.writeFile tmp content
+    IO.FS.rename tmp path
+  catch e =>
+    removePathIfExists tmp
+    throw e
 
 def compose (opts : Options) : IO Unit := do
   let outputManifest := opts.out / "VIR_WEB_ASSETS.json"
-  if ← outputManifest.pathExists then
-    IO.FS.removeFile outputManifest
-  let mut ids : Array String := #[]
-  let mut modules : Array String := #[]
-  for arg in opts.programs do
-    if ids.contains arg.id then
-      throw <| IO.userError s!"duplicate web-assets program id: {arg.id}"
-    if modules.contains s!"{arg.packageName}/{arg.moduleName}" then
-      throw <| IO.userError s!"duplicate web-assets program: {arg.packageName}/{arg.moduleName}"
-    ids := ids.push arg.id
-    modules := modules.push s!"{arg.packageName}/{arg.moduleName}"
-  let sdk ← readSdk opts
-  let mut programs := #[]
-  for arg in opts.programs do
-    let program ← readProgram arg
-    if normalizedLeanToolchain program.compatibility.leanToolchain !=
-        normalizedLeanToolchain sdk.compatibility.leanToolchain then
-      throw <| IO.userError <| s!"Lean toolchain mismatch for {arg.packageName}/{arg.moduleName}: " ++
-        s!"program is {program.compatibility.leanToolchain}, SDK is {sdk.compatibility.leanToolchain}"
-    programs := programs.push program
-  IO.FS.createDirAll opts.out
-  stageSdk opts sdk
-  for program in programs do
-    stageProgram opts program
-  removeStalePrograms opts programs
-  writeTextIfChanged outputManifest (manifestJson opts sdk programs)
+  removePathIfExists outputManifest
+  try
+    let mut ids : Array String := #[]
+    let mut modules : Array String := #[]
+    for arg in opts.programs do
+      validateProgramId arg.id
+      if ids.contains arg.id then
+        throw <| IO.userError s!"duplicate web-assets program id: {arg.id}"
+      if modules.contains s!"{arg.packageName}/{arg.moduleName}" then
+        throw <| IO.userError s!"duplicate web-assets program: {arg.packageName}/{arg.moduleName}"
+      ids := ids.push arg.id
+      modules := modules.push s!"{arg.packageName}/{arg.moduleName}"
+    let sdk ← readSdk opts
+    let mut programs := #[]
+    for arg in opts.programs do
+      let program ← readProgram arg
+      validateProgramCompatibility s!"{arg.packageName}/{arg.moduleName}"
+        program.compatibility sdk.compatibility
+      programs := programs.push program
+    IO.FS.createDirAll opts.out
+    stageSdk opts sdk
+    for program in programs do
+      stageProgram opts program
+    removeStalePrograms opts programs
+    writeTextAtomically outputManifest (manifestJson opts sdk programs)
+  catch e =>
+    removePathIfExists outputManifest
+    throw e
   IO.println s!"wrote {outputManifest}"
 
 def main (args : List String) : IO UInt32 := do
@@ -421,7 +532,11 @@ def main (args : List String) : IO UInt32 := do
       return if err == usage then 0 else 2
   | .ok opts =>
       try
-        compose opts
+        if opts.verifyInstalled then
+          verifyInstalled opts.out
+          IO.println s!"verified {opts.out}"
+        else
+          compose opts
         return 0
       catch e =>
         IO.eprintln e.toString

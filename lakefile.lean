@@ -96,6 +96,14 @@ private def virWebAssetsConfigFormat : String := "lean-vir-web-assets-config"
 
 private def virWebAssetsConfigVersion : Nat := 1
 
+private def virWebAssetProgramIdChar (char : Char) : Bool :=
+  char.isAlphanum || char == '.' || char == '_' || char == '-'
+
+private def virValidateWebAssetProgramId (id : String) : IO Unit := do
+  if id.isEmpty || id == "." || id == ".." || !id.all virWebAssetProgramIdChar then
+    throw <| IO.userError <|
+      s!"VIR web-assets program `id` must be a URL-safe slug using letters, digits, '.', '_', or '-': {id}"
+
 private structure VirSourceIdentity where
   version : String
   commit? : Option String
@@ -210,6 +218,20 @@ private def virPackageSetComplete
       return false
     index := index + 1
   return true
+
+private def virAddPackageSetTraces (descriptorPath : System.FilePath) : JobM Unit := do
+  addTrace (← computeTrace descriptorPath)
+  let .ok descriptor := Lean.Json.parse (← IO.FS.readFile descriptorPath)
+    | error s!"failed to parse VIR package-set descriptor: {descriptorPath}"
+  let .ok packagesJson := descriptor.getObjVal? "packages"
+    | error s!"VIR package-set descriptor is missing `packages`: {descriptorPath}"
+  let .ok packages := packagesJson.getArr?
+    | error s!"VIR package-set descriptor `packages` must be an array: {descriptorPath}"
+  let baseDir := descriptorPath.parent.getD "."
+  for packageJson in packages do
+    let some path := virJsonStringField? packageJson "path"
+      | error s!"VIR package-set member is missing `path`: {descriptorPath}"
+    addTrace (← computeTrace (baseDir / path))
 
 private def buildVirPackageSetFacet
     (mod : Module) : FetchM (Job System.FilePath) := do
@@ -380,11 +402,16 @@ private def virReadWebAssetsConfig (path : System.FilePath) : IO (Array VirWebPr
     if moduleName.isAnonymous then
       throw <| IO.userError "VIR web-assets program `module` must be a Lean module name"
     let id := (← virOptionalJsonString "VIR web-assets program" programJson "id").getD moduleString
+    virValidateWebAssetProgramId id
     if ids.contains id then
       throw <| IO.userError s!"duplicate VIR web-assets program id: {id}"
     ids := ids.push id
-    let package? := (← virOptionalJsonString "VIR web-assets program" programJson "package").map
-      String.toName
+    let package? ← (← virOptionalJsonString "VIR web-assets program" programJson "package").mapM
+      fun packageString => do
+        let packageName := packageString.toName
+        if packageName.isAnonymous then
+          throw <| IO.userError "VIR web-assets program `package` must be a Lake package name"
+        return packageName
     programs := programs.push { id, package?, moduleName }
   return programs
 
@@ -419,6 +446,8 @@ directory containing one matching SDK and one or more VIR package sets.
 package_facet virWebAssets (pkg : Package) : System.FilePath := do
   let identity ← virSourceIdentity
   let configPath := pkg.dir / "vir-web-assets.json"
+  let outputDir := pkg.buildDir / "vir" / "web-assets"
+  let outputManifest := outputDir / "VIR_WEB_ASSETS.json"
   let configs ← virReadWebAssetsConfig configPath
   let programs ← configs.mapM virResolveWebProgram
   let composerJob ← vir_web_assets.fetch
@@ -426,8 +455,6 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
   let descriptorJobs ← programs.mapM fun program => program.module.fetchFacetJob `vir
   let descriptorsJob := Job.collectArray descriptorJobs "VIR web programs"
   let sdkManifest := pkg.buildDir / "vir" / "sdk" / "lean-vir-artifact.json"
-  let outputDir := pkg.buildDir / "vir" / "web-assets"
-  let outputManifest := outputDir / "VIR_WEB_ASSETS.json"
   composerJob.bindM fun composer =>
     sdkJob.bindM fun _ =>
       descriptorsJob.mapM fun _ => do
@@ -446,7 +473,7 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
         ]
         for program in programs do
           let descriptor := virModuleOutput program.module "module-sets" "irpkg-set.json"
-          addTrace (← computeTrace descriptor)
+          virAddPackageSetTraces descriptor
           args := args ++ #[
             "--program",
             program.config.id,
@@ -454,9 +481,21 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
             program.module.name.toString,
             descriptor.toString
           ]
-        proc {
-          cmd := composer.toString
-          args
-          env := ← getAugmentedEnv
-        }
+        if ← outputManifest.pathExists then
+          let verification ← IO.Process.output {
+            cmd := composer.toString
+            args := #["--verify-installed", outputDir.toString]
+            env := ← getAugmentedEnv
+          }
+          if verification.exitCode != 0 then
+            if ← outputManifest.isDir then
+              IO.FS.removeDirAll outputManifest
+            else
+              IO.FS.removeFile outputManifest
+        buildFileUnlessUpToDate' (text := true) outputManifest do
+          proc {
+            cmd := composer.toString
+            args
+            env := ← getAugmentedEnv
+          }
         return outputManifest
