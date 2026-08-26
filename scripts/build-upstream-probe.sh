@@ -7,6 +7,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+source scripts/source-object-path.sh
 script_start=$SECONDS
 
 out="build/upstream-probe"
@@ -153,6 +154,7 @@ fi
 client_native_provider_sources=()
 client_native_provider_names=()
 client_native_provider_symbols=()
+client_native_project=""
 : > "$generated_native_provider_sources"
 : > "$generated_native_provider_symbols"
 if [ -n "$client_native_extern_manifest" ]; then
@@ -353,9 +355,7 @@ fi
 
 object_for_source() {
   local source="$1"
-  local stem="${source//\//_}"
-  stem="${stem//:/_}"
-  printf '%s/%s.o\n' "$obj_dir" "$stem"
+  vir_object_path_for_source "$obj_dir" "$src" "$PWD" "$client_native_project" "$source"
 }
 
 compile_one() {
