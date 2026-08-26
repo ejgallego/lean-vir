@@ -166,6 +166,7 @@ export function validateGenerationProfile(generation, context = "generation") {
         "omittedRequiredParameters",
         "omittedRestParameters",
         "fixedRestParameters",
+        "fixedArguments",
         "parameterRenames",
       ],
       `${context} method policy ${member}`,
@@ -195,6 +196,12 @@ export function validateGenerationProfile(generation, context = "generation") {
       Array.isArray(names) && names.length !== 0 && names.every(nonemptyString) &&
       new Set(names).size === names.length)) {
       throw new Error(`${context} method policy ${member} has invalid fixed rest parameters`);
+    }
+    const fixedArguments = policy.fixedArguments ?? {};
+    if (!object(fixedArguments) || !Object.keys(fixedArguments).every(nonemptyString) ||
+        !Object.values(fixedArguments).every((value) =>
+          ["string", "number", "boolean"].includes(typeof value))) {
+      throw new Error(`${context} method policy ${member} has invalid fixed arguments`);
     }
     const parameterRenames = policy.parameterRenames ?? {};
     if (!object(parameterRenames) || !Object.keys(parameterRenames).every(nonemptyString) ||
@@ -637,6 +644,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const omittedRequired = new Set(policy.omittedRequiredParameters ?? []);
   const omittedRest = new Set(policy.omittedRestParameters ?? []);
   const fixedRest = policy.fixedRestParameters ?? {};
+  const fixedArguments = policy.fixedArguments ?? {};
   const parameterRenames = policy.parameterRenames ?? {};
   const exception = exceptionFor(generation, operationId);
   for (const name of omitted) {
@@ -662,6 +670,20 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   if (omittedRequired.size !== 0 && exception === null) {
     throw new Error(`${member} required parameter omission requires a justified generation exception`);
   }
+  for (const [name, value] of Object.entries(fixedArguments)) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy fixes missing parameter ${name}`);
+    if (argument.rest === true || argument.type?.kind !== "literal" ||
+        !Object.is(argument.type.value, value)) {
+      throw new Error(`${member} fixed argument ${name} does not match its TypeScript literal`);
+    }
+    if (omitted.has(name) || omittedRequired.has(name)) {
+      throw new Error(`${member} policy cannot both omit and fix parameter ${name}`);
+    }
+  }
+  if (Object.keys(fixedArguments).length !== 0 && exception === null) {
+    throw new Error(`${member} fixed arguments require a justified generation exception`);
+  }
   for (const name of Object.keys(fixedRest)) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy fixes missing rest parameter ${name}`);
@@ -678,6 +700,9 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     }
     if (omitted.has(name) || omittedRequired.has(name)) {
       throw new Error(`${member} policy cannot rename omitted parameter ${name}`);
+    }
+    if (Object.hasOwn(fixedArguments, name)) {
+      throw new Error(`${member} policy cannot rename fixed parameter ${name}`);
     }
     leanBinderIdentifier(renamed, `${member} renamed parameter`);
   }
@@ -715,6 +740,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       continue;
     }
     if (omittedRequired.has(argument.name)) continue;
+    if (Object.hasOwn(fixedArguments, argument.name)) continue;
     if (argument.optional === true) {
       if (!omitted.has(argument.name)) {
         throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission policy`);
@@ -766,6 +792,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
         omittedRequiredParameters: [...omittedRequired],
         omittedRestParameters: [...omittedRest],
         fixedRestParameters: structuredClone(fixedRest),
+        fixedArguments: structuredClone(fixedArguments),
         parameterRenames: structuredClone(parameterRenames),
         provenance: signatureProvenance,
       },

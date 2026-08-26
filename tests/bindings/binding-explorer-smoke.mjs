@@ -309,6 +309,17 @@ assert.equal(generatedFillStyle?.receiver.argument.name, "ctx");
 assert.equal(generatedFillStyle?.arguments[0].name, "style");
 assert.equal(generatedFillStyle?.arguments[0].type, "Lean.Vir.Js String");
 assert.match(generatedFillStyle?.exception.reason, /string arm/u);
+
+const canvasElementRoot = roots.find((root) =>
+  root.library === "browser" && root.id === "canvas-element");
+const generatedContext2D = canvasElementRoot?.generatedOperations.find((operation) =>
+  operation.typescript.member === "HTMLCanvasElement.getContext");
+assert.deepEqual(generatedContext2D?.typescript.signaturePolicy.fixedArguments, {
+  contextId: "2d",
+});
+assert.deepEqual(generatedContext2D?.arguments, []);
+assert.equal(generatedContext2D?.receiver.argument.name, "canvas");
+assert.equal(generatedContext2D?.result.lean, "Lean.Vir.Js.Nullable CanvasRenderingContext2D");
 const elementTextContent = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.textContent",
 );
@@ -383,15 +394,15 @@ assert.equal(canvasElement?.findingStatus, "gap");
 assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 1 });
 assert.deepEqual(canvasElement?.coverage.summary, {
   exact: 0,
-  compatible: 2,
+  compatible: 3,
   weak: 0,
-  missing: 331,
+  missing: 330,
   unreviewed: 0,
   mappedTargets: 6,
 });
 assert.ok(canvasElement?.generatedOperations.some((operation) =>
-  operation.id === "browser.canvas.context2d" &&
-  operation.typescript.kind === "protocol"));
+  operation.id === "browser.htmlCanvasElement.getContext2D" &&
+  operation.typescript.kind === "method"));
 assert.ok(canvasElement?.generatedOperations.some((operation) =>
   operation.id === "browser.canvas.fromElement" &&
   operation.typescript.kind === "protocol"));

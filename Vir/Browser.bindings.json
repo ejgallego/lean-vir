@@ -39,7 +39,7 @@
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "Event"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
@@ -81,6 +81,11 @@
       "Element.setAttribute": { "signature": "only" },
       "Event.preventDefault": { "signature": "only" },
       "Event.stopPropagation": { "signature": "only" },
+      "HTMLCanvasElement.getContext": {
+        "signature": 0,
+        "fixedArguments": { "contextId": "2d" },
+        "omittedOptionalParameters": ["options"]
+      },
       "requestAnimationFrame": { "signature": "only" }
     },
     "exceptions": {
@@ -289,6 +294,10 @@
           }
         }
       },
+      "browser.htmlCanvasElement.getContext2D": {
+        "reason": "VIR specializes HTMLCanvasElement.getContext to the fixed 2d context id and default options.",
+        "receiver": { "name": "canvas" }
+      },
       "browser.event.currentTarget": {
         "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
         "result": {
@@ -375,19 +384,6 @@
           { "name": "element", "type": { "lean": "Lean.Vir.Js Element", "representation": "js-resource", "resourceInner": "Element" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Nullable HTMLCanvasElement", "representation": "js-resource", "resourceInner": "HTMLCanvasElement" } }
-      },
-      {
-        "id": "browser.canvas.context2d",
-        "group": "canvas-element",
-        "target": "browser.htmlCanvasElement.getContext2D",
-        "lean": "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
-        "marker": "vir_js",
-        "reason": "The host protocol specializes HTMLCanvasElement.getContext to the 2d context id and default options.",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "canvas", "type": { "lean": "Lean.Vir.Js HTMLCanvasElement", "representation": "js-resource", "resourceInner": "HTMLCanvasElement" } }
-        ],
-        "result": { "type": { "lean": "Lean.Vir.Js.Nullable CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } }
       },
       {
         "id": "browser.event.formValue",
@@ -723,6 +719,11 @@
       "lean": { "public": ["Lean.Vir.Browser.HTMLCanvasElement"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["HTMLCanvasElement"] },
       "mappings": [
+        {
+          "typescript": "HTMLCanvasElement.getContext",
+          "targets": ["browser.htmlCanvasElement.getContext2D"],
+          "lean": ["Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable"]
+        },
         {
           "typescript": "HTMLCanvasElement.height",
           "accessors": {

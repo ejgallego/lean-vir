@@ -445,6 +445,43 @@ test("reviewed argument overrides can identify retained callbacks", () => {
   });
 });
 
+test("literal parameters can be fixed by a reviewed host specialization", () => {
+  const fixedGeneration = structuredClone(generation);
+  fixedGeneration.methodPolicies["Widget.getAttribute"].fixedArguments = {
+    name: "data-id",
+  };
+  fixedGeneration.exceptions["demo.widget.getAttribute"] = {
+    reason: "The demo host always supplies the data-id attribute name.",
+    receiver: { name: "self" },
+  };
+  const fixedDescriptors = structuredClone(descriptors);
+  const method = fixedDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute");
+  method.shape.args[0].type = { kind: "literal", value: "data-id" };
+
+  const operation = buildGeneratedOperations(config, fixedGeneration, fixedDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  assert.deepEqual(operation.typescript.signaturePolicy.fixedArguments, {
+    name: "data-id",
+  });
+  assert.deepEqual(operation.arguments, []);
+  assert.equal(operation.receiver.argument.name, "self");
+
+  const stale = structuredClone(fixedGeneration);
+  stale.methodPolicies["Widget.getAttribute"].fixedArguments.name = "title";
+  assert.throws(
+    () => buildGeneratedOperations(config, stale, fixedDescriptors),
+    /fixed argument name does not match its TypeScript literal/u,
+  );
+
+  const unjustified = structuredClone(fixedGeneration);
+  delete unjustified.exceptions["demo.widget.getAttribute"];
+  assert.throws(
+    () => buildGeneratedOperations(config, unjustified, fixedDescriptors),
+    /fixed arguments require a justified generation exception/u,
+  );
+});
+
 test("generated anchors project comparator intent from operation IR", () => {
   const root = config.roots[0];
   const materialized = materializeGeneratedAnchors(

@@ -143,7 +143,10 @@ parameter must either be represented by a supported translation rule or named
 in `omittedOptionalParameters`; the current generator implements the latter
 path. A rest parameter must be omitted explicitly or projected to one or more
 named fixed-arity Lean binders through `fixedRestParameters`. Parameter names
-can be preserved or changed explicitly with `parameterRenames`.
+can be preserved or changed explicitly with `parameterRenames`. A literal
+TypeScript parameter that the host supplies internally can be recorded in
+`fixedArguments`; generation verifies both its name and exact literal value and
+requires a justified exception.
 
 Missing policies, changed overload layouts, unclassified rest parameters,
 unknown parameter names, unjustified required-parameter omissions, and
@@ -224,12 +227,11 @@ those are projections of the operation IR.
 ## Current Boundary And Next Extension
 
 The implemented translation covers full and partial properties, selected
-overloads, explicit optional and required parameter projections, fixed-arity
-rest specializations, parameter renames, resource-result mappings, and retained
-callback/disposer lifecycles. These rules derive the current Document, Element,
-Canvas 2D, animation-frame, and React root slices while retaining explicit
-reasons for every specialization.
+overloads, explicit optional and required parameter projections, fixed literal
+arguments, fixed-arity rest specializations, parameter renames, resource-result
+mappings, and retained callback/disposer lifecycles. These rules derive the
+current Document, Element, Canvas 2D, animation-frame, and React root slices
+while retaining explicit reasons for every specialization.
 
-Literal or fixed arguments such as the `"2d"` context selector, structural
-records, generic containers, and broader union translations remain fail-closed
-until their policies are explicit and tested.
+Structural records, generic containers, and broader union translations remain
+fail-closed until their policies are explicit and tested.

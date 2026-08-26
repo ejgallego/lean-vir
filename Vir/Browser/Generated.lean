@@ -924,6 +924,25 @@ end Event
 namespace HTMLCanvasElement
 
 /--
+Generated reviewed method specialization of TypeScript `HTMLCanvasElement.getContext`.
+
+The **`HTMLCanvasElement.getContext()`** method returns a drawing context on the canvas, or null if the context identifier is not supported, or the canvas has already been set to a different context mode.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLCanvasElement/getContext)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated reviewed JavaScript boundary specialization for the TypeScript `HTMLCanvasElement.getContext` method.
+ABI profile `browser-dom-faithful-v1`: canvas js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.getContext2D"]
+opaque getContext2DNullable
+    (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
+    DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
+
+/--
 Faithful generated getter binding for TypeScript `HTMLCanvasElement.height`.
 
 The **`HTMLCanvasElement.height`** property is a positive integer reflecting the height HTML attribute of the <canvas> element interpreted in CSS pixels. When the attribute is not specified, or if it is set to an invalid value, like a negative, the default value of 150 is used.
@@ -1017,23 +1036,6 @@ This declaration is generated; edit the binding configuration.
 opaque fromElementNullable
     (element : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js.Nullable HTMLCanvasElement)
-
-/--
-Generated binding for reviewed VIR protocol `browser.canvas.context2d`.
-
-The host protocol specializes HTMLCanvasElement.getContext to the 2d context id and default options.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `browser-dom-faithful-v1`: receiver none; canvas js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.htmlCanvasElement.getContext2D"]
-opaque getContext2DNullable
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
-    DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
 
 end HTMLCanvasElement
 
