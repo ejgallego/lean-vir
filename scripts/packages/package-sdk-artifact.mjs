@@ -25,9 +25,12 @@ import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
 const artifactPaths = artifactBundlePaths(repositoryRoot, artifactName);
 
-async function sha256(path) {
+async function inspectFile(path) {
   const bytes = await readFile(path);
-  return createHash("sha256").update(bytes).digest("hex");
+  return {
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    byteSize: bytes.byteLength,
+  };
 }
 
 await cleanArtifactBundle(artifactPaths);
@@ -40,7 +43,7 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   files.push({
     path: destRel,
     source: sourceRel,
-    sha256: await sha256(dest),
+    ...(await inspectFile(dest)),
   });
 }
 

@@ -28,6 +28,10 @@ write_sdk_manifest() {
   local commit="$2"
   local js_hash="$3"
   local wasm_hash="$4"
+  local js_size
+  local wasm_size
+  js_size="$(wc -c < "$sdk_dir/js/vir-runtime.js")"
+  wasm_size="$(wc -c < "$sdk_dir/wasm/vir-upstream.wasm")"
   printf '%s\n' \
     '{' \
     '  "name": "lean-vir-sdk",' \
@@ -41,8 +45,8 @@ write_sdk_manifest() {
     '  "manifestVersion": 7,' \
     '  "runtimeAbiVersion": 1,' \
     '  "files": [' \
-    "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$js_hash\"}," \
-    "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\"}" \
+    "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$js_hash\", \"byteSize\": $js_size}," \
+    "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\", \"byteSize\": $wasm_size}" \
     '  ]' \
     '}' > "$sdk_dir/lean-vir-artifact.json"
 }
@@ -455,6 +459,24 @@ if VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app \
 fi
 cat "$tmp/web-id.stdout" "$tmp/web-id.stderr" > "$tmp/web-id.output"
 grep -q 'program `id` must be a URL-safe slug' "$tmp/web-id.output"
+
+printf '%s\n' \
+  '{' \
+  '  "format": "lean-vir-web-assets-config",' \
+  '  "version": 1,' \
+  '  "programs": [' \
+  '    {"id": "runtime", "package": "vir_lake_smoke", "module": "Smoke.Runtime"},' \
+  '    {"id": "runtime", "package": "smoke_dep", "module": "Dep.Widget"}' \
+  '  ]' \
+  '}' > "$tmp/vir-web-assets.json"
+if VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app \
+    > "$tmp/web-duplicate-id.stdout" 2> "$tmp/web-duplicate-id.stderr"; then
+  echo "duplicate web-assets program id unexpectedly built" >&2
+  exit 1
+fi
+cat "$tmp/web-duplicate-id.stdout" "$tmp/web-duplicate-id.stderr" \
+  > "$tmp/web-duplicate-id.output"
+grep -q 'duplicate VIR web-assets program id: runtime' "$tmp/web-duplicate-id.output"
 
 printf '%s\n' \
   '{' \

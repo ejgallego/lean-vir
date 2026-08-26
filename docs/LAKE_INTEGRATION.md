@@ -250,6 +250,20 @@ interface manifest, runtime ABI, Lean toolchain, source revision, missing file,
 or digest mismatch stops composition and removes the discovery manifest so a
 partially updated directory is not advertised as valid.
 
+The version-1 manifest contract has six required top-level fields:
+
+- `format` and `version` identify `lean-vir-web-assets` version 1;
+- `hostPackage` names the application package and `vir` records the selected
+  `lean_vir` version and source commit;
+- `sdk` records its manifest, runtime-module and Wasm paths, identity,
+  compatibility tuple, and complete `files` array;
+- `programs` contains each program's stable ID, package/module identity,
+  descriptor path, compatibility tuple, and complete `files` array.
+
+Every file record contains `path`, `sha256`, and `byteSize`. Every path is
+relative to `VIR_WEB_ASSETS.json`; consumers should reject unsupported
+top-level format or version values before resolving nested paths.
+
 The staging step is incremental. Changing one program rebuilds and restages
 that program without reinstalling or recopying the SDK or unrelated programs.
 Changing the selected SDK revalidates all programs and replaces only the SDK
@@ -297,6 +311,11 @@ slides.runStartupEntries();
 
 const widgets = await createProgramRuntime("widgets");
 widgets.runStartupEntries();
+
+window.addEventListener("pagehide", () => {
+  slides.dispose();
+  widgets.dispose();
+}, { once: true });
 ```
 
 The two runtimes above share the factory's compiled `WebAssembly.Module`, but
@@ -342,21 +361,11 @@ Before accepting a cached SDK manifest, the facet rechecks every listed payload
 checksum. A missing or modified payload invalidates the manifest target and
 reinstalls the SDK from the configured source.
 
-The browser host can then load and run all startup hooks in manifest order:
-
-```js
-import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
-
-const vir = await createVirRuntime({
-  wasmUrl: "./vir/sdk/wasm/vir-upstream.wasm",
-  irPackageSetUrl: "./vir/module-sets/MySlides/Runtime.irpkg-set.json",
-});
-vir.runStartupEntries();
-```
-
-Publish the descriptor together with every referenced `.irpkg`, preserving
-their relative layout. The runtime resolves each member relative to the served
-descriptor URL.
+This standalone facet is intended for custom artifact assembly. Pair it with a
+separately built `+Module:vir` descriptor, publish every referenced `.irpkg`
+while preserving its relative layout, and load the set as described in
+[Module Package Sets](JS_API.md#module-package-sets). Application hosts should
+prefer the composed web-assets workflow above.
 
 ## Runtime Sharing Model
 

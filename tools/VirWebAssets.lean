@@ -137,6 +137,34 @@ def AssetFile.toJson (file : AssetFile) : String :=
     ("byteSize", jsonNat file.byteSize)
   ]
 
+def verifyListedFile (root : FilePath) (source : String) (json : Json) : IO AssetFile := do
+  let relPathString ← jsonField source json "path" Json.getStr?
+  let relPath ← validatedRelativePath source relPathString
+  let expectedHash ← jsonField source json "sha256" Json.getStr?
+  let expectedByteSize ← jsonField source json "byteSize" Json.getNat?
+  let file ← inspectFile (root / relPath) relPathString
+  if file.sha256 != expectedHash then
+    throw <| IO.userError <| s!"{source} checksum mismatch for {relPathString}: expected " ++
+      s!"{expectedHash}, got {file.sha256}"
+  if file.byteSize != expectedByteSize then
+    throw <| IO.userError <| s!"{source} byte-size mismatch for {relPathString}: expected " ++
+      s!"{expectedByteSize}, got {file.byteSize}"
+  return file
+
+def verifyListedFiles (root : FilePath) (source : String) (json : Json) : IO (Array AssetFile) := do
+  let fileJsons ← jsonField source json "files" Json.getArr?
+  if fileJsons.isEmpty then
+    throw <| IO.userError s!"{source} must list at least one file"
+  let mut files := #[]
+  let mut paths : Array String := #[]
+  for fileJson in fileJsons do
+    let file ← verifyListedFile root source fileJson
+    if paths.contains file.path then
+      throw <| IO.userError s!"{source} contains duplicate file path: {file.path}"
+    paths := paths.push file.path
+    files := files.push file
+  return files
+
 structure Compatibility where
   packageFormatVersion : Nat
   manifestVersion : Nat
@@ -224,22 +252,9 @@ def readSdk (opts : Options) : IO SdkInfo := do
     throw <| IO.userError s!"SDK source mismatch: lean_vir is {opts.virCommit}, SDK is {gitCommit}"
   let compatibility ← readCompatibility source manifest "leanVersionString"
   validateCompatibility source compatibility
-  let fileJsons ← jsonField source manifest "files" Json.getArr?
   let sdkDir := opts.sdkManifest.parent.getD "."
-  let mut files : Array AssetFile := #[]
-  let mut paths : Array String := #[]
-  for fileJson in fileJsons do
-    let relPathString ← jsonField "SDK file" fileJson "path" Json.getStr?
-    let relPath ← validatedRelativePath "SDK file" relPathString
-    if paths.contains relPathString then
-      throw <| IO.userError s!"duplicate SDK file path: {relPathString}"
-    paths := paths.push relPathString
-    let expectedHash ← jsonField "SDK file" fileJson "sha256" Json.getStr?
-    let file ← inspectFile (sdkDir / relPath) relPathString
-    if file.sha256 != expectedHash then
-      throw <| IO.userError <| s!"SDK checksum mismatch for {relPathString}: expected " ++
-        s!"{expectedHash}, got {file.sha256}"
-    files := files.push file
+  let files ← verifyListedFiles sdkDir "SDK" manifest
+  let paths := files.map (·.path)
   unless paths.contains "js/vir-runtime.js" do
     throw <| IO.userError "SDK does not contain js/vir-runtime.js"
   unless paths.contains "wasm/vir-upstream.wasm" do
@@ -254,7 +269,6 @@ structure ProgramInfo where
   files : Array AssetFile
 
 def readProgram (arg : ProgramArg) : IO ProgramInfo := do
-  validateProgramId arg.id
   let descriptor ← readJsonFile arg.descriptor
   let source := s!"package-set descriptor for {arg.moduleName}"
   let format ← jsonField source descriptor "format" Json.getStr?
@@ -295,34 +309,6 @@ def readProgram (arg : ProgramArg) : IO ProgramInfo := do
     paths := paths.push relPathString
     files := files.push (← inspectFile (descriptorDir / relPath) relPathString)
   return { arg, descriptorName, compatibility, files }
-
-def verifyListedFile (root : FilePath) (source : String) (json : Json) : IO AssetFile := do
-  let relPathString ← jsonField source json "path" Json.getStr?
-  let relPath ← validatedRelativePath source relPathString
-  let expectedHash ← jsonField source json "sha256" Json.getStr?
-  let expectedByteSize ← jsonField source json "byteSize" Json.getNat?
-  let file ← inspectFile (root / relPath) relPathString
-  if file.sha256 != expectedHash then
-    throw <| IO.userError <| s!"{source} checksum mismatch for {relPathString}: expected " ++
-      s!"{expectedHash}, got {file.sha256}"
-  if file.byteSize != expectedByteSize then
-    throw <| IO.userError <| s!"{source} byte-size mismatch for {relPathString}: expected " ++
-      s!"{expectedByteSize}, got {file.byteSize}"
-  return file
-
-def verifyListedFiles (root : FilePath) (source : String) (json : Json) : IO (Array AssetFile) := do
-  let fileJsons ← jsonField source json "files" Json.getArr?
-  if fileJsons.isEmpty then
-    throw <| IO.userError s!"{source} must list at least one file"
-  let mut files := #[]
-  let mut paths : Array String := #[]
-  for fileJson in fileJsons do
-    let file ← verifyListedFile root source fileJson
-    if paths.contains file.path then
-      throw <| IO.userError s!"{source} contains duplicate file path: {file.path}"
-    paths := paths.push file.path
-    files := files.push file
-  return files
 
 def verifyInstalled (out : FilePath) : IO Unit := do
   let manifestPath := out / "VIR_WEB_ASSETS.json"
