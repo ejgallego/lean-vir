@@ -7,10 +7,27 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import {
+  discoverBindingConfigPaths,
+  loadBindingConfig,
+} from "../../scripts/bindings/binding-config.mjs";
 
 const report = JSON.parse(await readFile("build/bindings/shipped-v1.coverage.json", "utf8"));
 const html = await readFile("build/bindings/shipped-v1.dashboard.html", "utf8");
 const declarations = report.bindings.flatMap((binding) => binding.declarations);
+const configPaths = await discoverBindingConfigPaths(resolve("Vir"));
+const configs = await Promise.all(configPaths.map(loadBindingConfig));
+const generatedSources = new Set(configs.map((config) => config.generation?.output));
+
+assert.equal(generatedSources.has(undefined), false, "every shipped binding library must generate Lean");
+for (const declaration of declarations) {
+  assert.ok(
+    generatedSources.has(declaration.source.path),
+    `${declaration.declaration} is handwritten in ${declaration.source.path}`,
+  );
+}
 
 assert.equal(report.format, "lean-vir-shipped-bindings-coverage");
 assert.equal(report.analysis.representationPolicy, "compiler-validated");
@@ -72,7 +89,7 @@ assert.deepEqual(
   )?.path,
   [
     "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
-    "_private.Vir.Browser.0.Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
+    "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
   ],
 );
 

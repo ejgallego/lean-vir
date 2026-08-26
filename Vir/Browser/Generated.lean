@@ -10,17 +10,443 @@ import Vir.Browser.Types
 
 namespace Lean.Vir.Browser
 
-namespace Document
+namespace Animation
 
 /--
-Generated faithful JavaScript boundary for the TypeScript `Document.title` getter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); result js-resource/owned.
+Faithful generated function binding for TypeScript `cancelAnimationFrame`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DedicatedWorkerGlobalScope/cancelAnimationFrame)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `cancelAnimationFrame` function.
+ABI profile `browser-dom-faithful-v1`: receiver none; handle js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.document.getTitle"]
-private opaque getTitleJs : DomM (Lean.Vir.Js String)
+@[vir_js "browser.animation.cancelAnimationFrame"]
+opaque cancelAnimationFrame
+    (handle : Lean.Vir.Js AnimationFrame) :
+    DomM Unit
+
+/--
+Faithful generated function binding for TypeScript `requestAnimationFrame`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DedicatedWorkerGlobalScope/requestAnimationFrame)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `requestAnimationFrame` function.
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.animation.requestAnimationFrame"]
+opaque requestAnimationFrameJs
+    (callback : Lean.Vir.Js Float → DomM Unit) :
+    DomM (Lean.Vir.Js AnimationFrame)
+
+end Animation
+
+namespace CanvasRenderingContext2D
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.arc`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/arc)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.arc` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; radius js-resource/borrowed/call; startAngle js-resource/borrowed/call; endAngle js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.arc"]
+opaque arcJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float)
+    (radius : @& Lean.Vir.Js Float)
+    (startAngle : @& Lean.Vir.Js Float)
+    (endAngle : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.beginPath`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/beginPath)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.beginPath` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.beginPath"]
+opaque beginPath
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.clearRect`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/clearRect)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.clearRect` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.clearRect"]
+opaque clearRectJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float)
+    (w : @& Lean.Vir.Js Float)
+    (h : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.closePath`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/closePath)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.closePath` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.closePath"]
+opaque closePath
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.fill`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/fill)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.fill` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.fill"]
+opaque fill
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.fillRect`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/fillRect)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.fillRect` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.fillRect"]
+opaque fillRectJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float)
+    (w : @& Lean.Vir.Js Float)
+    (h : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.lineTo`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/lineTo)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.lineTo` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.lineTo"]
+opaque lineToJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.moveTo`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/moveTo)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.moveTo` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.moveTo"]
+opaque moveToJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.restore`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/restore)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.restore` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.restore"]
+opaque restore
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.rotate`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/rotate)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.rotate` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; angle js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.rotate"]
+opaque rotateJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (angle : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.save`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/save)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.save` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.save"]
+opaque save
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.stroke`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/stroke)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.stroke` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.stroke"]
+opaque stroke
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.strokeRect`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/strokeRect)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.strokeRect` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.strokeRect"]
+opaque strokeRectJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float)
+    (w : @& Lean.Vir.Js Float)
+    (h : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.translate`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/translate)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.translate` method.
+ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.translate"]
+opaque translateJs
+    (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (x : @& Lean.Vir.Js Float)
+    (y : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas.fillStyleString`.
+
+This host protocol is the string arm of CanvasRenderingContext2D.fillStyle's string-or-gradient-or-pattern union.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.canvas2d.setFillStyle"]
+opaque setFillStyleJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (style : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas.strokeStyleString`.
+
+This host protocol is the string arm of CanvasRenderingContext2D.strokeStyle's string-or-gradient-or-pattern union.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.canvas2d.setStrokeStyle"]
+opaque setStrokeStyleJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (style : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas.lineWidth`.
+
+This protocol is the setter operation for CanvasRenderingContext2D.lineWidth; the getter is not yet shipped.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.canvas2d.setLineWidth"]
+opaque setLineWidthJs
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (width : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+end CanvasRenderingContext2D
+
+namespace Console
+
+/--
+Generated binding for reviewed VIR protocol `browser.console.logOneString`.
+
+The shipped console protocol deliberately exposes the common single-string logging case rather than TypeScript's variadic unknown-value surface.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; message js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.console.log"]
+opaque logJs
+    (message : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM Unit
+
+end Console
+
+namespace Document
+
+/--
+Faithful generated method binding for TypeScript `Document.createElement`.
+
+In an HTML document, the **`document.createElement()`** method creates the HTML element specified by localName, or an HTMLUnknownElement if localName isn't recognized.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/createElement)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12929
+
+Generated faithful JavaScript boundary for the TypeScript `Document.createElement` method.
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); tagName js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.document.createElement"]
+opaque createElement
+    (tagName : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js Element)
+
+/--
+Faithful generated method binding for TypeScript `Document.querySelector`.
+
+Returns the first element that is a descendant of node that matches selectors.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelector)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
+
+Generated faithful JavaScript boundary for the TypeScript `Document.querySelector` method.
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.document.querySelector"]
+opaque querySelector
+    (selectors : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+/--
+Faithful generated method binding for TypeScript `Document.querySelectorAll`.
+
+Returns all element descendants of node that match selectors.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelectorAll)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
+
+Generated faithful JavaScript boundary for the TypeScript `Document.querySelectorAll` method.
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.document.querySelectorAll"]
+opaque querySelectorAll
+    (selectors : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
 
 /--
 Faithful generated getter binding for TypeScript `Document.title`.
@@ -30,21 +456,14 @@ The **`document.title`** property gets or sets the current title of the document
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
--/
-def getTitle : DomM (Lean.Vir.Js String) :=
-  getTitleJs
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Document.title` setter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); title js-resource/borrowed/call; result immediate/value.
+Generated faithful JavaScript boundary for the TypeScript `Document.title` getter.
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.document.setTitle"]
-private opaque setTitleJs
-    (title : @& Lean.Vir.Js String) :
-    DomM Unit
+@[vir_js "browser.document.getTitle"]
+opaque getTitle : DomM (Lean.Vir.Js String)
 
 /--
 Faithful generated setter binding for TypeScript `Document.title`.
@@ -54,28 +473,40 @@ The **`document.title`** property gets or sets the current title of the document
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
+
+Generated faithful JavaScript boundary for the TypeScript `Document.title` setter.
+ABI profile `browser-dom-faithful-v1`: receiver global (Document); title js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-def setTitle
+@[vir_js "browser.document.setTitle"]
+opaque setTitle
     (title : @& Lean.Vir.Js String) :
-    DomM Unit :=
-  setTitleJs title
+    DomM Unit
 
 end Document
 
 namespace Element
 
 /--
-Generated faithful JavaScript boundary for the TypeScript `Element.getAttribute` method.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13681
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; result js-resource/owned.
+Faithful generated method binding for TypeScript `Element.appendChild`.
+
+The **`appendChild()`** method of the Node interface adds a node to the end of the list of children of a specified parent node.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Node/appendChild)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L26125
+
+Generated faithful JavaScript boundary for the TypeScript `Element.appendChild` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.getAttribute"]
-private opaque getAttributeJs
+@[vir_js "browser.element.appendChild"]
+opaque appendChild
     (element : @& Lean.Vir.Js Element)
-    (qualifiedName : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable String)
+    (node : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js Element)
 
 /--
 Faithful generated method binding for TypeScript `Element.getAttribute`.
@@ -85,24 +516,17 @@ The **`getAttribute()`** method of the Element interface returns the value of a 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/getAttribute)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13681
--/
-def getAttribute
-    (element : @& Lean.Vir.Js Element)
-    (qualifiedName : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable String) :=
-  getAttributeJs element qualifiedName
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` getter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+Generated faithful JavaScript boundary for the TypeScript `Element.getAttribute` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.getInnerHTML"]
-private opaque getInnerHTMLJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
+@[vir_js "browser.element.getAttribute"]
+opaque getAttribute
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable String)
 
 /--
 Faithful generated getter binding for TypeScript `Element.innerHTML`.
@@ -112,24 +536,16 @@ The **`innerHTML`** property of the Element interface gets or sets the HTML or X
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/innerHTML)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
--/
-def getInnerHTML
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getInnerHTMLJs element
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` setter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; innerHTML js-resource/borrowed/call; result immediate/value.
+Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` getter.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.setInnerHTML"]
-private opaque setInnerHTMLJs
-    (element : @& Lean.Vir.Js Element)
-    (innerHTML : @& Lean.Vir.Js String) :
-    DomM Unit
+@[vir_js "browser.element.getInnerHTML"]
+opaque getInnerHTML
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String)
 
 /--
 Faithful generated setter binding for TypeScript `Element.innerHTML`.
@@ -139,25 +555,75 @@ The **`innerHTML`** property of the Element interface gets or sets the HTML or X
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/innerHTML)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
--/
-def setInnerHTML
-    (element : @& Lean.Vir.Js Element)
-    (innerHTML : @& Lean.Vir.Js String) :
-    DomM Unit :=
-  setInnerHTMLJs element innerHTML
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Element.setAttribute` method.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13869
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+Generated faithful JavaScript boundary for the TypeScript `Element.innerHTML` setter.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; innerHTML js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.setAttribute"]
-private opaque setAttributeJs
+@[vir_js "browser.element.setInnerHTML"]
+opaque setInnerHTML
     (element : @& Lean.Vir.Js Element)
-    (qualifiedName : @& Lean.Vir.Js String)
-    (value : @& Lean.Vir.Js String) :
+    (innerHTML : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `Element.querySelector`.
+
+Returns the first element that is a descendant of node that matches selectors.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelector)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
+
+Generated faithful JavaScript boundary for the TypeScript `Element.querySelector` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.querySelector"]
+opaque querySelector
+    (element : @& Lean.Vir.Js Element)
+    (selectors : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+/--
+Faithful generated method binding for TypeScript `Element.querySelectorAll`.
+
+Returns all element descendants of node that match selectors.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelectorAll)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
+
+Generated faithful JavaScript boundary for the TypeScript `Element.querySelectorAll` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.querySelectorAll"]
+opaque querySelectorAll
+    (element : @& Lean.Vir.Js Element)
+    (selectors : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
+
+/--
+Faithful generated method binding for TypeScript `Element.remove`.
+
+Removes node.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CharacterData/remove)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L10671
+
+Generated faithful JavaScript boundary for the TypeScript `Element.remove` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.remove"]
+opaque remove
+    (element : @& Lean.Vir.Js Element) :
     DomM Unit
 
 /--
@@ -168,25 +634,18 @@ The **`setAttribute()`** method of the Element interface sets the value of an at
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/setAttribute)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13869
--/
-def setAttribute
-    (element : @& Lean.Vir.Js Element)
-    (qualifiedName : @& Lean.Vir.Js String)
-    (value : @& Lean.Vir.Js String) :
-    DomM Unit :=
-  setAttributeJs element qualifiedName value
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Element.textContent` getter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+Generated faithful JavaScript boundary for the TypeScript `Element.setAttribute` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.getTextContent"]
-private opaque getTextContentJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
+@[vir_js "browser.element.setAttribute"]
+opaque setAttribute
+    (element : @& Lean.Vir.Js Element)
+    (qualifiedName : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js String) :
+    DomM Unit
 
 /--
 Faithful generated getter binding for TypeScript `Element.textContent`.
@@ -194,24 +653,16 @@ Faithful generated getter binding for TypeScript `Element.textContent`.
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Node/textContent)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
--/
-def getTextContent
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getTextContentJs element
 
-/--
-Generated faithful JavaScript boundary for the TypeScript `Element.textContent` setter.
-Source: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; textContent js-resource/borrowed/call; result immediate/value.
+Generated faithful JavaScript boundary for the TypeScript `Element.textContent` getter.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.setTextContent"]
-private opaque setTextContentJs
-    (element : @& Lean.Vir.Js Element)
-    (textContent : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit
+@[vir_js "browser.element.getTextContent"]
+opaque getTextContent
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js String)
 
 /--
 Faithful generated setter binding for TypeScript `Element.textContent`.
@@ -219,13 +670,582 @@ Faithful generated setter binding for TypeScript `Element.textContent`.
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Node/textContent)
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
+
+Generated faithful JavaScript boundary for the TypeScript `Element.textContent` setter.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; textContent js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-def setTextContent
+@[vir_js "browser.element.setTextContent"]
+opaque setTextContent
     (element : @& Lean.Vir.Js Element)
     (textContent : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit :=
-  setTextContentJs element textContent
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.element.listener.add`.
+
+VIR returns a revocable listener resource so the retained callback has an explicit release operation.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.element.addEventListener"]
+opaque addEventListenerJs
+    (element : @& Lean.Vir.Js Element)
+    (event : @& Lean.Vir.Js String)
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    DomM (Lean.Vir.Js EventListener)
+
+/--
+Generated binding for reviewed VIR protocol `browser.element.listener.remove`.
+
+Removing a VIR listener consumes its revocable registration resource and releases the retained callback.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.element.removeEventListener"]
+opaque removeEventListener
+    (listener : Lean.Vir.Js EventListener) :
+    DomM Unit
 
 end Element
+
+namespace Element.ClassList
+
+/--
+Faithful generated method binding for TypeScript `DOMTokenList.toggle`.
+
+The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/toggle)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
+
+Generated faithful JavaScript boundary for the TypeScript `DOMTokenList.toggle` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.classList.toggle"]
+opaque toggleJs
+    (element : @& Lean.Vir.Js Element)
+    (token : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `browser.element.classList.addOne`.
+
+This lower-level host protocol implements one DOMTokenList token; the authored Lean convenience layer chooses the single-token operation explicitly.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.element.classList.add"]
+opaque addJs
+    (element : @& Lean.Vir.Js Element)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.element.classList.removeOne`.
+
+This lower-level host protocol implements one DOMTokenList token; the authored Lean convenience layer chooses the single-token operation explicitly.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.element.classList.remove"]
+opaque removeJs
+    (element : @& Lean.Vir.Js Element)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+end Element.ClassList
+
+namespace Element.Style
+
+/--
+Faithful generated method binding for TypeScript `CSSStyleDeclaration.setProperty`.
+
+The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CSSStyleDeclaration/setProperty)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
+
+Generated faithful JavaScript boundary for the TypeScript `CSSStyleDeclaration.setProperty` method.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.style.setProperty"]
+opaque setPropertyJs
+    (element : @& Lean.Vir.Js Element)
+    (property : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js.Nullable String) :
+    DomM Unit
+
+end Element.Style
+
+namespace Event
+
+/--
+Faithful generated getter binding for TypeScript `Event.currentTarget`.
+
+The **`currentTarget`** read-only property of the Event interface identifies the element to which the event handler has been attached.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/currentTarget)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `Event.currentTarget` getter.
+ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.event.currentTarget"]
+opaque getCurrentTarget
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+/--
+Faithful generated method binding for TypeScript `Event.preventDefault`.
+
+The **`preventDefault()`** method of the Event interface tells the user agent that the event is being explicitly handled, so its default action, such as page scrolling, link navigation, or pasting text, should not be taken.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/preventDefault)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `Event.preventDefault` method.
+ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.event.preventDefault"]
+opaque preventDefault
+    (event : @& Lean.Vir.Js Event) :
+    DomM Unit
+
+/--
+Faithful generated method binding for TypeScript `Event.stopPropagation`.
+
+The **`stopPropagation()`** method of the Event interface prevents further propagation of the current event in the capturing and bubbling phases. It does not, however, prevent any default behaviors from occurring; for instance, clicks on links are still processed. If you want to stop those behaviors, see the preventDefault() method. It also does not prevent propagation to other event-handlers of the current element. If you want to stop those, see stopImmediatePropagation().
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/stopPropagation)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `Event.stopPropagation` method.
+ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.event.stopPropagation"]
+opaque stopPropagation
+    (event : @& Lean.Vir.Js Event) :
+    DomM Unit
+
+/--
+Faithful generated getter binding for TypeScript `Event.target`.
+
+The read-only **`target`** property of the Event interface is a reference to the object onto which the event was dispatched. It is different from Event.currentTarget when the event handler is called during the bubbling or capturing phase of the event.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/target)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `Event.target` getter.
+ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.event.target"]
+opaque getTarget
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+/--
+Faithful generated getter binding for TypeScript `KeyboardEvent.key`.
+
+The KeyboardEvent interface's **`key`** read-only property returns the value of the key pressed by the user, taking into consideration the state of modifier keys such as Shift as well as the keyboard locale and layout.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/KeyboardEvent/key)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `KeyboardEvent.key` getter.
+ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.event.key"]
+opaque getKey
+    (keyboardEvent : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js String)
+
+/--
+Generated binding for reviewed VIR protocol `browser.event.formValue`.
+
+This local protocol extracts the common value property from supported form-control event targets.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.event.formValue"]
+opaque formValueNullable
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable String)
+
+end Event
+
+namespace HTMLCanvasElement
+
+/--
+Faithful generated getter binding for TypeScript `HTMLCanvasElement.height`.
+
+The **`HTMLCanvasElement.height`** property is a positive integer reflecting the height HTML attribute of the <canvas> element interpreted in CSS pixels. When the attribute is not specified, or if it is set to an invalid value, like a negative, the default value of 150 is used.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLCanvasElement/height)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLCanvasElement.height` getter.
+ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.getHeight"]
+opaque getHeight
+    (hTMLCanvasElement : @& Lean.Vir.Js HTMLCanvasElement) :
+    DomM (Lean.Vir.Js Float)
+
+/--
+Faithful generated setter binding for TypeScript `HTMLCanvasElement.height`.
+
+The **`HTMLCanvasElement.height`** property is a positive integer reflecting the height HTML attribute of the <canvas> element interpreted in CSS pixels. When the attribute is not specified, or if it is set to an invalid value, like a negative, the default value of 150 is used.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLCanvasElement/height)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLCanvasElement.height` setter.
+ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; height js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.setHeight"]
+opaque setHeight
+    (hTMLCanvasElement : @& Lean.Vir.Js HTMLCanvasElement)
+    (height : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Faithful generated getter binding for TypeScript `HTMLCanvasElement.width`.
+
+The **`HTMLCanvasElement.width`** property is a positive integer reflecting the width HTML attribute of the <canvas> element interpreted in CSS pixels. When the attribute is not specified, or if it is set to an invalid value, like a negative, the default value of 300 is used.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLCanvasElement/width)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLCanvasElement.width` getter.
+ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.getWidth"]
+opaque getWidth
+    (hTMLCanvasElement : @& Lean.Vir.Js HTMLCanvasElement) :
+    DomM (Lean.Vir.Js Float)
+
+/--
+Faithful generated setter binding for TypeScript `HTMLCanvasElement.width`.
+
+The **`HTMLCanvasElement.width`** property is a positive integer reflecting the width HTML attribute of the <canvas> element interpreted in CSS pixels. When the attribute is not specified, or if it is set to an invalid value, like a negative, the default value of 300 is used.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLCanvasElement/width)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLCanvasElement.width` setter.
+ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.setWidth"]
+opaque setWidth
+    (hTMLCanvasElement : @& Lean.Vir.Js HTMLCanvasElement)
+    (width : @& Lean.Vir.Js Float) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas.fromElement`.
+
+This checked host-resource narrowing has no corresponding JavaScript method.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.fromElement"]
+opaque fromElementNullable
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js.Nullable HTMLCanvasElement)
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas.context2d`.
+
+The host protocol specializes HTMLCanvasElement.getContext to the 2d context id and default options.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; canvas js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.htmlCanvasElement.getContext2D"]
+opaque getContext2DNullable
+    (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
+    DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
+
+end HTMLCanvasElement
+
+namespace HTMLInputElement
+
+/--
+Faithful generated getter binding for TypeScript `HTMLInputElement.checked`.
+
+The **`checked`** property of the HTMLInputElement interface specifies the current checkedness of the element; that is, whether the form control is checked or not.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLInputElement/checked)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLInputElement.checked` getter.
+ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlInputElement.getChecked"]
+opaque getChecked
+    (hTMLInputElement : @& Lean.Vir.Js HTMLInputElement) :
+    DomM (Lean.Vir.Js Bool)
+
+/--
+Faithful generated setter binding for TypeScript `HTMLInputElement.checked`.
+
+The **`checked`** property of the HTMLInputElement interface specifies the current checkedness of the element; that is, whether the form control is checked or not.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLInputElement/checked)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLInputElement.checked` setter.
+ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; checked js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlInputElement.setChecked"]
+opaque setChecked
+    (hTMLInputElement : @& Lean.Vir.Js HTMLInputElement)
+    (checked : @& Lean.Vir.Js Bool) :
+    DomM Unit
+
+/--
+Faithful generated getter binding for TypeScript `HTMLInputElement.value`.
+
+The **`value`** property of the HTMLInputElement interface represents the current value of the <input> element as a string.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLInputElement/value)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLInputElement.value` getter.
+ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlInputElement.getValue"]
+opaque getValue
+    (hTMLInputElement : @& Lean.Vir.Js HTMLInputElement) :
+    DomM (Lean.Vir.Js String)
+
+/--
+Faithful generated setter binding for TypeScript `HTMLInputElement.value`.
+
+The **`value`** property of the HTMLInputElement interface represents the current value of the <input> element as a string.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLInputElement/value)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `HTMLInputElement.value` setter.
+ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.htmlInputElement.setValue"]
+opaque setValue
+    (hTMLInputElement : @& Lean.Vir.Js HTMLInputElement)
+    (value : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.input.fromElement`.
+
+This checked host-resource narrowing has no corresponding JavaScript method.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.htmlInputElement.fromElement"]
+opaque fromElementNullable
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js.Nullable HTMLInputElement)
+
+end HTMLInputElement
+
+namespace Internal
+
+/--
+Generated binding for reviewed VIR protocol `browser.internal.ownedString`.
+
+Browser convenience wrappers require an owned JavaScript string resource before calling a consuming or asynchronous host protocol.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.string.owned"]
+opaque ownedString
+    (value : @& String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js String)
+
+/--
+Generated binding for reviewed VIR protocol `browser.internal.ownedFloat`.
+
+Canvas convenience wrappers require an owned JavaScript number resource for a generated raw canvas operation.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; value immediate/value/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.float.owned"]
+opaque ownedFloat
+    (value : Float) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Float)
+
+end Internal
+
+namespace Timer
+
+/--
+Generated binding for reviewed VIR protocol `browser.timer.setTimeout`.
+
+VIR represents the numeric timeout id as a revocable resource and retains the callback until firing or cancellation.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.timer.setTimeout"]
+opaque setTimeoutJs
+    (delayMs : @& Lean.Vir.Js Nat)
+    (callback : DomM Unit) :
+    DomM (Lean.Vir.Js Timeout)
+
+/--
+Generated binding for reviewed VIR protocol `browser.timer.clearTimeout`.
+
+Cancellation consumes the revocable timeout resource and releases its retained callback.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; timeout js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.timer.clearTimeout"]
+opaque clearTimeout
+    (timeout : Lean.Vir.Js Timeout) :
+    DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.timer.setInterval`.
+
+VIR represents the numeric interval id as a revocable resource and retains the callback until cancellation.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.timer.setInterval"]
+opaque setIntervalJs
+    (delayMs : @& Lean.Vir.Js Nat)
+    (callback : DomM Unit) :
+    DomM (Lean.Vir.Js Interval)
+
+/--
+Generated binding for reviewed VIR protocol `browser.timer.clearInterval`.
+
+Cancellation consumes the revocable interval resource and releases its retained callback.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `browser-dom-faithful-v1`: receiver none; interval js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.timer.clearInterval"]
+opaque clearInterval
+    (interval : Lean.Vir.Js Interval) :
+    DomM Unit
+
+end Timer
 
 end Lean.Vir.Browser

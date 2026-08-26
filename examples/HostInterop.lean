@@ -103,14 +103,14 @@ def elementQuerySelectorAllCount (selector childSelector : String) : DomM Nat :=
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure 0
   | some element =>
-    let nodes ← Lean.Vir.Browser.Element.querySelectorAll element childSelector
+    let nodes ← Lean.Vir.Browser.Element.querySelectorAllString element childSelector
     Lean.Vir.Js.NodeList.length nodes
 
 def elementQuerySelectorText (selector childSelector : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure ""
   | some element =>
-    match ← Lean.Vir.Browser.Element.querySelector element childSelector with
+    match ← Lean.Vir.Browser.Element.querySelectorString element childSelector with
     | none => pure ""
     | some child => getElementText child
 
@@ -188,7 +188,7 @@ def mountKeyTitle (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
-        setDocumentTitle (← Lean.Vir.Browser.Event.key event)
+        setDocumentTitle (← Lean.Vir.Browser.Event.keyString event)
       pure 1
   | none => pure 0
 

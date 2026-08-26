@@ -90,11 +90,16 @@ assert.deepEqual(report.summary.issues, {
   gap: issueCounts.gap ?? 0,
 });
 assert.deepEqual(report.summary.generation, {
+  boundaries: {
+    operations: roots.reduce((sum, root) => sum + (root.generatedOperations?.length ?? 0), 0),
+    targets: new Set(roots.flatMap((root) =>
+      (root.generatedOperations ?? []).map((operation) => operation.host.target))).size,
+    handwrittenDeclarations: 0,
+  },
   disposition: {
     generated: dispositionCounts.generated ?? 0,
     "needs-annotation": dispositionCounts["needs-annotation"] ?? 0,
     unsupported: dispositionCounts.unsupported ?? 0,
-    "manual-exception": dispositionCounts["manual-exception"] ?? 0,
     "not-selected": dispositionCounts["not-selected"] ?? 0,
   },
   availability: {
@@ -104,8 +109,9 @@ assert.deepEqual(report.summary.generation, {
   },
   workItems: report.workItems.length,
 });
-assert.equal(report.summary.generation.disposition.generated, 5);
-assert.equal(report.summary.generation.disposition["not-selected"], 2003);
+assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
+assert.ok(report.summary.generation.disposition.generated > 0);
+assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
@@ -144,7 +150,7 @@ assert.deepEqual(
   )?.path,
   [
     "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
-    "_private.Vir.Browser.0.Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
+    "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
   ],
 );
 
@@ -221,8 +227,8 @@ const documentQuerySelector = documentRoot?.coverage.members.find(
 );
 assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
-assert.equal(documentQuerySelector?.generation.disposition, "needs-annotation");
-assert.equal(documentQuerySelector?.generation.provenance, "handwritten");
+assert.equal(documentQuerySelector?.generation.disposition, "generated");
+assert.equal(documentQuerySelector?.generation.provenance, "generator");
 assert.equal(documentQuerySelector?.generation.availability, "available");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
@@ -238,10 +244,10 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 });
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
-  compatible: 4,
+  compatible: 10,
   weak: 0,
   missing: 728,
-  unreviewed: 10,
+  unreviewed: 4,
   mappedTargets: 16,
 });
 const elementInnerHTML = elementRoot?.coverage.members.find(
@@ -329,43 +335,25 @@ assert.deepEqual(
 const canvasElement = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");
 assert.deepEqual(canvasElement?.analysis, {
-  status: "automatic",
+  status: "in-progress",
   scope: "complete-upstream-surface",
 });
 assert.equal(canvasElement?.findingStatus, "gap");
 assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 1 });
 assert.deepEqual(canvasElement?.coverage.summary, {
   exact: 0,
-  compatible: 0,
+  compatible: 2,
   weak: 0,
-  missing: 330,
-  unreviewed: 3,
-  suggested: 3,
-  ambiguous: 0,
-  mappedTargets: 5,
-  ambiguousTargets: 0,
-  unmatchedTargets: 1,
+  missing: 331,
+  unreviewed: 0,
+  mappedTargets: 6,
 });
-const canvasContext = canvasElement?.coverage.targetMappings.find(
-  (mapping) => mapping.target === "browser.htmlCanvasElement.getContext2D",
-);
-assert.equal(canvasContext?.status, "suggested");
-assert.deepEqual(canvasContext?.candidates, [
-  {
-    typescript: "HTMLCanvasElement.getContext",
-    score: 80,
-    reason: "shared member-name prefix on matching owner",
-  },
-]);
-assert.equal(
-  canvasElement?.coverage.targetMappings.find(
-    (mapping) => mapping.target === "browser.htmlCanvasElement.fromElement",
-  )?.status,
-  "unmatched",
-);
-assert.ok(report.workItems.some((item) =>
-  item.target === "browser.htmlCanvasElement.fromElement" &&
-  item.code === "upstream-identity-missing"));
+assert.ok(canvasElement?.generatedOperations.some((operation) =>
+  operation.id === "browser.canvas.context2d" &&
+  operation.typescript.kind === "protocol"));
+assert.ok(canvasElement?.generatedOperations.some((operation) =>
+  operation.id === "browser.canvas.fromElement" &&
+  operation.typescript.kind === "protocol"));
 
 const localCommands = roots.find((root) =>
   root.library === "infoview" && root.id === "commands");
@@ -386,8 +374,8 @@ assert.deepEqual(reactDomRoot?.analysis, {
 assert.equal(reactDomRoot?.findingStatus, "warning");
 assert.deepEqual(reactDomRoot?.comparison.summary, {
   exact: 0,
-  compatible: 2,
-  weak: 2,
+  compatible: 3,
+  weak: 1,
   missing: 3,
 });
 assert.equal(

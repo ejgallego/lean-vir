@@ -10,6 +10,7 @@ import {
   createBrowserCanvasHostBindings,
   createBrowserElementHostBindings,
 } from "../../web/src/vir-host-bindings.js";
+import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
 
 const state = {
   resourceForValue: (value) => value,
@@ -42,11 +43,11 @@ const element = {
   removeEventListener() {},
 };
 const elementBindings = createBrowserElementHostBindings(state);
-elementBindings["browser.element.appendChild"](element, child);
+assert.equal(elementBindings["browser.element.appendChild"](element, child), child);
 elementBindings["browser.element.classList.add"](element, "active");
 elementBindings["browser.element.classList.remove"](element, "hidden");
 assert.equal(elementBindings["browser.element.classList.toggle"](element, "ready"), true);
-elementBindings["browser.element.style.setProperty"](element, "color", "red");
+elementBindings["browser.element.style.setProperty"](element, "color", createNullableValue("red"));
 elementBindings["browser.element.remove"](element);
 assert.deepEqual(elementCalls, [
   ["append", child],
@@ -81,10 +82,10 @@ const canvas = { width: 300, height: 150, getContext: (kind) => kind === "2d" ? 
 const canvasBindings = createBrowserCanvasHostBindings(state);
 assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"](canvas).value, canvas);
 assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"]({}).value, null);
-assert.equal(canvasBindings["browser.htmlCanvasElement.getWidth"](canvas), 300n);
-assert.equal(canvasBindings["browser.htmlCanvasElement.getHeight"](canvas), 150n);
-canvasBindings["browser.htmlCanvasElement.setWidth"](canvas, 640n);
-canvasBindings["browser.htmlCanvasElement.setHeight"](canvas, 360n);
+assert.equal(canvasBindings["browser.htmlCanvasElement.getWidth"](canvas), 300);
+assert.equal(canvasBindings["browser.htmlCanvasElement.getHeight"](canvas), 150);
+canvasBindings["browser.htmlCanvasElement.setWidth"](canvas, 640);
+canvasBindings["browser.htmlCanvasElement.setHeight"](canvas, 360);
 assert.equal(canvas.width, 640);
 assert.equal(canvas.height, 360);
 assert.equal(canvasBindings["browser.htmlCanvasElement.getContext2D"](canvas).value, ctx);

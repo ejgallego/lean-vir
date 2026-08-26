@@ -23,10 +23,10 @@ includes its concrete compiled-IR call path.
 
 Generation indexes every configured TypeScript API group before presenting the
 report. Unselected upstream entries remain ordinary documentation coverage;
-they are not findings. Authored mappings are confirmed shipped bindings,
-name-based candidates require an identity annotation, and generated members
-are distinguished from handwritten bindings. Current counts and work items
-belong to the generated report rather than this documentation.
+they are not findings. Authored mappings are confirmed shipped bindings and
+name-based candidates require an identity annotation. Every compiled host
+declaration must come from a configured generated output; the report displays
+the generated/handwritten boundary count explicitly.
 
 ## Fidelity Contract
 
@@ -48,10 +48,10 @@ This check makes six mechanically enforceable claims:
    from naming or source text.
 6. A reviewed TypeScript property is decomposed into named getter and setter
    operations (getter only for a readonly property). Each operation either
-   identifies one host target, one public Lean declaration, and one reviewed
-   anchor, or explicitly records a missing coverage gap. Another public
-   declaration in the configured binding namespace may not reach that accessor
-   target unless it corresponds to a distinct upstream operation.
+   identifies one host target and one canonical generated public Lean
+   declaration, or explicitly records a missing coverage gap. Downstream
+   conversion helpers may reach that generated operation, but they are not
+   presented as additional upstream property operations.
 
 This prevents accidental representation drift such as exposing a raw Lean
 `String` where the JavaScript API returns a `Js String`. Applications may
@@ -76,23 +76,25 @@ Each upstream member has a generation record with three independent facts:
 - **availability** is `available`, `candidate`, or `not-provided`. Only an
   authored mapping or comparison target is available; a name candidate is not
   presented as a Lean binding.
-- **provenance** records whether the current evidence comes from the generator,
-  handwritten code, an automatic candidate, an annotation, or no implementation.
-- **disposition** is `generated`, `needs-annotation`, `unsupported`,
-  `manual-exception`, or `not-selected`. Convenience wrappers are downstream
+- **provenance** records whether upstream-correspondence evidence comes from
+  direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
+  annotation, or no implementation. This is distinct from declaration
+  provenance: all shipped host declarations are generated.
+- **disposition** is `generated`, `needs-annotation`, `unsupported`, or
+  `not-selected`. Convenience wrappers are downstream
   Lean APIs rather than upstream members, so they are not a member disposition.
 
 Only dispositions with an actionable diagnostic appear in the binding
 workbench. In particular, `not-selected` is not an error or author action.
 Every work item names a diagnostic code, explains the evidence, and gives the
-next required action. Current handwritten mappings use `needs-annotation`
-until they move into generation or acquire a justified manual-exception
-annotation.
+next required action. Reviewed protocols may still use `needs-annotation`
+until their upstream identity and direct TypeScript lowering are fully
+expressed.
 
 A generated operation whose reviewed mapping has no legacy comparator anchor
 is `compatible` by generator evidence: the TypeScript shape, ABI policy, and
-emitted Lean type are one canonical operation record. Handwritten mappings
-still need comparator evidence or remain `unreviewed`.
+emitted Lean type are one canonical operation record. Reviewed protocol
+mappings still need comparator evidence or remain `unreviewed`.
 
 A **public Lean API** row is a public executable declaration in the measured
 `Vir` environment that reaches at least one JavaScript host target. It does not
@@ -137,28 +139,22 @@ Every binding repair or addition should satisfy these landing gates:
    independently.
 4. **Runtime parity.** Every generated target has its intended shipped provider,
    and provider-only targets are rejected.
-5. **Explicit exceptions.** A handwritten shipped binding is temporary author
-   work until it is generated or carries a justified manual-exception policy.
+5. **Explicit exceptions.** TypeScript deviations and VIR-owned protocols are
+   generated from structured, justified operation records; handwritten host
+   declarations are rejected.
 6. **Compiled evidence.** The consolidated gate reaches every target from a
    public Lean declaration and exercises relevant lifetime behavior.
 
-Before the first release, every external shipped binding should be generated or
-have a documented manual exception. Shipped targets must have authored upstream
-identity or an explicit no-parity classification. Unsupported selected
+Every external shipped binding is generated. Shipped targets must also acquire
+authored upstream identity or an explicit no-parity protocol classification.
+Unsupported selected
 operations and weak type translations remain workbench actions; unselected
 upstream operations may remain visible in the reference without failing CI.
 
-Land that work in small API-group slices, prioritizing existing exposed
-bindings over new surface:
-
-1. generate DOM selectors; attribute methods and their faithful string
-   boundaries are generated, with primitive conversions in a separate helper
-   layer;
-2. generate input, event, canvas, and timer operations;
-3. add fail-closed callback lifetime annotations;
-4. close or explicitly classify React root generation blockers;
-5. provide machine-readable contracts for shipped local Infoview and
-   ProofWidgets operations.
+The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
+and ProofWidgets. Further slices should replace reviewed protocol operations
+with direct TypeScript lowering where an upstream declaration exists, without
+changing their host target or public faithful type unnecessarily.
 
 Request planners and correspondence ranking consume the same authored
 API-group configurations and canonical operation data as generation. A
@@ -194,10 +190,6 @@ operations, or only `get` for a readonly property, with an exact host target,
 public Lean declaration, and comparison anchor for each shipped operation.
 An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
 entry, so partial property coverage cannot be mistaken for a faithful pair.
-A mapping may use `manualException: { "reason": "..." }` to classify a
-deliberate handwritten binding. The loader rejects a member that is both
-generated and a manual exception. An ordinary handwritten mapping without that
-annotation remains an actionable workbench item.
 Anchor `portIntent` contains only policy that the comparator mechanically
 checks. Lifecycle, retention, or ownership claims that are not yet derived from
 the operation IR use `advisorySemantics`; reports label those notes as not
@@ -225,8 +217,8 @@ compiled Vir + Vir.Infoview environments
 browser/React + virtual Node providers + runtime intrinsics
   -> strict reconciliation JSON
 
-legacy handwritten bindings + correspondence suggestions
-  -> migration and annotation work items
+reviewed protocol operations + correspondence suggestions
+  -> direct-lowering and annotation work items
 
 catalog + operation IR + compiled/runtime evidence + work items
   -> one machine report

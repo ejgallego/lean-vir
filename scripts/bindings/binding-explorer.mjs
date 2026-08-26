@@ -4,12 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
-import { loadBindingConfig } from "./binding-config.mjs";
+import { discoverBindingConfigPaths, loadBindingConfig } from "./binding-config.mjs";
 import { buildGeneratedOperations } from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
@@ -20,7 +20,6 @@ const generationDispositions = [
   "generated",
   "needs-annotation",
   "unsupported",
-  "manual-exception",
   "not-selected",
 ];
 const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [options]";
@@ -72,19 +71,6 @@ async function readJson(path) {
   } catch (error) {
     throw new Error(`${relative(repositoryRoot, path)}: ${error.message}`);
   }
-}
-
-async function discoverConfigs(directory) {
-  const paths = [];
-  async function visit(path) {
-    for (const entry of await readdir(path, { withFileTypes: true })) {
-      const child = join(path, entry.name);
-      if (entry.isDirectory()) await visit(child);
-      else if (entry.isFile() && entry.name.endsWith(".bindings.json")) paths.push(child);
-    }
-  }
-  await visit(directory);
-  return paths.sort();
 }
 
 function matchesPattern(target, pattern) {
@@ -301,17 +287,14 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
       message: unsupported.note ?? "The binding configuration explicitly marks this operation unsupported.",
       action: "Extend the generator and runtime policy before selecting this operation.",
     });
-  } else if (member.mapping?.manualException !== undefined) {
-    disposition = "manual-exception";
-    provenance = "handwritten";
   } else if (confirmedTargets.length !== 0) {
     disposition = "needs-annotation";
-    provenance = "handwritten";
+    provenance = "reviewed-protocol";
     diagnostics.push({
-      code: "handwritten-binding-unclassified",
+      code: "direct-typescript-lowering-required",
       severity: "action",
-      message: "VIR ships a handwritten binding for this upstream operation.",
-      action: "Move it into generation or record a justified manual exception.",
+      message: "VIR ships a generated reviewed protocol for this upstream operation, but does not yet lower it directly from TypeScript.",
+      action: "Express the correspondence in the TypeScript lowering policy, or keep it explicitly protocol-specific.",
     });
   } else if (candidateTargets.length !== 0) {
     disposition = "needs-annotation";
@@ -350,8 +333,6 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
       : candidateTargets.length !== 0 ? "candidate" : "not-provided",
     targets: confirmedTargets,
     ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
-    ...(member.mapping?.manualException === undefined
-      ? {} : { manualException: member.mapping.manualException }),
     diagnostics,
   };
 }
@@ -429,7 +410,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
       subject: "host-target",
       target: mapping.target,
       disposition: "needs-annotation",
-      provenance: "handwritten",
+      provenance: "generated-protocol",
       severity: "action",
       code: "upstream-identity-missing",
       message: "This shipped target has no upstream correspondence candidate.",
@@ -474,7 +455,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues) {
   return items;
 }
 
-function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison) {
+function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison, generatedOperations = []) {
   if (!Array.isArray(bindingRoot.mappings)) {
     return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings);
   }
@@ -494,6 +475,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   }
   const mappings = new Map();
   const mappedTargets = new Set();
+  const protocolTargets = new Set(generatedOperations
+    .filter((operation) => operation.typescript.kind === "protocol")
+    .map((operation) => operation.host.target));
   for (const mapping of bindingRoot.mappings) {
     const symbol = symbolsById.get(mapping.typescript);
     if (symbol === undefined) {
@@ -531,6 +515,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       }
       mappedTargets.add(operation.target);
       if (operation.accessor !== undefined) {
+        if (operation.anchor === undefined && generatedMembers.has(mapping.typescript)) continue;
         const result = resultsById.get(operation.anchor);
         if (result === undefined || result.ts !== mapping.typescript ||
             result.target !== operation.target ||
@@ -542,7 +527,10 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     const mappedOperations = operations.filter((operation) => operation.missing !== true);
     const results = mapping.accessors === undefined
       ? resultsByTypeScript.get(mapping.typescript) ?? []
-      : mappedOperations.map((operation) => resultsById.get(operation.anchor));
+      : mappedOperations.flatMap((operation) => {
+          const result = operation.anchor === undefined ? undefined : resultsById.get(operation.anchor);
+          return result === undefined ? [] : [result];
+        });
     const generatedCompatibility = generatedMembers.has(mapping.typescript) &&
       results.length === 0 && mappedOperations.length !== 0;
     mappings.set(mapping.typescript, {
@@ -556,8 +544,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       anchors: results.map((result) => result.id),
     });
   }
-  if (mappedTargets.size !== bindings.length) {
-    const missing = bindings.filter((binding) => !mappedTargets.has(binding.target)).map((binding) => binding.target);
+  const classifiedTargets = new Set([...mappedTargets, ...protocolTargets]);
+  if (classifiedTargets.size !== bindings.length) {
+    const missing = bindings.filter((binding) => !classifiedTargets.has(binding.target)).map((binding) => binding.target);
     throw new Error(`${config.id}/${bindingRoot.id} mappings do not classify targets: ${missing.join(", ")}`);
   }
   const members = typeScript.symbols.filter((symbol) => symbol.surfaceRoot !== undefined).map((symbol) => {
@@ -592,7 +581,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     }));
   return {
     mode: "reviewed",
-    summary: { ...summary, mappedTargets: mappedTargets.size },
+    summary: { ...summary, mappedTargets: classifiedTargets.size },
     members,
     targetMappings,
   };
@@ -692,7 +681,7 @@ function declarationMatchesSelector(declaration, selector) {
   return declaration === selector || declaration.startsWith(`${selector}.`);
 }
 
-function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
+function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget, generatedOperations) {
   if (surfaceCoverage?.mode !== "reviewed") return [];
   const selectors = bindingRoot.lean?.public ?? [];
   const issues = [];
@@ -711,6 +700,9 @@ function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
       }
     }
     if (mapping.accessor === undefined) continue;
+    const generated = generatedOperations.some((operation) =>
+      operation.host.target === mapping.target && mapping.lean.includes(operation.lean.declaration));
+    if (generated) continue;
     const reviewed = new Set(mapping.lean);
     for (const caller of callers) {
       if (reviewed.has(caller.entry.declaration) ||
@@ -823,7 +815,14 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       const typescript = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) ?? null;
       const rawSurfaceCoverage = typescript === null
         ? null
-        : buildSurfaceCoverage(config, bindingRoot, typescript, bindings, comparison);
+        : buildSurfaceCoverage(
+          config,
+          bindingRoot,
+          typescript,
+          bindings,
+          comparison,
+          generatedByGroup.get(bindingRoot.id) ?? [],
+        );
       const surfaceCoverage = rawSurfaceCoverage === null
         ? null
         : decorateGenerationCoverage(
@@ -851,7 +850,12 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
             : `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream entries have no automatic VIR mapping candidate`,
         ));
       }
-      issues.push(...reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget));
+      issues.push(...reviewedPublicIssues(
+        bindingRoot,
+        surfaceCoverage,
+        publicByTarget,
+        generatedByGroup.get(bindingRoot.id) ?? [],
+      ));
       issues.push(...semanticIssues(comparison));
       if (comparison !== null) {
         for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
@@ -908,7 +912,18 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   const apiGroups = libraries.flatMap((library) => library.apiGroups);
   const generationGroups = apiGroups.filter((entry) => entry.coverage !== undefined);
   const workItems = apiGroups.flatMap((entry) => entry.workItems);
+  const generatedOperations = apiGroups.flatMap((entry) => entry.generatedOperations ?? []);
+  const generatedTargets = new Set(generatedOperations.map((operation) => operation.host.target));
+  const generatedSources = new Set(configs.flatMap((config) =>
+    config.generation === undefined ? [] : [config.generation.output]));
+  const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
+    .filter((declaration) => !generatedSources.has(declaration.source?.path));
   const generationSummary = {
+    boundaries: {
+      operations: generatedOperations.length,
+      targets: generatedTargets.size,
+      handwrittenDeclarations: handwrittenDeclarations.length,
+    },
     disposition: Object.fromEntries(generationDispositions.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
@@ -999,7 +1014,7 @@ export async function runBindingExplorerCli(argv) {
   const options = parseArgs(argv);
   if (options === null) return 0;
   const coverage = await readJson(options.coverage);
-  const configPaths = await discoverConfigs(options.configDir);
+  const configPaths = await discoverBindingConfigPaths(options.configDir);
   if (configPaths.length === 0) throw new Error(`no *.bindings.json files found under ${relative(repositoryRoot, options.configDir)}`);
   const configs = [];
   const ids = new Set();
@@ -1040,7 +1055,8 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
-  console.log(`  generation: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
+  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
+  console.log(`  upstream lowering: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author workbench: ${report.summary.generation.workItems} actions`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
   console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);

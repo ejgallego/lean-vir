@@ -59,4 +59,28 @@ Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Elem
 -/
 opaque Element : Type
 
+/-- Browser event object class. Event values are callback-scoped resources. -/
+opaque Event : Type
+
+/-- Handle for a browser event-listener registration. -/
+opaque EventListener : Type
+
+/-- Browser `HTMLInputElement` object class. -/
+opaque HTMLInputElement : Type
+
+/-- Browser `HTMLCanvasElement` object class. -/
+opaque HTMLCanvasElement : Type
+
+/-- Browser two-dimensional canvas rendering context. -/
+opaque CanvasRenderingContext2D : Type
+
+/-- Browser timeout registration resource. -/
+opaque Timeout : Type
+
+/-- Browser interval registration resource. -/
+opaque Interval : Type
+
+/-- Browser animation-frame registration resource. -/
+opaque AnimationFrame : Type
+
 end Lean.Vir.Browser

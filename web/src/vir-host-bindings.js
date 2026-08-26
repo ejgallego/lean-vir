@@ -16,7 +16,6 @@ import {
   preventDefaultOnEvent,
   reportEventHandlerError,
   stopPropagationOnEvent,
-  withConsumedResources,
 } from "./host/vir-host-resources.js";
 import {
   createVirtualDocumentHostBindings,
@@ -133,8 +132,9 @@ export function createBrowserElementHostBindings(state = createHostResourceState
         createBrowserEventListenerResource(state, target, eventName, callback),
     }),
     "browser.element.appendChild": (parent, child) => {
-      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
-      return undefined;
+      const childValue = state.resolveResource(child, "Element");
+      state.resolveResource(parent, "Element").appendChild(childValue);
+      return state.resourceForValue(childValue);
     },
     "browser.element.remove": (element) => {
       state.resolveResource(element, "Element").remove();
@@ -157,7 +157,7 @@ export function createBrowserElementHostBindings(state = createHostResourceState
     "browser.element.style.setProperty": (element, name, value) => {
       state.resolveResource(element, "Element").style.setProperty(
         state.resolveResource(name, "JsString"),
-        state.resolveResource(value, "JsString"),
+        nullablePayload(state, value),
       );
       return undefined;
     },
@@ -173,15 +173,15 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
       return adoptResourceForValue(state, createNullableValue(canvas));
     },
     "browser.htmlCanvasElement.getWidth": (canvas) =>
-      state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
+      state.resourceForValue(Number(value(canvas, "HTMLCanvasElement").width)),
     "browser.htmlCanvasElement.setWidth": (canvas, width) => {
-      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
+      value(canvas, "HTMLCanvasElement").width = value(width, "JsFloat");
       return undefined;
     },
     "browser.htmlCanvasElement.getHeight": (canvas) =>
-      state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
+      state.resourceForValue(Number(value(canvas, "HTMLCanvasElement").height)),
     "browser.htmlCanvasElement.setHeight": (canvas, height) => {
-      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
+      value(canvas, "HTMLCanvasElement").height = value(height, "JsFloat");
       return undefined;
     },
     "browser.htmlCanvasElement.getContext2D": (canvas) =>
@@ -206,16 +206,14 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
         value(ctx, "CanvasRenderingContext2D").arc(...args)),
     "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
     "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
-    "browser.canvas2d.setFillStyle": (ctx, style) =>
-      withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
-        value(ctx, "CanvasRenderingContext2D").fillStyle = resolvedStyle;
-        return undefined;
-      }),
-    "browser.canvas2d.setStrokeStyle": (ctx, style) =>
-      withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
-        value(ctx, "CanvasRenderingContext2D").strokeStyle = resolvedStyle;
-        return undefined;
-      }),
+    "browser.canvas2d.setFillStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+      return undefined;
+    },
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
+      return undefined;
+    },
     "browser.canvas2d.setLineWidth": (ctx, width) =>
       withCanvasNumbers(state, [width], (resolvedWidth) => {
         value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
@@ -232,11 +230,7 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
 }
 
 function withCanvasNumbers(state, resources, run) {
-  return withConsumedResources(
-    state,
-    resources.map((resource) => [resource, "JsFloat"]),
-    run,
-  );
+  return run(...resources.map((resource) => state.resolveResource(resource, "JsFloat")));
 }
 
 export function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {

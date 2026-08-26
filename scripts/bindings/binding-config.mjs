@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { readFile, readdir } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020.js";
 
@@ -50,13 +50,6 @@ function validateLibrarySemantics(config, label) {
   for (const root of config.roots) {
     if (rootIds.has(root.id)) throw new Error(`${label} repeats root id ${root.id}`);
     rootIds.add(root.id);
-    for (const mapping of root.mappings ?? []) {
-      if (mapping.manualException !== undefined && generated.has(mapping.typescript)) {
-        throw new Error(
-          `${label} marks generated member ${mapping.typescript} as a manual exception`,
-        );
-      }
-    }
   }
 }
 
@@ -77,4 +70,17 @@ export async function loadBindingConfig(path) {
     throw new Error(`${label}: ${error.message}`);
   }
   return validateBindingConfig(config, path);
+}
+
+export async function discoverBindingConfigPaths(directory) {
+  const paths = [];
+  async function visit(path) {
+    for (const entry of await readdir(path, { withFileTypes: true })) {
+      const child = join(path, entry.name);
+      if (entry.isDirectory()) await visit(child);
+      else if (entry.isFile() && entry.name.endsWith(".bindings.json")) paths.push(child);
+    }
+  }
+  await visit(directory);
+  return paths.sort();
 }

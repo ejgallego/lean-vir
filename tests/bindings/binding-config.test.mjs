@@ -43,6 +43,16 @@ test("binding configuration requires a TypeScript declaration surface", async ()
   );
 });
 
+test("every binding library requires a generated Lean boundary", async () => {
+  const invalid = structuredClone(browser);
+  delete invalid.generation;
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /must have required property 'generation'/u,
+  );
+});
+
 test("binding configuration rejects duplicate API group ids", async () => {
   const invalid = structuredClone(browser);
   invalid.roots[1].id = invalid.roots[0].id;
@@ -63,39 +73,24 @@ test("binding configuration rejects wildcards outside the target suffix", async 
   );
 });
 
-test("binding configuration accepts justified manual exceptions", async () => {
-  const configured = structuredClone(browser);
-  configured.roots.find((root) => root.id === "document")
-    .mappings.find((mapping) => mapping.typescript === "Document.querySelector")
-    .manualException = { reason: "Method generation is not available in this release." };
-
-  const validated = await validateBindingConfig(configured, browserPath);
-  assert.equal(
-    validated.roots.find((root) => root.id === "document")
-      .mappings.find((mapping) => mapping.typescript === "Document.querySelector")
-      .manualException.reason,
-    "Method generation is not available in this release.",
-  );
-});
-
-test("generated members cannot also be manual exceptions", async () => {
+test("binding configuration rejects manual declaration exceptions", async () => {
   const invalid = structuredClone(browser);
-  invalid.roots.find((root) => root.id === "document")
-    .mappings.find((mapping) => mapping.typescript === "Document.title")
-    .manualException = { reason: "Conflicting provenance." };
+  invalid.roots.find((root) => root.id === "element")
+    .mappings.find((mapping) => mapping.typescript === "Element.addEventListener")
+    .manualException = { reason: "Method generation is not available in this release." };
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
-    /marks generated member Document\.title as a manual exception/u,
+    /manualException.*must NOT have additional properties/u,
   );
 });
 
 test("method policies are explicit, selected, and schema checked", async () => {
   const unselected = structuredClone(browser);
-  unselected.generation.methodPolicies["Element.remove"] = { signature: "only" };
+  unselected.generation.methodPolicies["Element.addEventListener"] = { signature: "only" };
   await assert.rejects(
     validateBindingConfig(unselected, browserPath),
-    /defines a method policy for unselected member Element\.remove/u,
+    /defines a method policy for unselected member Element\.addEventListener/u,
   );
 
   const vague = structuredClone(browser);

@@ -14,7 +14,7 @@ document.querySelector("#available-metric").textContent = String(
   generation.availability.available,
 );
 document.querySelector("#generated-metric").textContent = String(
-  generation.disposition.generated,
+  generation.boundaries.targets,
 );
 document.querySelector("#work-metric").textContent = String(generation.workItems);
 document.querySelector("#work-card").classList.add(
@@ -28,6 +28,8 @@ document.querySelector("#scope").replaceChildren(
     `${report.summary.apiGroups} API groups · ` +
     `${report.summary.targets} compiled host targets, ` +
     `${report.summary.provided} with runtime providers. ` +
+    `${generation.boundaries.targets} are generated and ` +
+    `${generation.boundaries.handwrittenDeclarations} declarations are handwritten. ` +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
 );
@@ -107,7 +109,6 @@ const dispositionLabel = (value) => ({
   generated: "generated",
   "needs-annotation": "needs annotation",
   unsupported: "unsupported",
-  "manual-exception": "manual exception",
   "not-selected": "not selected",
 })[value] ?? value;
 const availabilityLabel = (value) => ({

@@ -117,8 +117,8 @@ const descriptors = new Map([["widget", descriptor]]);
 test("TypeScript property shapes and an ABI profile determine Lean declarations", () => {
   const output = renderLeanBindings(config, generation, descriptors);
 
-  assert.match(output, /private opaque getLabelJs\n    \(widget : @& Lean\.Vir\.Js Widget\) :\n    DomM \(Lean\.Vir\.Js String\)/u);
-  assert.match(output, /private opaque setLabelJs\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(label : @& Lean\.Vir\.Js\.Nullable String\) :\n    DomM Unit/u);
+  assert.match(output, /opaque getLabel\n    \(widget : @& Lean\.Vir\.Js Widget\) :\n    DomM \(Lean\.Vir\.Js String\)/u);
+  assert.match(output, /opaque setLabel\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(label : @& Lean\.Vir\.Js\.Nullable String\) :\n    DomM Unit/u);
   assert.match(output, /@\[vir_js "demo\.widget\.getLabel"\]/u);
   assert.match(output, /ABI profile `demo-faithful-v1`/u);
   assert.doesNotMatch(output, /\(label : @& String\)/u);
@@ -153,12 +153,93 @@ test("operation IR records derived modalities and their provenance", () => {
   });
 });
 
+test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
+  const protocolGeneration = structuredClone(generation);
+  protocolGeneration.members = [];
+  protocolGeneration.methodPolicies = {};
+  protocolGeneration.protocolOperations = [{
+    id: "demo.widget.subscribe",
+    group: "widget",
+    target: "demo.widget.subscribe",
+    lean: "Lean.Vir.Demo.Widget.subscribe",
+    marker: "vir_js",
+    reason: "The host retains the callback until the subscription is released.",
+    typeParameters: ["α"],
+    effect: { id: "dom", lean: "DomM" },
+    arguments: [{
+      name: "widget",
+      role: "receiver",
+      type: {
+        lean: "Lean.Vir.Js Widget",
+        representation: "js-resource",
+        resourceInner: "Widget",
+      },
+    }, {
+      name: "callback",
+      role: "callback",
+      passing: "owned",
+      retention: "until-release",
+      type: { lean: "Lean.Vir.Js α → DomM Unit", representation: "callback" },
+    }],
+    result: {
+      type: {
+        lean: "Lean.Vir.Js Subscription",
+        representation: "js-resource",
+        resourceInner: "Subscription",
+      },
+    },
+  }];
+  const output = renderLeanBindings(config, protocolGeneration, new Map());
+  const [operation] = buildGeneratedOperations(config, protocolGeneration, new Map());
+
+  assert.match(output, /opaque subscribe\n    \{α : Type\}\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(callback : Lean\.Vir\.Js α → DomM Unit\)/u);
+  assert.deepEqual(operation.arguments[1].modalities, {
+    representation: "callback",
+    passing: "owned",
+    retention: "until-release",
+  });
+  assert.equal(
+    operation.arguments[1].provenance.retention.source,
+    "generation.protocolOperations",
+  );
+  assert.equal(
+    operation.result.provenance.type[0].source,
+    "generation.protocolOperations",
+  );
+  assert.equal(operation.exception, undefined);
+  assert.deepEqual(operation.typeParameters, ["α"]);
+
+  const protocolConfig = structuredClone(config);
+  protocolConfig.generation = protocolGeneration;
+  protocolConfig.roots[0].anchors = [{
+    id: "widget.subscribe",
+    lean: "Lean.Vir.Demo.Widget.subscribe",
+    ts: "Widget.subscribe",
+    target: "demo.widget.subscribe",
+    relation: "audit",
+    portIntent: { disposition: "bind" },
+  }];
+  const [anchor] = materializeGeneratedAnchors(
+    protocolConfig,
+    protocolConfig.roots[0],
+    descriptor,
+    { version: 1, anchors: protocolConfig.roots[0].anchors },
+  ).anchors;
+  assert.deepEqual(anchor.portIntent, {
+    disposition: "bind",
+    effect: "dom",
+    receiver: "borrowed",
+    resultRepresentation: "hostResource",
+  });
+  assert.equal(anchor.modalityContract.protocol.reason, protocolGeneration.protocolOperations[0].reason);
+});
+
 test("an explicit single-signature policy generates faithful methods and documentation", () => {
   const output = renderLeanBindings(config, generation, descriptors);
   const operations = buildGeneratedOperations(config, generation, descriptors);
   const method = operations.find((operation) => operation.id === "demo.widget.getAttribute");
 
-  assert.match(output, /private opaque getAttributeJs\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(name : @& Lean\.Vir\.Js String\) :\n    DomM \(Lean\.Vir\.Js\.Nullable String\)/u);
+  assert.match(output, /opaque getAttribute\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(name : @& Lean\.Vir\.Js String\) :\n    DomM \(Lean\.Vir\.Js\.Nullable String\)/u);
   assert.match(output, /Returns the named attribute\./u);
   assert.equal(method.typescript.signaturePolicy.selection, "only");
   assert.equal(method.typescript.documentation, "Returns the named attribute.");
@@ -178,7 +259,7 @@ test("TypeScript parameter names that are Lean keywords are escaped", () => {
   const output = renderLeanBindings(config, generation, keywordDescriptors);
 
   assert.match(output, /\(«namespace» : @& Lean\.Vir\.Js String\)/u);
-  assert.match(output, /getAttributeJs widget «namespace»/u);
+  assert.match(output, /opaque getAttribute/u);
 });
 
 test("method generation fails closed without a matching signature policy", () => {

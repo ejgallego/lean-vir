@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { basename, relative, resolve } from "node:path";
 
 import { repositoryRoot } from "../repository-paths.mjs";
-import { loadBindingConfig } from "./binding-config.mjs";
+import { discoverBindingConfigPaths, loadBindingConfig } from "./binding-config.mjs";
 import {
   buildGeneratedOperations,
   generatedOperationDocument,
@@ -20,19 +20,21 @@ import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 export { leanType } from "./binding-modalities.mjs";
 
 function usage() {
-  console.log(`usage: node scripts/bindings/generate-lean-bindings.mjs --config FILE [--check]
+  console.log(`usage: node scripts/bindings/generate-lean-bindings.mjs (--config FILE ... | --config-dir DIR) [--check]
 
 Generate faithful Lean host declarations and canonical operation IR from TypeScript declarations.
 
 Options:
-  --config FILE  Binding-library configuration containing a generation block.
+  --config FILE  Binding-library configuration containing a generation block; repeatable.
+  --config-dir DIR  Recursively generate every *.bindings.json manifest under DIR.
   --check        Reject a missing or stale generated Lean file.
   -h, --help     Show this help.
 `);
 }
 
 function parseArgs(argv) {
-  let config = null;
+  const configs = [];
+  const configDirs = [];
   let check = false;
   for (let index = 0; index < argv.length; index += 1) {
     const option = argv[index];
@@ -40,15 +42,20 @@ function parseArgs(argv) {
       usage();
       return null;
     } else if (option === "--config") {
-      config = resolve(repositoryRoot, requiredValue(argv, ++index, option));
+      configs.push(resolve(repositoryRoot, requiredValue(argv, ++index, option)));
+    } else if (option === "--config-dir") {
+      configDirs.push(resolve(repositoryRoot, requiredValue(argv, ++index, option)));
     } else if (option === "--check") {
       check = true;
     } else {
       throw new Error(`unknown option ${option}`);
     }
   }
-  if (config === null) throw new Error("--config is required");
-  return { config, check };
+  if (configs.length === 0 && configDirs.length === 0) {
+    throw new Error("--config or --config-dir is required");
+  }
+  if (new Set(configs).size !== configs.length) throw new Error("--config repeats a file");
+  return { configs, configDirs, check };
 }
 
 function nonemptyString(value) {
@@ -79,11 +86,15 @@ function validateGenerationConfig(config, configPath) {
   return generation;
 }
 
-function renderSignature(name, args, effect, result, prefix) {
+function renderSignature(name, typeParameters, args, effect, result, prefix) {
   const effectResult = result === "Unit" ? result : `(${result})`;
-  if (args.length === 0) return `${prefix}${name} : ${effect} ${effectResult}`;
-  return `${prefix}${name}\n${args.map((arg) =>
-    `    (${arg.name} : ${arg.modalities.passing === "borrowed" ? "@& " : ""}${arg.type})`).join("\n")} :\n    ${effect} ${effectResult}`;
+  const binders = [
+    ...typeParameters.map((parameter) => `    {${parameter} : Type}`),
+    ...args.map((arg) =>
+      `    (${arg.name} : ${arg.modalities.passing === "borrowed" ? "@& " : ""}${arg.type})`),
+  ];
+  if (binders.length === 0) return `${prefix}${name} : ${effect} ${effectResult}`;
+  return `${prefix}${name}\n${binders.join("\n")} :\n    ${effect} ${effectResult}`;
 }
 
 function sourceReference(source) {
@@ -97,9 +108,11 @@ function modalityLabel(argument) {
 }
 
 function operationModalities(operation, profile) {
-  const receiver = operation.receiver.kind === "global"
-    ? `receiver global (${operation.receiver.typescriptType})`
-    : modalityLabel(operation.receiver.argument);
+  const receiver = operation.receiver.kind === "none"
+    ? "receiver none"
+    : operation.receiver.kind === "global"
+      ? `receiver global (${operation.receiver.typescriptType})`
+      : modalityLabel(operation.receiver.argument);
   const arguments_ = operation.arguments.map(modalityLabel);
   const result = `result ${operation.result.modalities.representation}/${operation.result.modalities.ownership}`;
   return `ABI profile \`${profile.id}\`: ${[receiver, ...arguments_, result].join("; ")}.`;
@@ -114,21 +127,32 @@ function renderOperation(operation, profile) {
     ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
     ...operation.arguments,
   ];
-  const rawName = `${operation.lean.name}Js`;
-  const call = [rawName, ...args.map((arg) => arg.name)].join(" ");
   const source = sourceReference(operation.typescript.source);
   const operationLabel = operation.typescript.kind === "method"
     ? "method"
-    : operation.typescript.accessor === "get" ? "getter" : "setter";
+    : operation.typescript.kind === "function"
+      ? "function"
+      : operation.typescript.kind === "protocol"
+        ? "protocol operation"
+      : operation.typescript.accessor === "get" ? "getter" : "setter";
   const upstreamDocumentation = leanDocText(operation.typescript.documentation);
   const publicDocumentation = leanDocText([
-    `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
+    operation.typescript.kind === "protocol"
+      ? `Generated binding for reviewed VIR protocol \`${operation.typescript.member}\`.`
+      : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
     upstreamDocumentation,
-    `Upstream declaration: ${source}`,
+    operation.typescript.kind === "protocol"
+      ? "Binding contract: `generation.protocolOperations`."
+      : `Upstream declaration: ${source}`,
   ].filter(Boolean).join("\n\n"));
+  const marker = operation.host.marker ?? "vir_js";
+  const typeParameters = operation.typeParameters ?? [];
+  const boundarySummary = operation.typescript.kind === "protocol"
+    ? "Generated reviewed VIR protocol boundary."
+    : `Generated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`;
   return {
     namespace: operation.lean.namespace,
-    text: `/--\nGenerated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.\nSource: ${source}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit the TypeScript source or binding configuration.\n-/\n@[vir_js "${operation.host.target}"]\n${renderSignature(rawName, args, operation.effect.lean, operation.result.lean, "private opaque ")}\n\n/--\n${publicDocumentation}\n-/\n${renderSignature(operation.lean.name, args, operation.effect.lean, operation.result.lean, "def ")} :=\n  ${call}`,
+    text: `/--\n${publicDocumentation}\n\n${boundarySummary}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, "opaque ")}`,
   };
 }
 
@@ -205,16 +229,22 @@ export async function generateLeanBindings(configPath) {
 export async function runTypeScriptToLeanCli(argv) {
   const options = parseArgs(argv);
   if (options === null) return 0;
-  const generated = await generateLeanBindings(options.config);
-  const sourceAction = await emitGeneratedFile(generated.output, generated.text, {
-    check: options.check,
-    root: repositoryRoot,
-    staleHint: `run npm run generate:lean-bindings`,
-  });
-  const irAction = await emitGeneratedFile(generated.irOutput, generated.irText, {
-    root: repositoryRoot,
-  });
-  console.log(`${sourceAction} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(options.config)})`);
-  console.log(`${irAction} ${relative(repositoryRoot, generated.irOutput)} (${generated.operations} operations with modality provenance)`);
+  const discovered = (await Promise.all(
+    options.configDirs.map(discoverBindingConfigPaths),
+  )).flat();
+  const configs = [...new Set([...options.configs, ...discovered])].sort();
+  for (const config of configs) {
+    const generated = await generateLeanBindings(config);
+    const sourceAction = await emitGeneratedFile(generated.output, generated.text, {
+      check: options.check,
+      root: repositoryRoot,
+      staleHint: `run npm run generate:lean-bindings`,
+    });
+    const irAction = await emitGeneratedFile(generated.irOutput, generated.irText, {
+      root: repositoryRoot,
+    });
+    console.log(`${sourceAction} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(config)})`);
+    console.log(`${irAction} ${relative(repositoryRoot, generated.irOutput)} (${generated.operations} operations with modality provenance)`);
+  }
   return 0;
 }

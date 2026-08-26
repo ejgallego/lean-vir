@@ -42,14 +42,38 @@ function validateKeys(value, allowed, context) {
   }
 }
 
+function validateTypeOverride(value, context) {
+  if (!object(value) || !nonemptyString(value.lean) ||
+      !["immediate", "lean-owned", "js-resource", "callback"].includes(value.representation)) {
+    throw new Error(`${context} must define a Lean type and representation`);
+  }
+  validateKeys(value, ["lean", "representation", "resourceInner"], context);
+  if (value.resourceInner !== undefined && !nonemptyString(value.resourceInner)) {
+    throw new Error(`${context} resourceInner must be non-empty`);
+  }
+  if (value.representation !== "js-resource" && value.resourceInner !== undefined) {
+    throw new Error(`${context} resourceInner is only valid for JavaScript resources`);
+  }
+}
+
 function validateModalityOverride(value, context, { receiver = false } = {}) {
   if (!object(value)) throw new Error(`${context} must be an object`);
   if (Object.keys(value).length === 0) throw new Error(`${context} must select a modality`);
-  validateKeys(value, receiver ? ["kind", "passing", "retention"] : ["passing", "retention"], context);
+  validateKeys(
+    value,
+    receiver
+      ? ["kind", "passing", "retention", "name", "type"]
+      : ["passing", "retention", "type"],
+    context,
+  );
   if (value.passing !== undefined) validatePassing(value.passing, context);
   if (value.retention !== undefined) validateRetention(value.retention, context);
-  if (receiver && value.kind !== undefined && !["global", "argument"].includes(value.kind)) {
-    throw new Error(`${context} kind must be global or argument`);
+  if (value.type !== undefined) validateTypeOverride(value.type, `${context} type`);
+  if (receiver && value.kind !== undefined && !["global", "argument", "none"].includes(value.kind)) {
+    throw new Error(`${context} kind must be global, argument, or none`);
+  }
+  if (receiver && value.name !== undefined && !nonemptyString(value.name)) {
+    throw new Error(`${context} name must be non-empty`);
   }
 }
 
@@ -76,9 +100,13 @@ function validateException(exception, context) {
   }
   if (exception.result !== undefined) {
     if (!object(exception.result)) throw new Error(`${context} result must be an object`);
-    validateKeys(exception.result, ["ownership"], `${context} result`);
-    if (!["owned", "borrowed"].includes(exception.result.ownership)) {
+    validateKeys(exception.result, ["ownership", "type"], `${context} result`);
+    if (exception.result.ownership !== undefined &&
+        !["owned", "borrowed"].includes(exception.result.ownership)) {
       throw new Error(`${context} result ownership must be owned or borrowed`);
+    }
+    if (exception.result.type !== undefined) {
+      validateTypeOverride(exception.result.type, `${context} result type`);
     }
   }
   if (exception.effect !== undefined) {
@@ -127,7 +155,11 @@ export function validateGenerationProfile(generation, context = "generation") {
   }
   for (const [member, policy] of Object.entries(generation.methodPolicies ?? {})) {
     if (!object(policy)) throw new Error(`${context} method policy ${member} must be an object`);
-    validateKeys(policy, ["signature", "omittedOptionalParameters"], `${context} method policy ${member}`);
+    validateKeys(
+      policy,
+      ["signature", "omittedOptionalParameters", "omittedRestParameters"],
+      `${context} method policy ${member}`,
+    );
     if (policy.signature !== "only" &&
         (!Number.isInteger(policy.signature) || policy.signature < 0)) {
       throw new Error(`${context} method policy ${member} requires signature "only" or an overload index`);
@@ -136,6 +168,11 @@ export function validateGenerationProfile(generation, context = "generation") {
     if (!Array.isArray(omitted) || !omitted.every(nonemptyString) ||
         new Set(omitted).size !== omitted.length) {
       throw new Error(`${context} method policy ${member} has invalid omitted optional parameters`);
+    }
+    const omittedRest = policy.omittedRestParameters ?? [];
+    if (!Array.isArray(omittedRest) || !omittedRest.every(nonemptyString) ||
+        new Set(omittedRest).size !== omittedRest.length) {
+      throw new Error(`${context} method policy ${member} has invalid omitted rest parameters`);
     }
   }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
@@ -151,6 +188,22 @@ function typeProvenance(path, detail) {
 
 function translatedType(lean, representation, provenance, resourceInner = null) {
   return { lean, representation, provenance, resourceInner };
+}
+
+function overriddenType(override, context, source = "generation.exceptions") {
+  validateTypeOverride(override, context);
+  return translatedType(
+    override.lean,
+    override.representation,
+    [typeProvenance(source, `explicit Lean type ${override.lean}`)],
+    override.resourceInner ?? null,
+  );
+}
+
+function operationType(shape, override, generation, profile, context) {
+  return override?.type === undefined
+    ? translateType(shape, generation, profile, context)
+    : overriddenType(override.type, `${context} override`);
 }
 
 function nullableResource(shape, generation, profile, context) {
@@ -225,8 +278,17 @@ function exceptionFor(generation, operationId) {
   return generation.exceptions?.[operationId] ?? null;
 }
 
-function modalityArgument(name, role, type, defaults, provenanceBase, override = null) {
-  const resource = type.representation === "js-resource";
+function modalityArgument(
+  name,
+  role,
+  type,
+  defaults,
+  provenanceBase,
+  override = null,
+  overrideSource = "generation.exceptions",
+) {
+  const resource = type.representation === "js-resource" ||
+    type.representation === "callback" || type.representation === "lean-owned";
   const passing = override?.passing ?? (resource ? defaults.passing : "value");
   const retention = override?.retention ?? (resource ? defaults.retention : "call");
   if (resource) {
@@ -251,10 +313,10 @@ function modalityArgument(name, role, type, defaults, provenanceBase, override =
       type: type.provenance,
       passing: override?.passing === undefined
         ? typeProvenance(`${provenanceBase}.passing`, `default ${passing} passing`)
-        : typeProvenance("generation.exceptions", `exception selects ${passing} passing`),
+        : typeProvenance(overrideSource, `explicit policy selects ${passing} passing`),
       retention: override?.retention === undefined
         ? typeProvenance(`${provenanceBase}.retention`, `default ${retention} retention`)
-        : typeProvenance("generation.exceptions", `exception selects ${retention} retention`),
+        : typeProvenance(overrideSource, `explicit policy selects ${retention} retention`),
     },
   };
 }
@@ -283,21 +345,25 @@ function receiverFor(member, identity, generation, profile, exception) {
       },
     };
   }
-  const marker = generation.resources?.[owner];
-  if (!nonemptyString(marker)) {
-    throw new Error(`${identity.id} has no Lean resource mapping for receiver ${owner}`);
-  }
   const ownerName = owner.slice(owner.lastIndexOf(".") + 1);
   const name = leanBinderIdentifier(
-    ownerName[0].toLowerCase() + ownerName.slice(1),
+    exception?.receiver?.name ?? ownerName[0].toLowerCase() + ownerName.slice(1),
     `${identity.id} receiver name`,
   );
-  const type = translatedType(
-    `${profile.resource.constructor} ${marker}`,
-    "js-resource",
-    [typeProvenance(`generation.resources.${owner}`, `receiver uses Lean marker ${marker}`)],
-    marker,
-  );
+  const marker = generation.resources?.[owner];
+  const type = exception?.receiver?.type === undefined
+    ? (() => {
+      if (!nonemptyString(marker)) {
+        throw new Error(`${identity.id} has no Lean resource mapping for receiver ${owner}`);
+      }
+      return translatedType(
+        `${profile.resource.constructor} ${marker}`,
+        "js-resource",
+        [typeProvenance(`generation.resources.${owner}`, `receiver uses Lean marker ${marker}`)],
+        marker,
+      );
+    })()
+    : overriddenType(exception.receiver.type, `${identity.id} receiver type`);
   return {
     kind,
     typescriptType: owner,
@@ -312,8 +378,8 @@ function receiverFor(member, identity, generation, profile, exception) {
   };
 }
 
-function resultFor(type, profile, exception) {
-  const resource = type.representation === "js-resource";
+function resultFor(type, profile, exception, overrideSource = "generation.exceptions") {
+  const resource = type.representation === "js-resource" || type.representation === "callback";
   const ownership = exception?.result?.ownership ??
     (resource ? profile.resource.result.ownership : "value");
   if (resource && !["owned", "borrowed"].includes(ownership)) {
@@ -332,7 +398,10 @@ function resultFor(type, profile, exception) {
           resource ? "generation.abiProfile.resource.result.ownership" : "typescript.result",
           resource ? `default ${ownership} resource result` : "immediate value result",
         )
-        : typeProvenance("generation.exceptions", exception.reason),
+        : typeProvenance(
+          overrideSource,
+          exception.reason ?? `explicit policy selects ${ownership} ownership`,
+        ),
     },
   };
 }
@@ -361,6 +430,15 @@ function operationName(operation, namespace) {
 }
 
 function anchorFor(anchorsById, operation, member, accessor) {
+  if (operation.anchor === undefined) {
+    return {
+      id: operation.target,
+      ts: member,
+      target: operation.target,
+      relation: "audit",
+      portIntent: { disposition: "bind", accessor },
+    };
+  }
   const anchor = anchorsById.get(operation.anchor);
   if (anchor === undefined) {
     throw new Error(`${member} ${accessor} references missing anchor ${operation.anchor}`);
@@ -399,9 +477,19 @@ function propertyOperation(
   const arguments_ = [];
   let result;
   if (accessor === "get") {
-    result = resultFor(translateType(shape, generation, profile, `${member} getter`), profile, exception);
+    result = resultFor(
+      operationType(shape, exception?.result, generation, profile, `${member} getter`),
+      profile,
+      exception,
+    );
   } else {
-    const value = translateType(shape, generation, profile, `${member} setter`);
+    const value = operationType(
+      shape,
+      exception?.arguments?.[propertyName],
+      generation,
+      profile,
+      `${member} setter`,
+    );
     arguments_.push(modalityArgument(
       propertyBinder,
       "argument",
@@ -481,7 +569,7 @@ function selectedMethodShape(member, symbol, policy) {
   return { shape, provenance: `generation.methodPolicies.signature=${signature}` };
 }
 
-function methodOperation(config, root, mapping, symbol, generation, profile) {
+function methodOperation(config, root, mapping, symbol, generation, profile, { free = false } = {}) {
   const member = mapping.typescript;
   if (mapping.targets?.length !== 1 || mapping.lean?.length !== 1) {
     throw new Error(`${member} generation requires exactly one host target and one Lean declaration`);
@@ -491,17 +579,28 @@ function methodOperation(config, root, mapping, symbol, generation, profile) {
   const policy = generation.methodPolicies?.[member];
   const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
   const omitted = new Set(policy.omittedOptionalParameters ?? []);
+  const omittedRest = new Set(policy.omittedRestParameters ?? []);
   const knownParameters = new Set(shape.args.map((argument) => argument.name));
   for (const name of omitted) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
     if (argument.optional !== true) throw new Error(`${member} policy cannot omit required parameter ${name}`);
   }
+  for (const name of omittedRest) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy omits missing rest parameter ${name}`);
+    if (argument.rest !== true) throw new Error(`${member} policy cannot rest-omit non-rest parameter ${name}`);
+  }
   const exception = exceptionFor(generation, operationId);
   const arguments_ = [];
   let omittedTrailingParameter = false;
   for (const argument of shape.args) {
-    if (argument.rest === true) throw new Error(`${member} rest parameter ${argument.name} is not supported`);
+    if (argument.rest === true) {
+      if (!omittedRest.has(argument.name)) {
+        throw new Error(`${member} rest parameter ${argument.name} requires an explicit omission policy`);
+      }
+      continue;
+    }
     if (argument.optional === true) {
       if (!omitted.has(argument.name)) {
         throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission policy`);
@@ -515,21 +614,37 @@ function methodOperation(config, root, mapping, symbol, generation, profile) {
     arguments_.push(modalityArgument(
       leanBinderIdentifier(argument.name, `${member} parameter`),
       "argument",
-      translateType(argument.type, generation, profile, `${member} parameter ${argument.name}`),
+      operationType(
+        argument.type,
+        exception?.arguments?.[argument.name],
+        generation,
+        profile,
+        `${member} parameter ${argument.name}`,
+      ),
       profile.resource.argument,
       "generation.abiProfile.resource.argument",
       exception?.arguments?.[argument.name] ?? null,
     ));
   }
   for (const name of Object.keys(exception?.arguments ?? {})) {
-    if (!knownParameters.has(name) || omitted.has(name)) {
+    if (!knownParameters.has(name) || omitted.has(name) || omittedRest.has(name)) {
       throw new Error(`${operationId} exception references missing generated argument ${name}`);
     }
   }
-  const receiver = receiverFor(member, { id: operationId }, generation, profile, exception);
+  if (free && exception?.receiver !== undefined && exception.receiver.kind !== "none") {
+    throw new Error(`${operationId} free-function receiver exception must select none`);
+  }
+  const receiver = free
+    ? {
+      kind: "none",
+      provenance: {
+        kind: typeProvenance("typescript.kind", "TypeScript free function has no receiver"),
+      },
+    }
+    : receiverFor(member, { id: operationId }, generation, profile, exception);
   const leanName = operationName({ lean: mapping.lean[0] }, generation.namespace);
   const result = resultFor(
-    translateType(shape.result, generation, profile, `${member} result`),
+    operationType(shape.result, exception?.result, generation, profile, `${member} result`),
     profile,
     exception,
   );
@@ -547,6 +662,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile) {
       signaturePolicy: {
         selection: policy.signature,
         omittedOptionalParameters: [...omitted],
+        omittedRestParameters: [...omittedRest],
         provenance: signatureProvenance,
       },
     },
@@ -567,6 +683,22 @@ function methodOperation(config, root, mapping, symbol, generation, profile) {
     arguments: arguments_,
     result,
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
+  };
+}
+
+function functionOperation(config, root, mapping, symbol, generation, profile) {
+  const operation = methodOperation(
+    config,
+    root,
+    mapping,
+    symbol,
+    generation,
+    profile,
+    { free: true },
+  );
+  return {
+    ...operation,
+    typescript: { ...operation.typescript, kind: "function" },
   };
 }
 
@@ -601,15 +733,27 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (entry.mapping.accessors === undefined) {
-      if (symbol?.kind !== "method") throw new Error(`${member} is not a TypeScript method`);
-      operations.push(methodOperation(
-        config,
-        entry.root,
-        entry.mapping,
-        symbol,
-        generation,
-        profile,
-      ));
+      if (symbol?.kind === "method") {
+        operations.push(methodOperation(
+          config,
+          entry.root,
+          entry.mapping,
+          symbol,
+          generation,
+          profile,
+        ));
+      } else if (symbol?.kind === "function") {
+        operations.push(functionOperation(
+          config,
+          entry.root,
+          entry.mapping,
+          symbol,
+          generation,
+          profile,
+        ));
+      } else {
+        throw new Error(`${member} is not a TypeScript method or function`);
+      }
       continue;
     }
     if (symbol?.kind !== "property") throw new Error(`${member} is not a TypeScript property`);
@@ -645,6 +789,92 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       if (!operationIds.has(id)) throw new Error(`generation exception ${id} matches no generated operation`);
     }
   }
+  const groups = new Set(config.roots.map((root) => root.id));
+  const operationIds = new Set(operations.map((operation) => operation.id));
+  const targets = new Set(operations.map((operation) => operation.host.target));
+  for (const protocol of generation.protocolOperations ?? []) {
+    if (!groups.has(protocol.group)) {
+      throw new Error(`generated protocol ${protocol.id} references unknown API group ${protocol.group}`);
+    }
+    if (operationIds.has(protocol.id)) throw new Error(`generated operation id ${protocol.id} is repeated`);
+    if (targets.has(protocol.target)) throw new Error(`generated host target ${protocol.target} is repeated`);
+    const typeParameters = protocol.typeParameters ?? [];
+    if (new Set(typeParameters).size !== typeParameters.length) {
+      throw new Error(`generated protocol ${protocol.id} repeats a type parameter`);
+    }
+    for (const parameter of typeParameters) {
+      validateLeanIdentifier(parameter, `${protocol.id} type parameter`);
+    }
+    const args = protocol.arguments.map((argument) => {
+      const type = overriddenType(
+        argument.type,
+        `${protocol.id} argument ${argument.name}`,
+        "generation.protocolOperations",
+      );
+      return modalityArgument(
+        leanBinderIdentifier(argument.name, `${protocol.id} argument`),
+        argument.role ?? "argument",
+        type,
+        profile.resource.argument,
+        "generation.abiProfile.resource.argument",
+        argument.passing === undefined && argument.retention === undefined
+          ? null
+          : {
+            ...(argument.passing === undefined ? {} : { passing: argument.passing }),
+            ...(argument.retention === undefined ? {} : { retention: argument.retention }),
+          },
+        "generation.protocolOperations",
+      );
+    });
+    const resultType = overriddenType(
+      protocol.result.type,
+      `${protocol.id} result`,
+      "generation.protocolOperations",
+    );
+    const result = resultFor(
+      resultType,
+      profile,
+      protocol.result.ownership === undefined
+        ? null
+        : { result: { ownership: protocol.result.ownership } },
+      "generation.protocolOperations",
+    );
+    const leanName = operationName({ lean: protocol.lean }, generation.namespace);
+    operations.push({
+      id: protocol.id,
+      library: config.id,
+      group: protocol.group,
+      typescript: {
+        member: protocol.id,
+        kind: "protocol",
+        display: protocol.id,
+        documentation: protocol.documentation ?? protocol.reason,
+        source: null,
+      },
+      protocol: { reason: protocol.reason },
+      host: { target: protocol.target, marker: protocol.marker },
+      lean: {
+        declaration: protocol.lean,
+        namespace: leanName.namespace,
+        name: leanName.name,
+      },
+      effect: {
+        ...protocol.effect,
+        provenance: typeProvenance("generation.protocolOperations.effect", "explicit protocol effect"),
+      },
+      typeParameters,
+      receiver: {
+        kind: "none",
+        provenance: {
+          kind: typeProvenance("generation.protocolOperations", "protocol arguments are explicit"),
+        },
+      },
+      arguments: args,
+      result,
+    });
+    operationIds.add(protocol.id);
+    targets.add(protocol.target);
+  }
   return operations;
 }
 
@@ -654,14 +884,19 @@ function projectedPortIntent(anchor, operation) {
       throw new Error(`${anchor.id} authors derived modality field portIntent.${field}`);
     }
   }
+  const protocolReceiver = operation.arguments.find((argument) => argument.role === "receiver");
   const resourceArguments = operation.arguments.flatMap((argument, index) =>
-    argument.modalities.representation === "js-resource" ? [index] : []);
+    argument.role !== "receiver" && argument.modalities.representation === "js-resource"
+      ? [index]
+      : []);
   return {
     ...anchor.portIntent,
     effect: operation.effect.id,
     ...(operation.receiver.kind === "argument"
       ? { receiver: operation.receiver.argument.modalities.passing }
-      : {}),
+      : protocolReceiver === undefined
+        ? {}
+        : { receiver: protocolReceiver.modalities.passing }),
     ...(resourceArguments.length === 0 ? {} : { resourceArguments }),
     ...(operation.result.modalities.representation === "js-resource"
       ? { resultRepresentation: "hostResource" }
@@ -678,6 +913,7 @@ function modalityContract(operation, profile) {
     receiver: operation.receiver,
     arguments: operation.arguments,
     result: operation.result,
+    ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
     ...(operation.exception === undefined ? {} : { exception: operation.exception }),
   };
 }
@@ -691,10 +927,19 @@ export function materializeGeneratedAnchors(config, root, descriptor, anchorData
     { validateExceptions: false },
   );
   const byAnchor = new Map(operations.map((operation) => [operation.id, operation]));
+  const byCorrespondence = new Map(operations
+    .filter((operation) => operation.typescript.kind !== "protocol")
+    .map((operation) => [
+      `${operation.typescript.member}\u0000${operation.host.target}`,
+      operation,
+    ]));
+  const byTarget = new Map(operations.map((operation) => [operation.host.target, operation]));
   return {
     ...anchorData,
     anchors: (anchorData.anchors ?? []).map((anchor) => {
-      const operation = byAnchor.get(anchor.id);
+      const operation = byAnchor.get(anchor.id) ??
+        byCorrespondence.get(`${anchor.ts}\u0000${anchor.target}`) ??
+        byTarget.get(anchor.target);
       if (operation === undefined) return anchor;
       return {
         ...anchor,

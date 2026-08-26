@@ -48,18 +48,18 @@ def mount : DomM Unit := do
       let status ← Document.createElementString "p"
       Element.ClassList.add status "vir-slide-status"
       setTextContentString status "Starting Lean animation…"
-      Element.appendChild root status
+      discard <| Element.appendChild root status
       let canvasElement ← Document.createElementString "canvas"
       Element.ClassList.add canvasElement "vir-slide-canvas"
       Element.setAttributeString canvasElement "role" "img"
       Element.setAttributeString canvasElement "aria-label"
         "A blue rectangle bouncing horizontally across a canvas"
-      Element.appendChild root canvasElement
+      discard <| Element.appendChild root canvasElement
       match ← HTMLCanvasElement.fromElement canvasElement with
       | none => setTextContentString status "Lean could not initialize the canvas element"
       | some canvas =>
-          HTMLCanvasElement.setWidth canvas 640
-          HTMLCanvasElement.setHeight canvas 360
+          HTMLCanvasElement.setWidthNat canvas 640
+          HTMLCanvasElement.setHeightNat canvas 360
           match ← HTMLCanvasElement.getContext2D canvas with
           | none => setTextContentString status "CanvasRenderingContext2D is unavailable"
           | some ctx =>

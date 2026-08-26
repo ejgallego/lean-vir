@@ -69,13 +69,13 @@ to opaque Lean types.
 
 ## Canonical Operation IR
 
-`npm run generate:lean-bindings` first creates a canonical operation record for
-each selected property operation or method. It then renders all downstream
-views from that record.
-The ignored debugging artifact is:
+`npm run generate:lean-bindings` creates a canonical operation record for every
+selected TypeScript operation and every reviewed VIR-owned protocol operation.
+It then renders all downstream views from those records. Ignored debugging
+artifacts are written per library under:
 
 ```text
-build/bindings/browser.generated-operations.json
+build/bindings/*.generated-operations.json
 ```
 
 Each operation records:
@@ -90,8 +90,8 @@ Each operation records:
 - provenance for every derived choice;
 - the reason for any explicit exception.
 
-The checked-in `Vir/Browser/Generated.lean` declarations are rendered from this
-IR. The descriptor generator also projects comparator-compatible `portIntent`
+The checked-in `Vir/**/Generated.lean` declarations are rendered from this IR.
+The descriptor generator also projects comparator-compatible `portIntent`
 fields from it. Comparison results retain the complete `modalityContract`, and
 the binding explorer shows generated operations in an expandable conversion
 policy panel. This avoids three independently authored versions of the same
@@ -123,10 +123,19 @@ names, and unsupported parameter or result types fail generation.
 TypeScript parameter names that collide with Lean keywords are rendered as
 escaped Lean identifiers.
 
-The initial generated method slice is `Element.getAttribute` and
-`Element.setAttribute`. Both use `"only"`, omit no parameters, translate each
-TypeScript `string` through the browser ABI profile to `Lean.Vir.Js String`,
-and derive receiver/result modalities from the same profile as properties.
+The browser slice includes global functions, DOM methods, and properties.
+Selected overloads, omitted optional or rest parameters, callbacks, primitive
+resources, and receiver/result overrides are all recorded in the same IR.
+
+## Reviewed Protocol Operations
+
+Some shipped targets intentionally have no one-to-one TypeScript declaration:
+examples include retained Lean references, checked resource casts, selector
+conveniences, and replay-safe React callbacks. These are authored as structured
+`generation.protocolOperations`, never as handwritten `@[vir_js]`
+declarations. Protocol records carry their type parameters, complete Lean
+types, representation, passing, retention, effect, target, and justification.
+The generator emits them through the same declaration and modality pipeline.
 
 ## Documentation Flow
 

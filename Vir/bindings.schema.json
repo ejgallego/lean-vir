@@ -4,7 +4,7 @@
   "title": "Lean VIR binding library",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "id", "title", "description", "lean", "roots"],
+  "required": ["version", "id", "title", "description", "lean", "generation", "roots"],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": 1 },
@@ -54,7 +54,6 @@
         },
         "members": {
           "type": "array",
-          "minItems": 1,
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
@@ -65,7 +64,66 @@
         "exceptions": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/generationException" }
+        },
+        "protocolOperations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/protocolOperation" }
         }
+      }
+    },
+    "protocolOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "group", "target", "lean", "marker", "reason", "effect", "arguments", "result"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "group": { "$ref": "#/$defs/id" },
+        "target": { "type": "string", "minLength": 1 },
+        "lean": { "type": "string", "minLength": 1 },
+        "marker": { "enum": ["vir_js", "vir_js_explicit_conversion"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "documentation": { "type": "string", "minLength": 1 },
+        "typeParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
+        },
+        "arguments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protocolArgument" }
+        },
+        "result": { "$ref": "#/$defs/protocolResult" }
+      }
+    },
+    "protocolArgument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["receiver", "argument", "callback"] },
+        "type": { "$ref": "#/$defs/leanTypeOverride" },
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "protocolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/leanTypeOverride" },
+        "ownership": { "enum": ["owned", "borrowed"] }
       }
     },
     "methodPolicy": {
@@ -80,6 +138,11 @@
           ]
         },
         "omittedOptionalParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "omittedRestParameters": {
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
@@ -160,7 +223,8 @@
       "additionalProperties": false,
       "properties": {
         "passing": { "enum": ["borrowed", "owned", "consumed"] },
-        "retention": { "enum": ["call", "until-release", "runtime"] }
+        "retention": { "enum": ["call", "until-release", "runtime"] },
+        "type": { "$ref": "#/$defs/leanTypeOverride" }
       }
     },
     "receiverOverride": {
@@ -168,9 +232,21 @@
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {
-        "kind": { "enum": ["global", "argument"] },
+        "kind": { "enum": ["global", "argument", "none"] },
         "passing": { "enum": ["borrowed", "owned", "consumed"] },
-        "retention": { "enum": ["call", "until-release", "runtime"] }
+        "retention": { "enum": ["call", "until-release", "runtime"] },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/leanTypeOverride" }
+      }
+    },
+    "leanTypeOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lean", "representation"],
+      "properties": {
+        "lean": { "type": "string", "minLength": 1 },
+        "representation": { "enum": ["immediate", "lean-owned", "js-resource", "callback"] },
+        "resourceInner": { "type": "string", "minLength": 1 }
       }
     },
     "generationException": {
@@ -194,8 +270,11 @@
         "result": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["ownership"],
-          "properties": { "ownership": { "enum": ["owned", "borrowed"] } }
+          "minProperties": 1,
+          "properties": {
+            "ownership": { "enum": ["owned", "borrowed"] },
+            "type": { "$ref": "#/$defs/leanTypeOverride" }
+          }
         },
         "effect": {
           "type": "object",
@@ -206,14 +285,6 @@
             "lean": { "type": "string", "minLength": 1 }
           }
         }
-      }
-    },
-    "manualException": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["reason"],
-      "properties": {
-        "reason": { "type": "string", "minLength": 1 }
       }
     },
     "root": {
@@ -345,8 +416,7 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
-        "note": { "type": "string", "minLength": 1 },
-        "manualException": { "$ref": "#/$defs/manualException" }
+        "note": { "type": "string", "minLength": 1 }
       }
     },
     "propertyMapping": {
@@ -364,8 +434,7 @@
             "set": { "$ref": "#/$defs/accessorOperation" }
           }
         },
-        "note": { "type": "string", "minLength": 1 },
-        "manualException": { "$ref": "#/$defs/manualException" }
+        "note": { "type": "string", "minLength": 1 }
       }
     },
     "accessorOperation": {
@@ -377,7 +446,7 @@
     "accessorMapping": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "lean", "anchor"],
+      "required": ["target", "lean"],
       "properties": {
         "target": { "type": "string", "minLength": 1 },
         "lean": { "type": "string", "minLength": 1 },

@@ -67,7 +67,7 @@ const leanKeywords = new Set([
 ]);
 
 export function validateLeanIdentifier(value, context) {
-  if (!/^[A-Za-z_][A-Za-z0-9_']*$/u.test(value)) {
+  if (!/^[\p{L}_][\p{L}\p{N}_']*$/u.test(value)) {
     throw new Error(`${context} is not a supported Lean identifier: ${JSON.stringify(value)}`);
   }
   return value;
