@@ -21,7 +21,10 @@
       },
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
     },
-    "resources": { "Root": "Lean.Vir.React.Root" },
+    "resources": {
+      "React.ReactNode": "Lean.Vir.React.Node",
+      "Root": "Lean.Vir.React.Root"
+    },
     "members": ["Root.render", "Root.unmount", "createRoot"],
     "methodPolicies": {
       "Root.render": { "signature": "only" },
@@ -42,18 +45,8 @@
         },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
       },
-      "react.root.render": {
-        "reason": "VIR represents ReactNode as a retained render-safe Lean construction action.",
-        "arguments": {
-          "children": {
-            "passing": "owned",
-            "retention": "until-release",
-            "type": {
-              "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)",
-              "representation": "callback"
-            }
-          }
-        },
+      "react.root.renderNode": {
+        "reason": "Root rendering is a DOM effect; ReactNode remains a JavaScript-owned resource without conversion.",
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
       },
       "react.root.unmount": {
@@ -381,6 +374,18 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
+        "id": "react.root.render-tree", "group": "react-dom-root", "target": "react.root.render",
+        "lean": "Lean.Vir.React.Root.render", "marker": "vir_js",
+        "reason": "Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Root.render" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [
+          { "name": "root", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } },
+          { "name": "children", "role": "callback", "passing": "owned", "retention": "call", "type": { "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
         "id": "react.root.render-component", "group": "react-dom-root", "target": "react.root.renderComponent",
         "lean": "Lean.Vir.React.Root.renderComponentThunk", "marker": "vir_js",
         "reason": "Retains a Lean-authored component thunk as a real React function component until rerender or unmount.",
@@ -497,9 +502,9 @@
           { "id": "Document", "reason": "DOM documents cross the VIR boundary as host-owned resources.", "shape": { "kind": "resource", "name": "Document" } },
           {
             "id": "React.ReactNode",
-            "reason": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately.",
+            "reason": "The recursive ReactNode union crosses the faithful boundary as a JavaScript-owned opaque resource; VIR constructors and adapters are separate APIs.",
             "source": { "path": "node_modules/@types/react/index.d.ts", "startLine": 436, "startColumn": 5, "endLine": 447, "endColumn": 38, "url": "https://unpkg.com/@types/react@19.2.18/index.d.ts" },
-            "shape": { "kind": "opaque", "name": "React.ReactNode", "abstract": true, "reason": "recursive ReactNode union deferred by reviewed dependency policy" }
+            "shape": { "kind": "resource", "name": "Lean.Vir.React.Node" }
           },
           {
             "id": "React.Component",
@@ -517,8 +522,8 @@
         },
         {
           "typescript": "Root.render",
-          "targets": ["react.root.render"],
-          "lean": ["Lean.Vir.React.Root.render"]
+          "targets": ["react.root.renderNode"],
+          "lean": ["Lean.Vir.React.Root.renderNode"]
         },
         {
           "typescript": "Root.unmount",
@@ -544,13 +549,13 @@
         {
           "id": "react_dom.root.render",
           "category": "React DOM root",
-          "lean": "Lean.Vir.React.Root.render",
+          "lean": "Lean.Vir.React.Root.renderNode",
           "ts": "Root.render",
-          "target": "react.root.render",
+          "target": "react.root.renderNode",
           "relation": "audit",
           "portIntent": { "disposition": "bind" },
           "advisorySemantics": [
-            { "topic": "retention", "note": "Callbacks are expected to remain live until rerender, unmount, or runtime disposal." }
+            { "topic": "ownership", "note": "The root retains its own lease on the borrowed JavaScript ReactNode for the committed tree." }
           ]
         },
         {

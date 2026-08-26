@@ -197,10 +197,13 @@ helpers and React state examples. They let examples use primitive state without
 giving APIs such as `react.useState` a scalar ABI. `JsValue.ofFloat` and
 `JsValue.toFloat` preserve every JavaScript number, including NaN, positive and
 negative infinity, and the sign of zero.
-`Root.render` accepts a `ReactM (Lean.Vir.Js Node)` tree. The
-`react.root.render` host binding receives that render action as a releasable
-callback, invokes it to obtain the concrete `Js Node` resource, renders the
-resource, and releases the render callback.
+`Root.renderNode` is the faithful resource boundary for TypeScript
+`Root.render(ReactNode)`. The `react.root.renderNode` host binding borrows the
+concrete `Js Node`; the root retains its own tree lease. `Root.render` remains
+the generated Lean-construction convenience. Its `react.root.render` binding
+receives a `ReactM (Lean.Vir.Js Node)` action as a releasable callback, invokes
+it once, forwards the result to the same node-rendering path, and releases the
+callback.
 `react.root.renderIntoSelector`,
 `react.root.renderComponentIntoSelector`, and `react.root.unmountSelector`
 provide the proof-widget path: the JavaScript host owns and reuses the React

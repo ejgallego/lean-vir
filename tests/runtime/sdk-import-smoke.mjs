@@ -104,6 +104,7 @@ try {
   assert.equal(typeof bindings["react.node.createElement"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.render"], "function");
+  assert.equal(typeof bindings["react.root.renderNode"], "function");
   assert.equal(typeof bindings["react.root.renderIntoSelector"], "function");
   assert.equal(typeof bindings["react.root.renderComponentIntoSelector"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");

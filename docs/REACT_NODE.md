@@ -10,8 +10,10 @@ diagrams. The short model is:
 
 - `Component props := props -> ReactM (Lean.Vir.Js Node)` is a Lean-authored
   React function component.
+- `Root.renderNode root node` is the faithful resource boundary corresponding
+  to `root.render(reactNode)`.
 - `Root.render root tree` takes a `ReactM (Lean.Vir.Js Node)` tree and lowers
-  it at the DOM/root boundary.
+  it through the generated convenience adapter at the DOM/root boundary.
 - `Root.renderComponent` wraps that Lean function in a real JavaScript React
   function component, so hooks run under React's dispatcher.
 - `RuntimeM` is for JavaScript resource/runtime operations such as scalar
@@ -144,8 +146,12 @@ def mountFromSelector
     (action : Lean.Vir.Js Root → Lean.Vir.Browser.DomM Unit) :
     Lean.Vir.Browser.DomM Bool := ...
 
+@[vir_js "react.root.renderNode"]
+opaque renderNode (root : @& Lean.Vir.Js Root) (node : @& Lean.Vir.Js Node) :
+  Lean.Vir.Browser.DomM Unit := ...
+
 @[vir_js "react.root.render"]
-opaque render (root : @& Lean.Vir.Js Root) (node : ReactM (Lean.Vir.Js Node)) :
+opaque render (root : @& Lean.Vir.Js Root) (tree : ReactM (Lean.Vir.Js Node)) :
   Lean.Vir.Browser.DomM Unit := ...
 
 def renderComponent
@@ -198,12 +204,14 @@ resources without gaining access to raw `IO`.
 `Lean.Vir.Browser.DomM` is the browser/DOM effect used by React root lifetime
 operations and event callbacks. `ReactM` is the narrower render-construction
 effect reserved for React component APIs and static tree construction.
-`Root.render` is itself the host boundary and receives a `ReactM` tree action.
-The JavaScript host invokes that render action to obtain the concrete `Js Node`
-resource, renders it into the root, and releases the render callback. The
-current runtime uses the same synchronous host-call representation for all
-recognized effects, so these are irreducible Lean-side effect markers rather
-than distinct runtime wrappers.
+`Root.renderNode` is the faithful `Root.render(ReactNode)` boundary: it borrows
+an existing JavaScript-owned `Js Node`, and the root takes its own lease for the
+committed tree. `Root.render` is a generated convenience adapter that receives
+a `ReactM` tree action. The JavaScript host invokes that action once to obtain
+the concrete node, forwards it to the raw boundary behavior, and releases the
+render callback. The current runtime uses the same synchronous host-call
+representation for all recognized effects, so these are irreducible Lean-side
+effect markers rather than distinct runtime wrappers.
 
 `Root.renderComponent` wraps the Lean function in a real JavaScript React
 function component. Hooks therefore run under React's normal dispatcher instead
@@ -287,6 +295,8 @@ The browser React host binding is exposed from
   `React.createElement(React.Fragment, props, ...children)` in the browser host,
   reading any key from the props resource, and returns a virtual fragment node
   in tests.
+- `react.root.renderNode` borrows a JavaScript-owned `ReactNode` resource and
+  forwards it directly to the root, which retains an independent tree lease.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
   the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.

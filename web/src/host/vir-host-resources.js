@@ -718,6 +718,11 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       throwCollectedErrors(errors, "React root render failed during cleanup");
       return undefined;
     },
+    "react.root.renderNode": (root, node) => {
+      const value = resources.resolveResource(root, "ReactRoot");
+      value.render(node);
+      return undefined;
+    },
     "react.root.renderComponent": (root, component) => {
       withComponentCallbackHandoff(component, (ownedComponent, markHandedOff) => {
         const value = resources.resolveResource(root, "ReactRoot");

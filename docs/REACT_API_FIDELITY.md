@@ -52,7 +52,7 @@ The audit baseline is the public React 19.2 reference, checked on
 | --- | --- | --- | --- |
 | Function component | `function Component(props) { ... }` | `Component props := props -> ReactM (Js Node)` | Good. The effect and `Js Node` wrapper are justified runtime deltas. |
 | Root creation | `createRoot(domNode, options?)` | `Root.create : Js Element -> DomM (Js Root)` | Close. Missing root options. Selector helpers are convenience, not core React. |
-| Root render | `root.render(reactNode)` | `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Close. `renderComponent` is the bridge that creates a real JS React component so hooks run under React. |
+| Root render | `root.render(reactNode)` | `Root.renderNode root (Js Node)`; convenience `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Good core match. `renderNode` is the faithful resource boundary; the other two APIs are explicit generated adapters for Lean tree construction and real function components. |
 | Root unmount | `root.unmount()` | `Root.unmount : Js Root -> DomM Unit` | Good. Resource cleanup is an explicit runtime concern. |
 | Element construction | `createElement(type, props, ...children)` | `Node.createElement elementType props children` with `Array Props.Entry` | Close. `elementType : Js ElementType` mirrors React's `type`; Lean keeps an array for child-list ergonomics, and props carry keys, refs, properties, and handlers together. |
 | JSX | JSX elaborates to React elements | no native JSX-like syntax yet | Missing. Any future syntax should elaborate to `createElement`-shaped calls. |

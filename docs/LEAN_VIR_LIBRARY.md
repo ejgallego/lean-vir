@@ -406,6 +406,7 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
+- `Lean.Vir.React.Root.renderNode : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Node -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
@@ -435,10 +436,11 @@ native React nodes with `React.createElement` at that point. Rendering retains
 any Lean event callbacks embedded in the resource graph until the root is
 rerendered, unmounted, the package is reloaded, or the runtime is disposed.
 
-`Root.render` is the host boundary for rendering a `ReactM` tree into an
-existing root. The JavaScript host invokes the received render action to obtain
-the concrete `Js Node` resource and releases that render callback after the
-render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
+`Root.renderNode` is the faithful host boundary for borrowing a JavaScript-owned
+React node. `Root.render` is the generated convenience adapter for rendering a
+`ReactM` tree into an existing root: the JavaScript host invokes the received
+render action once, forwards the concrete `Js Node`, and releases that callback
+after the render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
 concrete props in a real JavaScript React function component. The public hook
 surface is
 resource-typed: `useState`, `State.set`, and `State.modify` accept

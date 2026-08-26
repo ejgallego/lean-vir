@@ -306,7 +306,11 @@ function callbackLease(cell, body = () => undefined) {
 {
   const resources = createHostResourceState();
   let unmounts = 0;
+  let renderedNode = null;
   const bindings = createReactRootResourceHostBindings(resources, () => ({
+    render(node) {
+      renderedNode = node;
+    },
     unmount() {
       unmounts++;
     },
@@ -318,6 +322,10 @@ function callbackLease(cell, body = () => undefined) {
   abandonHostResource(stagedAlias);
   assert.equal(unmounts, 0, "abandoning a new alias must not unmount an existing committed root");
   assert.doesNotThrow(() => resources.resolveResource(committedRoot, "ReactRoot"));
+  const node = resources.resourceForValue({ kind: "raw ReactNode" });
+  bindings["react.root.renderNode"](committedRoot, node);
+  assert.equal(renderedNode, node, "the faithful boundary must forward the borrowed ReactNode resource");
+  assert.doesNotThrow(() => resources.resolveResource(node, "ReactNode"));
   bindings["react.root.unmount"](committedRoot);
   assert.equal(unmounts, 1);
 
@@ -325,6 +333,7 @@ function callbackLease(cell, body = () => undefined) {
   abandonHostResource(stagedRoot);
   assert.equal(unmounts, 2, "abandoning a newly created root must roll back that root");
   assert.throws(() => resources.resolveResource(stagedRoot, "ReactRoot"), /resource is not live/);
+  resources.releaseResource(node);
   resources.releaseResource(container);
   resources.dispose();
 }

@@ -417,6 +417,14 @@ assert.equal(
     ?.args[1]?.type?.result?.type,
   "Js",
 );
+const reactRenderNodeImport = hostRuntime.interfaceManifest.hostImports.find(
+  (entry) => entry.target === "react.root.renderNode",
+);
+if (reactRenderNodeImport !== undefined) {
+  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "Js");
+  assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
+  assert.equal(reactRenderNodeImport.result?.type, "Unit");
+}
 const reactRenderIntoSelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.root.renderIntoSelector",
 );

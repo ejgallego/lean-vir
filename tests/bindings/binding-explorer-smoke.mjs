@@ -443,11 +443,11 @@ assert.deepEqual(reactDomRoot?.analysis, {
   status: "complete",
   scope: "complete-upstream-surface",
 });
-assert.equal(reactDomRoot?.findingStatus, "warning");
+assert.equal(reactDomRoot?.findingStatus, "gap");
 assert.deepEqual(reactDomRoot?.comparison.summary, {
   exact: 0,
-  compatible: 3,
-  weak: 1,
+  compatible: 4,
+  weak: 0,
   missing: 3,
 });
 assert.equal(
@@ -462,6 +462,15 @@ assert.deepEqual(
     { topic: "lifetime", note: "The root is expected to remain live until unmount or runtime disposal." },
   ],
 );
+const reactRootRender = reactDomRoot?.comparison.results.find((result) =>
+  result.id === "react_dom.root.render");
+assert.equal(reactRootRender?.status, "compatible");
+assert.equal(reactRootRender?.target, "react.root.renderNode");
+assert.ok(!(reactRootRender?.diagnostics ?? []).some((diagnostic) =>
+  diagnostic.code === "typescript_dependency_abstract"));
+assert.ok(reactDomRoot?.generatedOperations.some((operation) =>
+  operation.host.target === "react.root.render" &&
+  operation.protocol?.upstreamRelation.member === "Root.render"));
 assert.ok(reactDomRoot?.comparison.results.some((result) =>
   result.id === "react_dom.hydration.entrypoint" &&
   result.status === "missing" &&

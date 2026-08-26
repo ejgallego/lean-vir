@@ -36,9 +36,9 @@ def reactRootCreateCall
 
 def reactRootRenderCall
     (root : Lean.Vir.Js Lean.Vir.React.Root)
-    (node : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    (node : Lean.Vir.Js Lean.Vir.React.Node) :
     Lean.Vir.Browser.DomM Unit :=
-  Lean.Vir.React.Root.render root node
+  Lean.Vir.React.Root.renderNode root node
 
 def reactRootUnmountCall
     (root : Lean.Vir.Js Lean.Vir.React.Root) :

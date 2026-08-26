@@ -563,14 +563,14 @@ Generated reviewed method specialization of TypeScript `Root.render`.
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62
 
 Generated reviewed JavaScript boundary specialization for the TypeScript `Root.render` method.
-ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children callback/owned/until-release; result immediate/value.
+ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "react.root.render"]
-opaque render
+@[vir_js "react.root.renderNode"]
+opaque renderNode
     (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (children : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    (children : @& Lean.Vir.Js Lean.Vir.React.Node) :
     Lean.Vir.Browser.DomM Unit
 
 /--
@@ -604,6 +604,24 @@ This declaration is generated; edit the TypeScript source or binding configurati
 opaque create
     (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
+
+/--
+Generated binding for reviewed VIR protocol `react.root.render-tree`.
+
+Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.
+
+Binding contract: `generation.protocolOperations`.
+
+Generated reviewed VIR protocol boundary.
+ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; children callback/owned/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.root.render"]
+opaque render
+    (root : @& Lean.Vir.Js Lean.Vir.React.Root)
+    (children : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.Browser.DomM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.root.render-component`.

@@ -267,11 +267,13 @@ existing VIR wrappers. The last three are explicit gaps.
 Two levels of bounded closure resolve `Container` through its DOM resource
 arms. The report now identifies that VIR accepts the `Element` arm but not the
 whole container union, rather than reporting an unresolved name or overstating
-coverage. `React.ReactNode` is deliberately retained as an abstract reviewed
-dependency: expanding its recursive union would pull most of React's type
-surface into this seed, while VIR currently exposes a separately reviewed
-`ReactM (Js Node)` builder representation. Consequently an abstract ReactNode
-diagnostic is intentional and distinguishable from an unresolved symbol.
+coverage. `React.ReactNode` is deliberately represented as the opaque
+JavaScript-owned `Js Node` resource at this boundary: expanding its recursive
+union would pull most of React's type surface into this seed without improving
+boundary faithfulness. The curated comparison audits `Root.renderNode` against
+that resource representation; the separate `Root.render` `ReactM` builder is a
+reviewed convenience adapter rather than comparison evidence for the upstream
+method.
 
 ```bash
 npm run generate:react-dom-root-type-descriptors
