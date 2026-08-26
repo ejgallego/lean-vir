@@ -70,6 +70,10 @@ const ctx = {
   closePath: () => canvasCalls.push(["closePath"]),
   moveTo: (...args) => canvasCalls.push(["moveTo", ...args]),
   lineTo: (...args) => canvasCalls.push(["lineTo", ...args]),
+  measureText: (text) => {
+    canvasCalls.push(["measureText", text]);
+    return { width: 42.5 };
+  },
   arc: (...args) => canvasCalls.push(["arc", ...args]),
   fill: () => canvasCalls.push(["fill"]),
   stroke: () => canvasCalls.push(["stroke"]),
@@ -95,6 +99,8 @@ canvasBindings["browser.canvas2d.strokeRect"](ctx, 3, 4, 50, 60);
 canvasBindings["browser.canvas2d.beginPath"](ctx);
 canvasBindings["browser.canvas2d.moveTo"](ctx, 1, 2);
 canvasBindings["browser.canvas2d.lineTo"](ctx, 3, 4);
+const metrics = canvasBindings["browser.canvas2d.measureText"](ctx, "Lean VIR");
+assert.equal(canvasBindings["browser.canvas2d.textMetrics.getWidth"](metrics), 42.5);
 canvasBindings["browser.canvas2d.arc"](ctx, 5, 6, 7, 0, 3.14);
 canvasBindings["browser.canvas2d.closePath"](ctx);
 canvasBindings["browser.canvas2d.fill"](ctx);
@@ -122,6 +128,7 @@ assert.deepEqual(canvasCalls, [
   ["beginPath"],
   ["moveTo", 1, 2],
   ["lineTo", 3, 4],
+  ["measureText", "Lean VIR"],
   ["arc", 5, 6, 7, 0, 3.14],
   ["closePath"],
   ["fill"],

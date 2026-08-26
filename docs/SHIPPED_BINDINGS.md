@@ -1,18 +1,21 @@
-# Binding reference and author workbench
+# Binding reference, shipped inventory, and author actions
 
 The generated binding reference is the primary human report for VIR's
-pre-release library surface. One HTML document presents two projections of the
+pre-release library surface. One HTML document presents three projections of the
 same machine data:
 
-- **VIR binding reference** follows the configured upstream TypeScript
+- **Upstream reference** follows the configured upstream TypeScript
   documentation hierarchy and shows only confirmed Lean correspondences as
   bindings.
-- **Binding workbench** lists precise generator, annotation, identity,
+- **Shipped VIR surface** inventories every generated host boundary, including
+  TypeScript-derived operations, upstream adapters, VIR-owned protocols, and
+  local contracts.
+- **Author actions** lists precise generator, annotation, identity,
   type-translation, and runtime actions for binding authors.
 
 Convenience wrappers and arbitrary Lean dependencies are not upstream API
 entries. They do not appear in the primary reference or contribute to upstream
-coverage. The workbench may still flag a shipped declaration whose upstream
+coverage. Author actions may still flag a shipped declaration whose upstream
 identity or exception policy is missing.
 
 The report exhaustively scans ordinary `@[vir_js]` declarations and explicit
@@ -90,9 +93,14 @@ Each upstream member has a generation record with three independent facts:
   or `not-selected`. `adapted` means a reviewed protocol is linked to an
   upstream or local declaration member. Convenience wrappers are downstream
   Lean APIs rather than upstream members, so they are not a member disposition.
+- **evidence status** keeps semantic comparison separate from correspondence:
+  `exact` and `compatible` come only from the comparator, `derived` means one
+  canonical TypeScript operation produced the Lean declaration,
+  `protocol-linked` means reviewed policy names an upstream member, and
+  `contract-linked` means a repository-local declaration member is linked.
 
-Only dispositions with an actionable diagnostic appear in the binding
-workbench. In particular, `not-selected` is not an error or author action, and
+Only dispositions with an actionable diagnostic appear under author actions.
+In particular, `not-selected` is not an error or author action, and
 an explicitly `unsupported` upstream member remains a visible reference/roadmap
 gap without becoming immediate binding-author work.
 Every work item names a diagnostic code, explains the evidence, and gives the
@@ -100,10 +108,11 @@ next required action. Reviewed protocols may still use `needs-annotation`
 until their upstream identity and direct TypeScript lowering are fully
 expressed.
 
-A generated operation whose reviewed mapping has no legacy comparator anchor
-is `compatible` by generator evidence: the TypeScript shape, ABI policy, and
-emitted Lean type are one canonical operation record. Reviewed protocol
-mappings still need comparator evidence or remain `unreviewed`.
+A generated operation whose reviewed mapping has no comparator anchor is
+`derived`: the TypeScript shape, ABI policy, and emitted Lean type are one
+canonical operation record. An upstream adapter is `protocol-linked`, and a
+local declaration operation is `contract-linked`; neither is silently promoted
+to semantic `compatible` without comparator evidence.
 
 A **public Lean API** row is a public executable declaration in the measured
 `Vir` environment that reaches at least one JavaScript host target. It does not
@@ -114,8 +123,8 @@ the JavaScript runtime.
 Therefore a provided target proves that VIR ships the runtime path, while an
 automatic correspondence only proposes an upstream identity. The user-facing
 reference never presents that candidate as a confirmed binding. Compiler and
-runtime internals remain workbench evidence rather than a parallel
-documentation hierarchy.
+runtime internals remain author evidence rather than a parallel documentation
+hierarchy.
 
 ## Soundness-first Roadmap
 
@@ -135,7 +144,8 @@ not count as an upstream binding.
 
 An incorrect public binding is a release-blocking defect. An unselected
 upstream operation is documentation coverage, not evidence that an existing
-binding is unsound. The reference and workbench keep those conditions separate.
+binding is unsound. The reference, inventory, and author actions keep those
+conditions separate.
 
 Every binding repair or addition should satisfy these landing gates:
 
@@ -157,7 +167,7 @@ Every binding repair or addition should satisfy these landing gates:
 Every external shipped binding is generated. Shipped targets must also acquire
 authored upstream identity or an explicit no-parity protocol classification.
 Unsupported selected
-operations and weak type translations remain workbench actions; unselected
+operations and weak type translations remain author actions; unselected
 upstream operations may remain visible in the reference without failing CI.
 
 The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
@@ -243,8 +253,9 @@ reviewed protocol operations + correspondence suggestions
 
 catalog + operation IR + compiled/runtime evidence + work items
   -> one machine report
-  -> upstream-shaped VIR binding reference
-  -> binding-author workbench
+  -> upstream-shaped reference
+  -> complete shipped-boundary inventory
+  -> binding-author actions
 ```
 
 Generate the consolidated local report with human-readable progress output:
@@ -273,25 +284,33 @@ python3 -m http.server 4178 --bind 127.0.0.1
 
 Then open `http://127.0.0.1:4178/build/bindings/index.html`.
 
-The document supports library, availability, and author-disposition filters;
+The document supports library, availability, boundary-evidence, and
+author-disposition filters;
 deep links; upstream TypeScript documentation; inherited-member provenance;
 Lean and TypeScript source context; compiled boundary evidence; and light/dark
 themes. It omits descriptor dependencies that are not configured upstream
 roots or members. Types referenced by signatures remain part of the declaration
 rather than a heuristic "related types" section.
 
-Use **VIR binding reference** to browse the upstream hierarchy. A confirmed
+Use **Upstream reference** to browse the upstream hierarchy. A confirmed
 entry shows its TypeScript declaration beside the corresponding public Lean
 type. Candidates remain labeled unconfirmed and are not displayed as bindings.
-Use the availability filter's **Confirmed VIR bindings** option for the reverse
-view of the upstream operations VIR currently ships.
+Use **Shipped VIR surface** for the reverse map of all generated host
+boundaries, including operations without a one-to-one upstream declaration.
+Each row identifies its evidence class, generated policy, provider, public Lean
+entry point, and compiled call path.
 
-Use **Binding workbench** for required intervention. Each row describes one
+Use **Author actions** for required intervention. Each row describes one
 precise action and shows the upstream declaration, current public Lean evidence,
 compiled call path, and provider when available. Convenience wrappers are not
 shown as upstream operations.
 
+Unselected upstream entries contribute to coverage totals but are not issues.
+Explicitly unsupported selected entries appear under `report.json`'s roadmap;
+only compiler, provider, reachability, and semantic comparison failures are
+issues.
+
 `build/bindings/shipped-v1.coverage.json` and
 `build/bindings/shipped-v1.dashboard.html` are lower-level reconciliation
-artifacts. Focused type-anchor HTML files likewise remain useful for generator
-debugging, but they are not the main entry point.
+artifacts. Focused type-anchor rendering remains an explicit fixture-debugging
+command and is not part of the default binding generation or check workflow.

@@ -74,6 +74,9 @@ opaque HTMLCanvasElement : Type
 /-- Browser two-dimensional canvas rendering context. -/
 opaque CanvasRenderingContext2D : Type
 
+/-- Browser-owned dimensions returned by `CanvasRenderingContext2D.measureText`. -/
+opaque TextMetrics : Type
+
 /--
 JavaScript-owned canvas fill/stroke style value.
 

@@ -484,6 +484,7 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
+        "receiverName": { "type": "string", "minLength": 1 },
         "note": { "type": "string", "minLength": 1 }
       }
     },

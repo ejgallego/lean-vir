@@ -16,6 +16,18 @@ import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
+const coverageStatuses = [
+  "exact",
+  "compatible",
+  "derived",
+  "protocol-linked",
+  "contract-linked",
+  "weak",
+  "unreviewed",
+  "suggested",
+  "ambiguous",
+  "missing",
+];
 const generationDispositions = [
   "generated",
   "adapted",
@@ -28,7 +40,7 @@ const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --
 function usage() {
   console.log(`${usageLine}
 
-Generate the consolidated Lean VIR binding reference and author workbench.
+Generate the consolidated Lean VIR upstream reference, shipped inventory, and author actions.
 
 Options:
   --coverage FILE   Shipped-binding coverage report.
@@ -170,10 +182,10 @@ function semanticIssues(comparison) {
         anchor: result.id,
         ...(result.target ? { target: result.target } : {}),
       }));
-    } else if (result.status === "missing") {
+    } else if (result.status === "missing" && result.relation !== "coverageGap") {
       issues.push(issue(
-        result.relation === "coverageGap" ? "coverage-gap" : "missing-descriptor",
-        result.relation === "coverageGap" ? "gap" : "error",
+        "missing-descriptor",
+        "error",
         result.note ?? `${result.lean} or ${result.ts} is missing`,
         { anchor: result.id, ...(result.target ? { target: result.target } : {}) },
       ));
@@ -189,6 +201,18 @@ function semanticIssues(comparison) {
     }
   }
   return issues;
+}
+
+function semanticRoadmap(comparison) {
+  if (comparison === null) return [];
+  return comparison.results.filter((result) =>
+    result.status === "missing" && result.relation === "coverageGap").map((result) => ({
+    kind: "unsupported-upstream-entry",
+    message: result.note ?? `${result.ts} is not provided by VIR`,
+    anchor: result.id,
+    typescript: result.ts,
+    ...(result.target ? { target: result.target } : {}),
+  }));
 }
 
 function analysisState(bindingRoot, coverage, comparison) {
@@ -217,8 +241,11 @@ function findingStatus(bindings, issues) {
   if (bindings.some((binding) => binding.status !== "provided") ||
       issues.some((entry) => entry.severity === "error")) return "error";
   if (issues.some((entry) => entry.severity === "warning")) return "warning";
-  if (issues.some((entry) => entry.severity === "gap")) return "gap";
   return "none";
+}
+
+function emptyCoverageSummary() {
+  return Object.fromEntries(coverageStatuses.map((status) => [status, 0]));
 }
 
 function reviewedMappingOperations(mapping) {
@@ -604,7 +631,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       lean: mappedOperations.flatMap((operation) => operation.lean),
       status: operations.some((operation) => operation.missing === true)
         ? "missing"
-        : generatedCompatibility ? "compatible" : worstSemanticStatus(results),
+        : generatedCompatibility ? "derived" : worstSemanticStatus(results),
       anchors: results.map((result) => result.id),
     });
   }
@@ -623,7 +650,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       ...(mapping === undefined ? {} : { mapping }),
     };
   });
-  const summary = { exact: 0, compatible: 0, weak: 0, missing: 0, unreviewed: 0 };
+  const summary = emptyCoverageSummary();
   for (const member of members) summary[member.status] += 1;
   const targetMappings = [...mappings.values()].flatMap((mapping) =>
     mapping.operations.filter((operation) => operation.missing !== true).map((operation) => {
@@ -634,7 +661,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       return {
         target: operation.target,
         status: generatedMembers.has(mapping.typescript) && operationResults.length === 0
-          ? "compatible"
+          ? "derived"
           : worstSemanticStatus(operationResults),
         source: "reviewed",
         typescript: mapping.typescript,
@@ -676,7 +703,7 @@ function buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, g
     operationsByMember.set(relation.member, memberOperations);
     targetMappings.push({
       target: operation.host.target,
-      status: "compatible",
+      status: "contract-linked",
       source: "protocol-relation",
       typescript: relation.member,
       lean: [operation.lean.declaration],
@@ -702,27 +729,23 @@ function buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, g
       })),
       targets: operations.map((operation) => operation.host.target),
       lean: operations.map((operation) => operation.lean.declaration),
-      status: "compatible",
+      status: "contract-linked",
       anchors: [],
     };
     return {
       id: member.id,
       kind: member.kind,
       ...(member.inheritedFrom ? { inheritedFrom: member.inheritedFrom } : {}),
-      status: mapping === undefined ? "missing" : "compatible",
+      status: mapping === undefined ? "missing" : "contract-linked",
       ...(mapping === undefined ? {} : { mapping }),
     };
   });
-  const compatible = coveredMembers.filter((member) => member.status === "compatible").length;
-  const missing = coveredMembers.length - compatible;
+  const summary = emptyCoverageSummary();
+  for (const member of coveredMembers) summary[member.status] += 1;
   return {
     mode: "reviewed",
     summary: {
-      exact: 0,
-      compatible,
-      weak: 0,
-      missing,
-      unreviewed: 0,
+      ...summary,
       mappedTargets: classifiedTargets.size,
     },
     members: coveredMembers,
@@ -742,7 +765,7 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, genera
     if (relation?.kind === "upstream-adapter") {
       return {
         target: binding.target,
-        status: "compatible",
+        status: "protocol-linked",
         source: "protocol-relation",
         typescript: relation.member,
         relation,
@@ -763,7 +786,7 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, genera
   const mappedMembers = new Map();
   for (const mapping of targetMappings) {
     if (mapping.source === "protocol-relation" && mapping.typescript !== undefined) {
-      mappedMembers.set(mapping.typescript, "compatible");
+      mappedMembers.set(mapping.typescript, "protocol-linked");
       continue;
     }
     for (const candidate of mapping.candidates) {
@@ -778,16 +801,12 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, genera
     ...(member.inheritedFrom ? { inheritedFrom: member.inheritedFrom } : {}),
     status: mappedMembers.get(member.id) ?? "missing",
   }));
+  const evidence = emptyCoverageSummary();
+  for (const member of coveredMembers) evidence[member.status] += 1;
   const summary = {
-    exact: 0,
-    compatible: 0,
-    weak: 0,
-    missing: coveredMembers.filter((member) => member.status === "missing").length,
-    unreviewed: coveredMembers.filter((member) => member.status !== "missing").length,
-    suggested: coveredMembers.filter((member) => member.status === "suggested").length,
-    ambiguous: coveredMembers.filter((member) => member.status === "ambiguous").length,
+    ...evidence,
     mappedTargets: targetMappings.filter((mapping) =>
-      ["compatible", "suggested"].includes(mapping.status)).length,
+      ["protocol-linked", "suggested"].includes(mapping.status)).length,
     ambiguousTargets: targetMappings.filter((mapping) => mapping.status === "ambiguous").length,
     unmatchedTargets: targetMappings.filter((mapping) => mapping.status === "unmatched").length,
     noParityTargets: targetMappings.filter((mapping) => mapping.status === "no-parity").length,
@@ -962,6 +981,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   }
 
   const allIssues = [];
+  const allRoadmap = [];
   const libraries = [];
   const semanticSummary = Object.fromEntries(semanticStatuses.map((status) => [status, 0]));
   for (const config of configs) {
@@ -1014,16 +1034,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           issues.push(issue("runtime-only", "error", `${binding.target} has no compiler declaration`, { target: binding.target }));
         }
       }
-      if (surfaceCoverage !== null && surfaceCoverage.summary.missing !== 0 &&
-          !(comparison !== null && surfaceCoverage.mode === "automatic")) {
-        issues.push(issue(
-          surfaceCoverage.mode === "reviewed" ? "upstream-members-missing" : "upstream-members-unmapped",
-          "gap",
-          surfaceCoverage.mode === "reviewed"
-            ? `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream members have no shipped VIR binding`
-            : `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream entries have no automatic VIR mapping candidate`,
-        ));
-      }
       issues.push(...reviewedPublicIssues(
         bindingRoot,
         surfaceCoverage,
@@ -1031,6 +1041,11 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         generatedByGroup.get(bindingRoot.id) ?? [],
       ));
       issues.push(...semanticIssues(comparison));
+      const roadmap = semanticRoadmap(comparison).map((entry) => ({
+        library: config.id,
+        group: bindingRoot.id,
+        ...entry,
+      }));
       if (comparison !== null) {
         for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
         for (const result of comparison.results) {
@@ -1049,6 +1064,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       );
       libraryIssues.push(...decoratedIssues);
       allIssues.push(...decoratedIssues);
+      allRoadmap.push(...roadmap);
       roots.push({
         id: bindingRoot.id,
         title: bindingRoot.title,
@@ -1063,6 +1079,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           bindings: bindings.length,
           provided: bindings.filter((entry) => entry.status === "provided").length,
           issues: issues.length,
+          roadmap: roadmap.length,
         },
         bindings,
         ...(comparison === null ? {} : { comparison }),
@@ -1071,6 +1088,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           : {}),
         workItems,
         issues: decoratedIssues,
+        roadmap,
       });
     }
     libraries.push({
@@ -1083,6 +1101,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         apiGroups: roots.length,
         bindings: roots.reduce((sum, entry) => sum + entry.summary.bindings, 0),
         issues: libraryIssues.length,
+        roadmap: roots.reduce((sum, entry) => sum + entry.summary.roadmap, 0),
       },
       apiGroups: roots,
       issues: libraryIssues,
@@ -1144,7 +1163,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     notRun: apiGroups.filter((entry) => entry.analysis.status === "not-run").length,
     notApplicable: apiGroups.filter((entry) => entry.analysis.status === "not-applicable").length,
   };
-  const issueCounts = { error: 0, warning: 0, gap: 0 };
+  const issueCounts = { error: 0, warning: 0 };
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
     format: "lean-vir-binding-explorer",
@@ -1177,24 +1196,20 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       coverage: {
         groups: coveredGroups.length,
         members: coveredGroups.reduce((sum, entry) => sum + entry.coverage.members.length, 0),
-        reviewed: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) =>
-            ["exact", "compatible", "weak"].includes(member.status)).length, 0),
-        unreviewed: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "unreviewed").length, 0),
-        suggested: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "suggested").length, 0),
-        ambiguous: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "ambiguous").length, 0),
-        missing: coveredGroups.reduce((sum, entry) => sum + entry.coverage.summary.missing, 0),
+        evidence: Object.fromEntries(coverageStatuses.map((status) => [
+          status,
+          coveredGroups.reduce((sum, entry) => sum + entry.coverage.summary[status], 0),
+        ])),
       },
       generation: generationSummary,
       issues: issueCounts,
+      roadmap: { unsupportedEntries: allRoadmap.length },
     },
     publicEntries: coverage.publicEntries,
     libraries,
     workItems,
     issues: allIssues,
+    roadmap: allRoadmap,
   };
 }
 
@@ -1245,18 +1260,23 @@ export async function runBindingExplorerCli(argv) {
         outputOptions,
       )),
   ]);
-  console.log("\nLean VIR binding reference and author workbench");
+  console.log("\nLean VIR upstream reference, shipped inventory, and author actions");
   console.log(`  libraries: ${report.summary.libraries}`);
   console.log(`  API groups: ${report.summary.apiGroups}`);
   console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
-  console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
+  console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
-  console.log(`  author workbench: ${report.summary.generation.workItems} actions`);
-  console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
-  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
+  console.log(`  author actions: ${report.summary.generation.workItems}`);
+  const unresolvedSemanticMissing = Math.max(
+    0,
+    report.summary.semantic.missing - report.summary.roadmap.unsupportedEntries,
+  );
+  console.log(`  semantic comparison: ${report.summary.semantic.weak} weak, ${unresolvedSemanticMissing} unresolved missing, ${report.summary.roadmap.unsupportedEntries} reviewed unsupported`);
+  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings`);
+  console.log(`  roadmap: ${report.summary.roadmap.unsupportedEntries} explicitly unsupported upstream entries; unselected entries remain coverage only`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
   console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);
   if (report.summary.issues.error !== 0) {

@@ -33,6 +33,18 @@ const coveredRoots = roots.filter((root) =>
   ["complete", "in-progress", "automatic"].includes(root.analysis.status));
 const coverageMembers = coveredRoots.flatMap((root) => root.coverage.members);
 const coverageStatuses = countBy(coverageMembers.map((member) => member.status));
+const coverageEvidenceStatuses = [
+  "exact",
+  "compatible",
+  "derived",
+  "protocol-linked",
+  "contract-linked",
+  "weak",
+  "unreviewed",
+  "suggested",
+  "ambiguous",
+  "missing",
+];
 const issueCounts = countBy(report.issues.map((issue) => issue.severity));
 const generationMembers = roots.flatMap((root) => root.coverage?.members ?? []);
 const dispositionCounts = countBy(generationMembers.map((member) =>
@@ -77,18 +89,19 @@ assert.equal(
 assert.deepEqual(report.summary.coverage, {
   groups: coveredRoots.length,
   members: coverageMembers.length,
-  reviewed: (coverageStatuses.exact ?? 0) + (coverageStatuses.compatible ?? 0) +
-    (coverageStatuses.weak ?? 0),
-  unreviewed: coverageStatuses.unreviewed ?? 0,
-  suggested: coverageStatuses.suggested ?? 0,
-  ambiguous: coverageStatuses.ambiguous ?? 0,
-  missing: coverageStatuses.missing ?? 0,
+  evidence: Object.fromEntries(coverageEvidenceStatuses.map((status) => [
+    status,
+    coverageStatuses[status] ?? 0,
+  ])),
 });
 assert.deepEqual(report.summary.issues, {
   error: issueCounts.error ?? 0,
   warning: issueCounts.warning ?? 0,
-  gap: issueCounts.gap ?? 0,
 });
+assert.deepEqual(report.summary.roadmap, {
+  unsupportedEntries: report.roadmap.length,
+});
+assert.ok(report.issues.every((issue) => issue.severity !== "gap"));
 assert.deepEqual(report.summary.generation, {
   boundaries: {
     operations: roots.reduce((sum, root) => sum + (root.generatedOperations?.length ?? 0), 0),
@@ -192,7 +205,7 @@ assert.deepEqual(documentRoot?.analysis, {
   status: "complete",
   scope: "complete-upstream-surface",
 });
-assert.equal(documentRoot?.findingStatus, "gap");
+assert.equal(documentRoot?.findingStatus, "none");
 assert.deepEqual(documentRoot?.upstream.roots, ["Document"]);
 assert.ok(documentRoot?.bindings.some((binding) => binding.target === "browser.document.getTitle"));
 assert.deepEqual(documentRoot?.comparison.summary, {
@@ -204,9 +217,14 @@ assert.deepEqual(documentRoot?.comparison.summary, {
 assert.deepEqual(documentRoot?.coverage.summary, {
   exact: 0,
   compatible: 4,
+  derived: 0,
+  "protocol-linked": 0,
+  "contract-linked": 0,
   weak: 0,
-  missing: 267,
   unreviewed: 0,
+  suggested: 0,
+  ambiguous: 0,
+  missing: 267,
   mappedTargets: 5,
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
@@ -277,10 +295,15 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 });
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
-  compatible: 14,
+  compatible: 2,
+  derived: 12,
+  "protocol-linked": 0,
+  "contract-linked": 0,
   weak: 0,
-  missing: 728,
   unreviewed: 0,
+  suggested: 0,
+  ambiguous: 0,
+  missing: 728,
   mappedTargets: 16,
 });
 const elementInnerHTML = elementRoot?.coverage.members.find(
@@ -324,7 +347,7 @@ const generatedFillStyleGetter = canvasRoot?.generatedOperations.find((operation
 const generatedFillStyleSetter = canvasRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "CanvasRenderingContext2D.fillStyle" &&
   operation.typescript.accessor === "set");
-assert.equal(canvasFillStyle?.status, "compatible");
+assert.equal(canvasFillStyle?.status, "derived");
 assert.equal(canvasFillStyle?.generation.disposition, "generated");
 assert.equal(canvasFillStyle?.mapping.operations[0].accessor, "get");
 assert.equal(canvasFillStyle?.mapping.operations[1].accessor, "set");
@@ -341,15 +364,40 @@ assert.ok(canvasRoot?.generatedOperations.some((operation) =>
 
 const canvasLineWidth = canvasRoot?.coverage.members.find((member) =>
   member.id === "CanvasRenderingContext2D.lineWidth");
-assert.equal(canvasLineWidth?.status, "compatible");
+assert.equal(canvasLineWidth?.status, "derived");
 assert.deepEqual(canvasLineWidth?.mapping.operations.map((operation) => operation.accessor),
   ["get", "set"]);
 
 const canvasStrokeStyle = canvasRoot?.coverage.members.find((member) =>
   member.id === "CanvasRenderingContext2D.strokeStyle");
-assert.equal(canvasStrokeStyle?.status, "compatible");
+assert.equal(canvasStrokeStyle?.status, "derived");
 assert.deepEqual(canvasStrokeStyle?.mapping.operations.map((operation) => operation.accessor),
   ["get", "set"]);
+
+const canvasMeasureText = canvasRoot?.coverage.members.find((member) =>
+  member.id === "CanvasRenderingContext2D.measureText");
+const textMetricsWidth = canvasRoot?.coverage.members.find((member) =>
+  member.id === "TextMetrics.width");
+assert.equal(canvasMeasureText?.status, "derived");
+assert.equal(textMetricsWidth?.status, "derived");
+const generatedMeasureText = canvasRoot?.generatedOperations.find((operation) =>
+  operation.host.target === "browser.canvas2d.measureText");
+const generatedTextMetricsWidth = canvasRoot?.generatedOperations.find((operation) =>
+  operation.host.target === "browser.canvas2d.textMetrics.getWidth");
+assert.equal(generatedMeasureText?.receiver.argument.name, "ctx");
+assert.equal(generatedMeasureText?.arguments[0].type, "Lean.Vir.Js String");
+assert.equal(generatedMeasureText?.result.lean, "Lean.Vir.Js TextMetrics");
+assert.equal(generatedTextMetricsWidth?.receiver.argument.name, "metrics");
+assert.equal(generatedTextMetricsWidth?.result.lean, "Lean.Vir.Js Float");
+assert.equal(
+  publicEntries.get("Lean.Vir.Browser.CanvasRenderingContext2D.measureText")?.type,
+  "Lean.Vir.Js Lean.Vir.Browser.CanvasRenderingContext2D → Lean.Vir.Js String → " +
+    "Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.TextMetrics)",
+);
+assert.equal(
+  publicEntries.get("Lean.Vir.Browser.TextMetrics.getWidth")?.type,
+  "Lean.Vir.Js Lean.Vir.Browser.TextMetrics → Lean.Vir.Browser.DomM (Lean.Vir.Js Float)",
+);
 
 const canvasElementRoot = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");
@@ -431,14 +479,19 @@ assert.deepEqual(canvasElement?.analysis, {
   status: "in-progress",
   scope: "complete-upstream-surface",
 });
-assert.equal(canvasElement?.findingStatus, "gap");
-assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 1 });
+assert.equal(canvasElement?.findingStatus, "none");
+assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 0, roadmap: 0 });
 assert.deepEqual(canvasElement?.coverage.summary, {
   exact: 0,
-  compatible: 3,
+  compatible: 0,
+  derived: 3,
+  "protocol-linked": 0,
+  "contract-linked": 0,
   weak: 0,
-  missing: 330,
   unreviewed: 0,
+  suggested: 0,
+  ambiguous: 0,
+  missing: 330,
   mappedTargets: 6,
 });
 assert.ok(canvasElement?.generatedOperations.some((operation) =>
@@ -456,7 +509,8 @@ assert.deepEqual(localCommands?.analysis, {
 });
 assert.ok(localCommands?.bindings.some((binding) =>
   binding.target === "infoview.command.insertText"));
-assert.equal(localCommands?.coverage.summary.compatible, 3);
+assert.equal(localCommands?.coverage.summary["contract-linked"], 3);
+assert.equal(localCommands?.coverage.summary.compatible, 0);
 assert.equal(localCommands?.coverage.summary.missing, 0);
 assert.equal(localCommands?.workItems.length, 0);
 assert.ok(localCommands?.generatedOperations.every((operation) =>
@@ -469,7 +523,8 @@ assert.deepEqual(localRpcReferences?.analysis, {
   status: "complete",
   scope: "complete-upstream-surface",
 });
-assert.equal(localRpcReferences?.coverage.summary.compatible, 5);
+assert.equal(localRpcReferences?.coverage.summary["contract-linked"], 5);
+assert.equal(localRpcReferences?.coverage.summary.compatible, 0);
 assert.equal(localRpcReferences?.coverage.summary.missing, 0);
 assert.equal(localRpcReferences?.workItems.length, 0);
 
@@ -478,7 +533,8 @@ assert.deepEqual(reactDomRoot?.analysis, {
   status: "complete",
   scope: "complete-upstream-surface",
 });
-assert.equal(reactDomRoot?.findingStatus, "gap");
+assert.equal(reactDomRoot?.findingStatus, "none");
+assert.equal(reactDomRoot?.summary.roadmap, 3);
 assert.deepEqual(reactDomRoot?.comparison.summary, {
   exact: 0,
   compatible: 4,
@@ -520,11 +576,16 @@ assert.match(html, /id="available-metric"/u);
 assert.match(html, /id="direct-metric"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /VIR binding reference/u);
-assert.match(html, /Binding workbench/u);
+assert.match(html, /Shipped VIR surface/u);
+assert.match(html, /Author actions/u);
 assert.doesNotMatch(html, /Complete surface analysis/u);
 assert.doesNotMatch(html, /Public Lean API/u);
 assert.doesNotMatch(html, /Host targets/u);
 assert.match(app, /Expected versus current/u);
+assert.match(app, /function renderInventory\(\)/u);
+assert.match(app, /function renderInventoryDetail\(target\)/u);
+assert.match(app, /TypeScript-derived/u);
+assert.match(app, /reviewed upstream adapter/u);
 assert.match(html, /src="assets\/app\.js"/u);
 assert.match(html, /href="assets\/style\.css"/u);
 assert.match(app, /function renderUpstreamSymbol\(group, symbol\)/u);

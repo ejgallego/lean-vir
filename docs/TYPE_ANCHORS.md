@@ -161,11 +161,11 @@ outputs directly.
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
 | Shipped generated DOM bindings | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | checked-in `Vir/Browser/Generated.lean`; ignored `build/bindings/browser.generated-operations.json` |
-| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
+| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`; explicit renderer commands may also produce `vir-v1.anchors.md` and `vir-v1.anchors.html` |
 | Shipped public Lean surface | Compiled `Vir` and `Vir.Infoview` modules | `build/type-descriptors/vir-js-shipped-v1.lean.json` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
 | DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
-| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`; the focused HTML renderer is explicit |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
 level shipped census. Its primary outputs are `build/bindings/report.json` and
@@ -218,17 +218,20 @@ When descriptor closure is enabled, `typeScriptDependencies` records the root
 symbols, included declaration/policy dependencies, closure depth, and unresolved
 names in the comparison report.
 
-`vir-v1.anchors.md` is a rendered documentation fragment. It is not the source
-of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
-show the same report with usable links and hovers.
+`vir-v1.anchors.md` is an optional rendered documentation fragment. It is not
+the source of truth or a default check artifact. An explicit renderer command
+can produce it when a Verso/Blueprint or Markdown consumer needs the focused
+view.
 
 `vir-v1.anchors.html` is a legacy standalone focused report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
 text. New binding work should use the consolidated explorer, whose upstream
-reference and author workbench provide filtering, semantic TypeScript/Lean
+reference and author actions provide filtering, semantic TypeScript/Lean
 highlighting, generated conversion policy, and documentation links. The
-focused renderer remains for fixture-level comparator tests.
+focused renderer remains available for fixture-level comparator debugging, but
+the default checks exercise its library contract without producing focused
+Markdown or HTML files.
 
 ## Match Status
 
@@ -278,9 +281,11 @@ method.
 ```bash
 npm run generate:react-dom-root-type-descriptors
 npm run compare:react-dom-root-type-anchors
-npm run render:react-dom-root-type-anchors
 npm run check:react-dom-root-type-anchors
 ```
+
+Run `npm run render:react-dom-root-type-anchors` only when debugging the focused
+comparison page.
 
 The machine-facing output is
 `build/type-descriptors/react-dom-root-v1.report.json`; the review page is

@@ -66,6 +66,10 @@ def mount : DomM Unit := do
               CanvasRenderingContext2D.setFillStyle ctx "#2563eb"
               CanvasRenderingContext2D.setStrokeStyle ctx "#0f172a"
               CanvasRenderingContext2D.setLineWidth ctx 3.0
+              let text ← Lean.Vir.JsValue.ofString "Lean VIR"
+              let metrics ← CanvasRenderingContext2D.measureText ctx text
+              let textWidth ← Lean.Vir.JsValue.toFloat (← TextMetrics.getWidth metrics)
+              setTextContentString status s!"Lean text width: {textWidth.toUInt64.toNat}"
               let _ ← Animation.requestAnimationFrame fun timestamp =>
                 drawFrame ctx status 0 timestamp timestamp
               pure ()

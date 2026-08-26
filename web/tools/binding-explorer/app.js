@@ -34,7 +34,7 @@ document.querySelector("#scope").replaceChildren(
     `${generation.boundaries.targets} are generated and ` +
     `${generation.boundaries.handwrittenDeclarations} declarations are handwritten: ` +
     `${generation.boundaries.typescriptDerived} boundaries are TypeScript-derived and ` +
-    `${generation.boundaries.reviewedProtocols} are reviewed VIR protocols ` +
+    `${generation.boundaries.reviewedProtocols} are policy-authored VIR protocols ` +
     `(${generation.protocolRelations.upstreamAdapters} upstream adapters, ` +
     `${generation.protocolRelations.virOwned} VIR-owned operations, ` +
     `${generation.protocolRelations.localContracts} local-contract operations, ` +
@@ -126,6 +126,30 @@ const availabilityLabel = (value) => ({
   candidate: "correspondence not confirmed",
   "not-provided": "not provided",
 })[value] ?? value;
+const evidenceLabel = (value) => ({
+  exact: "exact comparator match",
+  compatible: "comparator-compatible",
+  derived: "TypeScript-derived",
+  "protocol-linked": "reviewed protocol link",
+  "contract-linked": "local contract link",
+  weak: "limited comparison",
+  unreviewed: "not compared",
+  suggested: "suggested correspondence",
+  ambiguous: "ambiguous correspondence",
+  missing: "no confirmed binding",
+})[value] ?? value;
+const boundaryEvidence = (operation) => operation === null || operation === undefined
+  ? "unclassified"
+  : operation.typescript.kind !== "protocol"
+    ? "typescript-derived"
+    : operation.protocol?.upstreamRelation.kind ?? "unclassified";
+const boundaryEvidenceLabel = (value) => ({
+  "typescript-derived": "TypeScript-derived",
+  "upstream-adapter": "reviewed upstream adapter",
+  "vir-owned": "VIR-owned protocol",
+  "local-contract": "local contract protocol",
+  unclassified: "unclassified protocol",
+})[value] ?? value;
 
 const librarySelect = document.querySelector("#library");
 for (const library of report.libraries) {
@@ -147,6 +171,8 @@ for (const entry of report.publicEntries) {
 const targets = groups.flatMap((group) => group.bindings.map((binding) => ({
   ...binding,
   group,
+  operation: group.generatedOperations?.find((operation) =>
+    operation.host.target === binding.target) ?? null,
   mapping: group.coverage?.targetMappings?.find((entry) => entry.target === binding.target) ?? null,
   comparison: group.comparison?.results?.find((entry) => entry.target === binding.target) ?? null,
   publicEntries: publicByTarget.get(binding.target) ?? [],
@@ -158,19 +184,22 @@ const elements = Object.fromEntries([
   "search",
   "library",
   "availability",
+  "boundary",
   "disposition",
   "count",
   "results",
   "detail",
   "theme",
   "reference-view",
+  "inventory-view",
   "workbench-view",
 ].map((id) => [id, document.querySelector("#" + id)]));
 
 const hashWork = location.hash.match(/^#work=(.*)$/u);
-let view = hashWork ? "workbench" : "reference";
+const hashTarget = location.hash.match(/^#target=(.*)$/u);
+let view = hashWork ? "workbench" : hashTarget ? "inventory" : "reference";
 let selected = decodeURIComponent(
-  hashWork?.[1] ?? location.hash.replace(/^#(?:group|root)=/u, ""),
+  hashWork?.[1] ?? hashTarget?.[1] ?? location.hash.replace(/^#(?:group|root)=/u, ""),
 );
 if (view === "reference" && !groupById.has(selected)) {
   selected = referenceGroups[0]
@@ -178,6 +207,7 @@ if (view === "reference" && !groupById.has(selected)) {
     : "";
 }
 if (view === "workbench" && !workById.has(selected)) selected = workItems[0]?.id ?? "";
+if (view === "inventory" && !targetById.has(selected)) selected = targets[0]?.target ?? "";
 
 function groupId(group) {
   return group.library.id + "/" + group.id;
@@ -218,6 +248,24 @@ function referenceGroupMatches(group) {
     (!query || groupSearchText(group).includes(query));
 }
 
+function inventoryTargetMatches(target) {
+  const query = elements.search.value.trim().toLowerCase();
+  const library = elements.library.value;
+  const evidence = boundaryEvidence(target.operation);
+  return (library === "all" || target.group.library.id === library) &&
+    (elements.boundary.value === "all" || evidence === elements.boundary.value) &&
+    (!query || searchText([
+      target.target,
+      target.group.library.title,
+      target.group.title,
+      target.providers,
+      target.declarations.map((declaration) => [declaration.declaration, declaration.type]),
+      target.operation?.lean.declaration,
+      target.operation?.typescript.member,
+      target.operation?.protocol?.upstreamRelation.member,
+    ]).includes(query));
+}
+
 function workItemMatches(item) {
   const query = elements.search.value.trim().toLowerCase();
   const group = groupById.get(item.library + "/" + item.group);
@@ -238,10 +286,13 @@ function workItemMatches(item) {
 
 function render() {
   elements["reference-view"].classList.toggle("active", view === "reference");
+  elements["inventory-view"].classList.toggle("active", view === "inventory");
   elements["workbench-view"].classList.toggle("active", view === "workbench");
   elements.availability.hidden = view !== "reference";
+  elements.boundary.hidden = view !== "inventory";
   elements.disposition.hidden = view !== "workbench";
   if (view === "reference") renderReference();
+  else if (view === "inventory") renderInventory();
   else renderWorkbench();
 }
 
@@ -269,6 +320,29 @@ function renderReference() {
   renderGroupDetail(groupById.get(selected));
 }
 
+function renderInventory() {
+  const visible = targets.filter(inventoryTargetMatches)
+    .sort((left, right) => left.target.localeCompare(right.target));
+  if (!visible.some((target) => target.target === selected)) {
+    selected = visible[0]?.target ?? "";
+  }
+  elements.count.textContent = `${visible.length} shipped ${visible.length === 1 ? "boundary" : "boundaries"}`;
+  elements.results.innerHTML = visible.length === 0
+    ? '<div class="empty">No shipped boundaries match these filters.</div>'
+    : visible.map((target) => {
+      const evidence = boundaryEvidence(target.operation);
+      return '<button type="button" class="row ' + (target.target === selected ? "active" : "") +
+        '" data-target="' + escapeHtml(target.target) + '"><span><span class="name">' +
+        escapeHtml(target.target) + '</span><span class="sub">' +
+        escapeHtml(target.group.library.title + " · " + target.group.title) +
+        '</span></span><span class="pill ' + escapeHtml(evidence) + '">' +
+        escapeHtml(boundaryEvidenceLabel(evidence)) + "</span></button>";
+    }).join("");
+  elements.results.querySelectorAll("[data-target]").forEach((button) =>
+    button.addEventListener("click", () => selectTarget(button.dataset.target)));
+  renderInventoryDetail(targetById.get(selected));
+}
+
 function renderWorkbench() {
   const visible = workItems.filter(workItemMatches);
   if (!visible.some((item) => item.id === selected)) selected = visible[0]?.id ?? "";
@@ -294,6 +368,13 @@ function selectGroup(id) {
   view = "reference";
   selected = id;
   history.replaceState(null, "", "#group=" + encodeURIComponent(id));
+  render();
+}
+
+function selectTarget(id) {
+  view = "inventory";
+  selected = id;
+  history.replaceState(null, "", "#target=" + encodeURIComponent(id));
   render();
 }
 
@@ -386,42 +467,44 @@ function modalityText(argument) {
     [mode.representation, mode.passing, mode.retention].join(" / ");
 }
 
+function renderOperationPolicy(operation) {
+  const receiver = operation.receiver.kind === "global"
+    ? "receiver: host global " + operation.receiver.typescriptType
+    : operation.receiver.kind === "argument"
+      ? modalityText(operation.receiver.argument)
+      : "receiver: none";
+  const arguments_ = operation.arguments.map(modalityText);
+  const result = operation.result.modalities;
+  const signature = operation.typescript.signaturePolicy;
+  return '<article><div class="card-head"><span class="card-title">' +
+    escapeHtml(operation.host.target) + '</span><span class="badge">' +
+    escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
+    escapeHtml(operation.protocol?.upstreamRelation.member ?? operation.typescript.member) +
+    '</span><span aria-hidden="true">→</span><span>' +
+    escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
+    [receiver, ...arguments_, "result: " + operation.result.lean + " · " +
+      [result.representation, result.ownership].join(" / ")]
+      .map(escapeHtml).join("</li><li>") + "</li></ul>" +
+    (signature === undefined ? "" : '<p class="policy-source">Signature: <code>' +
+      escapeHtml(String(signature.selection)) + "</code> · " +
+      escapeHtml(signature.provenance) +
+      (signature.omittedOptionalParameters.length === 0
+        ? " · no parameters omitted"
+        : " · omitted: " + escapeHtml(signature.omittedOptionalParameters.join(", "))) +
+      "</p>") +
+    (operation.protocol === undefined ? "" : '<p class="policy-source"><b>Policy-authored protocol:</b> ' +
+      escapeHtml(operation.protocol.reason) + "</p>") +
+    (operation.exception === undefined ? "" : '<p class="policy-source"><b>Reviewed specialization:</b> ' +
+      escapeHtml(operation.exception.reason) + "</p>") + "</article>";
+}
+
 function renderGenerationPolicy(group, symbol) {
   const operations = (group.generatedOperations ?? []).filter((operation) =>
     operation.typescript.member === symbol.id ||
     operation.protocol?.upstreamRelation.member === symbol.id);
   if (operations.length === 0) return "";
   return '<details class="generation-policy"><summary>Generated conversion policy</summary>' +
-    operations.map((operation) => {
-      const receiver = operation.receiver.kind === "global"
-        ? "receiver: host global " + operation.receiver.typescriptType
-        : operation.receiver.kind === "argument"
-          ? modalityText(operation.receiver.argument)
-          : "receiver: none";
-      const arguments_ = operation.arguments.map(modalityText);
-      const result = operation.result.modalities;
-      const signature = operation.typescript.signaturePolicy;
-      return '<article><div class="card-head"><span class="card-title">' +
-        escapeHtml(operation.host.target) + '</span><span class="badge">' +
-        escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
-        escapeHtml(operation.protocol?.upstreamRelation.member ?? operation.typescript.member) +
-        '</span><span aria-hidden="true">→</span><span>' +
-        escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
-        [receiver, ...arguments_, "result: " + operation.result.lean + " · " +
-          [result.representation, result.ownership].join(" / ")]
-          .map(escapeHtml).join("</li><li>") + "</li></ul>" +
-        (signature === undefined ? "" : '<p class="policy-source">Signature: <code>' +
-          escapeHtml(String(signature.selection)) + "</code> · " +
-          escapeHtml(signature.provenance) +
-          (signature.omittedOptionalParameters.length === 0
-            ? " · no parameters omitted"
-            : " · omitted: " + escapeHtml(signature.omittedOptionalParameters.join(", "))) +
-          "</p>") +
-        (operation.protocol === undefined ? "" : '<p class="policy-source"><b>Reviewed protocol:</b> ' +
-          escapeHtml(operation.protocol.reason) + "</p>") +
-        (operation.exception === undefined ? "" : '<p class="policy-source"><b>Reviewed specialization:</b> ' +
-          escapeHtml(operation.exception.reason) + "</p>") + "</article>";
-    }).join("") + "</details>";
+    operations.map(renderOperationPolicy).join("") + "</details>";
 }
 
 function renderUpstreamSymbol(group, symbol) {
@@ -434,6 +517,10 @@ function renderUpstreamSymbol(group, symbol) {
     ? '<span class="pill ' + escapeHtml(state.availability) + '">' +
       escapeHtml(availabilityLabel(state.availability)) + "</span>"
     : "";
+  const evidence = member
+    ? '<span class="pill ' + escapeHtml(member.status) + '">' +
+      escapeHtml(evidenceLabel(member.status)) + "</span>"
+    : "";
   const lean = state?.availability === "available"
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
       renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">Faithful Lean binding</div>' +
@@ -442,7 +529,7 @@ function renderUpstreamSymbol(group, symbol) {
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
-    availability + '</summary><div class="card-head">' +
+    availability + " " + evidence + '</summary><div class="card-head">' +
     renderDocumentation(symbol.hover) +
     symbolSource(symbol) + "</div>" + lean + renderGenerationPolicy(group, symbol) + "</details>";
 }
@@ -468,6 +555,39 @@ function renderGroupDetail(group) {
     '</div></section><section class="section"><h3>Upstream API</h3>' +
     (symbols.length ? symbols.map((symbol) => renderUpstreamSymbol(group, symbol)).join("")
       : '<div class="empty">No upstream entries match these filters.</div>') + "</section>";
+}
+
+function renderInventoryDetail(target) {
+  if (target === undefined) {
+    elements.detail.innerHTML = '<div class="empty">Select a shipped boundary.</div>';
+    return;
+  }
+  const operation = target.operation;
+  const evidence = boundaryEvidence(operation);
+  const upstreamMember = operation?.protocol?.upstreamRelation.member ??
+    (operation?.typescript.kind === "protocol" ? undefined : operation?.typescript.member);
+  const symbol = upstreamMember === undefined
+    ? undefined
+    : target.group.typescript?.symbols.find((entry) => entry.id === upstreamMember);
+  const upstream = symbol === undefined
+    ? '<div class="empty">This boundary has no one-to-one upstream declaration.</div>'
+    : '<article class="anchor"><div class="card-head"><span class="card-title">' +
+      escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div>" +
+      renderCode(symbol.display, "typescript") + renderDocumentation(symbol.hover) + "</article>";
+  elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
+    escapeHtml(evidence) + '">' + escapeHtml(boundaryEvidenceLabel(evidence)) +
+    '</span><span class="badge">' + escapeHtml(target.status) + "</span>" +
+    target.providers.map((provider) => '<span class="badge">' + escapeHtml(provider) +
+      " provider</span>").join("") + "</div><h2>" + escapeHtml(target.target) +
+    '</h2><p class="note">' + escapeHtml(target.group.library.title + " · " +
+      target.group.title) + '</p><section class="section"><h3>Public Lean boundary</h3>' +
+    renderLeanCards([target.target], { showRuntime: true }) +
+    '</section><section class="section"><h3>Upstream or local declaration</h3>' + upstream +
+    '</section><section class="section"><h3>Generation evidence</h3>' +
+    (operation === null
+      ? '<div class="empty">No canonical generated operation was recorded.</div>'
+      : '<div class="generation-policy">' + renderOperationPolicy(operation) + "</div>") +
+    "</section>";
 }
 
 function comparisonResults(group, member) {
@@ -526,10 +646,12 @@ function renderWorkItem(item) {
     selectGroup(item.library + "/" + item.group));
 }
 
-[elements.search, elements.library, elements.availability, elements.disposition].forEach((element) =>
+[elements.search, elements.library, elements.availability, elements.boundary, elements.disposition].forEach((element) =>
   element.addEventListener(element === elements.search ? "input" : "change", render));
 elements["reference-view"].addEventListener("click", () =>
   selectGroup(groupById.has(selected) ? selected : groupId(referenceGroups[0])));
+elements["inventory-view"].addEventListener("click", () =>
+  selectTarget(targetById.has(selected) ? selected : targets[0]?.target ?? ""));
 elements["workbench-view"].addEventListener("click", () =>
   selectWork(workById.has(selected) ? selected : workItems[0]?.id ?? ""));
 elements.theme.addEventListener("click", () => {

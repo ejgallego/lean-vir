@@ -150,6 +150,11 @@ TypeScript parameter that the host supplies internally can be recorded in
 `fixedArguments`; generation verifies both its name and exact literal value and
 requires a justified exception.
 
+A direct method mapping may set `receiverName` to preserve a concise Lean
+binder such as `ctx`. Like accessor `receiverName` and setter `parameterName`,
+this changes source spelling only; representation or modality differences still
+require a justified exception.
+
 Missing policies, changed overload layouts, unclassified rest parameters,
 unknown parameter names, unjustified required-parameter omissions, and
 unsupported parameter or result types fail generation.

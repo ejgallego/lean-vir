@@ -93,6 +93,10 @@ const context2d = {
   strokeRect: (...args) => {
     drawCalls.push(["strokeRect", ...args]);
   },
+  measureText: (text) => {
+    drawCalls.push(["measureText", text]);
+    return { width: 64 };
+  },
 };
 
 class FakeCanvas extends FakeElement {
@@ -161,6 +165,8 @@ try {
     );
     assert.equal(canvas.width, 640);
     assert.equal(canvas.height, 360);
+    assert.equal(status.textContent, "Lean text width: 64");
+    assert.deepEqual(drawCalls, [["measureText", "Lean VIR"]]);
     assert.equal(queuedFrames.size, 1);
     const mountedResourceOwners = resources.debugResourceCounts().owners;
 
@@ -170,6 +176,7 @@ try {
     assert.deepEqual(hostErrors, []);
 
     assert.deepEqual(drawCalls, [
+      ["measureText", "Lean VIR"],
       ["clearRect", 0, 0, 640, 360],
       ["fillRect", 0, 124, 72, 72],
       ["strokeRect", 0, 124, 72, 72],
@@ -189,7 +196,7 @@ try {
     queuedFrames.delete(secondFrameId);
     secondDrawFrame(20_160);
     assert.deepEqual(hostErrors, []);
-    assert.deepEqual(drawCalls.slice(3), [
+    assert.deepEqual(drawCalls.slice(4), [
       ["clearRect", 0, 0, 640, 360],
       ["fillRect", 40, 124, 72, 72],
       ["strokeRect", 40, 124, 72, 72],
@@ -205,7 +212,7 @@ try {
     const [[thirdFrameId, thirdDrawFrame]] = queuedFrames.entries();
     queuedFrames.delete(thirdFrameId);
     thirdDrawFrame(22_272);
-    assert.deepEqual(drawCalls.slice(6), [
+    assert.deepEqual(drawCalls.slice(7), [
       ["clearRect", 0, 0, 640, 360],
       ["fillRect", 568, 124, 72, 72],
       ["strokeRect", 568, 124, 72, 72],
@@ -215,7 +222,7 @@ try {
     const [[fourthFrameId, fourthDrawFrame]] = queuedFrames.entries();
     queuedFrames.delete(fourthFrameId);
     fourthDrawFrame(22_432);
-    assert.deepEqual(drawCalls.slice(9), [
+    assert.deepEqual(drawCalls.slice(10), [
       ["clearRect", 0, 0, 640, 360],
       ["fillRect", 528, 124, 72, 72],
       ["strokeRect", 528, 124, 72, 72],

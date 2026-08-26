@@ -255,6 +255,24 @@ opaque setLineWidthJs
     DomM Unit
 
 /--
+Faithful generated method binding for TypeScript `CanvasRenderingContext2D.measureText`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/measureText)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `CanvasRenderingContext2D.measureText` method.
+ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.measureText"]
+opaque measureText
+    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
+    (text : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js TextMetrics)
+
+/--
 Faithful generated method binding for TypeScript `CanvasRenderingContext2D.moveTo`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/moveTo)
@@ -1264,6 +1282,29 @@ opaque ownedFloat
     Lean.Vir.RuntimeM (Lean.Vir.Js Float)
 
 end Internal
+
+namespace TextMetrics
+
+/--
+Faithful generated getter binding for TypeScript `TextMetrics.width`.
+
+The read-only **`width`** property of the TextMetrics interface contains the text's advance width (the width of that inline box) in CSS pixels.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/TextMetrics/width)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+Generated faithful JavaScript boundary for the TypeScript `TextMetrics.width` getter.
+ABI profile `browser-dom-faithful-v1`: metrics js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.canvas2d.textMetrics.getWidth"]
+opaque getWidth
+    (metrics : @& Lean.Vir.Js TextMetrics) :
+    DomM (Lean.Vir.Js Float)
+
+end TextMetrics
 
 namespace Timer
 

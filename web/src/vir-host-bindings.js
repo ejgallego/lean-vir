@@ -201,6 +201,10 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
       withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
     "browser.canvas2d.lineTo": (ctx, x, y) =>
       withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
+    "browser.canvas2d.measureText": (ctx, text) =>
+      state.resourceForValue(
+        value(ctx, "CanvasRenderingContext2D").measureText(value(text, "JsString")),
+      ),
     "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) =>
       withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) =>
         value(ctx, "CanvasRenderingContext2D").arc(...args)),
@@ -233,6 +237,8 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
         value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
         return undefined;
       }),
+    "browser.canvas2d.textMetrics.getWidth": (metrics) =>
+      state.resourceForValue(Number(value(metrics, "TextMetrics").width)),
     "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
     "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
     "browser.canvas2d.translate": (ctx, x, y) =>

@@ -261,6 +261,16 @@ test("an explicit single-signature policy generates faithful methods and documen
     passing: "borrowed",
     retention: "call",
   });
+
+  const namedReceiverConfig = structuredClone(config);
+  namedReceiverConfig.roots[0].mappings.find((mapping) =>
+    mapping.typescript === "Widget.getAttribute").receiverName = "self";
+  const namedReceiver = renderLeanBindings(
+    namedReceiverConfig,
+    namedReceiverConfig.generation,
+    descriptors,
+  );
+  assert.match(namedReceiver, /opaque getAttribute\n    \(self : @& Lean\.Vir\.Js Widget\)/u);
 });
 
 test("generated exceptions are documented as reviewed specializations", () => {

@@ -37,9 +37,10 @@
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
-      "KeyboardEvent": "Event"
+      "KeyboardEvent": "Event",
+      "TextMetrics": "TextMetrics"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
@@ -49,6 +50,7 @@
       "CanvasRenderingContext2D.fill": { "signature": 0, "omittedOptionalParameters": ["fillRule"] },
       "CanvasRenderingContext2D.fillRect": { "signature": "only" },
       "CanvasRenderingContext2D.lineTo": { "signature": "only" },
+      "CanvasRenderingContext2D.measureText": { "signature": "only" },
       "CanvasRenderingContext2D.moveTo": { "signature": "only" },
       "CanvasRenderingContext2D.restore": { "signature": "only" },
       "CanvasRenderingContext2D.rotate": { "signature": "only" },
@@ -532,8 +534,8 @@
       "id": "canvas-2d",
       "title": "Canvas 2D",
       "targets": ["browser.canvas2d.*"],
-      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D"] },
+      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D", "Lean.Vir.Browser.TextMetrics"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D", "TextMetrics"] },
       "mappings": [
         { "typescript": "CanvasRenderingContext2D.arc", "targets": ["browser.canvas2d.arc"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.arcJs"] },
         { "typescript": "CanvasRenderingContext2D.beginPath", "targets": ["browser.canvas2d.beginPath"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.beginPath"] },
@@ -556,6 +558,7 @@
             "set": { "target": "browser.canvas2d.setLineWidth", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setLineWidthJs", "receiverName": "ctx", "parameterName": "width" }
           }
         },
+        { "typescript": "CanvasRenderingContext2D.measureText", "targets": ["browser.canvas2d.measureText"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.measureText"], "receiverName": "ctx" },
         { "typescript": "CanvasRenderingContext2D.moveTo", "targets": ["browser.canvas2d.moveTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.moveToJs"] },
         { "typescript": "CanvasRenderingContext2D.restore", "targets": ["browser.canvas2d.restore"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.restore"] },
         { "typescript": "CanvasRenderingContext2D.rotate", "targets": ["browser.canvas2d.rotate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.rotateJs"] },
@@ -569,7 +572,13 @@
             "set": { "target": "browser.canvas2d.setStrokeStyleValue", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleValue", "receiverName": "ctx", "parameterName": "style" }
           }
         },
-        { "typescript": "CanvasRenderingContext2D.translate", "targets": ["browser.canvas2d.translate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.translateJs"] }
+        { "typescript": "CanvasRenderingContext2D.translate", "targets": ["browser.canvas2d.translate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.translateJs"] },
+        {
+          "typescript": "TextMetrics.width",
+          "accessors": {
+            "get": { "target": "browser.canvas2d.textMetrics.getWidth", "lean": "Lean.Vir.Browser.TextMetrics.getWidth", "receiverName": "metrics" }
+          }
+        }
       ]
     },
     {

@@ -768,7 +768,14 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
         kind: typeProvenance("typescript.kind", "TypeScript free function has no receiver"),
       },
     }
-    : receiverFor(member, { id: operationId }, generation, profile, exception);
+    : receiverFor(
+      member,
+      { id: operationId },
+      generation,
+      profile,
+      exception,
+      mapping.receiverName,
+    );
   const leanName = operationName({ lean: mapping.lean[0] }, generation.namespace);
   const result = resultFor(
     operationType(shape.result, exception?.result, generation, profile, `${member} result`),

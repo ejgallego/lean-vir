@@ -2,7 +2,8 @@
 
 This directory owns the shipped-JavaScript-binding inventory, TypeScript
 descriptor generation, faithful Lean declaration generation, Lean type-anchor
-comparison, and the consolidated binding reference/author workbench. Use the stable
+comparison, and the consolidated upstream reference/shipped inventory/author
+actions document. Use the stable
 `npm run generate:*`, `npm run check:*`, and `npm run test:*` commands from the
 repository root rather than invoking these entry points directly during
 routine work.
@@ -29,9 +30,9 @@ IR. Lean source generation, comparator intent, generated documentation, and
 report evidence consume that same IR. Structured protocols additionally state
 whether they adapt a named TypeScript member, are VIR-owned, follow a local
 contract, or still need classification. The interactive document presents an
-upstream-shaped reference with semantic TypeScript/Lean highlighting and
-actionable generation dispositions to binding authors; convenience APIs do not
-count as upstream bindings.
+upstream-shaped reference, a complete shipped-boundary inventory, and
+actionable author findings with semantic TypeScript/Lean highlighting;
+convenience APIs do not count as upstream bindings.
 
 Related ownership:
 
