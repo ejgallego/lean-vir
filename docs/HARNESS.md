@@ -366,8 +366,10 @@ which validates the tag and ABI versions, builds `lean-vir-sdk.tar.gz`, imports
 the packaged SDK modules, and uploads it to the matching GitHub release. Create
 the tag from the final merged commit so the archive manifest records the
 revision clients actually depend on. Before that tag exists, test consumers
-with `VIR_SDK_ARCHIVE` or the commit-artifact fetch path; the zero-argument
-`:virSdk` facet intentionally targets the tagged release.
+with `VIR_SDK_ARCHIVE` or the commit-artifact fetch path. Dependency-driven
+`:virSdk` builds select an exact resolved commit automatically; when the
+consumer uses another Lean toolchain, they use the local compatible-build path
+documented in [Lake Integration](LAKE_INTEGRATION.md#install-the-browser-sdk).
 
 ## CI Shape
 

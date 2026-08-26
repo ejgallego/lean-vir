@@ -107,6 +107,9 @@ private def virValidateWebAssetProgramId (id : String) : IO Unit := do
 private structure VirSourceIdentity where
   version : String
   commit? : Option String
+  exactTag? : Option String
+  dir : System.FilePath
+  toolchain : String
 
 private def virGitCommit? (dir : System.FilePath) : IO (Option String) := do
   try
@@ -117,10 +120,24 @@ private def virGitCommit? (dir : System.FilePath) : IO (Option String) := do
     let lines := output.stdout.splitOn "\n"
     let some root := lines[0]? | return none
     let some commit := lines[1]? | return none
-    let root := (System.FilePath.mk root.trimAscii.toString).normalize
+    let root ← IO.FS.realPath (System.FilePath.mk root.trimAscii.toString)
+    let dir ← IO.FS.realPath dir
     let commit := commit.trimAscii.toString
-    if output.exitCode == 0 && root == dir.normalize && !commit.isEmpty then
+    if output.exitCode == 0 && root == dir && !commit.isEmpty then
       return some commit
+    return none
+  catch _ =>
+    return none
+
+private def virGitExactTag? (dir : System.FilePath) : IO (Option String) := do
+  try
+    let output ← IO.Process.output {
+      cmd := "git"
+      args := #["-C", dir.toString, "describe", "--tags", "--exact-match", "HEAD"]
+    }
+    let tag := output.stdout.trimAscii.toString
+    if output.exitCode == 0 && !tag.isEmpty then
+      return some tag
     return none
   catch _ =>
     return none
@@ -128,10 +145,22 @@ private def virGitCommit? (dir : System.FilePath) : IO (Option String) := do
 private def virSourceIdentity : FetchM VirSourceIdentity := do
   let some virPkg ← findPackageByName? `lean_vir
     | error "the VIR facets require the `lean_vir` package in this workspace"
+  let toolchainPath := virPkg.dir / "lean-toolchain"
+  unless (← toolchainPath.pathExists) do
+    error s!"the resolved lean_vir package is missing {toolchainPath}"
   return {
     version := virPkg.version.toString
     commit? := ← virGitCommit? virPkg.dir
+    exactTag? := ← virGitExactTag? virPkg.dir
+    dir := virPkg.dir
+    toolchain := (← IO.FS.readFile toolchainPath).trimAscii.toString
   }
+
+private def virNormalizeLeanToolchain (toolchain : String) : String :=
+  if toolchain.startsWith "leanprover/lean4:v" then
+    "leanprover/lean4:" ++ toolchain.drop "leanprover/lean4:v".length
+  else
+    toolchain
 
 private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
   match json.getObjVal? field with
@@ -323,13 +352,24 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       if configured != derived then
         error s!"VIR_SDK_EXPECT_COMMIT={configured} does not match lean_vir at {derived}"
   let expectedCommit? := identity.commit?.orElse fun _ => expectCommit?
+  let explicitSource := archive?.isSome || url?.isSome || tag?.isSome || commit?.isSome
+  let consumerToolchain := Lean.toolchain
+  let localBuild := !explicitSource &&
+    virNormalizeLeanToolchain identity.toolchain != virNormalizeLeanToolchain consumerToolchain
+  let releaseTag := s!"v{identity.version}"
+  let taggedRelease := identity.exactTag? == some releaseTag
+  let automaticCommit? := if explicitSource || localBuild || taggedRelease then none else identity.commit?
   let sourceConfig := String.intercalate "\n" [
+    s!"policy={if localBuild then "local-build" else if automaticCommit?.isSome then "dependency-commit" else "configured-or-release"}",
     s!"archive={archive?.getD ""}",
     s!"url={url?.getD ""}",
     s!"tag={tag?.getD ""}",
     s!"commit={commit?.getD ""}",
     s!"expectCommit={expectedCommit?.getD ""}",
-    s!"repo={repo?.getD ""}"
+    s!"repo={repo?.getD ""}",
+    s!"exactTag={identity.exactTag?.getD ""}",
+    s!"consumerToolchain={consumerToolchain}",
+    s!"virToolchain={identity.toolchain}"
   ]
   fetcherJob.mapM fun fetcher => do
     addTrace (← computeTrace fetcher)
@@ -337,13 +377,23 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
     if let some commit := identity.commit? then
       addPureTrace commit "lean_vir source revision"
     addPureTrace sourceConfig "VIR SDK source"
+    addTrace (← computeTrace (identity.dir / "lean-toolchain"))
+    if localBuild then
+      addTrace (← computeTrace (identity.dir / "scripts/packages/build-local-sdk.mjs"))
     if let some archive := archive? then
       addTrace (← computeTrace (System.FilePath.mk archive))
+    let sourceArgs :=
+      if localBuild then
+        #["--local-source", identity.dir.toString]
+      else
+        (automaticCommit?.map fun commit => #["--commit", commit]).getD #[]
+    let expectedArgs := #["--expect-version", identity.version] ++
+      (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[] ++
+      (if localBuild then #["--expect-current-lean"] else #[])
     if ← manifestPath.pathExists then
       let verification ← IO.Process.output {
         cmd := fetcher.toString
-        args := #["--verify-installed", sdkDir.toString, "--expect-version", identity.version] ++
-          (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[]
+        args := #["--verify-installed", sdkDir.toString] ++ expectedArgs
         env := ← getAugmentedEnv
       }
       if verification.exitCode != 0 then
@@ -352,15 +402,14 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       createParentDirs manifestPath
       proc {
         cmd := fetcher.toString
-        args := #["--out", sdkDir.toString, "--expect-version", identity.version] ++
-          (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[]
+        args := #["--out", sdkDir.toString] ++ sourceArgs ++ expectedArgs
         env := ← getAugmentedEnv
       }
     return manifestPath
 
 private structure VirWebProgramConfig where
   id : String
-  package? : Option Lean.Name
+  package? : Option String
   moduleName : Lean.Name
 
 private def virRequiredJsonString (source : String) (json : Lean.Json) (field : String) : IO String := do
@@ -408,10 +457,9 @@ private def virReadWebAssetsConfig (path : System.FilePath) : IO (Array VirWebPr
     ids := ids.push id
     let package? ← (← virOptionalJsonString "VIR web-assets program" programJson "package").mapM
       fun packageString => do
-        let packageName := packageString.toName
-        if packageName.isAnonymous then
-          throw <| IO.userError "VIR web-assets program `package` must be a Lake package name"
-        return packageName
+        if packageString.isEmpty then
+          throw <| IO.userError "VIR web-assets program `package` must not be empty"
+        return packageString
     programs := programs.push { id, package?, moduleName }
   return programs
 
@@ -421,11 +469,12 @@ private structure VirResolvedWebProgram where
 
 private def virResolveWebProgram (config : VirWebProgramConfig) : FetchM VirResolvedWebProgram := do
   let module ← match config.package? with
-  | some packageName =>
-      let some programPkg ← findPackageByName? packageName
-        | error s!"VIR web-assets package `{packageName}` was not found"
+  | some packageId =>
+      let workspace ← getWorkspace
+      let some programPkg := workspace.packages.find? (·.prettyName == packageId)
+        | error s!"VIR web-assets package `{packageId}` was not found"
       let some module := programPkg.findTargetModule? config.moduleName
-        | error s!"VIR web-assets module `{config.moduleName}` was not found in package `{packageName}`"
+        | error s!"VIR web-assets module `{config.moduleName}` was not found in package `{packageId}`"
       pure module
   | none =>
       let modules ← findModules config.moduleName
@@ -469,7 +518,7 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
           "--sdk-manifest", sdkManifest.toString,
           "--vir-version", identity.version,
           "--vir-commit", identity.commit?.getD "",
-          "--host-package", pkg.baseName.toString
+          "--host-package", pkg.prettyName
         ]
         for program in programs do
           let descriptor := virModuleOutput program.module "module-sets" "irpkg-set.json"
@@ -477,7 +526,7 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
           args := args ++ #[
             "--program",
             program.config.id,
-            program.module.pkg.baseName.toString,
+            program.module.pkg.prettyName,
             program.module.name.toString,
             descriptor.toString
           ]

@@ -66,10 +66,13 @@ List the program in the application root's `vir-web-assets.json`:
   "format": "lean-vir-web-assets-config",
   "version": 1,
   "programs": [
-    {"id": "slides", "package": "my_slides", "module": "MySlides.Runtime"}
+    {"id": "slides", "package": "verso-slides", "module": "MySlides.Runtime"}
   ]
 }
 ```
+
+`package` is the exact Lake package identifier, so quoted Lake names containing
+hyphens are written without Lean's `«...»` source escaping.
 
 Attach the root package facet to the application's ordinary target and build
 that target:
@@ -84,15 +87,12 @@ lean_exe my_slides where
 lake build my_slides
 ```
 
-When the dependency is pinned to an unreleased commit rather than a release
-tag, request the SDK artifact built from that same commit:
-
-```bash
-VIR_SDK_COMMIT=<same-commit> lake build my_slides
-```
-
-Keep that selection on each application build until the corresponding tagged
-release exists.
+No parallel SDK-selection variable is needed. For an untagged commit-pinned
+dependency, the facet selects that commit's CI artifact automatically when the
+application's Lean toolchain matches VIR's; an exact `v<version>` tag selects
+the durable release. If the toolchains differ, it builds and caches an SDK from
+the resolved VIR source and the application's exact Lean source revision. The
+strict Lean identity check remains in force.
 
 The application facet builds each module's package set, installs one matching
 SDK, checks source/ABI compatibility and digests, and stages everything under
@@ -273,11 +273,14 @@ the commit-artifact path.
 
 Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet defaults to the release matching the installed `lean_vir`
-package version once that release has been published;
-`vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
-version must still match the installed package. Unreleased or commit-pinned
-clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
+`:virSdk` facet derives its default source from the resolved `lean_vir`
+dependency: an untagged dependency commit selects the corresponding CI artifact,
+while an exact `v<version>` tag or a source without a Git identity selects its
+versioned release. A consumer using another Lean toolchain receives a
+compatible local build instead. `vir_fetch_sdk --tag <tag>` can override the
+download source, but the artifact version must still match the installed
+package. Unreleased or commit-pinned clients can still use `--commit` or
+`VIR_SDK_ARCHIVE` for explicit artifact management.
 
 ## Where To Go Next
 

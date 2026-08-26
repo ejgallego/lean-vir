@@ -186,6 +186,9 @@ selects an existing `+Module:vir` producer. Use `package` when the module belong
 to a dependency or when its name would otherwise be ambiguous; `id` is the
 stable URL directory name and defaults to the module name. An explicit `id`
 must be a URL-safe slug containing only letters, digits, `.`, `_`, or `-`.
+The `package` value is the exact user-facing Lake package identifier. For
+example, the Lean declaration `package «verso-slides»` is selected with
+`"package": "verso-slides"`, without Lean source escaping.
 
 ```json
 {
@@ -339,27 +342,35 @@ and render initialization failures visibly.
 lake build :virSdk
 ```
 
-This installs the release matching the installed `lean_vir` package version
-under `.lake/build/vir/sdk/`. The corresponding GitHub release must exist; for
-an unreleased revision, select the exact pinned commit:
+This installs the SDK under `.lake/build/vir/sdk/`. The facet derives the
+expected VIR version and Git commit directly from the resolved `lean_vir`
+dependency; clients do not need `VIR_SDK_COMMIT` alongside their Lake pin.
 
-```bash
-VIR_SDK_COMMIT=<lean-vir-revision> lake build my_slides
-```
+When the consuming workspace uses VIR's Lean toolchain, an untagged Git
+dependency selects the CI SDK for its resolved commit. An exact `v<version>`
+tag or a source without a Git identity selects the matching versioned release.
+GitHub Actions artifact downloads require `GITHUB_TOKEN` or an authenticated
+`gh` CLI.
 
-The facet derives the expected version and Git commit directly from the
-resolved `lean_vir` dependency. `VIR_SDK_COMMIT` selects the unreleased artifact;
-keep it set on each application build until that revision has a tagged release.
-Clients do not need a separate expected-revision setting. The installer checks
-the SDK version, runtime ABI, non-empty source commit, and every manifest
-checksum. GitHub Actions artifact downloads
-require `GITHUB_TOKEN` or an authenticated `gh` CLI. Set
+When the consuming workspace uses another Lean toolchain, the facet builds the
+SDK locally from the resolved VIR checkout and the exact Lean revision embedded
+in the consumer's compiler. It caches the Lean source, build tree, and WASI SDK
+under `.lake/build/vir/sdk-build-cache/`. The first build therefore needs Git,
+Node/npm, and network access. Set `LEAN4_SRC` to an existing exact Lean source
+checkout or `WASI_SDK_PATH` to an existing WASI SDK to reuse local tools. This
+path changes SDK acquisition; it does not relax the program/SDK Lean toolchain,
+version, or Git-hash checks.
+
+Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
-archive without network access. Lake tracks the selected source and local
-archive contents when caching the facet.
-Before accepting a cached SDK manifest, the facet rechecks every listed payload
-checksum. A missing or modified payload invalidates the manifest target and
-reinstalls the SDK from the configured source.
+archive without network access. `VIR_SDK_URL`, `VIR_SDK_TAG`, and
+`VIR_SDK_COMMIT` remain explicit source overrides. Lake tracks the selected
+source and local archive contents when caching the facet. Before accepting a
+cached SDK manifest, the facet compares the installed VIR version and commit
+with the resolved dependency and rechecks every listed payload checksum. A
+stale identity, missing payload, or modified payload invalidates the manifest
+target and reinstalls the SDK from the selected source. Locally built SDKs also
+recheck the consumer's current Lean identity before reuse.
 
 This standalone facet is intended for custom artifact assembly. Pair it with a
 separately built `+Module:vir` descriptor, publish every referenced `.irpkg`
