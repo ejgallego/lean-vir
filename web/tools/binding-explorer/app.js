@@ -199,6 +199,47 @@ const elements = Object.fromEntries([
   "workbench-view",
 ].map((id) => [id, document.querySelector("#" + id)]));
 
+const typeBrowserOptionValues = {
+  boundaryNotes: new Set(["show", "hide"]),
+  jsWrapper: new Set(["plain", "highlight", "hide"]),
+  leanNames: new Set(["short", "qualified"]),
+};
+const typeBrowserDefaults = {
+  boundaryNotes: "show",
+  jsWrapper: "highlight",
+  leanNames: "short",
+};
+const typeBrowserStorageKey = "lean-vir.binding-type-browser.v1";
+
+function loadTypeBrowserSettings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(typeBrowserStorageKey) ?? "{}");
+    return Object.fromEntries(Object.entries(typeBrowserDefaults).map(([key, fallback]) => [
+      key,
+      typeBrowserOptionValues[key].has(stored[key]) ? stored[key] : fallback,
+    ]));
+  } catch {
+    return { ...typeBrowserDefaults };
+  }
+}
+
+let typeBrowserSettings = loadTypeBrowserSettings();
+
+function applyTypeBrowserSettings() {
+  document.documentElement.dataset.boundaryNotes = typeBrowserSettings.boundaryNotes;
+  document.documentElement.dataset.jsWrapper = typeBrowserSettings.jsWrapper;
+}
+
+function saveTypeBrowserSettings() {
+  try {
+    localStorage.setItem(typeBrowserStorageKey, JSON.stringify(typeBrowserSettings));
+  } catch {
+    // The report remains usable when storage is unavailable.
+  }
+}
+
+applyTypeBrowserSettings();
+
 const hashWork = location.hash.match(/^#work=(.*)$/u);
 const hashTarget = location.hash.match(/^#target=(.*)$/u);
 let view = hashWork ? "workbench" : hashTarget ? "inventory" : "reference";
@@ -428,18 +469,23 @@ function preferredPublicEntries(target) {
     .sort((left, right) => left.entry.declaration.localeCompare(right.entry.declaration));
 }
 
-function shortLeanName(value) {
+function displayLeanName(value) {
   let display = String(value ?? "");
-  for (const [prefix, replacement] of [
-    ["Lean.Vir.Browser.", ""],
-    ["Lean.Vir.React.", ""],
-    ["Lean.Vir.ProofWidgets.", ""],
-    ["Lean.Vir.Infoview.", ""],
-    ["Lean.Vir.Common.", ""],
-    ["Lean.Vir.Js.", "Js."],
-    ["Lean.Vir.Js", "Js"],
-    ["Lean.Vir.", ""],
-  ]) display = display.replaceAll(prefix, replacement);
+  if (typeBrowserSettings.leanNames === "short") {
+    for (const [prefix, replacement] of [
+      ["Lean.Vir.Browser.", ""],
+      ["Lean.Vir.React.", ""],
+      ["Lean.Vir.ProofWidgets.", ""],
+      ["Lean.Vir.Infoview.", ""],
+      ["Lean.Vir.Common.", ""],
+      ["Lean.Vir.Js.", "Js."],
+      ["Lean.Vir.Js", "Js"],
+      ["Lean.Vir.", ""],
+    ]) display = display.replaceAll(prefix, replacement);
+  }
+  if (typeBrowserSettings.jsWrapper === "hide") {
+    display = display.replace(/\b(?:Lean\.Vir\.)?Js(?:\.[A-Z][A-Za-z0-9_']*)?\s+/gu, "");
+  }
   return display;
 }
 
@@ -465,8 +511,8 @@ function renderSemanticLeanType(value, provenance = []) {
   const tooltip = tooltipText(String(value), provenance);
   return '<span class="signature-type semantic-text" tabindex="0" data-tooltip="' +
     escapeHtml(tooltip) + '" aria-label="' +
-    escapeHtml(shortLeanName(value) + ": " + tooltip) + '">' +
-    highlightCode(shortLeanName(value), "lean") + "</span>";
+    escapeHtml(displayLeanName(value) + ": " + tooltip) + '">' +
+    highlightCode(displayLeanName(value), "lean") + "</span>";
 }
 
 const modalityDescriptions = {
@@ -554,7 +600,7 @@ function renderReadableLeanSignature(operation, source) {
     source + '</div><div class="signature-source"><div class="signature-declaration semantic-text" tabindex="0" data-tooltip="' +
     escapeHtml(operation.lean.declaration) + '" aria-label="Lean declaration: ' +
     escapeHtml(operation.lean.declaration) + '">' +
-    highlightCode(shortLeanName(operation.lean.declaration), "lean") + "</div>" +
+    highlightCode(displayLeanName(operation.lean.declaration), "lean") + "</div>" +
     receiverContext + parameters +
     '<div class="signature-line signature-result"><code class="signature-expression">' +
     escapeHtml("  : ") +
@@ -620,7 +666,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
   const rows = [];
   if (operation.receiver.typescriptType) {
     const leanReceiver = operation.receiver.kind === "argument"
-      ? operation.receiver.argument.name + ": " + shortLeanName(operation.receiver.argument.type)
+      ? operation.receiver.argument.name + ": " + displayLeanName(operation.receiver.argument.type)
       : operation.receiver.kind === "global"
         ? "host global · no Lean parameter"
         : "no Lean receiver";
@@ -639,7 +685,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
       usedLeanArguments.add(argument.name);
       rows.push(renderTransformationRow(
         "value: " + formatTypeScriptType(operation.typescript.shape),
-        argument.name + ": " + shortLeanName(argument.type),
+        argument.name + ": " + displayLeanName(argument.type),
         "property setter value",
       ));
     }
@@ -668,7 +714,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
           usedLeanArguments.add(emitted.name);
           rows.push(renderTransformationRow(
             formatTypeScriptParameter(argument),
-            emitted.name + ": " + shortLeanName(emitted.type),
+            emitted.name + ": " + displayLeanName(emitted.type),
             "fixed-arity specialization",
           ));
         }
@@ -689,7 +735,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
         usedLeanArguments.add(emitted.name);
         rows.push(renderTransformationRow(
           formatTypeScriptParameter(argument),
-          emitted.name + ": " + shortLeanName(emitted.type),
+          emitted.name + ": " + displayLeanName(emitted.type),
           emitted.role === "callback" ? "retained callback policy" : "faithful representation",
         ));
       }
@@ -699,7 +745,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
     if (usedLeanArguments.has(argument.name)) continue;
     rows.push(renderTransformationRow(
       "VIR policy",
-      argument.name + ": " + shortLeanName(argument.type),
+      argument.name + ": " + displayLeanName(argument.type),
       "policy-authored boundary argument",
       "policy",
     ));
@@ -711,7 +757,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
     : formatTypeScriptType(operation.typescript.shape?.result);
   rows.push(renderTransformationRow(
     "result: " + typeScriptResult,
-    "result: " + shortLeanName(effectfulLeanType(operation)),
+    "result: " + displayLeanName(effectfulLeanType(operation)),
     operation.effect.id + " effect · " + Object.values(operation.result.modalities).join(" · "),
   ));
   return '<section class="type-transformation">' +
@@ -740,7 +786,7 @@ function renderLeanCards(targetIds, {
       const signature = operation === null
         ? '<div class="card-head"><span class="card-title" title="' +
           escapeHtml(item.entry.declaration) + '">' +
-          escapeHtml(shortLeanName(item.entry.declaration)) + "</span>" +
+          escapeHtml(displayLeanName(item.entry.declaration)) + "</span>" +
           sourceLink(item.entry.source, item.entry.module) + "</div>" +
           renderCode(item.entry.type, "lean")
         : renderReadableLeanSignature(
@@ -875,6 +921,47 @@ function renderGroupDetail(group) {
       : '<div class="empty">No upstream entries match these filters.</div>') + "</section>";
 }
 
+function renderTypeOptionGroup(key, label, choices) {
+  return '<div class="type-option-group" role="group" aria-label="' + escapeHtml(label) +
+    '"><span class="type-option-label">' + escapeHtml(label) +
+    '</span><span class="type-option-choices">' + choices.map(([value, text]) => {
+      const active = typeBrowserSettings[key] === value;
+      return '<button type="button" class="type-option' + (active ? " active" : "") +
+        '" data-type-option="' + escapeHtml(key) + '" data-type-value="' +
+        escapeHtml(value) + '" aria-pressed="' + String(active) + '">' +
+        escapeHtml(text) + "</button>";
+    }).join("") + "</span></div>";
+}
+
+function renderTypeBrowserOptions() {
+  return '<div class="type-browser-options"><span class="type-options-title" ' +
+    'title="Presentation only; exact compiled evidence is unchanged.">Type display</span>' +
+    renderTypeOptionGroup("boundaryNotes", "Boundary notes", [
+      ["show", "Show"],
+      ["hide", "Hide"],
+    ]) + renderTypeOptionGroup("jsWrapper", "Js wrapper", [
+      ["plain", "Plain"],
+      ["highlight", "Highlight"],
+      ["hide", "Hide"],
+    ]) + renderTypeOptionGroup("leanNames", "Lean names", [
+      ["short", "Short"],
+      ["qualified", "Qualified"],
+    ]) + "</div>";
+}
+
+function bindTypeBrowserOptions() {
+  elements.detail.querySelectorAll("[data-type-option]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const key = button.dataset.typeOption;
+      const value = button.dataset.typeValue;
+      if (!typeBrowserOptionValues[key]?.has(value)) return;
+      typeBrowserSettings = { ...typeBrowserSettings, [key]: value };
+      applyTypeBrowserSettings();
+      saveTypeBrowserSettings();
+      renderInventoryDetail(targetById.get(selected));
+    }));
+}
+
 function contractOriginLabel(operation) {
   return ({
     "typescript-derived": "Upstream TypeScript",
@@ -960,7 +1047,7 @@ function renderCompiledEvidence(target) {
     ? '<section class="evidence-unit compiled-evidence"><h4>Compiled public declaration' +
       (declarations.length === 1 ? "" : "s") + "</h4>" +
       declarations.map((item) => '<article class="compiled-record"><div class="card-head"><div class="contract-title">' +
-        escapeHtml(shortLeanName(item.entry.declaration)) + "</div>" +
+        escapeHtml(displayLeanName(item.entry.declaration)) + "</div>" +
         sourceLink(item.entry.source, item.entry.module) + "</div>" +
         renderCode(item.entry.type, "lean") + '<div class="evidence-subtitle">Public reachability</div>' +
         renderCode(item.reach.path.join("\n→ "), "lean") + "</article>").join("") + "</section>"
@@ -999,8 +1086,10 @@ function renderInventoryDetail(target) {
         escapeHtml(target.status) + "</span>") + "</div><h2>" + escapeHtml(target.target) +
     '</h2><p class="note">' + escapeHtml(target.group.library.title + " · " +
       target.group.title) + '</p><section class="section"><h3>Binding contract</h3>' +
-    renderBindingContract(target, operation, symbol) + '</section><section class="section">' +
+    renderTypeBrowserOptions() + renderBindingContract(target, operation, symbol) +
+    '</section><section class="section">' +
     renderImplementationEvidence(target, operation) + "</section>";
+  bindTypeBrowserOptions();
 }
 
 function comparisonResults(group, member) {
