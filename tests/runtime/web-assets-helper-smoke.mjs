@@ -65,6 +65,15 @@ function manifest() {
 }
 
 assert.equal(validateVirWebAssetsManifest(manifest()).programs[0].id, "slides");
+const normalizedToolchain = manifest();
+normalizedToolchain.sdk.compatibility = {
+  ...compatibility,
+  leanToolchain: "leanprover/lean4:4.34.0-rc2",
+};
+assert.equal(
+  validateVirWebAssetsManifest(normalizedToolchain).programs[0].id,
+  "slides",
+);
 const traversal = manifest();
 traversal.programs[0].descriptor = "programs/slides/../secret.irpkg";
 assert.throws(() => validateVirWebAssetsManifest(traversal), /normalized relative URL path/);
@@ -114,6 +123,23 @@ try {
   assert.equal(
     globalThis.__virWebAssetsRuntimeOptions.irPackageSetUrl.href,
     pathToFileURL(join(root, "programs", "slides", "VirPrettyM.irpkg-set.json")).href,
+  );
+  const inferredRuntime = await createVirWebAssetsRuntime(manifestUrl, {
+    fetchManifest,
+  });
+  assert.deepEqual(inferredRuntime, { source: "named-program" });
+  const multiProgramManifest = manifest();
+  multiProgramManifest.programs.push({
+    ...multiProgramManifest.programs[0],
+    id: "search",
+    descriptor: "programs/search/Search.irpkg-set.json",
+    files: [file("programs/search/Search.irpkg-set.json")],
+  });
+  await assert.rejects(
+    createVirWebAssetsRuntime(manifestUrl, {
+      fetchManifest: async () => new Response(JSON.stringify(multiProgramManifest)),
+    }),
+    /program id is required; available programs: slides, search/,
   );
   await assert.rejects(
     createVirWebAssetsRuntime(manifestUrl, "unknown", { fetchManifest }),

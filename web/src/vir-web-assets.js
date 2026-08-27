@@ -103,7 +103,7 @@ function requireListedPath(container, field, paths, label) {
 }
 
 function assertCompatible(program, sdk, label) {
-  for (const field of [...COMPATIBILITY_NAT_FIELDS, ...COMPATIBILITY_STRING_FIELDS]) {
+  for (const field of [...COMPATIBILITY_NAT_FIELDS, "leanVersion", "leanGithash"]) {
     if (program[field] !== sdk[field]) {
       throw new TypeError(`${label} compatibility mismatch for ${field}`);
     }
@@ -228,9 +228,21 @@ export async function createVirWebAssetsFactory(manifestUrl, options = {}) {
     manifest: loaded.manifest,
     programIds: Object.freeze(loaded.manifest.programs.map((program) => program.id)),
     createRuntime(programId) {
-      const program = loaded.manifest.programs.find((candidate) => candidate.id === programId);
+      let selectedId = programId;
+      if (selectedId === undefined) {
+        if (loaded.manifest.programs.length !== 1) {
+          throw new Error(
+            `VIR web-assets program id is required; available programs: ${loaded.manifest.programs.map((program) => program.id).join(", ")}`,
+          );
+        }
+        selectedId = loaded.manifest.programs[0].id;
+      }
+      if (typeof selectedId !== "string" || selectedId.length === 0) {
+        throw new TypeError("VIR web-assets program id must be a non-empty string");
+      }
+      const program = loaded.manifest.programs.find((candidate) => candidate.id === selectedId);
       if (program === undefined) {
-        throw new Error(`unknown VIR web-assets program: ${programId}`);
+        throw new Error(`unknown VIR web-assets program: ${selectedId}`);
       }
       return factory.createRuntime({
         irPackageSetUrl: new URL(program.descriptor, loaded.manifestUrl),
@@ -239,7 +251,12 @@ export async function createVirWebAssetsFactory(manifestUrl, options = {}) {
   });
 }
 
-export async function createVirWebAssetsRuntime(manifestUrl, programId, options = {}) {
+export async function createVirWebAssetsRuntime(manifestUrl, programIdOrOptions, options = {}) {
+  let programId = programIdOrOptions;
+  if (programIdOrOptions !== null && typeof programIdOrOptions === "object") {
+    programId = undefined;
+    options = programIdOrOptions;
+  }
   const factory = await createVirWebAssetsFactory(manifestUrl, options);
   return factory.createRuntime(programId);
 }

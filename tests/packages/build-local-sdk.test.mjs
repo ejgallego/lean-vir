@@ -20,7 +20,7 @@ import {
 test("shared SDK guidance prefers composed application assets", () => {
   assert.deepEqual(SDK_METADATA_FILES, ["README.txt", "LICENSE", "NOTICE"]);
   for (const readme of [sdkReadme(), sdkReadme({ localBuild: true })]) {
-    assert.match(readme, /one-root Lean library named for the program/);
+    assert.match(readme, /named Lean library with one or more explicit application roots/);
     assert.match(readme, /library's virWebAssets facet/);
     assert.match(readme, /one live Wasm instance and Lean heap/);
     assert.match(readme, /lower-level commands remain available/);

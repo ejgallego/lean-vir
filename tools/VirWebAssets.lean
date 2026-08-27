@@ -45,6 +45,8 @@ partial def parseArgs (args : List String) (opts : Options := {}) : Except Strin
         .ok opts
       else if opts.virVersion.isEmpty then
         .error s!"missing --vir-version\n\n{usage}"
+      else if opts.virCommit.isEmpty then
+        .error s!"missing --vir-commit\n\n{usage}"
       else if opts.hostPackage.isEmpty then
         .error s!"missing --host-package\n\n{usage}"
       else if opts.programs.isEmpty then
@@ -95,7 +97,11 @@ def validatedRelativePath (source path : String) : IO FilePath := do
   return filePath.normalize
 
 def isProgramIdChar (char : Char) : Bool :=
-  char.isAlphanum || char == '.' || char == '_' || char == '-'
+  let code := char.toNat
+  (code >= 'A'.toNat && code <= 'Z'.toNat) ||
+    (code >= 'a'.toNat && code <= 'z'.toNat) ||
+    (code >= '0'.toNat && code <= '9'.toNat) ||
+    char == '.' || char == '_' || char == '-'
 
 def validateProgramId (id : String) : IO Unit := do
   if id.isEmpty || id == "." || id == ".." || !id.all isProgramIdChar then
@@ -110,8 +116,11 @@ def run (cmd : String) (args : Array String) : IO String := do
   return out.stdout.trimAscii.toString
 
 def sha256 (path : FilePath) : IO String := do
-  let line ← run "sha256sum" #[path.toString]
-  return (line.splitOn " ").head?.getD ""
+  run "node" #[
+    "-e",
+    "const fs=require('node:fs'),c=require('node:crypto');process.stdout.write(c.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))",
+    path.toString
+  ]
 
 structure AssetFile where
   path : String
@@ -165,6 +174,26 @@ def verifyListedFiles (root : FilePath) (source : String) (json : Json) : IO (Ar
     files := files.push file
   return files
 
+partial def listedLeafPaths (root : FilePath) (relPrefix : String := "") : IO (Array String) := do
+  let mut paths := #[]
+  unless ← root.pathExists do
+    return paths
+  for entry in ← root.readDir do
+    let relPath := if relPrefix.isEmpty then entry.fileName else s!"{relPrefix}/{entry.fileName}"
+    if ← entry.path.isDir then
+      paths := paths ++ (← listedLeafPaths entry.path relPath)
+    else
+      paths := paths.push relPath
+  return paths
+
+def verifyNoUnlistedFiles
+    (root : FilePath)
+    (source : String)
+    (expectedPaths : Array String) : IO Unit := do
+  for path in ← listedLeafPaths root do
+    unless expectedPaths.contains path do
+      throw <| IO.userError s!"{source} contains an unlisted file: {path}"
+
 structure Compatibility where
   packageFormatVersion : Nat
   manifestVersion : Nat
@@ -172,6 +201,12 @@ structure Compatibility where
   leanVersion : String
   leanToolchain : String
   leanGithash : String
+
+def normalizedLeanToolchain (toolchain : String) : String :=
+  if toolchain.startsWith "leanprover/lean4:v" then
+    "leanprover/lean4:" ++ toolchain.drop "leanprover/lean4:v".length
+  else
+    toolchain
 
 def readCompatibility
     (source : String)
@@ -192,7 +227,7 @@ def Compatibility.toJson (compatibility : Compatibility) : String :=
     ("manifestVersion", jsonNat compatibility.manifestVersion),
     ("runtimeAbiVersion", jsonNat compatibility.runtimeAbiVersion),
     ("leanVersion", jsonString compatibility.leanVersion),
-    ("leanToolchain", jsonString compatibility.leanToolchain),
+    ("leanToolchain", jsonString (normalizedLeanToolchain compatibility.leanToolchain)),
     ("leanGithash", jsonString compatibility.leanGithash)
   ]
 
@@ -213,15 +248,9 @@ def validateCompatibility (source : String) (compatibility : Compatibility) : IO
   if compatibility.leanGithash.isEmpty then
     throw <| IO.userError s!"{source} Lean git hash must not be empty"
 
-def normalizedLeanToolchain (toolchain : String) : String :=
-  toolchain.replace ":v" ":"
-
 def validateProgramCompatibility
     (source : String)
     (program sdk : Compatibility) : IO Unit := do
-  if normalizedLeanToolchain program.leanToolchain != normalizedLeanToolchain sdk.leanToolchain then
-    throw <| IO.userError <| s!"Lean toolchain mismatch for {source}: " ++
-      s!"program is {program.leanToolchain}, SDK is {sdk.leanToolchain}"
   if program.leanVersion != sdk.leanVersion then
     throw <| IO.userError <| s!"Lean version mismatch for {source}: " ++
       s!"program is {program.leanVersion}, SDK is {sdk.leanVersion}"
@@ -251,8 +280,11 @@ def readSdk (opts : Options) : IO SdkInfo := do
   let gitCommit ← jsonField source manifest "gitCommit" Json.getStr?
   if gitCommit.isEmpty then
     throw <| IO.userError "SDK manifest gitCommit must not be empty"
-  if !opts.virCommit.isEmpty && gitCommit != opts.virCommit then
+  if gitCommit != opts.virCommit then
     throw <| IO.userError s!"SDK source mismatch: lean_vir is {opts.virCommit}, SDK is {gitCommit}"
+  let gitDirty ← jsonField source manifest "gitDirty" Json.getBool?
+  if gitDirty then
+    throw <| IO.userError "SDK manifest records a dirty VIR source tree"
   let compatibility ← readCompatibility source manifest "leanVersionString"
   validateCompatibility source compatibility
   let sdkDir := opts.sdkManifest.parent.getD "."
@@ -352,8 +384,16 @@ def verifyInstalled (out : FilePath) : IO Unit := do
   let virVersion ← jsonField "VIR identity" virJson "version" Json.getStr?
   if virVersion.isEmpty then
     throw <| IO.userError "VIR identity version must not be empty"
-  discard <| jsonField "VIR identity" virJson "gitCommit" Json.getStr?
+  let virCommit ← jsonField "VIR identity" virJson "gitCommit" Json.getStr?
+  if virCommit.isEmpty then
+    throw <| IO.userError "VIR identity gitCommit must not be empty"
   let sdkJson ← jsonField source manifest "sdk" pure
+  let sdkVersion ← jsonField "staged SDK" sdkJson "version" Json.getStr?
+  let sdkCommit ← jsonField "staged SDK" sdkJson "gitCommit" Json.getStr?
+  if sdkVersion != virVersion then
+    throw <| IO.userError s!"VIR/SDK version mismatch: VIR is {virVersion}, SDK is {sdkVersion}"
+  if sdkCommit != virCommit then
+    throw <| IO.userError s!"VIR/SDK commit mismatch: VIR is {virCommit}, SDK is {sdkCommit}"
   let sdkCompatibilityJson ← jsonField "staged SDK" sdkJson "compatibility" pure
   let sdkCompatibility ← readCompatibility "staged SDK" sdkCompatibilityJson
   validateCompatibility "staged SDK" sdkCompatibility
@@ -367,6 +407,8 @@ def verifyInstalled (out : FilePath) : IO Unit := do
   for file in sdkFiles do
     unless file.path.startsWith "sdk/" do
       throw <| IO.userError s!"staged SDK file must be under sdk/: {file.path}"
+  verifyNoUnlistedFiles (out / "sdk") "staged SDK"
+    (sdkPaths.map fun path => (path.drop "sdk/".length).toString)
   let programJsons ← jsonField source manifest "programs" Json.getArr?
   if programJsons.isEmpty then
     throw <| IO.userError s!"{source} must contain at least one program"
@@ -399,6 +441,8 @@ def verifyInstalled (out : FilePath) : IO Unit := do
     discard <| validatedRelativePath s!"staged program {id} descriptor" descriptor
     unless paths.contains descriptor do
       throw <| IO.userError s!"staged program {id} descriptor is not listed in its files: {descriptor}"
+    verifyNoUnlistedFiles (out / "programs" / id) s!"staged program {id}"
+      (paths.map fun path => (path.drop pathPrefix.length).toString)
 
 def removePathIfExists (path : FilePath) : IO Unit := do
   if ← path.pathExists then
@@ -416,20 +460,26 @@ def copyFileIfChanged (source dest : FilePath) (expectedHash : String) : IO Unit
     IO.FS.createDirAll parent
   IO.FS.writeBinFile dest (← IO.FS.readBinFile source)
 
-def fileContentsEqual (left right : FilePath) : IO Bool := do
-  if !(← left.pathExists) || !(← right.pathExists) then
-    return false
-  if (← left.isDir) || (← right.isDir) then
-    return false
-  return (← IO.FS.readBinFile left) == (← IO.FS.readBinFile right)
+partial def reconcileOwnedTree
+    (root : FilePath)
+    (expectedPaths : Array String)
+    (relPrefix : String := "") : IO Unit := do
+  unless ← root.pathExists do
+    return
+  for entry in ← root.readDir do
+    let relPath := if relPrefix.isEmpty then entry.fileName else s!"{relPrefix}/{entry.fileName}"
+    if ← entry.path.isDir then
+      reconcileOwnedTree entry.path expectedPaths relPath
+      if (← entry.path.readDir).isEmpty then
+        IO.FS.removeDir entry.path
+    else unless expectedPaths.contains relPath do
+      IO.FS.removeFile entry.path
 
 def stageSdk (opts : Options) (sdk : SdkInfo) : IO Unit := do
   let sdkDir := opts.sdkManifest.parent.getD "."
   let destDir := opts.out / "sdk"
   let destManifest := destDir / "lean-vir-artifact.json"
-  unless ← fileContentsEqual opts.sdkManifest destManifest do
-    if ← destDir.pathExists then
-      IO.FS.removeDirAll destDir
+  reconcileOwnedTree destDir ((sdk.files.map (·.path)).push "lean-vir-artifact.json")
   for file in sdk.files do
     copyFileIfChanged (sdkDir / FilePath.mk file.path)
       (destDir / FilePath.mk file.path) file.sha256
@@ -438,10 +488,7 @@ def stageSdk (opts : Options) (sdk : SdkInfo) : IO Unit := do
 def stageProgram (opts : Options) (program : ProgramInfo) : IO Unit := do
   let sourceDir := program.arg.descriptor.parent.getD "."
   let destDir := opts.out / "programs" / program.arg.id
-  let destDescriptor := destDir / program.descriptorName
-  unless ← fileContentsEqual program.arg.descriptor destDescriptor do
-    if ← destDir.pathExists then
-      IO.FS.removeDirAll destDir
+  reconcileOwnedTree destDir (program.files.map (·.path))
   for file in program.files do
     let source := if file.path == program.descriptorName then
       program.arg.descriptor

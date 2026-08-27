@@ -38,7 +38,7 @@ The preferred Lake application workflow is:
 
   1. mark the application root's declarations with @[vir_export] and
      @[vir_startup];
-  2. declare a one-root Lean library named for the program;
+  2. declare a named Lean library with one or more explicit application roots;
   3. add that library's virWebAssets facet to the application's ordinary
      target; and
   4. build that target and deploy its named .lake/build/vir/web-assets
@@ -77,7 +77,6 @@ composed-assets browser usage is:
 
   const vir = await createVirWebAssetsRuntime(
     "./VIR_WEB_ASSETS.json",
-    "my-program",
   );
 
   vir.runStartupEntries();
@@ -86,7 +85,8 @@ Expose the runtime where the application needs it and call vir.dispose() when
 the page or application is torn down. The composed directory contains the
 browser dependency closure selected by the SDK manifest; optional Node and
 browser-React entry points plus the debug Wasm remain available in the full SDK
-for custom assembly.
+for custom assembly. A multi-program manifest requires an explicit program ID;
+omission is accepted only when exactly one program exists.
 
 Check lean-vir-artifact.json before mixing this SDK with generated packages
 from another lean_vir revision or Lean compiler identity.

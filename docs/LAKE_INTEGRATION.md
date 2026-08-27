@@ -2,9 +2,9 @@
 
 VIR provides a module facet for compiling marked Lean declarations into a
 browser-loadable package set, a package facet for installing the matching
-JavaScript/Wasm SDK, and an application facet for composing several package
-sets with one SDK. This is intentionally a focused browser-program workflow,
-not a general Lean-to-Wasm compiler.
+JavaScript/Wasm SDK, and a named library facet for composing one or more
+explicit application roots with one SDK. This is intentionally a focused
+browser-program workflow, not a general Lean-to-Wasm compiler.
 
 ## Add The Lake Dependency
 
@@ -181,11 +181,12 @@ directly into an executable.
 
 ## Compose Application Web Assets
 
-Declare a one-root Lean library whose target name is the explicit program ID.
-The declaration supplies the owning package and exact module through Lake's
+Declare a named Lean library containing one or more explicit application roots.
+The declaration supplies the owning package and exact modules through Lake's
 typed target model; the facet does not discover marked modules automatically.
-Program IDs must be URL-safe slugs containing only letters, digits, `.`, `_`,
-or `-`:
+For a singleton bundle, the library target name is the program ID. For a
+multi-program bundle, each full root module name is its program ID. IDs use the
+ASCII slug alphabet `[A-Za-z0-9._-]`:
 
 ```lean
 lean_lib «slides» where
@@ -196,9 +197,10 @@ lean_exe my_slides where
   needs := #[`@/«slides»:virWebAssets]
 ```
 
-The `@/` prefix selects a target in the current package. The library must own
-exactly one root module; imported package contributions belong in that root's
-dependency cone, preserving the explicit application-root model.
+The `@/` prefix selects a target in the current package. Imported package
+contributions belong in an application root's dependency cone. Root wrappers
+own exports and startup because annotations on imported declarations are not
+promoted.
 
 Then the ordinary build produces the executable and its web assets together:
 
@@ -238,9 +240,11 @@ application:
 identity and entry points, each program's package/module identity and
 compatibility tuple, and SHA-256/size records for every staged payload. Program
 descriptors retain their relative member layout. A version, package format,
-interface manifest, runtime ABI, Lean toolchain, source revision, missing file,
-or digest mismatch stops composition and removes the discovery manifest so a
-partially updated directory is not advertised as valid.
+interface manifest, runtime ABI, Lean version or Git hash, source revision,
+missing file, or digest mismatch stops composition and removes the discovery
+manifest so a partially updated directory is not advertised as valid. The
+toolchain token is canonicalized for diagnostics; Lean version and Git hash are
+the authoritative compiler identity.
 
 The version-1 manifest contract has six required top-level fields:
 
@@ -257,17 +261,35 @@ Every file record contains `path`, `sha256`, and `byteSize`. Every path is
 relative to `VIR_WEB_ASSETS.json`; consumers should reject unsupported
 top-level format or version values before resolving nested paths.
 
-The staging step is incremental. Changing one program rebuilds and restages
+The staging step is incremental and exact. Changing one program rebuilds and restages
 that program without reinstalling or recopying the SDK or unrelated programs.
 Changing the selected SDK revalidates all programs and replaces only the SDK
 subtree. Removing a program from the configuration removes its owned staging
-directory.
+directory. Unlisted files and empty directories under retained `sdk/` and
+`programs/<id>/` subtrees are removed, so obsolete payloads cannot survive a
+successful recomposition.
 
 ### Multiple Explicit Programs
 
-The named library facet is the normal one-root application path. A host that
-deliberately publishes several independent package sets in one directory can
-retain the package-level facet and an explicit `vir-web-assets.json`:
+The same named library facet is the normal `1..N` application-bundle API. A
+bundle with two independent roots remains typed and stages one SDK:
+
+```lean
+lean_lib «presentation-assets» where
+  roots := #[`MySlides.Runtime, `MyWidgets.Runtime]
+
+lean_exe presentation where
+  root := `Main
+  needs := #[`@/«presentation-assets»:virWebAssets]
+```
+
+Its program IDs are `MySlides.Runtime` and `MyWidgets.Runtime`. Each selected
+root still creates a separate runtime and heap. If both contributions must
+share one live heap, import them under one application root and expose
+root-owned wrappers instead.
+
+The package-level facet and `vir-web-assets.json` remain a lower-level form for
+selecting roots owned directly by several dependency packages:
 
 ```json
 {
@@ -289,16 +311,16 @@ lean_exe multi_program_host where
 Every entry remains explicit: `id` is its stable URL directory name, `package`
 is the exact user-facing Lake package identifier, and `module` is the exact
 root. For example, `package «my-slides»` is written as `"my-slides"` in JSON.
-This form stages several independent programs; it does not merge their package
-sets or heaps. A cross-package application that needs one live runtime should
-instead keep one application-owned root and use the named library facet.
+This lower-level form stages several independent programs; it does not merge
+their package sets or heaps.
 
 The application can copy or serve this one directory without running npm,
 selecting an SDK revision in nested packages, or teaching its renderer about
 Lake's dependency build directories.
 
 All entry-point and program paths in `VIR_WEB_ASSETS.json` are relative to that
-manifest. Import the staged helper and name the program explicitly:
+manifest. For a singleton manifest, omit the program ID because there is only
+one valid choice:
 
 ```js
 import { createVirWebAssetsRuntime } from
@@ -306,11 +328,18 @@ import { createVirWebAssetsRuntime } from
 
 const slides = await createVirWebAssetsRuntime(
   "./vir/VIR_WEB_ASSETS.json",
-  "slides",
 );
 slides.runStartupEntries();
 window.versoVir = slides;
 window.addEventListener("pagehide", () => slides.dispose(), { once: true });
+```
+
+For a multi-program manifest, pass the ID explicitly or use a factory. An
+omitted ID then fails with a diagnostic listing the available programs:
+
+```js
+const factory = await createVirWebAssetsFactory("./vir/VIR_WEB_ASSETS.json");
+const slides = await factory.createRuntime("MySlides.Runtime");
 ```
 
 The helper validates the discovery manifest, selected SDK paths, named program,
@@ -344,32 +373,45 @@ This installs the SDK under `.lake/build/vir/sdk/`. The facet derives the
 expected VIR version and Git commit directly from the resolved `lean_vir`
 dependency; clients do not need `VIR_SDK_COMMIT` alongside their Lake pin.
 
-When the consuming workspace uses VIR's Lean toolchain, an untagged Git
-dependency selects the CI SDK for its resolved commit. An exact `v<version>`
-tag or a source without a Git identity selects the matching versioned release.
-GitHub Actions artifact downloads require `GITHUB_TOKEN` or an authenticated
-`gh` CLI.
+An exact `v<version>` Git dependency selects the durable release SDK. For a
+clean untagged dependency on the same Lean toolchain, the facet first reuses a
+validated cache and then tries the matching authenticated CI artifact as a fast
+path. [Actions artifacts are temporary](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository?apiVersion=2022-11-28);
+if one is unavailable, expired,
+inaccessible, or absent, the automatic policy explains the failure and builds
+the exact SDK locally. Lookup filters workflow runs by the dependency
+`head_sha` and paginates both runs and their artifacts.
+Dirty, vendored, or otherwise unidentified VIR sources are rejected before SDK
+selection; an empty commit is never used as provenance and a matching version
+string never manufactures release identity.
 
-When the consuming workspace uses another Lean toolchain, the facet builds the
-SDK locally from the resolved VIR checkout and the exact Lean revision embedded
-in the consumer's compiler. It caches the Lean source, build tree, and WASI SDK
-under `.lake/build/vir/sdk-build-cache/`. The first build therefore needs Git,
+When the consuming workspace uses another Lean toolchain, the facet goes
+directly to the same local build path. It builds from the resolved clean VIR
+checkout and the exact Lean revision embedded in the consumer's compiler, and
+caches the Lean source, build tree, and WASI SDK under
+`.lake/build/vir/sdk-build-cache/`. The first build therefore needs Git,
 Node/npm, and network access. Set `LEAN4_SRC` to an existing exact Lean source
 checkout or `WASI_SDK_PATH` to an existing WASI SDK to reuse local tools. This
 path fetches the exact Lean githash reported by the consumer compiler; it does
 not treat the Elan toolchain token as a Git branch. It changes SDK acquisition,
-but does not relax the program/SDK Lean toolchain, version, or Git-hash checks.
+but does not relax the program/SDK Lean version or Git-hash checks.
 
 Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
 archive without network access. `VIR_SDK_URL`, `VIR_SDK_TAG`, and
-`VIR_SDK_COMMIT` remain explicit source overrides. Lake tracks the selected
+`VIR_SDK_COMMIT` remain explicit source overrides; these are strict and never
+silently switch to another source. Lake tracks the selected
 source and local archive contents when caching the facet. Before accepting a
 cached SDK manifest, the facet compares the installed VIR version and commit
 with the resolved dependency and rechecks every listed payload checksum. A
-stale identity, missing payload, or modified payload invalidates the manifest
+stale identity, dirty producer, missing payload, or modified payload invalidates the manifest
 target and reinstalls the SDK from the selected source. Locally built SDKs also
 recheck the consumer's current Lean identity before reuse.
+
+The Lake SDK/composition path is supported and tested on Linux and macOS. It
+requires Node, Git, `curl`, `tar`, and `unzip`; hashing and temporary-directory
+handling are portable across those hosts. Native Windows clients are not yet
+an advertised target.
 
 This standalone facet is intended for custom artifact assembly. Pair it with a
 separately built `+Module:vir` descriptor, publish every referenced `.irpkg`

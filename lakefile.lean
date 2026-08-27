@@ -97,7 +97,11 @@ private def virWebAssetsConfigFormat : String := "lean-vir-web-assets-config"
 private def virWebAssetsConfigVersion : Nat := 1
 
 private def virWebAssetProgramIdChar (char : Char) : Bool :=
-  char.isAlphanum || char == '.' || char == '_' || char == '-'
+  let code := char.toNat
+  (code >= 'A'.toNat && code <= 'Z'.toNat) ||
+    (code >= 'a'.toNat && code <= 'z'.toNat) ||
+    (code >= '0'.toNat && code <= '9'.toNat) ||
+    char == '.' || char == '_' || char == '-'
 
 private def virValidateWebAssetProgramId (id : String) : IO Unit := do
   if id.isEmpty || id == "." || id == ".." || !id.all virWebAssetProgramIdChar then
@@ -106,7 +110,7 @@ private def virValidateWebAssetProgramId (id : String) : IO Unit := do
 
 private structure VirSourceIdentity where
   version : String
-  commit? : Option String
+  commit : String
   exactTag? : Option String
   dir : System.FilePath
   toolchain : String
@@ -142,15 +146,32 @@ private def virGitExactTag? (dir : System.FilePath) : IO (Option String) := do
   catch _ =>
     return none
 
+private def virGitIsClean (dir : System.FilePath) : IO Bool := do
+  try
+    let output ← IO.Process.output {
+      cmd := "git"
+      args := #["-C", dir.toString, "status", "--porcelain", "--untracked-files=normal"]
+    }
+    return output.exitCode == 0 && output.stdout.trimAscii.isEmpty
+  catch _ =>
+    return false
+
 private def virSourceIdentity : FetchM VirSourceIdentity := do
   let some virPkg ← findPackageByName? `lean_vir
     | error "the VIR facets require the `lean_vir` package in this workspace"
   let toolchainPath := virPkg.dir / "lean-toolchain"
   unless (← toolchainPath.pathExists) do
     error s!"the resolved lean_vir package is missing {toolchainPath}"
+  let some commit ← virGitCommit? virPkg.dir
+    | error <| s!"the resolved lean_vir package at {virPkg.dir} has no exact Git identity; " ++
+        "VIR web assets require a clean Git checkout so the selected SDK cannot be mistaken " ++
+        "for a different source tree"
+  unless ← virGitIsClean virPkg.dir do
+    error <| s!"the resolved lean_vir package at {virPkg.dir} has uncommitted or untracked changes; " ++
+      "commit or remove them before composing VIR web assets, or provide a clean dependency checkout"
   return {
     version := virPkg.version.toString
-    commit? := ← virGitCommit? virPkg.dir
+    commit
     exactTag? := ← virGitExactTag? virPkg.dir
     dir := virPkg.dir
     toolchain := (← IO.FS.readFile toolchainPath).trimAscii.toString
@@ -161,6 +182,15 @@ private def virNormalizeLeanToolchain (toolchain : String) : String :=
     "leanprover/lean4:" ++ toolchain.drop "leanprover/lean4:v".length
   else
     toolchain
+
+private partial def virInvalidateWebAssetsManifests (root : System.FilePath) : IO Unit := do
+  unless ← root.pathExists do
+    return
+  for entry in ← root.readDir do
+    if ← entry.path.isDir then
+      virInvalidateWebAssetsManifests entry.path
+    else if entry.fileName == "VIR_WEB_ASSETS.json" then
+      IO.FS.removeFile entry.path
 
 private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
   match json.getObjVal? field with
@@ -348,24 +378,23 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   let expectCommit? ← IO.getEnv "VIR_SDK_EXPECT_COMMIT"
   let repo? ← IO.getEnv "VIR_SDK_REPO"
   if let some configured := expectCommit? then
-    if let some derived := identity.commit? then
-      if configured != derived then
-        error s!"VIR_SDK_EXPECT_COMMIT={configured} does not match lean_vir at {derived}"
-  let expectedCommit? := identity.commit?.orElse fun _ => expectCommit?
+    if configured != identity.commit then
+      error s!"VIR_SDK_EXPECT_COMMIT={configured} does not match lean_vir at {identity.commit}"
+  let expectedCommit := identity.commit
   let explicitSource := archive?.isSome || url?.isSome || tag?.isSome || commit?.isSome
   let consumerToolchain := Lean.toolchain
   let localBuild := !explicitSource &&
     virNormalizeLeanToolchain identity.toolchain != virNormalizeLeanToolchain consumerToolchain
   let releaseTag := s!"v{identity.version}"
   let taggedRelease := identity.exactTag? == some releaseTag
-  let automaticCommit? := if explicitSource || localBuild || taggedRelease then none else identity.commit?
+  let automaticCommit? := if explicitSource || localBuild || taggedRelease then none else some identity.commit
   let sourceConfig := String.intercalate "\n" [
     s!"policy={if localBuild then "local-build" else if automaticCommit?.isSome then "dependency-commit" else "configured-or-release"}",
     s!"archive={archive?.getD ""}",
     s!"url={url?.getD ""}",
     s!"tag={tag?.getD ""}",
     s!"commit={commit?.getD ""}",
-    s!"expectCommit={expectedCommit?.getD ""}",
+    s!"expectCommit={expectedCommit}",
     s!"repo={repo?.getD ""}",
     s!"exactTag={identity.exactTag?.getD ""}",
     s!"consumerToolchain={consumerToolchain}",
@@ -374,11 +403,10 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   fetcherJob.mapM fun fetcher => do
     addTrace (← computeTrace fetcher)
     addPureTrace identity.version "VIR SDK version"
-    if let some commit := identity.commit? then
-      addPureTrace commit "lean_vir source revision"
+    addPureTrace identity.commit "lean_vir source revision"
     addPureTrace sourceConfig "VIR SDK source"
     addTrace (← computeTrace (identity.dir / "lean-toolchain"))
-    if localBuild then
+    if localBuild || automaticCommit?.isSome then
       addTrace (← computeTrace (identity.dir / "scripts/packages/build-local-sdk.mjs"))
     if let some archive := archive? then
       addTrace (← computeTrace (System.FilePath.mk archive))
@@ -386,10 +414,13 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       if localBuild then
         #["--local-source", identity.dir.toString]
       else
-        (automaticCommit?.map fun commit => #["--commit", commit]).getD #[]
-    let expectedArgs := #["--expect-version", identity.version] ++
-      (expectedCommit?.map fun commit => #["--expect-commit", commit]).getD #[] ++
-      (if localBuild then #["--expect-current-lean"] else #[])
+        (automaticCommit?.map fun commit =>
+          #["--commit", commit, "--fallback-local-source", identity.dir.toString]).getD #[]
+    let expectedArgs := #[
+      "--expect-version", identity.version,
+      "--expect-commit", expectedCommit,
+      "--expect-current-lean"
+    ]
     if ← manifestPath.pathExists then
       let verification ← IO.Process.output {
         cmd := fetcher.toString
@@ -398,13 +429,18 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
       }
       if verification.exitCode != 0 then
         IO.FS.removeFile manifestPath
+        virInvalidateWebAssetsManifests (pkg.buildDir / "vir" / "web-assets")
     buildFileUnlessUpToDate' (text := true) manifestPath do
       createParentDirs manifestPath
-      proc {
-        cmd := fetcher.toString
-        args := #["--out", sdkDir.toString] ++ sourceArgs ++ expectedArgs
-        env := ← getAugmentedEnv
-      }
+      try
+        proc {
+          cmd := fetcher.toString
+          args := #["--out", sdkDir.toString] ++ sourceArgs ++ expectedArgs
+          env := ← getAugmentedEnv
+        }
+      catch error =>
+        virInvalidateWebAssetsManifests (pkg.buildDir / "vir" / "web-assets")
+        throw error
     return manifestPath
 
 private structure VirWebProgramConfig where
@@ -508,13 +544,12 @@ private def virComposeWebAssets
           addTrace (← computeTrace configPath)
         addTrace (← computeTrace sdkManifest)
         addPureTrace identity.version "lean_vir version"
-        if let some commit := identity.commit? then
-          addPureTrace commit "lean_vir source revision"
+        addPureTrace identity.commit "lean_vir source revision"
         let mut args := #[
           "--out", outputDir.toString,
           "--sdk-manifest", sdkManifest.toString,
           "--vir-version", identity.version,
-          "--vir-commit", identity.commit?.getD "",
+          "--vir-commit", identity.commit,
           "--host-package", pkg.prettyName
         ]
         for program in programs do
@@ -557,22 +592,27 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
   virComposeWebAssets pkg (pkg.buildDir / "vir" / "web-assets") programs (some configPath)
 
 /--
-Compose a one-root Lean library as a named VIR web-assets target. The library
-name is the explicit program ID; its owning package and sole root select the
-program module without source-side JSON configuration.
+Compose a named application bundle from one or more explicit Lean library roots.
+For a singleton bundle, the library name is the program ID. For a multi-program
+bundle, each root module name is its program ID. Every bundle stages exactly one
+SDK, and application-root wrappers remain responsible for exports and startup.
 -/
 library_facet virWebAssets (lib : LeanLib) : System.FilePath := do
-  if lib.roots.size != 1 then
-    error s!"VIR web-assets library `{lib.name}` must declare exactly one root module"
-  let some moduleName := lib.roots[0]?
-    | error s!"VIR web-assets library `{lib.name}` must declare exactly one root module"
-  let id := lib.name.toString (escape := false)
-  virValidateWebAssetProgramId id
-  let some module := lib.pkg.findTargetModule? moduleName
-    | error s!"VIR web-assets module `{moduleName}` was not found in package `{lib.pkg.prettyName}`"
-  let program : VirResolvedWebProgram := {
-    config := { id, package? := some lib.pkg.prettyName, moduleName }
-    module
-  }
-  let outputDir := lib.pkg.buildDir / "vir" / "web-assets" / id
-  virComposeWebAssets lib.pkg outputDir #[program]
+  if lib.roots.isEmpty then
+    error s!"VIR web-assets library `{lib.name}` must declare at least one root module"
+  let bundleId := lib.name.toString (escape := false)
+  virValidateWebAssetProgramId bundleId
+  let programs ← lib.roots.mapM fun moduleName => do
+    let id := if lib.roots.size == 1 then bundleId else moduleName.toString
+    virValidateWebAssetProgramId id
+    let some module := lib.pkg.findTargetModule? moduleName
+      | error s!"VIR web-assets module `{moduleName}` was not found in package `{lib.pkg.prettyName}`"
+    return {
+      config := { id, package? := some lib.pkg.prettyName, moduleName }
+      module
+    }
+  let ids := programs.map (·.config.id)
+  if ids.toList.eraseDups.length != ids.size then
+    error s!"VIR web-assets library `{lib.name}` resolves duplicate program IDs"
+  let outputDir := lib.pkg.buildDir / "vir" / "web-assets" / bundleId
+  virComposeWebAssets lib.pkg outputDir programs

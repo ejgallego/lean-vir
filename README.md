@@ -9,7 +9,8 @@ For downstream Lake packages, the preferred workflow is:
 1. add `lean_vir` as a pinned Lake dependency;
 2. mark browser exports with `@[vir_export]` and startup hooks with
    `@[vir_startup]`;
-3. declare a one-root Lean library named for the program and make the
+3. declare a named Lean library containing one or more explicit application
+   roots and make the
    application's normal target depend on that library's `virWebAssets` facet;
 4. serve the resulting one-SDK/many-program directory and call
    `runStartupEntries()` for the selected program.
@@ -59,8 +60,10 @@ how to make that IR available. The `:vir` build repeats marker checks for raw
 metadata and reports generated boxed-boundary, package-wide, or unresolved
 dependency problems.
 
-Declare a one-root library whose target name is the explicit program ID. Lake
-provides the owning package and checks the root module as part of the target:
+Declare a named application library. The common singleton form uses the target
+name as its program ID; a multi-root library is one named bundle whose root
+module names identify its independent programs. Lake checks every root through
+its typed target model:
 
 ```lean
 lean_lib «slides» where
@@ -80,12 +83,13 @@ lean_exe my_slides where
 lake build my_slides
 ```
 
-No parallel SDK-selection variable is needed. For an untagged commit-pinned
-dependency, the facet selects that commit's CI artifact automatically when the
-application's Lean toolchain matches VIR's; an exact `v<version>` tag selects
-the durable release. If the toolchains differ, it builds and caches an SDK from
-the resolved VIR source and the application's exact Lean source revision. The
-strict Lean identity check remains in force.
+No parallel SDK-selection variable is needed. An exact `v<version>` tag selects
+the durable release. For a clean untagged commit, the facet reuses a validated
+cache, tries that commit's authenticated CI artifact as a fast path, and falls
+back to an exact local build if the temporary artifact is unavailable. A
+different Lean toolchain goes directly to the local build. Dirty, vendored, or
+otherwise unidentified VIR sources are rejected rather than matched to an
+unrelated release. The strict Lean version and Git-hash checks remain in force.
 
 The application facet builds the root's dependency-cone package set, installs
 one matching SDK, checks source/ABI compatibility and digests, and stages
@@ -99,7 +103,6 @@ import { createVirWebAssetsRuntime } from
 
 const vir = await createVirWebAssetsRuntime(
   "./vir/VIR_WEB_ASSETS.json",
-  "slides",
 );
 vir.runStartupEntries();
 window.vir = vir;
@@ -285,14 +288,14 @@ the commit-artifact path.
 
 Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet derives its default source from the resolved `lean_vir`
-dependency: an untagged dependency commit selects the corresponding CI artifact,
-while an exact `v<version>` tag or a source without a Git identity selects its
-versioned release. A consumer using another Lean toolchain receives a
-compatible local build instead. `vir_fetch_sdk --tag <tag>` can override the
-download source, but the artifact version must still match the installed
-package. Unreleased or commit-pinned clients can still use `--commit` or
-`VIR_SDK_ARCHIVE` for explicit artifact management.
+`:virSdk` facet derives its default source from the resolved clean `lean_vir`
+Git dependency. An exact `v<version>` tag selects the release; an untagged
+commit tries the matching temporary CI artifact and falls back to an exact
+local build; another Lean toolchain goes directly to that local build. Sources
+without a clean exact Git identity fail with an actionable diagnostic.
+`vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
+version and commit must still match the installed package. Unreleased clients
+can use `--commit` or `VIR_SDK_ARCHIVE` for strict explicit artifact management.
 
 ## Where To Go Next
 

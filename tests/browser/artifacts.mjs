@@ -140,7 +140,7 @@ async function assertSdkBundle(path) {
     assert.equal(file.sha256, createHash("sha256").update(contents).digest("hex"));
   }
   const { stdout: readme } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/README.txt"]);
-  assert.match(readme, /one-root Lean library named for the program/);
+  assert.match(readme, /named Lean library with one or more explicit application roots/);
   assert.match(readme, /one live Wasm instance and Lean heap/);
 }
 

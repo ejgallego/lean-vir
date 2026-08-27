@@ -22,6 +22,7 @@ structure Options where
   tag? : Option String := none
   commit? : Option String := none
   localSource? : Option String := none
+  fallbackLocalSource? : Option String := none
   expectCommit? : Option String := none
   expectVersion : String := sdkVersion
   artifactName : String := "lean-vir-sdk"
@@ -30,7 +31,7 @@ structure Options where
   expectCurrentLean : Bool := false
 
 def usage : String :=
-  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO] | --local-source DIR]\n" ++
+  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO] [--fallback-local-source DIR] | --local-source DIR]\n" ++
   "       lake exe lean_vir/vir_fetch_sdk --verify-installed DIR [--expect-version VERSION] [--expect-commit SHA] [--expect-current-lean]\n\n" ++
   "Installs a lean-vir-sdk.tar.gz archive into DIR and verifies lean-vir-artifact.json checksums.\n\n" ++
   s!"The default source is release v{sdkVersion}. Use --local-source to build an SDK for the current Lean toolchain.\n" ++
@@ -46,6 +47,8 @@ partial def parseArgs (args : List String) (opts : Options := {}) : Except Strin
   | "--tag" :: value :: rest => parseArgs rest { opts with tag? := some value }
   | "--commit" :: value :: rest => parseArgs rest { opts with commit? := some value }
   | "--local-source" :: value :: rest => parseArgs rest { opts with localSource? := some value }
+  | "--fallback-local-source" :: value :: rest =>
+      parseArgs rest { opts with fallbackLocalSource? := some value }
   | "--expect-commit" :: value :: rest => parseArgs rest { opts with expectCommit? := some value }
   | "--expect-version" :: value :: rest => parseArgs rest { opts with expectVersion := value }
   | "--expect-current-lean" :: rest => parseArgs rest { opts with expectCurrentLean := true }
@@ -176,43 +179,94 @@ def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
   args := ((args.push "--output").push dest.toString).push url
   discard <| run "curl" args
 
-def findCommitArtifactUrl (json : Json) (artifactName : String) (commit : String) : IO String := do
+def sha256 (path : FilePath) : IO String :=
+  run "node" #[
+    "-e",
+    "const fs=require('node:fs'),c=require('node:crypto');process.stdout.write(c.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))",
+    path.toString
+  ]
+
+def findArtifactUrl? (json : Json) (artifactName : String) : IO (Option String × Bool) := do
   let artifacts ← jsonField json "artifacts" Json.getArr?
   let mut found? := none
   let mut sawExpired := false
   for artifact in artifacts do
     let name ← jsonField artifact "name" Json.getStr?
     if name == artifactName then
-      let workflowRun ←
-        match artifact.getObjVal? "workflow_run" with
-        | .ok value => pure value
-        | .error err => throw <| IO.userError s!"invalid artifact workflow_run field: {err}"
-      let headSha ← jsonField workflowRun "head_sha" Json.getStr?
-      if headSha == commit then
-        let expired ← jsonField artifact "expired" Json.getBool?
-        if expired then
-          sawExpired := true
-        else
-          found? := some (← jsonField artifact "archive_download_url" Json.getStr?)
-  match found? with
-  | some url => return url
-  | none =>
-      if sawExpired then
-        throw <| IO.userError s!"GitHub Actions artifact `{artifactName}` for commit {commit} has expired"
-      throw <| IO.userError s!"no GitHub Actions artifact `{artifactName}` found for commit {commit} in this repository"
+      let expired ← jsonField artifact "expired" Json.getBool?
+      if expired then
+        sawExpired := true
+      else if found?.isNone then
+        found? := some (← jsonField artifact "archive_download_url" Json.getStr?)
+  return (found?, sawExpired)
+
+def workflowRunIds (json : Json) : IO (Array Nat) := do
+  let runs ← jsonField json "workflow_runs" Json.getArr?
+  runs.mapM fun workflowRun => jsonField workflowRun "id" Json.getNat?
+
+partial def collectWorkflowRunPages
+    (loadPage : Nat → IO Json)
+    (page : Nat := 1)
+    (ids : Array Nat := #[]) : IO (Array Nat) := do
+  let pageIds ← workflowRunIds (← loadPage page)
+  let ids := ids ++ pageIds
+  if pageIds.size < 100 then
+    return ids
+  collectWorkflowRunPages loadPage (page + 1) ids
+
+partial def findArtifactAcrossPages
+    (artifactName : String)
+    (loadPage : Nat → IO Json)
+    (page : Nat := 1)
+    (sawExpired : Bool := false) : IO (Option String × Bool) := do
+  let json ← loadPage page
+  let artifacts ← jsonField json "artifacts" Json.getArr?
+  let (url?, pageExpired) ← findArtifactUrl? json artifactName
+  let sawExpired := sawExpired || pageExpired
+  if let some url := url? then
+    return (some url, sawExpired)
+  if artifacts.size < 100 then
+    return (none, sawExpired)
+  findArtifactAcrossPages artifactName loadPage (page + 1) sawExpired
+
+def fetchWorkflowRunIds
+    (opts : Options)
+    (commit : String)
+    (tmpRoot : FilePath) : IO (Array Nat) := do
+  collectWorkflowRunPages fun page => do
+    let listingPath := tmpRoot / s!"workflow-runs-{page}.json"
+    let url := s!"https://api.github.com/repos/{opts.repo}/actions/runs?head_sha={commit}&per_page=100&page={page}"
+    fetchUrl url listingPath
+    readJsonFile listingPath
+
+def findWorkflowArtifactUrl
+    (opts : Options)
+    (runId : Nat)
+    (tmpRoot : FilePath) : IO (Option String × Bool) := do
+  findArtifactAcrossPages opts.artifactName fun page => do
+    let listingPath := tmpRoot / s!"artifacts-{runId}-{page}.json"
+    let url := s!"https://api.github.com/repos/{opts.repo}/actions/runs/{runId}/artifacts?name={opts.artifactName}&per_page=100&page={page}"
+    fetchUrl url listingPath
+    readJsonFile listingPath
 
 def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO Unit := do
-  let stamp ← IO.monoMsNow
-  let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-github-artifact-{stamp}"
-  let listingPath := tmpRoot / "artifacts.json"
+  let tmpRoot ← IO.FS.createTempDir
   let zipPath := tmpRoot / "artifact.zip"
   let unpackDir := tmpRoot / "artifact"
   try
-    IO.FS.createDirAll tmpRoot
-    let listUrl := s!"https://api.github.com/repos/{opts.repo}/actions/artifacts?name={opts.artifactName}&per_page=100"
-    fetchUrl listUrl listingPath
-    let listing ← readJsonFile listingPath
-    let downloadUrl ← findCommitArtifactUrl listing opts.artifactName commit
+    let runIds ← fetchWorkflowRunIds opts commit tmpRoot
+    let mut downloadUrl? := none
+    let mut sawExpired := false
+    for runId in runIds do
+      let (url?, runExpired) ← findWorkflowArtifactUrl opts runId tmpRoot
+      sawExpired := sawExpired || runExpired
+      if downloadUrl?.isNone then
+        downloadUrl? := url?
+    let some downloadUrl := downloadUrl? | do
+      if sawExpired then
+        throw <| IO.userError s!"GitHub Actions artifact `{opts.artifactName}` for commit {commit} has expired"
+      throw <| IO.userError <| s!"no GitHub Actions artifact `{opts.artifactName}` found for " ++
+        s!"{opts.repo}@{commit}; commit artifacts require GitHub authentication and are retained only temporarily"
     fetchUrl downloadUrl zipPath
     IO.FS.createDirAll unpackDir
     discard <| run "unzip" #["-q", zipPath.toString, "-d", unpackDir.toString]
@@ -221,7 +275,7 @@ def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO
       throw <| IO.userError s!"GitHub Actions artifact `{opts.artifactName}` did not contain lean-vir-sdk.tar.gz"
     if let some parent := dest.parent then
       IO.FS.createDirAll parent
-    discard <| run "mv" #[archive.toString, dest.toString]
+    IO.FS.writeBinFile dest (← IO.FS.readBinFile archive)
   finally
     try
       IO.FS.removeDirAll tmpRoot
@@ -234,16 +288,9 @@ def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
     let relPath ← jsonField file "path" Json.getStr?
     let expected ← jsonField file "sha256" Json.getStr?
     let filePath := sdkDir / FilePath.mk relPath
-    let hashLine ← run "sha256sum" #[filePath.toString]
-    let actual := (hashLine.splitOn " ").head?.getD ""
+    let actual ← sha256 filePath
     if actual != expected then
       throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
-
-def normalizeLeanToolchain (toolchain : String) : String :=
-  if toolchain.startsWith "leanprover/lean4:v" then
-    "leanprover/lean4:" ++ toolchain.drop "leanprover/lean4:v".length
-  else
-    toolchain
 
 def verifyInstalledSdk
     (sdkDir : FilePath)
@@ -267,10 +314,13 @@ def verifyInstalledSdk
   if let some expectCommit := expectCommit? then
     if actualCommit != expectCommit then
       throw <| IO.userError s!"SDK commit mismatch: expected {expectCommit}, got {actualCommit}"
+  let gitDirty ← jsonField manifest "gitDirty" Json.getBool?
+  if gitDirty then
+    throw <| IO.userError "SDK manifest records a dirty VIR source tree; only clean exact source identities may be installed"
   if expectCurrentLean then
     let toolchain ← jsonField manifest "leanToolchain" Json.getStr?
-    if normalizeLeanToolchain toolchain != normalizeLeanToolchain Lean.toolchain then
-      throw <| IO.userError s!"SDK Lean toolchain mismatch: expected {Lean.toolchain}, got {toolchain}"
+    if toolchain.isEmpty then
+      throw <| IO.userError "SDK Lean toolchain token must not be empty"
     let version ← jsonField manifest "leanVersionString" Json.getStr?
     if version != Lean.versionString then
       throw <| IO.userError s!"SDK Lean version mismatch: expected {Lean.versionString}, got {version}"
@@ -279,25 +329,46 @@ def verifyInstalledSdk
       throw <| IO.userError s!"SDK Lean git hash mismatch: expected {Lean.githash}, got {githash}"
   verifySdkFiles sdkDir manifest
 
+partial def copyDirectoryContents (source dest : FilePath) : IO Unit := do
+  IO.FS.createDirAll dest
+  for entry in ← source.readDir do
+    let target := dest / entry.fileName
+    if ← entry.path.isDir then
+      copyDirectoryContents entry.path target
+    else
+      IO.FS.writeBinFile target (← IO.FS.readBinFile entry.path)
+
+def replaceInstalledDirectory (source outDir : FilePath) : IO Unit := do
+  let parent := outDir.parent.getD "."
+  IO.FS.createDirAll parent
+  let stamp ← IO.monoMsNow
+  let stageDir := parent / s!".lean-vir-sdk-install-{stamp}"
+  if ← stageDir.pathExists then
+    IO.FS.removeDirAll stageDir
+  try
+    copyDirectoryContents source stageDir
+    if ← outDir.pathExists then
+      IO.FS.removeDirAll outDir
+    IO.FS.rename stageDir outDir
+  catch error =>
+    if ← stageDir.pathExists then
+      IO.FS.removeDirAll stageDir
+    throw error
+
 def installArchive
     (archive : FilePath)
     (outDir : FilePath)
     (expectVersion : String)
     (expectCommit? : Option String)
     (expectCurrentLean : Bool) : IO Unit := do
-  let stamp ← IO.monoMsNow
-  let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-fetch-{stamp}"
+  let tmpRoot ← IO.FS.createTempDir
   let unpackDir := tmpRoot / "unpack"
   let sdkDir := unpackDir / "lean-vir-sdk"
   try
     IO.FS.createDirAll unpackDir
     discard <| run "tar" #["-xzf", archive.toString, "-C", unpackDir.toString]
     verifyInstalledSdk sdkDir expectVersion expectCommit? expectCurrentLean
-    if ← outDir.pathExists then
-      IO.FS.removeDirAll outDir
-    if let some parent := outDir.parent then
-      IO.FS.createDirAll parent
-    discard <| run "mv" #[sdkDir.toString, outDir.toString]
+    replaceInstalledDirectory sdkDir outDir
   finally
     try
       IO.FS.removeDirAll tmpRoot
@@ -319,8 +390,7 @@ def installLocalSdk
   let script := sourceDir / "scripts/packages/build-local-sdk.mjs"
   unless (← script.pathExists) do
     throw <| IO.userError s!"resolved lean_vir package is missing local SDK builder: {script}"
-  let stamp ← IO.monoMsNow
-  let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-local-{stamp}"
+  let tmpRoot ← IO.FS.createTempDir
   let sdkDir := tmpRoot / "lean-vir-sdk"
   let cacheDir := outDir.parent.getD "." / "sdk-build-cache"
   try
@@ -336,16 +406,29 @@ def installLocalSdk
       "--lean-githash", Lean.githash
     ]
     verifyInstalledSdk sdkDir expectVersion expectCommit? expectCurrentLean
-    if ← outDir.pathExists then
-      IO.FS.removeDirAll outDir
-    if let some parent := outDir.parent then
-      IO.FS.createDirAll parent
-    discard <| run "mv" #[sdkDir.toString, outDir.toString]
+    replaceInstalledDirectory sdkDir outDir
   finally
     try
       IO.FS.removeDirAll tmpRoot
     catch _ =>
       pure ()
+
+def installCommitSdk
+    (opts : Options)
+    (commit : String)
+    (archive : FilePath)
+    (expectCommit? : Option String) : IO Unit := do
+  try
+    IO.println s!"trying GitHub Actions artifact {opts.artifactName} for {opts.repo}@{commit}"
+    fetchCommitArchive opts commit archive
+    installArchive archive opts.out opts.expectVersion expectCommit? opts.expectCurrentLean
+  catch artifactError =>
+    let some fallbackSource := opts.fallbackLocalSource?
+      | throw artifactError
+    IO.eprintln <| s!"commit artifact unavailable ({artifactError}); " ++
+      "building the exact Lean-toolchain-compatible SDK locally"
+    installLocalSdk (FilePath.mk fallbackSource) opts.out opts.expectVersion expectCommit?
+      opts.expectCurrentLean
 
 def runMain (args : List String) : IO UInt32 := do
   match parseArgs args with
@@ -360,35 +443,29 @@ def runMain (args : List String) : IO UInt32 := do
           IO.println s!"verified {opts.out}"
           return (0 : UInt32)
         let source ← sourceFromOptions opts
-        if let .local sourceDir := source then
-          IO.println s!"building Lean-toolchain-compatible SDK from {sourceDir}"
-          installLocalSdk sourceDir opts.out opts.expectVersion expectCommit? opts.expectCurrentLean
-          IO.println s!"installed {opts.out}"
-          return (0 : UInt32)
-        let (archive, cleanup?) ←
-          match source with
-          | .archive path => pure (FilePath.mk path, none)
-          | .url url =>
-              let stamp ← IO.monoMsNow
-              let archive := FilePath.mk s!"/tmp/lean-vir-sdk-download-{stamp}.tar.gz"
+        match source with
+        | .archive path =>
+            installArchive (FilePath.mk path) opts.out opts.expectVersion expectCommit?
+              opts.expectCurrentLean
+        | .url url =>
+            let tmpRoot ← IO.FS.createTempDir
+            let archive := tmpRoot / "lean-vir-sdk.tar.gz"
+            try
               IO.println s!"downloading {url}"
               fetchArchive url archive
-              pure (archive, some archive)
-          | .commit commit =>
-              let stamp ← IO.monoMsNow
-              let archive := FilePath.mk s!"/tmp/lean-vir-sdk-download-{stamp}.tar.gz"
-              IO.println s!"downloading GitHub Actions artifact {opts.artifactName} for {opts.repo}@{commit}"
-              fetchCommitArchive opts commit archive
-              pure (archive, some archive)
-          | .local _ => unreachable!
-        try
-          installArchive archive opts.out opts.expectVersion expectCommit? opts.expectCurrentLean
-        finally
-          if let some cleanup := cleanup? then
+              installArchive archive opts.out opts.expectVersion expectCommit? opts.expectCurrentLean
+            finally
+              try IO.FS.removeDirAll tmpRoot catch _ => pure ()
+        | .commit commit =>
+            let tmpRoot ← IO.FS.createTempDir
+            let archive := tmpRoot / "lean-vir-sdk.tar.gz"
             try
-              IO.FS.removeFile cleanup
-            catch _ =>
-              pure ()
+              installCommitSdk opts commit archive expectCommit?
+            finally
+              try IO.FS.removeDirAll tmpRoot catch _ => pure ()
+        | .local sourceDir =>
+            IO.println s!"building Lean-toolchain-compatible SDK from {sourceDir}"
+            installLocalSdk sourceDir opts.out opts.expectVersion expectCommit? opts.expectCurrentLean
         IO.println s!"installed {opts.out}"
         return (0 : UInt32)
       catch error =>
