@@ -58,14 +58,9 @@ assert.equal(
 
 const wasmBytes = await readFile(wasmPath);
 const factory = createVirRuntimeFactory({ wasmBytes });
-let runtimeCreations = 0;
-const createApplicationRuntime = async () => {
-  runtimeCreations += 1;
-  return factory.createRuntime({ irPackageSetBytes: packageBytes });
-};
-
-const runtime = await createApplicationRuntime();
-assert.equal(runtimeCreations, 1);
+const runtime = await factory.createRuntime({
+  irPackageSetBytes: packageBytes,
+});
 assert.equal(runtime.packageInfo.packageCount, 2);
 assert.equal(runtime.call("App.Root.dependencyFeature"), "40");
 assert.equal(runtime.call("App.Root.applicationFeature"), "2");
@@ -79,9 +74,6 @@ assert.equal(runtime.call("App.Root.dependencyFeature"), "41");
 assert.equal(runtime.runStartupEntries(), undefined);
 assert.equal(runtime.call("App.Root.dependencyFeature"), "41");
 
-let disposals = 0;
 runtime.dispose();
-disposals += 1;
-assert.equal(disposals, 1);
 
 console.log("cross-package one-root one-runtime smoke ok");

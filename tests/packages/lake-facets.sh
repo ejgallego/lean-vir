@@ -30,8 +30,20 @@ write_sdk_manifest() {
   local wasm_hash="$4"
   local js_size
   local wasm_size
+  local readme_hash
+  local license_hash
+  local notice_hash
+  local readme_size
+  local license_size
+  local notice_size
   js_size="$(wc -c < "$sdk_dir/js/vir-runtime.js")"
   wasm_size="$(wc -c < "$sdk_dir/wasm/vir-upstream.wasm")"
+  readme_hash="$(sha256sum "$sdk_dir/README.txt" | cut -d' ' -f1)"
+  license_hash="$(sha256sum "$sdk_dir/LICENSE" | cut -d' ' -f1)"
+  notice_hash="$(sha256sum "$sdk_dir/NOTICE" | cut -d' ' -f1)"
+  readme_size="$(wc -c < "$sdk_dir/README.txt")"
+  license_size="$(wc -c < "$sdk_dir/LICENSE")"
+  notice_size="$(wc -c < "$sdk_dir/NOTICE")"
   printf '%s\n' \
     '{' \
     '  "name": "lean-vir-sdk",' \
@@ -46,9 +58,19 @@ write_sdk_manifest() {
     '  "runtimeAbiVersion": 1,' \
     '  "files": [' \
     "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$js_hash\", \"byteSize\": $js_size}," \
-    "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\", \"byteSize\": $wasm_size}" \
+    "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\", \"byteSize\": $wasm_size}," \
+    "    {\"path\": \"README.txt\", \"sha256\": \"$readme_hash\", \"byteSize\": $readme_size}," \
+    "    {\"path\": \"LICENSE\", \"sha256\": \"$license_hash\", \"byteSize\": $license_size}," \
+    "    {\"path\": \"NOTICE\", \"sha256\": \"$notice_hash\", \"byteSize\": $notice_size}" \
     '  ]' \
     '}' > "$sdk_dir/lean-vir-artifact.json"
+}
+
+write_sdk_metadata() {
+  local sdk_dir="$1"
+  printf '%s\n' 'Lean VIR SDK fixture' > "$sdk_dir/README.txt"
+  cp LICENSE "$sdk_dir/LICENSE"
+  cp NOTICE "$sdk_dir/NOTICE"
 }
 
 assert_module_fixture_descriptor() {
@@ -310,6 +332,7 @@ printf '%s\n' \
 
 printf '%s\n' 'export const smoke = true;' > "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js"
 printf '%s\n' 'fake-wasm' > "$tmp/sdk-source/lean-vir-sdk/wasm/vir-upstream.wasm"
+write_sdk_metadata "$tmp/sdk-source/lean-vir-sdk"
 sdk_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
 wasm_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/wasm/vir-upstream.wasm" | cut -d' ' -f1)"
 write_sdk_manifest "$tmp/sdk-source/lean-vir-sdk" "$repo_commit" "$sdk_hash" "$wasm_hash"
@@ -318,6 +341,7 @@ tar -czf "$tmp/lean-vir-sdk.tar.gz" -C "$tmp/sdk-source" lean-vir-sdk
 mkdir -p "$tmp/sdk-bad/lean-vir-sdk/js" "$tmp/sdk-bad/lean-vir-sdk/wasm" "$tmp/existing-sdk"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-bad/lean-vir-sdk/js/vir-runtime.js"
 printf '%s\n' 'fake-wasm' > "$tmp/sdk-bad/lean-vir-sdk/wasm/vir-upstream.wasm"
+write_sdk_metadata "$tmp/sdk-bad/lean-vir-sdk"
 write_sdk_manifest "$tmp/sdk-bad/lean-vir-sdk" "$repo_commit" \
   "0000000000000000000000000000000000000000000000000000000000000000" "$wasm_hash"
 tar -czf "$tmp/lean-vir-sdk-bad.tar.gz" -C "$tmp/sdk-bad" lean-vir-sdk
@@ -369,6 +393,9 @@ web_manifest="$web_assets/VIR_WEB_ASSETS.json"
 test -f "$web_manifest"
 test -f "$web_assets/sdk/js/vir-runtime.js"
 test -f "$web_assets/sdk/wasm/vir-upstream.wasm"
+test -f "$web_assets/sdk/README.txt"
+test -f "$web_assets/sdk/LICENSE"
+test -f "$web_assets/sdk/NOTICE"
 test -f "$web_assets/programs/runtime/Runtime.irpkg-set.json"
 node --input-type=module -e '
   import crypto from "node:crypto";
@@ -380,6 +407,9 @@ node --input-type=module -e '
   if (manifest.sdk?.compatibility?.leanGithash !== process.argv[3]) process.exit(1);
   if (manifest.sdk?.runtimeModule !== "sdk/js/vir-runtime.js") process.exit(1);
   if (manifest.sdk?.wasm !== "sdk/wasm/vir-upstream.wasm") process.exit(1);
+  for (const path of ["sdk/README.txt", "sdk/LICENSE", "sdk/NOTICE"]) {
+    if (!manifest.sdk?.files?.some((file) => file.path === path)) process.exit(1);
+  }
   if (manifest.programs?.length !== 1) process.exit(1);
   if (manifest.programs[0]?.module !== "Smoke.Runtime") process.exit(1);
   if (!manifest.programs[0]?.files?.every(({ sha256 }) => /^[0-9a-f]{64}$/.test(sha256))) process.exit(1);
@@ -451,6 +481,11 @@ test "$(stat -c '%y' "$web_manifest")" = "$web_manifest_time"
 rm -f "$web_assets/programs/runtime/Runtime.irpkg"
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
 test -f "$web_assets/programs/runtime/Runtime.irpkg"
+test -f "$web_manifest"
+
+rm -f "$web_assets/sdk/NOTICE"
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
+test -f "$web_assets/sdk/NOTICE"
 test -f "$web_manifest"
 
 printf '%s\n' \
@@ -622,6 +657,9 @@ test ! -e "$module_package"
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
 test -f "$tmp/.lake/build/vir/sdk/lean-vir-artifact.json"
+test -f "$tmp/.lake/build/vir/sdk/README.txt"
+test -f "$tmp/.lake/build/vir/sdk/LICENSE"
+test -f "$tmp/.lake/build/vir/sdk/NOTICE"
 
 node --input-type=module -e '
   import fs from "node:fs";
@@ -660,6 +698,7 @@ grep -q 'smoke = true' "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
 mkdir -p "$tmp/sdk-source-2/lean-vir-sdk/js" "$tmp/sdk-source-2/lean-vir-sdk/wasm"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js"
 printf '%s\n' 'fake-wasm-2' > "$tmp/sdk-source-2/lean-vir-sdk/wasm/vir-upstream.wasm"
+write_sdk_metadata "$tmp/sdk-source-2/lean-vir-sdk"
 sdk_hash="$(sha256sum "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
 wasm_hash="$(sha256sum "$tmp/sdk-source-2/lean-vir-sdk/wasm/vir-upstream.wasm" | cut -d' ' -f1)"
 write_sdk_manifest "$tmp/sdk-source-2/lean-vir-sdk" "$repo_commit" "$sdk_hash" "$wasm_hash"

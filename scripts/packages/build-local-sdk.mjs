@@ -5,7 +5,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createHash } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import {
   access,
@@ -25,6 +24,11 @@ import { runSync } from "../process-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { parseLeanBuildIdentity } from "./lean-build-identity.mjs";
 import { PACKAGE_VERSIONS } from "./package-versions.mjs";
+import {
+  SDK_METADATA_FILES,
+  sdkFileRecord,
+  sdkReadme,
+} from "./sdk-metadata.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
 const usage = `usage: node scripts/packages/build-local-sdk.mjs
@@ -194,12 +198,6 @@ async function resolveWasiSdk(source, buildSource) {
   return installed;
 }
 
-async function fileRecord(root, path) {
-  const bytes = await readFile(join(root, path));
-  const hash = createHash("sha256").update(bytes).digest("hex");
-  return { path, sha256: hash, byteSize: bytes.byteLength };
-}
-
 async function buildLocalSdk(options) {
   const packageJson = JSON.parse(
     await readFile(join(repositoryRoot, "package.json"), "utf8"),
@@ -262,7 +260,7 @@ async function buildLocalSdk(options) {
       join(buildSource, source),
       join(options.out, destination),
     );
-    files.push(await fileRecord(options.out, destination));
+    files.push(await sdkFileRecord(options.out, destination));
   }
   await copyFileWithDirs(
     join(repositoryRoot, "LICENSE"),
@@ -274,8 +272,11 @@ async function buildLocalSdk(options) {
   );
   await writeFile(
     join(options.out, "README.txt"),
-    "Lean VIR SDK built locally for the consuming workspace's exact Lean toolchain.\n",
+    sdkReadme({ localBuild: true }),
   );
+  for (const path of SDK_METADATA_FILES) {
+    files.push(await sdkFileRecord(options.out, path));
+  }
 
   const gitDirty = git(repositoryRoot, ["status", "--short"]).length !== 0;
   const manifest = {

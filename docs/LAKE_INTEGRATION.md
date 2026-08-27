@@ -233,6 +233,9 @@ writes:
   VIR_WEB_ASSETS.json
   sdk/
     lean-vir-artifact.json
+    README.txt
+    LICENSE
+    NOTICE
     js/...
     wasm/...
   programs/
@@ -259,7 +262,8 @@ The version-1 manifest contract has six required top-level fields:
 - `hostPackage` names the application package and `vir` records the selected
   `lean_vir` version and source commit;
 - `sdk` records its manifest, runtime-module and Wasm paths, identity,
-  compatibility tuple, and complete `files` array;
+  compatibility tuple, and complete `files` array, including the SDK README,
+  license, and notice;
 - `programs` contains each program's stable ID, package/module identity,
   descriptor path, compatibility tuple, and complete `files` array.
 

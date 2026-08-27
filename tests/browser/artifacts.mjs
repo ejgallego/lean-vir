@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,6 +29,7 @@ import {
   INTERFACE_MANIFEST_VERSION,
   RUNTIME_ABI_VERSION,
 } from "../../scripts/packages/package-versions.mjs";
+import { SDK_METADATA_FILES } from "../../scripts/packages/sdk-metadata.mjs";
 import { sdkArchiveEntries } from "../../scripts/packages/sdk-payloads.mjs";
 
 const distDir = new URL("../../web/dist/", import.meta.url);
@@ -110,6 +112,17 @@ async function assertSdkBundle(path) {
   assert.equal(manifest.manifestVersion, INTERFACE_MANIFEST_VERSION);
   assert.equal(manifest.runtimeAbiVersion, RUNTIME_ABI_VERSION);
   assert.ok(Array.isArray(manifest.files));
+  const files = new Map(manifest.files.map((file) => [file.path, file]));
+  for (const path of SDK_METADATA_FILES) {
+    const file = files.get(path);
+    assert.ok(file, `SDK manifest does not list ${path}`);
+    const { stdout: contents } = await execFileAsync("tar", ["-xOzf", archivePath, `lean-vir-sdk/${path}`]);
+    assert.equal(file.byteSize, Buffer.byteLength(contents));
+    assert.equal(file.sha256, createHash("sha256").update(contents).digest("hex"));
+  }
+  const { stdout: readme } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/README.txt"]);
+  assert.match(readme, /needs := #\[`@:virWebAssets\]/);
+  assert.match(readme, /one live Wasm instance and Lean heap/);
 }
 
 async function assertSurfaceReport() {

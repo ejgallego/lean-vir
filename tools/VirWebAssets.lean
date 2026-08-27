@@ -255,10 +255,9 @@ def readSdk (opts : Options) : IO SdkInfo := do
   let sdkDir := opts.sdkManifest.parent.getD "."
   let files ← verifyListedFiles sdkDir "SDK" manifest
   let paths := files.map (·.path)
-  unless paths.contains "js/vir-runtime.js" do
-    throw <| IO.userError "SDK does not contain js/vir-runtime.js"
-  unless paths.contains "wasm/vir-upstream.wasm" do
-    throw <| IO.userError "SDK does not contain wasm/vir-upstream.wasm"
+  for path in #["README.txt", "LICENSE", "NOTICE", "js/vir-runtime.js", "wasm/vir-upstream.wasm"] do
+    unless paths.contains path do
+      throw <| IO.userError s!"SDK does not contain {path}"
   let manifestFile ← inspectFile opts.sdkManifest "lean-vir-artifact.json"
   return { version, gitCommit, compatibility, manifestFile, files }
 

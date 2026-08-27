@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { SDK_METADATA_FILES } from "./sdk-metadata.mjs";
+
 export const SDK_PAYLOADS = [
   ["wasm/vir-upstream.wasm", "web/public/vir-upstream.wasm"],
   ["wasm/vir-upstream.dev.wasm", "web/public/vir-upstream.dev.wasm"],
@@ -34,13 +36,6 @@ export const SDK_PAYLOADS = [
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 
-const SDK_METADATA_ENTRIES = [
-  "README.txt",
-  "LICENSE",
-  "NOTICE",
-  "lean-vir-artifact.json",
-];
-
 export const SDK_JS_MODULES = SDK_PAYLOADS
   .map(([dest]) => dest)
   .filter((dest) => dest.startsWith("js/"))
@@ -48,7 +43,8 @@ export const SDK_JS_MODULES = SDK_PAYLOADS
 
 export function sdkArchiveEntries(root = "lean-vir-sdk") {
   return [
-    ...SDK_METADATA_ENTRIES.map((entry) => `${root}/${entry}`),
+    ...SDK_METADATA_FILES.map((entry) => `${root}/${entry}`),
+    `${root}/lean-vir-artifact.json`,
     ...SDK_PAYLOADS.map(([dest]) => `${root}/${dest}`),
   ];
 }

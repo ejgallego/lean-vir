@@ -1,0 +1,88 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+export const SDK_METADATA_FILES = Object.freeze([
+  "README.txt",
+  "LICENSE",
+  "NOTICE",
+]);
+
+export async function sdkFileRecord(root, path, extra = {}) {
+  const bytes = await readFile(join(root, path));
+  return {
+    path,
+    ...extra,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    byteSize: bytes.byteLength,
+  };
+}
+
+export function sdkReadme({ localBuild = false } = {}) {
+  const provenance = localBuild
+    ? "This copy was built locally for the consuming workspace's exact Lean toolchain."
+    : "This copy was packaged for the matching lean_vir package revision.";
+  return `Lean VIR SDK
+============
+
+${provenance}
+
+This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter.
+The preferred Lake application workflow is:
+
+  1. mark the application root's declarations with @[vir_export] and
+     @[vir_startup];
+  2. list the root in vir-web-assets.json;
+  3. add needs := #[\`@:virWebAssets] to the application's ordinary target; and
+  4. build that target and deploy its .lake/build/vir/web-assets directory.
+
+The application root may import contributions from several Lake packages. To
+run them in one live Wasm instance and Lean heap, keep one explicit root and let
+that root own the public wrappers, startup order, and lifecycle.
+
+The lower-level commands remain available for custom artifact assembly:
+
+  lake build +MyApp.Runtime:vir
+  lake build :virSdk
+
+The JavaScript files are ES modules. The generic runtime and host-binding
+modules do not import React; js/vir-react-host-bindings.js imports react and
+react-dom/client and should only be used by browser React integrations.
+
+Application code should import the entry modules directly under js/:
+
+  js/vir-runtime.js
+  js/vir-runtime-node.js
+  js/vir-host-bindings.js
+  js/vir-react-host-bindings.js
+
+Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
+modules can resolve relative imports. They remain internal implementation
+modules and may change with the matching lean_vir revision.
+
+For custom assembly, serve the selected Wasm file, the runtime modules, and the
+generated .irpkg-set.json together with all of its .irpkg members. Minimal
+browser usage is:
+
+  import { createVirRuntime } from "./js/vir-runtime.js";
+
+  const vir = await createVirRuntime({
+    wasmUrl: "./wasm/vir-upstream.wasm",
+    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
+  });
+
+  vir.runStartupEntries();
+
+Call vir.dispose() when the page or application is torn down. Set debugWasm:
+true to select wasm/vir-upstream.dev.wasm when using the standard SDK layout.
+
+Check lean-vir-artifact.json before mixing this SDK with generated packages
+from another lean_vir revision or Lean compiler identity.
+`;
+}

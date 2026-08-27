@@ -12,6 +12,23 @@ import { basename, join } from "node:path";
 import test from "node:test";
 
 import { acquireLeanSource } from "../../scripts/packages/build-local-sdk.mjs";
+import {
+  SDK_METADATA_FILES,
+  sdkReadme,
+} from "../../scripts/packages/sdk-metadata.mjs";
+
+test("shared SDK guidance prefers composed application assets", () => {
+  assert.deepEqual(SDK_METADATA_FILES, ["README.txt", "LICENSE", "NOTICE"]);
+  for (const readme of [sdkReadme(), sdkReadme({ localBuild: true })]) {
+    assert.match(readme, /needs := #\[`@:virWebAssets\]/);
+    assert.match(readme, /one live Wasm instance and Lean heap/);
+    assert.match(readme, /lower-level commands remain available/);
+  }
+  assert.match(
+    sdkReadme({ localBuild: true }),
+    /built locally for the consuming workspace's exact Lean toolchain/,
+  );
+});
 
 function git(cwd, args) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
