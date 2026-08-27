@@ -27,6 +27,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/host/vir-host-resources.js",
   "web/src/host/vir-js-collection-bindings.js",
   "web/src/host/vir-js-value-bindings.js",
+  "web/src/host/vir-proofwidgets-refs.js",
   "web/src/host/vir-virtual-host-bindings.js",
   "web/src/pages/browser-package-config.js",
   "web/src/react/vir-react-hooks.js",
@@ -44,6 +45,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/runtime/object-values.js",
   "web/src/runtime/vir-codec.js",
   "web/src/runtime/vir-value-normalizers.js",
+  "web/src/vir-browser-host-bindings.js",
   "web/src/vir-host-bindings.js",
   "web/src/vir-runtime.js",
 ];

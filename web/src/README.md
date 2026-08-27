@@ -7,12 +7,16 @@ unrelated responsibilities.
 
 ## Runtime Entry Points
 
+- `vir-web-assets.js`: staged-SDK helper that validates a composed-assets
+  manifest and creates one explicitly named program runtime.
 - `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
   convenience helpers, and host import wiring.
 - `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs virtual browser and
   React host bindings.
-- `vir-host-bindings.js`: public package/SDK common/browser host-binding factories and
-  stable re-exports.
+- `vir-browser-host-bindings.js`: browser runtime's dependency-closure entry for
+  common/browser host-binding factories.
+- `vir-host-bindings.js`: compatibility facade that also exports the Node and
+  virtual-document bindings.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.

@@ -488,17 +488,13 @@ private def virResolveWebProgram (config : VirWebProgramConfig) : FetchM VirReso
         pure module
   return { config, module }
 
-/--
-Compose the root application's `vir-web-assets.json` into one deployable
-directory containing one matching SDK and one or more VIR package sets.
--/
-package_facet virWebAssets (pkg : Package) : System.FilePath := do
+private def virComposeWebAssets
+    (pkg : Package)
+    (outputDir : System.FilePath)
+    (programs : Array VirResolvedWebProgram)
+    (configPath? : Option System.FilePath := none) : FetchM (Job System.FilePath) := do
   let identity ← virSourceIdentity
-  let configPath := pkg.dir / "vir-web-assets.json"
-  let outputDir := pkg.buildDir / "vir" / "web-assets"
   let outputManifest := outputDir / "VIR_WEB_ASSETS.json"
-  let configs ← virReadWebAssetsConfig configPath
-  let programs ← configs.mapM virResolveWebProgram
   let composerJob ← vir_web_assets.fetch
   let sdkJob ← pkg.fetchFacetJob `virSdk
   let descriptorJobs ← programs.mapM fun program => program.module.fetchFacetJob `vir
@@ -508,7 +504,8 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
     sdkJob.bindM fun _ =>
       descriptorsJob.mapM fun _ => do
         addTrace (← computeTrace composer)
-        addTrace (← computeTrace configPath)
+        if let some configPath := configPath? then
+          addTrace (← computeTrace configPath)
         addTrace (← computeTrace sdkManifest)
         addPureTrace identity.version "lean_vir version"
         if let some commit := identity.commit? then
@@ -548,3 +545,34 @@ package_facet virWebAssets (pkg : Package) : System.FilePath := do
             env := ← getAugmentedEnv
           }
         return outputManifest
+
+/--
+Compose the root application's `vir-web-assets.json` into one deployable
+directory containing one matching SDK and one or more VIR package sets.
+-/
+package_facet virWebAssets (pkg : Package) : System.FilePath := do
+  let configPath := pkg.dir / "vir-web-assets.json"
+  let configs ← virReadWebAssetsConfig configPath
+  let programs ← configs.mapM virResolveWebProgram
+  virComposeWebAssets pkg (pkg.buildDir / "vir" / "web-assets") programs (some configPath)
+
+/--
+Compose a one-root Lean library as a named VIR web-assets target. The library
+name is the explicit program ID; its owning package and sole root select the
+program module without source-side JSON configuration.
+-/
+library_facet virWebAssets (lib : LeanLib) : System.FilePath := do
+  if lib.roots.size != 1 then
+    error s!"VIR web-assets library `{lib.name}` must declare exactly one root module"
+  let some moduleName := lib.roots[0]?
+    | error s!"VIR web-assets library `{lib.name}` must declare exactly one root module"
+  let id := lib.name.toString (escape := false)
+  virValidateWebAssetProgramId id
+  let some module := lib.pkg.findTargetModule? moduleName
+    | error s!"VIR web-assets module `{moduleName}` was not found in package `{lib.pkg.prettyName}`"
+  let program : VirResolvedWebProgram := {
+    config := { id, package? := some lib.pkg.prettyName, moduleName }
+    module
+  }
+  let outputDir := lib.pkg.buildDir / "vir" / "web-assets" / id
+  virComposeWebAssets lib.pkg outputDir #[program]

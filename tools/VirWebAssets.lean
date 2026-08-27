@@ -234,6 +234,9 @@ structure SdkInfo where
   gitCommit : String
   compatibility : Compatibility
   manifestFile : AssetFile
+  webAssetsModule : String
+  runtimeModule : String
+  wasm : String
   files : Array AssetFile
 
 def readSdk (opts : Options) : IO SdkInfo := do
@@ -253,13 +256,35 @@ def readSdk (opts : Options) : IO SdkInfo := do
   let compatibility ← readCompatibility source manifest "leanVersionString"
   validateCompatibility source compatibility
   let sdkDir := opts.sdkManifest.parent.getD "."
-  let files ← verifyListedFiles sdkDir "SDK" manifest
-  let paths := files.map (·.path)
-  for path in #["README.txt", "LICENSE", "NOTICE", "js/vir-runtime.js", "wasm/vir-upstream.wasm"] do
+  let allFiles ← verifyListedFiles sdkDir "SDK" manifest
+  let browser ← jsonField source manifest "browser" pure
+  let webAssetsModule ← jsonField "SDK browser profile" browser "webAssetsModule" Json.getStr?
+  let runtimeModule ← jsonField "SDK browser profile" browser "runtimeModule" Json.getStr?
+  let wasm ← jsonField "SDK browser profile" browser "wasm" Json.getStr?
+  let selectedJsons ← jsonField "SDK browser profile" browser "files" Json.getArr?
+  if selectedJsons.isEmpty then
+    throw <| IO.userError "SDK browser profile must select at least one file"
+  let mut files := #[]
+  let mut paths : Array String := #[]
+  for selectedJson in selectedJsons do
+    let path ← match selectedJson.getStr? with
+      | .ok path => pure path
+      | .error err => throw <| IO.userError s!"invalid SDK browser profile file: {err}"
+    discard <| validatedRelativePath "SDK browser profile" path
+    if paths.contains path then
+      throw <| IO.userError s!"SDK browser profile contains duplicate file: {path}"
+    let some file := allFiles.find? (·.path == path)
+      | throw <| IO.userError s!"SDK browser profile selects an unlisted file: {path}"
+    paths := paths.push path
+    files := files.push file
+  for path in #["README.txt", "LICENSE", "NOTICE", webAssetsModule, runtimeModule, wasm] do
     unless paths.contains path do
-      throw <| IO.userError s!"SDK does not contain {path}"
+      throw <| IO.userError s!"SDK browser profile does not select {path}"
   let manifestFile ← inspectFile opts.sdkManifest "lean-vir-artifact.json"
-  return { version, gitCommit, compatibility, manifestFile, files }
+  return {
+    version, gitCommit, compatibility, manifestFile,
+    webAssetsModule, runtimeModule, wasm, files
+  }
 
 structure ProgramInfo where
   arg : ProgramArg
@@ -334,7 +359,7 @@ def verifyInstalled (out : FilePath) : IO Unit := do
   validateCompatibility "staged SDK" sdkCompatibility
   let sdkFiles ← verifyListedFiles out "staged SDK" sdkJson
   let sdkPaths := sdkFiles.map (·.path)
-  for field in #["manifest", "runtimeModule", "wasm"] do
+  for field in #["manifest", "webAssetsModule", "runtimeModule", "wasm"] do
     let path ← jsonField "staged SDK" sdkJson field Json.getStr?
     discard <| validatedRelativePath s!"staged SDK {field}" path
     unless sdkPaths.contains path do
@@ -458,8 +483,9 @@ def manifestJson (opts : Options) (sdk : SdkInfo) (programs : Array ProgramInfo)
       ("version", jsonString sdk.version),
       ("gitCommit", jsonString sdk.gitCommit),
       ("compatibility", sdk.compatibility.toJson),
-      ("runtimeModule", jsonString "sdk/js/vir-runtime.js"),
-      ("wasm", jsonString "sdk/wasm/vir-upstream.wasm"),
+      ("webAssetsModule", jsonString s!"sdk/{sdk.webAssetsModule}"),
+      ("runtimeModule", jsonString s!"sdk/{sdk.runtimeModule}"),
+      ("wasm", jsonString s!"sdk/{sdk.wasm}"),
       ("files", jsonArray <| (#[sdk.manifestFile] ++ sdk.files).map fun file =>
         { file with path := s!"sdk/{file.path}" }.toJson)
     ]),

@@ -38,9 +38,11 @@ The preferred Lake application workflow is:
 
   1. mark the application root's declarations with @[vir_export] and
      @[vir_startup];
-  2. list the root in vir-web-assets.json;
-  3. add needs := #[\`@:virWebAssets] to the application's ordinary target; and
-  4. build that target and deploy its .lake/build/vir/web-assets directory.
+  2. declare a one-root Lean library named for the program;
+  3. add that library's virWebAssets facet to the application's ordinary
+     target; and
+  4. build that target and deploy its named .lake/build/vir/web-assets
+     directory.
 
 The application root may import contributions from several Lake packages. To
 run them in one live Wasm instance and Lean heap, keep one explicit root and let
@@ -57,6 +59,7 @@ react-dom/client and should only be used by browser React integrations.
 
 Application code should import the entry modules directly under js/:
 
+  js/vir-web-assets.js
   js/vir-runtime.js
   js/vir-runtime-node.js
   js/vir-host-bindings.js
@@ -68,19 +71,21 @@ modules and may change with the matching lean_vir revision.
 
 For custom assembly, serve the selected Wasm file, the runtime modules, and the
 generated .irpkg-set.json together with all of its .irpkg members. Minimal
-browser usage is:
+composed-assets browser usage is:
 
-  import { createVirRuntime } from "./js/vir-runtime.js";
+  import { createVirWebAssetsRuntime } from "./sdk/js/vir-web-assets.js";
 
-  const vir = await createVirRuntime({
-    wasmUrl: "./wasm/vir-upstream.wasm",
-    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
-  });
+  const vir = await createVirWebAssetsRuntime(
+    "./VIR_WEB_ASSETS.json",
+    "my-program",
+  );
 
   vir.runStartupEntries();
 
-Call vir.dispose() when the page or application is torn down. Set debugWasm:
-true to select wasm/vir-upstream.dev.wasm when using the standard SDK layout.
+Expose the runtime where the application needs it and call vir.dispose() when
+the page or application is torn down. The composed directory contains the
+browser dependency closure selected by the SDK manifest; Node, React, and
+debug-Wasm payloads remain available in the full SDK for custom assembly.
 
 Check lean-vir-artifact.json before mixing this SDK with generated packages
 from another lean_vir revision or Lean compiler identity.

@@ -24,7 +24,11 @@ import {
   sdkFileRecord,
   sdkReadme,
 } from "./sdk-metadata.mjs";
-import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
+import {
+  SDK_BROWSER_PROFILE,
+  SDK_PAYLOADS,
+  sdkBrowserFiles,
+} from "./sdk-payloads.mjs";
 
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
 const artifactPaths = artifactBundlePaths(repositoryRoot, artifactName);
@@ -68,6 +72,10 @@ const leanVersion = runSync("lean", ["--version"], {
   capture: true,
 });
 const leanBuildIdentity = parseLeanBuildIdentity(leanVersion);
+const browser = {
+  ...SDK_BROWSER_PROFILE,
+  files: await sdkBrowserFiles(artifactPaths.bundleDir),
+};
 const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
@@ -77,6 +85,7 @@ const artifactManifest = {
   leanVersion,
   ...leanBuildIdentity,
   ...PACKAGE_VERSIONS,
+  browser,
   generatedAt: new Date().toISOString(),
   files,
 };

@@ -9,8 +9,8 @@ For downstream Lake packages, the preferred workflow is:
 1. add `lean_vir` as a pinned Lake dependency;
 2. mark browser exports with `@[vir_export]` and startup hooks with
    `@[vir_startup]`;
-3. list one or more program modules in `vir-web-assets.json` and make the
-   application's normal target depend on `@:virWebAssets`;
+3. declare a one-root Lean library named for the program and make the
+   application's normal target depend on that library's `virWebAssets` facet;
 4. serve the resulting one-SDK/many-program directory and call
    `runStartupEntries()` for the selected program.
 
@@ -59,28 +59,21 @@ how to make that IR available. The `:vir` build repeats marker checks for raw
 metadata and reports generated boxed-boundary, package-wide, or unresolved
 dependency problems.
 
-List the program in the application root's `vir-web-assets.json`:
+Declare a one-root library whose target name is the explicit program ID. Lake
+provides the owning package and checks the root module as part of the target:
 
-```json
-{
-  "format": "lean-vir-web-assets-config",
-  "version": 1,
-  "programs": [
-    {"id": "slides", "package": "verso-slides", "module": "MySlides.Runtime"}
-  ]
-}
+```lean
+lean_lib «slides» where
+  roots := #[`MySlides.Runtime]
 ```
 
-`package` is the exact Lake package identifier, so quoted Lake names containing
-hyphens are written without Lean's `«...»` source escaping.
-
-Attach the root package facet to the application's ordinary target and build
-that target:
+Attach that named library facet to the application's ordinary target and build
+the target. The `@/` prefix means a target in the current package:
 
 ```lean
 lean_exe my_slides where
   root := `Main
-  needs := #[`@:virWebAssets]
+  needs := #[`@/«slides»:virWebAssets]
 ```
 
 ```bash
@@ -94,9 +87,28 @@ the durable release. If the toolchains differ, it builds and caches an SDK from
 the resolved VIR source and the application's exact Lean source revision. The
 strict Lean identity check remains in force.
 
-The application facet builds each module's package set, installs one matching
-SDK, checks source/ABI compatibility and digests, and stages everything under
-`.lake/build/vir/web-assets/` with a `VIR_WEB_ASSETS.json` discovery manifest.
+The application facet builds the root's dependency-cone package set, installs
+one matching SDK, checks source/ABI compatibility and digests, and stages
+everything under `.lake/build/vir/web-assets/slides/` with a
+`VIR_WEB_ASSETS.json` discovery manifest.
+The staged browser helper reduces loading to one named-program call:
+
+```js
+import { createVirWebAssetsRuntime } from
+  "./vir/sdk/js/vir-web-assets.js";
+
+const vir = await createVirWebAssetsRuntime(
+  "./vir/VIR_WEB_ASSETS.json",
+  "slides",
+);
+vir.runStartupEntries();
+window.vir = vir;
+window.addEventListener("pagehide", () => vir.dispose(), { once: true });
+```
+
+Composition copies the SDK manifest's browser dependency closure rather than
+the full SDK, leaving the debug Wasm and Node/React modules out of the
+application directory.
 The lower-level `+Module:vir` and `:virSdk` facets remain available for custom
 artifact workflows. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
@@ -250,7 +262,7 @@ npm run build:sdk-artifact
 ```
 
 Client Lake applications should normally receive the matching SDK through their
-ordinary target's `@:virWebAssets` dependency, as shown above. The standalone
+named library's `virWebAssets` facet, as shown above. The standalone
 `:virSdk` facet and lower-level package executable remain available for explicit
 artifact-management workflows. The first complete client is
 [ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).

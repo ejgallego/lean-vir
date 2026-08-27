@@ -16,6 +16,7 @@ import {
   createBrowserReactNodeFragmentResource,
   createBrowserReactNodeTextResource,
   createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
+  reactNodeResourceFactories,
 } from "./react/vir-react-node.js";
 import {
   hasHostResourceFinalizationSupport,
@@ -49,6 +50,7 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
           createBrowserReactNodeElementResource(state, React.createElement, hooks, elementType, props, children),
         createNodeFragmentResource: (props, children) =>
           createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children),
+        ...reactNodeResourceFactories,
       }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),

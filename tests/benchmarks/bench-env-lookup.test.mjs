@@ -114,6 +114,7 @@ test("environment lookup harness identity covers the loaded runtime source closu
     "web/src/pages/browser-package-config.js",
     "web/src/runtime/core.js",
     "web/src/runtime/object-values.js",
+    "web/src/vir-browser-host-bindings.js",
     "web/src/vir-host-bindings.js",
     "web/src/vir-runtime.js",
   ]) {

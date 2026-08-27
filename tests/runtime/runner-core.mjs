@@ -17,6 +17,7 @@ function freezeRuntimeTest(test) {
 
 export const runtimeTests = Object.freeze([
   { id: "manifest", file: "manifest-smoke.mjs", group: "pure" },
+  { id: "web-assets-helper", file: "web-assets-helper-smoke.mjs", group: "pure" },
   { id: "call-timing", file: "call-timing-smoke.mjs", group: "pure" },
   { id: "js-float", file: "js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },

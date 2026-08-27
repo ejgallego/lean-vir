@@ -83,6 +83,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 
 | Module | Role |
 | --- | --- |
+| `vir-web-assets.js` | Composed-assets manifest validation and named-program runtime creation. |
 | `vir-runtime.js` | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
 | `runtime/call-timing.js` | Internal accumulator for opt-in synchronous runtime call phase attribution. |
@@ -95,7 +96,8 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/object-abi.js` | Object ABI support checks, layout planning, scalar packing, and unpacking helpers. |
 | `runtime/object-abi-exports.js` | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling. |
 | `runtime/vir-value-normalizers.js` | Input normalization helpers used by object ABI lowering. |
-| `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
+| `vir-browser-host-bindings.js` | Browser-only host-binding dependency-closure entry used by the generic runtime. |
+| `vir-host-bindings.js` | Compatibility facade for browser, Node, and virtual-document host bindings. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
 | `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |

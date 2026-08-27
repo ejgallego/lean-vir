@@ -29,7 +29,11 @@ import {
   sdkFileRecord,
   sdkReadme,
 } from "./sdk-metadata.mjs";
-import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
+import {
+  SDK_BROWSER_PROFILE,
+  SDK_PAYLOADS,
+  sdkBrowserFiles,
+} from "./sdk-payloads.mjs";
 
 const usage = `usage: node scripts/packages/build-local-sdk.mjs
   --out DIR --cache DIR --expect-version VERSION --expect-commit SHA
@@ -277,6 +281,10 @@ async function buildLocalSdk(options) {
   for (const path of SDK_METADATA_FILES) {
     files.push(await sdkFileRecord(options.out, path));
   }
+  const browser = {
+    ...SDK_BROWSER_PROFILE,
+    files: await sdkBrowserFiles(options.out),
+  };
 
   const gitDirty = git(repositoryRoot, ["status", "--short"]).length !== 0;
   const manifest = {
@@ -289,6 +297,7 @@ async function buildLocalSdk(options) {
     leanVersionString: options.leanVersion,
     leanGithash: options.leanGithash,
     ...PACKAGE_VERSIONS,
+    browser,
     generatedAt: new Date().toISOString(),
     files,
   };

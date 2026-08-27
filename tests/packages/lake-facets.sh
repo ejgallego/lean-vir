@@ -33,17 +33,25 @@ write_sdk_manifest() {
   local readme_hash
   local license_hash
   local notice_hash
+  local helper_hash
+  local unused_hash
   local readme_size
   local license_size
   local notice_size
+  local helper_size
+  local unused_size
   js_size="$(wc -c < "$sdk_dir/js/vir-runtime.js")"
   wasm_size="$(wc -c < "$sdk_dir/wasm/vir-upstream.wasm")"
   readme_hash="$(sha256sum "$sdk_dir/README.txt" | cut -d' ' -f1)"
   license_hash="$(sha256sum "$sdk_dir/LICENSE" | cut -d' ' -f1)"
   notice_hash="$(sha256sum "$sdk_dir/NOTICE" | cut -d' ' -f1)"
+  helper_hash="$(sha256sum "$sdk_dir/js/vir-web-assets.js" | cut -d' ' -f1)"
+  unused_hash="$(sha256sum "$sdk_dir/js/unused.js" | cut -d' ' -f1)"
   readme_size="$(wc -c < "$sdk_dir/README.txt")"
   license_size="$(wc -c < "$sdk_dir/LICENSE")"
   notice_size="$(wc -c < "$sdk_dir/NOTICE")"
+  helper_size="$(wc -c < "$sdk_dir/js/vir-web-assets.js")"
+  unused_size="$(wc -c < "$sdk_dir/js/unused.js")"
   printf '%s\n' \
     '{' \
     '  "name": "lean-vir-sdk",' \
@@ -56,7 +64,15 @@ write_sdk_manifest() {
     '  "packageFormatVersion": 10,' \
     '  "manifestVersion": 7,' \
     '  "runtimeAbiVersion": 1,' \
+    '  "browser": {' \
+    '    "webAssetsModule": "js/vir-web-assets.js",' \
+    '    "runtimeModule": "js/vir-runtime.js",' \
+    '    "wasm": "wasm/vir-upstream.wasm",' \
+    '    "files": ["README.txt", "LICENSE", "NOTICE", "js/vir-web-assets.js", "js/vir-runtime.js", "wasm/vir-upstream.wasm"]' \
+    '  },' \
     '  "files": [' \
+    "    {\"path\": \"js/vir-web-assets.js\", \"sha256\": \"$helper_hash\", \"byteSize\": $helper_size}," \
+    "    {\"path\": \"js/unused.js\", \"sha256\": \"$unused_hash\", \"byteSize\": $unused_size}," \
     "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$js_hash\", \"byteSize\": $js_size}," \
     "    {\"path\": \"wasm/vir-upstream.wasm\", \"sha256\": \"$wasm_hash\", \"byteSize\": $wasm_size}," \
     "    {\"path\": \"README.txt\", \"sha256\": \"$readme_hash\", \"byteSize\": $readme_size}," \
@@ -71,6 +87,8 @@ write_sdk_metadata() {
   printf '%s\n' 'Lean VIR SDK fixture' > "$sdk_dir/README.txt"
   cp LICENSE "$sdk_dir/LICENSE"
   cp NOTICE "$sdk_dir/NOTICE"
+  printf '%s\n' 'export const fixture = true;' > "$sdk_dir/js/vir-web-assets.js"
+  printf '%s\n' 'export const unused = true;' > "$sdk_dir/js/unused.js"
 }
 
 assert_module_fixture_descriptor() {
@@ -180,6 +198,13 @@ printf '%s\n' \
   '@[default_target]' \
   'lean_lib Smoke' \
   '' \
+  'lean_lib «runtime-assets» where' \
+  '  roots := #[`Smoke.Runtime]' \
+  '' \
+  'lean_exe typed_smoke_app where' \
+  '  root := `TypedMain' \
+  '  needs := #[`@/«runtime-assets»:virWebAssets]' \
+  '' \
   'lean_exe smoke_app where' \
   '  root := `Main' \
   '  needs := #[`@:virWebAssets]' > "$tmp/lakefile.lean"
@@ -202,6 +227,8 @@ cp lean-toolchain "$tmp/dep/lean-toolchain"
 
 printf '%s\n' \
   'def main : IO Unit := pure ()' > "$tmp/Main.lean"
+printf '%s\n' \
+  'def main : IO Unit := pure ()' > "$tmp/TypedMain.lean"
 
 printf '%s\n' \
   'module' \
@@ -377,6 +404,20 @@ lake -d "$tmp" build Smoke.PackagePipeline
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
 
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build typed_smoke_app
+typed_web_assets="$tmp/.lake/build/vir/web-assets/runtime-assets"
+test -f "$typed_web_assets/VIR_WEB_ASSETS.json"
+test -f "$typed_web_assets/sdk/js/vir-web-assets.js"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  if (manifest.hostPackage !== "vir-lake-smoke") process.exit(1);
+  if (manifest.programs?.length !== 1) process.exit(1);
+  if (manifest.programs[0]?.id !== "runtime-assets") process.exit(1);
+  if (manifest.programs[0]?.package !== "vir-lake-smoke") process.exit(1);
+  if (manifest.programs[0]?.module !== "Smoke.Runtime") process.exit(1);
+' "$typed_web_assets/VIR_WEB_ASSETS.json"
+
 printf '%s\n' \
   '{' \
   '  "format": "lean-vir-web-assets-config",' \
@@ -392,6 +433,8 @@ web_assets="$tmp/.lake/build/vir/web-assets"
 web_manifest="$web_assets/VIR_WEB_ASSETS.json"
 test -f "$web_manifest"
 test -f "$web_assets/sdk/js/vir-runtime.js"
+test -f "$web_assets/sdk/js/vir-web-assets.js"
+test ! -e "$web_assets/sdk/js/unused.js"
 test -f "$web_assets/sdk/wasm/vir-upstream.wasm"
 test -f "$web_assets/sdk/README.txt"
 test -f "$web_assets/sdk/LICENSE"
@@ -406,6 +449,7 @@ node --input-type=module -e '
   if (manifest.sdk?.gitCommit !== process.argv[2]) process.exit(1);
   if (manifest.sdk?.compatibility?.leanGithash !== process.argv[3]) process.exit(1);
   if (manifest.sdk?.runtimeModule !== "sdk/js/vir-runtime.js") process.exit(1);
+  if (manifest.sdk?.webAssetsModule !== "sdk/js/vir-web-assets.js") process.exit(1);
   if (manifest.sdk?.wasm !== "sdk/wasm/vir-upstream.wasm") process.exit(1);
   for (const path of ["sdk/README.txt", "sdk/LICENSE", "sdk/NOTICE"]) {
     if (!manifest.sdk?.files?.some((file) => file.path === path)) process.exit(1);
@@ -656,6 +700,7 @@ test ! -e "$module_package"
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
+test -f "$tmp/.lake/build/vir/sdk/js/vir-web-assets.js"
 test -f "$tmp/.lake/build/vir/sdk/lean-vir-artifact.json"
 test -f "$tmp/.lake/build/vir/sdk/README.txt"
 test -f "$tmp/.lake/build/vir/sdk/LICENSE"

@@ -112,6 +112,27 @@ async function assertSdkBundle(path) {
   assert.equal(manifest.manifestVersion, INTERFACE_MANIFEST_VERSION);
   assert.equal(manifest.runtimeAbiVersion, RUNTIME_ABI_VERSION);
   assert.ok(Array.isArray(manifest.files));
+  assert.equal(manifest.browser?.webAssetsModule, "js/vir-web-assets.js");
+  assert.equal(manifest.browser?.runtimeModule, "js/vir-runtime.js");
+  assert.equal(manifest.browser?.wasm, "wasm/vir-upstream.wasm");
+  const browserFiles = new Set(manifest.browser?.files);
+  for (const required of [
+    ...SDK_METADATA_FILES,
+    "js/vir-web-assets.js",
+    "js/vir-runtime.js",
+    "js/vir-browser-host-bindings.js",
+    "wasm/vir-upstream.wasm",
+  ]) {
+    assert.ok(browserFiles.has(required), `SDK browser profile omits ${required}`);
+  }
+  for (const excluded of [
+    "wasm/vir-upstream.dev.wasm",
+    "js/vir-runtime-node.js",
+    "js/vir-react-host-bindings.js",
+    "js/react/vir-react-node.js",
+  ]) {
+    assert.ok(!browserFiles.has(excluded), `SDK browser profile includes ${excluded}`);
+  }
   const files = new Map(manifest.files.map((file) => [file.path, file]));
   for (const path of SDK_METADATA_FILES) {
     const file = files.get(path);
@@ -121,7 +142,7 @@ async function assertSdkBundle(path) {
     assert.equal(file.sha256, createHash("sha256").update(contents).digest("hex"));
   }
   const { stdout: readme } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/README.txt"]);
-  assert.match(readme, /needs := #\[`@:virWebAssets\]/);
+  assert.match(readme, /one-root Lean library named for the program/);
   assert.match(readme, /one live Wasm instance and Lean heap/);
 }
 

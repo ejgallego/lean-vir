@@ -14,7 +14,7 @@ import {
   VIR_HOST_DISPOSE,
   VIR_HOST_RESOLVE_BINDING,
 } from "../host-resource.js";
-import { createBrowserHostBindings } from "../vir-host-bindings.js";
+import { createBrowserHostBindings } from "../vir-browser-host-bindings.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { collectCleanupError, throwCollectedErrors, throwWithCleanup } from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";

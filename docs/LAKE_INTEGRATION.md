@@ -181,42 +181,24 @@ directly into an executable.
 
 ## Compose Application Web Assets
 
-Add `vir-web-assets.json` at the root of the application package. Each entry
-selects an existing `+Module:vir` producer. Use `package` when the module belongs
-to a dependency or when its name would otherwise be ambiguous; `id` is the
-stable URL directory name and defaults to the module name. An explicit `id`
-must be a URL-safe slug containing only letters, digits, `.`, `_`, or `-`.
-The `package` value is the exact user-facing Lake package identifier. For
-example, the Lean declaration `package «verso-slides»` is selected with
-`"package": "verso-slides"`, without Lean source escaping.
-
-```json
-{
-  "format": "lean-vir-web-assets-config",
-  "version": 1,
-  "programs": [
-    {
-      "id": "slides",
-      "package": "my_slides",
-      "module": "MySlides.Runtime"
-    },
-    {
-      "id": "widgets",
-      "package": "some_dependency",
-      "module": "Widgets.Runtime"
-    }
-  ]
-}
-```
-
-Make the root package's `virWebAssets` facet a dependency of the normal
-application target:
+Declare a one-root Lean library whose target name is the explicit program ID.
+The declaration supplies the owning package and exact module through Lake's
+typed target model; the facet does not discover marked modules automatically.
+Program IDs must be URL-safe slugs containing only letters, digits, `.`, `_`,
+or `-`:
 
 ```lean
+lean_lib «slides» where
+  roots := #[`MySlides.Runtime]
+
 lean_exe my_slides where
   root := `Main
-  needs := #[`@:virWebAssets]
+  needs := #[`@/«slides»:virWebAssets]
 ```
+
+The `@/` prefix selects a target in the current package. The library must own
+exactly one root module; imported package contributions belong in that root's
+dependency cone, preserving the explicit application-root model.
 
 Then the ordinary build produces the executable and its web assets together:
 
@@ -224,28 +206,31 @@ Then the ordinary build produces the executable and its web assets together:
 lake build my_slides
 ```
 
-The facet resolves and builds every listed module facet, installs exactly one
-SDK owned by the root application, verifies source and ABI compatibility, and
-writes:
+The facet builds the selected root module facet, installs exactly one SDK owned
+by the application package, verifies source and ABI compatibility, and
+writes the SDK manifest's browser deployment profile. That profile contains the
+release Wasm, browser helper, runtime module, its static JavaScript dependency
+closure, and distribution metadata. Node and React modules plus the debug Wasm
+remain in the full SDK and are not copied into this application:
 
 ```text
-.lake/build/vir/web-assets/
+.lake/build/vir/web-assets/slides/
   VIR_WEB_ASSETS.json
   sdk/
     lean-vir-artifact.json
     README.txt
     LICENSE
     NOTICE
-    js/...
-    wasm/...
+    js/vir-web-assets.js
+    js/vir-runtime.js
+    js/runtime/...
+    js/host/...
+    wasm/vir-upstream.wasm
   programs/
     slides/
       Runtime.irpkg-set.json
       Runtime.irpkg
       Runtime.parts/...
-    widgets/
-      Runtime.irpkg-set.json
-      Runtime.irpkg
 ```
 
 `VIR_WEB_ASSETS.json` records the `lean_vir` version and source revision, SDK
@@ -261,9 +246,9 @@ The version-1 manifest contract has six required top-level fields:
 - `format` and `version` identify `lean-vir-web-assets` version 1;
 - `hostPackage` names the application package and `vir` records the selected
   `lean_vir` version and source commit;
-- `sdk` records its manifest, runtime-module and Wasm paths, identity,
-  compatibility tuple, and complete `files` array, including the SDK README,
-  license, and notice;
+- `sdk` records its manifest, browser-helper, runtime-module and Wasm paths,
+  identity, compatibility tuple, and complete selected `files` array, including
+  the SDK README, license, and notice;
 - `programs` contains each program's stable ID, package/module identity,
   descriptor path, compatibility tuple, and complete `files` array.
 
@@ -277,56 +262,63 @@ Changing the selected SDK revalidates all programs and replaces only the SDK
 subtree. Removing a program from the configuration removes its owned staging
 directory.
 
+### Multiple Explicit Programs
+
+The named library facet is the normal one-root application path. A host that
+deliberately publishes several independent package sets in one directory can
+retain the package-level facet and an explicit `vir-web-assets.json`:
+
+```json
+{
+  "format": "lean-vir-web-assets-config",
+  "version": 1,
+  "programs": [
+    {"id": "slides", "package": "my-slides", "module": "MySlides.Runtime"},
+    {"id": "widgets", "package": "widgets", "module": "Widgets.Runtime"}
+  ]
+}
+```
+
+```lean
+lean_exe multi_program_host where
+  root := `Main
+  needs := #[`@:virWebAssets]
+```
+
+Every entry remains explicit: `id` is its stable URL directory name, `package`
+is the exact user-facing Lake package identifier, and `module` is the exact
+root. For example, `package «my-slides»` is written as `"my-slides"` in JSON.
+This form stages several independent programs; it does not merge their package
+sets or heaps. A cross-package application that needs one live runtime should
+instead keep one application-owned root and use the named library facet.
+
 The application can copy or serve this one directory without running npm,
 selecting an SDK revision in nested packages, or teaching its renderer about
 Lake's dependency build directories.
 
 All entry-point and program paths in `VIR_WEB_ASSETS.json` are relative to that
-manifest. A browser host can load one manifest, compile the shared Wasm module
-once, and create an isolated runtime for each selected program:
+manifest. Import the staged helper and name the program explicitly:
 
 ```js
-const manifestUrl = new URL(
+import { createVirWebAssetsRuntime } from
+  "./vir/sdk/js/vir-web-assets.js";
+
+const slides = await createVirWebAssetsRuntime(
   "./vir/VIR_WEB_ASSETS.json",
-  window.location.href,
+  "slides",
 );
-const assets = await fetch(manifestUrl).then((response) => {
-  if (!response.ok) throw new Error(`failed to load VIR assets: ${response.status}`);
-  return response.json();
-});
-
-if (assets.format !== "lean-vir-web-assets" || assets.version !== 1) {
-  throw new Error("unsupported VIR web-assets manifest");
-}
-
-const runtimeModuleUrl = new URL(assets.sdk.runtimeModule, manifestUrl);
-const { createVirRuntimeFactory } = await import(runtimeModuleUrl.href);
-const factory = createVirRuntimeFactory({
-  wasmUrl: new URL(assets.sdk.wasm, manifestUrl),
-});
-
-async function createProgramRuntime(id) {
-  const program = assets.programs.find((candidate) => candidate.id === id);
-  if (!program) throw new Error(`unknown VIR program: ${id}`);
-  return factory.createRuntime({
-    irPackageSetUrl: new URL(program.descriptor, manifestUrl),
-  });
-}
-
-const slides = await createProgramRuntime("slides");
 slides.runStartupEntries();
-
-const widgets = await createProgramRuntime("widgets");
-widgets.runStartupEntries();
-
-window.addEventListener("pagehide", () => {
-  slides.dispose();
-  widgets.dispose();
-}, { once: true });
+window.versoVir = slides;
+window.addEventListener("pagehide", () => slides.dispose(), { once: true });
 ```
 
-The two runtimes above share the factory's compiled `WebAssembly.Module`, but
-own separate Wasm instances, Lean heaps, host resources, and startup state.
+The helper validates the discovery manifest, selected SDK paths, named program,
+file records, and composite compatibility tuple before it imports the runtime
+module and creates the program runtime. Applications selecting several
+independent programs can call `createVirWebAssetsFactory()` once and then its
+`createRuntime(id)` method for each program. This preserves shared Wasm
+compilation while each runtime owns a separate instance, Lean heap, host
+resources, and startup state.
 
 A Verso Slides integration can expose configuration shaped like:
 
@@ -334,9 +326,10 @@ A Verso Slides integration can expose configuration shaped like:
 vir := some { module := `MySlides.Runtime }
 ```
 
-That integration should depend on `@:virWebAssets`, copy the one composed
-directory beside the presentation, create its mount element, wait for Reveal
-initialization, load the selected program, and call
+That integration should declare its one-root named library, depend on the
+library's `virWebAssets` facet, copy the returned composed directory beside the
+presentation, create its mount element, wait for Reveal initialization, load
+the selected program, and call
 `vir.runStartupEntries()`. It should call `vir.dispose()` during page teardown
 and render initialization failures visibly.
 

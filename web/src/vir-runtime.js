@@ -8,12 +8,12 @@ import { VirRuntime } from "./runtime/core.js";
 import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
 import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
-import { createBrowserHostBindings } from "./vir-host-bindings.js";
+import { createBrowserHostBindings } from "./vir-browser-host-bindings.js";
 
 export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
-} from "./vir-host-bindings.js";
+} from "./vir-browser-host-bindings.js";
 export {
   releaseHostResource,
   VIR_HOST_DISPOSE,
