@@ -46,7 +46,6 @@ try {
   const webAssets = modules["vir-web-assets.js"];
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
-  const browserHostBindings = modules["vir-browser-host-bindings.js"];
   const codec = modules["runtime/vir-codec.js"];
   const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
@@ -57,7 +56,6 @@ try {
   assert.equal(typeof webAssets.createVirWebAssetsFactory, "function");
   assert.equal(typeof webAssets.loadVirWebAssetsManifest, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
-  assert.equal(typeof browserHostBindings.createBrowserHostBindings, "function");
   assert.equal(typeof hostBindings.createNodeHostBindings, "function");
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(typeof runtime.VirCallback, "function");

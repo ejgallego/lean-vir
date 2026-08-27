@@ -13,10 +13,8 @@ unrelated responsibilities.
   convenience helpers, and host import wiring.
 - `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs virtual browser and
   React host bindings.
-- `vir-browser-host-bindings.js`: browser runtime's dependency-closure entry for
-  common/browser host-binding factories.
-- `vir-host-bindings.js`: compatibility facade that also exports the Node and
-  virtual-document bindings.
+- `vir-host-bindings.js`: public package/SDK common/browser host-binding factories and
+  stable re-exports.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.

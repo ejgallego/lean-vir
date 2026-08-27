@@ -17,17 +17,6 @@ import {
 import { releaseCallbacks, retainCallbackLease, takeCallbackLease } from "../runtime/callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
-export const reactNodeResourceFactories = Object.freeze({
-  createElementTypeTagResource: createReactElementTypeTagResource,
-  createPropsResource: createReactPropsResource,
-  setPropsKey: setReactPropsKey,
-  setPropsProperty: setReactPropsProperty,
-  setPropsEventHandler: setReactPropsEventHandler,
-  setPropsRef: setReactPropsRef,
-  createNodeChildrenResource: createReactNodeChildrenResource,
-  pushNodeChild: pushReactNodeChild,
-});
-
 const REACT_NODE_MAX_DEPTH = 128;
 const REACT_NODE_MAX_NODES = 10000;
 const reactPropsStates = new WeakMap();

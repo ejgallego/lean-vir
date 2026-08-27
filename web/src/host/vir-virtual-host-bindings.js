@@ -9,14 +9,13 @@ import {
   createVirtualReactNodeFragmentResource,
   createVirtualReactNodeTextResource,
   createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
-  reactNodeResourceFactories,
 } from "../react/vir-react-node.js";
 import {
   createReactJsValueHostBindings,
   createReactStateHostBindings,
   createVirtualReactHookRuntime,
 } from "../react/vir-react-hooks.js";
-import { VIR_HOST_DISPOSE, isHostResource } from "../host-resource.js";
+import { VIR_HOST_DISPOSE, hostResourceValue, isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
   createAnimationResourceHostBindings,
@@ -34,15 +33,6 @@ import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js
 import { createStaticNodeList } from "./vir-js-collection-bindings.js";
 import { takeCallbackLease } from "../runtime/callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
-import {
-  normalizeProofWidgetsResolvedRef,
-  normalizeProofWidgetsRpcRef,
-} from "./vir-proofwidgets-refs.js";
-
-export {
-  normalizeProofWidgetsResolvedRef,
-  normalizeProofWidgetsRpcRef,
-} from "./vir-proofwidgets-refs.js";
 
 export function createVirtualDocumentState({
   title = "",
@@ -236,7 +226,6 @@ export function createVirtualDocumentHostBindings(
           createVirtualReactNodeElementResource(resources, reactHooks, elementType, props, children),
         createNodeFragmentResource: (props, children) =>
           createVirtualReactNodeFragmentResource(resources, props, children),
-        ...reactNodeResourceFactories,
       }),
     ...createReactJsValueHostBindings(resources),
     ...createReactStateHostBindings(resources, reactHookRuntime),
@@ -435,6 +424,70 @@ function normalizeInfoviewDocumentPosition(position) {
     return null;
   }
   return { uri, line, character };
+}
+
+export function normalizeProofWidgetsRpcRef(ref) {
+  if (ref === null || typeof ref !== "object") {
+    return null;
+  }
+  const id = stringField(ref.id);
+  if (id.length === 0) {
+    return null;
+  }
+  const normalized = {
+    id,
+    label: stringField(ref.label),
+    typeName: stringField(ref.typeName),
+    summary: stringField(ref.summary),
+    expression: stringField(ref.expression),
+    typeText: stringField(ref.typeText),
+    context: stringField(ref.context),
+  };
+  const serverRef = proofWidgetsServerRpcRef(ref);
+  if (serverRef !== null) {
+    normalized.serverRef = serverRef;
+  }
+  return normalized;
+}
+
+export function normalizeProofWidgetsResolvedRef(ref) {
+  const value = ref !== null && typeof ref === "object" ? ref : {};
+  return {
+    id: stringField(value.id),
+    label: stringField(value.label),
+    typeName: stringField(value.typeName),
+    summary: stringField(value.summary),
+    expression: stringField(value.expression),
+    typeText: stringField(value.typeText),
+    context: stringField(value.context),
+    source: stringField(value.source),
+    position: stringField(value.position),
+    packageRevision: stringField(value.packageRevision),
+    storeKey: stringField(value.storeKey),
+    knownConstant: value.knownConstant === true,
+  };
+}
+
+function stringField(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function proofWidgetsServerRpcRef(ref) {
+  if (isRpcRefObject(ref.serverRef)) {
+    return ref.serverRef;
+  }
+  if (isHostResource(ref.serverRef)) {
+    const value = hostResourceValue(ref.serverRef);
+    return isRpcRefObject(value) ? value : null;
+  }
+  return null;
+}
+
+function isRpcRefObject(value) {
+  return value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (typeof value.__rpcref === "number" || typeof value.p === "number");
 }
 
 function virtualProofWidgetsRpcRefInfo(ref) {

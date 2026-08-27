@@ -13,7 +13,7 @@ import {
 import {
   createHostResourceState,
   createReactHostHooks,
-  createReactRootResourceHostBindings as createRawReactRootResourceHostBindings,
+  createReactRootResourceHostBindings,
 } from "../../web/src/host/vir-host-resources.js";
 import {
   abandonHostResource,
@@ -40,7 +40,6 @@ import {
   createReactNodeResource,
   createVirtualReactRootResource,
   disposeReactNode,
-  reactNodeResourceFactories,
 } from "../../web/src/react/vir-react-node.js";
 import {
   assert,
@@ -67,13 +66,6 @@ import {
   smokeVirtualReactSelectTextarea,
   smokeVirtualReactTamagotchi,
 } from "../support/virtual-react-smoke-scenarios.mjs";
-
-function createReactRootResourceHostBindings(resources, createRootResource, options = {}) {
-  return createRawReactRootResourceHostBindings(resources, createRootResource, {
-    ...reactNodeResourceFactories,
-    ...options,
-  });
-}
 
 const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 

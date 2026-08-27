@@ -25,6 +25,16 @@ import {
   retainHostResourcePayload,
   transferHostResource,
 } from "../host-resource.js";
+import {
+  createReactElementTypeTagResource,
+  createReactNodeChildrenResource,
+  createReactPropsResource,
+  pushReactNodeChild,
+  setReactPropsEventHandler,
+  setReactPropsKey,
+  setReactPropsProperty,
+  setReactPropsRef,
+} from "../react/vir-react-node.js";
 import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 import { takeCallbackLease } from "../runtime/callbacks.js";
@@ -511,14 +521,6 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   createNodeTextResource = null,
   createNodeElementResource = null,
   createNodeFragmentResource = null,
-  createElementTypeTagResource = null,
-  createPropsResource = null,
-  setPropsKey = null,
-  setPropsProperty = null,
-  setPropsEventHandler = null,
-  setPropsRef = null,
-  createNodeChildrenResource = null,
-  pushNodeChild = null,
 } = {}) {
   const rootsByContainer = new WeakMap();
   const rootsBySelector = new Map();
@@ -658,23 +660,23 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
         { tracked: false },
       ),
     "react.elementType.tag": (tag) =>
-      resources.resourceForValue(createElementTypeTagResource(
+      resources.resourceForValue(createReactElementTypeTagResource(
         jsStringValue(resources, tag, "React element type tag"),
       )),
     "react.props.empty": () =>
-      resources.adoptResourceForValue(createPropsResource()),
+      resources.adoptResourceForValue(createReactPropsResource()),
     "react.props.setKey": (props, key) =>
-      setPropsKey(resources, props, key),
+      setReactPropsKey(resources, props, key),
     "react.props.setProperty": (props, property) =>
-      setPropsProperty(resources, props, property),
+      setReactPropsProperty(resources, props, property),
     "react.props.setEventHandler": (props, handler) =>
-      setPropsEventHandler(resources, props, handler),
+      setReactPropsEventHandler(resources, props, handler),
     "react.props.setRef": (props, ref) =>
-      setPropsRef(resources, props, ref),
+      setReactPropsRef(resources, props, ref),
     "react.node.children.empty": () =>
-      resources.adoptResourceForValue(createNodeChildrenResource()),
+      resources.adoptResourceForValue(createReactNodeChildrenResource()),
     "react.node.children.push": (children, child) =>
-      pushNodeChild(resources, children, child),
+      pushReactNodeChild(resources, children, child),
     "react.node.createElement": (elementType, props, children) =>
       resources.adoptResourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(

@@ -84,8 +84,9 @@ composed-assets browser usage is:
 
 Expose the runtime where the application needs it and call vir.dispose() when
 the page or application is torn down. The composed directory contains the
-browser dependency closure selected by the SDK manifest; Node, React, and
-debug-Wasm payloads remain available in the full SDK for custom assembly.
+browser dependency closure selected by the SDK manifest; optional Node and
+browser-React entry points plus the debug Wasm remain available in the full SDK
+for custom assembly.
 
 Check lean-vir-artifact.json before mixing this SDK with generated packages
 from another lean_vir revision or Lean compiler identity.

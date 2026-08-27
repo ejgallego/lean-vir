@@ -120,7 +120,6 @@ async function assertSdkBundle(path) {
     ...SDK_METADATA_FILES,
     "js/vir-web-assets.js",
     "js/vir-runtime.js",
-    "js/vir-browser-host-bindings.js",
     "wasm/vir-upstream.wasm",
   ]) {
     assert.ok(browserFiles.has(required), `SDK browser profile omits ${required}`);
@@ -129,7 +128,6 @@ async function assertSdkBundle(path) {
     "wasm/vir-upstream.dev.wasm",
     "js/vir-runtime-node.js",
     "js/vir-react-host-bindings.js",
-    "js/react/vir-react-node.js",
   ]) {
     assert.ok(!browserFiles.has(excluded), `SDK browser profile includes ${excluded}`);
   }

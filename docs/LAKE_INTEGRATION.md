@@ -210,8 +210,9 @@ The facet builds the selected root module facet, installs exactly one SDK owned
 by the application package, verifies source and ABI compatibility, and
 writes the SDK manifest's browser deployment profile. That profile contains the
 release Wasm, browser helper, runtime module, its static JavaScript dependency
-closure, and distribution metadata. Node and React modules plus the debug Wasm
-remain in the full SDK and are not copied into this application:
+closure, and distribution metadata. The optional Node and browser-React entry
+points plus the debug Wasm remain in the full SDK and are not copied into this
+application:
 
 ```text
 .lake/build/vir/web-assets/slides/

@@ -7,13 +7,11 @@ Author: Emilio J. Gallego Arias
 import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir-runtime.js";
 import {
   createNodeHostBindings,
-} from "./vir-host-bindings.js";
-import {
   createHostResourceState,
-} from "./vir-browser-host-bindings.js";
-import {
   createVirtualDocumentState,
-} from "./host/vir-virtual-host-bindings.js";
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
+} from "./vir-host-bindings.js";
 
 export {
   createVirImports,
@@ -27,8 +25,8 @@ export {
   VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";
-export { createNodeHostBindings } from "./vir-host-bindings.js";
 export {
+  createNodeHostBindings,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
   createVirtualElementState,
@@ -37,12 +35,10 @@ export {
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
-  virtualReactElementById,
-} from "./host/vir-virtual-host-bindings.js";
-export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
-} from "./vir-browser-host-bindings.js";
+  virtualReactElementById,
+} from "./vir-host-bindings.js";
 
 export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, virtualDocumentState = createVirtualDocumentState(), ...browserOptions } = options;

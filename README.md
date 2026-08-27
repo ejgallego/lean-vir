@@ -107,8 +107,8 @@ window.addEventListener("pagehide", () => vir.dispose(), { once: true });
 ```
 
 Composition copies the SDK manifest's browser dependency closure rather than
-the full SDK, leaving the debug Wasm and Node/React modules out of the
-application directory.
+the full SDK, leaving the debug Wasm and optional Node/browser-React entry
+points out of the application directory.
 The lower-level `+Module:vir` and `:virSdk` facets remain available for custom
 artifact workflows. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
