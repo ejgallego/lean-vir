@@ -617,6 +617,45 @@ VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app
 test -f "$web_assets/sdk/NOTICE"
 test -f "$web_manifest"
 
+runtime_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/Runtime.irpkg-set.json"
+new_runtime_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
+sdk_manifest="$tmp/.lake/build/vir/sdk/lean-vir-artifact.json"
+if lake exe vir_web_assets \
+    --out "$tmp/direct-casefold" \
+    --sdk-manifest "$sdk_manifest" \
+    --vir-version "$sdk_version" \
+    --vir-commit "$repo_commit" \
+    --host-package vir-lake-smoke \
+    --program Slides vir-lake-smoke Smoke.Runtime "$runtime_descriptor" \
+    --program slides vir-lake-smoke Smoke.NewRuntime "$new_runtime_descriptor" \
+    > "$tmp/direct-casefold.stdout" 2> "$tmp/direct-casefold.stderr"; then
+  echo "case-fold-colliding direct web-assets program ids unexpectedly composed" >&2
+  exit 1
+fi
+grep -q 'unique under ASCII case-folding.*`Slides` conflicts with `slides`' \
+  "$tmp/direct-casefold.stderr"
+
+cp "$runtime_descriptor" "$tmp/unsafe-path.irpkg-set.json"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  descriptor.packages[0].path = "Runtime.parts/%2e%2e.irpkg";
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$tmp/unsafe-path.irpkg-set.json"
+if lake exe vir_web_assets \
+    --out "$tmp/direct-unsafe-path" \
+    --sdk-manifest "$sdk_manifest" \
+    --vir-version "$sdk_version" \
+    --vir-commit "$repo_commit" \
+    --host-package vir-lake-smoke \
+    --program runtime vir-lake-smoke Smoke.Runtime "$tmp/unsafe-path.irpkg-set.json" \
+    > "$tmp/direct-unsafe-path.stdout" 2> "$tmp/direct-unsafe-path.stderr"; then
+  echo "URL-unsafe direct web-assets path unexpectedly composed" >&2
+  exit 1
+fi
+grep -q "must not contain.*'%'" "$tmp/direct-unsafe-path.stderr"
+
 printf '%s\n' \
   '{' \
   '  "format": "lean-vir-web-assets-config",' \
@@ -649,7 +688,27 @@ if VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app \
 fi
 cat "$tmp/web-duplicate-id.stdout" "$tmp/web-duplicate-id.stderr" \
   > "$tmp/web-duplicate-id.output"
-grep -q 'duplicate VIR web-assets program id: runtime' "$tmp/web-duplicate-id.output"
+grep -q 'unique under ASCII case-folding.*`runtime` conflicts with `runtime`' \
+  "$tmp/web-duplicate-id.output"
+
+printf '%s\n' \
+  '{' \
+  '  "format": "lean-vir-web-assets-config",' \
+  '  "version": 1,' \
+  '  "programs": [' \
+  '    {"id": "Runtime", "package": "vir-lake-smoke", "module": "Smoke.Runtime"},' \
+  '    {"id": "runtime", "package": "smoke-dep", "module": "Dep.Widget"}' \
+  '  ]' \
+  '}' > "$tmp/vir-web-assets.json"
+if VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build smoke_app \
+    > "$tmp/web-casefold-id.stdout" 2> "$tmp/web-casefold-id.stderr"; then
+  echo "case-fold-colliding web-assets program ids unexpectedly built" >&2
+  exit 1
+fi
+cat "$tmp/web-casefold-id.stdout" "$tmp/web-casefold-id.stderr" \
+  > "$tmp/web-casefold-id.output"
+grep -q 'unique under ASCII case-folding.*`Runtime` conflicts with `runtime`' \
+  "$tmp/web-casefold-id.output"
 
 printf '%s\n' \
   '{' \

@@ -87,6 +87,11 @@ def jsonField (source : String) (json : Json) (field : String)
 def validatedRelativePath (source path : String) : IO FilePath := do
   if path.isEmpty then
     throw <| IO.userError s!"{source} path must be non-empty"
+  if path.any fun char =>
+      char == '\\' || char == '%' || char == '?' || char == '#' ||
+        char.toNat < 0x20 || char.toNat == 0x7f then
+    throw <| IO.userError <|
+      s!"{source} path must not contain '\\', '%', '?', '#', or control characters: {path}"
   let filePath := FilePath.mk path
   if filePath.isAbsolute then
     throw <| IO.userError s!"{source} path must be relative: {path}"
@@ -107,6 +112,13 @@ def validateProgramId (id : String) : IO Unit := do
   if id.isEmpty || id == "." || id == ".." || !id.all isProgramIdChar then
     throw <| IO.userError <|
       s!"program id must be a URL-safe slug using letters, digits, '.', '_', or '-': {id}"
+
+def validatePortableProgramId (ids : Array String) (id : String) : IO Unit := do
+  validateProgramId id
+  if let some existing := ids.find? (fun candidate => candidate.toLower == id.toLower) then
+    throw <| IO.userError <|
+      "program IDs must be unique under ASCII case-folding for portable filesystems: " ++
+        s!"`{existing}` conflicts with `{id}`"
 
 def run (cmd : String) (args : Array String) : IO String := do
   let out ← IO.Process.output { cmd, args }
@@ -416,9 +428,7 @@ def verifyInstalled (out : FilePath) : IO Unit := do
   let mut allPaths := sdkPaths
   for programJson in programJsons do
     let id ← jsonField "staged program" programJson "id" Json.getStr?
-    validateProgramId id
-    if ids.contains id then
-      throw <| IO.userError s!"duplicate staged program id: {id}"
+    validatePortableProgramId ids id
     ids := ids.push id
     let packageName ← jsonField "staged program" programJson "package" Json.getStr?
     let moduleName ← jsonField "staged program" programJson "module" Json.getStr?
@@ -558,9 +568,7 @@ def compose (opts : Options) : IO Unit := do
     let mut ids : Array String := #[]
     let mut modules : Array String := #[]
     for arg in opts.programs do
-      validateProgramId arg.id
-      if ids.contains arg.id then
-        throw <| IO.userError s!"duplicate web-assets program id: {arg.id}"
+      validatePortableProgramId ids arg.id
       if modules.contains s!"{arg.packageName}/{arg.moduleName}" then
         throw <| IO.userError s!"duplicate web-assets program: {arg.packageName}/{arg.moduleName}"
       ids := ids.push arg.id

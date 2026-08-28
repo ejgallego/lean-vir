@@ -77,6 +77,29 @@ assert.equal(
 const traversal = manifest();
 traversal.programs[0].descriptor = "programs/slides/../secret.irpkg";
 assert.throws(() => validateVirWebAssetsManifest(traversal), /normalized relative URL path/);
+for (const unsafePath of [
+  "programs/slides/unsafe\\name.irpkg",
+  "programs/slides/%2e%2e/secret.irpkg",
+  "programs/slides/name?variant.irpkg",
+  "programs/slides/name#fragment.irpkg",
+  "programs/slides/name\u001fcontrol.irpkg",
+]) {
+  const unsafe = manifest();
+  unsafe.programs[0].descriptor = unsafePath;
+  unsafe.programs[0].files = [file(unsafePath)];
+  assert.throws(() => validateVirWebAssetsManifest(unsafe), /normalized relative URL path/);
+}
+const caseFoldCollision = manifest();
+caseFoldCollision.programs.push({
+  ...caseFoldCollision.programs[0],
+  id: "SLIDES",
+  descriptor: "programs/SLIDES/Slides.irpkg-set.json",
+  files: [file("programs/SLIDES/Slides.irpkg-set.json")],
+});
+assert.throws(
+  () => validateVirWebAssetsManifest(caseFoldCollision),
+  /unique under ASCII case-folding.*slides conflicts with SLIDES/,
+);
 const mismatch = manifest();
 mismatch.programs[0].compatibility = {
   ...compatibility,

@@ -51,7 +51,7 @@ function requireRelativePath(value, label) {
   const components = path.split("/");
   if (
     path.startsWith("/") ||
-    path.includes("\\") ||
+    /[\\%?#\u0000-\u001f\u007f]/.test(path) ||
     components.some((component) => component === "" || component === "." || component === "..")
   ) {
     throw new TypeError(`${label} must be a normalized relative URL path`);
@@ -150,7 +150,7 @@ export function validateVirWebAssetsManifest(value) {
   if (programs.length === 0) {
     throw new TypeError("VIR web-assets manifest.programs must not be empty");
   }
-  const programIds = new Set();
+  const programIds = new Map();
   for (const [index, entry] of programs.entries()) {
     const label = `VIR web-assets manifest.programs[${index}]`;
     const program = requireObject(entry, label);
@@ -158,10 +158,14 @@ export function validateVirWebAssetsManifest(value) {
     if (!/^[A-Za-z0-9._-]+$/.test(id) || id === "." || id === "..") {
       throw new TypeError(`${label}.id must be a URL-safe slug`);
     }
-    if (programIds.has(id)) {
-      throw new TypeError(`VIR web-assets manifest contains duplicate program id ${id}`);
+    const foldedId = id.toLowerCase();
+    if (programIds.has(foldedId)) {
+      throw new TypeError(
+        "VIR web-assets manifest program IDs must be unique under ASCII case-folding " +
+          `for portable filesystems: ${programIds.get(foldedId)} conflicts with ${id}`,
+      );
     }
-    programIds.add(id);
+    programIds.set(foldedId, id);
     requireString(program.package, `${label}.package`);
     requireString(program.module, `${label}.module`);
     const compatibility = validateCompatibility(

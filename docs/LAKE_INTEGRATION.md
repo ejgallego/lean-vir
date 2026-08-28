@@ -186,7 +186,8 @@ The declaration supplies the owning package and exact modules through Lake's
 typed target model; the facet does not discover marked modules automatically.
 For a singleton bundle, the library target name is the program ID. For a
 multi-program bundle, each full root module name is its program ID. IDs use the
-ASCII slug alphabet `[A-Za-z0-9._-]`:
+ASCII slug alphabet `[A-Za-z0-9._-]` and must be unique under ASCII
+case-folding so every bundle has the same layout on portable filesystems:
 
 ```lean
 lean_lib «slides» where
@@ -258,8 +259,9 @@ The version-1 manifest contract has six required top-level fields:
   descriptor path, compatibility tuple, and complete `files` array.
 
 Every file record contains `path`, `sha256`, and `byteSize`. Every path is
-relative to `VIR_WEB_ASSETS.json`; consumers should reject unsupported
-top-level format or version values before resolving nested paths.
+relative to `VIR_WEB_ASSETS.json` and excludes backslashes, URL-significant
+`%`, `?`, and `#` characters, and control characters. Consumers should reject
+unsupported top-level format or version values before resolving nested paths.
 
 The staging step is incremental and exact. Changing one program rebuilds and restages
 that program without reinstalling or recopying the SDK or unrelated programs.

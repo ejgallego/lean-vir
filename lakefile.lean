@@ -108,6 +108,14 @@ private def virValidateWebAssetProgramId (id : String) : IO Unit := do
     throw <| IO.userError <|
       s!"VIR web-assets program `id` must be a URL-safe slug using letters, digits, '.', '_', or '-': {id}"
 
+private def virValidatePortableWebAssetProgramId
+    (ids : Array String) (id : String) : IO Unit := do
+  virValidateWebAssetProgramId id
+  if let some existing := ids.find? (fun candidate => candidate.toLower == id.toLower) then
+    throw <| IO.userError <|
+      "VIR web-assets program IDs must be unique under ASCII case-folding for portable " ++
+        s!"filesystems: `{existing}` conflicts with `{id}`"
+
 private structure VirSourceIdentity where
   version : String
   commit : String
@@ -487,9 +495,7 @@ private def virReadWebAssetsConfig (path : System.FilePath) : IO (Array VirWebPr
     if moduleName.isAnonymous then
       throw <| IO.userError "VIR web-assets program `module` must be a Lean module name"
     let id := (← virOptionalJsonString "VIR web-assets program" programJson "id").getD moduleString
-    virValidateWebAssetProgramId id
-    if ids.contains id then
-      throw <| IO.userError s!"duplicate VIR web-assets program id: {id}"
+    virValidatePortableWebAssetProgramId ids id
     ids := ids.push id
     let package? ← (← virOptionalJsonString "VIR web-assets program" programJson "package").mapM
       fun packageString => do
@@ -612,7 +618,9 @@ library_facet virWebAssets (lib : LeanLib) : System.FilePath := do
       module
     }
   let ids := programs.map (·.config.id)
-  if ids.toList.eraseDups.length != ids.size then
-    error s!"VIR web-assets library `{lib.name}` resolves duplicate program IDs"
+  let mut portableIds : Array String := #[]
+  for id in ids do
+    virValidatePortableWebAssetProgramId portableIds id
+    portableIds := portableIds.push id
   let outputDir := lib.pkg.buildDir / "vir" / "web-assets" / bundleId
   virComposeWebAssets lib.pkg outputDir programs
