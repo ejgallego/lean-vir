@@ -14,9 +14,10 @@ The modality model and operation IR are specified in
 
 The exhaustive shipped-boundary gate and consolidated library explorer are
 documented in `SHIPPED_BINDINGS.md`. The gate proves that every compiled
-`@[vir_js]` and explicit conversion declaration obeys VIR's representation
-policy and has a shipped runtime provider. Type anchors add the narrower
-semantic question; their results are incorporated into the explorer.
+`@[vir_js]` and explicit conversion declaration obeys VIR's coarse boundary
+policy and has a matching shipped runtime provider key. It does not verify the
+provider's implementation behavior. Type anchors add the narrower semantic
+question; their results are incorporated into the explorer.
 
 ## Data Flow
 

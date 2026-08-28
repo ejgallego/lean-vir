@@ -537,7 +537,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
       severity: entry.severity,
       code: entry.kind,
       message: entry.message,
-      action: "Repair the binding configuration, generated declaration, or runtime provider.",
+      action: "Repair the binding configuration, generated declaration, or runtime provider map.",
       ...(entry.target === undefined ? {} : { target: entry.target }),
     }));
   return items;
@@ -1029,7 +1029,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       const issues = [];
       for (const binding of bindings) {
         if (binding.status === "missing-provider") {
-          issues.push(issue("missing-provider", "error", `${binding.target} has no shipped runtime provider`, { target: binding.target }));
+          issues.push(issue("missing-provider", "error", `${binding.target} has no shipped runtime provider key`, { target: binding.target }));
         } else if (binding.status === "runtime-only") {
           issues.push(issue("runtime-only", "error", `${binding.target} has no compiler declaration`, { target: binding.target }));
         }
@@ -1175,6 +1175,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     },
     lean: coverage.lean,
     providers: coverage.providers,
+    boundaryAnalysis: coverage.analysis,
     summary: {
       libraries: libraries.length,
       apiGroups: apiGroups.length,
@@ -1263,7 +1264,7 @@ export async function runBindingExplorerCli(argv) {
   console.log("\nLean VIR upstream reference, shipped inventory, and author actions");
   console.log(`  libraries: ${report.summary.libraries}`);
   console.log(`  API groups: ${report.summary.apiGroups}`);
-  console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
+  console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} with provider keys present`);
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);

@@ -726,9 +726,19 @@ function typeLiteralShape(node, sourceFile, prefix) {
 
 function unionShape(node, sourceFile, prefix) {
   const types = node.types.map((type) => normalizeTypeNode(type, sourceFile, prefix));
-  const nonNull = types.filter((type) => !(type.kind === "primitive" && (type.name === "null" || type.name === "undefined")));
-  if (nonNull.length === 1 && nonNull.length !== types.length) {
-    return { kind: "option", element: nonNull[0] };
+  const absence = types.filter((type) =>
+    type.kind === "primitive" && (type.name === "null" || type.name === "undefined"))
+    .map((type) => type.name);
+  const present = types.filter((type) =>
+    !(type.kind === "primitive" && (type.name === "null" || type.name === "undefined")));
+  if (present.length === 1 && absence.length !== 0) {
+    return {
+      kind: "option",
+      absence: absence.includes("null") && absence.includes("undefined")
+        ? "nullish"
+        : absence[0],
+      element: present[0],
+    };
   }
   if (types.every((type) => type.kind === "literal")) {
     return { kind: "enum", cases: types.map((type) => String(type.value)) };

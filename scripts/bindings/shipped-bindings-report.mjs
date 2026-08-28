@@ -25,7 +25,7 @@ const usageLine = "usage: node scripts/bindings/generate-shipped-bindings-report
 function usage() {
   console.log(`${usageLine}
 
-Reconcile compiler-derived JavaScript bindings with runtime providers.
+Reconcile compiler-derived JavaScript bindings with runtime provider keys.
 
 Options:
   --lean FILE  Compiler-derived VIR JavaScript inventory.
@@ -177,9 +177,11 @@ export function buildShippedBindingsReport(inventory, providers) {
     version: 1,
     generatedBy: "scripts/bindings/generate-shipped-bindings-report.mjs",
     analysis: {
-      representationPolicy: "compiler-validated",
+      representationPolicy: "compiler-validated-coarse-boundary",
       ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
       conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
+      providerCoverage: "target-name-presence-only",
+      providerBehavior: "not-mechanically-verified",
       semanticParity: "library-specific type anchors",
     },
     lean: {
@@ -250,17 +252,17 @@ export function renderShippedBindingsHtml(report) {
 </head>
 <body>
 <main>
-  <header><div><div class="eyebrow">Lean VIR · pre-release boundary audit</div><h1>Shipped JavaScript bindings</h1><p class="lede">Every compiler-discovered VIR JavaScript boundary reconciled with the provider maps actually shipped by this checkout. Lean boundary representation is compiler-validated; upstream semantic parity remains the job of library-specific type anchors.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
+  <header><div><div class="eyebrow">Lean VIR · pre-release boundary inventory</div><h1>Shipped JavaScript bindings</h1><p class="lede">Every compiler-discovered VIR JavaScript boundary reconciled by target name with the provider maps shipped by this checkout. Lean validates the coarse boundary representation; provider behavior and upstream semantic parity require separate evidence.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
   <section class="metrics">
-    <article class="metric good"><strong id="provided-metric">${report.summary.provided}/${report.summary.declaredTargets}</strong><span>declared targets provided</span></article>
+    <article class="metric good"><strong id="provided-metric">${report.summary.provided}/${report.summary.declaredTargets}</strong><span>declared targets with provider keys</span></article>
     <article class="metric"><strong id="vir-js-metric">${report.summary.virJs}</strong><span>ordinary vir_js boundaries</span></article>
     <article class="metric"><strong id="conversion-metric">${report.summary.explicitConversions}</strong><span>explicit conversions</span></article>
-    <article class="metric ${report.summary.missingProvider === 0 ? "good" : "bad"}"><strong id="missing-metric">${report.summary.missingProvider}</strong><span>missing runtime providers</span></article>
+    <article class="metric ${report.summary.missingProvider === 0 ? "good" : "bad"}"><strong id="missing-metric">${report.summary.missingProvider}</strong><span>missing runtime provider keys</span></article>
   </section>
-  <div class="scope"><b>Measured surface:</b> compiled <code>${report.lean.modules.join(", ")}</code> environments · ${report.summary.declarations} declarations · ${report.summary.boundaries.hostResource} host-resource boundaries · ${report.summary.boundaries.objectHandle} object-handle boundaries · ${report.summary.boundaries.explicitConversion} explicit conversions. A provided row proves representation-policy validation and runtime dispatch coverage, not full upstream API parity.</div>
+  <div class="scope"><b>Measured surface:</b> compiled <code>${report.lean.modules.join(", ")}</code> environments · ${report.summary.declarations} declarations · ${report.summary.boundaries.hostResource} host-resource boundaries · ${report.summary.boundaries.objectHandle} object-handle boundaries · ${report.summary.boundaries.explicitConversion} explicit conversions. A provider-key-present row proves that the declaration passes VIR's coarse compiler boundary policy and that a matching dispatch key exists. It does not verify provider modality or behavior, callback escape, affine use, or upstream API parity.</div>
   <section class="workspace">
     <div class="left">
-      <div class="toolbar"><input id="search" type="search" placeholder="Search target, declaration, type…" aria-label="Search bindings"><select id="status"><option value="all">All statuses</option><option value="provided">Provided</option><option value="missing-provider">Missing provider</option><option value="runtime-only">Runtime only</option></select></div>
+      <div class="toolbar"><input id="search" type="search" placeholder="Search target, declaration, type…" aria-label="Search bindings"><select id="status"><option value="all">All statuses</option><option value="provided">Provider key present</option><option value="missing-provider">Missing provider key</option><option value="runtime-only">Runtime only</option></select></div>
       <div class="filters"><select id="provider"><option value="all">All providers</option>${report.providers.map((entry) => `<option value="${entry.id}">${entry.title}</option>`).join("")}</select><select id="boundary"><option value="all">All boundaries</option><option value="hostResource">Host resource</option><option value="explicitConversion">Explicit conversion</option><option value="objectHandle">Object handle</option></select><select id="visibility"><option value="all">All visibility</option><option value="public">Public import</option><option value="private">Private import</option></select></div>
       <div class="result-head" id="count"></div><div id="results"></div>
     </div>
@@ -275,7 +277,7 @@ export function renderShippedBindingsHtml(report) {
   let selected = decodeURIComponent(location.hash.replace(/^#target=/, ""));
   if (!byTarget.has(selected)) selected = report.bindings.find((entry) => entry.status === "missing-provider")?.target || report.bindings[0]?.target || "";
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[character]));
-  const statusLabel = (value) => value === "missing-provider" ? "missing provider" : value === "runtime-only" ? "runtime only" : value;
+  const statusLabel = (value) => value === "missing-provider" ? "missing provider key" : value === "runtime-only" ? "runtime only" : "provider key present";
   function matches(entry) {
     const query = elements.search.value.trim().toLowerCase();
     const text = [entry.target, entry.prefix, ...entry.providers, ...entry.boundaries, ...entry.declarations.flatMap((decl) => [decl.declaration, decl.module, decl.type])].join(" ").toLowerCase();
@@ -284,14 +286,14 @@ export function renderShippedBindingsHtml(report) {
   function render() {
     const rows = report.bindings.filter(matches);
     elements.count.textContent = rows.length + (rows.length === 1 ? " binding" : " bindings");
-    elements.results.innerHTML = rows.length === 0 ? '<div class="empty">No bindings match these filters.</div>' : rows.map((entry) => '<button type="button" class="row ' + (entry.target === selected ? "active" : "") + '" data-target="' + escapeHtml(entry.target) + '"><span><span class="target">' + escapeHtml(entry.target) + '</span><span class="sub">' + escapeHtml(entry.visibility) + " · " + escapeHtml(entry.boundaries.join(", ") || "runtime provider") + '</span></span><span class="pill ' + entry.status + '">' + escapeHtml(statusLabel(entry.status)) + "</span></button>").join("");
+    elements.results.innerHTML = rows.length === 0 ? '<div class="empty">No bindings match these filters.</div>' : rows.map((entry) => '<button type="button" class="row ' + (entry.target === selected ? "active" : "") + '" data-target="' + escapeHtml(entry.target) + '"><span><span class="target">' + escapeHtml(entry.target) + '</span><span class="sub">' + escapeHtml(entry.visibility) + " · " + escapeHtml(entry.boundaries.join(", ") || "runtime provider key") + '</span></span><span class="pill ' + entry.status + '">' + escapeHtml(statusLabel(entry.status)) + "</span></button>").join("");
     elements.results.querySelectorAll("[data-target]").forEach((button) => button.addEventListener("click", () => select(button.dataset.target)));
     renderDetail(byTarget.get(selected));
   }
   function select(target) { selected = target; history.replaceState(null, "", "#target=" + encodeURIComponent(target)); render(); }
   function renderDetail(entry) {
     if (!entry) { elements.detail.innerHTML = '<div class="empty">Select a binding.</div>'; return; }
-    const providerBadges = entry.providers.length === 0 ? '<span class="badge">No shipped provider</span>' : entry.providers.map((id) => '<span class="badge">' + escapeHtml(report.providers.find((provider) => provider.id === id)?.title || id) + "</span>").join("");
+    const providerBadges = entry.providers.length === 0 ? '<span class="badge">No shipped provider key</span>' : entry.providers.map((id) => '<span class="badge">' + escapeHtml(report.providers.find((provider) => provider.id === id)?.title || id) + "</span>").join("");
     const declarations = entry.declarations.length === 0 ? '<div class="empty">Runtime provider with no declaration in the measured Lean modules.</div>' : entry.declarations.map((decl) => { const source = decl.source?.path ? '<a class="source" href="../../' + escapeHtml(decl.source.path) + "#L" + decl.source.startLine + '">' + escapeHtml(decl.module) + ":" + decl.source.startLine + "</a>" : '<span class="source">' + escapeHtml(decl.module) + "</span>"; return '<div class="decl"><div class="decl-head"><span class="decl-name">' + escapeHtml(decl.declaration) + "</span>" + source + '</div><div class="badges"><span class="badge">' + (decl.private ? "private implementation" : "public import") + '</span><span class="badge">' + escapeHtml(decl.marker) + '</span><span class="badge">' + escapeHtml(decl.boundary) + '</span></div><code>' + escapeHtml(decl.type) + "</code></div>"; }).join("");
     elements.detail.innerHTML = '<span class="pill ' + entry.status + '">' + escapeHtml(statusLabel(entry.status)) + '</span><h2>' + escapeHtml(entry.target) + '</h2><div class="badges">' + providerBadges + '</div><section class="section"><h3>Compiler-validated Lean boundary</h3>' + declarations + "</section>";
   }
@@ -322,7 +324,7 @@ export async function runShippedBindingsReportCli(argv) {
 
   if (report.summary.missingProvider !== 0 || report.summary.runtimeOnly !== 0) {
     throw new Error(
-      `shipped binding reconciliation found ${report.summary.missingProvider} missing providers and ` +
+      `shipped binding reconciliation found ${report.summary.missingProvider} missing provider keys and ` +
         `${report.summary.runtimeOnly} runtime-only targets`,
     );
   }
@@ -331,8 +333,8 @@ export async function runShippedBindingsReportCli(argv) {
   console.log(`  vir_js declarations: ${report.summary.virJs}`);
   console.log(`  explicit conversions: ${report.summary.explicitConversions}`);
   console.log(`  declared targets: ${report.summary.declaredTargets}`);
-  console.log(`  provided: ${report.summary.provided}`);
-  console.log(`  missing providers: ${report.summary.missingProvider}`);
+  console.log(`  provider keys present: ${report.summary.provided}`);
+  console.log(`  missing provider keys: ${report.summary.missingProvider}`);
   console.log(`  runtime-only targets: ${report.summary.runtimeOnly}`);
   console.log(`  public entries reaching targets: ${report.summary.publicEntries}`);
   console.log(`  public entry/target edges: ${report.summary.publicTargetEdges}`);

@@ -30,7 +30,7 @@ document.querySelector("#scope").replaceChildren(
     `${report.summary.libraries} configured libraries · ` +
     `${report.summary.apiGroups} API groups · ` +
     `${report.summary.targets} compiled host targets, ` +
-    `${report.summary.provided} with runtime providers. ` +
+    `${report.summary.provided} with runtime provider keys present. ` +
     `${generation.boundaries.targets} are generated and ` +
     `${generation.boundaries.handwrittenDeclarations} declarations are handwritten: ` +
     `${generation.boundaries.typescriptDerived} boundaries are TypeScript-derived and ` +
@@ -39,6 +39,7 @@ document.querySelector("#scope").replaceChildren(
     `${generation.protocolRelations.virOwned} VIR-owned operations, ` +
     `${generation.protocolRelations.localContracts} local-contract operations, ` +
     `${generation.protocolRelations.unclassified} unclassified). ` +
+    "Provider behavior is not mechanically verified by this name reconciliation. " +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
 );
@@ -521,7 +522,7 @@ const modalityDescriptions = {
   callback: "A Lean callback crossing the JavaScript boundary.",
   borrowed: "Borrowed by the host for this boundary call.",
   owned: "Ownership transfers across this boundary.",
-  consumed: "Consumed by this call and unavailable afterward.",
+  consumed: "The runtime takes this handle and dynamically revokes its aliases after the call; Lean does not enforce affine use.",
   call: "The host may retain this value only for the duration of the call.",
   "until-release": "The host retains this value until the matching release operation.",
   retained: "The host retains this value after the call.",
@@ -630,7 +631,11 @@ function formatTypeScriptType(shape) {
     return (shape.element?.kind === "union" ? "(" + element + ")" : element) + "[]";
   }
   case "option":
-    return formatTypeScriptType(shape.element) + " | null";
+    return formatTypeScriptType(shape.element) + " | " + ({
+      null: "null",
+      undefined: "undefined",
+      nullish: "null | undefined",
+    }[shape.absence ?? "null"] ?? shape.absence);
   case "union":
     return shape.options.map(formatTypeScriptType).join(" | ");
   case "function":
@@ -1038,11 +1043,12 @@ function renderGenerationDecisions(operation) {
 
 function renderCompiledEvidence(target) {
   const declarations = preferredPublicEntries(target);
-  const runtime = '<section class="evidence-unit"><h4>Runtime providers</h4><div class="badges">' +
+  const runtime = '<section class="evidence-unit"><h4>Runtime provider keys</h4><div class="badges">' +
     (target.providers.length
       ? target.providers.map((provider) => '<span class="badge">' +
         escapeHtml(provider) + "</span>").join("")
-      : '<span class="pill missing-provider">missing provider</span>') + "</div></section>";
+      : '<span class="pill missing-provider">missing provider key</span>') +
+    '</div><p class="evidence-hint">Presence proves dispatch-name coverage, not provider modality or behavior.</p></section>';
   const compiled = declarations.length
     ? '<section class="evidence-unit compiled-evidence"><h4>Compiled public declaration' +
       (declarations.length === 1 ? "" : "s") + "</h4>" +
@@ -1058,8 +1064,8 @@ function renderCompiledEvidence(target) {
 
 function renderImplementationEvidence(target, operation) {
   const declarations = preferredPublicEntries(target).length;
-  const summary = target.providers.length + " runtime " +
-    (target.providers.length === 1 ? "provider" : "providers") + " · " +
+  const summary = target.providers.length + " runtime provider " +
+    (target.providers.length === 1 ? "key" : "keys") + " · " +
     declarations + " public " + (declarations === 1 ? "declaration" : "declarations");
   return '<details class="implementation-evidence"><summary><span>Implementation evidence</span><span>' +
     escapeHtml(summary) + '</span></summary><div class="implementation-evidence-body">' +

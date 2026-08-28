@@ -19,10 +19,10 @@ coverage. Author actions may still flag a shipped declaration whose upstream
 identity or exception policy is missing.
 
 The report exhaustively scans ordinary `@[vir_js]` declarations and explicit
-conversion declarations. Every distinct target must have a shipped provider,
-provider-only targets are rejected, and every shipped target must be reachable
-from at least one public executable Lean declaration. Each public connection
-includes its concrete compiled-IR call path.
+conversion declarations. Every distinct target must have a matching key in a
+shipped provider map, provider-only keys are rejected, and every shipped target
+must be reachable from at least one public executable Lean declaration. Each
+public connection includes its concrete compiled-IR call path.
 
 Generation indexes every configured TypeScript API group before presenting the
 report. Unselected upstream entries remain ordinary documentation coverage;
@@ -49,8 +49,8 @@ This check makes six mechanically enforceable claims:
 3. Conversions between JavaScript values and ordinary Lean values must be
    isolated behind `@[vir_js_explicit_conversion]`; they cannot be hidden in an
    ordinary binding.
-4. Every declared target must be implemented by a shipped browser/React,
-   virtual Node, or runtime-intrinsic provider, and every such provider target
+4. Every declared target must have a matching key in a shipped browser/React,
+   virtual Node, or runtime-intrinsic provider map, and every such provider key
    must have a compiled declaration.
 5. Public Lean-to-target links come from transitive references in compiled IR.
    Each link carries its declaration path; the report does not infer callers
@@ -67,11 +67,16 @@ This prevents accidental representation drift such as exposing a raw Lean
 convert at call sites or in their own policy layer, but the reviewed binding
 surface remains one-to-one with the upstream property operations.
 
-The compiler/runtime check deliberately does not claim that all upstream APIs
-have been ported, or that every phantom resource name has been proven equivalent
-to an upstream TypeScript type. Configured API groups and type-anchor
-comparisons provide that semantic layer. The explorer keeps the layers visibly
-distinct while presenting their findings together.
+Provider reconciliation is target-name presence only. It does not inspect raw
+provider argument handling, retention, callback leases, result adoption, or
+terminal cleanup, so it is not a mechanical provider-modality audit. The
+compiler/runtime check also does not claim that all upstream APIs have been
+ported, or that every phantom resource name has been proven equivalent to an
+upstream TypeScript type. Configured API groups, type-anchor comparisons, and
+focused lifecycle tests provide separate evidence. The explorer keeps these
+layers visibly distinct while presenting their findings together.
+The consolidated machine report records this guarantee boundary explicitly in
+its `boundaryAnalysis` object rather than leaving it implicit in prose.
 
 ## Terminology and dispositions
 
@@ -120,11 +125,11 @@ claim to inventory type-only declarations or pure APIs that never cross the
 host boundary. A **host target** is the lower-level dispatch key implemented by
 the JavaScript runtime.
 
-Therefore a provided target proves that VIR ships the runtime path, while an
-automatic correspondence only proposes an upstream identity. The user-facing
-reference never presents that candidate as a confirmed binding. Compiler and
-runtime internals remain author evidence rather than a parallel documentation
-hierarchy.
+Therefore a provider-key-present target proves only that VIR can resolve that
+dispatch name, while an automatic correspondence only proposes an upstream
+identity. Neither proves raw provider behavior. The user-facing reference never
+presents that candidate as a confirmed binding. Compiler and runtime internals
+remain author evidence rather than a parallel documentation hierarchy.
 
 ## Soundness-first Roadmap
 
@@ -137,10 +142,12 @@ TypeScript declaration + VIR ABI policy + explicit annotation
   -> generated Lean declaration
 ```
 
-The operation IR preserves JavaScript resources, nullability, optionality,
-overloads, receiver shape, effects, and ownership or retention behavior.
-Convenience conversions belong in a separate application-facing layer and do
-not count as an upstream binding.
+The operation IR preserves JavaScript resources, supported null-only
+nullability, overloads, receiver shape, effects, and authored ownership or
+retention policy. Descriptors distinguish `null`, `undefined`, and nullish
+absence; generation rejects the latter two and optional properties until they
+have explicit representations. Convenience conversions belong in a separate
+application-facing layer and do not count as upstream bindings.
 
 An incorrect public binding is a release-blocking defect. An unselected
 upstream operation is documentation coverage, not evidence that an existing
@@ -151,18 +158,21 @@ Every binding repair or addition should satisfy these landing gates:
 
 1. **Reproducible generation.** Checked-in generated Lean is an exact function
    of pinned declarations, ABI policy, and annotations.
-2. **Boundary soundness.** Compiler validation accepts the generated host
-   signature; ordinary bindings contain no implicit Lean/JavaScript conversion.
+2. **Boundary representation safety.** Compiler validation accepts the
+   generated host signature; ordinary bindings contain no implicit
+   Lean/JavaScript conversion.
 3. **Operation identity.** The configuration selects one upstream operation
    and host target. Writable properties generate getter and setter operations
    independently.
-4. **Runtime parity.** Every generated target has its intended shipped provider,
-   and provider-only targets are rejected.
+4. **Runtime dispatch presence.** Every generated target has its intended
+   shipped provider key, and provider-only keys are rejected. Provider behavior
+   remains separately trusted and tested.
 5. **Explicit exceptions.** TypeScript deviations and protocols are generated
    from structured, justified operation records. Every protocol declares its
    upstream relation; handwritten host declarations are rejected.
 6. **Compiled evidence.** The consolidated gate reaches every target from a
-   public Lean declaration and exercises relevant lifetime behavior.
+   public Lean declaration; focused runtime suites exercise selected lifetime
+   behavior separately.
 
 Every external shipped binding is generated. Shipped targets must also acquire
 authored upstream identity or an explicit no-parity protocol classification.
@@ -245,8 +255,8 @@ compiled Vir + Vir.Infoview environments
   -> compiler-decoded vir_js metadata
   -> public declaration call reachability and exact paths
 
-browser/React + virtual Node providers + runtime intrinsics
-  -> strict reconciliation JSON
+browser/React + virtual Node provider keys + runtime intrinsics
+  -> strict target-name reconciliation JSON
 
 reviewed protocol operations + correspondence suggestions
   -> direct-lowering and annotation work items

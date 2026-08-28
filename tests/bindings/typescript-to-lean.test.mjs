@@ -17,7 +17,7 @@ import {
 } from "../../scripts/bindings/typescript-to-lean.mjs";
 
 const stringShape = { kind: "primitive", name: "string" };
-const nullableStringShape = { kind: "option", element: stringShape };
+const nullableStringShape = { kind: "option", absence: "null", element: stringShape };
 const generation = {
   output: "Vir/Demo/Generated.lean",
   irOutput: "build/bindings/demo.generated-operations.json",
@@ -123,6 +123,34 @@ test("TypeScript property shapes and an ABI profile determine Lean declarations"
   assert.match(output, /@\[vir_js "demo\.widget\.getLabel"\]/u);
   assert.match(output, /ABI profile `demo-faithful-v1`/u);
   assert.doesNotMatch(output, /\(label : @& String\)/u);
+});
+
+test("undefined and nullish options fail closed instead of using Js.Nullable", () => {
+  assert.equal(
+    leanType(nullableStringShape, generation).lean,
+    "Lean.Vir.Js.Nullable String",
+  );
+  for (const absence of ["undefined", "nullish"]) {
+    assert.throws(
+      () => leanType({ kind: "option", absence, element: stringShape }, generation),
+      new RegExp(`uses TypeScript ${absence} absence; only null-backed nullable resources are supported`, "u"),
+    );
+  }
+  assert.throws(
+    () => leanType({ kind: "option", element: stringShape }, generation),
+    /option is missing TypeScript absence provenance/u,
+  );
+});
+
+test("optional properties fail closed before accessor generation", () => {
+  const optionalDescriptors = structuredClone(descriptors);
+  optionalDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.label").optional = true;
+
+  assert.throws(
+    () => buildGeneratedOperations(config, generation, optionalDescriptors),
+    /Widget\.label is optional; optional property generation is not supported yet/u,
+  );
 });
 
 test("operation IR records derived modalities and their provenance", () => {

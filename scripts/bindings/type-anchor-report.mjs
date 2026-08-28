@@ -749,8 +749,19 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   }
   switch (lean.kind) {
     case "array":
-    case "option":
       return compareShapes(lean.element, ts.element, tsSymbols, seen);
+    case "option": {
+      const element = compareShapes(lean.element, ts.element, tsSymbols, seen);
+      const absence = ts.absence ?? "null";
+      if (absence === "null") return element;
+      return comparison("weak", [
+        diagnostic(
+          "typescript_undefined_not_represented",
+          `Lean Option does not preserve TypeScript ${absence} absence semantics`,
+        ),
+        ...element.diagnostics,
+      ]);
+    }
     case "tuple":
       return compareSequence(lean.elements, ts.elements, tsSymbols, seen, "tuple element");
     case "record":

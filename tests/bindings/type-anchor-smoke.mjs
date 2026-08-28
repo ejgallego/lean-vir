@@ -273,7 +273,11 @@ declare function schedule(value: number): void;
     descriptorComparison.symbols.find((symbol) => symbol.id === "Demo.Controls.text")?.accessors,
     {
       get: { kind: "primitive", name: "string" },
-      set: { kind: "option", element: { kind: "primitive", name: "string" } },
+      set: {
+        kind: "option",
+        absence: "null",
+        element: { kind: "primitive", name: "string" },
+      },
     },
   );
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "schedule")?.shape.options.length, 2);

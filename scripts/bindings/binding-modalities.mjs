@@ -242,6 +242,15 @@ function operationType(shape, override, generation, profile, context) {
 }
 
 function nullableResource(shape, generation, profile, context) {
+  const absence = shape.absence;
+  if (absence === undefined) {
+    throw new Error(`${context} option is missing TypeScript absence provenance`);
+  }
+  if (absence !== "null") {
+    throw new Error(
+      `${context} uses TypeScript ${absence} absence; only null-backed nullable resources are supported`,
+    );
+  }
   const element = translateType(shape.element, generation, profile, context);
   if (element.representation !== "js-resource" || element.resourceInner === null) {
     throw new Error(`${context} nullable values require a JavaScript resource element`);

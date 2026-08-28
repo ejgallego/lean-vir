@@ -30,7 +30,14 @@ for (const declaration of declarations) {
 }
 
 assert.equal(report.format, "lean-vir-shipped-bindings-coverage");
-assert.equal(report.analysis.representationPolicy, "compiler-validated");
+assert.deepEqual(report.analysis, {
+  representationPolicy: "compiler-validated-coarse-boundary",
+  ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
+  conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
+  providerCoverage: "target-name-presence-only",
+  providerBehavior: "not-mechanically-verified",
+  semanticParity: "library-specific type anchors",
+});
 assert.equal(report.summary.declarations, declarations.length);
 assert.equal(
   report.summary.virJs,
@@ -109,6 +116,8 @@ assert.match(
   html,
   new RegExp(`id="provided-metric">${report.summary.provided}/${report.summary.totalTargets}`),
 );
+assert.match(html, /Provider key present/u);
+assert.match(html, /does not verify provider modality or behavior/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /id="boundary"/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
@@ -121,5 +130,5 @@ Function(scripts.at(-1)[1]);
 console.log(
   `shipped bindings smoke ok: ${report.summary.virJs} vir_js + ` +
   `${report.summary.explicitConversions} explicit conversions, ` +
-  `${report.summary.provided}/${report.summary.totalTargets} provided`,
+  `${report.summary.provided}/${report.summary.totalTargets} provider keys present`,
 );

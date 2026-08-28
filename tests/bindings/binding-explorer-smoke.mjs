@@ -53,6 +53,14 @@ const availabilityCounts = countBy(generationMembers.map((member) =>
   member.generation.availability));
 
 assert.equal(report.format, "lean-vir-binding-explorer");
+assert.deepEqual(report.boundaryAnalysis, {
+  representationPolicy: "compiler-validated-coarse-boundary",
+  ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
+  conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
+  providerCoverage: "target-name-presence-only",
+  providerBehavior: "not-mechanically-verified",
+  semanticParity: "library-specific type anchors",
+});
 assert.equal(report.summary.libraries, report.libraries.length);
 assert.equal(report.summary.apiGroups, roots.length);
 assert.equal(targets.length, uniqueTargets.size, "every shipped target should occur exactly once");
@@ -596,6 +604,9 @@ assert.match(app, /omitted by reviewed policy/u);
 assert.match(app, /data-tooltip/u);
 assert.match(app, /TypeScript-derived/u);
 assert.match(app, /reviewed upstream adapter/u);
+assert.match(app, /runtime provider keys present/u);
+assert.match(app, /Provider behavior is not mechanically verified/u);
+assert.match(app, /Lean does not enforce affine use/u);
 assert.match(html, /src="assets\/app\.js"/u);
 assert.match(html, /href="assets\/style\.css"/u);
 assert.match(app, /function renderUpstreamSymbol\(group, symbol\)/u);

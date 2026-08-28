@@ -34,6 +34,11 @@ upstream-shaped reference, a complete shipped-boundary inventory, and
 actionable author findings with semantic TypeScript/Lean highlighting;
 convenience APIs do not count as upstream bindings.
 
+Runtime provider reconciliation is deliberately narrower: it proves that every
+compiled target has a matching provider-map key and that no key is orphaned. It
+does not inspect provider behavior or mechanically enforce the operation IR's
+retention and revocation policy.
+
 Related ownership:
 
 - `Vir/*.bindings.json` and `Vir/bindings.schema.json`: authored binding maps,

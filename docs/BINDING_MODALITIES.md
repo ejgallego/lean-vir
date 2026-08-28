@@ -25,14 +25,21 @@ differences.
 | Axis | Examples | Meaning |
 | --- | --- | --- |
 | Representation | `immediate`, `js-resource` | How a TypeScript value crosses the Lean/JavaScript boundary. |
-| Argument passing | `value`, `borrowed`, `owned`, `consumed` | What the callee receives for this invocation. `value` applies to immediate values; the other modes apply to resources. |
+| Argument passing | `value`, `borrowed`, `owned`, `consumed` | What the runtime does with the argument for this invocation. `value` applies to immediate values; the other modes apply to resources. |
 | Argument retention | `call`, `until-release`, `runtime` | How long the host may retain a resource. |
 | Result ownership | `value`, `owned`, `borrowed` | Whether a result is immediate or which side owns the returned resource. |
 | Effect | for example `dom` / `DomM` | Which Lean host-effect carrier wraps the result. |
 
 A borrowed resource cannot have retention beyond `call`. The generator rejects
-that combination instead of emitting a declaration whose lifetime cannot be
-supported by `@&`.
+that combination instead of emitting a declaration that contradicts its host
+ABI policy.
+
+These modes are runtime/ABI policy, not an affine Lean type system. `@&` marks
+borrowed arguments for Lean's calling convention; it does not prevent a caller
+from retaining a Lean alias. Likewise, `consumed` means the runtime takes the
+handle and dynamically revokes its aliases after the call. A later operation
+through an alias fails resource-liveness validation, but ordinary Lean typing
+does not make the second use unrepresentable.
 
 ## ABI Profile
 
@@ -66,6 +73,12 @@ The normal property rules are therefore mechanical:
 
 Unsupported TypeScript shapes fail generation. They are not silently converted
 to opaque Lean types.
+
+Descriptor options retain whether absence came from `null`, `undefined`, or
+both. The current `Lean.Vir.Js.Nullable` lane represents only `T | null`.
+Generation rejects `T | undefined`, `T | null | undefined`, and optional
+properties until their distinct JavaScript semantics have an explicit ABI
+representation.
 
 ## Canonical Operation IR
 
@@ -166,7 +179,7 @@ Selected overloads, parameter projections and renames, fixed-arity rest
 specializations, callbacks, primitive resources, and receiver/result overrides
 are all recorded in the same IR. In particular, the event-listener pair records
 registration as returning a revocable handle and removal as a receiver-free
-disposer that consumes that handle.
+disposer that dynamically revokes that handle and its aliases.
 
 ## Reviewed Protocol Operations
 
