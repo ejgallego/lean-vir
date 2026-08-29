@@ -13,6 +13,7 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildBindingExplorerReport,
   renderBindingExplorerHtml,
 } from "../../scripts/bindings/binding-explorer.mjs";
 import {
@@ -39,6 +40,77 @@ test("binding explorer rendering injects one script-safe report", () => {
     () => renderBindingExplorerHtml("no marker", {}),
     /exactly one report marker/u,
   );
+});
+
+test("reviewed method mappings require their named public declaration to reach the target", async () => {
+  const target = "demo.widget.render";
+  const coverage = {
+    format: "lean-vir-shipped-bindings-coverage",
+    version: 1,
+    lean: {},
+    providers: [],
+    summary: {
+      totalTargets: 1,
+      provided: 1,
+      missingProvider: 0,
+      runtimeOnly: 0,
+      publicEntries: 1,
+      publicTargetEdges: 1,
+      targetsReachedByPublicEntries: 1,
+    },
+    bindings: [{
+      target,
+      status: "provided",
+      declarations: [{ module: "Vir.Demo" }],
+      providers: ["demo"],
+    }],
+    publicEntries: [{
+      declaration: "Lean.Vir.Demo.Widget.other",
+      module: "Vir.Demo",
+      type: "Unit",
+      source: { path: "Vir/Demo.lean", startLine: 1 },
+      targets: [{ target, path: ["Lean.Vir.Demo.Widget.other"] }],
+    }],
+  };
+  const config = {
+    id: "demo",
+    title: "Demo",
+    description: "Demo bindings.",
+    path: "Vir/Demo.bindings.json",
+    lean: { modules: ["Vir.Demo"] },
+    roots: [{
+      id: "widget",
+      title: "Widget",
+      targets: ["demo.widget.*"],
+      lean: { public: ["Lean.Vir.Demo.Widget"] },
+      upstream: { kind: "typescript", roots: ["Widget"] },
+      mappings: [{
+        typescript: "Widget.render",
+        targets: [target],
+        lean: ["Lean.Vir.Demo.Widget.render"],
+      }],
+    }],
+  };
+  const typeScript = {
+    symbols: [{
+      id: "Widget.render",
+      kind: "method",
+      surfaceRoot: "Widget",
+      display: "render(): void;",
+    }],
+  };
+
+  const report = await buildBindingExplorerReport(
+    coverage,
+    [config],
+    new Map([["demo/widget", typeScript]]),
+    repositoryPath("build", "bindings", "demo.coverage.json"),
+  );
+
+  assert.ok(report.issues.some((entry) =>
+    entry.kind === "mapped-public-api-unreachable" &&
+    entry.declaration === "Lean.Vir.Demo.Widget.render" &&
+    entry.target === target));
 });
 
 test("type anchor rendering is a side-effect-free format choice", () => {
@@ -79,8 +151,9 @@ test("generated-file checks reject stale output without exiting", async () => {
 
 test("binding entry points own help and error exit status", () => {
   const helpCases = [
-    ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR binding explorer/u],
+    ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR upstream reference, shipped inventory, and author actions/u],
     ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
+    ["generate-lean-bindings.mjs", /Generate faithful Lean host declarations/u],
     ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],
     ["generate-ts-descriptors.mjs", /Generate Lean VIR TypeScript descriptor JSON/u],
     ["render-type-anchors.mjs", /Render a Verso\/Blueprint-friendly Markdown fragment/u],
@@ -129,4 +202,30 @@ test("binding entry points propagate a returned nonzero status", async () => {
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
+});
+
+test("type anchor rendering distinguishes checked policy from advisory semantics", () => {
+  const result = {
+    id: "demo",
+    lean: "Demo.root",
+    ts: "Root",
+    status: "compatible",
+    relation: "audit",
+    notes: [],
+    diagnostics: [],
+    portIntent: { disposition: "bind", representation: "hostResource" },
+    advisorySemantics: [{
+      topic: "lifetime",
+      note: "Expected to remain live until release.",
+    }],
+  };
+  const report = {
+    summary: { exact: 0, compatible: 1, weak: 0, missing: 0 },
+    diagnosticSummary: { error: 0, warning: 0, info: 0 },
+    results: [result],
+  };
+
+  const html = renderTypeAnchorReport(report, "html");
+  assert.match(html, /Mechanically checked comparison policy/u);
+  assert.match(html, /Advisory semantics — not mechanically verified/u);
 });

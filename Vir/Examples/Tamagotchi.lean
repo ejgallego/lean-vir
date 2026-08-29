@@ -202,11 +202,11 @@ def setText (selector text : String) : DomM Unit := do
 def getAttribute (selector name : String) : DomM (Option String) := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
   | none => pure none
-  | some element => Lean.Vir.Browser.Element.getAttribute element name
+  | some element => Lean.Vir.Browser.Element.getAttributeString element name
 
 def setAttribute (selector name value : String) : DomM Unit :=
   withElement selector fun element =>
-    Lean.Vir.Browser.Element.setAttribute element name value
+    Lean.Vir.Browser.Element.setAttributeString element name value
 
 def getChecked (selector : String) : DomM Bool := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
@@ -214,7 +214,7 @@ def getChecked (selector : String) : DomM Bool := do
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure false
-      | some input => Lean.Vir.Browser.HTMLInputElement.getChecked input
+      | some input => Lean.Vir.Browser.HTMLInputElement.getCheckedBool input
 
 def setChecked (selector : String) (checked : Bool) : DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
@@ -222,7 +222,7 @@ def setChecked (selector : String) (checked : Bool) : DomM Unit := do
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ()
-      | some input => Lean.Vir.Browser.HTMLInputElement.setChecked input checked
+      | some input => Lean.Vir.Browser.HTMLInputElement.setCheckedBool input checked
 
 def getValue (selector : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
@@ -230,7 +230,7 @@ def getValue (selector : String) : DomM String := do
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ""
-      | some input => Lean.Vir.Browser.HTMLInputElement.getValue input
+      | some input => Lean.Vir.Browser.HTMLInputElement.getValueString input
 
 def setValue (selector value : String) : DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelectorString selector with
@@ -238,7 +238,7 @@ def setValue (selector value : String) : DomM Unit := do
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ()
-      | some input => Lean.Vir.Browser.HTMLInputElement.setValue input value
+      | some input => Lean.Vir.Browser.HTMLInputElement.setValueString input value
 
 def render (state : PetState) (actionLabel : String) : DomM Unit := do
   let artwork := normalizeArtwork state.artwork

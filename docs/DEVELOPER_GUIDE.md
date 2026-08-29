@@ -279,10 +279,11 @@ sequenceDiagram
 The current API intentionally follows ordinary React semantics. JavaScript
 resource/runtime operations live in `RuntimeM`, render functions are authored
 in `ReactM`, DOM/root operations live in `DomM`, and real host IO remains
-outside the React component effect. `Root.render` is the host boundary for
-static tree rendering: the raw host import accepts a render action of type
-`ReactM (Lean.Vir.Js Node)`, invokes that action to obtain the concrete
-`Js Node`, renders it, and releases the render callback. This is a shallow
+outside the React component effect. `Root.renderNode` is the faithful raw
+boundary corresponding to `root.render(reactNode)` and borrows a `Js Node`.
+`Root.render` is the generated static-tree convenience: its host import accepts
+a render action of type `ReactM (Lean.Vir.Js Node)`, invokes that action once,
+forwards the concrete node, and releases the render callback. This is a shallow
 embedding: it aims to make existing React/ProofWidgets-style code portable
 before introducing higher-level safety abstractions.
 

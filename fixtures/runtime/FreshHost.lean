@@ -24,9 +24,9 @@ def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option
   | none => pure ("", none)
   | some fresh =>
       setFreshText fresh s
-      Lean.Vir.Browser.Element.setAttribute fresh "data-fresh" (s ++ "!")
+      Lean.Vir.Browser.Element.setAttributeString fresh "data-fresh" (s ++ "!")
       let text ← getFreshText fresh
-      let attr ← Lean.Vir.Browser.Element.getAttribute fresh "data-fresh"
+      let attr ← Lean.Vir.Browser.Element.getAttributeString fresh "data-fresh"
       pure (text, attr)
 
 @[vir_js "test.react.value"]

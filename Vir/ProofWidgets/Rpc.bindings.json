@@ -4,14 +4,98 @@
   "id": "proofwidgets",
   "title": "ProofWidgets RPC",
   "description": "ProofWidgets reference transport and inspection calls implemented by the VIR host.",
-  "lean": { "modules": ["Vir.ProofWidgets.Rpc"] },
+  "lean": { "modules": ["Vir.ProofWidgets.Rpc", "Vir.ProofWidgets.Rpc.Generated"] },
+  "generation": {
+    "output": "Vir/ProofWidgets/Rpc/Generated.lean",
+    "irOutput": "build/bindings/proofwidgets.generated-operations.json",
+    "imports": ["Vir.Browser.Types", "Vir.ProofWidgets.Rpc.Types"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-proofwidgets-protocol-v1",
+      "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+    },
+    "resources": {},
+    "members": [],
+    "protocolOperations": [
+      {
+        "id": "proofwidgets.rpc.ref-base", "group": "rpc-references", "target": "proofwidgets.rpc.ref",
+        "lean": "Lean.Vir.ProofWidgets.rpcRefBaseJs", "marker": "vir_js",
+        "reason": "Constructs the base host-side ProofWidgets reference descriptor from explicit JavaScript strings.",
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.ref" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "id", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "label", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "typeName", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "summary", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "expression", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } }
+      },
+      {
+        "id": "proofwidgets.rpc.ref-finish", "group": "rpc-references", "target": "proofwidgets.rpc.ref.finish",
+        "lean": "Lean.Vir.ProofWidgets.rpcRefFinishJs", "marker": "vir_js",
+        "reason": "Completes a host-side ProofWidgets reference with optional server state and contextual text.",
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.finishRef" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "ref", "role": "receiver", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } },
+          { "name": "typeText", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "context", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "serverRef", "type": { "lean": "Lean.Vir.Js.Nullable ProofWidgets.ServerRef", "representation": "js-resource", "resourceInner": "ProofWidgets.ServerRef" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } }
+      },
+      {
+        "id": "proofwidgets.rpc.resolved-value", "group": "rpc-references", "target": "js.value.proofwidgets.resolvedRef.value",
+        "lean": "Lean.Vir.ProofWidgets.Rpc.resolvedRefValueJs", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly decodes the fixed ResolvedRef record returned by the ProofWidgets host protocol.",
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.resolvedRefValue" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.ResolvedRef", "representation": "js-resource", "resourceInner": "ProofWidgets.ResolvedRef" } }],
+        "result": { "type": { "lean": "ProofWidgets.ResolvedRef", "representation": "lean-owned" } }
+      },
+      {
+        "id": "proofwidgets.rpc.inspect", "group": "rpc-references", "target": "proofwidgets.rpc.inspectRef",
+        "lean": "Lean.Vir.ProofWidgets.Rpc.inspectRefJs", "marker": "vir_js",
+        "reason": "Asks the host whether a ProofWidgets reference can be inspected.",
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.inspectRef" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [{ "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "proofwidgets.rpc.resolve", "group": "rpc-references", "target": "proofwidgets.rpc.resolveRef",
+        "lean": "Lean.Vir.ProofWidgets.Rpc.resolveRefJs", "marker": "vir_js",
+        "reason": "Starts a one-shot host resolution and retains the callback until resolution or runtime disposal.",
+        "upstreamRelation": { "kind": "local-contract", "member": "ProofWidgetsRpcHost.resolveRef" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [
+          { "name": "ref", "type": { "lean": "Lean.Vir.Js ProofWidgets.RpcRef", "representation": "js-resource", "resourceInner": "ProofWidgets.RpcRef" } },
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js ProofWidgets.ResolvedRef → Lean.Vir.Browser.DomM Unit", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      }
+    ]
+  },
   "roots": [
     {
       "id": "rpc-references",
       "title": "RPC references",
       "targets": ["proofwidgets.rpc.*", "js.value.proofwidgets.*"],
       "lean": { "public": ["Lean.Vir.ProofWidgets.Rpc"] },
-      "upstream": { "kind": "local" }
+      "upstream": {
+        "kind": "local",
+        "declarations": ["Vir/ProofWidgets/Rpc.contract.d.ts"],
+        "roots": ["ProofWidgetsRpcHost"]
+      }
     }
   ]
 }

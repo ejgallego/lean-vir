@@ -4,22 +4,43 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
+import { discoverBindingConfigPaths, loadBindingConfig } from "./binding-config.mjs";
+import { buildGeneratedOperations } from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
 const semanticStatuses = ["exact", "compatible", "weak", "missing"];
+const coverageStatuses = [
+  "exact",
+  "compatible",
+  "derived",
+  "protocol-linked",
+  "contract-linked",
+  "weak",
+  "unreviewed",
+  "suggested",
+  "ambiguous",
+  "missing",
+];
+const generationDispositions = [
+  "generated",
+  "adapted",
+  "needs-annotation",
+  "unsupported",
+  "not-selected",
+];
 const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [options]";
 
 function usage() {
   console.log(`${usageLine}
 
-Generate the consolidated Lean VIR binding explorer.
+Generate the consolidated Lean VIR upstream reference, shipped inventory, and author actions.
 
 Options:
   --coverage FILE   Shipped-binding coverage report.
@@ -65,80 +86,6 @@ async function readJson(path) {
   }
 }
 
-async function discoverConfigs(directory) {
-  const paths = [];
-  async function visit(path) {
-    for (const entry of await readdir(path, { withFileTypes: true })) {
-      const child = join(path, entry.name);
-      if (entry.isDirectory()) await visit(child);
-      else if (entry.isFile() && entry.name.endsWith(".bindings.json")) paths.push(child);
-    }
-  }
-  await visit(directory);
-  return paths.sort();
-}
-
-function nonemptyString(value) {
-  return typeof value === "string" && value.length !== 0;
-}
-
-function validateConfig(value, path) {
-  const label = relative(repositoryRoot, path);
-  if (value?.version !== 1 || !nonemptyString(value.id) || !nonemptyString(value.title) ||
-      !nonemptyString(value.description) || !Array.isArray(value.lean?.modules) ||
-      value.lean.modules.length === 0 || !Array.isArray(value.roots) || value.roots.length === 0) {
-    throw new Error(`${label} is not a binding-library v1 configuration`);
-  }
-  const rootIds = new Set();
-  for (const [index, bindingRoot] of value.roots.entries()) {
-    if (!nonemptyString(bindingRoot?.id) || !nonemptyString(bindingRoot?.title) ||
-        !Array.isArray(bindingRoot.targets) || bindingRoot.targets.length === 0 ||
-        !["typescript", "local", "internal"].includes(bindingRoot.upstream?.kind)) {
-      throw new Error(`${label} roots[${index}] is invalid`);
-    }
-    if (rootIds.has(bindingRoot.id)) throw new Error(`${label} repeats root id ${bindingRoot.id}`);
-    rootIds.add(bindingRoot.id);
-    for (const pattern of bindingRoot.targets) validateTargetPattern(pattern, `${label} root ${bindingRoot.id}`);
-    if (bindingRoot.upstream.kind === "typescript" &&
-        (!Array.isArray(bindingRoot.upstream.declarations) || !Array.isArray(bindingRoot.upstream.roots))) {
-      throw new Error(`${label} root ${bindingRoot.id} must identify TypeScript declarations and roots`);
-    }
-    if (bindingRoot.anchors !== undefined && !Array.isArray(bindingRoot.anchors)) {
-      throw new Error(`${label} root ${bindingRoot.id} anchors must be an array`);
-    }
-    if (bindingRoot.mappings !== undefined && !Array.isArray(bindingRoot.mappings)) {
-      throw new Error(`${label} root ${bindingRoot.id} mappings must be an array`);
-    }
-    for (const [mappingIndex, mapping] of (bindingRoot.mappings ?? []).entries()) {
-      const direct = Array.isArray(mapping?.targets) && mapping.targets.length !== 0 &&
-        mapping.targets.every(nonemptyString) && mapping.accessors === undefined;
-      const accessorNames = mapping?.accessors && typeof mapping.accessors === "object" &&
-        !Array.isArray(mapping.accessors) ? Object.keys(mapping.accessors) : [];
-      const property = mapping?.targets === undefined && accessorNames.length !== 0 &&
-        accessorNames.every((accessor) => ["get", "set"].includes(accessor)) &&
-        accessorNames.every((accessor) => {
-          const operation = mapping.accessors[accessor];
-          return (nonemptyString(operation?.target) && nonemptyString(operation?.lean) &&
-            nonemptyString(operation?.anchor) && operation.missing === undefined) ||
-            (operation?.missing === true && nonemptyString(operation.note) &&
-              operation.target === undefined && operation.lean === undefined &&
-              operation.anchor === undefined);
-        });
-      if (!nonemptyString(mapping?.typescript) || (!direct && !property)) {
-        throw new Error(`${label} root ${bindingRoot.id} mappings[${mappingIndex}] is invalid`);
-      }
-    }
-  }
-  return { ...value, path: label };
-}
-
-function validateTargetPattern(pattern, context) {
-  if (!nonemptyString(pattern) || (pattern.includes("*") && !pattern.endsWith("*")) ||
-      pattern.slice(0, -1).includes("*")) {
-    throw new Error(`${context} has invalid target pattern ${JSON.stringify(pattern)}`);
-  }
-}
-
 function matchesPattern(target, pattern) {
   return pattern.endsWith("*") ? target.startsWith(pattern.slice(0, -1)) : target === pattern;
 }
@@ -151,7 +98,7 @@ async function generateTypeScriptSurfaces(configs) {
   const groups = new Map();
   for (const config of configs) {
     for (const bindingRoot of config.roots) {
-      if (bindingRoot.upstream.kind !== "typescript") continue;
+      if (!["typescript", "local"].includes(bindingRoot.upstream.kind)) continue;
       const upstream = bindingRoot.upstream;
       const key = JSON.stringify({
         declarations: upstream.declarations,
@@ -203,10 +150,11 @@ async function generateTypeScriptSurfaces(configs) {
   return surfaces;
 }
 
-function explorerTypeScriptSymbol({ shape: _shape, ...symbol }) {
+function explorerTypeScriptSymbol(symbol) {
   if (symbol.kind !== "interface") return symbol;
+  const { shape: _shape, ...presentation } = symbol;
   const header = symbol.display.slice(0, symbol.display.indexOf("{")).trim();
-  return { ...symbol, display: `${header} { … }` };
+  return { ...presentation, display: `${header} { … }` };
 }
 
 async function loadComparison(bindingRoot) {
@@ -234,10 +182,10 @@ function semanticIssues(comparison) {
         anchor: result.id,
         ...(result.target ? { target: result.target } : {}),
       }));
-    } else if (result.status === "missing") {
+    } else if (result.status === "missing" && result.relation !== "coverageGap") {
       issues.push(issue(
-        result.relation === "coverageGap" ? "coverage-gap" : "missing-descriptor",
-        result.relation === "coverageGap" ? "gap" : "error",
+        "missing-descriptor",
+        "error",
         result.note ?? `${result.lean} or ${result.ts} is missing`,
         { anchor: result.id, ...(result.target ? { target: result.target } : {}) },
       ));
@@ -255,12 +203,25 @@ function semanticIssues(comparison) {
   return issues;
 }
 
+function semanticRoadmap(comparison) {
+  if (comparison === null) return [];
+  return comparison.results.filter((result) =>
+    result.status === "missing" && result.relation === "coverageGap").map((result) => ({
+    kind: "unsupported-upstream-entry",
+    message: result.note ?? `${result.ts} is not provided by VIR`,
+    anchor: result.id,
+    typescript: result.ts,
+    ...(result.target ? { target: result.target } : {}),
+  }));
+}
+
 function analysisState(bindingRoot, coverage, comparison) {
   if (bindingRoot.upstream.kind === "internal") {
     return { status: "not-applicable", scope: "no-upstream-contract" };
   }
   if (coverage?.mode === "reviewed") {
-    return comparison !== null && coverage.summary.unreviewed === 0
+    return (bindingRoot.upstream.kind === "local" || comparison !== null) &&
+        coverage.summary.unreviewed === 0
       ? { status: "complete", scope: "complete-upstream-surface" }
       : { status: "in-progress", scope: "complete-upstream-surface" };
   }
@@ -280,8 +241,11 @@ function findingStatus(bindings, issues) {
   if (bindings.some((binding) => binding.status !== "provided") ||
       issues.some((entry) => entry.severity === "error")) return "error";
   if (issues.some((entry) => entry.severity === "warning")) return "warning";
-  if (issues.some((entry) => entry.severity === "gap")) return "gap";
   return "none";
+}
+
+function emptyCoverageSummary() {
+  return Object.fromEntries(coverageStatuses.map((status) => [status, 0]));
 }
 
 function reviewedMappingOperations(mapping) {
@@ -310,12 +274,285 @@ function worstSemanticStatus(results) {
       : candidate, "exact");
 }
 
-function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison) {
+function comparisonResultsForSymbol(symbol, comparison) {
+  if (comparison === null) return [];
+  return comparison.results.filter((result) =>
+    result.ts === symbol.id ||
+    (result.portIntent?.disposition === "unsupported" &&
+      result.ts === symbol.surfaceRoot));
+}
+
+function generationRecord(generatedMembers, symbol, member, targetMappings, comparison) {
+  const comparisonResults = comparisonResultsForSymbol(symbol, comparison);
+  const auditedTargets = comparisonResults.filter((result) =>
+    result.relation === "audit" && result.target !== undefined).map((result) => result.target);
+  const mappedTargets = member.mapping?.targets ?? [];
+  const confirmedTargets = [...new Set([...mappedTargets, ...auditedTargets])].sort();
+  const candidateTargets = [...new Set(targetMappings.filter((mapping) =>
+    mapping.source === "automatic").map((mapping) => mapping.target))].sort();
+  const adaptedTargets = [...new Set(targetMappings.filter((mapping) =>
+    mapping.source === "protocol-relation" &&
+    ["upstream-adapter", "local-contract"].includes(mapping.relation.kind) &&
+    mapping.typescript === symbol.id).map((mapping) => mapping.target))].sort();
+  const unsupported = comparisonResults.find((result) =>
+    result.portIntent?.disposition === "unsupported");
+  const diagnostics = [];
+  let disposition;
+  let provenance;
+
+  if (generatedMembers.has(symbol.id)) {
+    disposition = "generated";
+    provenance = "generator";
+    if (confirmedTargets.length === 0) {
+      diagnostics.push({
+        code: "generated-binding-unreachable",
+        severity: "error",
+        message: "The member is selected for generation but has no confirmed shipped target.",
+        action: "Regenerate the Lean source and reconcile its compiled target.",
+      });
+    }
+  } else if (adaptedTargets.length !== 0) {
+    disposition = "adapted";
+    provenance = "reviewed-protocol";
+  } else if (unsupported !== undefined) {
+    disposition = "unsupported";
+    provenance = "annotation";
+  } else if (confirmedTargets.length !== 0) {
+    disposition = "needs-annotation";
+    provenance = "reviewed-protocol";
+    diagnostics.push({
+      code: "direct-typescript-lowering-required",
+      severity: "action",
+      message: "VIR ships a generated reviewed protocol for this upstream operation, but does not yet lower it directly from TypeScript.",
+      action: "Express the correspondence in the TypeScript lowering policy, or keep it explicitly protocol-specific.",
+    });
+  } else if (candidateTargets.length !== 0) {
+    disposition = "needs-annotation";
+    provenance = "candidate";
+    diagnostics.push({
+      code: targetMappings.some((mapping) => mapping.status === "ambiguous")
+        ? "ambiguous-upstream-correspondence"
+        : "upstream-correspondence-unconfirmed",
+      severity: "action",
+      message: targetMappings.some((mapping) => mapping.status === "ambiguous")
+        ? "More than one upstream operation may correspond to a shipped target."
+        : "A name-based candidate connects this upstream operation to a shipped target, but the identity is not authored.",
+      action: "Confirm the operation identity in the binding configuration before generation.",
+    });
+  } else {
+    disposition = "not-selected";
+    provenance = "none";
+  }
+
+  for (const operation of member.mapping?.operations ?? []) {
+    if (operation.missing !== true) continue;
+    diagnostics.push({
+      code: "upstream-accessor-missing",
+      severity: "action",
+      accessor: operation.accessor,
+      message: operation.note,
+      action: `Add the ${operation.accessor} binding or keep this coverage gap explicitly reviewed.`,
+    });
+  }
+
+  for (const result of comparisonResults) {
+    if (result.relation !== "audit" || !["weak", "missing"].includes(result.status)) continue;
+    diagnostics.push({
+      code: result.status === "weak" ? "type-translation-limited" : "type-translation-missing",
+      severity: result.status === "weak" ? "warning" : "error",
+      message: result.note ?? `${result.lean} does not faithfully represent ${result.ts}.`,
+      action: "Repair the translation policy or record the unsupported TypeScript construct.",
+      anchor: result.id,
+    });
+  }
+
+  return {
+    disposition,
+    provenance,
+    availability: confirmedTargets.length !== 0 || adaptedTargets.length !== 0
+      ? "available"
+      : candidateTargets.length !== 0 ? "candidate" : "not-provided",
+    targets: [...new Set([...confirmedTargets, ...adaptedTargets])].sort(),
+    ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
+    diagnostics,
+  };
+}
+
+function decorateGenerationCoverage(config, bindingRoot, typeScript, surfaceCoverage, comparison) {
+  const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
+  const generatedMembers = new Set(config.generation?.members ?? []);
+  const targetMappingsBySymbol = new Map();
+  for (const mapping of surfaceCoverage.targetMappings) {
+    const ids = [mapping.typescript, ...(mapping.candidates ?? []).map((candidate) =>
+      candidate.typescript)].filter(Boolean);
+    for (const id of ids) {
+      const mappings = targetMappingsBySymbol.get(id) ?? [];
+      mappings.push(mapping);
+      targetMappingsBySymbol.set(id, mappings);
+    }
+  }
+  const members = surfaceCoverage.members.map((member) => {
+    const symbol = symbolsById.get(member.id);
+    if (symbol === undefined) {
+      throw new Error(`${config.id}/${bindingRoot.id} cannot decorate missing member ${member.id}`);
+    }
+    return {
+      ...member,
+      generation: generationRecord(
+        generatedMembers,
+        symbol,
+        member,
+        targetMappingsBySymbol.get(member.id) ?? [],
+        comparison,
+      ),
+    };
+  });
+  const disposition = Object.fromEntries(generationDispositions.map((status) => [status, 0]));
+  const availability = { available: 0, candidate: 0, "not-provided": 0 };
+  for (const member of members) {
+    disposition[member.generation.disposition] += 1;
+    availability[member.generation.availability] += 1;
+  }
+  return {
+    ...surfaceCoverage,
+    members,
+    generation: {
+      disposition,
+      availability,
+      actions: members.reduce((sum, member) => sum + member.generation.diagnostics.length, 0),
+    },
+  };
+}
+
+function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedOperations) {
+  const items = [];
+  for (const member of surfaceCoverage?.members ?? []) {
+    member.generation.diagnostics.forEach((diagnostic, index) => items.push({
+      id: `${config.id}/${bindingRoot.id}/member/${member.id}/${diagnostic.code}/${index}`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "upstream-member",
+      member: member.id,
+      disposition: member.generation.disposition,
+      provenance: member.generation.provenance,
+      availability: member.generation.availability,
+      targets: member.generation.targets,
+      ...(member.generation.candidateTargets === undefined
+        ? {} : { candidateTargets: member.generation.candidateTargets }),
+      ...diagnostic,
+    }));
+  }
+  for (const mapping of surfaceCoverage?.targetMappings ?? []) {
+    if (mapping.status !== "unmatched") continue;
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/target/${mapping.target}/upstream-identity-missing`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "host-target",
+      target: mapping.target,
+      disposition: "needs-annotation",
+      provenance: "generated-protocol",
+      severity: "action",
+      code: "upstream-identity-missing",
+      message: "This shipped target has no upstream correspondence candidate.",
+      action: "Identify its upstream operation or classify it as an explicit no-parity operation.",
+    });
+  }
+  for (const operation of generatedOperations) {
+    if (operation.protocol?.upstreamRelation.kind !== "unclassified") continue;
+    const represented = items.some((item) =>
+      item.target === operation.host.target ||
+      item.targets?.includes(operation.host.target) ||
+      item.candidateTargets?.includes(operation.host.target));
+    if (represented) continue;
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/target/${operation.host.target}/protocol-classification-required`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "host-target",
+      target: operation.host.target,
+      disposition: "needs-annotation",
+      provenance: "generated-protocol",
+      severity: "action",
+      code: "protocol-classification-required",
+      message: "This generated protocol has not been classified against its upstream API.",
+      action: "Name the adapted upstream member or classify the operation as VIR-owned.",
+    });
+  }
+  if (bindingRoot.upstream.kind === "local" && surfaceCoverage === null) {
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/contract/local-contract-required`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "upstream-contract",
+      disposition: "needs-annotation",
+      provenance: "none",
+      severity: "action",
+      code: "local-upstream-contract-required",
+      message: "The local API group has no machine-readable upstream contract.",
+      action: "Provide a declaration contract before generating or auditing its bindings.",
+    });
+  }
+  const representedAnchors = new Set(items.flatMap((item) =>
+    item.anchor === undefined ? [] : [item.anchor]));
+  issues.filter((entry) =>
+    ["type-fidelity", "missing-descriptor"].includes(entry.kind) &&
+    entry.anchor !== undefined && !representedAnchors.has(entry.anchor))
+    .forEach((entry) => {
+      items.push({
+        id: `${config.id}/${bindingRoot.id}/comparison/${entry.anchor}/${entry.kind}`,
+        library: config.id,
+        group: bindingRoot.id,
+        subject: "comparison-anchor",
+        anchor: entry.anchor,
+        disposition: "needs-annotation",
+        provenance: "comparison",
+        severity: entry.severity,
+        code: entry.kind === "type-fidelity"
+          ? "type-translation-limited"
+          : "type-translation-missing",
+        message: entry.message,
+        action: entry.kind === "type-fidelity"
+          ? "Review the generated specialization and improve the type translation policy."
+          : "Provide the missing TypeScript or Lean descriptor before generation.",
+        ...(entry.target === undefined ? {} : { target: entry.target }),
+      });
+      representedAnchors.add(entry.anchor);
+    });
+  const structuralIssueKinds = new Set([
+    "missing-provider",
+    "runtime-only",
+    "mapped-public-api-unreachable",
+    "extra-public-accessor-api",
+    "comparison-error",
+  ]);
+  issues.filter((entry) => structuralIssueKinds.has(entry.kind)).forEach((entry, index) =>
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/finding/${entry.kind}/${index}`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: entry.target === undefined ? "binding-group" : "host-target",
+      disposition: "needs-annotation",
+      provenance: "compiled-evidence",
+      severity: entry.severity,
+      code: entry.kind,
+      message: entry.message,
+      action: "Repair the binding configuration, generated declaration, or runtime provider map.",
+      ...(entry.target === undefined ? {} : { target: entry.target }),
+    }));
+  return items;
+}
+
+function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison, generatedOperations = []) {
+  if (bindingRoot.upstream.kind === "local") {
+    return buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, generatedOperations);
+  }
   if (!Array.isArray(bindingRoot.mappings)) {
-    return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings);
+    return buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, generatedOperations);
   }
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
+  const generatedMembers = new Set(config.generation?.members ?? []);
   const resultsByTypeScript = new Map();
   const resultsById = new Map();
   for (const result of comparison?.results ?? []) {
@@ -329,6 +566,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   }
   const mappings = new Map();
   const mappedTargets = new Set();
+  const protocolTargets = new Set(generatedOperations
+    .filter((operation) => operation.typescript.kind === "protocol")
+    .map((operation) => operation.host.target));
   for (const mapping of bindingRoot.mappings) {
     const symbol = symbolsById.get(mapping.typescript);
     if (symbol === undefined) {
@@ -345,7 +585,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must use accessor mappings`);
     }
     if (mapping.accessors !== undefined) {
-      const readonly = /^readonly\s/u.test(symbol.display);
+      const readonly = symbol.access === "get" || /^readonly\s/u.test(symbol.display);
       if (mapping.accessors.get === undefined) {
         throw new Error(`${config.id}/${bindingRoot.id} property ${mapping.typescript} must classify its getter`);
       }
@@ -366,6 +606,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       }
       mappedTargets.add(operation.target);
       if (operation.accessor !== undefined) {
+        if (operation.anchor === undefined && generatedMembers.has(mapping.typescript)) continue;
         const result = resultsById.get(operation.anchor);
         if (result === undefined || result.ts !== mapping.typescript ||
             result.target !== operation.target ||
@@ -377,7 +618,12 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     const mappedOperations = operations.filter((operation) => operation.missing !== true);
     const results = mapping.accessors === undefined
       ? resultsByTypeScript.get(mapping.typescript) ?? []
-      : mappedOperations.map((operation) => resultsById.get(operation.anchor));
+      : mappedOperations.flatMap((operation) => {
+          const result = operation.anchor === undefined ? undefined : resultsById.get(operation.anchor);
+          return result === undefined ? [] : [result];
+        });
+    const generatedCompatibility = generatedMembers.has(mapping.typescript) &&
+      results.length === 0 && mappedOperations.length !== 0;
     mappings.set(mapping.typescript, {
       ...mapping,
       operations,
@@ -385,12 +631,13 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       lean: mappedOperations.flatMap((operation) => operation.lean),
       status: operations.some((operation) => operation.missing === true)
         ? "missing"
-        : worstSemanticStatus(results),
+        : generatedCompatibility ? "derived" : worstSemanticStatus(results),
       anchors: results.map((result) => result.id),
     });
   }
-  if (mappedTargets.size !== bindings.length) {
-    const missing = bindings.filter((binding) => !mappedTargets.has(binding.target)).map((binding) => binding.target);
+  const classifiedTargets = new Set([...mappedTargets, ...protocolTargets]);
+  if (classifiedTargets.size !== bindings.length) {
+    const missing = bindings.filter((binding) => !classifiedTargets.has(binding.target)).map((binding) => binding.target);
     throw new Error(`${config.id}/${bindingRoot.id} mappings do not classify targets: ${missing.join(", ")}`);
   }
   const members = typeScript.symbols.filter((symbol) => symbol.surfaceRoot !== undefined).map((symbol) => {
@@ -403,7 +650,7 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
       ...(mapping === undefined ? {} : { mapping }),
     };
   });
-  const summary = { exact: 0, compatible: 0, weak: 0, missing: 0, unreviewed: 0 };
+  const summary = emptyCoverageSummary();
   for (const member of members) summary[member.status] += 1;
   const targetMappings = [...mappings.values()].flatMap((mapping) =>
     mapping.operations.filter((operation) => operation.missing !== true).map((operation) => {
@@ -413,7 +660,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
         : [resultsById.get(operation.anchor)];
       return {
         target: operation.target,
-        status: worstSemanticStatus(operationResults),
+        status: generatedMembers.has(mapping.typescript) && operationResults.length === 0
+          ? "derived"
+          : worstSemanticStatus(operationResults),
         source: "reviewed",
         typescript: mapping.typescript,
         lean: operation.lean,
@@ -423,19 +672,123 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     }));
   return {
     mode: "reviewed",
-    summary: { ...summary, mappedTargets: mappedTargets.size },
+    summary: { ...summary, mappedTargets: classifiedTargets.size },
     members,
     targetMappings,
   };
 }
 
-function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings) {
+function buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, generatedOperations) {
   const roots = new Set(bindingRoot.upstream.roots);
   const members = typeScript.symbols.filter((symbol) =>
     symbol.surfaceRoot !== undefined || (roots.has(symbol.id) && symbol.kind !== "interface"));
-  const targetMappings = bindings.map((binding) => suggestTargetMapping(binding.target, members));
+  const symbolsById = new Map(members.map((member) => [member.id, member]));
+  const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
+  const operationsByMember = new Map();
+  const targetMappings = [];
+
+  for (const operation of generatedOperations) {
+    const relation = operation.protocol?.upstreamRelation;
+    if (relation?.kind !== "local-contract") {
+      throw new Error(`${config.id}/${bindingRoot.id} local operation ${operation.id} lacks a local-contract relation`);
+    }
+    if (!symbolsById.has(relation.member)) {
+      throw new Error(`${config.id}/${bindingRoot.id} local operation ${operation.id} references missing contract member ${relation.member}`);
+    }
+    if (!bindingsByTarget.has(operation.host.target)) {
+      throw new Error(`${config.id}/${bindingRoot.id} local operation ${operation.id} references target outside its group: ${operation.host.target}`);
+    }
+    const memberOperations = operationsByMember.get(relation.member) ?? [];
+    memberOperations.push(operation);
+    operationsByMember.set(relation.member, memberOperations);
+    targetMappings.push({
+      target: operation.host.target,
+      status: "contract-linked",
+      source: "protocol-relation",
+      typescript: relation.member,
+      lean: [operation.lean.declaration],
+      relation,
+      candidates: [],
+    });
+  }
+
+  const classifiedTargets = new Set(targetMappings.map((mapping) => mapping.target));
+  if (classifiedTargets.size !== bindings.length) {
+    const missing = bindings.filter((binding) => !classifiedTargets.has(binding.target))
+      .map((binding) => binding.target);
+    throw new Error(`${config.id}/${bindingRoot.id} local contract does not classify targets: ${missing.join(", ")}`);
+  }
+
+  const coveredMembers = members.map((member) => {
+    const operations = operationsByMember.get(member.id) ?? [];
+    const mapping = operations.length === 0 ? undefined : {
+      typescript: member.id,
+      operations: operations.map((operation) => ({
+        target: operation.host.target,
+        lean: [operation.lean.declaration],
+      })),
+      targets: operations.map((operation) => operation.host.target),
+      lean: operations.map((operation) => operation.lean.declaration),
+      status: "contract-linked",
+      anchors: [],
+    };
+    return {
+      id: member.id,
+      kind: member.kind,
+      ...(member.inheritedFrom ? { inheritedFrom: member.inheritedFrom } : {}),
+      status: mapping === undefined ? "missing" : "contract-linked",
+      ...(mapping === undefined ? {} : { mapping }),
+    };
+  });
+  const summary = emptyCoverageSummary();
+  for (const member of coveredMembers) summary[member.status] += 1;
+  return {
+    mode: "reviewed",
+    summary: {
+      ...summary,
+      mappedTargets: classifiedTargets.size,
+    },
+    members: coveredMembers,
+    targetMappings,
+  };
+}
+
+function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings, generatedOperations) {
+  const roots = new Set(bindingRoot.upstream.roots);
+  const members = typeScript.symbols.filter((symbol) =>
+    symbol.surfaceRoot !== undefined || (roots.has(symbol.id) && symbol.kind !== "interface"));
+  const relationsByTarget = new Map(generatedOperations
+    .filter((operation) => operation.typescript.kind === "protocol")
+    .map((operation) => [operation.host.target, operation.protocol.upstreamRelation]));
+  const targetMappings = bindings.map((binding) => {
+    const relation = relationsByTarget.get(binding.target);
+    if (relation?.kind === "upstream-adapter") {
+      return {
+        target: binding.target,
+        status: "protocol-linked",
+        source: "protocol-relation",
+        typescript: relation.member,
+        relation,
+        candidates: [],
+      };
+    }
+    if (relation?.kind === "vir-owned") {
+      return {
+        target: binding.target,
+        status: "no-parity",
+        source: "protocol-relation",
+        relation,
+        candidates: [],
+      };
+    }
+    return suggestTargetMapping(binding.target, members);
+  });
   const mappedMembers = new Map();
   for (const mapping of targetMappings) {
+    if (mapping.source === "protocol-relation" && mapping.typescript !== undefined) {
+      mappedMembers.set(mapping.typescript, "protocol-linked");
+      continue;
+    }
     for (const candidate of mapping.candidates) {
       const previous = mappedMembers.get(candidate.typescript);
       const status = mapping.status === "suggested" ? "suggested" : "ambiguous";
@@ -448,17 +801,15 @@ function buildSuggestedSurfaceCoverage(bindingRoot, typeScript, bindings) {
     ...(member.inheritedFrom ? { inheritedFrom: member.inheritedFrom } : {}),
     status: mappedMembers.get(member.id) ?? "missing",
   }));
+  const evidence = emptyCoverageSummary();
+  for (const member of coveredMembers) evidence[member.status] += 1;
   const summary = {
-    exact: 0,
-    compatible: 0,
-    weak: 0,
-    missing: coveredMembers.filter((member) => member.status === "missing").length,
-    unreviewed: coveredMembers.filter((member) => member.status !== "missing").length,
-    suggested: coveredMembers.filter((member) => member.status === "suggested").length,
-    ambiguous: coveredMembers.filter((member) => member.status === "ambiguous").length,
-    mappedTargets: targetMappings.filter((mapping) => mapping.status === "suggested").length,
+    ...evidence,
+    mappedTargets: targetMappings.filter((mapping) =>
+      ["protocol-linked", "suggested"].includes(mapping.status)).length,
     ambiguousTargets: targetMappings.filter((mapping) => mapping.status === "ambiguous").length,
     unmatchedTargets: targetMappings.filter((mapping) => mapping.status === "unmatched").length,
+    noParityTargets: targetMappings.filter((mapping) => mapping.status === "no-parity").length,
   };
   return { mode: "automatic", summary, members: coveredMembers, targetMappings };
 }
@@ -523,24 +874,28 @@ function declarationMatchesSelector(declaration, selector) {
   return declaration === selector || declaration.startsWith(`${selector}.`);
 }
 
-function accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget) {
+function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget, generatedOperations) {
   if (surfaceCoverage?.mode !== "reviewed") return [];
   const selectors = bindingRoot.lean?.public ?? [];
   const issues = [];
-  for (const mapping of surfaceCoverage.targetMappings.filter((entry) =>
-    entry.accessor !== undefined)) {
+  for (const mapping of surfaceCoverage.targetMappings) {
     const callers = publicByTarget.get(mapping.target) ?? [];
     for (const declaration of mapping.lean) {
       if (!callers.some((caller) => caller.entry.declaration === declaration)) {
         issues.push(issue(
           "mapped-public-api-unreachable",
           "error",
-          `${declaration} is the reviewed ${mapping.accessor} accessor for ${mapping.typescript}, but compiled IR does not reach ${mapping.target}`,
+          `${declaration} is the reviewed${mapping.accessor === undefined
+            ? "" : ` ${mapping.accessor} accessor`} binding for ${mapping.typescript}, but compiled IR does not reach ${mapping.target}`,
           { target: mapping.target, declaration, typescript: mapping.typescript,
-            accessor: mapping.accessor },
+            ...(mapping.accessor === undefined ? {} : { accessor: mapping.accessor }) },
         ));
       }
     }
+    if (mapping.accessor === undefined) continue;
+    const generated = generatedOperations.some((operation) =>
+      operation.host.target === mapping.target && mapping.lean.includes(operation.lean.declaration));
+    if (generated) continue;
     const reviewed = new Set(mapping.lean);
     for (const caller of callers) {
       if (reviewed.has(caller.entry.declaration) ||
@@ -626,38 +981,71 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   }
 
   const allIssues = [];
+  const allRoadmap = [];
   const libraries = [];
   const semanticSummary = Object.fromEntries(semanticStatuses.map((status) => [status, 0]));
   for (const config of configs) {
+    const generatedByGroup = new Map();
+    if (config.generation !== undefined) {
+      const descriptorsByRoot = new Map(config.roots.flatMap((bindingRoot) => {
+        const descriptor = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`);
+        return descriptor === undefined ? [] : [[bindingRoot.id, descriptor]];
+      }));
+      for (const operation of buildGeneratedOperations(
+        config,
+        config.generation,
+        descriptorsByRoot,
+      )) {
+        const operations = generatedByGroup.get(operation.group) ?? [];
+        operations.push(operation);
+        generatedByGroup.set(operation.group, operations);
+      }
+    }
     const libraryIssues = [];
     const roots = [];
     for (const bindingRoot of config.roots) {
       const bindings = assigned.get(config.id).get(bindingRoot.id).sort((left, right) => left.target.localeCompare(right.target));
       const comparison = await loadComparison(bindingRoot);
       const typescript = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) ?? null;
-      const surfaceCoverage = typescript === null
+      const rawSurfaceCoverage = typescript === null
         ? null
-        : buildSurfaceCoverage(config, bindingRoot, typescript, bindings, comparison);
+        : buildSurfaceCoverage(
+          config,
+          bindingRoot,
+          typescript,
+          bindings,
+          comparison,
+          generatedByGroup.get(bindingRoot.id) ?? [],
+        );
+      const surfaceCoverage = rawSurfaceCoverage === null
+        ? null
+        : decorateGenerationCoverage(
+          config,
+          bindingRoot,
+          typescript,
+          rawSurfaceCoverage,
+          comparison,
+        );
       const issues = [];
       for (const binding of bindings) {
         if (binding.status === "missing-provider") {
-          issues.push(issue("missing-provider", "error", `${binding.target} has no shipped runtime provider`, { target: binding.target }));
+          issues.push(issue("missing-provider", "error", `${binding.target} has no shipped runtime provider key`, { target: binding.target }));
         } else if (binding.status === "runtime-only") {
           issues.push(issue("runtime-only", "error", `${binding.target} has no compiler declaration`, { target: binding.target }));
         }
       }
-      if (surfaceCoverage !== null && surfaceCoverage.summary.missing !== 0 &&
-          !(comparison !== null && surfaceCoverage.mode === "automatic")) {
-        issues.push(issue(
-          surfaceCoverage.mode === "reviewed" ? "upstream-members-missing" : "upstream-members-unmapped",
-          "gap",
-          surfaceCoverage.mode === "reviewed"
-            ? `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream members have no shipped VIR binding`
-            : `${surfaceCoverage.summary.missing} of ${surfaceCoverage.members.length} upstream entries have no automatic VIR mapping candidate`,
-        ));
-      }
-      issues.push(...accessorPublicIssues(bindingRoot, surfaceCoverage, publicByTarget));
+      issues.push(...reviewedPublicIssues(
+        bindingRoot,
+        surfaceCoverage,
+        publicByTarget,
+        generatedByGroup.get(bindingRoot.id) ?? [],
+      ));
       issues.push(...semanticIssues(comparison));
+      const roadmap = semanticRoadmap(comparison).map((entry) => ({
+        library: config.id,
+        group: bindingRoot.id,
+        ...entry,
+      }));
       if (comparison !== null) {
         for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
         for (const result of comparison.results) {
@@ -667,8 +1055,16 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         }
       }
       const decoratedIssues = issues.map((entry) => ({ library: config.id, group: bindingRoot.id, ...entry }));
+      const workItems = groupWorkItems(
+        config,
+        bindingRoot,
+        surfaceCoverage,
+        issues,
+        generatedByGroup.get(bindingRoot.id) ?? [],
+      );
       libraryIssues.push(...decoratedIssues);
       allIssues.push(...decoratedIssues);
+      allRoadmap.push(...roadmap);
       roots.push({
         id: bindingRoot.id,
         title: bindingRoot.title,
@@ -683,10 +1079,16 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           bindings: bindings.length,
           provided: bindings.filter((entry) => entry.status === "provided").length,
           issues: issues.length,
+          roadmap: roadmap.length,
         },
         bindings,
         ...(comparison === null ? {} : { comparison }),
+        ...(generatedByGroup.has(bindingRoot.id)
+          ? { generatedOperations: generatedByGroup.get(bindingRoot.id) }
+          : {}),
+        workItems,
         issues: decoratedIssues,
+        roadmap,
       });
     }
     libraries.push({
@@ -699,6 +1101,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         apiGroups: roots.length,
         bindings: roots.reduce((sum, entry) => sum + entry.summary.bindings, 0),
         issues: libraryIssues.length,
+        roadmap: roots.reduce((sum, entry) => sum + entry.summary.roadmap, 0),
       },
       apiGroups: roots,
       issues: libraryIssues,
@@ -706,6 +1109,49 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   }
   libraries.sort((left, right) => left.title.localeCompare(right.title));
   const apiGroups = libraries.flatMap((library) => library.apiGroups);
+  const generationGroups = apiGroups.filter((entry) => entry.coverage !== undefined);
+  const workItems = apiGroups.flatMap((entry) => entry.workItems);
+  const generatedOperations = apiGroups.flatMap((entry) => entry.generatedOperations ?? []);
+  const generatedTargets = new Set(generatedOperations.map((operation) => operation.host.target));
+  const typescriptDerivedOperations = generatedOperations.filter((operation) =>
+    operation.typescript.kind !== "protocol");
+  const reviewedProtocolOperations = generatedOperations.filter((operation) =>
+    operation.typescript.kind === "protocol");
+  const protocolRelations = {
+    upstreamAdapters: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "upstream-adapter").length,
+    virOwned: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "vir-owned").length,
+    localContracts: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "local-contract").length,
+    unclassified: reviewedProtocolOperations.filter((operation) =>
+      operation.protocol.upstreamRelation.kind === "unclassified").length,
+  };
+  const generatedSources = new Set(configs.flatMap((config) =>
+    config.generation === undefined ? [] : [config.generation.output]));
+  const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
+    .filter((declaration) => !generatedSources.has(declaration.source?.path));
+  const generationSummary = {
+    boundaries: {
+      operations: generatedOperations.length,
+      targets: generatedTargets.size,
+      typescriptDerived: typescriptDerivedOperations.length,
+      reviewedProtocols: reviewedProtocolOperations.length,
+      handwrittenDeclarations: handwrittenDeclarations.length,
+    },
+    protocolRelations,
+    disposition: Object.fromEntries(generationDispositions.map((status) => [
+      status,
+      generationGroups.reduce((sum, entry) =>
+        sum + entry.coverage.generation.disposition[status], 0),
+    ])),
+    availability: Object.fromEntries(["available", "candidate", "not-provided"].map((status) => [
+      status,
+      generationGroups.reduce((sum, entry) =>
+        sum + entry.coverage.generation.availability[status], 0),
+    ])),
+    workItems: workItems.length,
+  };
   const coveredGroups = apiGroups.filter((entry) =>
     ["complete", "in-progress", "automatic"].includes(entry.analysis.status));
   const analysisCounts = {
@@ -717,7 +1163,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     notRun: apiGroups.filter((entry) => entry.analysis.status === "not-run").length,
     notApplicable: apiGroups.filter((entry) => entry.analysis.status === "not-applicable").length,
   };
-  const issueCounts = { error: 0, warning: 0, gap: 0 };
+  const issueCounts = { error: 0, warning: 0 };
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
     format: "lean-vir-binding-explorer",
@@ -729,6 +1175,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     },
     lean: coverage.lean,
     providers: coverage.providers,
+    boundaryAnalysis: coverage.analysis,
     summary: {
       libraries: libraries.length,
       apiGroups: apiGroups.length,
@@ -750,22 +1197,20 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       coverage: {
         groups: coveredGroups.length,
         members: coveredGroups.reduce((sum, entry) => sum + entry.coverage.members.length, 0),
-        reviewed: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) =>
-            ["exact", "compatible", "weak"].includes(member.status)).length, 0),
-        unreviewed: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "unreviewed").length, 0),
-        suggested: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "suggested").length, 0),
-        ambiguous: coveredGroups.reduce((sum, entry) =>
-          sum + entry.coverage.members.filter((member) => member.status === "ambiguous").length, 0),
-        missing: coveredGroups.reduce((sum, entry) => sum + entry.coverage.summary.missing, 0),
+        evidence: Object.fromEntries(coverageStatuses.map((status) => [
+          status,
+          coveredGroups.reduce((sum, entry) => sum + entry.coverage.summary[status], 0),
+        ])),
       },
+      generation: generationSummary,
       issues: issueCounts,
+      roadmap: { unsupportedEntries: allRoadmap.length },
     },
     publicEntries: coverage.publicEntries,
     libraries,
+    workItems,
     issues: allIssues,
+    roadmap: allRoadmap,
   };
 }
 
@@ -782,12 +1227,12 @@ export async function runBindingExplorerCli(argv) {
   const options = parseArgs(argv);
   if (options === null) return 0;
   const coverage = await readJson(options.coverage);
-  const configPaths = await discoverConfigs(options.configDir);
+  const configPaths = await discoverBindingConfigPaths(options.configDir);
   if (configPaths.length === 0) throw new Error(`no *.bindings.json files found under ${relative(repositoryRoot, options.configDir)}`);
   const configs = [];
   const ids = new Set();
   for (const path of configPaths) {
-    const config = validateConfig(await readJson(path), path);
+    const config = await loadBindingConfig(path);
     if (ids.has(config.id)) throw new Error(`duplicate binding-library id ${config.id}`);
     ids.add(config.id);
     configs.push(config);
@@ -816,15 +1261,23 @@ export async function runBindingExplorerCli(argv) {
         outputOptions,
       )),
   ]);
-  console.log("\nLean VIR binding explorer");
+  console.log("\nLean VIR upstream reference, shipped inventory, and author actions");
   console.log(`  libraries: ${report.summary.libraries}`);
   console.log(`  API groups: ${report.summary.apiGroups}`);
-  console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
+  console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} with provider keys present`);
   console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
-  console.log(`  member coverage: ${report.summary.coverage.reviewed} reviewed, ${report.summary.coverage.unreviewed} mapped awaiting review, ${report.summary.coverage.suggested} suggested, ${report.summary.coverage.ambiguous} ambiguous, ${report.summary.coverage.missing} unmapped`);
-  console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
-  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings, ${report.summary.issues.gap} gaps`);
+  console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
+  console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
+  console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
+  console.log(`  author actions: ${report.summary.generation.workItems}`);
+  const unresolvedSemanticMissing = Math.max(
+    0,
+    report.summary.semantic.missing - report.summary.roadmap.unsupportedEntries,
+  );
+  console.log(`  semantic comparison: ${report.summary.semantic.weak} weak, ${unresolvedSemanticMissing} unresolved missing, ${report.summary.roadmap.unsupportedEntries} reviewed unsupported`);
+  console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings`);
+  console.log(`  roadmap: ${report.summary.roadmap.unsupportedEntries} explicitly unsupported upstream entries; unselected entries remain coverage only`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);
   console.log(`             ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.html)}`);
   if (report.summary.issues.error !== 0) {

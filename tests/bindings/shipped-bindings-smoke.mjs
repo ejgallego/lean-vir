@@ -7,13 +7,37 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import {
+  discoverBindingConfigPaths,
+  loadBindingConfig,
+} from "../../scripts/bindings/binding-config.mjs";
 
 const report = JSON.parse(await readFile("build/bindings/shipped-v1.coverage.json", "utf8"));
 const html = await readFile("build/bindings/shipped-v1.dashboard.html", "utf8");
 const declarations = report.bindings.flatMap((binding) => binding.declarations);
+const configPaths = await discoverBindingConfigPaths(resolve("Vir"));
+const configs = await Promise.all(configPaths.map(loadBindingConfig));
+const generatedSources = new Set(configs.map((config) => config.generation?.output));
+
+assert.equal(generatedSources.has(undefined), false, "every shipped binding library must generate Lean");
+for (const declaration of declarations) {
+  assert.ok(
+    generatedSources.has(declaration.source.path),
+    `${declaration.declaration} is handwritten in ${declaration.source.path}`,
+  );
+}
 
 assert.equal(report.format, "lean-vir-shipped-bindings-coverage");
-assert.equal(report.analysis.representationPolicy, "compiler-validated");
+assert.deepEqual(report.analysis, {
+  representationPolicy: "compiler-validated-coarse-boundary",
+  ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
+  conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
+  providerCoverage: "target-name-presence-only",
+  providerBehavior: "not-mechanically-verified",
+  semanticParity: "library-specific type anchors",
+});
 assert.equal(report.summary.declarations, declarations.length);
 assert.equal(
   report.summary.virJs,
@@ -52,6 +76,16 @@ assert.equal(report.summary.targetsReachedByPublicEntries, report.summary.totalT
 const publicEntries = new Map(report.publicEntries.map((entry) => [entry.declaration, entry]));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
+assert.deepEqual(publicEntries.get("Lean.Vir.Browser.Document.getTitle")?.interface, {
+  kind: "function",
+  effect: "dom",
+  args: [],
+  result: { type: "Js", interfaceTag: 23, kind: "resource", name: "Lean.Vir.Js" },
+});
+assert.deepEqual(
+  publicEntries.get("Lean.Vir.Browser.Element.setTextContent")?.interface?.args.map((arg) => arg.name),
+  ["element", "textContent"],
+);
 const publicCanvasContext = publicEntries.get(
   "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
 );
@@ -62,7 +96,7 @@ assert.deepEqual(
   )?.path,
   [
     "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
-    "_private.Vir.Browser.0.Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
+    "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
   ],
 );
 
@@ -82,6 +116,8 @@ assert.match(
   html,
   new RegExp(`id="provided-metric">${report.summary.provided}/${report.summary.totalTargets}`),
 );
+assert.match(html, /Provider key present/u);
+assert.match(html, /does not verify provider modality or behavior/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /id="boundary"/u);
 const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
@@ -94,5 +130,5 @@ Function(scripts.at(-1)[1]);
 console.log(
   `shipped bindings smoke ok: ${report.summary.virJs} vir_js + ` +
   `${report.summary.explicitConversions} explicit conversions, ` +
-  `${report.summary.provided}/${report.summary.totalTargets} provided`,
+  `${report.summary.provided}/${report.summary.totalTargets} provider keys present`,
 );

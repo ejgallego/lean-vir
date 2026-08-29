@@ -4,6 +4,21 @@
 JavaScript host while running through VIR's WASM interpreter. Those modules
 expose APIs in the `Lean.Vir.*` namespace.
 
+All shipped JavaScript host declarations are generated from the companion
+`Vir/**/*.bindings.json` manifests. Browser properties and methods are lowered
+directly from pinned TypeScript declarations where supported. VIR-owned or
+ABI-special operations use structured reviewed protocol records in the same
+manifests; each record identifies a named upstream adapter, a VIR-owned
+operation, a local contract, or outstanding classification work. Generated
+files live under `Vir/**/Generated.lean`; authored modules
+contain reusable types and higher-level Lean APIs, but no host declarations.
+The generator derives or records representation, passing, retention, result
+ownership, and effect in a canonical operation IR; see
+[BINDING_MODALITIES.md](BINDING_MODALITIES.md). Run
+`npm run check:lean-bindings` to reject drift. These generated boundaries
+preserve JavaScript resources; conversion to Lean-owned values is an explicit
+caller-side choice.
+
 The core library used by local package generation is built by:
 
 ```bash
@@ -330,8 +345,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`
 - `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js.Nullable String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
-- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
+- `Element.getAttributeString` and `setAttributeString` are explicit helpers
+  that convert Lean-owned strings around those faithful generated methods.
 - `Lean.Vir.Browser.Element.querySelector` and `querySelectorAll` search below an existing element resource.
 - `Lean.Vir.Browser.Element.getInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
   and `setInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
@@ -353,7 +370,8 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.HTMLCanvasElement.fromElement`, `getWidth`, `setWidth`, `getHeight`, `setHeight`, and `getContext2D` narrow and configure canvas elements.
 - `Lean.Vir.Browser.CanvasRenderingContext2D.clearRect`, `fillRect`, and `strokeRect` accept ordinary Lean `Float` coordinates.
 - `Lean.Vir.Browser.CanvasRenderingContext2D.beginPath`, `closePath`, `moveTo`, `lineTo`, `arc`, `fill`, and `stroke` provide basic path drawing.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyle`, `setStrokeStyle`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure drawing state and transforms.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.getFillStyle`, `setFillStyleValue`, `getStrokeStyle`, and `setStrokeStyleValue` preserve the full JavaScript-owned `CanvasStyle` union; `setFillStyle` and `setStrokeStyle` are string conveniences.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.getLineWidth`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure numeric drawing state and transforms.
 - `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
 - `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
@@ -389,6 +407,7 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
+- `Lean.Vir.React.Root.renderNode : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Node -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
@@ -418,10 +437,11 @@ native React nodes with `React.createElement` at that point. Rendering retains
 any Lean event callbacks embedded in the resource graph until the root is
 rerendered, unmounted, the package is reloaded, or the runtime is disposed.
 
-`Root.render` is the host boundary for rendering a `ReactM` tree into an
-existing root. The JavaScript host invokes the received render action to obtain
-the concrete `Js Node` resource and releases that render callback after the
-render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
+`Root.renderNode` is the faithful host boundary for borrowing a JavaScript-owned
+React node. `Root.render` is the generated convenience adapter for rendering a
+`ReactM` tree into an existing root: the JavaScript host invokes the received
+render action once, forwards the concrete `Js Node`, and releases that callback
+after the render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
 concrete props in a real JavaScript React function component. The public hook
 surface is
 resource-typed: `useState`, `State.set`, and `State.modify` accept

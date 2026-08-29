@@ -4,7 +4,226 @@
   "id": "javascript",
   "title": "JavaScript values",
   "description": "Core JavaScript resources, nullable values, collections, primitive conversions, and retained Lean references.",
-  "lean": { "modules": ["Vir.Js"] },
+  "lean": { "modules": ["Vir.Js", "Vir.Js.Generated"] },
+  "generation": {
+    "output": "Vir/Js/Generated.lean",
+    "irOutput": "build/bindings/javascript.generated-operations.json",
+    "imports": ["Vir.Js.Types"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-javascript-protocol-v1",
+      "effect": { "id": "runtime", "lean": "RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js",
+        "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": {
+        "default": { "passing": "borrowed", "retention": "call" },
+        "globalTypes": []
+      }
+    },
+    "resources": {},
+    "members": [],
+    "protocolOperations": [
+      {
+        "id": "javascript.string.of", "group": "primitive-conversions", "target": "js.string",
+        "lean": "Lean.Vir.JsValue.ofString", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a Lean-owned String into a JavaScript string resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "String", "representation": "lean-owned" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "javascript.string.value", "group": "primitive-conversions", "target": "js.string.value",
+        "lean": "Lean.Vir.JsValue.toString", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly decodes a JavaScript string resource into a Lean-owned String.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "String", "representation": "lean-owned" } }
+      },
+      {
+        "id": "javascript.nat.of", "group": "primitive-conversions", "target": "js.nat",
+        "lean": "Lean.Vir.JsValue.ofNat", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a Lean Nat into a JavaScript number resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Nat", "representation": "immediate" } }],
+        "result": { "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      },
+      {
+        "id": "javascript.nat.value", "group": "primitive-conversions", "target": "js.nat.value",
+        "lean": "Lean.Vir.JsValue.toNat", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly decodes a JavaScript number resource as a Lean Nat.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
+        "result": { "type": { "lean": "Nat", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.bool.of", "group": "primitive-conversions", "target": "js.bool",
+        "lean": "Lean.Vir.JsValue.ofBool", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a Lean Bool into a JavaScript boolean resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Bool", "representation": "immediate" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.bool.value", "group": "primitive-conversions", "target": "js.bool.value",
+        "lean": "Lean.Vir.JsValue.toBool", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly decodes a JavaScript boolean resource as a Lean Bool.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }],
+        "result": { "type": { "lean": "Bool", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.float.of", "group": "primitive-conversions", "target": "js.float",
+        "lean": "Lean.Vir.JsValue.ofFloat", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly preserves a Lean Float as a JavaScript IEEE-754 number resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Float", "representation": "immediate" } }],
+        "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.float.value", "group": "primitive-conversions", "target": "js.float.value",
+        "lean": "Lean.Vir.JsValue.toFloat", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly decodes a JavaScript IEEE-754 number resource as a Lean Float.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }],
+        "result": { "type": { "lean": "Float", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.nullable.null", "group": "nullable", "target": "js.nullable.null",
+        "lean": "Lean.Vir.Js.Nullable.null", "marker": "vir_js",
+        "reason": "Constructs a JavaScript null resource for a statically selected phantom type.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.nullable.of", "group": "nullable", "target": "js.nullable.of",
+        "lean": "Lean.Vir.Js.Nullable.ofJs", "marker": "vir_js",
+        "reason": "Injects a JavaScript resource into VIR's JavaScript nullable representation.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.nullable.is-null", "group": "nullable", "target": "js.nullable.isNull",
+        "lean": "Lean.Vir.Js.Nullable.isNullJs", "marker": "vir_js",
+        "reason": "Tests a JavaScript nullable resource without decoding its payload.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.nullable.value", "group": "nullable", "target": "js.nullable.value",
+        "lean": "Lean.Vir.Js.Nullable.get", "marker": "vir_js",
+        "reason": "Extracts the non-null payload of a JavaScript nullable resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.array.length", "group": "array", "target": "js.array.length",
+        "lean": "Lean.Vir.Js.Array.lengthJs", "marker": "vir_js",
+        "reason": "Reads Array.length while keeping the array contents in JavaScript land.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      },
+      {
+        "id": "javascript.array.item", "group": "array", "target": "js.array.item",
+        "lean": "Lean.Vir.Js.Array.itemNullable", "marker": "vir_js",
+        "reason": "Reads an Array entry as a nullable resource without decoding it into Lean.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
+          { "name": "index", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",
+        "lean": "Lean.Vir.Js.NodeList.lengthJs", "marker": "vir_js",
+        "reason": "Reads NodeList.length while keeping the collection in JavaScript land.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.length", "accessor": "get" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      },
+      {
+        "id": "javascript.node-list.item", "group": "node-list", "target": "js.nodeList.item",
+        "lean": "Lean.Vir.Js.NodeList.itemNullable", "marker": "vir_js",
+        "reason": "Calls NodeList.item and represents a missing entry as JavaScript null.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.item" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value (Lean.Vir.Js α)" } },
+          { "name": "index", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.node-list.to-array", "group": "node-list", "target": "js.nodeList.toArray",
+        "lean": "Lean.Vir.Js.NodeList.toArray", "marker": "vir_js",
+        "reason": "Copies a NodeList into a JavaScript Array without crossing its entries into Lean.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
+      },
+      {
+        "id": "javascript.lean-ref.create", "group": "lean-reference", "target": "js.leanRef",
+        "lean": "Lean.Vir.LeanRef.toJSL", "marker": "vir_js",
+        "reason": "Retains a Lean-owned value behind an independently tracked JavaScript resource lease.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "α", "representation": "lean-owned" } }],
+        "result": { "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }
+      },
+      {
+        "id": "javascript.lean-ref.value", "group": "lean-reference", "target": "js.leanRef.value",
+        "lean": "Lean.Vir.LeanRef.fromJSL", "marker": "vir_js",
+        "reason": "Returns a fresh owned Lean reference from a live retained-value lease.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
+        "result": { "type": { "lean": "α", "representation": "lean-owned" } }
+      },
+      {
+        "id": "javascript.lean-ref.retain", "group": "lean-reference", "target": "js.leanRef.retain",
+        "lean": "Lean.Vir.LeanRef.retainJSL", "marker": "vir_js",
+        "reason": "Creates an independently releasable lease for the same retained Lean value.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
+        "result": { "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }
+      },
+      {
+        "id": "javascript.lean-ref.release", "group": "lean-reference", "target": "js.leanRef.release",
+        "lean": "Lean.Vir.LeanRef.releaseJSL", "marker": "vir_js",
+        "reason": "Consumes one retained-value lease and invalidates aliases of that same handle.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "passing": "consumed", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      }
+    ]
+  },
   "roots": [
     {
       "id": "array",

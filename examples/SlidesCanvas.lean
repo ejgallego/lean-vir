@@ -48,24 +48,28 @@ def mount : DomM Unit := do
       let status ← Document.createElementString "p"
       Element.ClassList.add status "vir-slide-status"
       setTextContentString status "Starting Lean animation…"
-      Element.appendChild root status
+      discard <| Element.appendChild root status
       let canvasElement ← Document.createElementString "canvas"
       Element.ClassList.add canvasElement "vir-slide-canvas"
-      Element.setAttribute canvasElement "role" "img"
-      Element.setAttribute canvasElement "aria-label"
+      Element.setAttributeString canvasElement "role" "img"
+      Element.setAttributeString canvasElement "aria-label"
         "A blue rectangle bouncing horizontally across a canvas"
-      Element.appendChild root canvasElement
+      discard <| Element.appendChild root canvasElement
       match ← HTMLCanvasElement.fromElement canvasElement with
       | none => setTextContentString status "Lean could not initialize the canvas element"
       | some canvas =>
-          HTMLCanvasElement.setWidth canvas 640
-          HTMLCanvasElement.setHeight canvas 360
+          HTMLCanvasElement.setWidthNat canvas 640
+          HTMLCanvasElement.setHeightNat canvas 360
           match ← HTMLCanvasElement.getContext2D canvas with
           | none => setTextContentString status "CanvasRenderingContext2D is unavailable"
           | some ctx =>
               CanvasRenderingContext2D.setFillStyle ctx "#2563eb"
               CanvasRenderingContext2D.setStrokeStyle ctx "#0f172a"
               CanvasRenderingContext2D.setLineWidth ctx 3.0
+              let text ← Lean.Vir.JsValue.ofString "Lean VIR"
+              let metrics ← CanvasRenderingContext2D.measureText ctx text
+              let textWidth ← Lean.Vir.JsValue.toFloat (← TextMetrics.getWidth metrics)
+              setTextContentString status s!"Lean text width: {textWidth.toUInt64.toNat}"
               let _ ← Animation.requestAnimationFrame fun timestamp =>
                 drawFrame ctx status 0 timestamp timestamp
               pure ()

@@ -6,126 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import Vir.Common
 import Vir.Js
+import Vir.Browser.Generated
 
 namespace Lean.Vir.Browser
-
-/-- Browser/DOM effect used by Lean-authored browser code. -/
-@[irreducible] def DomM (α : Type) : Type :=
-  Lean.Vir.RuntimeM α
-
-namespace DomM
-
-/-- Runs a browser/DOM action at an exported `IO` boundary. -/
-def run (action : DomM α) : IO α :=
-  by
-    unfold DomM at action
-    exact action.run
-
-instance : Monad DomM where
-  pure value :=
-    by
-      unfold DomM
-      exact pure value
-  bind action next :=
-    by
-      unfold DomM at action
-      unfold DomM
-      exact action >>= fun value => by
-        unfold DomM at next
-        exact next value
-
-instance : MonadLift Lean.Vir.RuntimeM DomM where
-  monadLift action :=
-    by
-      unfold DomM
-      exact action
-
-instance : Nonempty (DomM α) :=
-  by
-    unfold DomM
-    infer_instance
-
-end DomM
-
-/--
-Browser DOM element object class.
-
-Lean code receives element values from `Document.querySelector` and passes them
-to `Element` or more-specific element APIs. The current `wasm32-wasip1` runtime
-represents this as a typed JavaScript object resource; Lean programs should not
-construct or persist assumptions about the resource representation.
-
-Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Element).
--/
-opaque Element : Type
-
-/--
-Browser event object class.
-
-Listener callbacks receive event values as private
-resources. The event resource is only valid for the duration of that listener
-callback. The current `Js` type does not statically prevent escape; storing the
-event past callback return leaves an invalid handle whose later use fails.
-
-Reference: [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event).
--/
-opaque Event : Type
-
-/--
-Browser event listener registration object class.
-
-`Element.addEventListener` returns listener handles so Lean code can remove the
-registered listener later with `Element.removeEventListener`.
-
-Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
--/
-opaque EventListener : Type
-
-/--
-Browser `HTMLInputElement` object class.
-
-Use `HTMLInputElement.fromElement` to narrow an `Element` before reading or
-writing input-specific DOM properties.
-
-Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
--/
-opaque HTMLInputElement : Type
-
-/-- Browser `HTMLCanvasElement` object class. -/
-opaque HTMLCanvasElement : Type
-
-/-- Browser two-dimensional canvas rendering context. -/
-opaque CanvasRenderingContext2D : Type
-
-@[vir_js_explicit_conversion "js.string.owned"]
-private opaque ownedString (value : @& String) : Lean.Vir.RuntimeM (Lean.Vir.Js String)
-
-@[vir_js_explicit_conversion "js.float.owned"]
-private opaque ownedFloat (value : Float) : Lean.Vir.RuntimeM (Lean.Vir.Js Float)
-
-/--
-Browser timeout object class returned by `setTimeout`.
-
-The JavaScript host owns the timer registration and the retained Lean callback
-until the timer fires, is cleared, or the runtime is disposed.
--/
-opaque Timeout : Type
-
-/--
-Browser interval object class returned by `setInterval`.
-
-The JavaScript host owns the timer registration and the retained Lean callback
-until the interval is cleared or the runtime is disposed.
--/
-opaque Interval : Type
-
-/--
-Browser animation-frame object class returned by `requestAnimationFrame`.
-
-The JavaScript host owns the frame registration and the retained Lean callback
-until the frame fires, is cancelled, or the runtime is disposed.
--/
-opaque AnimationFrame : Type
 
 namespace Event
 
@@ -137,11 +20,8 @@ resource itself remains callback-scoped.
 
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
-@[vir_js "browser.event.target"]
-private opaque targetNullable (event : @& Lean.Vir.Js Event) : DomM (Lean.Vir.Js.Nullable Element)
-
-def target (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← targetNullable event)
+def targetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← getTarget event)
 
 /--
 Returns the current event target as a DOM element when the current target is an
@@ -152,29 +32,8 @@ resource itself remains callback-scoped.
 
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
-@[vir_js "browser.event.currentTarget"]
-private opaque currentTargetNullable (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable Element)
-
-def currentTarget (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← currentTargetNullable event)
-
-/--
-Prevents the default action for this event when the underlying browser event is
-cancelable.
-
-Reference: [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault).
--/
-@[vir_js "browser.event.preventDefault"]
-opaque preventDefault (event : @& Lean.Vir.Js Event) : DomM Unit
-
-/--
-Stops propagation of this event to further listeners.
-
-Reference: [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation).
--/
-@[vir_js "browser.event.stopPropagation"]
-opaque stopPropagation (event : @& Lean.Vir.Js Event) : DomM Unit
+def currentTargetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← getCurrentTarget event)
 
 /--
 Returns the keyboard key represented by an event, or the empty string for
@@ -182,11 +41,8 @@ events without a string-valued {lit}`key` property.
 
 Reference: [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
 -/
-@[vir_js "browser.event.key"]
-private opaque keyJs (event : @& Lean.Vir.Js Event) : DomM (Lean.Vir.Js String)
-
-def key (event : @& Lean.Vir.Js Event) : DomM String := do
-  Lean.Vir.JsValue.toString (← keyJs event)
+def keyString (event : @& Lean.Vir.Js Event) : DomM String := do
+  Lean.Vir.JsValue.toString (← getKey event)
 
 end Event
 
@@ -200,9 +56,6 @@ synchronous and returns `Unit`.
 
 Reference: [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static).
 -/
-@[vir_js "browser.console.log"]
-private opaque logJs (message : @& Lean.Vir.Js String) : Lean.Vir.RuntimeM Unit
-
 def log (message : @& String) : IO Unit :=
   Lean.Vir.RuntimeM.run do
     let jsMessage ← Lean.Vir.JsValue.ofString message
@@ -211,36 +64,6 @@ def log (message : @& String) : IO Unit :=
 end Console
 
 namespace Document
-
-/--
-Reads the current document title through the JavaScript host.
-
-In a browser this returns `document.title`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
--/
-@[vir_js "browser.document.getTitle"]
-private opaque getTitleJs : DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary view of `document.title`. -/
-def getTitle : DomM (Lean.Vir.Js String) :=
-  getTitleJs
-
-/--
-Sets the current document title through the JavaScript host.
-
-In a browser this writes `document.title`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
--/
-@[vir_js "browser.document.setTitle"]
-private opaque setTitleJs (title : @& Lean.Vir.Js String) : DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `document.title`. -/
-def setTitle (title : @& Lean.Vir.Js String) : DomM Unit :=
-  setTitleJs title
 
 /--
 Returns the first element matching a CSS selector.
@@ -253,18 +76,6 @@ that need an element fixture should pre-seed it from JavaScript with
 
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
-@[vir_js "browser.document.querySelector"]
-private opaque querySelectorNullable
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable Element)
-
-/-- Faithful JavaScript-boundary view of `document.querySelector`. -/
-def querySelector
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable Element) :=
-  querySelectorNullable selector
-
-/-- Converts a Lean selector string and the nullable JavaScript result explicitly. -/
 def querySelectorString
     (selector : @& String) :
     DomM (Option (Lean.Vir.Js Element)) := do
@@ -280,28 +91,10 @@ handles remain valid independently of the list.
 
 Reference: [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll).
 -/
-@[vir_js "browser.document.querySelectorAll"]
-private opaque querySelectorAllJs
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
-
-def querySelectorAll
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) :=
-  querySelectorAllJs selector
-
-/-- Converts a Lean selector string before calling `document.querySelectorAll`. -/
 def querySelectorAllString
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
   querySelectorAll (← Lean.Vir.JsValue.ofString selector)
-
-@[vir_js "browser.document.createElement"]
-private opaque createElementJs (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element)
-
-/-- Faithful JavaScript-boundary view of `document.createElement`. -/
-def createElement (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element) :=
-  createElementJs tagName
 
 /-- Converts a Lean tag name before calling `document.createElement`. -/
 def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
@@ -311,187 +104,51 @@ end Document
 
 namespace Element
 
-/-- Returns the first descendant matching a CSS selector. -/
-@[vir_js "browser.element.querySelector"]
-private opaque querySelectorNullable
-    (element : @& Lean.Vir.Js Element)
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable Element)
-
-def querySelector
+/-- Converts a Lean selector before calling the faithful `Element.querySelector` binding. -/
+def querySelectorString
     (element : @& Lean.Vir.Js Element)
     (selector : @& String) :
     DomM (Option (Lean.Vir.Js Element)) := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
-  Lean.Vir.Js.Nullable.toOption (← querySelectorNullable element jsSelector)
+  Lean.Vir.Js.Nullable.toOption (← querySelector element jsSelector)
 
-/-- Returns the static list of descendants matching a CSS selector. -/
-@[vir_js "browser.element.querySelectorAll"]
-private opaque querySelectorAllJs
-    (element : @& Lean.Vir.Js Element)
-    (selector : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
-
-def querySelectorAll
+/-- Converts a Lean selector before calling the faithful `Element.querySelectorAll` binding. -/
+def querySelectorAllString
     (element : @& Lean.Vir.Js Element)
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
-  querySelectorAllJs element (← Lean.Vir.JsValue.ofString selector)
+  querySelectorAll element (← Lean.Vir.JsValue.ofString selector)
 
-/--
-Reads an element's serialized child markup as a JavaScript string resource.
-
-Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
--/
-@[vir_js "browser.element.getInnerHTML"]
-private opaque getInnerHTMLJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary getter for `Element.innerHTML`. -/
-def getInnerHTML
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getInnerHTMLJs element
-
-/--
-Replaces an element's child markup from a borrowed JavaScript string resource.
-
-The caller's string remains live after the call.
-
-Reference: [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML).
--/
-@[vir_js "browser.element.setInnerHTML"]
-private opaque setInnerHTMLJs
+/-- Converts a Lean-owned attribute name and result around the faithful `getAttribute` binding. -/
+def getAttributeString
     (element : @& Lean.Vir.Js Element)
-    (html : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `Element.innerHTML`. -/
-def setInnerHTML
-    (element : @& Lean.Vir.Js Element)
-    (html : @& Lean.Vir.Js String) :
-    DomM Unit :=
-  setInnerHTMLJs element html
-
-/--
-Reads an element's text content as a JavaScript string resource.
-
-Although `Node.textContent` is nullable for some node kinds, TypeScript narrows
-the `Element` getter to `string`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
--/
-@[vir_js "browser.element.getTextContent"]
-private opaque getTextContentJs
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String)
-
-/-- Faithful JavaScript-boundary getter for `Element.textContent`. -/
-def getTextContent
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js String) :=
-  getTextContentJs element
-
-/--
-Sets an element's text content from a borrowed nullable JavaScript string.
-
-JavaScript treats `null` as the empty string for this property. The caller's
-nullable resource remains live after the call. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
--/
-@[vir_js "browser.element.setTextContent"]
-private opaque setTextContentJs
-    (element : @& Lean.Vir.Js Element)
-    (text : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit
-
-/-- Faithful JavaScript-boundary setter for `Element.textContent`. -/
-def setTextContent
-    (element : @& Lean.Vir.Js Element)
-    (text : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit :=
-  setTextContentJs element text
-
-/--
-Reads an element attribute through the JavaScript host.
-
-In a browser this calls `element.getAttribute(name)`. The result is `none` when
-the attribute is absent. In Node tests, use the `lean-vir/vir-runtime-node`
-wrapper for virtual document state.
-
-Reference: [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute).
--/
-@[vir_js "browser.element.getAttribute"]
-private opaque getAttributeNullable
-    (element : @& Lean.Vir.Js Element)
-    (name : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js.Nullable String)
-
-def getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String) := do
+    (name : @& String) :
+    DomM (Option String) := do
   let jsName ← Lean.Vir.JsValue.ofString name
-  match ← Lean.Vir.Js.Nullable.toOption (← getAttributeNullable element jsName) with
+  match ← Lean.Vir.Js.Nullable.toOption (← getAttribute element jsName) with
   | none => pure none
   | some value =>
       let text ← Lean.Vir.JsValue.toString value
       pure (some text)
 
-/--
-Sets an element attribute through the JavaScript host.
-
-In a browser this calls `element.setAttribute(name, value)`. In Node tests, use
-the `lean-vir/vir-runtime-node` wrapper for virtual document state.
-
-Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute).
--/
-@[vir_js "browser.element.setAttribute"]
-private opaque setAttributeJs
+/-- Converts Lean-owned attribute text around the faithful `setAttribute` binding. -/
+def setAttributeString
     (element : @& Lean.Vir.Js Element)
-    (name value : @& Lean.Vir.Js String) :
-    DomM Unit
-
-def setAttribute (element : @& Lean.Vir.Js Element) (name value : @& String) : DomM Unit := do
+    (name value : @& String) :
+    DomM Unit := do
   let jsName ← Lean.Vir.JsValue.ofString name
   let jsValue ← Lean.Vir.JsValue.ofString value
-  setAttributeJs element jsName jsValue
-
-/-- Appends `child` to `parent` and returns no ownership-bearing DOM value. -/
-@[vir_js "browser.element.appendChild"]
-opaque appendChild
-    (parent child : @& Lean.Vir.Js Element) :
-    DomM Unit
-
-/-- Removes an element from its parent, if it has one. -/
-@[vir_js "browser.element.remove"]
-opaque remove (element : @& Lean.Vir.Js Element) : DomM Unit
+  setAttribute element jsName jsValue
 
 namespace ClassList
-
-@[vir_js "browser.element.classList.add"]
-private opaque addJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) : DomM Unit
 
 /-- Adds a CSS class to an element. -/
 def add (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
   addJs element (← Lean.Vir.JsValue.ofString className)
 
-@[vir_js "browser.element.classList.remove"]
-private opaque removeJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) : DomM Unit
-
 /-- Removes a CSS class from an element. -/
 def remove (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
   removeJs element (← Lean.Vir.JsValue.ofString className)
-
-@[vir_js "browser.element.classList.toggle"]
-private opaque toggleJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Bool)
 
 /-- Toggles a CSS class and returns whether it is present afterward. -/
 def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Bool := do
@@ -501,19 +158,13 @@ end ClassList
 
 namespace Style
 
-/-- Calls `element.style.setProperty(name, value)`. -/
-@[vir_js "browser.element.style.setProperty"]
-private opaque setPropertyJs
-    (element : @& Lean.Vir.Js Element)
-    (name value : @& Lean.Vir.Js String) : DomM Unit
-
 /-- Sets a CSS custom or ordinary property on an element's inline style. -/
 def setProperty
     (element : @& Lean.Vir.Js Element)
     (name value : @& String) : DomM Unit := do
-  setPropertyJs element
-    (← Lean.Vir.JsValue.ofString name)
-    (← Lean.Vir.JsValue.ofString value)
+  let jsName ← Lean.Vir.JsValue.ofString name
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  setPropertyJs element jsName (← Lean.Vir.Js.Nullable.ofJs jsValue)
 
 end Style
 
@@ -526,13 +177,6 @@ that is valid only during that event dispatch.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
-@[vir_js "browser.element.addEventListener"]
-private opaque addEventListenerJs
-    (element : @& Lean.Vir.Js Element)
-    (event : @& Lean.Vir.Js String)
-    (callback : Lean.Vir.Js Event → DomM Unit) :
-    DomM (Lean.Vir.Js EventListener)
-
 def addEventListener
     (element : @& Lean.Vir.Js Element)
     (event : @& String)
@@ -540,14 +184,6 @@ def addEventListener
     DomM (Lean.Vir.Js EventListener) := do
   let jsEvent ← Lean.Vir.JsValue.ofString event
   addEventListenerJs element jsEvent callback
-
-/--
-Removes a listener previously registered by `Element.addEventListener`.
-
-Reference: [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener).
--/
-@[vir_js "browser.element.removeEventListener"]
-opaque removeEventListener (listener : @& Lean.Vir.Js EventListener) : DomM Unit
 
 end Element
 
@@ -562,11 +198,6 @@ for virtual document state.
 
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
-@[vir_js "browser.htmlInputElement.fromElement"]
-private opaque fromElementNullable
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js.Nullable HTMLInputElement)
-
 def fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js HTMLInputElement)) := do
   Lean.Vir.Js.Nullable.toOption (← fromElementNullable element)
 
@@ -578,11 +209,8 @@ In a browser this reads `input.checked`. In Node tests, use the
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
-@[vir_js "browser.htmlInputElement.getChecked"]
-private opaque getCheckedJs (input : @& Lean.Vir.Js HTMLInputElement) : DomM (Lean.Vir.Js Bool)
-
-def getChecked (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool := do
-  let checked ← getCheckedJs input
+def getCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool := do
+  let checked ← getChecked input
   Lean.Vir.JsValue.toBool checked
 
 /--
@@ -593,15 +221,9 @@ In a browser this writes `input.checked`. In Node tests, use the
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
-@[vir_js "browser.htmlInputElement.setChecked"]
-private opaque setCheckedJs
-    (input : @& Lean.Vir.Js HTMLInputElement)
-    (checked : @& Lean.Vir.Js Bool) :
-    DomM Unit
-
-def setChecked (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : DomM Unit := do
+def setCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : DomM Unit := do
   let jsChecked ← Lean.Vir.JsValue.ofBool checked
-  setCheckedJs input jsChecked
+  setChecked input jsChecked
 
 /--
 Reads the `value` property of an input element.
@@ -611,11 +233,8 @@ In a browser this reads `input.value`. In Node tests, use the
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
-@[vir_js "browser.htmlInputElement.getValue"]
-private opaque getValueJs (input : @& Lean.Vir.Js HTMLInputElement) : DomM (Lean.Vir.Js String)
-
-def getValue (input : @& Lean.Vir.Js HTMLInputElement) : DomM String := do
-  let value ← getValueJs input
+def getValueString (input : @& Lean.Vir.Js HTMLInputElement) : DomM String := do
+  let value ← getValue input
   Lean.Vir.JsValue.toString value
 
 /--
@@ -626,24 +245,13 @@ In a browser this writes `input.value`. In Node tests, use the
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
-@[vir_js "browser.htmlInputElement.setValue"]
-private opaque setValueJs
-    (input : @& Lean.Vir.Js HTMLInputElement)
-    (value : @& Lean.Vir.Js String) :
-    DomM Unit
-
-def setValue (input : @& Lean.Vir.Js HTMLInputElement) (value : @& String) : DomM Unit := do
+def setValueString (input : @& Lean.Vir.Js HTMLInputElement) (value : @& String) : DomM Unit := do
   let jsValue ← Lean.Vir.JsValue.ofString value
-  setValueJs input jsValue
+  setValue input jsValue
 
 end HTMLInputElement
 
 namespace HTMLCanvasElement
-
-@[vir_js "browser.htmlCanvasElement.fromElement"]
-private opaque fromElementNullable
-    (element : @& Lean.Vir.Js Element) :
-    DomM (Lean.Vir.Js.Nullable HTMLCanvasElement)
 
 /-- Narrows a generic DOM element to an `HTMLCanvasElement`. -/
 def fromElement
@@ -651,44 +259,21 @@ def fromElement
     DomM (Option (Lean.Vir.Js HTMLCanvasElement)) := do
   Lean.Vir.Js.Nullable.toOption (← fromElementNullable element)
 
-@[vir_js "browser.htmlCanvasElement.getWidth"]
-private opaque getWidthJs
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM (Lean.Vir.Js Nat)
-
 /-- Returns the canvas bitmap width. -/
-def getWidth (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
-  Lean.Vir.JsValue.toNat (← getWidthJs canvas)
-
-@[vir_js "browser.htmlCanvasElement.setWidth"]
-private opaque setWidthJs
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement)
-    (width : @& Lean.Vir.Js Nat) : DomM Unit
+def getWidthNat (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
+  return (← Lean.Vir.JsValue.toFloat (← getWidth canvas)).toUInt64.toNat
 
 /-- Sets the canvas bitmap width. -/
-def setWidth (canvas : @& Lean.Vir.Js HTMLCanvasElement) (width : Nat) : DomM Unit := do
-  setWidthJs canvas (← Lean.Vir.JsValue.ofNat width)
-
-@[vir_js "browser.htmlCanvasElement.getHeight"]
-private opaque getHeightJs
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM (Lean.Vir.Js Nat)
+def setWidthNat (canvas : @& Lean.Vir.Js HTMLCanvasElement) (width : Nat) : DomM Unit := do
+  setWidth canvas (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat width).toFloat)
 
 /-- Returns the canvas bitmap height. -/
-def getHeight (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
-  Lean.Vir.JsValue.toNat (← getHeightJs canvas)
-
-@[vir_js "browser.htmlCanvasElement.setHeight"]
-private opaque setHeightJs
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement)
-    (height : @& Lean.Vir.Js Nat) : DomM Unit
+def getHeightNat (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
+  return (← Lean.Vir.JsValue.toFloat (← getHeight canvas)).toUInt64.toNat
 
 /-- Sets the canvas bitmap height. -/
-def setHeight (canvas : @& Lean.Vir.Js HTMLCanvasElement) (height : Nat) : DomM Unit := do
-  setHeightJs canvas (← Lean.Vir.JsValue.ofNat height)
-
-@[vir_js "browser.htmlCanvasElement.getContext2D"]
-private opaque getContext2DNullable
-    (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
-    DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
+def setHeightNat (canvas : @& Lean.Vir.Js HTMLCanvasElement) (height : Nat) : DomM Unit := do
+  setHeight canvas (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat height).toFloat)
 
 /-- Returns the canvas's two-dimensional rendering context when available. -/
 def getContext2D
@@ -702,12 +287,7 @@ namespace CanvasRenderingContext2D
 
 private def withFloat (value : Float)
     (next : Lean.Vir.Js Float → DomM α) : DomM α := do
-  next (← ownedFloat value)
-
-@[vir_js "browser.canvas2d.clearRect"]
-private opaque clearRectJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y width height : @& Lean.Vir.Js Float) : DomM Unit
+  next (← Internal.ownedFloat value)
 
 /-- Clears an axis-aligned rectangle to transparent black. -/
 def clearRect
@@ -716,11 +296,6 @@ def clearRect
   withFloat x fun x => withFloat y fun y =>
   withFloat width fun width => withFloat height fun height =>
   clearRectJs ctx x y width height
-
-@[vir_js "browser.canvas2d.fillRect"]
-private opaque fillRectJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y width height : @& Lean.Vir.Js Float) : DomM Unit
 
 /-- Fills an axis-aligned rectangle in the current fill style. -/
 def fillRect
@@ -731,11 +306,6 @@ def fillRect
   withFloat width fun width => withFloat height fun height =>
   fillRectJs ctx x y width height
 
-@[vir_js "browser.canvas2d.strokeRect"]
-private opaque strokeRectJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y width height : @& Lean.Vir.Js Float) : DomM Unit
-
 /-- Strokes an axis-aligned rectangle in the current stroke style. -/
 def strokeRect
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
@@ -744,36 +314,13 @@ def strokeRect
   withFloat width fun width => withFloat height fun height =>
   strokeRectJs ctx x y width height
 
-/-- Starts a new path. -/
-@[vir_js "browser.canvas2d.beginPath"]
-opaque beginPath (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-/-- Closes the current path by joining it back to its start. -/
-@[vir_js "browser.canvas2d.closePath"]
-opaque closePath (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-@[vir_js "browser.canvas2d.moveTo"]
-private opaque moveToJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y : @& Lean.Vir.Js Float) : DomM Unit
-
 /-- Moves the current path point without drawing. -/
 def moveTo (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => moveToJs ctx x y
 
-@[vir_js "browser.canvas2d.lineTo"]
-private opaque lineToJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y : @& Lean.Vir.Js Float) : DomM Unit
-
 /-- Adds a line from the current path point to `(x, y)`. -/
 def lineTo (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => lineToJs ctx x y
-
-@[vir_js "browser.canvas2d.arc"]
-private opaque arcJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y radius startAngle endAngle : @& Lean.Vir.Js Float) : DomM Unit
 
 /-- Adds a clockwise circular arc to the current path. -/
 def arc
@@ -783,65 +330,24 @@ def arc
   withFloat startAngle fun startAngle => withFloat endAngle fun endAngle =>
   arcJs ctx x y radius startAngle endAngle
 
-/-- Fills the current path. -/
-@[vir_js "browser.canvas2d.fill"]
-opaque fill (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-/-- Strokes the current path. -/
-@[vir_js "browser.canvas2d.stroke"]
-opaque stroke (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-@[vir_js "browser.canvas2d.setFillStyle"]
-private opaque setFillStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) : DomM Unit
-
 /-- Sets the context's CSS fill style. -/
 def setFillStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setFillStyleJs ctx (← ownedString style)
-
-@[vir_js "browser.canvas2d.setStrokeStyle"]
-private opaque setStrokeStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) : DomM Unit
+  setFillStyleJs ctx (← Internal.ownedString style)
 
 /-- Sets the context's CSS stroke style. -/
 def setStrokeStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setStrokeStyleJs ctx (← ownedString style)
-
-@[vir_js "browser.canvas2d.setLineWidth"]
-private opaque setLineWidthJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (width : @& Lean.Vir.Js Float) : DomM Unit
+  setStrokeStyleJs ctx (← Internal.ownedString style)
 
 /-- Sets the context's stroke width. -/
 def setLineWidth
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (width : Float) : DomM Unit :=
   withFloat width fun width => setLineWidthJs ctx width
 
-/-- Saves the current drawing state. -/
-@[vir_js "browser.canvas2d.save"]
-opaque save (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-/-- Restores the most recently saved drawing state. -/
-@[vir_js "browser.canvas2d.restore"]
-opaque restore (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
-
-@[vir_js "browser.canvas2d.translate"]
-private opaque translateJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (x y : @& Lean.Vir.Js Float) : DomM Unit
-
 /-- Translates the current transformation matrix. -/
 def translate (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => translateJs ctx x y
-
-@[vir_js "browser.canvas2d.rotate"]
-private opaque rotateJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (angle : @& Lean.Vir.Js Float) : DomM Unit
 
 /-- Rotates the current transformation matrix by radians. -/
 def rotate (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (angle : Float) : DomM Unit :=
@@ -858,10 +364,10 @@ This checks `currentTarget` first, then falls back to `target`, and narrows the
 element with `HTMLInputElement.fromElement`.
 -/
 def inputElement? (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js HTMLInputElement)) := do
-  match ← currentTarget event with
+  match ← currentTargetOption event with
   | some element => HTMLInputElement.fromElement element
   | none =>
-      match ← target event with
+      match ← targetOption event with
       | none => pure none
       | some element => HTMLInputElement.fromElement element
 
@@ -874,7 +380,7 @@ This is the usual helper for controlled input handlers. It checks
 def inputValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
   match ← inputElement? event with
   | none => pure none
-  | some input => some <$> HTMLInputElement.getValue input
+  | some input => some <$> HTMLInputElement.getValueString input
 
 /--
 Returns the current value for a form-control event.
@@ -883,10 +389,6 @@ This checks `currentTarget` first, then falls back to `target`. In a browser it
 returns `some value` for `HTMLInputElement`, `HTMLTextAreaElement`, and
 `HTMLSelectElement` targets, and `none` for other elements.
 -/
-@[vir_js "browser.event.formValue"]
-private opaque formValueNullable (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable String)
-
 def formValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
   match ← Lean.Vir.Js.Nullable.toOption (← formValueNullable event) with
   | none => pure none
@@ -903,7 +405,7 @@ This is the usual helper for controlled checkbox/radio handlers. It checks
 def inputChecked? (event : @& Lean.Vir.Js Event) : DomM (Option Bool) := do
   match ← inputElement? event with
   | none => pure none
-  | some input => some <$> HTMLInputElement.getChecked input
+  | some input => some <$> HTMLInputElement.getCheckedBool input
 
 end Event
 
@@ -917,23 +419,9 @@ cleared.
 
 Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
 -/
-@[vir_js "browser.timer.setTimeout"]
-private opaque setTimeoutJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
-    DomM (Lean.Vir.Js Timeout)
-
 def setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout) := do
   let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
   setTimeoutJs jsDelay callback
-
-/--
-Cancels a pending timeout and releases its retained callback.
-
-Reference: [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout).
--/
-@[vir_js "browser.timer.clearTimeout"]
-opaque clearTimeout (timeout : @& Lean.Vir.Js Timeout) : DomM Unit
 
 /--
 Runs `callback` every `delayMs` milliseconds until cleared.
@@ -943,23 +431,9 @@ disposed.
 
 Reference: [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval).
 -/
-@[vir_js "browser.timer.setInterval"]
-private opaque setIntervalJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
-    DomM (Lean.Vir.Js Interval)
-
 def setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval) := do
   let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
   setIntervalJs jsDelay callback
-
-/--
-Cancels a pending interval and releases its retained callback.
-
-Reference: [MDN `clearInterval`](https://developer.mozilla.org/en-US/docs/Web/API/clearInterval).
--/
-@[vir_js "browser.timer.clearInterval"]
-opaque clearInterval (interval : @& Lean.Vir.Js Interval) : DomM Unit
 
 end Timer
 
@@ -973,23 +447,10 @@ retained callback after it fires or when the frame is cancelled.
 
 Reference: [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
 -/
-@[vir_js "browser.animation.requestAnimationFrame"]
-private opaque requestAnimationFrameJs
-    (callback : Lean.Vir.Js Float → DomM Unit) :
-    DomM (Lean.Vir.Js AnimationFrame)
-
 def requestAnimationFrame (callback : Float → DomM Unit) : DomM (Lean.Vir.Js AnimationFrame) :=
   requestAnimationFrameJs fun timestamp => do
     let value ← Lean.Vir.JsValue.toFloat timestamp
     callback value
-
-/--
-Cancels a pending animation frame and releases its retained callback.
-
-Reference: [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame).
--/
-@[vir_js "browser.animation.cancelAnimationFrame"]
-opaque cancelAnimationFrame (frame : @& Lean.Vir.Js AnimationFrame) : DomM Unit
 
 end Animation
 

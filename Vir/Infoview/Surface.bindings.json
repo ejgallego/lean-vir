@@ -4,7 +4,73 @@
   "id": "infoview",
   "title": "Infoview client surface",
   "description": "Browser capabilities supplied to the Lean infoview and its editor-facing command bridge.",
-  "lean": { "modules": ["Vir.Infoview.Surface"] },
+  "lean": { "modules": ["Vir.Infoview.Surface", "Vir.Infoview.Surface.Generated"] },
+  "generation": {
+    "output": "Vir/Infoview/Surface/Generated.lean",
+    "irOutput": "build/bindings/infoview.generated-operations.json",
+    "imports": ["Vir.Browser.Types", "Vir.Infoview.Surface.Types"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-infoview-protocol-v1",
+      "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+    },
+    "resources": {},
+    "members": [],
+    "protocolOperations": [
+      {
+        "id": "infoview.document-position", "group": "commands", "target": "infoview.documentPosition",
+        "lean": "Lean.Vir.Infoview.documentPositionJs", "marker": "vir_js",
+        "reason": "Constructs the fixed host-side document-position record used by editor commands.",
+        "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.documentPosition" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "uri", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "fileName", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "line", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
+          { "name": "character", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
+          { "name": "label", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.DocumentPosition", "representation": "js-resource", "resourceInner": "Infoview.DocumentPosition" } }
+      },
+      {
+        "id": "infoview.clipboard.write-text", "group": "clipboard", "target": "infoview.clipboard.writeText",
+        "lean": "Lean.Vir.Infoview.Clipboard.writeTextJs", "marker": "vir_js",
+        "reason": "Adapts Clipboard.writeText to the infoview capability protocol, returning false when unavailable or rejected.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Clipboard.writeText" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [{ "name": "text", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "infoview.command.reveal", "group": "commands", "target": "infoview.command.revealPosition",
+        "lean": "Lean.Vir.Infoview.Command.revealPositionJs", "marker": "vir_js",
+        "reason": "Dispatches the local editor reveal-position capability and reports whether a dispatcher handled it.",
+        "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.revealPosition" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [{ "name": "position", "type": { "lean": "Lean.Vir.Js Infoview.DocumentPosition", "representation": "js-resource", "resourceInner": "Infoview.DocumentPosition" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "infoview.command.insert", "group": "commands", "target": "infoview.command.insertText",
+        "lean": "Lean.Vir.Infoview.Command.insertTextJs", "marker": "vir_js",
+        "reason": "Dispatches the local editor insert-text capability and reports whether it was applied.",
+        "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.insertText" },
+        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
+        "arguments": [
+          { "name": "position", "type": { "lean": "Lean.Vir.Js Infoview.DocumentPosition", "representation": "js-resource", "resourceInner": "Infoview.DocumentPosition" } },
+          { "name": "text", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      }
+    ]
+  },
   "roots": [
     {
       "id": "clipboard",
@@ -18,7 +84,11 @@
       "title": "Editor commands",
       "targets": ["infoview.command.*", "infoview.documentPosition"],
       "lean": { "public": ["Lean.Vir.Infoview.Command", "Lean.Vir.Infoview.documentPosition"] },
-      "upstream": { "kind": "local" }
+      "upstream": {
+        "kind": "local",
+        "declarations": ["Vir/Infoview/Surface.contract.d.ts"],
+        "roots": ["InfoviewCommandHost"]
+      }
     }
   ]
 }

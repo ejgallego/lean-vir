@@ -306,8 +306,9 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   binding-audit, package/artifact, report-analysis, and native-boundary
   implementations are grouped under `scripts/bindings/`, `scripts/packages/`,
   `scripts/analysis/`, and `scripts/native/` respectively.
-  Generated sources, reports, packages, bundles, and site output stay
-  under ignored `build/`, `web/public/`, or `web/dist/` paths.
+  Generated reports, packages, bundles, and site output stay under ignored
+  `build/`, `web/public/`, or `web/dist/` paths. Checked-in generated binding
+  declarations live beside their Lean modules and are guarded by drift checks.
 
 The default Lake target builds the core `Vir` library without browser tooling.
 Use `lake build VirInfoview` when working on the optional infoview integration;

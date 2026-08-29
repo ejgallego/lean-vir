@@ -82,9 +82,16 @@ build_module Vir/HostValidation.lean
 build_module Vir/Attributes.lean
 build_module Vir/Host.lean
 build_module Vir/Runtime.lean
+build_module Vir/Js/Types.lean
+build_module Vir/Js/Generated.lean
 build_module Vir/Js.lean
+build_module Vir/Common/Generated.lean
 build_module Vir/Common.lean
+build_module Vir/Browser/Types.lean
+build_module Vir/Browser/Generated.lean
 build_module Vir/Browser.lean
+build_module Vir/React/Types.lean
+build_module Vir/React/Generated.lean
 build_module Vir/React.lean
 build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean
@@ -99,6 +106,8 @@ build_module Vir/GeneratePackage/Emit.lean
 build_module Vir/GeneratePackage/Report.lean
 build_module Vir/GeneratePackage/Run.lean
 build_module Vir/ProofWidgets/Html.lean
+build_module Vir/ProofWidgets/Rpc/Types.lean
+build_module Vir/ProofWidgets/Rpc/Generated.lean
 build_module Vir/ProofWidgets/Rpc.lean
 build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean

@@ -9,6 +9,8 @@ import { relative, resolve } from "node:path";
 
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
+import { loadBindingConfig } from "./binding-config.mjs";
+import { materializeGeneratedAnchors } from "./binding-modalities.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
@@ -114,6 +116,7 @@ function parseArgs(argv) {
     dependencyDepth,
     dependencyPolicy,
     dependencyPolicyData: null,
+    bindingContext: null,
   };
 }
 
@@ -147,6 +150,7 @@ export async function generateDescriptorFile({
   dependencyDepth,
   dependencyPolicy,
   dependencyPolicyData,
+  bindingContext = null,
 }) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
@@ -193,8 +197,16 @@ export async function generateDescriptorFile({
   const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
-  const anchorData = anchorsData ??
+  const rawAnchorData = anchorsData ??
     (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
+  const anchorData = bindingContext === null
+    ? rawAnchorData
+    : materializeGeneratedAnchors(
+      bindingContext.config,
+      bindingContext.root,
+      { symbols: selectedSymbols },
+      rawAnchorData,
+    );
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -222,18 +234,15 @@ async function resolveBindingRoot(options) {
   }
   const configPath = resolve(root, options.bindingRoot.slice(0, separator));
   const rootId = options.bindingRoot.slice(separator + 1);
-  const config = JSON.parse(await readFile(configPath, "utf8"));
-  if (config?.version !== 1 || !Array.isArray(config.roots)) {
-    throw new Error(`${relative(root, configPath)} is not a binding-library v1 configuration`);
-  }
+  const config = await loadBindingConfig(configPath);
   const binding = config.roots.find((entry) => entry?.id === rootId);
   if (binding === undefined) {
     throw new Error(`${relative(root, configPath)} has no API group ${rootId}`);
   }
   const upstream = binding.upstream;
-  if (upstream?.kind !== "typescript" || !Array.isArray(upstream.declarations) ||
+  if (!["typescript", "local"].includes(upstream?.kind) || !Array.isArray(upstream.declarations) ||
       !Array.isArray(upstream.roots)) {
-    throw new Error(`API group ${config.id}/${rootId} does not define a TypeScript declaration surface`);
+    throw new Error(`API group ${config.id}/${rootId} does not define a declaration surface`);
   }
   if (upstream.sourceUrl !== undefined && upstream.declarations.length !== 1) {
     throw new Error(`API group ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
@@ -246,6 +255,7 @@ async function resolveBindingRoot(options) {
     sourceUrl: upstream.sourceUrl ?? null,
     dependencyDepth: upstream.dependencyDepth ?? 0,
     dependencyPolicyData: upstream.dependencyPolicy ?? null,
+    bindingContext: { config, root: binding },
   };
 }
 
@@ -442,12 +452,21 @@ function mergeDeclarationSymbols(left, right) {
   }
   if (left.kind === "property" && right.kind === "property") {
     const sameShape = JSON.stringify(left.shape) === JSON.stringify(right.shape);
+    const accessors = { ...(left.accessors ?? {}) };
+    for (const [accessor, shape] of Object.entries(right.accessors ?? {})) {
+      if (accessors[accessor] !== undefined &&
+          JSON.stringify(accessors[accessor]) !== JSON.stringify(shape)) {
+        throw new Error(`conflicting TypeScript ${accessor} accessor types for ${left.id}`);
+      }
+      accessors[accessor] = shape;
+    }
     return {
       ...left,
       display: `${left.display}\n${right.display}`,
       hover: left.hover || right.hover,
       shape: sameShape ? left.shape : { kind: "union", options: [left.shape, right.shape] },
       access: left.access === right.access ? left.access : "get-set",
+      accessors,
     };
   }
   throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
@@ -514,34 +533,43 @@ function interfaceMemberSymbols(node, sourceFile, prefix) {
         functionShape(member.parameters, member.type, sourceFile, prefix),
       ));
     } else if (ts.isPropertySignature(member) && member.type !== undefined) {
+      const shape = normalizeTypeNode(member.type, sourceFile, prefix);
+      const readonly = member.modifiers?.some((modifier) =>
+        modifier.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false;
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.type, sourceFile, prefix),
-        member.questionToken !== undefined ? { optional: true } : {},
+        shape,
+        {
+          ...(member.questionToken !== undefined ? { optional: true } : {}),
+          access: readonly ? "get" : "get-set",
+          accessors: readonly ? { get: shape } : { get: shape, set: shape },
+        },
       ));
     } else if (ts.isGetAccessorDeclaration(member) && member.type !== undefined) {
+      const shape = normalizeTypeNode(member.type, sourceFile, prefix);
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.type, sourceFile, prefix),
-        { access: "get" },
+        shape,
+        { access: "get", accessors: { get: shape } },
       ));
     } else if (ts.isSetAccessorDeclaration(member) && member.parameters[0]?.type !== undefined) {
+      const shape = normalizeTypeNode(member.parameters[0].type, sourceFile, prefix);
       symbols.push(memberSymbol(
         owner,
         name,
         "property",
         member,
         sourceFile,
-        normalizeTypeNode(member.parameters[0].type, sourceFile, prefix),
-        { access: "set" },
+        shape,
+        { access: "set", accessors: { set: shape } },
       ));
     }
   }
@@ -698,9 +726,19 @@ function typeLiteralShape(node, sourceFile, prefix) {
 
 function unionShape(node, sourceFile, prefix) {
   const types = node.types.map((type) => normalizeTypeNode(type, sourceFile, prefix));
-  const nonNull = types.filter((type) => !(type.kind === "primitive" && (type.name === "null" || type.name === "undefined")));
-  if (nonNull.length === 1 && nonNull.length !== types.length) {
-    return { kind: "option", element: nonNull[0] };
+  const absence = types.filter((type) =>
+    type.kind === "primitive" && (type.name === "null" || type.name === "undefined"))
+    .map((type) => type.name);
+  const present = types.filter((type) =>
+    !(type.kind === "primitive" && (type.name === "null" || type.name === "undefined")));
+  if (present.length === 1 && absence.length !== 0) {
+    return {
+      kind: "option",
+      absence: absence.includes("null") && absence.includes("undefined")
+        ? "nullish"
+        : absence[0],
+      element: present[0],
+    };
   }
   if (types.every((type) => type.kind === "literal")) {
     return { kind: "enum", cases: types.map((type) => String(type.value)) };

@@ -4,7 +4,7 @@
   "title": "Lean VIR binding library",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "id", "title", "description", "lean", "roots"],
+  "required": ["version", "id", "title", "description", "lean", "generation", "roots"],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": 1 },
@@ -24,6 +24,7 @@
         }
       }
     },
+    "generation": { "$ref": "#/$defs/generation" },
     "roots": {
       "type": "array",
       "minItems": 1,
@@ -32,6 +33,328 @@
   },
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output", "irOutput", "imports", "namespace", "abiProfile", "resources", "members"],
+      "properties": {
+        "output": { "type": "string", "minLength": 1 },
+        "irOutput": { "type": "string", "minLength": 1 },
+        "imports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "namespace": { "type": "string", "minLength": 1 },
+        "abiProfile": { "$ref": "#/$defs/abiProfile" },
+        "resources": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "members": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "methodPolicies": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/methodPolicy" }
+        },
+        "exceptions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/generationException" }
+        },
+        "protocolOperations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/protocolOperation" }
+        }
+      }
+    },
+    "protocolOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "group", "target", "lean", "marker", "reason", "upstreamRelation", "effect", "arguments", "result"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "group": { "$ref": "#/$defs/id" },
+        "target": { "type": "string", "minLength": 1 },
+        "lean": { "type": "string", "minLength": 1 },
+        "marker": { "enum": ["vir_js", "vir_js_explicit_conversion"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "upstreamRelation": { "$ref": "#/$defs/protocolUpstreamRelation" },
+        "documentation": { "type": "string", "minLength": 1 },
+        "typeParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
+        },
+        "arguments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protocolArgument" }
+        },
+        "result": { "$ref": "#/$defs/protocolResult" }
+      }
+    },
+    "protocolUpstreamRelation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "vir-owned" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "member"],
+          "properties": {
+            "kind": { "const": "local-contract" },
+            "member": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "member"],
+          "properties": {
+            "kind": { "const": "upstream-adapter" },
+            "member": { "type": "string", "minLength": 1 },
+            "accessor": { "enum": ["get", "set"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "unclassified" } }
+        }
+      ]
+    },
+    "protocolArgument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["receiver", "argument", "callback"] },
+        "type": { "$ref": "#/$defs/leanTypeOverride" },
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "protocolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/leanTypeOverride" },
+        "ownership": { "enum": ["owned", "borrowed"] }
+      }
+    },
+    "methodPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature"],
+      "properties": {
+        "signature": {
+          "oneOf": [
+            { "const": "only" },
+            { "type": "integer", "minimum": 0 }
+          ]
+        },
+        "omittedOptionalParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "omittedRequiredParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "omittedRestParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "fixedRestParameters": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "fixedArguments": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "parameterRenames": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "abiProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effect", "types", "resource", "receiver"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
+        },
+        "types": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lean", "representation"],
+            "properties": {
+              "lean": { "type": "string", "minLength": 1 },
+              "representation": { "enum": ["immediate", "js-resource"] }
+            }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["constructor", "nullableConstructor", "argument", "result"],
+          "properties": {
+            "constructor": { "type": "string", "minLength": 1 },
+            "nullableConstructor": { "type": "string", "minLength": 1 },
+            "argument": { "$ref": "#/$defs/passingRetention" },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ownership"],
+              "properties": { "ownership": { "enum": ["owned", "borrowed"] } }
+            }
+          }
+        },
+        "receiver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default", "globalTypes"],
+          "properties": {
+            "default": { "$ref": "#/$defs/passingRetention" },
+            "globalTypes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "passingRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passing", "retention"],
+      "properties": {
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] }
+      }
+    },
+    "modalityOverride": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "role": { "enum": ["argument", "callback"] },
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] },
+        "type": { "$ref": "#/$defs/leanTypeOverride" }
+      }
+    },
+    "receiverOverride": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["global", "argument", "none"] },
+        "passing": { "enum": ["borrowed", "owned", "consumed"] },
+        "retention": { "enum": ["call", "until-release", "runtime"] },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/leanTypeOverride" }
+      }
+    },
+    "leanTypeOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lean", "representation"],
+      "properties": {
+        "lean": { "type": "string", "minLength": 1 },
+        "representation": { "enum": ["immediate", "lean-owned", "js-resource", "callback"] },
+        "resourceInner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "generationException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "anyOf": [
+        { "required": ["receiver"] },
+        { "required": ["arguments"] },
+        { "required": ["result"] },
+        { "required": ["effect"] }
+      ],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "receiver": { "$ref": "#/$defs/receiverOverride" },
+        "arguments": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/modalityOverride" }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "ownership": { "enum": ["owned", "borrowed"] },
+            "type": { "$ref": "#/$defs/leanTypeOverride" }
+          }
+        },
+        "effect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "lean"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "lean": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
     "root": {
       "type": "object",
       "additionalProperties": false,
@@ -44,7 +367,7 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "type": "string", "minLength": 1, "pattern": "^[^*]*(?:\\*)?$" }
         },
         "lean": {
           "type": "object",
@@ -77,8 +400,71 @@
         },
         "anchors": {
           "type": "array",
-          "items": { "type": "object" }
+          "items": { "$ref": "#/$defs/anchor" }
         }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lean", "ts", "relation", "portIntent"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "lean": { "type": "string", "minLength": 1 },
+        "ts": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "relation": { "enum": ["audit", "coverageGap"] },
+        "portIntent": { "$ref": "#/$defs/portIntent" },
+        "note": { "type": "string", "minLength": 1 },
+        "advisorySemantics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/advisorySemantic" }
+        }
+      }
+    },
+    "portIntent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["disposition"],
+          "properties": { "disposition": { "const": "unsupported" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["disposition"],
+          "properties": {
+            "disposition": { "const": "bind" },
+            "accessor": { "enum": ["get", "set"] },
+            "effect": { "type": "string", "minLength": 1 },
+            "omittedOptionalParameters": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "overload": { "type": "integer", "minimum": 0 },
+            "receiver": { "enum": ["borrowed", "owned", "consumed"] },
+            "representation": { "const": "hostResource" },
+            "resourceArguments": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 0 }
+            },
+            "resultRepresentation": { "const": "hostResource" }
+          }
+        }
+      ]
+    },
+    "advisorySemantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic", "note"],
+      "properties": {
+        "topic": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "note": { "type": "string", "minLength": 1 }
       }
     },
     "directMapping": {
@@ -98,6 +484,7 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
+        "receiverName": { "type": "string", "minLength": 1 },
         "note": { "type": "string", "minLength": 1 }
       }
     },
@@ -128,11 +515,13 @@
     "accessorMapping": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target", "lean", "anchor"],
+      "required": ["target", "lean"],
       "properties": {
         "target": { "type": "string", "minLength": 1 },
         "lean": { "type": "string", "minLength": 1 },
-        "anchor": { "type": "string", "minLength": 1 }
+        "anchor": { "type": "string", "minLength": 1 },
+        "receiverName": { "type": "string", "minLength": 1 },
+        "parameterName": { "type": "string", "minLength": 1 }
       }
     },
     "missingAccessor": {
@@ -148,6 +537,26 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["kind"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "typescript" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["declarations", "roots"] }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "local" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["declarations", "roots"] }
+        },
+        {
+          "if": { "required": ["sourceUrl"] },
+          "then": { "properties": { "declarations": { "type": "array", "maxItems": 1 } } }
+        }
+      ],
       "properties": {
         "kind": { "enum": ["typescript", "local", "internal"] },
         "package": { "type": "string", "minLength": 1 },
@@ -168,9 +577,33 @@
         "dependencyDepth": { "type": "integer", "minimum": 0 },
         "dependencyPolicy": {
           "type": "array",
-          "items": { "type": "object" }
+          "items": { "$ref": "#/$defs/dependencyPolicySymbol" }
         },
         "docs": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dependencyPolicySymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "shape"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "display": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "shape": { "type": "object" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "startLine", "startColumn", "endLine", "endColumn"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "startLine": { "type": "integer", "minimum": 1 },
+            "startColumn": { "type": "integer", "minimum": 1 },
+            "endLine": { "type": "integer", "minimum": 1 },
+            "endColumn": { "type": "integer", "minimum": 1 },
+            "url": { "type": "string", "minLength": 1 }
+          }
+        }
       }
     }
   }

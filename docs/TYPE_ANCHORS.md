@@ -1,20 +1,23 @@
 # Type Anchors
 
-This note documents the small TypeScript-to-Lean VIR descriptor anchor pipeline.
-The goal is reviewable, inexact correspondence data, not a complete type
-theory for TypeScript.
+This note documents the TypeScript-to-Lean VIR binding pipeline. It provides
+both reviewable correspondence data and a deliberately small, fail-closed Lean
+source generator; it is not a complete type theory for TypeScript.
 
-This is the review layer for a soft porting loop. Codex (or a person) can draft
-Lean bindings, regenerate the real Lean manifest, and use the report's stable
-diagnostic codes to decide what to revise. It is deliberately not a source-to-
-source binding generator yet. Once repeated, reviewed port intents become
-stable, a later generator can consume the same descriptor and intent data.
+The review layer remains useful for the unsupported surface: Codex (or a
+person) can propose policy, regenerate the real Lean manifest, and use stable
+diagnostic codes to decide what to revise. For supported operations, the source
+generator makes the Lean declaration a deterministic function of the pinned
+TypeScript declaration, a named library ABI profile, and justified exceptions.
+The modality model and operation IR are specified in
+`BINDING_MODALITIES.md`.
 
 The exhaustive shipped-boundary gate and consolidated library explorer are
 documented in `SHIPPED_BINDINGS.md`. The gate proves that every compiled
-`@[vir_js]` and explicit conversion declaration obeys VIR's representation
-policy and has a shipped runtime provider. Type anchors add the narrower
-semantic question; their results are incorporated into the explorer.
+`@[vir_js]` and explicit conversion declaration obeys VIR's coarse boundary
+policy and has a matching shipped runtime provider key. It does not verify the
+provider's implementation behavior. Type anchors add the narrower semantic
+question; their results are incorporated into the explorer.
 
 ## Data Flow
 
@@ -37,24 +40,68 @@ Each generated symbol records:
 - `display`: compact TypeScript declaration text.
 - `hover`: JSDoc text for hovercards or native `title` hovers.
 - `shape`: normalized descriptor shape used by the comparator.
+- `accessors`: distinct getter and setter shapes for properties. This matters
+  for APIs such as `Element.textContent`, whose getter is `string` while its
+  setter accepts `string | null`.
 
-The generated descriptor JSON is a TypeScript-side index. It does not claim
-that the TypeScript declaration is the implementation source of truth. It says:
-for this symbol id, this is the authored TypeScript shape, this is where a
-reader can jump, and this is the text that should appear in a hover.
+The generated descriptor JSON is the TypeScript-side index. For reviewed
+generated members, its accessor or function shape is the binding type source
+of truth. For report-only members, it remains comparison input and does not by
+itself assert a Lean policy.
 
-The comparator reads descriptor JSON and a Lean VIR interface manifest:
+## Generated Lean Bindings
+
+`Vir/Browser.bindings.json` contains the small amount of policy TypeScript
+cannot determine: the generated member set, Lean declaration and host-target
+names, a named ABI profile, Lean names for resource marker types, and any
+justified semantic exceptions. It does not restate selected TypeScript types or
+repeat derived modalities in generated-member anchors.
+
+The initial shipped slice generates `Document.title`, `Element.innerHTML`,
+`Element.textContent`, `Element.getAttribute`, and `Element.setAttribute` into
+`Vir/Browser/Generated.lean`:
+
+```bash
+npm run generate:lean-bindings
+npm run check:lean-bindings
+```
+
+Generation reads the pinned `lib.dom.d.ts` through the same descriptor code as
+the explorer. It first emits canonical operation IR under ignored
+`build/bindings/`, then renders the checked-in Lean source and projects the
+comparator intent from that same record. TypeScript `string` becomes a
+JavaScript string resource, nullable `string` becomes `Js.Nullable String`, and
+the ABI profile determines ordinary argument, receiver, result, and effect
+modalities. Unsupported shapes, unsafe lifetimes, unmatched exceptions,
+mismatched anchors, and stale checked-in output are errors. The generated
+module is imported by `Vir.Browser`, so this is the shipped binding surface
+rather than a report fixture.
+
+Convenience conversions are intentionally outside this generated faithful
+boundary. Callers may use `Lean.Vir.JsValue.ofString`,
+`Lean.Vir.JsValue.toString`, and similarly explicit helpers where their own API
+policy calls for Lean-owned values.
+
+The comparator reads descriptor JSON and one or more Lean inputs: an interface
+manifest or `.irpkg` for package exports, and the compiler-derived shipped
+public inventory for library declarations:
 
 ```bash
 npm run compare:type-anchors
 ```
 
 For normal package work, pass a real `.irpkg` with
-`scripts/bindings/check-type-anchors.mjs --irpkg <package.irpkg>`. The local
-`build/type-descriptors/vir-v1.manifest.json` fixture is generated from
-`vir-v1.fixture.lean` through the real package generator. The manifest,
-intermediate `.irpkg`, and generator report all stay under ignored `build/`
-paths.
+`scripts/bindings/check-type-anchors.mjs --irpkg <package.irpkg>`. Pass
+`--inventory build/type-descriptors/vir-js-shipped-v1.lean.json` when anchors
+name public declarations shipped by VIR. Each classifiable public entry in that
+inventory carries the compiler-derived function interface used for comparison;
+unsupported generic entries remain inventoried with `interface: null`.
+
+The local `build/type-descriptors/vir-v1.manifest.json` fixture is generated
+from `vir-v1.fixture.lean` through the real package generator. It now supplies
+only reviewed shapes that do not have a directly classifiable shipped public
+declaration. The manifest, inventory, intermediate `.irpkg`, and generator
+report all stay under ignored `build/` paths.
 
 Anchors classify each relation as either `audit` or `coverageGap`. They may
 also carry a reviewed `portIntent` object. The first React DOM API-group intent
@@ -106,17 +153,20 @@ distinct upstream operation.
 
 ## Artifact Ownership
 
-Only the authored inputs are checked in. Descriptor, manifest, report,
-Markdown, and HTML outputs are reproducible local artifacts under ignored
-`build/` paths. Edit their inputs and regenerate them rather than editing the
+Authored inputs and shipped generated Lean declarations are checked in.
+Descriptor, manifest, report, Markdown, and HTML outputs are reproducible local
+artifacts under ignored `build/` paths. Edit the TypeScript/configuration inputs
+and regenerate checked-in Lean; never edit generated declarations or report
 outputs directly.
 
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
-| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
-| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
-| DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
-| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+| Shipped generated DOM bindings | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | checked-in `Vir/Browser/Generated.lean`; ignored `build/bindings/browser.generated-operations.json` |
+| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`; explicit renderer commands may also produce `vir-v1.anchors.md` and `vir-v1.anchors.html` |
+| Shipped public Lean surface | Compiled `Vir` and `Vir.Infoview` modules | `build/type-descriptors/vir-js-shipped-v1.lean.json` |
+| DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
+| DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |
+| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `build/type-descriptors/react-dom-root-v1.json`, `react-dom-root-v1.report.json`; the focused HTML renderer is explicit |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
 level shipped census. Its primary outputs are `build/bindings/report.json` and
@@ -125,9 +175,15 @@ local artifacts.
 
 ## Lower-level Output Contract
 
-The type-anchor pipeline has four lower-level outputs. They remain stable
+The type-anchor pipeline has five lower-level outputs. They remain stable
 machine contracts and useful debugging views, while `build/bindings/index.html`
 is the primary human entry point.
+
+`vir-js-shipped-v1.lean.json` is the compiler-derived Lean inventory. In
+addition to call-reachability evidence, classifiable `publicEntries[]` carry an
+`interface` with effect, ordered arguments, result, and nested VIR interface
+types. This is the Lean descriptor source for direct shipped-declaration
+anchors; the pretty-printed `type` remains human display data.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 
@@ -148,6 +204,8 @@ is the primary human entry point.
 - `results[].notes`, short explanations for non-exact matches;
 - `results[].relation`, either `audit` or `coverageGap`;
 - `results[].portIntent`, when the anchor has reviewed binding intent;
+- `results[].modalityContract`, when generated operation IR supplied the
+  derived ABI modalities and their provenance;
 - `results[].diagnostics[]`, stable `code`, `severity`, and `message` values;
 - `results[].leanDescriptor` and `results[].tsSymbol`, when found.
 
@@ -161,15 +219,20 @@ When descriptor closure is enabled, `typeScriptDependencies` records the root
 symbols, included declaration/policy dependencies, closure depth, and unresolved
 names in the comparison report.
 
-`vir-v1.anchors.md` is a rendered documentation fragment. It is not the source
-of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
-show the same report with usable links and hovers.
+`vir-v1.anchors.md` is an optional rendered documentation fragment. It is not
+the source of truth or a default check artifact. An explicit renderer command
+can produce it when a Verso/Blueprint or Markdown consumer needs the focused
+view.
 
-`vir-v1.anchors.html` is a standalone focused report. It treats the
+`vir-v1.anchors.html` is a legacy standalone focused report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
-text. This focused renderer is static HTML: it does not yet provide client-side
-filtering or syntax highlighting.
+text. New binding work should use the consolidated explorer, whose upstream
+reference and author actions provide filtering, semantic TypeScript/Lean
+highlighting, generated conversion policy, and documentation links. The
+focused renderer remains available for fixture-level comparator debugging, but
+the default checks exercise its library contract without producing focused
+Markdown or HTML files.
 
 ## Match Status
 
@@ -208,18 +271,22 @@ existing VIR wrappers. The last three are explicit gaps.
 Two levels of bounded closure resolve `Container` through its DOM resource
 arms. The report now identifies that VIR accepts the `Element` arm but not the
 whole container union, rather than reporting an unresolved name or overstating
-coverage. `React.ReactNode` is deliberately retained as an abstract reviewed
-dependency: expanding its recursive union would pull most of React's type
-surface into this seed, while VIR currently exposes a separately reviewed
-`ReactM (Js Node)` builder representation. Consequently an abstract ReactNode
-diagnostic is intentional and distinguishable from an unresolved symbol.
+coverage. `React.ReactNode` is deliberately represented as the opaque
+JavaScript-owned `Js Node` resource at this boundary: expanding its recursive
+union would pull most of React's type surface into this seed without improving
+boundary faithfulness. The curated comparison audits `Root.renderNode` against
+that resource representation; the separate `Root.render` `ReactM` builder is a
+reviewed convenience adapter rather than comparison evidence for the upstream
+method.
 
 ```bash
 npm run generate:react-dom-root-type-descriptors
 npm run compare:react-dom-root-type-anchors
-npm run render:react-dom-root-type-anchors
 npm run check:react-dom-root-type-anchors
 ```
+
+Run `npm run render:react-dom-root-type-anchors` only when debugging the focused
+comparison page.
 
 The machine-facing output is
 `build/type-descriptors/react-dom-root-v1.report.json`; the review page is

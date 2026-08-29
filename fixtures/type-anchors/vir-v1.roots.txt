@@ -1,16 +1,7 @@
-# Real Lean VIR type-anchor wrappers.
+# Review-only Lean VIR type-anchor wrappers not already present in the shipped inventory.
 Lean.Vir.TypeAnchors.reactPropertyIdentity
 Lean.Vir.TypeAnchors.reactEventHandlerIdentity
 Lean.Vir.TypeAnchors.reactRootIdentity
 Lean.Vir.TypeAnchors.reactRootCreateCall
 Lean.Vir.TypeAnchors.reactRootRenderCall
 Lean.Vir.TypeAnchors.reactRootUnmountCall
-Lean.Vir.TypeAnchors.documentGetTitleCall
-Lean.Vir.TypeAnchors.documentSetTitleCall
-Lean.Vir.TypeAnchors.documentQuerySelectorCall
-Lean.Vir.TypeAnchors.documentQuerySelectorAllCall
-Lean.Vir.TypeAnchors.documentCreateElementCall
-Lean.Vir.TypeAnchors.elementGetInnerHTMLCall
-Lean.Vir.TypeAnchors.elementSetInnerHTMLCall
-Lean.Vir.TypeAnchors.elementGetTextContentCall
-Lean.Vir.TypeAnchors.elementSetTextContentCall

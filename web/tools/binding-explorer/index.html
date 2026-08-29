@@ -5,23 +5,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Lean VIR binding explorer</title>
+  <title>Lean VIR binding reference</title>
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body><main>
-  <header><div><div class="eyebrow">Lean VIR · runtime coverage and API fidelity</div><h1>Binding explorer</h1><p class="lede">Every configured TypeScript API group is fully indexed before display. Automatic correspondence candidates are review leads; only reviewed mappings receive type-fidelity verdicts.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
+  <header><div><div class="eyebrow">Lean VIR · generated boundary documentation</div><h1>Binding reference</h1><p class="lede">Browse upstream declarations, inspect generated Lean boundaries and provider-key presence, and resolve the remaining binding-author actions from one report.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
   <section class="metrics">
-    <article class="metric good"><strong id="provided-metric"></strong><span>runtime targets provided</span></article>
-    <article class="metric"><strong id="surface-metric"></strong><span>TypeScript surfaces fully indexed</span></article>
-    <article class="metric" id="findings-card"><strong id="findings-metric"></strong><span>member/type findings</span></article>
-    <article class="metric" id="automatic-card"><strong id="automatic-metric"></strong><span>analyses need review</span></article>
+    <article class="metric"><strong id="catalog-metric"></strong><span>upstream API entries</span></article>
+    <article class="metric good"><strong id="available-metric"></strong><span>confirmed VIR bindings</span></article>
+    <article class="metric good"><strong id="generated-metric"></strong><span>generated host boundaries</span></article>
+    <article class="metric good"><strong id="direct-metric"></strong><span>TypeScript-derived boundaries</span></article>
+    <article class="metric" id="work-card"><strong id="work-metric"></strong><span>binding-author actions</span></article>
   </section>
   <div class="scope" id="scope"></div>
   <section class="workspace">
     <div class="left">
-      <div class="view-tabs"><button class="view-tab" id="groups-view" type="button">Upstream libraries</button><button class="view-tab" id="public-view" type="button">Public Lean API</button><button class="view-tab" id="targets-view" type="button">Host targets</button></div>
-      <div class="toolbar"><input id="search" type="search" placeholder="Search library, API group, target, type…" aria-label="Search bindings"><select id="analysis"><option value="all">All analysis states</option><option value="complete">Complete surface analysis</option><option value="automatic">Automatic analysis · review needed</option><option value="in-progress">Analysis in progress</option><option value="curated">Curated comparison only</option><option value="needs-input">Upstream contract needs input</option><option value="not-run">Upstream analysis not run</option><option value="not-applicable">No upstream contract</option></select></div>
-      <div class="filters"><select id="library"><option value="all">All libraries</option></select><select id="issue"><option value="all">All findings</option><option value="error">Errors</option><option value="warning">Type warnings</option><option value="gap">Coverage gaps</option><option value="none">No findings</option></select></div>
+      <div class="view-tabs"><button class="view-tab" id="reference-view" type="button">Upstream reference</button><button class="view-tab" id="inventory-view" type="button">Shipped VIR surface</button><button class="view-tab" id="workbench-view" type="button">Author actions</button></div>
+      <div class="toolbar"><input id="search" type="search" placeholder="Search upstream APIs, host boundaries, or actions…" aria-label="Search bindings"><select id="library"><option value="all">All libraries</option></select></div>
+      <div class="filters"><select id="availability" aria-label="Filter binding availability"><option value="all">All upstream entries</option><option value="available">Confirmed VIR bindings</option><option value="candidate">Unconfirmed candidates</option><option value="not-provided">Not provided</option></select><select id="boundary" aria-label="Filter boundary evidence"><option value="all">All generated boundaries</option><option value="typescript-derived">TypeScript-derived</option><option value="upstream-adapter">Upstream adapters</option><option value="vir-owned">VIR-owned</option><option value="local-contract">Local contracts</option></select><select id="disposition" aria-label="Filter author disposition"><option value="all">All author actions</option><option value="needs-annotation">Needs annotation</option><option value="generated">Generated diagnostics</option></select></div>
       <div class="result-head" id="count"></div><div id="results"></div>
     </div>
     <article class="detail" id="detail"></article>

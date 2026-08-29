@@ -4,7 +4,49 @@
   "id": "common",
   "title": "Common host helpers",
   "description": "Small VIR-owned host calls used to exercise explicit JavaScript conversion boundaries.",
-  "lean": { "modules": ["Vir.Common"] },
+  "lean": { "modules": ["Vir.Common", "Vir.Common.Generated"] },
+  "generation": {
+    "output": "Vir/Common/Generated.lean",
+    "irOutput": "build/bindings/common.generated-operations.json",
+    "imports": ["Vir.Js"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-common-protocol-v1",
+      "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+    },
+    "resources": {},
+    "members": [],
+    "protocolOperations": [
+      {
+        "id": "common.echo-string", "group": "common", "target": "common.echoString",
+        "lean": "Lean.Vir.Common.echoStringJs", "marker": "vir_js",
+        "reason": "VIR-owned smoke-test protocol that round-trips a JavaScript string resource.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "common.add-nat", "group": "common", "target": "common.addNat",
+        "lean": "Lean.Vir.Common.addNatJs", "marker": "vir_js",
+        "reason": "VIR-owned smoke-test protocol that adds two JavaScript number resources interpreted as natural numbers.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "lhs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
+          { "name": "rhs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      }
+    ]
+  },
   "roots": [
     {
       "id": "common",

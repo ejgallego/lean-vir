@@ -4,218 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Browser
+import Vir.React.Generated
 
 namespace Lean.Vir.React
-
-/--
-Effect used by Lean-authored React render construction.
-
-`ReactM` is intentionally narrower than `IO`: React render construction can
-allocate React-side resources exposed by this module, but arbitrary host `IO`
-must stay outside the render surface unless the API exposes a render-safe
-operation for it.
-
-The current runtime lowers `ReactM` through `Lean.Vir.RuntimeM`, so this is an
-irreducible effect marker rather than a separate runtime representation. Use
-`ReactM.run` only at explicit root boundaries that already live in `DomM`.
--/
-@[irreducible] def ReactM (α : Type) : Type :=
-  Lean.Vir.RuntimeM α
-
-namespace ReactM
-
-/-- Explicitly lowers a render-construction action at a browser/DOM boundary. -/
-def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
-  by
-    unfold ReactM at action
-    unfold Lean.Vir.Browser.DomM
-    exact action
-
-instance : Monad ReactM where
-  pure value :=
-    by
-      unfold ReactM
-      exact pure value
-  bind action next :=
-    by
-      unfold ReactM at action
-      unfold ReactM
-      exact action >>= fun value => by
-        unfold ReactM at next
-        exact next value
-
-instance : MonadLift Lean.Vir.RuntimeM ReactM where
-  monadLift action :=
-    by
-      unfold ReactM
-      exact action
-
-instance : MonadLift ReactM Lean.Vir.Browser.DomM where
-  monadLift := ReactM.run
-
-instance : Nonempty (ReactM α) :=
-  by
-    unfold ReactM
-    infer_instance
-
-end ReactM
-
-/--
-React root object class created from a browser container element.
-
-The JavaScript host owns the underlying React root and any callbacks retained by
-the currently rendered tree until `Root.unmount`, package reload, or runtime
-disposal.
--/
-opaque Root : Type
-
-/--
-React element type value accepted by `React.createElement`.
-
-DOM tag strings are explicitly wrapped with `ElementType.ofTag`. Future
-JavaScript library bindings can return `Lean.Vir.Js ElementType` resources for
-component functions or React component objects and pass them to
-`Node.createElement` without inventing a parallel element-construction API.
--/
-opaque ElementType : Type
-
-/--
-React state setter object returned by `useState`.
-
-The JavaScript host owns the underlying setter function. Lean code can retain
-the typed `Js (StateSetter α)` handle in callbacks and pass it back to the
-state setter helpers in this module.
--/
-opaque StateSetter (α : Type) : Type
-
-/--
-React reducer dispatch function returned by `useReducer`.
-
-The JavaScript host owns the underlying dispatch function. Lean callbacks can
-retain the typed handle and pass `Js action` values back through
-`ReducerDispatch.dispatch`.
--/
-opaque ReducerDispatch (state action : Type) : Type
-
-/--
-React ref object returned by `useRef`.
-
-The JavaScript host owns the underlying `{ current }` object. Reading and
-writing `current` does not schedule a React render, matching React's ref
-lifetime semantics.
--/
-opaque Ref (α : Type) : Type
-
-/--
-Default React props object marker.
-
-`Root.renderComponent` accepts Lean-side props directly. This marker names the
-JavaScript object shape used by hosts that want to pass an opaque props object
-through `Lean.Vir.Js Props`. Lean-authored element construction uses
-`Props.Entry` below to build this JavaScript-owned props object explicitly.
--/
-opaque Props : Type
-
-/-- A single React `style` object entry. Use camelCase property names. -/
-structure StyleProperty where
-  name : String
-  value : String
-
-/-- Conservative v0 set of React property values. -/
-inductive PropValue where
-  | string (value : String)
-  | bool (value : Bool)
-  | int (value : Int)
-  | float (value : Float)
-  | style (entries : Array StyleProperty)
-  | classList (classes : Array String)
-
-/--
-A non-event React property.
-
-Public element construction consumes `Props.Entry`, which can carry properties,
-event handlers, and special React props such as `key`. `Property` remains the
-typed non-event property payload used by the current host ABI.
--/
-structure Property where
-  name : String
-  value : PropValue
-
-/-- A DOM-like React event handler backed by a retained Lean closure. -/
-structure EventHandler where
-  name : String
-  callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
-
-namespace Props
-
-/--
-One public React props entry.
-
-This is the React-shaped public lane: element construction receives one props
-array containing ordinary properties, event handlers, and special React props.
-`Node.createElement` lowers these entries into a JavaScript-owned `Props`
-resource before calling the low-level host import.
--/
-inductive Entry where
-  | key (value : String)
-  | ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α)))
-  | property (value : Property)
-  | eventHandler (value : EventHandler)
-
-end Props
-
-/-- React state value and setter returned by `useState`. -/
-structure State (α : Type) where
-  value : α
-  setter : Lean.Vir.Js (StateSetter α)
-
-/--
-React reducer value and dispatch function returned by `useReducer`.
-
-Reducer state and actions live in JavaScript-land. Use `Js` resources directly
-for JavaScript-owned state. Use `Lean.Vir.JSL α` when React should store a
-retained Lean-owned value, and call `Lean.Vir.LeanRef.toJSL` / `fromJSL`
-explicitly at the application boundary. React retains its own alias while it
-stores a JSL value; Lean code remains responsible for releasing the independent
-aliases that it creates or receives.
--/
-structure ReducerState (state action : Type) where
-  value : Lean.Vir.Js state
-  dispatch : Lean.Vir.Js (ReducerDispatch state action)
-
-/--
-React node object class created by the JavaScript host through React's public
-APIs.
-
-Lean code builds values of this marker through `Node.text` and
-`Node.createElement`.
-At the host boundary these are typed `Lean.Vir.Js Node` resources, so React
-nodes are constructed once with `React.createElement` instead of decoded from a
-private recursive tree on every render.
--/
-opaque Node : Type
-
-/--
-JavaScript-owned React child list.
-
-Lean-facing builders accept ordinary Lean arrays for ergonomics, then populate
-this resource with explicit `react.node.children.*` calls before crossing the
-host boundary.
--/
-opaque NodeChildren : Type
-
-/-- JavaScript-owned React hook dependency list. -/
-opaque DependencyList : Type
-
-/--
-A React function component authored in Lean.
-
-The JavaScript host wraps this function in a real React function component, so
-React hooks exposed by this module run under React's normal hook dispatcher.
--/
-abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Node)
 
 private def stringToJs (value : String) : ReactM (Lean.Vir.Js String) := do
   let jsValue ← Lean.Vir.JsValue.ofString value
@@ -390,9 +181,6 @@ def required (value : Bool) : Property :=
 def selected (value : Bool) : Property :=
   bool "selected" value
 
-@[vir_js_explicit_conversion "js.value.react.property"]
-opaque toJs (value : @& Property) : Lean.Vir.RuntimeM (Lean.Vir.Js Property)
-
 end Property
 
 namespace EventHandler
@@ -482,9 +270,6 @@ def onSubmit (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
 
 def onSubmitWith (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onSubmit" callback
-
-@[vir_js_explicit_conversion "js.value.react.eventHandler"]
-opaque toJs (value : @& EventHandler) : Lean.Vir.RuntimeM (Lean.Vir.Js EventHandler)
 
 end EventHandler
 
@@ -772,33 +557,6 @@ def onSubmitWith
     Entry :=
   eventHandler <| EventHandler.onSubmitWith callback
 
-@[vir_js "react.props.empty"]
-opaque empty : ReactM (Lean.Vir.Js Lean.Vir.React.Props)
-
-@[vir_js "react.props.setKey"]
-private opaque setKeyJs
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (key : @& Lean.Vir.Js String) :
-    ReactM Unit
-
-@[vir_js "react.props.setProperty"]
-opaque setProperty
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (property : @& Lean.Vir.Js Property) :
-    ReactM Unit
-
-@[vir_js "react.props.setEventHandler"]
-opaque setEventHandler
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (handler : @& Lean.Vir.Js EventHandler) :
-    ReactM Unit
-
-@[vir_js "react.props.setRef"]
-opaque setRef {α : Type}
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) :
-    ReactM Unit
-
 def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit := do
   let jsKey ← stringToJs key
   setKeyJs props jsKey
@@ -823,36 +581,9 @@ end Props
 
 namespace StateSetter
 
-@[vir_js "react.state.set"]
-opaque set {α : Type}
-    (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
-    (value : @& Lean.Vir.Js α) :
-    Lean.Vir.RuntimeM Unit
-
-/--
-Evaluate `update` exactly once in the VIR host and enqueue its concrete result.
-
-The callback is not passed to React as a functional updater, so React render
-replay and development Strict Mode cannot invoke Lean effects more than once.
-The `previous` handle is callback-scoped and must not escape. The current `Js`
-type does not enforce this statically; an escaped handle is invalidated after
-the callback and fails on later use.
--/
-@[vir_js "react.state.modify"]
-opaque modify {α : Type}
-    (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
-    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
-    Lean.Vir.RuntimeM Unit
-
 end StateSetter
 
 namespace ReducerDispatch
-
-@[vir_js "react.reducer.dispatch"]
-private opaque dispatchJs {state action : Type}
-    (dispatch : @& Lean.Vir.Js (ReducerDispatch state action))
-    (action : @& Lean.Vir.Js action) :
-    Lean.Vir.RuntimeM Unit
 
 def dispatch {state action : Type}
     (dispatch : Lean.Vir.Js (ReducerDispatch state action))
@@ -862,48 +593,6 @@ def dispatch {state action : Type}
 end ReducerDispatch
 
 namespace Hooks
-
-/--
-Create replay-safe reducer state.
-
-VIR invokes `reducer` once when an action is dispatched and enqueues the
-concrete result through React state. The effectful Lean callback is never
-installed as a React reducer function and is therefore not subject to React
-render replay. The synthetic state and action handles are callback-scoped and
-must not escape; other resources allocated by the callback have their ordinary
-`RuntimeM` lifetime. The current `Js` type enforces this scope dynamically, not
-statically: escaped synthetic inputs are invalidated after the callback.
--/
-@[vir_js "react.useReducer"]
-private opaque useReducerJs {state action : Type}
-    (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state))
-    (initial : @& Lean.Vir.Js state) :
-    ReactM (Lean.Vir.Js (ReducerState state action))
-
-@[vir_js "react.reducerState.value"]
-private opaque reducerStateValueJs {state action : Type}
-    (reducerState : @& Lean.Vir.Js (ReducerState state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state)
-
-@[vir_js "react.reducerState.dispatch"]
-private opaque reducerStateDispatchJs {state action : Type}
-    (reducerState : @& Lean.Vir.Js (ReducerState state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action))
-
-@[vir_js "react.useState"]
-private opaque useStateJs {α : Type}
-    (initial : @& Lean.Vir.Js α) :
-    ReactM (Lean.Vir.Js (State (Lean.Vir.Js α)))
-
-@[vir_js "react.state.value"]
-private opaque stateValueJs {α : Type}
-    (state : @& Lean.Vir.Js (State (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js α)
-
-@[vir_js "react.state.setter"]
-private opaque stateSetterJs {α : Type}
-    (state : @& Lean.Vir.Js (State (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
 
 def useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α)) := do
   let state ← useStateJs initial
@@ -919,43 +608,7 @@ def useReducer {state action : Type}
   let dispatch ← reducerStateDispatchJs reducerStateJs
   pure { value := valueJs, dispatch }
 
-@[vir_js "react.useRef"]
-opaque useRef {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (Lean.Vir.Js (Ref (Lean.Vir.Js α)))
-
-/--
-Runs a React effect whose setup returns a host resource cleaned up by React.
-
-This is the v0 resource-shaped `useEffect` binding with React's no-dependency
-behavior: React calls `setup` after each committed render and calls `cleanup`
-with the returned resource before the effect is replaced, before unmount, or
-when the runtime is disposed. The resource passed to `cleanup` is
-callback-local: it is invalid after `cleanup` returns and must not escape.
--/
-@[vir_js "react.useEffect"]
-opaque useEffect {α : Type}
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    ReactM Unit
-
-/-
-Runs a resource-shaped React effect with a dependency list.
-
-This is the dependency-array form of `useEffect`: React calls `setup` after the
-initial committed render and after later commits where any dependency changes
-according to `Object.is`, and calls `cleanup` with the returned resource before
-replacement or unmount. The resource passed to `cleanup` is callback-local and
-must not escape. Use `#[]` for React's empty dependency array behavior.
--/
 namespace DependencyList
-
-@[vir_js "react.deps.empty"]
-opaque empty : ReactM (Lean.Vir.Js DependencyList)
-
-@[vir_js "react.deps.push"]
-opaque push {α : Type}
-    (deps : @& Lean.Vir.Js DependencyList)
-    (value : @& Lean.Vir.Js α) :
-    ReactM Unit
 
 def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
     ReactM (Lean.Vir.Js DependencyList) := do
@@ -973,12 +626,6 @@ def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := 
 
 end DependencyList
 
-@[vir_js "react.useMemo"]
-opaque useMemo {α : Type}
-    (calculate : ReactM (Lean.Vir.Js α))
-    (deps : @& Lean.Vir.Js DependencyList) :
-    ReactM (Lean.Vir.Js α)
-
 def useMemoWithArrayDeps {α β : Type}
     (calculate : ReactM (Lean.Vir.Js α))
     (deps : @& Array (Lean.Vir.Js β)) :
@@ -992,13 +639,6 @@ def useMemoWithStringDeps {α : Type}
     ReactM (Lean.Vir.Js α) := do
   let jsDeps ← DependencyList.ofStrings deps
   useMemo calculate jsDeps
-
-@[vir_js "react.useEffectWithDeps"]
-private opaque useEffectWithDepsJs {α : Type}
-    (deps : @& Lean.Vir.Js DependencyList)
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    ReactM Unit
 
 def useEffectWithDeps {α : Type}
     (deps : @& Lean.Vir.Js DependencyList)
@@ -1027,15 +667,6 @@ end Hooks
 
 namespace Ref
 
-@[vir_js "react.ref.get"]
-opaque get {α : Type} (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) : Lean.Vir.RuntimeM (Lean.Vir.Js α)
-
-@[vir_js "react.ref.set"]
-opaque set {α : Type}
-    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α)))
-    (value : @& Lean.Vir.Js α) :
-    Lean.Vir.RuntimeM Unit
-
 end Ref
 
 namespace State
@@ -1053,9 +684,6 @@ end State
 
 namespace ElementType
 
-@[vir_js "react.elementType.tag"]
-private opaque tagJs (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType)
-
 def ofTag (tag : @& String) : ReactM (Lean.Vir.Js ElementType) := do
   let jsTag ← Lean.Vir.JsValue.ofString tag
   tagJs jsTag
@@ -1064,32 +692,7 @@ end ElementType
 
 namespace Node
 
-@[vir_js "react.node.text"]
-private opaque textJs (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node)
-
-@[vir_js "react.node.createElement"]
-private opaque createElementJs
-    (elementType : @& Lean.Vir.Js ElementType)
-    (props : @& Lean.Vir.Js Props)
-    (children : @& Lean.Vir.Js NodeChildren) :
-    ReactM (Lean.Vir.Js Node)
-
-@[vir_js "react.node.fragment"]
-private opaque fragmentWithKeyJs
-    (props : @& Lean.Vir.Js Props)
-    (children : @& Lean.Vir.Js NodeChildren) :
-    ReactM (Lean.Vir.Js Node)
-
 namespace NodeChildren
-
-@[vir_js "react.node.children.empty"]
-opaque empty : ReactM (Lean.Vir.Js NodeChildren)
-
-@[vir_js "react.node.children.push"]
-opaque push
-    (children : @& Lean.Vir.Js NodeChildren)
-    (child : @& Lean.Vir.Js Node) :
-    ReactM Unit
 
 def ofArray (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js NodeChildren) := do
   let jsChildren ← empty
@@ -1347,14 +950,6 @@ end Node
 namespace Root
 
 /--
-Creates a React root for an existing browser element.
-
-Reference: [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot).
--/
-@[vir_js "react.root.create"]
-opaque create (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) : Lean.Vir.Browser.DomM (Lean.Vir.Js Root)
-
-/--
 Creates a React root for the first element matching a CSS selector.
 -/
 def createFromSelector (selector : String) : Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := do
@@ -1379,47 +974,17 @@ def mountFromSelector
       pure true
 
 /--
-Constructs a React tree and renders it into a React root.
-
-The host retains callbacks embedded in the rendered resource graph until the
-root is rerendered, unmounted, or the owning runtime is disposed.
--/
-@[vir_js "react.root.render"]
-opaque render
-    (root : @& Lean.Vir.Js Root)
-    (node : ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.Browser.DomM Unit
-
-/--
 Renders a Lean-authored React function component into a React root.
 
 The host wraps the Lean function in a JavaScript React component, so hooks such
 as `Hooks.useState` are evaluated by React during the component render.
 -/
-@[vir_js "react.root.renderComponent"]
-opaque renderComponentThunk
-    (root : @& Lean.Vir.Js Root)
-    (component : Unit → ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.Browser.DomM Unit
-
 def renderComponent
     (root : @& Lean.Vir.Js Root)
     (component : Component props)
     (props : props) :
     Lean.Vir.Browser.DomM Unit :=
   renderComponentThunk root fun _ => component props
-
-@[vir_js "react.root.renderIntoSelector"]
-private opaque renderIntoSelectorJs
-    (selector : @& Lean.Vir.Js String)
-    (node : @& Lean.Vir.Js Node) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-@[vir_js "react.root.renderComponentIntoSelector"]
-private opaque renderComponentIntoSelectorThunkJs
-    (selector : @& Lean.Vir.Js String)
-    (component : Unit → ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
 def renderIntoSelector
     (selector : @& String)
@@ -1444,18 +1009,7 @@ def renderComponentIntoSelector
     Lean.Vir.Browser.DomM Bool :=
   renderComponentIntoSelectorThunk selector fun _ => component props
 
-/--
-Unmounts a React root and releases callbacks retained by its current render.
-
-Reference: [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount).
--/
-@[vir_js "react.root.unmount"]
-opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
-
-@[vir_js "react.root.unmountSelector"]
-private opaque unmountSelectorJs (selector : @& Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
+/-- Unmounts the React root associated with a selector, when present. -/
 def unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
   let unmounted ← unmountSelectorJs jsSelector

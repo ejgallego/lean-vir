@@ -21,7 +21,7 @@ const statusRank = {
 };
 
 function usage() {
-  console.log(`usage: node scripts/bindings/check-type-anchors.mjs --descriptors FILE (--irpkg FILE | --manifest FILE) [options]
+  console.log(`usage: node scripts/bindings/check-type-anchors.mjs --descriptors FILE [Lean inputs] [options]
 
 Compare TypeScript descriptor JSON with Lean VIR interface descriptors.
 
@@ -29,6 +29,7 @@ Options:
   --descriptors FILE  TypeScript descriptor JSON from generate-ts-descriptors.
   --irpkg FILE        Read Lean descriptors from a manifest-bearing .irpkg.
   --manifest FILE     Read Lean descriptors from a manifest JSON fixture.
+  --inventory FILE    Read compiler-classified shipped public Lean declarations.
   --out FILE          Write machine-readable comparison report JSON.
   --check             Compare generated report with --out instead of writing it.
   --json              Print report JSON to stdout when --out is not used.
@@ -42,6 +43,7 @@ function parseArgs(argv) {
   let descriptors = null;
   let irpkg = null;
   let manifest = null;
+  let inventory = null;
   let out = null;
   let check = false;
   let json = false;
@@ -63,6 +65,9 @@ function parseArgs(argv) {
       case "--manifest":
         manifest = requiredValue(argv, ++index, "--manifest");
         break;
+      case "--inventory":
+        inventory = requiredValue(argv, ++index, "--inventory");
+        break;
       case "--out":
         out = requiredValue(argv, ++index, "--out");
         break;
@@ -83,14 +88,18 @@ function parseArgs(argv) {
     }
   }
   if (descriptors === null) throw new Error("--descriptors is required");
-  if ((irpkg === null) === (manifest === null)) {
-    throw new Error("pass exactly one of --irpkg or --manifest");
+  if (irpkg !== null && manifest !== null) {
+    throw new Error("pass at most one of --irpkg or --manifest");
+  }
+  if (irpkg === null && manifest === null && inventory === null) {
+    throw new Error("pass at least one Lean input: --irpkg, --manifest, or --inventory");
   }
   if (check && out === null) throw new Error("--check requires --out");
   return {
     descriptors: resolve(root, descriptors),
     irpkg: irpkg === null ? null : resolve(root, irpkg),
     manifest: manifest === null ? null : resolve(root, manifest),
+    inventory: inventory === null ? null : resolve(root, inventory),
     out: out === null ? null : resolve(root, out),
     check,
     json,
@@ -125,12 +134,24 @@ export async function runTypeAnchorReportCli(argv) {
   return strictFailure || diagnosticFailure ? 1 : 0;
 }
 
-export async function buildTypeAnchorReport({ descriptors, irpkg, manifest }) {
+export async function buildTypeAnchorReport({
+  descriptors,
+  irpkg = null,
+  manifest = null,
+  inventory = null,
+}) {
   const tsDescriptors = validateTsDescriptors(JSON.parse(await readFile(descriptors, "utf8")));
-  const leanManifest = irpkg !== null
-    ? (await readIrPackageFile(irpkg)).manifest
-    : validateInterfaceManifest(JSON.parse(await readFile(manifest, "utf8")));
-  const lean = collectLeanDescriptors(leanManifest);
+  let lean = new Map();
+  if (irpkg !== null || manifest !== null) {
+    const leanManifest = irpkg !== null
+      ? (await readIrPackageFile(irpkg)).manifest
+      : validateInterfaceManifest(JSON.parse(await readFile(manifest, "utf8")));
+    lean = collectLeanDescriptors(leanManifest);
+  }
+  if (inventory !== null) {
+    const shipped = validateShippedInventory(JSON.parse(await readFile(inventory, "utf8")));
+    collectShippedLeanDescriptors(lean, shipped);
+  }
   const tsSymbols = new Map(tsDescriptors.symbols.map((symbol) => [symbol.id, symbol]));
   const results = tsDescriptors.anchors.map((anchor) => compareAnchor(anchor, lean, tsSymbols));
   const summary = { exact: 0, compatible: 0, weak: 0, missing: 0 };
@@ -144,7 +165,10 @@ export async function buildTypeAnchorReport({ descriptors, irpkg, manifest }) {
     generatedBy: "scripts/bindings/check-type-anchors.mjs",
     inputs: {
       descriptors: relative(root, descriptors),
-      lean: irpkg === null ? relative(root, manifest) : relative(root, irpkg),
+      ...(irpkg === null && manifest === null
+        ? {}
+        : { lean: irpkg === null ? relative(root, manifest) : relative(root, irpkg) }),
+      ...(inventory === null ? {} : { shippedInventory: relative(root, inventory) }),
     },
     ...(tsDescriptors.dependencies ? { typeScriptDependencies: tsDescriptors.dependencies } : {}),
     summary,
@@ -158,6 +182,48 @@ function validateTsDescriptors(value) {
     throw new Error("descriptor JSON must be { version: 1, symbols: [...], anchors: [...] }");
   }
   return value;
+}
+
+function validateShippedInventory(value) {
+  if (value?.format !== "lean-vir-js-inventory" || value.version !== 1 ||
+      !Array.isArray(value.publicEntries) ||
+      value.summary?.publicEntries !== value.publicEntries.length) {
+    throw new Error("shipped inventory must be a compiler-derived lean-vir-js-inventory v1 artifact");
+  }
+  for (const entry of value.publicEntries) {
+    const descriptor = entry.interface;
+    if (typeof entry.declaration !== "string" ||
+        (descriptor !== null &&
+          (descriptor?.kind !== "function" || typeof descriptor.effect !== "string" ||
+            !Array.isArray(descriptor.args) ||
+            descriptor.args.some((arg) =>
+              typeof arg?.name !== "string" || arg?.type === null || typeof arg?.type !== "object") ||
+            descriptor.result === null || typeof descriptor.result !== "object"))) {
+      throw new Error(`invalid shipped public interface descriptor for ${entry.declaration ?? "?"}`);
+    }
+  }
+  return value;
+}
+
+function collectShippedLeanDescriptors(descriptors, inventory) {
+  for (const entry of inventory.publicEntries) {
+    if (entry.interface === null) continue;
+    const descriptor = {
+      kind: "public",
+      lean: entry.declaration,
+      label: entry.declaration,
+      source: entry.source,
+      shape: {
+        kind: "function",
+        effect: entry.interface.effect,
+        args: entry.interface.args.map((arg) => ({ name: arg.name, type: leanShape(arg.type) })),
+        result: leanShape(entry.interface.result),
+      },
+    };
+    addLeanDescriptor(descriptors, entry.declaration, descriptor);
+    collectLeanTypes(descriptors, entry.interface.result);
+    for (const arg of entry.interface.args) collectLeanTypes(descriptors, arg.type);
+  }
 }
 
 function collectLeanDescriptors(manifest) {
@@ -428,17 +494,19 @@ function applyPortIntent(leanShape, tsSymbol, portIntent) {
         `reviewed ${portIntent.accessor} accessor intent requires a TypeScript property`,
       ));
     } else if (portIntent.accessor === "get") {
-      ts = { kind: "function", effect: "pure", args: [], result: ts };
+      const accessorType = tsSymbol.accessors?.get ?? ts;
+      ts = { kind: "function", effect: "pure", args: [], result: accessorType };
       diagnostics.push(diagnostic(
         "reviewed_property_getter",
         "Lean exposes the TypeScript property getter as a function",
         "info",
       ));
     } else {
+      const accessorType = tsSymbol.accessors?.set ?? ts;
       ts = {
         kind: "function",
         effect: "pure",
-        args: [{ name: "value", type: ts }],
+        args: [{ name: "value", type: accessorType }],
         result: { kind: "primitive", name: "void" },
       };
       diagnostics.push(diagnostic(
@@ -608,7 +676,9 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     ...(anchor.category ? { category: anchor.category } : {}),
     ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
+    ...(anchor.advisorySemantics ? { advisorySemantics: anchor.advisorySemantics } : {}),
     ...(anchor.portIntent ? { portIntent: anchor.portIntent } : {}),
+    ...(anchor.modalityContract ? { modalityContract: anchor.modalityContract } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
     ...(tsSymbol ? { tsSymbol } : {}),
   };
@@ -679,8 +749,19 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   }
   switch (lean.kind) {
     case "array":
-    case "option":
       return compareShapes(lean.element, ts.element, tsSymbols, seen);
+    case "option": {
+      const element = compareShapes(lean.element, ts.element, tsSymbols, seen);
+      const absence = ts.absence ?? "null";
+      if (absence === "null") return element;
+      return comparison("weak", [
+        diagnostic(
+          "typescript_undefined_not_represented",
+          `Lean Option does not preserve TypeScript ${absence} absence semantics`,
+        ),
+        ...element.diagnostics,
+      ]);
+    }
     case "tuple":
       return compareSequence(lean.elements, ts.elements, tsSymbols, seen, "tuple element");
     case "record":

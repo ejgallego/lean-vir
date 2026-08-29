@@ -1,23 +1,41 @@
-# Binding explorer and shipped JavaScript coverage
+# Binding reference, shipped inventory, and author actions
 
-The binding explorer is the primary human report for VIR's pre-release library
-surface. It combines the exhaustive JavaScript boundary census, colocated
-API-group configuration, and available TypeScript-to-Lean comparisons in
-one searchable page.
+The generated binding reference is the primary human report for VIR's
+pre-release library surface. One HTML document presents three projections of the
+same machine data:
+
+- **Upstream reference** follows the configured upstream TypeScript
+  documentation hierarchy and shows only confirmed Lean correspondences as
+  bindings.
+- **Shipped VIR surface** inventories every generated host boundary, including
+  TypeScript-derived operations, upstream adapters, VIR-owned protocols, and
+  local contracts.
+- **Author actions** lists precise generator, annotation, identity,
+  type-translation, and runtime actions for binding authors.
+
+Convenience wrappers and arbitrary Lean dependencies are not upstream API
+entries. They do not appear in the primary reference or contribute to upstream
+coverage. Author actions may still flag a shipped declaration whose upstream
+identity or exception policy is missing.
 
 The report exhaustively scans ordinary `@[vir_js]` declarations and explicit
-conversion declarations. Every distinct target must have a shipped provider,
-provider-only targets are rejected, and every shipped target must be reachable
-from at least one public executable Lean declaration. Each public connection
-includes its concrete compiled-IR call path.
+conversion declarations. Every distinct target must have a matching key in a
+shipped provider map, provider-only keys are rejected, and every shipped target
+must be reachable from at least one public executable Lean declaration. Each
+public connection includes its concrete compiled-IR call path.
 
 Generation indexes every configured TypeScript API group before presenting the
-report. The reviewed `Document` analysis expands its inheritance graph and
-checks each authored operation mapping. Other external groups begin with
-automatic correspondence suggestions rather than reviewed fidelity claims.
-Local APIs without a machine-readable contract and narrower curated
-comparisons remain visibly distinct. Current counts and findings belong to the
-generated report rather than this documentation.
+report. Unselected upstream entries remain ordinary documentation coverage;
+they are not findings. Authored mappings are confirmed shipped bindings and
+name-based candidates require an identity annotation. Every compiled host
+declaration must come from a configured generated output; the report displays
+the generated/handwritten boundary count explicitly. It also separates
+operations derived from selected TypeScript declarations from reviewed
+protocol operations. Protocols are further classified as named upstream
+adapters, VIR-owned operations, local-contract operations, or unclassified
+author debt, so migration progress does not conflate generated source with
+direct upstream lowering and intentional convenience APIs do not create false
+correspondence actions.
 
 ## Fidelity Contract
 
@@ -31,49 +49,75 @@ This check makes six mechanically enforceable claims:
 3. Conversions between JavaScript values and ordinary Lean values must be
    isolated behind `@[vir_js_explicit_conversion]`; they cannot be hidden in an
    ordinary binding.
-4. Every declared target must be implemented by a shipped browser/React,
-   virtual Node, or runtime-intrinsic provider, and every such provider target
+4. Every declared target must have a matching key in a shipped browser/React,
+   virtual Node, or runtime-intrinsic provider map, and every such provider key
    must have a compiled declaration.
 5. Public Lean-to-target links come from transitive references in compiled IR.
    Each link carries its declaration path; the report does not infer callers
    from naming or source text.
 6. A reviewed TypeScript property is decomposed into named getter and setter
    operations (getter only for a readonly property). Each operation either
-   identifies one host target, one public Lean declaration, and one reviewed
-   anchor, or explicitly records a missing coverage gap. Another public
-   declaration in the configured binding namespace may not reach that accessor
-   target unless it corresponds to a distinct upstream operation.
+   identifies one host target and one canonical generated public Lean
+   declaration, or explicitly records a missing coverage gap. Downstream
+   conversion helpers may reach that generated operation, but they are not
+   presented as additional upstream property operations.
 
 This prevents accidental representation drift such as exposing a raw Lean
 `String` where the JavaScript API returns a `Js String`. Applications may
 convert at call sites or in their own policy layer, but the reviewed binding
 surface remains one-to-one with the upstream property operations.
 
-The compiler/runtime check deliberately does not claim that all upstream APIs
-have been ported, or that every phantom resource name has been proven equivalent
-to an upstream TypeScript type. Configured API groups and type-anchor
-comparisons provide that semantic layer. The explorer keeps the layers visibly
-distinct while presenting their findings together.
+Provider reconciliation is target-name presence only. It does not inspect raw
+provider argument handling, retention, callback leases, result adoption, or
+terminal cleanup, so it is not a mechanical provider-modality audit. The
+compiler/runtime check also does not claim that all upstream APIs have been
+ported, or that every phantom resource name has been proven equivalent to an
+upstream TypeScript type. Configured API groups, type-anchor comparisons, and
+focused lifecycle tests provide separate evidence. The explorer keeps these
+layers visibly distinct while presenting their findings together.
+The consolidated machine report records this guarantee boundary explicitly in
+its `boundaryAnalysis` object rather than leaving it implicit in prose.
 
-## Terminology and Independent Statuses
+## Terminology and dispositions
 
 An **API group** is the unit presented in the explorer, such as `Document`,
 `HTMLCanvasElement`, or timers. The configuration schema retains the historical
 `roots` key, but those entries group upstream entry points, public Lean APIs,
 and shipped runtime targets; the UI does not call them roots.
 
-The explorer reports independent facts for each API group:
+Each upstream member has a generation record with three independent facts:
 
-- **runtime coverage** counts shipped targets with providers;
-- **upstream analysis** says whether the complete upstream surface has been
-  reviewed, automatically indexed, compared as a curated subset, needs a local
-  contract as input, or has no upstream contract;
-- **mapping coverage** counts upstream members associated with VIR targets;
-- **type fidelity** classifies reviewed mappings as exact, compatible, weak, or
-  missing;
-- **findings** contain only concrete runtime, coverage, or type-fidelity
-  problems. An automatic suggestion is evidence for review, not a fidelity
-  verdict.
+- **availability** is `available`, `candidate`, or `not-provided`. Only an
+  authored mapping or comparison target is available; a name candidate is not
+  presented as a Lean binding.
+- **provenance** records whether upstream-correspondence evidence comes from
+  direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
+  annotation, or no implementation. This is distinct from declaration
+  provenance: all shipped host declarations are generated.
+- **disposition** is `generated`, `adapted`, `needs-annotation`, `unsupported`,
+  or `not-selected`. `adapted` means a reviewed protocol is linked to an
+  upstream or local declaration member. Convenience wrappers are downstream
+  Lean APIs rather than upstream members, so they are not a member disposition.
+- **evidence status** keeps semantic comparison separate from correspondence:
+  `exact` and `compatible` come only from the comparator, `derived` means one
+  canonical TypeScript operation produced the Lean declaration,
+  `protocol-linked` means reviewed policy names an upstream member, and
+  `contract-linked` means a repository-local declaration member is linked.
+
+Only dispositions with an actionable diagnostic appear under author actions.
+In particular, `not-selected` is not an error or author action, and
+an explicitly `unsupported` upstream member remains a visible reference/roadmap
+gap without becoming immediate binding-author work.
+Every work item names a diagnostic code, explains the evidence, and gives the
+next required action. Reviewed protocols may still use `needs-annotation`
+until their upstream identity and direct TypeScript lowering are fully
+expressed.
+
+A generated operation whose reviewed mapping has no comparator anchor is
+`derived`: the TypeScript shape, ABI policy, and emitted Lean type are one
+canonical operation record. An upstream adapter is `protocol-linked`, and a
+local declaration operation is `contract-linked`; neither is silently promoted
+to semantic `compatible` without comparator evidence.
 
 A **public Lean API** row is a public executable declaration in the measured
 `Vir` environment that reaches at least one JavaScript host target. It does not
@@ -81,64 +125,71 @@ claim to inventory type-only declarations or pure APIs that never cross the
 host boundary. A **host target** is the lower-level dispatch key implemented by
 the JavaScript runtime.
 
-Therefore a green provided target proves that VIR ships the runtime path, while
-an automatic correspondence only proposes which upstream declaration to
-review. `Complete surface analysis` is reserved for API groups whose mappings
-and type translations have been reviewed.
+Therefore a provider-key-present target proves only that VIR can resolve that
+dispatch name, while an automatic correspondence only proposes an upstream
+identity. Neither proves raw provider behavior. The user-facing reference never
+presents that candidate as a confirmed binding. Compiler and runtime internals
+remain author evidence rather than a parallel documentation hierarchy.
 
 ## Soundness-first Roadmap
 
 The upstream operation is the source of truth for the faithful binding layer.
-VIR should preserve JavaScript resources, nullability, optionality, overloads,
-receiver shape, effects, and ownership or retention behavior unless a reviewed
-representation rule says otherwise. Convenience conversions belong in a
-separate application-facing layer and do not count as the upstream binding.
+The intended construction is:
 
-An incorrect public binding is a release-blocking defect. A missing upstream
-operation is a visible coverage gap, but it is not evidence that an existing
-binding is unsound. The explorer and CI keep those two conditions separate.
+```text
+TypeScript declaration + VIR ABI policy + explicit annotation
+  -> canonical operation IR
+  -> generated Lean declaration
+```
+
+The operation IR preserves JavaScript resources, supported null-only
+nullability, overloads, receiver shape, effects, and authored ownership or
+retention policy. Descriptors distinguish `null`, `undefined`, and nullish
+absence; generation rejects the latter two and optional properties until they
+have explicit representations. Convenience conversions belong in a separate
+application-facing layer and do not count as upstream bindings.
+
+An incorrect public binding is a release-blocking defect. An unselected
+upstream operation is documentation coverage, not evidence that an existing
+binding is unsound. The reference, inventory, and author actions keep those
+conditions separate.
 
 Every binding repair or addition should satisfy these landing gates:
 
-1. **Boundary soundness.** Compiler validation accepts the host signature;
-   ordinary bindings contain no implicit Lean/JavaScript conversion.
-2. **Operation identity.** The API-group configuration maps one upstream
-   operation to its public Lean declaration and host target. Writable
-   properties classify getter and setter independently.
-3. **Runtime parity.** Every declared target has the intended shipped provider,
-   and provider-only targets are rejected. Resource lifetime behavior is
-   covered where the operation retains or returns host-owned values.
-4. **Type fidelity.** Reviewed intent accounts for resource representation,
-   nullability, unions, overload selection, omitted optional parameters,
-   effects, ownership, and callback retention. Weak or missing comparisons for
-   shipped operations require repair or an explicit reviewed limitation.
-5. **Regression evidence.** The consolidated gate reaches the target from a
-   public Lean declaration and exercises the relevant runtime behavior. The
-   generated explorer is then review evidence, not committed source.
+1. **Reproducible generation.** Checked-in generated Lean is an exact function
+   of pinned declarations, ABI policy, and annotations.
+2. **Boundary representation safety.** Compiler validation accepts the
+   generated host signature; ordinary bindings contain no implicit
+   Lean/JavaScript conversion.
+3. **Operation identity.** The configuration selects one upstream operation
+   and host target. Writable properties generate getter and setter operations
+   independently.
+4. **Runtime dispatch presence.** Every generated target has its intended
+   shipped provider key, and provider-only keys are rejected. Provider behavior
+   remains separately trusted and tested.
+5. **Explicit exceptions.** TypeScript deviations and protocols are generated
+   from structured, justified operation records. Every protocol declares its
+   upstream relation; handwritten host declarations are rejected.
+6. **Compiled evidence.** The consolidated gate reaches every target from a
+   public Lean declaration; focused runtime suites exercise selected lifetime
+   behavior separately.
 
-Before the first release, every API group containing a public shipped binding
-should move from an automatic suggestion or missing local contract to reviewed
-analysis or an explicit no-parity classification. Shipped operations should
-have no unclassified accessor aliases and no unresolved weak or missing type
-finding. Unimplemented upstream operations may remain clearly reported gaps.
+Every external shipped binding is generated. Shipped targets must also acquire
+authored upstream identity or an explicit no-parity protocol classification.
+Unsupported selected
+operations and weak type translations remain author actions; unselected
+upstream operations may remain visible in the reference without failing CI.
 
-Land that work in small API-group slices, prioritizing existing exposed
-bindings over new surface:
+The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
+and ProofWidgets. Further slices should replace reviewed protocol operations
+with direct TypeScript lowering where an upstream declaration exists, without
+changing their host target or public faithful type unnecessarily.
 
-1. repair browser properties and methods that currently hide primitive or
-   nullable resource conversions;
-2. review input, event, canvas, timer, and callback lifetime surfaces;
-3. close or explicitly classify React root fidelity findings;
-4. provide machine-readable contracts for shipped local Infoview and
-   ProofWidgets operations;
-5. accept client binding requests and add new libraries only after the shipped
-   core has a reviewed baseline.
-
-Request planners, correspondence ranking, and future code generation should
-consume the same authored API-group configurations and generated machine
-report. They may propose work, but a suggestion never becomes reviewed
-coverage automatically. Generated declarations must target the faithful layer;
-conversion wrappers remain an explicit downstream policy choice.
+Request planners and correspondence ranking consume the same authored
+API-group configurations and canonical operation data as generation. A
+suggestion never becomes a confirmed binding automatically. Generated
+declarations target the faithful layer; conversion wrappers remain an explicit
+downstream policy choice.
 
 ## Library Configuration
 
@@ -153,6 +204,23 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/Infoview/Surface.bindings.json`
 - `Vir/ProofWidgets/Rpc.bindings.json`
 
+Local host protocols use declaration syntax too:
+
+- `Vir/Infoview/Surface.contract.d.ts`
+- `Vir/ProofWidgets/Rpc.contract.d.ts`
+
+Every local protocol operation names the exact declaration member it
+implements. The generator rejects missing members, while the explorer verifies
+that the contract covers every generated target and that its public Lean entry
+point reaches that target. The reviewed protocol still owns ABI-specific effect,
+resource, callback, and conversion policy that cannot be inferred from the
+local declaration alone.
+
+The descriptor generator, Lean generator, and consolidated explorer all load
+these files through the same schema validator. Unknown fields and malformed
+nested anchors, mappings, ABI profiles, and dependency-policy entries therefore
+fail consistently at every configured entry point.
+
 A configuration identifies its compiled Lean modules and divides their targets
 into API groups. External groups name their declaration files and upstream
 entry points; internal groups explicitly state that they have no external
@@ -163,6 +231,10 @@ operations, or only `get` for a readonly property, with an exact host target,
 public Lean declaration, and comparison anchor for each shipped operation.
 An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
 entry, so partial property coverage cannot be mistaken for a faithful pair.
+Anchor `portIntent` contains only policy that the comparator mechanically
+checks. Lifecycle, retention, or ownership claims that are not yet derived from
+the operation IR use `advisorySemantics`; reports label those notes as not
+mechanically verified.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a property operation that disagrees with its reviewed
@@ -172,29 +244,28 @@ assign every shipped target exactly once.
 ## Data Flow
 
 ```text
+TypeScript declarations + configured upstream entry points
+  -> complete upstream documentation catalog
+
+binding selection + ABI profile + explicit annotations
+  -> canonical operation IR
+  -> reproducible faithful Lean declarations
+
 compiled Vir + Vir.Infoview environments
   -> compiler-decoded vir_js metadata
-  -> signature and boundary-policy validation
   -> public declaration call reachability and exact paths
 
-browser/React + virtual Node provider maps
-runtime object-handle intrinsic targets
-  -> shipped provider inventory
+browser/React + virtual Node provider keys + runtime intrinsics
+  -> strict target-name reconciliation JSON
 
-compiler targets + provider targets
-  -> strict reconciliation JSON
-  -> configured API groups
+reviewed protocol operations + correspondence suggestions
+  -> direct-lowering and annotation work items
 
-TypeScript declarations + configured API-group entry points
-  -> generated upstream surface inventory
-  -> automatic target/member correspondence suggestions
-
-reviewed API-group intent + focused type-anchor comparisons
-  -> semantic comparison results
-
-reconciled targets + public call paths + API groups + comparisons
+catalog + operation IR + compiled/runtime evidence + work items
   -> one machine report
-  -> one interactive library explorer
+  -> upstream-shaped reference
+  -> complete shipped-boundary inventory
+  -> binding-author actions
 ```
 
 Generate the consolidated local report with human-readable progress output:
@@ -223,26 +294,42 @@ python3 -m http.server 4178 --bind 127.0.0.1
 
 Then open `http://127.0.0.1:4178/build/bindings/index.html`.
 
-The explorer supports library, upstream-analysis, and finding filters; deep
-links; generated upstream TypeScript declarations; inherited-member
-provenance; Lean and TypeScript source context; exact elaborated boundary
-types; side-by-side semantic descriptors; and light/dark themes. Generation
-expands every configured TypeScript API group before rendering. Authored
-mappings distinguish reviewed compatible members from missing coverage;
-automatic groups distinguish unique suggestions, ambiguous suggestions, and
-unmapped upstream entries.
+The document supports library, availability, boundary-evidence, and
+author-disposition filters;
+deep links; upstream TypeScript documentation; inherited-member provenance;
+Lean and TypeScript source context; compiled boundary evidence; and light/dark
+themes. It omits descriptor dependencies that are not configured upstream
+roots or members. Types referenced by signatures remain part of the declaration
+rather than a heuristic "related types" section.
 
-Use **Upstream libraries** to start from a library contract and inspect VIR's
-coverage. Expanding a mapped upstream entry shows its expected TypeScript
-declaration beside the nearest public Lean API type. Use **Public Lean API** for
-the reverse product surface: public declarations, their elaborated types,
-source locations, nearest upstream expectations, and exact compiler paths to
-host targets. Use **Host targets** for the lower-level dispatch keys, their
-providers and implementation boundaries. Reviewed mappings prefer the exact
-reviewed public declaration; other transitive callers remain available without
-being presented as reviewed matches.
+Generated boundaries lead with a structured Lean signature derived from the
+canonical operation IR. Receiver, argument, result, effect, representation,
+passing, retention, and ownership annotations are interactive and expose their
+policy provenance on hover or keyboard focus. For TypeScript-derived operations,
+the same card aligns the selected TypeScript shape with the emitted Lean
+boundary, including omitted or host-fixed parameters. The fully qualified
+compiler type remains available under **Exact compiled Lean type**; namespace
+elision affects presentation only.
+
+Use **Upstream reference** to browse the upstream hierarchy. A confirmed
+entry shows its TypeScript declaration beside the corresponding public Lean
+type. Candidates remain labeled unconfirmed and are not displayed as bindings.
+Use **Shipped VIR surface** for the reverse map of all generated host
+boundaries, including operations without a one-to-one upstream declaration.
+Each row identifies its evidence class, generated policy, provider, public Lean
+entry point, and compiled call path.
+
+Use **Author actions** for required intervention. Each row describes one
+precise action and shows the upstream declaration, current public Lean evidence,
+compiled call path, and provider when available. Convenience wrappers are not
+shown as upstream operations.
+
+Unselected upstream entries contribute to coverage totals but are not issues.
+Explicitly unsupported selected entries appear under `report.json`'s roadmap;
+only compiler, provider, reachability, and semantic comparison failures are
+issues.
 
 `build/bindings/shipped-v1.coverage.json` and
 `build/bindings/shipped-v1.dashboard.html` are lower-level reconciliation
-artifacts. Focused type-anchor HTML files likewise remain useful for generator
-debugging, but they are not the main entry point.
+artifacts. Focused type-anchor rendering remains an explicit fixture-debugging
+command and is not part of the default binding generation or check workflow.
