@@ -17,6 +17,7 @@ function freezeRuntimeTest(test) {
 
 export const runtimeTests = Object.freeze([
   { id: "manifest", file: "manifest-smoke.mjs", group: "pure" },
+  { id: "web-assets-helper", file: "web-assets-helper-smoke.mjs", group: "pure" },
   { id: "call-timing", file: "call-timing-smoke.mjs", group: "pure" },
   { id: "js-float", file: "js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },
@@ -40,6 +41,11 @@ export const runtimeTests = Object.freeze([
   { id: "package-decoder", file: "package-decoder-smoke.mjs", group: "pure" },
   { id: "package-set-descriptor", file: "package-set-descriptor-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "package-generator-smoke.mjs", group: "lean" },
+  {
+    id: "cross-package-one-runtime",
+    file: "cross-package-one-runtime-smoke.mjs",
+    group: "lean",
+  },
   {
     id: "interpreter-constant-cache",
     file: "interpreter-constant-cache-smoke.mjs",

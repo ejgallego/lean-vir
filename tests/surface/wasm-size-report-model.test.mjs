@@ -7,6 +7,8 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { mapAreaFor, mapDetailFor } from "../../scripts/analysis/wasm-size-report.mjs";
+
 import {
   annotateRuntimeContextTree,
   annotateSurfaceSummaries,
@@ -17,6 +19,17 @@ import {
   countKind,
   indexSurfaceLinks,
 } from "../../scripts/analysis/wasm-size-report/model.mjs";
+
+test("structured bounded object paths retain size-report provenance", () => {
+  const leanRuntime = "build/upstream-probe/obj/lean/src/runtime/alloc.cpp.o";
+  assert.equal(mapAreaFor(leanRuntime), "Lean C runtime");
+  assert.equal(mapDetailFor(leanRuntime), "Lean/runtime/alloc.cpp.o");
+
+  const virAbi =
+    "build/upstream-probe/obj/vir/wasm/upstream_shim/abi/call_abi.cpp.o";
+  assert.equal(mapAreaFor(virAbi), "VIR JS/WASM ABI");
+  assert.equal(mapDetailFor(virAbi), "VIR/abi/call_abi.cpp.o");
+});
 
 test("binary and section models retain sizes and account for framing bytes", () => {
   const report = {

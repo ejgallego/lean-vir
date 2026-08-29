@@ -5,7 +5,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -18,16 +17,21 @@ import {
 import { copyFileWithDirs } from "../file-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { runSync } from "../process-utils.mjs";
+import { parseLeanBuildIdentity } from "./lean-build-identity.mjs";
 import { PACKAGE_VERSIONS } from "./package-versions.mjs";
-import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
+import {
+  SDK_METADATA_FILES,
+  sdkFileRecord,
+  sdkReadme,
+} from "./sdk-metadata.mjs";
+import {
+  SDK_BROWSER_PROFILE,
+  SDK_PAYLOADS,
+  sdkBrowserFiles,
+} from "./sdk-payloads.mjs";
 
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
 const artifactPaths = artifactBundlePaths(repositoryRoot, artifactName);
-
-async function sha256(path) {
-  const bytes = await readFile(path);
-  return createHash("sha256").update(bytes).digest("hex");
-}
 
 await cleanArtifactBundle(artifactPaths);
 
@@ -36,20 +40,42 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   const source = join(repositoryRoot, sourceRel);
   const dest = join(artifactPaths.bundleDir, destRel);
   await copyFileWithDirs(source, dest);
-  files.push({
-    path: destRel,
-    source: sourceRel,
-    sha256: await sha256(dest),
-  });
+  files.push(
+    await sdkFileRecord(artifactPaths.bundleDir, destRel, {
+      source: sourceRel,
+    }),
+  );
 }
 
 await copyArtifactMetadata(repositoryRoot, artifactPaths.bundleDir);
+await writeFile(join(artifactPaths.bundleDir, "README.txt"), sdkReadme());
+for (const path of SDK_METADATA_FILES) {
+  files.push(await sdkFileRecord(artifactPaths.bundleDir, path));
+}
 
-const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
-const leanToolchain = (await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")).trim();
-const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, capture: true });
-const gitStatus = runSync("git", ["status", "--short"], { cwd: repositoryRoot, capture: true });
-const leanVersion = runSync("lean", ["--version"], { cwd: repositoryRoot, capture: true });
+const packageJson = JSON.parse(
+  await readFile(join(repositoryRoot, "package.json"), "utf8"),
+);
+const leanToolchain = (
+  await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")
+).trim();
+const gitCommit = runSync("git", ["rev-parse", "HEAD"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const gitStatus = runSync("git", ["status", "--short"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const leanVersion = runSync("lean", ["--version"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const leanBuildIdentity = parseLeanBuildIdentity(leanVersion);
+const browser = {
+  ...SDK_BROWSER_PROFILE,
+  files: await sdkBrowserFiles(artifactPaths.bundleDir),
+};
 const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
@@ -57,96 +83,14 @@ const artifactManifest = {
   gitDirty: gitStatus.length !== 0,
   leanToolchain,
   leanVersion,
+  ...leanBuildIdentity,
   ...PACKAGE_VERSIONS,
+  browser,
   generatedAt: new Date().toISOString(),
   files,
 };
-await writeFile(join(artifactPaths.bundleDir, "lean-vir-artifact.json"), `${JSON.stringify(artifactManifest, null, 2)}\n`);
 await writeFile(
-  join(artifactPaths.bundleDir, "README.txt"),
-  `Lean VIR SDK
-============
-
-This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
-for the matching lean_vir package revision.
-
-The JavaScript files are ES modules. The generic runtime and host-binding
-modules do not import React; js/vir-react-host-bindings.js imports react and
-react-dom/client and should only be used by browser React integrations.
-
-Application code should import the entry modules directly under js/:
-
-  js/vir-runtime.js
-  js/vir-runtime-node.js
-  js/vir-host-bindings.js
-  js/vir-react-host-bindings.js
-
-Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
-modules can resolve relative imports. They remain internal implementation
-modules and may change with the matching lean_vir revision.
-
-In a Lake client package, mark JavaScript-callable declarations with
-@[vir_export] and startup hooks with @[vir_startup], then build the module
-package and matching SDK:
-
-  lake build +MyApp.Runtime:vir
-  lake build :virSdk
-
-The module facet creates a descriptor plus ordinary .irpkg members. Serve:
-
-  wasm/vir-upstream.wasm
-  wasm/vir-upstream.dev.wasm
-  js/vir-runtime.js
-  your generated .irpkg-set.json and all of its .irpkg members
-
-wasm/vir-upstream.wasm is the stripped release artifact and is selected by
-default. wasm/vir-upstream.dev.wasm is an optimized, unstripped debugging
-companion.
-
-Minimal browser usage:
-
-  import { createVirRuntime } from "./js/vir-runtime.js";
-
-  const vir = await createVirRuntime({
-    wasmUrl: "./wasm/vir-upstream.wasm",
-    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
-  });
-
-  vir.runStartupEntries();
-
-Call vir.dispose() when the page or application is torn down.
-
-Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
-
-  const debugVir = await createVirRuntime({
-    wasmUrl: "./wasm/vir-upstream.wasm",
-    debugWasm: true,
-    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
-  });
-
-Browser React root usage:
-
-  import { createVirRuntimeFactory } from "./js/vir-runtime.js";
-  import {
-    createBrowserHostBindings,
-    createHostResourceState,
-  } from "./js/vir-host-bindings.js";
-  import { createBrowserReactHostBindings } from "./js/vir-react-host-bindings.js";
-
-  const factory = createVirRuntimeFactory({
-    wasmUrl: "./wasm/vir-upstream.wasm",
-    defaultHostBindings: () => {
-      const resources = createHostResourceState();
-      return createBrowserHostBindings({
-        resources,
-        reactHostBindings: createBrowserReactHostBindings(resources),
-      });
-    },
-  });
-
-Check lean-vir-artifact.json before mixing this SDK with generated packages
-from another lean_vir revision.
-`,
+  join(artifactPaths.bundleDir, "lean-vir-artifact.json"),
+  `${JSON.stringify(artifactManifest, null, 2)}\n`,
 );
-
 await writeAndPublishArtifactArchive(repositoryRoot, artifactPaths);

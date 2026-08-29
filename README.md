@@ -9,9 +9,11 @@ For downstream Lake packages, the preferred workflow is:
 1. add `lean_vir` as a pinned Lake dependency;
 2. mark browser exports with `@[vir_export]` and startup hooks with
    `@[vir_startup]`;
-3. build the module's `.irpkg` with its `:vir` facet and install the matching
-   browser SDK with `:virSdk`;
-4. load the package and call `runStartupEntries()` from the browser host.
+3. declare a named Lean library containing one or more explicit application
+   roots and make the
+   application's normal target depend on that library's `virWebAssets` facet;
+4. serve the resulting one-SDK/many-program directory and call
+   `runStartupEntries()` for the selected program.
 
 See
 [Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
@@ -29,7 +31,7 @@ require lean_vir from git
   "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
 ```
 
-Then mark exports directly in Lean and build the containing module:
+Then mark exports directly in Lean:
 
 ```lean
 import Vir
@@ -58,21 +60,60 @@ how to make that IR available. The `:vir` build repeats marker checks for raw
 metadata and reports generated boxed-boundary, package-wide, or unresolved
 dependency problems.
 
-```bash
-lake build +MySlides.Runtime:vir
-lake build :virSdk
+Declare a named application library. The common singleton form uses the target
+name as its program ID; a multi-root library is one named bundle whose root
+module names identify its independent programs. Lake checks every root through
+its typed target model:
+
+```lean
+lean_lib «slides» where
+  roots := #[`MySlides.Runtime]
 ```
 
-When the dependency is pinned to an unreleased commit rather than a release
-tag, request the SDK artifact built from that same commit:
+Attach that named library facet to the application's ordinary target and build
+the target. The `@/` prefix means a target in the current package:
 
-```bash
-VIR_SDK_COMMIT=<same-commit> lake build :virSdk
+```lean
+lean_exe my_slides where
+  root := `Main
+  needs := #[`@/«slides»:virWebAssets]
 ```
 
-The module facet writes a package-set descriptor, root member, reached
-dependency members, and report under `.lake/build/vir/module-sets/`; the package
-facet installs the versioned browser SDK. `vir.runStartupEntries()`
+```bash
+lake build my_slides
+```
+
+No parallel SDK-selection variable is needed. An exact `v<version>` tag selects
+the durable release. For a clean untagged commit, the facet reuses a validated
+cache, tries that commit's authenticated CI artifact as a fast path, and falls
+back to an exact local build if the temporary artifact is unavailable. A
+different Lean toolchain goes directly to the local build. Dirty, vendored, or
+otherwise unidentified VIR sources are rejected rather than matched to an
+unrelated release. The strict Lean version and Git-hash checks remain in force.
+
+The application facet builds the root's dependency-cone package set, installs
+one matching SDK, checks source/ABI compatibility and digests, and stages
+everything under `.lake/build/vir/web-assets/slides/` with a
+`VIR_WEB_ASSETS.json` discovery manifest.
+The staged browser helper reduces loading to one named-program call:
+
+```js
+import { createVirWebAssetsRuntime } from
+  "./vir/sdk/js/vir-web-assets.js";
+
+const vir = await createVirWebAssetsRuntime(
+  "./vir/VIR_WEB_ASSETS.json",
+);
+vir.runStartupEntries();
+window.vir = vir;
+window.addEventListener("pagehide", () => vir.dispose(), { once: true });
+```
+
+Composition copies the SDK manifest's browser dependency closure rather than
+the full SDK, leaving the debug Wasm and optional Node/browser-React entry
+points out of the application directory.
+The lower-level `+Module:vir` and `:virSdk` facets remain available for custom
+artifact workflows. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
@@ -223,10 +264,10 @@ manifest:
 npm run build:sdk-artifact
 ```
 
-Client Lake packages should normally install the matching SDK with
-`lake build :virSdk`, as shown above. The lower-level package executable remains
-available for explicit artifact-management workflows. The first complete
-client is
+Client Lake applications should normally receive the matching SDK through their
+named library's `virWebAssets` facet, as shown above. The standalone
+`:virSdk` facet and lower-level package executable remain available for explicit
+artifact-management workflows. The first complete client is
 [ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
 
 ```bash
@@ -247,11 +288,14 @@ the commit-artifact path.
 
 Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet defaults to the release matching the installed `lean_vir`
-package version once that release has been published;
+`:virSdk` facet derives its default source from the resolved clean `lean_vir`
+Git dependency. An exact `v<version>` tag selects the release; an untagged
+commit tries the matching temporary CI artifact and falls back to an exact
+local build; another Lean toolchain goes directly to that local build. Sources
+without a clean exact Git identity fail with an actionable diagnostic.
 `vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
-version must still match the installed package. Unreleased or commit-pinned
-clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
+version and commit must still match the installed package. Unreleased clients
+can use `--commit` or `VIR_SDK_ARCHIVE` for strict explicit artifact management.
 
 ## Where To Go Next
 

@@ -6,9 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { SDK_JS_MODULES } from "../../scripts/packages/sdk-payloads.mjs";
@@ -43,6 +43,7 @@ try {
     modules[moduleName] = await import(pathToFileURL(join(jsDir, moduleName)));
   }
   const runtime = modules["vir-runtime.js"];
+  const webAssets = modules["vir-web-assets.js"];
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
   const codec = modules["runtime/vir-codec.js"];
@@ -51,7 +52,11 @@ try {
   const interfaceTags = modules["runtime/interface-tags.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
+  assert.equal(typeof webAssets.createVirWebAssetsRuntime, "function");
+  assert.equal(typeof webAssets.createVirWebAssetsFactory, "function");
+  assert.equal(typeof webAssets.loadVirWebAssetsManifest, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
+  assert.equal(typeof hostBindings.createNodeHostBindings, "function");
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(typeof runtime.VirCallback, "function");
   assert.equal(typeof runtime.releaseHostResource, "function");
@@ -86,6 +91,20 @@ try {
     interfaceTag: interfaceTags.INTERFACE_TAG.NAT,
   });
   assert.deepEqual(decoded, { interfaceTag: interfaceTags.INTERFACE_TAG.NAT });
+
+  const sdkRoot = join(isolatedDir, "lean-vir-sdk");
+  const sdkManifest = JSON.parse(await readFile(join(sdkRoot, "lean-vir-artifact.json"), "utf8"));
+  const browserRoot = join(isolatedDir, "browser-closure");
+  for (const path of sdkManifest.browser.files) {
+    const destination = join(browserRoot, path);
+    await mkdir(dirname(destination), { recursive: true });
+    await copyFile(join(sdkRoot, path), destination);
+  }
+  await writeFile(join(browserRoot, "package.json"), "{\"type\":\"module\"}\n");
+  const closureWebAssets = await import(pathToFileURL(join(browserRoot, sdkManifest.browser.webAssetsModule)));
+  const closureRuntime = await import(pathToFileURL(join(browserRoot, sdkManifest.browser.runtimeModule)));
+  assert.equal(typeof closureWebAssets.createVirWebAssetsRuntime, "function");
+  assert.equal(typeof closureRuntime.createVirRuntime, "function");
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }

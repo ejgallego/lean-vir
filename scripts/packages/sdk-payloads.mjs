@@ -4,9 +4,15 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { readFile } from "node:fs/promises";
+import { join, posix } from "node:path";
+
+import { SDK_METADATA_FILES } from "./sdk-metadata.mjs";
+
 export const SDK_PAYLOADS = [
   ["wasm/vir-upstream.wasm", "web/public/vir-upstream.wasm"],
   ["wasm/vir-upstream.dev.wasm", "web/public/vir-upstream.dev.wasm"],
+  ["js/vir-web-assets.js", "web/src/vir-web-assets.js"],
   ["js/vir-runtime.js", "web/src/vir-runtime.js"],
   ["js/vir-runtime-node.js", "web/src/vir-runtime-node.js"],
   ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],
@@ -34,12 +40,54 @@ export const SDK_PAYLOADS = [
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 
-const SDK_METADATA_ENTRIES = [
-  "README.txt",
-  "LICENSE",
-  "NOTICE",
-  "lean-vir-artifact.json",
-];
+export const SDK_BROWSER_PROFILE = Object.freeze({
+  webAssetsModule: "js/vir-web-assets.js",
+  runtimeModule: "js/vir-runtime.js",
+  wasm: "wasm/vir-upstream.wasm",
+});
+
+const SDK_PAYLOAD_PATHS = new Set(SDK_PAYLOADS.map(([destination]) => destination));
+const STATIC_MODULE_SPECIFIER = /\b(?:import|export)\s+(?:[^"']*?\s+from\s*)?["'](\.[^"']+)["']/g;
+
+function resolveSdkModule(importer, specifier) {
+  const resolved = posix.normalize(posix.join(posix.dirname(importer), specifier));
+  return posix.extname(resolved) === "" ? `${resolved}.js` : resolved;
+}
+
+export async function sdkBrowserFiles(root) {
+  const selected = new Set([
+    ...SDK_METADATA_FILES,
+    SDK_BROWSER_PROFILE.webAssetsModule,
+    SDK_BROWSER_PROFILE.runtimeModule,
+    SDK_BROWSER_PROFILE.wasm,
+  ]);
+  const pending = [
+    SDK_BROWSER_PROFILE.webAssetsModule,
+    SDK_BROWSER_PROFILE.runtimeModule,
+  ];
+
+  while (pending.length > 0) {
+    const importer = pending.pop();
+    const source = await readFile(join(root, importer), "utf8");
+    for (const match of source.matchAll(STATIC_MODULE_SPECIFIER)) {
+      const dependency = resolveSdkModule(importer, match[1]);
+      if (!SDK_PAYLOAD_PATHS.has(dependency)) {
+        throw new Error(
+          `browser SDK module ${importer} imports unshipped module ${dependency}`,
+        );
+      }
+      if (!selected.has(dependency)) {
+        selected.add(dependency);
+        pending.push(dependency);
+      }
+    }
+  }
+
+  return [
+    ...SDK_METADATA_FILES,
+    ...SDK_PAYLOADS.map(([destination]) => destination).filter((path) => selected.has(path)),
+  ];
+}
 
 export const SDK_JS_MODULES = SDK_PAYLOADS
   .map(([dest]) => dest)
@@ -48,7 +96,8 @@ export const SDK_JS_MODULES = SDK_PAYLOADS
 
 export function sdkArchiveEntries(root = "lean-vir-sdk") {
   return [
-    ...SDK_METADATA_ENTRIES.map((entry) => `${root}/${entry}`),
+    ...SDK_METADATA_FILES.map((entry) => `${root}/${entry}`),
+    `${root}/lean-vir-artifact.json`,
     ...SDK_PAYLOADS.map(([dest]) => `${root}/${dest}`),
   ];
 }

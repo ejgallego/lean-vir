@@ -173,10 +173,21 @@ def packageSetMemberJson (moduleName role path : String) : String :=
     ("path", jsonString path)
   ]
 
-def packageSetDescriptorJson (members : Array String) : String :=
+def packageSetCompatibilityJson (metadata : PackageMetadata) : String :=
+  jsonObject #[
+    ("packageFormatVersion", jsonNat metadata.packageFormatVersion),
+    ("manifestVersion", jsonNat metadata.manifestVersion),
+    ("runtimeAbiVersion", jsonNat currentRuntimeAbiVersion),
+    ("leanVersion", jsonString metadata.leanVersion),
+    ("leanToolchain", jsonString metadata.leanToolchain),
+    ("leanGithash", jsonString metadata.leanGithash)
+  ]
+
+def packageSetDescriptorJson (metadata : PackageMetadata) (members : Array String) : String :=
   jsonObject #[
     ("format", jsonString packageSetFormat),
     ("version", jsonNat currentPackageSetVersion),
+    ("compatibility", packageSetCompatibilityJson metadata),
     ("packages", jsonArray members)
   ] ++ "\n"
 
@@ -245,7 +256,7 @@ unsafe def runModuleSet
       writeBinFile packagePath bytes
       members := members.push <| packageSetMemberJson
         rootModule.toString "root" rootRelativePath
-      writeTextFile descriptorPath (packageSetDescriptorJson members)
+      writeTextFile descriptorPath (packageSetDescriptorJson manifest.metadata members)
       IO.println s!"wrote {descriptorPath}"
       IO.println s!"wrote {packagePath}"
       IO.println s!"wrote {reportPath}"

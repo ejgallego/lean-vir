@@ -68,8 +68,9 @@ ownership diagrams.
 
 ## User And Integration Guides
 
-- [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md): marked VIR exports, Lake facets,
-  SDK installation, and the all-Lean Slides canvas workflow.
+- [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md): marked VIR exports, application
+  web-assets composition, SDK installation, runtime sharing, and the all-Lean
+  Slides canvas workflow.
 - [LOCAL_IRPKG.md](LOCAL_IRPKG.md): local `.irpkg` package generation and
   `/dev.html` loading.
 - [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md): project-owned native

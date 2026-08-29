@@ -83,6 +83,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 
 | Module | Role |
 | --- | --- |
+| `vir-web-assets.js` | Composed-assets manifest validation and named-program runtime creation. |
 | `vir-runtime.js` | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
 | `runtime/call-timing.js` | Internal accumulator for opt-in synchronous runtime call phase attribution. |

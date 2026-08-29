@@ -7,6 +7,8 @@ unrelated responsibilities.
 
 ## Runtime Entry Points
 
+- `vir-web-assets.js`: staged-SDK helper that validates a composed-assets
+  manifest and creates one explicitly named program runtime.
 - `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
   convenience helpers, and host import wiring.
 - `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs virtual browser and
