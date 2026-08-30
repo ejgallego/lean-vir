@@ -215,6 +215,7 @@ const elements = Object.fromEntries([
   "library",
   "availability",
   "boundary",
+  "semantics",
   "disposition",
   "count",
   "results",
@@ -323,8 +324,10 @@ function inventoryTargetMatches(target) {
   const query = elements.search.value.trim().toLowerCase();
   const library = elements.library.value;
   const evidence = boundaryEvidence(target.operation);
+  const relation = semanticRelation(target.operation);
   return (library === "all" || target.group.library.id === library) &&
     (elements.boundary.value === "all" || evidence === elements.boundary.value) &&
+    (elements.semantics.value === "all" || relation === elements.semantics.value) &&
     (!query || searchText([
       target.target,
       target.group.library.title,
@@ -361,6 +364,7 @@ function render() {
   elements["workbench-view"].classList.toggle("active", view === "workbench");
   elements.availability.hidden = view !== "reference";
   elements.boundary.hidden = view !== "inventory";
+  elements.semantics.hidden = view !== "inventory";
   elements.disposition.hidden = view !== "workbench";
   if (view === "reference") renderReference();
   else if (view === "inventory") renderInventory();
@@ -402,12 +406,15 @@ function renderInventory() {
     ? '<div class="empty">No shipped boundaries match these filters.</div>'
     : visible.map((target) => {
       const evidence = boundaryEvidence(target.operation);
+      const relation = semanticRelation(target.operation);
       return '<button type="button" class="row ' + (target.target === selected ? "active" : "") +
         '" data-target="' + escapeHtml(target.target) + '"><span><span class="name">' +
         escapeHtml(target.target) + '</span><span class="sub">' +
         escapeHtml(target.group.library.title + " · " + target.group.title) +
-        '</span></span><span class="pill ' + escapeHtml(evidence) + '">' +
-        escapeHtml(boundaryEvidenceLabel(evidence)) + "</span></button>";
+        '</span></span><span class="row-badges"><span class="pill ' + escapeHtml(evidence) + '">' +
+        escapeHtml(boundaryEvidenceLabel(evidence)) + '</span><span class="pill ' +
+        escapeHtml(relation) + '">' + escapeHtml(semanticRelationLabel(relation)) +
+        "</span></span></button>";
     }).join("");
   elements.results.querySelectorAll("[data-target]").forEach((button) =>
     button.addEventListener("click", () => selectTarget(button.dataset.target)));
@@ -1191,7 +1198,7 @@ function renderWorkItem(item) {
     selectGroup(item.library + "/" + item.group));
 }
 
-[elements.search, elements.library, elements.availability, elements.boundary, elements.disposition].forEach((element) =>
+[elements.search, elements.library, elements.availability, elements.boundary, elements.semantics, elements.disposition].forEach((element) =>
   element.addEventListener(element === elements.search ? "input" : "change", render));
 elements["reference-view"].addEventListener("click", () =>
   selectGroup(groupById.has(selected) ? selected : groupId(referenceGroups[0])));
