@@ -149,6 +149,20 @@ absence; generation rejects the latter two and optional properties until they
 have explicit representations. Convenience conversions belong in a separate
 application-facing layer and do not count as upstream bindings.
 
+Faithfulness includes observable behavior, not only declaration shape. The
+canonical boundary preserves identity, mutation, argument reuse, success and
+failure behavior, callback retention, terminal behavior, and ownership. The
+runtime may acquire independent leases internally, but it may not expose a
+stronger consumption or conversion policy as though it were upstream
+semantics. Managed handles and ergonomic conversions remain explicit adapters.
+
+The explorer reports a semantic relation independently of type evidence. An
+exact or compatible comparator result says only that the represented types
+compare successfully. It cannot promote a semantics-changing or unreviewed
+operation to faithful. Every operation exception and upstream-linked protocol
+therefore remains binding-author work until it is classified as preserving or
+changing.
+
 An incorrect public binding is a release-blocking defect. An unselected
 upstream operation is documentation coverage, not evidence that an existing
 binding is unsound. The reference, inventory, and author actions keep those
@@ -173,6 +187,10 @@ Every binding repair or addition should satisfy these landing gates:
 6. **Compiled evidence.** The consolidated gate reaches every target from a
    public Lean declaration; focused runtime suites exercise selected lifetime
    behavior separately.
+7. **Semantic relation.** The canonical contract is classified as preserving,
+   changing, unreviewed, VIR-owned, or local-contract. Preserving claims cover
+   success and failure paths; changing contracts are exposed as adapters, and
+   unreviewed contracts remain author actions.
 
 Every external shipped binding is generated. Shipped targets must also acquire
 authored upstream identity or an explicit no-parity protocol classification.

@@ -123,6 +123,24 @@ test("reviewed protocols require a machine-readable upstream relation", async ()
   );
 });
 
+test("semantic review classifications are fail-closed enums", async () => {
+  const invalidProtocol = structuredClone(browser);
+  invalidProtocol.generation.protocolOperations.find((operation) =>
+    operation.upstreamRelation.kind === "upstream-adapter")
+    .upstreamRelation.semantics = "probably close enough";
+  await assert.rejects(
+    validateBindingConfig(invalidProtocol, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+
+  const invalidException = structuredClone(browser);
+  Object.values(invalidException.generation.exceptions)[0].semantics = "unknown";
+  await assert.rejects(
+    validateBindingConfig(invalidException, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+});
+
 test("local protocol relations identify their declaration member", async () => {
   const invalid = structuredClone(infoview);
   delete invalid.generation.protocolOperations.find((operation) =>

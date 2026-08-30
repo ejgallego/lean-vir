@@ -16,6 +16,61 @@ choices explicit and reusable. An anchor still identifies which TypeScript
 operation, Lean declaration, and host target correspond; it does not repeat the
 modalities derived by generation.
 
+## Semantics Fidelity
+
+Semantics fidelity is the repository-wide rule for every upstream-backed
+binding. The canonical Lean boundary preserves every representable,
+caller-observable property of the upstream operation: operation identity and
+naming, types and absence, overload selection, mutation and object identity,
+synchronous or asynchronous behavior, success and failure behavior, argument
+lifetime and reuse, callback retention, terminal behavior, and result
+ownership.
+
+Runtime ownership machinery may retain independent internal leases needed to
+implement that contract. It must not consume, clone, revoke, normalize,
+convert, or otherwise change a caller-owned value unless the upstream
+operation does so. Memory-management convenience is not evidence for changing
+the public modality. For example, a reusable JavaScript argument remains
+borrowed even when the result must independently retain values reachable from
+it.
+
+Conversions and ergonomic policies belong in explicitly named Lean adapters
+above the canonical boundary. Such an adapter may be useful and generated, but
+it does not occupy the upstream operation's faithful documentation lane or
+count as semantics-preserving coverage. Unsupported or ambiguous semantics
+fail closed until they have an explicit representation or reviewed policy.
+
+Canonical operation IR records this separately from type-comparator evidence:
+
+- `preserving` claims that the generated contract preserves upstream-observable
+  behavior;
+- `changing` identifies an explicit semantic adapter;
+- `unreviewed` is binding-author work and must never be presented as faithful;
+- `vir-owned` and `local-contract` identify operations whose semantics do not
+  come from an external upstream operation.
+
+A TypeScript-derived operation without an operation exception receives a
+`preserving` contract claim from its declaration plus ABI profile. Exceptions
+and `upstream-adapter` protocols must explicitly set `semantics` to
+`preserving` or `changing`; until then the operation remains `unreviewed` in
+the author workbench. This is a contract classification, not provider-behavior
+verification. Provider dispatch, retention, rollback, and cleanup remain
+separately trusted and tested.
+
+### Direct Value Rule
+
+Generated bindings preserve the upstream value itself whenever it can cross as
+a JavaScript resource. `Js`, borrowing, ownership, and an effect carrier are
+boundary semantics, not intermediate representations. A VIR-specific props,
+node, collection, or scalar algebra cannot replace a representable upstream
+value in the canonical operation. Explicitly named builders and conversions may
+sit above that operation, but the audit reports them as adapters rather than API
+fidelity.
+
+Any protocol operation that introduces a distinct data model must explain why
+the upstream value cannot cross directly. Convenience or easier decoding is not
+such a reason.
+
 ## Separate Questions
 
 Every operation answers separate representation, passing, and lifetime
@@ -204,6 +259,12 @@ groups. The explorer reports each class separately, confirms upstream members
 served by reviewed adapters, and reserves correspondence actions for genuinely
 unclassified operations.
 
+An `upstream-adapter` relation also records whether its behavior is
+`semantics: "preserving"` or `semantics: "changing"`. These values answer a
+different question from correspondence: naming an upstream member says what an
+operation relates to, while semantic classification says whether the VIR
+contract preserves or intentionally changes that member's observable behavior.
+
 ## Documentation Flow
 
 The TypeScript compiler extracts declaration display text, JSDoc, source
@@ -235,6 +296,10 @@ Exceptions are intended for semantics that TypeScript declarations do not
 express, such as a host retaining a callback until explicit release. They are
 not a place to restate ordinary profile defaults. The operation IR marks every
 override and its reason, so review can distinguish inference from policy.
+An exception's optional `semantics` field records whether the reviewed override
+preserves upstream behavior or creates an explicit semantic adapter. Omitting
+that field leaves the operation visibly unreviewed rather than inferring
+faithfulness from its type comparison.
 
 ## Authored And Generated Ownership
 

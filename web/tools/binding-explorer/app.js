@@ -39,6 +39,9 @@ document.querySelector("#scope").replaceChildren(
     `${generation.protocolRelations.virOwned} VIR-owned operations, ` +
     `${generation.protocolRelations.localContracts} local-contract operations, ` +
     `${generation.protocolRelations.unclassified} unclassified). ` +
+    `${generation.semanticRelations.preserving} contracts claim semantics preservation, ` +
+    `${generation.semanticRelations.changing} are explicit semantic adapters, and ` +
+    `${generation.semanticRelations.unreviewed} require semantic review. ` +
     "Provider behavior is not mechanically verified by this name reconciliation. " +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
@@ -155,6 +158,28 @@ const boundaryEvidenceLabel = (value) => ({
   "local-contract": "local contract protocol",
   unclassified: "unclassified protocol",
 })[value] ?? value;
+const semanticRelation = (operation) => operation?.semantics?.relation ?? "unreviewed";
+const semanticRelationLabel = (value) => ({
+  preserving: "semantics-preserving contract",
+  changing: "explicit semantic adapter",
+  unreviewed: "semantic review required",
+  "vir-owned": "VIR-owned semantics",
+  "local-contract": "local contract semantics",
+})[value] ?? value;
+
+function operationsForSymbol(group, symbol) {
+  return (group.generatedOperations ?? []).filter((operation) =>
+    operation.typescript.member === symbol.id ||
+    operation.protocol?.upstreamRelation.member === symbol.id);
+}
+
+function combinedSemanticRelation(operations) {
+  const relations = new Set(operations.map(semanticRelation));
+  if (relations.has("unreviewed")) return "unreviewed";
+  if (relations.has("changing")) return "changing";
+  if (relations.size === 1) return [...relations][0];
+  return operations.length === 0 ? "unreviewed" : "changing";
+}
 
 const librarySelect = document.querySelector("#library");
 for (const library of report.libraries) {
@@ -847,7 +872,10 @@ function renderOperationPolicy(operation) {
   const signature = operation.typescript.signaturePolicy;
   return '<article><div class="card-head"><span class="card-title">' +
     escapeHtml(operation.host.target) + '</span><span class="badge">' +
-    escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
+    escapeHtml(operation.effect.id) + '</span><span class="pill ' +
+    escapeHtml(semanticRelation(operation)) + '">' +
+    escapeHtml(semanticRelationLabel(semanticRelation(operation))) +
+    '</span></div><div class="policy-flow"><span>' +
     escapeHtml(operation.protocol?.upstreamRelation.member ?? operation.typescript.member) +
     '</span><span aria-hidden="true">→</span><span>' +
     escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
@@ -868,9 +896,7 @@ function renderOperationPolicy(operation) {
 }
 
 function renderGenerationPolicy(group, symbol) {
-  const operations = (group.generatedOperations ?? []).filter((operation) =>
-    operation.typescript.member === symbol.id ||
-    operation.protocol?.upstreamRelation.member === symbol.id);
+  const operations = operationsForSymbol(group, symbol);
   if (operations.length === 0) return "";
   return '<details class="generation-policy"><summary>Generated conversion policy</summary>' +
     operations.map(renderOperationPolicy).join("") + "</details>";
@@ -890,9 +916,16 @@ function renderUpstreamSymbol(group, symbol) {
     ? '<span class="pill ' + escapeHtml(member.status) + '">' +
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
+  const relation = combinedSemanticRelation(operationsForSymbol(group, symbol));
+  const leanPaneTitle = ({
+    preserving: "Semantics-preserving Lean boundary",
+    changing: "Explicit Lean semantic adapter",
+    unreviewed: "Lean boundary — semantic review required",
+  })[relation] ?? "Lean boundary";
   const lean = state?.availability === "available"
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
-      renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">Faithful Lean binding</div>' +
+      renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
+      escapeHtml(leanPaneTitle) + '</div>' +
       renderLeanCards(state.targets) + "</div></div>"
     : renderCode(symbol.display, "typescript") +
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
@@ -1025,6 +1058,8 @@ function renderGenerationDecisions(operation) {
       '<p class="note">No canonical generated operation was recorded.</p></section>';
   }
   const decisions = [
+    "Semantic relation: " + semanticRelationLabel(semanticRelation(operation)) +
+      " (" + operation.semantics.evidence + ")",
     signaturePolicySummary(operation.typescript.signaturePolicy),
     operation.protocol === undefined
       ? undefined
@@ -1079,6 +1114,7 @@ function renderInventoryDetail(target) {
   }
   const operation = target.operation;
   const evidence = boundaryEvidence(operation);
+  const relation = semanticRelation(operation);
   const upstreamMember = operation?.protocol?.upstreamRelation.member ??
     (operation?.typescript.kind === "protocol" ? undefined : operation?.typescript.member);
   const symbol = upstreamMember === undefined
@@ -1086,7 +1122,8 @@ function renderInventoryDetail(target) {
     : target.group.typescript?.symbols.find((entry) => entry.id === upstreamMember);
   elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
     escapeHtml(evidence) + '">' + escapeHtml(boundaryEvidenceLabel(evidence)) +
-    "</span>" + (target.status === "provided"
+    '</span><span class="pill ' + escapeHtml(relation) + '">' +
+    escapeHtml(semanticRelationLabel(relation)) + "</span>" + (target.status === "provided"
       ? ""
       : '<span class="pill ' + escapeHtml(target.status) + '">' +
         escapeHtml(target.status) + "</span>") + "</div><h2>" + escapeHtml(target.target) +

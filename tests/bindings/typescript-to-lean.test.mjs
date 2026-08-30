@@ -180,6 +180,11 @@ test("operation IR records derived modalities and their provenance", () => {
     representation: "immediate",
     ownership: "value",
   });
+  assert.deepEqual(getter.semantics, {
+    relation: "preserving",
+    evidence: "typescript-derived",
+    detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+  });
 });
 
 test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
@@ -266,6 +271,24 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     kind: "upstream-adapter",
     member: "Widget.getAttribute",
   });
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "upstream-adapter",
+    detail: protocolGeneration.protocolOperations[0].reason,
+  });
+
+  const reviewedProtocol = structuredClone(protocolGeneration);
+  reviewedProtocol.protocolOperations[0].upstreamRelation.semantics = "preserving";
+  const [reviewedOperation] = buildGeneratedOperations(
+    config,
+    reviewedProtocol,
+    descriptors,
+  );
+  assert.deepEqual(reviewedOperation.semantics, {
+    relation: "preserving",
+    evidence: "reviewed-protocol",
+    detail: reviewedProtocol.protocolOperations[0].reason,
+  });
 
   const missingMember = structuredClone(protocolGeneration);
   missingMember.protocolOperations[0].upstreamRelation.member = "Widget.missing";
@@ -314,6 +337,9 @@ test("generated exceptions are documented as reviewed specializations", () => {
     },
   };
   const output = renderLeanBindings(config, specialized, descriptors);
+  const operation = buildGeneratedOperations(config, specialized, descriptors).find(
+    (candidate) => candidate.id === "demo.widget.getAttribute",
+  );
 
   assert.match(
     output,
@@ -323,6 +349,21 @@ test("generated exceptions are documented as reviewed specializations", () => {
     output,
     /Faithful generated method binding for TypeScript `Widget\.getAttribute`\./u,
   );
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "operation-exception",
+    detail: specialized.exceptions["demo.widget.getAttribute"].reason,
+  });
+
+  specialized.exceptions["demo.widget.getAttribute"].semantics = "changing";
+  const reviewed = buildGeneratedOperations(config, specialized, descriptors).find(
+    (candidate) => candidate.id === "demo.widget.getAttribute",
+  );
+  assert.deepEqual(reviewed.semantics, {
+    relation: "changing",
+    evidence: "reviewed-exception",
+    detail: specialized.exceptions["demo.widget.getAttribute"].reason,
+  });
 });
 
 test("TypeScript parameter names that are Lean keywords are escaped", () => {

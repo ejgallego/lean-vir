@@ -51,6 +51,9 @@ const dispositionCounts = countBy(generationMembers.map((member) =>
   member.generation.disposition));
 const availabilityCounts = countBy(generationMembers.map((member) =>
   member.generation.availability));
+const generatedOperations = roots.flatMap((root) => root.generatedOperations ?? []);
+const semanticRelationCounts = countBy(generatedOperations.map((operation) =>
+  operation.semantics.relation));
 
 assert.equal(report.format, "lean-vir-binding-explorer");
 assert.deepEqual(report.boundaryAnalysis, {
@@ -137,6 +140,13 @@ assert.deepEqual(report.summary.generation, {
       sum + (root.generatedOperations ?? []).filter((operation) =>
         operation.protocol?.upstreamRelation.kind === "unclassified").length, 0),
   },
+  semanticRelations: Object.fromEntries([
+    "preserving",
+    "changing",
+    "unreviewed",
+    "vir-owned",
+    "local-contract",
+  ].map((relation) => [relation, semanticRelationCounts[relation] ?? 0])),
   disposition: {
     generated: dispositionCounts.generated ?? 0,
     adapted: dispositionCounts.adapted ?? 0,
@@ -156,6 +166,12 @@ assert.equal(
   report.summary.generation.boundaries.reviewedProtocols,
 );
 assert.equal(report.summary.generation.protocolRelations.unclassified, 0);
+assert.equal(
+  Object.values(report.summary.generation.semanticRelations).reduce((sum, count) =>
+    sum + count, 0),
+  report.summary.generation.boundaries.operations,
+);
+assert.ok(report.summary.generation.semanticRelations.unreviewed > 0);
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
   report.summary.generation.boundaries.typescriptDerived +
@@ -166,7 +182,11 @@ assert.ok(report.summary.generation.disposition.generated > 0);
 assert.ok(report.summary.generation.disposition["not-selected"] > 0);
 assert.ok(report.workItems.every((item) =>
   typeof item.code === "string" && typeof item.action === "string"));
-assert.equal(report.workItems.length, 0);
+assert.equal(
+  report.workItems.filter((item) =>
+    item.code === "semantic-fidelity-review-required").length,
+  report.summary.generation.semanticRelations.unreviewed,
+);
 assert.ok(report.workItems.every((item) => item.disposition !== "unsupported"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);
@@ -328,6 +348,7 @@ assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "only"
 assert.match(generatedGetAttribute?.typescript.documentation, /MDN Reference/u);
 assert.equal(generatedGetAttribute?.arguments[0].type, "Lean.Vir.Js String");
 assert.equal(generatedGetAttribute?.result.lean, "Lean.Vir.Js.Nullable String");
+assert.equal(generatedGetAttribute?.semantics.relation, "preserving");
 const generatedAddEventListener = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.addEventListener");
 const generatedRemoveEventListener = elementRoot?.generatedOperations.find((operation) =>
@@ -335,6 +356,7 @@ const generatedRemoveEventListener = elementRoot?.generatedOperations.find((oper
 assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
 assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
 assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
+assert.equal(generatedAddEventListener?.semantics.relation, "unreviewed");
 assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
 assert.deepEqual(
   generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
@@ -359,10 +381,16 @@ assert.equal(canvasFillStyle?.status, "derived");
 assert.equal(canvasFillStyle?.generation.disposition, "generated");
 assert.equal(canvasFillStyle?.mapping.operations[0].accessor, "get");
 assert.equal(canvasFillStyle?.mapping.operations[1].accessor, "set");
-assert.equal(canvasRoot?.workItems.length, 0);
+assert.equal(
+  canvasRoot?.workItems.filter((item) =>
+    item.code === "semantic-fidelity-review-required").length,
+  canvasRoot?.generatedOperations.filter((operation) =>
+    operation.semantics.relation === "unreviewed").length,
+);
 assert.equal(generatedFillStyleGetter?.receiver.argument.name, "ctx");
 assert.equal(generatedFillStyleGetter?.result.lean, "Lean.Vir.Js CanvasStyle");
 assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGradient, and CanvasPattern union/u);
+assert.equal(generatedFillStyleGetter?.semantics.relation, "unreviewed");
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
 assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
 assert.ok(canvasRoot?.generatedOperations.some((operation) =>
@@ -574,7 +602,12 @@ assert.ok(reactDomRoot?.comparison.results.some((result) =>
   result.id === "react_dom.hydration.entrypoint" &&
   result.status === "missing" &&
   result.portIntent.disposition === "unsupported"));
-assert.equal(reactDomRoot?.workItems.length, 0);
+assert.equal(
+  reactDomRoot?.workItems.filter((item) =>
+    item.code === "semantic-fidelity-review-required").length,
+  reactDomRoot?.generatedOperations.filter((operation) =>
+    operation.semantics.relation === "unreviewed").length,
+);
 assert.ok(reactDomRoot?.coverage.members.filter((member) =>
   member.generation.disposition === "unsupported").every((member) =>
     member.generation.diagnostics.length === 0));
@@ -604,6 +637,8 @@ assert.match(app, /omitted by reviewed policy/u);
 assert.match(app, /data-tooltip/u);
 assert.match(app, /TypeScript-derived/u);
 assert.match(app, /reviewed upstream adapter/u);
+assert.match(app, /semantics-preserving contract/u);
+assert.match(app, /semantic review required/u);
 assert.match(app, /runtime provider keys present/u);
 assert.match(app, /Provider behavior is not mechanically verified/u);
 assert.match(app, /Lean does not enforce affine use/u);

@@ -479,6 +479,23 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
       action: "Name the adapted upstream member or classify the operation as VIR-owned.",
     });
   }
+  for (const operation of generatedOperations) {
+    if (operation.semantics?.relation !== "unreviewed" ||
+        operation.protocol?.upstreamRelation.kind === "unclassified") continue;
+    items.push({
+      id: `${config.id}/${bindingRoot.id}/target/${operation.host.target}/semantic-fidelity-review-required`,
+      library: config.id,
+      group: bindingRoot.id,
+      subject: "host-target",
+      target: operation.host.target,
+      disposition: "needs-annotation",
+      provenance: operation.semantics.evidence,
+      severity: "action",
+      code: "semantic-fidelity-review-required",
+      message: "This generated boundary has a reviewed shape or protocol relation, but no claim about whether it preserves upstream-observable semantics.",
+      action: "Review identity, mutation, lifetime, reuse, callback retention, failure behavior, and terminal behavior; classify the exception or upstream adapter as semantics-preserving or semantics-changing.",
+    });
+  }
   if (bindingRoot.upstream.kind === "local" && surfaceCoverage === null) {
     items.push({
       id: `${config.id}/${bindingRoot.id}/contract/local-contract-required`,
@@ -1127,6 +1144,17 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     unclassified: reviewedProtocolOperations.filter((operation) =>
       operation.protocol.upstreamRelation.kind === "unclassified").length,
   };
+  const semanticRelations = Object.fromEntries([
+    "preserving",
+    "changing",
+    "unreviewed",
+    "vir-owned",
+    "local-contract",
+  ].map((relation) => [
+    relation,
+    generatedOperations.filter((operation) =>
+      operation.semantics?.relation === relation).length,
+  ]));
   const generatedSources = new Set(configs.flatMap((config) =>
     config.generation === undefined ? [] : [config.generation.output]));
   const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
@@ -1140,6 +1168,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       handwrittenDeclarations: handwrittenDeclarations.length,
     },
     protocolRelations,
+    semanticRelations,
     disposition: Object.fromEntries(generationDispositions.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
@@ -1269,6 +1298,7 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
+  console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);
   const unresolvedSemanticMissing = Math.max(

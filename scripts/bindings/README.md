@@ -34,6 +34,13 @@ upstream-shaped reference, a complete shipped-boundary inventory, and
 actionable author findings with semantic TypeScript/Lean highlighting;
 convenience APIs do not count as upstream bindings.
 
+Operation IR also carries a semantic relation independent of type comparison.
+Unmodified TypeScript-derived operations are classified as preserving by
+construction; operation exceptions and upstream adapters must be reviewed as
+preserving or changing, and otherwise remain visible author actions. This
+classification is a contract claim. Provider behavior remains separately
+trusted and tested.
+
 Runtime provider reconciliation is deliberately narrower: it proves that every
 compiled target has a matching provider-map key and that no key is orphaned. It
 does not inspect provider behavior or mechanically enforce the operation IR's

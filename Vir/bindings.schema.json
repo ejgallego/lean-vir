@@ -130,7 +130,8 @@
           "properties": {
             "kind": { "const": "upstream-adapter" },
             "member": { "type": "string", "minLength": 1 },
-            "accessor": { "enum": ["get", "set"] }
+            "accessor": { "enum": ["get", "set"] },
+            "semantics": { "$ref": "#/$defs/upstreamSemantics" }
           }
         },
         {
@@ -329,6 +330,7 @@
       ],
       "properties": {
         "reason": { "type": "string", "minLength": 1 },
+        "semantics": { "$ref": "#/$defs/upstreamSemantics" },
         "receiver": { "$ref": "#/$defs/receiverOverride" },
         "arguments": {
           "type": "object",
@@ -354,6 +356,9 @@
           }
         }
       }
+    },
+    "upstreamSemantics": {
+      "enum": ["preserving", "changing"]
     },
     "root": {
       "type": "object",

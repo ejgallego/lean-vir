@@ -36,6 +36,12 @@ function validateRetention(value, context) {
   }
 }
 
+function validateUpstreamSemantics(value, context) {
+  if (!["preserving", "changing"].includes(value)) {
+    throw new Error(`${context} semantics must be preserving or changing`);
+  }
+}
+
 function validateKeys(value, allowed, context) {
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) throw new Error(`${context} has unsupported field ${key}`);
@@ -84,7 +90,14 @@ function validateException(exception, context) {
   if (!object(exception) || !nonemptyString(exception.reason)) {
     throw new Error(`${context} requires a reason`);
   }
-  validateKeys(exception, ["reason", "receiver", "arguments", "result", "effect"], context);
+  validateKeys(
+    exception,
+    ["reason", "semantics", "receiver", "arguments", "result", "effect"],
+    context,
+  );
+  if (exception.semantics !== undefined) {
+    validateUpstreamSemantics(exception.semantics, context);
+  }
   if (!["receiver", "arguments", "result", "effect"].some((key) => exception[key] !== undefined)) {
     throw new Error(`${context} must define an override`);
   }
@@ -320,6 +333,50 @@ export function leanType(shape, generation, context = "TypeScript shape") {
 
 function exceptionFor(generation, operationId) {
   return generation.exceptions?.[operationId] ?? null;
+}
+
+function derivedSemantics(exception) {
+  if (exception === null) {
+    return {
+      relation: "preserving",
+      evidence: "typescript-derived",
+      detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+    };
+  }
+  if (exception.semantics === undefined) {
+    return {
+      relation: "unreviewed",
+      evidence: "operation-exception",
+      detail: exception.reason,
+    };
+  }
+  return {
+    relation: exception.semantics,
+    evidence: "reviewed-exception",
+    detail: exception.reason,
+  };
+}
+
+function protocolSemantics(protocol) {
+  const relation = protocol.upstreamRelation;
+  if (relation.kind === "vir-owned") {
+    return { relation: "vir-owned", evidence: "protocol-relation", detail: protocol.reason };
+  }
+  if (relation.kind === "local-contract") {
+    return { relation: "local-contract", evidence: "protocol-relation", detail: protocol.reason };
+  }
+  if (relation.kind === "upstream-adapter" && relation.semantics !== undefined) {
+    return {
+      relation: relation.semantics,
+      evidence: "reviewed-protocol",
+      detail: protocol.reason,
+    };
+  }
+  return {
+    relation: "unreviewed",
+    evidence: relation.kind === "upstream-adapter" ? "upstream-adapter" : "unclassified",
+    detail: protocol.reason,
+  };
 }
 
 function modalityArgument(
@@ -615,6 +672,7 @@ function propertyOperation(
     receiver,
     arguments: arguments_,
     result,
+    semantics: derivedSemantics(exception),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -829,6 +887,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     receiver,
     arguments: arguments_,
     result,
+    semantics: derivedSemantics(exception),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -966,6 +1025,12 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       }
     }
     if (relation.kind === "upstream-adapter") {
+      if (relation.semantics !== undefined) {
+        validateUpstreamSemantics(
+          relation.semantics,
+          `generated protocol ${protocol.id}`,
+        );
+      }
       if (root.upstream.kind !== "typescript") {
         throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);
       }
@@ -1061,6 +1126,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       },
       arguments: args,
       result,
+      semantics: protocolSemantics(protocol),
     });
     operationIds.add(protocol.id);
     targets.add(protocol.target);
@@ -1103,6 +1169,7 @@ function modalityContract(operation, profile) {
     receiver: operation.receiver,
     arguments: operation.arguments,
     result: operation.result,
+    semantics: operation.semantics,
     ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
     ...(operation.exception === undefined ? {} : { exception: operation.exception }),
   };
