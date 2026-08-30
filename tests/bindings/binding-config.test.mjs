@@ -141,6 +141,46 @@ test("semantic review classifications are fail-closed enums", async () => {
   );
 });
 
+test("the Browser audit classifies every exception and upstream adapter", () => {
+  const exceptions = Object.entries(browser.generation.exceptions);
+  assert.equal(exceptions.filter(([, exception]) =>
+    exception.semantics === undefined).length, 0);
+  assert.deepEqual(
+    exceptions.filter(([, exception]) => exception.semantics === "changing")
+      .map(([id]) => id).sort(),
+    [
+      "browser.animation.cancelAnimationFrame",
+      "browser.animation.requestAnimationFrame",
+      "browser.element.addEventListener",
+      "browser.element.removeEventListener",
+      "browser.event.currentTarget",
+      "browser.event.target",
+    ],
+  );
+
+  const adapters = browser.generation.protocolOperations.filter((operation) =>
+    operation.upstreamRelation.kind === "upstream-adapter");
+  assert.equal(adapters.filter((operation) =>
+    operation.upstreamRelation.semantics === undefined).length, 0);
+  assert.deepEqual(
+    adapters.filter((operation) =>
+      operation.upstreamRelation.semantics === "changing")
+      .map((operation) => operation.id).sort(),
+    [
+      "browser.timer.clearInterval",
+      "browser.timer.clearTimeout",
+      "browser.timer.setInterval",
+      "browser.timer.setTimeout",
+    ],
+  );
+});
+
+test("the infoview clipboard capability is an explicit semantic adapter", () => {
+  const clipboard = infoview.generation.protocolOperations.find((operation) =>
+    operation.id === "infoview.clipboard.write-text");
+  assert.equal(clipboard.upstreamRelation.semantics, "changing");
+});
+
 test("local protocol relations identify their declaration member", async () => {
   const invalid = structuredClone(infoview);
   delete invalid.generation.protocolOperations.find((operation) =>

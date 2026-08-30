@@ -172,6 +172,12 @@ assert.equal(
   report.summary.generation.boundaries.operations,
 );
 assert.ok(report.summary.generation.semanticRelations.unreviewed > 0);
+assert.ok(report.summary.generation.semanticRelations.changing > 0);
+assert.equal(
+  generatedOperations.find((operation) =>
+    operation.id === "infoview.clipboard.write-text")?.semantics.relation,
+  "changing",
+);
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
   report.summary.generation.boundaries.typescriptDerived +
@@ -356,13 +362,14 @@ const generatedRemoveEventListener = elementRoot?.generatedOperations.find((oper
 assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
 assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
 assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
-assert.equal(generatedAddEventListener?.semantics.relation, "unreviewed");
+assert.equal(generatedAddEventListener?.semantics.relation, "changing");
 assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
 assert.deepEqual(
   generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
   ["type"],
 );
 assert.equal(generatedRemoveEventListener?.arguments[0].modalities.passing, "consumed");
+assert.equal(generatedRemoveEventListener?.semantics.relation, "changing");
 assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);
@@ -390,7 +397,7 @@ assert.equal(
 assert.equal(generatedFillStyleGetter?.receiver.argument.name, "ctx");
 assert.equal(generatedFillStyleGetter?.result.lean, "Lean.Vir.Js CanvasStyle");
 assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGradient, and CanvasPattern union/u);
-assert.equal(generatedFillStyleGetter?.semantics.relation, "unreviewed");
+assert.equal(generatedFillStyleGetter?.semantics.relation, "preserving");
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
 assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
 assert.ok(canvasRoot?.generatedOperations.some((operation) =>
