@@ -171,7 +171,7 @@ assert.equal(
     sum + count, 0),
   report.summary.generation.boundaries.operations,
 );
-assert.ok(report.summary.generation.semanticRelations.unreviewed > 0);
+assert.equal(report.summary.generation.semanticRelations.unreviewed, 0);
 assert.ok(report.summary.generation.semanticRelations.changing > 0);
 assert.equal(
   generatedOperations.find((operation) =>

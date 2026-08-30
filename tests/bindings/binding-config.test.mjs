@@ -17,6 +17,10 @@ const browserPath = new URL("../../Vir/Browser.bindings.json", import.meta.url).
 const browser = JSON.parse(await readFile(browserPath, "utf8"));
 const infoviewPath = new URL("../../Vir/Infoview/Surface.bindings.json", import.meta.url).pathname;
 const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
+const javascriptPath = new URL("../../Vir/Js.bindings.json", import.meta.url).pathname;
+const javascript = JSON.parse(await readFile(javascriptPath, "utf8"));
+const reactPath = new URL("../../Vir/React.bindings.json", import.meta.url).pathname;
+const react = JSON.parse(await readFile(reactPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
@@ -179,6 +183,47 @@ test("the infoview clipboard capability is an explicit semantic adapter", () => 
   const clipboard = infoview.generation.protocolOperations.find((operation) =>
     operation.id === "infoview.clipboard.write-text");
   assert.equal(clipboard.upstreamRelation.semantics, "changing");
+});
+
+test("the JavaScript collection audit distinguishes direct operations from ownership and null adapters", () => {
+  const adapters = javascript.generation.protocolOperations.filter((operation) =>
+    operation.upstreamRelation.kind === "upstream-adapter");
+  assert.equal(adapters.filter((operation) =>
+    operation.upstreamRelation.semantics === undefined).length, 0);
+  assert.deepEqual(
+    adapters.filter((operation) =>
+      operation.upstreamRelation.semantics === "changing")
+      .map((operation) => operation.id),
+    ["javascript.array.push", "javascript.array.item"],
+  );
+});
+
+test("the React audit treats direct native values as the preserving exemplar", () => {
+  assert.equal(Object.values(react.generation.exceptions).filter((exception) =>
+    exception.semantics === undefined).length, 0);
+
+  const adapters = react.generation.protocolOperations.filter((operation) =>
+    operation.upstreamRelation.kind === "upstream-adapter");
+  assert.equal(adapters.filter((operation) =>
+    operation.upstreamRelation.semantics === undefined).length, 0);
+  assert.deepEqual(
+    adapters.filter((operation) =>
+      operation.upstreamRelation.semantics === "changing")
+      .map((operation) => operation.id).sort(),
+    [
+      "react.hooks.use-effect-with-deps",
+      "react.hooks.use-memo",
+      "react.hooks.use-reducer",
+      "react.hooks.use-state",
+      "react.props.set-key",
+      "react.root.render-tree",
+    ],
+  );
+  assert.equal(
+    adapters.find((operation) => operation.id === "react.node.create-element")
+      ?.upstreamRelation.semantics,
+    "preserving",
+  );
 });
 
 test("local protocol relations identify their declaration member", async () => {

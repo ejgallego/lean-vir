@@ -33,7 +33,7 @@ opaque lengthJs
 /--
 Generated binding for reviewed VIR protocol `javascript.array.item`.
 
-Reads an Array entry as a nullable resource without decoding it into Lean.
+Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.
 
 Binding contract: `generation.protocolOperations`.
 
