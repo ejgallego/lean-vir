@@ -1,453 +1,148 @@
 # React Node Renderer
 
-This note tracks the standalone React renderer that Vir exposes today. It
-is intentionally separate from the future ProofWidgets compatibility work in
-`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
+VIR exposes a small Lean surface for constructing and rendering native React
+values. The binding rule is simple: where the React API accepts or returns a
+JavaScript value, VIR passes that exact value.
 
-For implementors, [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) has the React
-component call-flow diagram and the shared host-resource/closure ownership
-diagrams. The short model is:
+## Values
 
-- `Component props := props -> ReactM (Lean.Vir.Js Node)` is a Lean-authored
-  React function component.
-- `Root.renderNode root node` is the faithful resource boundary corresponding
-  to `root.render(reactNode)`.
-- `Root.render root tree` takes a `ReactM (Lean.Vir.Js Node)` tree and lowers
-  it through the generated convenience adapter at the DOM/root boundary.
-- `Root.renderComponent` wraps that Lean function in a real JavaScript React
-  function component, so hooks run under React's dispatcher.
-- `RuntimeM` is for JavaScript resource/runtime operations such as scalar
-  boxing and React setter calls; it lifts into `ReactM` and `DomM`.
-- `ReactM` is for render-safe React construction; root and DOM lifetime
-  operations remain in `DomM`.
-- `Node`, `Root`, state setters, events, and primitive JavaScript state values
-  are JavaScript-owned resources that cross as `Lean.Vir.Js α`.
-- Event and updater closures are Lean-owned closures that cross to JavaScript
-  as releasable `VirCallback` leases. React nodes, components, reducers,
-  effects, and pending state updates acquire and release their own leases;
-  Lean callers do not manage them.
-- `Lean.Vir.JSL α` values are Lean-owned objects behind per-alias leases. React
-  acquires a separate alias while state, reducer, ref, or memo storage owns the
-  value, and releases that alias on replacement or component disposal. Lean
-  wrapper drop releases its own alias automatically; `releaseJSL` is available
-  for deterministic early release.
+The low-level marker types are phantom Lean types over ordinary JavaScript
+values:
 
-## Current V0
+- `Js Node` is an actual React node or element;
+- `Js ElementType` is the tag, component, symbol, or React type object;
+- `Js Props` is a JavaScript object;
+- `Js NodeChildren` and `Js DependencyList` are JavaScript arrays;
+- `Js ReactRef` is React's `{ current }` object;
+- state values, actions, setters, and dispatchers are the values returned or
+  stored by React.
 
-The current v0 exposes React as a runtime renderer behind a narrow native-node
-resource ABI:
+There is no React-node wrapper, ownership lease, virtual node graph, or alias
+table. `React.createElement` decides which parts of props and children it
+copies or retains, exactly as it does in JavaScript.
+
+## Construction
+
+Lean builders make the low-level values pleasant to construct:
 
 ```lean
-namespace Lean.Vir.React
+import Vir.React
 
-@[irreducible] def ReactM (α : Type) : Type := Lean.Vir.RuntimeM α
+open Lean.Vir.React
 
-opaque Root : Type
-opaque StateSetter (α : Type) : Type
-opaque Props : Type
-opaque Node : Type
-
-inductive PropValue where
-  | string : String → PropValue
-  | bool : Bool → PropValue
-  | int : Int → PropValue
-  | float : Float → PropValue
-  | style : Array StyleProperty → PropValue
-  | classList : Array String → PropValue
-
-structure StyleProperty where
-  name : String
-  value : String
-
-structure Property where
-  name : String
-  value : PropValue
-
-structure EventHandler where
-  name : String
-  callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
-
-structure State (α : Type) where
-  value : α
-  setter : Lean.Vir.Js (StateSetter α)
-
-abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Node)
-
-end Lean.Vir.React
-
-namespace Lean.Vir.JsValue
-
-def ofString (value : String) : Lean.Vir.RuntimeM (Lean.Vir.Js String)
-def toString (value : Lean.Vir.Js String) : Lean.Vir.RuntimeM String
-def ofNat (value : Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
-def toNat (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM Nat
-def ofBool (value : Bool) : Lean.Vir.RuntimeM (Lean.Vir.Js Bool)
-def toBool (value : Lean.Vir.Js Bool) : Lean.Vir.RuntimeM Bool
-def ofFloat (value : Float) : Lean.Vir.RuntimeM (Lean.Vir.Js Float)
-def toFloat (value : Lean.Vir.Js Float) : Lean.Vir.RuntimeM Float
-
-end Lean.Vir.JsValue
-
-namespace Lean.Vir.React
-
-namespace Hooks
-
-def useState (initial : Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
-def useEffectWithDeps
-    (deps : Lean.Vir.Js DependencyList)
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    ReactM Unit
-def useEffectWithStringDeps
-    (deps : Array String)
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    ReactM Unit
-
-end Hooks
-
-namespace State
-
-def set
-    (state : State (Lean.Vir.Js α))
-    (value : Lean.Vir.Js α) :
-    Lean.Vir.RuntimeM Unit
-def modify
-    (state : State (Lean.Vir.Js α))
-    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
-    Lean.Vir.RuntimeM Unit
-
-end State
-
-namespace Node
-
-def text (value : String) : ReactM (Lean.Vir.Js Node)
-
-def createElement
-    (tag : String)
-    (props : Array Props.Entry := #[])
-    (children : Array (Lean.Vir.Js Node)) :
-    ReactM (Lean.Vir.Js Node)
-
-end Node
-
-namespace Root
-
-@[vir_js "react.root.create"]
-opaque create (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
-  Lean.Vir.Browser.DomM (Lean.Vir.Js Root)
-
-def createFromSelector (selector : String) :
-  Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := ...
-
-def mountFromSelector
-    (selector : String)
-    (action : Lean.Vir.Js Root → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.Browser.DomM Bool := ...
-
-@[vir_js "react.root.renderNode"]
-opaque renderNode (root : @& Lean.Vir.Js Root) (node : @& Lean.Vir.Js Node) :
-  Lean.Vir.Browser.DomM Unit := ...
-
-@[vir_js "react.root.render"]
-opaque render (root : @& Lean.Vir.Js Root) (tree : ReactM (Lean.Vir.Js Node)) :
-  Lean.Vir.Browser.DomM Unit := ...
-
-def renderComponent
-    (root : @& Lean.Vir.Js Root)
-    (component : Component props)
-    (props : props) :
-    Lean.Vir.Browser.DomM Unit
-
-def renderIntoSelector (selector : String) (node : @& Lean.Vir.Js Node) :
-  Lean.Vir.Browser.DomM Bool
-
-def renderComponentIntoSelector
-    (selector : String)
-    (component : Component props)
-    (props : props) :
-    Lean.Vir.Browser.DomM Bool
-
-@[vir_js "react.root.unmount"]
-opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
-
-def unmountSelector (selector : String) : Lean.Vir.Browser.DomM Bool
-
-end Root
-end Lean.Vir.React
+def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
+  Node.element "section"
+    #[Property.className "greeting"]
+    #[← Node.text s!"Hello, {name}"]
 ```
 
-`Lean.Vir.React.Node` is an opaque JavaScript-owned object marker and crosses
-the host boundary as `Lean.Vir.Js Node`. Lean builds nodes through
-`Node.text` and `Node.createElement`. Those public helpers convert text, props,
-children, and dependency lists through explicit resource builders before calling
-the private `react.node.*` host imports. The low-level host boundary receives
-`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
-`Lean.Vir.Js NodeChildren` resources, not generic lowered arrays. DOM tag names
-are explicitly wrapped through `ElementType.ofTag`/`react.elementType.tag`; JS
-component bindings can provide component element-type resources directly. The
-browser host constructs native React nodes immediately with
-`React.createElement`, while the virtual test host constructs equivalent
-virtual nodes. The package generator
-still represents the known `Property`, `PropValue`, and `EventHandler` payload
-shapes directly inside explicit conversion calls; the React-specific boundary is
-the native React node resource and callback ownership policy, not a private
-recursive structural codec.
+The builders are explicit adapters:
 
-`Lean.Vir.RuntimeM` is the JavaScript runtime/resource effect: it can allocate
-or inspect `Lean.Vir.Js ...` values and update VIR runtime bookkeeping, but it
-does not represent DOM/root mutation or arbitrary host `IO`. `ReactM` lifts
-`RuntimeM` so component code can box scalar state and call React setter
-resources without gaining access to raw `IO`.
+- `react.props.empty` creates `{}`;
+- property and event-handler operations mutate that object;
+- `react.node.children.empty` creates `[]`;
+- `react.node.children.push` calls the array's normal mutation path;
+- `react.node.createElement` forwards the values to `React.createElement`;
+- fragment construction forwards to `React.Fragment`.
 
-`Lean.Vir.Browser.DomM` is the browser/DOM effect used by React root lifetime
-operations and event callbacks. `ReactM` is the narrower render-construction
-effect reserved for React component APIs and static tree construction.
-`Root.renderNode` is the faithful `Root.render(ReactNode)` boundary: it borrows
-an existing JavaScript-owned `Js Node`, and the root takes its own lease for the
-committed tree. `Root.render` is a generated convenience adapter that receives
-a `ReactM` tree action. The JavaScript host invokes that action once to obtain
-the concrete node, forwards it to the raw boundary behavior, and releases the
-render callback. The current runtime uses the same synchronous host-call
-representation for all recognized effects, so these are irreducible Lean-side
-effect markers rather than distinct runtime wrappers.
+`PropValue` conversion is intentionally visible. It converts the Lean helper
+description to the JavaScript value stored in props; it is not hidden inside
+the native `createElement` binding.
 
-`Root.renderComponent` wraps the Lean function in a real JavaScript React
-function component. Hooks therefore run under React's normal dispatcher instead
-of being simulated by the Lean runtime. Components are props-taking functions:
-`Component props := props → ReactM (Lean.Vir.Js Node)`, and no-props
-components use `Component Unit` plus `()` at the render call.
+## Roots And Components
 
-The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
-`State.modify` operate on `Lean.Vir.Js α` values. There are deliberately no
-`String`, `Nat`, or `Bool` `useState` overloads; scalar values must be converted
-explicitly with `JsValue` helpers before crossing the React hook boundary.
-`State.set` and `State.modify` are `RuntimeM` operations because they call a
-retained JavaScript React setter resource. VIR evaluates `modify` once against
-the latest committed-or-queued state and gives React a pure action over the
-concrete result. The resource ownership policy for state values,
-synthetic updater/reducer input handles, and scalar `JsValue` wrappers is
-centralized in
-[HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
+Browser roots are the objects returned by `ReactDOMClient.createRoot`.
+`Root.renderNode` forwards an actual node to `root.render`, and `Root.unmount`
+forwards to `root.unmount`.
 
-```lean
-State.modify count fun previous => do
-  let value ← Lean.Vir.JsValue.toNat previous
-  Lean.Vir.JsValue.ofNat (value + 1)
+`Root.render` is a Lean-construction convenience that invokes a Lean render
+callback once and forwards its resulting node. `Root.renderComponent` is the
+component adapter: it supplies an actual JavaScript function component so
+React controls invocation, replay, hooks, and commits. Use the component path
+for recurring application updates.
+
+The adapter keeps one function-component type per root. Repeated component
+submissions update its callback without resetting React state or mount effects;
+unmounting and recreating the root is the explicit remount boundary. As in a
+TypeScript component, updates must preserve valid hook ordering. Submitters
+that intentionally change the component's hook shape must unmount first.
+
+Selector helpers keep one active root per selected container and return a
+boolean when the selector is missing. Root registration is tracked only so
+runtime disposal can unmount it. If a newly created root cannot be published
+back to Lean, the host-call transaction unmounts it.
+
+Direct root submissions have no public React commit acknowledgement. VIR does
+not infer when React has stopped retaining a submitted graph. Application code
+that needs normal evolving UI state should put that state behind a component.
+
+## Hooks
+
+The browser hook runtime delegates directly to official React:
+
+- `useState` returns React's current value and setter;
+- `useReducer` installs the supplied reducer and returns React's dispatch;
+- `useRef` returns React's ref object;
+- `useMemo` receives the actual dependency array and returns React's result;
+- `useEffect` and `useEffectWithDeps` register official effects;
+- state setters and reducer dispatchers receive the exact JavaScript value.
+
+The Lean effect API splits setup and cleanup into two callbacks and is
+therefore an explicit adapter. Apart from that adapter, VIR does not keep
+committed/speculative hook slots, action queues, dependency leases, or render
+generation records.
+
+React restrictions remain programmer responsibilities. Lean does not add
+purity, valid hook ordering, complete dependency lists, replay-safe reducers,
+or lane acknowledgements that TypeScript React lacks.
+
+## Refs And Events
+
+Refs use React's exact semantics. A callback ref is the original function; an
+object ref is the original object; React may write a DOM node or `null` to its
+`current` property. VIR does not preserve an independent hidden ref payload.
+
+Event handler props store the exact callback function. The browser/React event
+object is passed unchanged. Any restrictions on using the event after the
+handler are those of the corresponding React/browser version, not a VIR scope.
+
+## JSL Values In React
+
+A `JSL α` value is an ordinary JavaScript object with a private association to
+one rooted Lean value. React stores that exact object. React's ordinary object
+graph keeps it reachable; collection releases the Lean root as a best-effort
+backstop, and runtime disposal provides deterministic cleanup.
+
+This is generic JSL behavior. There is no React-specific JSL alias or lease.
+
+## Browser-Only Semantics
+
+Official React 19, ReactDOM, and Chromium are the semantic oracle. The Node
+virtual document is not a React renderer. Its React providers are explicit
+cleanup-safe unsupported shims and do not emulate nodes, hooks, roots,
+reconciliation, Strict Mode, Suspense, or commits.
+
+Runtime-only unit tests may use a fake root to verify generic active-resource
+registration and rollback. All React behavior belongs in the browser suite.
+
+## Validation
+
+The browser matrix covers:
+
+- exact props, callback, ref, setter, dispatcher, and memo identity;
+- actual DOM ref assignment followed by `null` on unmount;
+- Strict Mode effect behavior;
+- dependency changes that return the same memo result;
+- interleaved state lanes;
+- suspended and abandoned renders;
+- root render and unmount behavior.
+
+Run:
+
+```bash
+npm run build:site
+CHROMIUM=/path/to/chromium npm run test:pages:browser
 ```
 
-## Blessed Helpers
-
-The intended authoring surface is a DOM-like helper set over that ABI:
-
-- props: named helpers for common DOM/React names such as `id`, `inputName`,
-  `formName`, `className`, `classList`, `title`, `role`, `aria*`, `data`,
-  `dataTestId`, `tabIndex`, `style`/`stylePairs`, link/media props,
-  controlled/default input props, dimensions, and boolean form props.
-- handlers: `onClick`/`onClickWith`, input/change/submit helpers, focus/blur,
-  keyboard, mouse, and raw `on`/`onUnit` escape hatches.
-- elements: keyed and unkeyed helpers for common text, form, sectioning, list,
-  table, inline, button, link, image, and void elements.
-
-`Property.inputValue` maps to React's `value` prop. It is named `inputValue`
-because `Property.value` is already the Lean structure-field projection.
-`Property.inputName` and `Property.formName` map to React's `name` prop for the
-same reason: `Property.name` is the structure-field projection.
-`Property.htmlFor` maps to React's label `htmlFor` prop. The `aria*` helpers
-map to hyphenated ARIA attributes, `Property.data name value` prefixes the prop
-name with `data-`, `Property.dataTestId` maps to `data-testid`, and
-`Property.tabIndex` maps to React's numeric `tabIndex` prop. The `data` helper
-expects a non-empty suffix, matching the documented `data-*` shape.
-`Property.classList` validates DOMTokenList-like non-empty class tokens,
-deduplicates them while preserving order, and lowers to `className`.
-`Property.style` builds React's object-valued `style` prop from camelCase
-`StyleProperty.mk` entries with string values. The keyed element helpers set
-React's `key` through `Props.key` while preserving the same props-entry and
-children conventions as their unkeyed counterparts.
-
-`Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
-`Node.elementWith`/`keyedElementWith` remain intentional escape hatches for
-unblessed scalar prop names, event names, and tags. `PropValue.style` and
-`PropValue.classList` are intentionally constrained to the `style` and
-`className` props by the host renderer.
-
-## Runtime Contract
-
-The browser React host binding is exposed from
-`lean-vir/react-host-bindings`. It owns a React root resource:
-
-- `react.root.create` calls `ReactDOM.createRoot(container)`.
-- `react.node.text` creates a `ReactNode` resource for an explicit `Js String`
-  text node.
-- `react.props.empty`, `react.props.setKey`, `react.props.setRef`,
-  `react.props.setProperty`, and `react.props.setEventHandler` build a
-  JavaScript-owned React props resource from explicit conversions.
-- `react.node.children.empty` and `react.node.children.push` build a
-  JavaScript-owned child list resource from explicit `Js Node` children.
-- `react.elementType.tag` wraps an explicit `Js String` DOM tag as a
-  JavaScript-owned `ElementType` resource.
-- `react.node.createElement` unwraps the explicit `Js ElementType`, validates
-  the props and children resources, calls
-  `React.createElement(type, props, ...children)`, and returns a `ReactNode`
-  resource.
-- `react.node.fragment` calls
-  `React.createElement(React.Fragment, props, ...children)` in the browser host,
-  reading any key from the props resource, and returns a virtual fragment node
-  in tests.
-- `react.root.renderNode` borrows a JavaScript-owned `ReactNode` resource and
-  forwards it directly to the root, which retains an independent tree lease.
-- `react.root.render` invokes the received Lean `ReactM` render action, renders
-  the retained native React node held by the resulting `ReactNode` resource,
-  and releases the render callback.
-- `react.root.renderComponent` wraps a Lean thunk produced from
-  `Component props` plus concrete props in a JavaScript React function
-  component and invokes `root.render(...)` with that component.
-- Repeated `react.root.renderComponent` or
-  `react.root.renderComponentIntoSelector` calls on the same root update the
-  Lean render callback at layout commit while keeping the same JavaScript
-  component identity, so React hook state is preserved across prop-only
-  rerenders such as infoview cursor changes. An abandoned update retains the
-  previously committed callback.
-- `react.useState` calls `React.useState` while rendering a component. Its ABI
-  is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
-- `react.useReducer` allocates a replay-safe `React.useState` slot while
-  rendering a component. VIR invokes the Lean reducer exactly once at dispatch
-  time and queues the concrete result, so React never replays an effectful Lean
-  reducer. The public Lean surface is JS-shaped: reducers receive `Js state` and
-  `Js action`, return `Js state`, and dispatch consumes `Js action`. Structured
-  Lean-owned state and actions use explicit `LeanRef.toJSL`/`fromJSL` calls so
-  React stores `Lean.Vir.JSL` handles instead of decoding them or confusing
-  them with JavaScript-shaped `Js` values. The host gives React an independent
-  JSL alias and releases React's alias after state replacement, action
-  consumption, or unmount; aliases retained by Lean remain independent.
-- `react.useRef` calls `React.useRef` while rendering a component and returns a
-  host-owned ref object. `react.ref.get` and `react.ref.set` read/write
-  `.current`; they do not schedule a render. Retainable payload ownership is
-  recorded independently of the mutable slot, so React attaching a DOM node or
-  clearing the ref cannot hide a lease from component disposal.
-- `react.useMemo` calls `React.useMemo` while rendering a component. The
-  calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
-  `DependencyList`, and the returned value stays in the `Js` resource lane.
-- `react.useEffect` calls `React.useEffect` while rendering a component. Each
-  React setup/cleanup cycle gets distinct callback leases, including the extra
-  development Strict Mode cycle. The current ABI is resource-shaped: setup returns a host resource and cleanup
-  receives that resource when React cleans the effect up. The base binding
-  exposes React's no-dependency behavior.
-- `react.deps.empty` and `react.deps.push` build a JavaScript-owned dependency
-  list resource from explicit `Js α` dependencies.
-- `react.useEffectWithDeps` is the same resource-shaped effect with a
-  Lean-provided `Js DependencyList`. The browser binding passes the unwrapped
-  JavaScript values as React's dependency array and uses `Object.is` comparison
-  to release newly created Lean callbacks when the effect does not need to
-  restart. `useEffectWithStringDeps` remains a string convenience wrapper that
-  explicitly converts each string through `JsValue` first.
-- `js.string`, `js.nat`, `js.bool`, and `js.float` convert Lean scalar values into explicit
-  `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
-  React state.
-- `react.root.renderIntoSelector` and
-  `react.root.renderComponentIntoSelector` create or reuse a host-owned React
-  root for a selector. Public helpers accept ordinary strings and convert them
-  to explicit `Js String` selector resources before the low-level host call,
-  then convert the returned `Js Bool` success value back to `Bool`. This is the
-  infoview/proof-widget path where the shell owns the DOM mount element and
-  Lean supplies the current tree or component. `renderIntoSelector` borrows its
-  node argument; when the selector is missing and the helper returns `false`,
-  that node wrapper and its shared payload remain live.
-- `react.state.set` and `react.state.modify` call the retained React setter;
-  both are `RuntimeM`. `modify` runs the Lean updater once in VIR against the
-  latest committed-or-queued state. React receives only a pure JavaScript
-  action over that concrete result, making replay safe without repeating Lean
-  effects.
-- `react.state.modify` and reducer callback-input lifetimes are documented
-  with the shared host ownership rules in
-  [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
-- `react.root.unmount` calls `root.unmount()` and releases callbacks retained
-  by the current render.
-- `react.root.unmountSelector` unwraps an explicit `Js String` selector,
-  unmounts, forgets a selector-owned root, and returns an explicit `Js Bool`
-  success value.
-- Browser function-component nodes, component render callbacks, and root-level
-  node/component ownership swap from `useLayoutEffect` after React commits.
-  Interrupted render generations never release the visible committed tree or
-  callback and are not inserted into a strong runtime registry; weak
-  finalization cleans up generations React abandons without a callback. The
-  browser binding therefore requires `FinalizationRegistry` and `WeakRef`.
-  The virtual renderer keeps immediate-commit behavior and explicit deferred
-  callback cleanup.
-- Runtime dispose and package reload unmount all live React roots through the
-  same disposable-resource path used for DOM listeners, timeouts, and frames.
-
-Browser apps compose these bindings with `createBrowserHostBindings` and a
-shared `createHostResourceState()`. The generic `lean-vir/host-bindings` entry
-does not import React; the Node wrapper still provides a virtual React host for
-tests.
-
-Event handlers use DOM-like names such as `onClick`, `onChange`, `onInput`, and
-`onSubmit`, and receive the same opaque
-`Lean.Vir.Js Lean.Vir.Browser.Event` resource that `Element.addEventListener`
-uses. React synthetic events should not be stored by Lean; they are
-callback-scoped resources. The current `Js` type does not statically enforce
-that scope: an escaped event or synthetic updater/reducer input is invalidated
-after its callback and fails if used later. A scoped/generative borrow type is
-follow-up work.
-
-Input callbacks can read `Event.currentTarget` or `Event.target`, narrow the
-returned element with `HTMLInputElement.fromElement`, or use
-`Event.inputValue?`/`inputChecked?` for common controlled-input cases. Those
-helpers check `currentTarget` first, then fall back to `target`.
-
-## Implemented Slice
-
-1. Added `react` and `react-dom` dependencies to the Vite app.
-2. Added `Vir/React.lean` with `Root`, opaque `Node`, `Property`,
-   `PropValue`, `EventHandler`, native Node construction, and root
-   create/render/unmount host imports.
-3. Added `ReactNode` resource typing so Lean cannot bind a JavaScript-backed
-   React node without the marker appearing under `Lean.Vir.Js`.
-4. Added JavaScript React node validation with depth and node-count limits
-   before rendering.
-5. Added browser and virtual Node host bindings for React roots, components,
-   and hooks.
-6. Added `fixtures/ReactCounter.lean` that renders hook-backed function
-   components with `Hooks.useState`, `Hooks.useReducer`, functional state
-   setters, fragments, and refs.
-7. Added `fixtures/ReactInput.lean` with hook-backed controlled text, change,
-   submit, checkbox, attribute-conformance, label, and form examples.
-8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger reducer
-   state example that shares the non-React Tamagotchi model, renders a keyed
-   React tree, and handles controlled input, checkbox, submit, timer, and
-   action callbacks.
-9. Added `examples/ReactProofWidget.lean` as a focused infoview tool that turns
-   the current goal and hypotheses into editor-inserting tactic actions.
-10. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
-   component rerenders, root rerender cleanup, unmount cleanup, package reload
-   cleanup, runtime dispose, malformed Node construction, depth limits, missing
-   selectors, and input-event
-   target fallback. Virtual `Document.querySelector` and `querySelectorAll`
-   follow DOM semantics, so tests pre-seed expected fixtures with
-   `ensureVirtualElementState` or `ensureVirtualElementStates`. Virtual
-   React callback tests find nodes by DOM-like `id` props instead of child
-   indexes.
-11. Added browser smoke coverage proving real React click, input, change,
-    submit/checkbox, and React Tamagotchi handlers call back into Lean,
-    including rapid rerender cleanup, plus proof-state goal selection.
-
-## Future Notes
-
-`externref` is now required by the experimental JavaScript resource path.
-Resource values cross the JS/Wasm boundary through `externref` side-channel
-imports, while Lean stores GC-finalized external resource objects. This keeps
-the Lean-facing API compatible with future component-model-style resources.
-The React-first direction and feature probes are tracked in
-`docs/REACT_WASM_BINDINGS.md`.
-
-Open engineering questions:
-
-- Whether `PropValue` should add JSON-like values beyond the current scalar,
-  style-object, and class-list surface.
-- Whether the microtask cleanup policy for browser React rerenders is enough for
-  broader concurrent React edge cases.
-- Whether broader prop values should include JSON-like objects or stay limited
-  to the current scalar/style/class-list set until a real ProofWidgets port
-  needs more.
+See [HOST_BINDINGS.md](HOST_BINDINGS.md) for the underlying JavaScript-value
+and active-resource contract.

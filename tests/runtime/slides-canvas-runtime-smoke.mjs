@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 
 import {
   createBrowserHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
 } from "../../web/src/vir-host-bindings.js";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import {
@@ -117,8 +117,10 @@ try {
   globalThis.HTMLCanvasElement = FakeCanvas;
   globalThis.document = {
     title: "",
-    querySelector: (selector) => selector === "#vir-slide-root" ? slideRoot : null,
-    createElement: (tagName) => tagName === "canvas" ? new FakeCanvas() : new FakeElement(tagName),
+    querySelector: (selector) =>
+      selector === "#vir-slide-root" ? slideRoot : null,
+    createElement: (tagName) =>
+      tagName === "canvas" ? new FakeCanvas() : new FakeElement(tagName),
   };
   globalThis.requestAnimationFrame = (callback) => {
     const id = nextFrameId;
@@ -139,7 +141,7 @@ try {
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
   const { wasmBytes } = await readRuntimeArtifacts();
-  const resources = createHostResourceState();
+  const resources = createHostLifecycle();
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageSetBytes: [await readFile(packagePath)],
@@ -147,7 +149,9 @@ try {
   });
   try {
     for (const target of ["js.float.owned", "js.string.owned"]) {
-      const hostImport = runtime.interfaceManifest.hostImports.find((entry) => entry.target === target);
+      const hostImport = runtime.interfaceManifest.hostImports.find(
+        (entry) => entry.target === target,
+      );
       assert.equal(hostImport?.boundary, "explicitConversion");
     }
     assert.equal(runtime.runStartupEntries(), undefined);
@@ -168,7 +172,7 @@ try {
     assert.equal(status.textContent, "Lean text width: 64");
     assert.deepEqual(drawCalls, [["measureText", "Lean VIR"]]);
     assert.equal(queuedFrames.size, 1);
-    const mountedResourceOwners = resources.debugResourceCounts().owners;
+    const mountedActiveValues = resources.debugResourceCounts().active;
 
     const [[frameId, drawFrame]] = queuedFrames.entries();
     queuedFrames.delete(frameId);
@@ -185,11 +189,15 @@ try {
     assert.equal(context2d.strokeStyle, "#0f172a");
     assert.equal(context2d.lineWidth, 3);
     assert.equal(status.textContent, "Lean animation frame: 0");
-    assert.equal(queuedFrames.size, 1, "the Lean callback should schedule the next frame");
     assert.equal(
-      resources.debugResourceCounts().owners,
-      mountedResourceOwners,
-      "a frame should not accumulate active resource owners",
+      queuedFrames.size,
+      1,
+      "the Lean callback should schedule the next frame",
+    );
+    assert.equal(
+      resources.debugResourceCounts().active,
+      mountedActiveValues,
+      "a frame should not accumulate active values",
     );
 
     const [[secondFrameId, secondDrawFrame]] = queuedFrames.entries();
@@ -202,11 +210,15 @@ try {
       ["strokeRect", 40, 124, 72, 72],
     ]);
     assert.equal(status.textContent, "Lean animation frame: 1");
-    assert.equal(queuedFrames.size, 1, "the Lean callback should keep scheduling frames");
     assert.equal(
-      resources.debugResourceCounts().owners,
-      mountedResourceOwners,
-      "repeated frames should not accumulate active resource owners",
+      queuedFrames.size,
+      1,
+      "the Lean callback should keep scheduling frames",
+    );
+    assert.equal(
+      resources.debugResourceCounts().active,
+      mountedActiveValues,
+      "repeated frames should not accumulate active values",
     );
 
     const [[thirdFrameId, thirdDrawFrame]] = queuedFrames.entries();
@@ -228,16 +240,24 @@ try {
       ["strokeRect", 528, 124, 72, 72],
     ]);
     assert.equal(status.textContent, "Lean animation frame: 3");
-    assert.equal(queuedFrames.size, 1, "the bouncing frame loop should keep running");
     assert.equal(
-      resources.debugResourceCounts().owners,
-      mountedResourceOwners,
-      "the bounce should not accumulate active resource owners",
+      queuedFrames.size,
+      1,
+      "the bouncing frame loop should keep running",
+    );
+    assert.equal(
+      resources.debugResourceCounts().active,
+      mountedActiveValues,
+      "the bounce should not accumulate active values",
     );
   } finally {
     runtime.dispose();
   }
-  assert.equal(queuedFrames.size, 0, "runtime disposal should cancel the pending frame");
+  assert.equal(
+    queuedFrames.size,
+    0,
+    "runtime disposal should cancel the pending frame",
+  );
 } finally {
   console.error = previousConsoleError;
   restoreGlobal("document", previousDocument);

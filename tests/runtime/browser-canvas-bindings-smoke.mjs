@@ -13,10 +13,8 @@ import {
 import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
 
 const state = {
-  resourceForValue: (value) => value,
-  resolveResource: (value) => value,
   addDisposable() {},
-  releaseResource() {},
+  removeDisposable() {},
 };
 
 const elementCalls = [];
@@ -37,17 +35,31 @@ const element = {
   },
   appendChild: (value) => elementCalls.push(["append", value]),
   remove: () => elementCalls.push(["remove"]),
-  getAttribute(name) { return this.attributes.get(name) ?? null; },
-  setAttribute(name, value) { this.attributes.set(name, value); },
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  },
+  setAttribute(name, value) {
+    this.attributes.set(name, value);
+  },
   addEventListener() {},
   removeEventListener() {},
 };
 const elementBindings = createBrowserElementHostBindings(state);
-assert.equal(elementBindings["browser.element.appendChild"](element, child), child);
+assert.equal(
+  elementBindings["browser.element.appendChild"](element, child),
+  child,
+);
 elementBindings["browser.element.classList.add"](element, "active");
 elementBindings["browser.element.classList.remove"](element, "hidden");
-assert.equal(elementBindings["browser.element.classList.toggle"](element, "ready"), true);
-elementBindings["browser.element.style.setProperty"](element, "color", createNullableValue("red"));
+assert.equal(
+  elementBindings["browser.element.classList.toggle"](element, "ready"),
+  true,
+);
+elementBindings["browser.element.style.setProperty"](
+  element,
+  "color",
+  createNullableValue("red"),
+);
 elementBindings["browser.element.remove"](element);
 assert.deepEqual(elementCalls, [
   ["append", child],
@@ -82,17 +94,30 @@ const ctx = {
   translate: (...args) => canvasCalls.push(["translate", ...args]),
   rotate: (...args) => canvasCalls.push(["rotate", ...args]),
 };
-const canvas = { width: 300, height: 150, getContext: (kind) => kind === "2d" ? ctx : null };
+const canvas = {
+  width: 300,
+  height: 150,
+  getContext: (kind) => (kind === "2d" ? ctx : null),
+};
 const canvasBindings = createBrowserCanvasHostBindings(state);
-assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"](canvas).value, canvas);
-assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"]({}).value, null);
+assert.equal(
+  canvasBindings["browser.htmlCanvasElement.fromElement"](canvas),
+  canvas,
+);
+assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"]({}), null);
 assert.equal(canvasBindings["browser.htmlCanvasElement.getWidth"](canvas), 300);
-assert.equal(canvasBindings["browser.htmlCanvasElement.getHeight"](canvas), 150);
+assert.equal(
+  canvasBindings["browser.htmlCanvasElement.getHeight"](canvas),
+  150,
+);
 canvasBindings["browser.htmlCanvasElement.setWidth"](canvas, 640);
 canvasBindings["browser.htmlCanvasElement.setHeight"](canvas, 360);
 assert.equal(canvas.width, 640);
 assert.equal(canvas.height, 360);
-assert.equal(canvasBindings["browser.htmlCanvasElement.getContext2D"](canvas).value, ctx);
+assert.equal(
+  canvasBindings["browser.htmlCanvasElement.getContext2D"](canvas),
+  ctx,
+);
 canvasBindings["browser.canvas2d.clearRect"](ctx, 0, 0, 640, 360);
 canvasBindings["browser.canvas2d.fillRect"](ctx, 1.5, 2.5, 30, 40);
 canvasBindings["browser.canvas2d.strokeRect"](ctx, 3, 4, 50, 60);
@@ -100,7 +125,10 @@ canvasBindings["browser.canvas2d.beginPath"](ctx);
 canvasBindings["browser.canvas2d.moveTo"](ctx, 1, 2);
 canvasBindings["browser.canvas2d.lineTo"](ctx, 3, 4);
 const metrics = canvasBindings["browser.canvas2d.measureText"](ctx, "Lean VIR");
-assert.equal(canvasBindings["browser.canvas2d.textMetrics.getWidth"](metrics), 42.5);
+assert.equal(
+  canvasBindings["browser.canvas2d.textMetrics.getWidth"](metrics),
+  42.5,
+);
 canvasBindings["browser.canvas2d.arc"](ctx, 5, 6, 7, 0, 3.14);
 canvasBindings["browser.canvas2d.closePath"](ctx);
 canvasBindings["browser.canvas2d.fill"](ctx);

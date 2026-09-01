@@ -31,9 +31,15 @@ import {
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
-import { hostResourceValue } from "../../web/src/host-resource.js";
 
-export { assert, readFile, writeFile, spawnSync, join, validateInterfaceManifest };
+export {
+  assert,
+  readFile,
+  writeFile,
+  spawnSync,
+  join,
+  validateInterfaceManifest,
+};
 
 export async function readRuntimeArtifacts() {
   return {
@@ -51,7 +57,9 @@ async function readPublicArtifact(file) {
     return await readFile(new URL(`../../${artifactPath}`, import.meta.url));
   } catch (error) {
     if (error?.code === "ENOENT") {
-      throw new Error(`missing runtime artifact ${artifactPath}; run npm run build:demo first`);
+      throw new Error(
+        `missing runtime artifact ${artifactPath}; run npm run build:demo first`,
+      );
     }
     throw error;
   }
@@ -60,11 +68,7 @@ async function readPublicArtifact(file) {
 export function createCallbackHostBindings(records = []) {
   return {
     "test.callNatCallback": (input, callback) => {
-      try {
-        return callback(input);
-      } finally {
-        callback.release();
-      }
+      return callback(input);
     },
     "test.recordNat": (value) => {
       records.push(Number(jsNatResourceValue(value)));
@@ -74,11 +78,10 @@ export function createCallbackHostBindings(records = []) {
 }
 
 export function jsNatResourceValue(value) {
-  const nat = hostResourceValue(value);
-  if (typeof nat !== "bigint") {
+  if (typeof value !== "bigint") {
     throw new Error("expected JsNat host resource");
   }
-  return nat;
+  return value;
 }
 
 export function assertManifestTypeDescriptorsRoundTrip(manifest) {
@@ -91,13 +94,19 @@ export function assertManifestTypeDescriptorsRoundTrip(manifest) {
   ];
   for (const entry of entries) {
     for (const arg of entry.args) {
-      const decoded = roundTripInterfaceTypeDescriptor(arg.type, `${entry.entry} argument ${arg.name}`);
+      const decoded = roundTripInterfaceTypeDescriptor(
+        arg.type,
+        `${entry.entry} argument ${arg.name}`,
+      );
       assert.ok(
         sameInterfaceTypeDescriptor(arg.type, decoded),
         `${entry.entry} argument ${arg.name} descriptor should round-trip`,
       );
     }
-    const decoded = roundTripInterfaceTypeDescriptor(entry.result, `${entry.entry} result`);
+    const decoded = roundTripInterfaceTypeDescriptor(
+      entry.result,
+      `${entry.entry} result`,
+    );
     assert.ok(
       sameInterfaceTypeDescriptor(entry.result, decoded),
       `${entry.entry} result descriptor should round-trip`,
@@ -149,7 +158,11 @@ const validManifestShape = {
 };
 
 export function assertValidManifestShape() {
-  assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
+  assert.equal(
+    validateInterfaceManifest(structuredClone(validManifestShape)).exports[0]
+      .entry,
+    "ok",
+  );
 }
 
 export function assertInvalidManifest(mutator, pattern) {
@@ -189,7 +202,9 @@ function skipVirIrpkgBuildEnv() {
 
 export function ensureVirJsBuilt() {
   if (virJsBuilt) return;
-  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], { encoding: "utf8" });
+  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], {
+    encoding: "utf8",
+  });
   assert.equal(builtVirJs.status, 0, builtVirJs.stderr || builtVirJs.stdout);
   virJsBuilt = true;
 }
@@ -215,28 +230,60 @@ function preparedVirIrpkg() {
 }
 
 export async function writeRuntimeFixture(target, fixtureName) {
-  const fixture = new URL(`../../fixtures/runtime/${fixtureName}`, import.meta.url);
+  const fixture = new URL(
+    `../../fixtures/runtime/${fixtureName}`,
+    import.meta.url,
+  );
   await writeFile(target, await readFile(fixture, "utf8"));
 }
 
-export async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, roots = null) {
+export async function assertUnsupportedInterfaceSource(
+  dir,
+  stem,
+  lines,
+  patterns,
+  roots = null,
+) {
   const source = join(dir, `${stem}.lean`);
   const packagePath = join(dir, `${stem}.irpkg`);
   const reportPath = join(dir, `${stem}.report.md`);
   await writeFile(source, lines.join("\n"));
-  await assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots);
+  await assertUnsupportedInterfaceFile(
+    source,
+    packagePath,
+    reportPath,
+    patterns,
+    roots,
+  );
 }
 
-export async function assertUnsupportedInterfaceFixture(dir, fixtureName, patterns, roots = null) {
+export async function assertUnsupportedInterfaceFixture(
+  dir,
+  fixtureName,
+  patterns,
+  roots = null,
+) {
   const stem = fixtureName.replace(/\.lean$/, "");
   const source = join(dir, fixtureName);
   const packagePath = join(dir, `${stem}.irpkg`);
   const reportPath = join(dir, `${stem}.report.md`);
   await writeRuntimeFixture(source, fixtureName);
-  await assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots);
+  await assertUnsupportedInterfaceFile(
+    source,
+    packagePath,
+    reportPath,
+    patterns,
+    roots,
+  );
 }
 
-async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots) {
+async function assertUnsupportedInterfaceFile(
+  source,
+  packagePath,
+  reportPath,
+  patterns,
+  roots,
+) {
   ensureVirIrpkgBuilt();
   const generated = spawnSync(
     "node",
@@ -245,9 +292,16 @@ async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, p
       : ["scripts/packages/lean-to-irpkg.mjs", source, packagePath, ...roots],
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
-  assert.notEqual(generated.status, 0, `${source} unexpectedly generated successfully`);
+  assert.notEqual(
+    generated.status,
+    0,
+    `${source} unexpectedly generated successfully`,
+  );
   const diagnosticsText = `${generated.stderr}${generated.stdout}`;
-  assert.match(diagnosticsText, /package diagnostics|unsupported interface exports/);
+  assert.match(
+    diagnosticsText,
+    /package diagnostics|unsupported interface exports/,
+  );
   const report = await readFile(reportPath, "utf8");
   for (const pattern of patterns) {
     assert.match(diagnosticsText, pattern);

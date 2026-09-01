@@ -222,7 +222,7 @@ changes; `package.json` remains the exact command-order source of truth.
   evidence
 - Native runtime coverage or library-surface analyzer changes:
   `npm run test:surface`; use `npm run analyze:surface -- <report.json>
-  <report.md>` for a complete installed-library report, then
+<report.md>` for a complete installed-library report, then
   `npm run render:surface -- <report.json> <html-directory>` for the interactive
   folder/module/function browser. For a project pinned to another Lean release,
   use `npm run analyze:target-surface -- ...` after building its imports; see
@@ -457,8 +457,8 @@ logic into entry-point scripts or pages:
 - Infoview widget smoke coverage: `tests/infoview/`
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
-- Host resource and virtual binding internals:
-  `web/src/host-resource.js`, `web/src/host/vir-host-resources.js`, and
+- Host boundary, active lifecycle, and virtual binding internals:
+  `web/src/host-boundary.js`, `web/src/host/vir-host-resources.js`, and
   `web/src/host/vir-virtual-host-bindings.js`
 
 ## Worktree Workflow

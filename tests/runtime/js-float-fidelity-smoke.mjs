@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   createCommonHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
 } from "../../web/src/vir-host-bindings.js";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { createCallbackHostBindings, readRuntimeArtifacts } from "./shared.mjs";
@@ -26,38 +26,14 @@ const floatCases = [
 ];
 
 {
-  const resources = createHostResourceState();
-  const positiveZero = resources.resourceForValue(0);
-  const negativeZero = resources.resourceForValue(-0);
-  assert.notEqual(negativeZero, positiveZero, "signed zero must use distinct host resources");
-  assert.notEqual(resources.resourceForValue(0), positiveZero);
-  assert.notEqual(resources.resourceForValue(-0), negativeZero);
-  assert.ok(Object.is(resources.resolveResource(positiveZero, "Js Float"), 0));
-  assert.ok(Object.is(resources.resolveResource(negativeZero, "Js Float"), -0));
+  const positiveZero = 0;
+  const negativeZero = -0;
+  assert.equal(Object.is(negativeZero, positiveZero), false);
+  assert.equal(Object.is(0, positiveZero), true);
+  assert.equal(Object.is(-0, negativeZero), true);
 
-  const nan = resources.resourceForValue(Number.NaN);
-  assert.notEqual(resources.resourceForValue(Number.NaN), nan);
-  assert.deepEqual(resources.debugResourceCounts(), {
-    scoped: 0,
-    temporaryScopes: 0,
-    owners: 0,
-  });
-
-  resources.releaseResource(negativeZero);
-  assert.throws(() => resources.resolveResource(negativeZero, "Js Float"), /resource is not live/);
-  assert.ok(Object.is(resources.resolveResource(positiveZero, "Js Float"), 0));
-  assert.deepEqual(resources.debugResourceCounts(), {
-    scoped: 0,
-    temporaryScopes: 0,
-    owners: 0,
-  });
-
-  resources.dispose();
-  assert.deepEqual(resources.debugResourceCounts(), {
-    scoped: 0,
-    temporaryScopes: 0,
-    owners: 0,
-  });
+  const nan = Number.NaN;
+  assert.equal(Object.is(Number.NaN, nan), true);
 }
 
 {
@@ -81,11 +57,14 @@ const floatCases = [
 }
 
 {
-  const resources = createHostResourceState();
+  const resources = createHostLifecycle();
   const bindings = createCommonHostBindings(resources);
   try {
-    assert.throws(() => bindings["js.float"]("1.5"), /js\.float expects a number/);
-    const stringResource = resources.resourceForValue("1.5");
+    assert.throws(
+      () => bindings["js.float"]("1.5"),
+      /js\.float expects a number/,
+    );
+    const stringResource = "1.5";
     assert.throws(
       () => bindings["js.float.value"](stringResource),
       /js\.float\.value expects a JS number/,
@@ -94,7 +73,7 @@ const floatCases = [
     for (const expected of floatCases) {
       const encoded = bindings["js.float"](expected);
       assertSameFloat(
-        resources.resolveResource(encoded, "Js Float"),
+        encoded,
         expected,
         `Float -> Js Float (${floatLabel(expected)})`,
       );
@@ -104,11 +83,11 @@ const floatCases = [
         `Float -> Js Float -> Float (${floatLabel(expected)})`,
       );
 
-      const jsValue = resources.resourceForValue(expected);
+      const jsValue = expected;
       const decoded = bindings["js.float.value"](jsValue);
       const reencoded = bindings["js.float"](decoded);
       assertSameFloat(
-        resources.resolveResource(reencoded, "Js Float"),
+        reencoded,
         expected,
         `Js Float -> Float -> Js Float (${floatLabel(expected)})`,
       );

@@ -1,600 +1,290 @@
 # Host Bindings
 
 This page documents the JavaScript side of Lean-to-JavaScript host imports.
-The Lean declaration list is maintained in `docs/LEAN_VIR_LIBRARY.md`; the
-runtime API overview stays in `docs/JS_API.md`.
+The Lean declarations are listed in [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),
+and the runtime facade is documented in [JS_API.md](JS_API.md).
 
-Lean sources call synchronous JavaScript functions through declarations marked
-with `@[vir_js "..."]`. Built-in `common.*` and `browser.*` targets are
-installed by the browser runtime. Node tests and tools can use
-`lean-vir/vir-runtime-node`, which installs virtual browser and React bindings.
+Lean calls a synchronous JavaScript function through a declaration marked
+with `@[vir_js "..."]`. Browser builds install the common and browser binding
+groups. React bindings are installed separately from
+`lean-vir/react-host-bindings` so the generic runtime does not depend on React.
 
-## Boundary Rule
+## Semantic Fidelity
 
-`@[vir_js]` is a JavaScript host boundary, not the same surface as an exported
-Lean declaration called from JavaScript. Host imports should expose
-`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for JavaScript
-`null`, and callbacks whose own arguments/results are `Unit` or resources.
-Callbacks are accepted only as host-import arguments; nested callback arguments
-are rejected. Public Lean wrappers can convert to or from ordinary Lean values with
-`Lean.Vir.JsValue` and `Lean.Vir.Js.Nullable`.
+The host binding receives the same JavaScript value that a TypeScript caller
+would receive, and it returns the same value the corresponding JavaScript API
+returns. VIR does not place resource, ownership-lease, or alias wrappers
+around JavaScript values.
 
-Raw Lean scalar, structure, array, list, option, and product types are rejected
-in ordinary host imports. The supported boundary lanes are:
+For example:
 
-| Lean type surface | Owner / shape | Import boundary | Use |
-| --- | --- | --- | --- |
-| `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `hostResource` | Pass real JavaScript objects without decoding them in Lean. |
-| `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `hostResource` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
-| `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
-| Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
-| Structural interface values | JavaScript caller to exported Lean entrypoints | descriptor-guided object lowering | Call public Lean functions from JavaScript without a host-import wrapper. |
-
-The package manifest records each host import boundary as `hostResource`,
-`explicitConversion`, or `objectHandle`, and the runtime dispatches them through
-the corresponding path. Explicit conversion declarations use
-`@[vir_js_explicit_conversion "..."]`. Both host-import attributes validate the
-complete signature and boundary policy when Lean elaborates the declaration, so
-unsupported implicit arguments, result types, effects, and conversion shapes are
-reported at the attribute. Package generation repeats the same typed analysis as
-a final guard for raw extern metadata, then checks package-only limits such as IR
-arity and import slots. The JavaScript runtime still requires a matching host
-binding for the declared target. The manifest also records structural descriptor
-tags for exported Lean entrypoints; those tags belong to the interface
-descriptors, not to the ordinary host-resource import boundary.
-
-For host imports, the relevant descriptor family is:
-
-| Descriptor | Ordinary `hostResource` import | Other accepted path |
-| --- | --- | --- |
-| `INTERFACE_TAG.UNIT` | Argument or result | `js.leanRef.release` result |
-| `INTERFACE_TAG.RESOURCE` | Argument or result | Explicit conversions and `JSL` handles use the generic `Js` resource shape. |
-| `INTERFACE_TAG.FUNCTION` | Argument only | Callback arguments/results must be `INTERFACE_TAG.UNIT` or `INTERFACE_TAG.RESOURCE`. |
-| `INTERFACE_TAG.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
-| Structural descriptors such as `INTERFACE_TAG.NAT`, `INTERFACE_TAG.STRING`, `INTERFACE_TAG.ARRAY`, and `INTERFACE_TAG.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
-
-For example, a package can define a named conversion for a Lean structure when
-the JavaScript host binding wants to inspect that structure and return a real
-JavaScript resource:
-
-```lean
-structure Payload where
-  name : String
-  count : Nat
-
-@[vir_js_explicit_conversion "test.payload"]
-opaque payloadToJs (payload : @& Payload) :
-  Lean.Vir.RuntimeM (Lean.Vir.Js Payload)
+```js
+hostBindings: {
+  "demo.bumpNat": (value) => value + 1n,
+  "demo.identity": (value) => value,
+}
 ```
 
-## Built-In Targets
+`value` in the second binding is the actual object. Returning it preserves
+`Object.is` identity. The same rule applies to DOM nodes, React elements,
+props objects, child arrays, dependency arrays, refs, callbacks, state values,
+and reducer actions.
 
-`Lean.Vir.Common.echoString` and `Lean.Vir.Common.addNat` map to `common.*`
-helpers through explicit `Lean.Vir.JsValue` conversions. The low-level
-`common.*` JavaScript targets receive and return `Lean.Vir.Js α` resources;
-the public Lean wrappers return ordinary Lean values in `RuntimeM`.
+VIR does not impose guarantees that JavaScript or React does not impose. In
+particular, Lean types do not make React components pure, make hook ordering
+safe, or make dependency arrays complete. Those remain application
+responsibilities exactly as in a TypeScript React program. Lean-friendly
+operations that intentionally differ from an upstream JavaScript API must be
+separately named and documented as adapters.
 
-`Lean.Vir.Browser.Console.log` maps to `console.log`.
+## Lean Boundary Types
 
-`Lean.Vir.Browser.Document.getTitle` and `setTitle` map faithfully to
-`document.title` with `Lean.Vir.Js String` values. `Document.querySelector`
-returns a nullable JavaScript element resource. `Document.querySelectorAll`
-returns the browser's native static `NodeList` as
-`Lean.Vir.Js.NodeList (Lean.Vir.Js Element)`. Lean code can inspect it with
-`Js.NodeList.length` and `item`, copy it on the JavaScript side with
-`Js.NodeList.toArray`, or explicitly materialize a Lean array of independent
-element handles with `Js.NodeList.toLeanArray`. Dropping the list or copied
-array does not invalidate element handles already obtained from it.
-`Document.createElement` creates a browser element resource by tag name.
-`querySelectorString`, `querySelectorAllString`, and `createElementString`
-provide separately named conversions for method arguments. The `title`
-property is deliberately only the faithful `getTitle`/`setTitle` pair;
-applications can compose `JsValue.toString` or `JsValue.ofString` at their own
-policy boundary. Other browser API convenience wrappers likewise keep
-conversions above their faithful `browser.*` host targets.
+Ordinary host imports use a deliberately narrow type surface:
 
-`Lean.Vir.Browser.Element.*` targets query descendants, read and write text
-content, attributes, and `innerHTML`, append and remove elements, update
-`classList`, and set inline style properties through DOM element
-properties/methods. The `innerHTML` property is exposed only as the faithful
-`getInnerHTML`/`setInnerHTML` pair over `Lean.Vir.Js String`; applications place
-`JsValue.toString` and `JsValue.ofString` at their own policy boundary. The
-setter borrows its JavaScript string argument and leaves it live. Replacing
-`innerHTML` detaches the old descendant DOM nodes; Lean callers should first
-replace any runtime state that holds handles to those descendants. Event
-listener targets retain Lean closures until the listener is removed or the
-runtime is disposed. The `textContent` property follows the same representation
-policy: its getter returns `Lean.Vir.Js String`, while its setter borrows a
-`Lean.Vir.Js.Nullable String`. Passing JavaScript `null` clears the text to the
-empty string.
+| Lean type                | JavaScript value                                                | Purpose                                   |
+| ------------------------ | --------------------------------------------------------------- | ----------------------------------------- |
+| `Lean.Vir.Js α`          | The exact JavaScript value                                      | Phantom-typed JavaScript value.           |
+| `Lean.Vir.Js.Nullable α` | The exact value or `null`                                       | Native nullable result or argument.       |
+| `Lean.Vir.JSL α`         | An ordinary JavaScript object backed by one Lean root           | Store an opaque Lean value in JavaScript. |
+| Function argument        | An ordinary JavaScript function backed by one Lean closure root | JavaScript callback into Lean.            |
+| `Unit`                   | `undefined`                                                     | No result.                                |
 
-`Lean.Vir.Browser.HTMLCanvasElement.*` narrows canvas elements, reads and writes
-their bitmap size, and obtains a 2D context. `browser.canvas2d.*` covers
-rectangles, paths, fill/stroke styles, line width, save/restore, translation,
-and rotation. One-shot float and string arguments use owned resources that the
-receiving canvas binding consumes after the synchronous DOM call.
+Raw Lean scalars and structures are rejected on an ordinary host-import
+boundary. Named declarations marked `@[vir_js_explicit_conversion "..."]`
+are the explicit exception used by conversions such as `js.string.value`.
+Exported Lean functions called from JavaScript use the separate structural
+interface codec.
 
-`Lean.Vir.Browser.Event.target` and `currentTarget` return element resources
-when the event target is an element. `Event.key` returns the string-valued
-keyboard key when present. `preventDefault` and `stopPropagation` forward to
-the browser event object.
+The package manifest currently calls the raw JavaScript-value lane
+`hostResource`. That is a legacy ABI classification name, not a JavaScript
+wrapper or public lifetime model. At runtime the lane transports the value
+itself.
 
-`Lean.Vir.Browser.HTMLInputElement.fromElement` narrows an element resource
-before reading or writing `checked` and `value`.
+## Interpreter Transport
 
-Timer targets map to `setTimeout` and `clearTimeout`. Animation targets map to
-`requestAnimationFrame` and `cancelAnimationFrame`, with a timer fallback in
-non-browser environments.
+JavaScript values cross the C++/Wasm interpreter boundary through an
+`externref` root table:
 
-Infoview command targets use the same explicit scalar resource convention.
-`infoview.documentPosition` builds a host `Js DocumentPosition` resource from
-`Js String`/`Js Nat` fields, and `infoview.command.revealPosition` receives
-that resource and returns a `Js Bool` success value.
-ProofWidgets RPC refs follow the same shape: public Lean code keeps the
-`RpcRef` record, `proofwidgets.rpc.ref` builds a host `Js RpcRef` resource from
-explicit scalar fields, and `proofwidgets.rpc.resolveRef` receives that
-resource. Resolve callbacks receive a `Js ResolvedRef` resource and the public
-Lean wrapper calls `js.value.proofwidgets.resolvedRef.value` to decode it
-explicitly.
+```text
+exact JavaScript value
+        │
+        ▼
+externref table slot  ◀── numeric root id ──▶  Lean external object
+```
 
-Browser `react.root.*` targets are provided by
-`lean-vir/react-host-bindings`. With that entry installed, React roots map to
-`ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
-`react.node.text`, `react.node.createElement`, and `react.node.fragment`
-construct `ReactNode` resources. Their low-level host targets receive explicit
-`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
-`Lean.Vir.Js NodeChildren` resources; `react.elementType.tag` wraps ordinary
-DOM tag strings, and component bindings can provide `Js ElementType` resources
-directly. Public Lean helpers convert ordinary strings with `JsValue` and
-populate props/children with explicit `react.props.*` and
-`react.node.children.*` calls. The browser binding uses `React.createElement`
-and `React.Fragment`, while the virtual binding builds test-visible virtual
-React nodes.
-`react.root.renderComponent` wraps the thunk produced by Lean's
-`Root.renderComponent root component props` API in a real React function
-component. The hook bindings `react.useState`, `react.useRef`,
-`react.useMemo`, `react.useReducer`, `react.useEffect`, and
-`react.useEffectWithDeps` are render-time `ReactM` operations. `useRef` returns
-a host-owned React ref object; `react.ref.get` and `react.ref.set` are
-`RuntimeM` operations over its `current` field and do not schedule renders.
-For ownership-bearing values, the browser runtime keeps the committed payload
-lease separately from mutable `.current`; React may replace the slot with a DOM
-node or `null` without orphaning the payload, and `react.ref.set` reconciles the
-explicit lease when it changes the value.
-`useMemo` receives an explicit `Lean.Vir.Js DependencyList` and returns an
-explicit `Lean.Vir.Js α` value. `useReducer` keeps the low-level React boundary
-in `Js` resources, but VIR evaluates reducers once at dispatch time and queues
-the concrete result through a replay-safe JavaScript state action; an effectful
-Lean reducer is never installed as a React-replayable reducer function. Reducer state and actions are typed by their
-JavaScript resource marker, so structured Lean-owned values use
-`Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
-`Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
-A retained Lean string therefore does not typecheck as a JavaScript-shaped
-`Js String`.
-`react.useMemo` and `react.useEffectWithDeps` receive a
-`Lean.Vir.Js DependencyList` built by `react.deps.empty` and
-`react.deps.push`, so dependency arrays do not cross the host boundary through
-generic array lowering.
-Reducer callbacks are staged per render generation, transferred to their hook
-slot only from a commit-phase layout effect, and released on replacement,
-abandoned-generation collection, unmount, package reload, or runtime dispose.
-`useEffect` currently has a resource shape: setup returns a
-host resource, and cleanup receives the same resource at React's cleanup point.
-The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
-React's dependency-array form and compares the Lean-provided dependency list
-with `Object.is`; each dependency crosses the low-level host boundary as an
-explicit `Lean.Vir.Js α` resource. `useEffectWithStringDeps` is only a
-convenience wrapper over explicit string conversion.
-`react.state.set` and `react.state.modify` are `RuntimeM` operations over
-`Lean.Vir.Js α` resources and share the same browser and virtual host resource
-store as React roots. `modify` evaluates its Lean callback exactly once against
-VIR's latest committed-or-queued value, then gives a replay-safe JavaScript
-action the concrete result; React never receives the Lean callback as a
-functional updater. The small
-`js.string`, `js.nat`, `js.bool`, and `js.float` scalar
-helpers are runtime-level `Lean.Vir.JsValue` bindings used by both common host
-helpers and React state examples. They let examples use primitive state without
-giving APIs such as `react.useState` a scalar ABI. `JsValue.ofFloat` and
-`JsValue.toFloat` preserve every JavaScript number, including NaN, positive and
-negative infinity, and the sign of zero.
-`Root.renderNode` is the faithful resource boundary for TypeScript
-`Root.render(ReactNode)`. The `react.root.renderNode` host binding borrows the
-concrete `Js Node`; the root retains its own tree lease. `Root.render` remains
-the generated Lean-construction convenience. Its `react.root.render` binding
-receives a `ReactM (Lean.Vir.Js Node)` action as a releasable callback, invokes
-it once, forwards the result to the same node-rendering path, and releases the
-callback.
-`react.root.renderIntoSelector`,
-`react.root.renderComponentIntoSelector`, and `react.root.unmountSelector`
-provide the proof-widget path: the JavaScript host owns and reuses the React
-root for a selector, while Lean supplies either a `ReactNode` resource or a
-function component render callback. The selector arguments are also explicit
-`Lean.Vir.Js String` resources at the low-level host boundary, and boolean
-success/failure results are returned as explicit `Lean.Vir.Js Bool` resources.
+The root id is private transport. It is never presented to a host binding and
+does not replace the JavaScript value with a handle object. A separate live-id
+set makes every JavaScript value valid, including `null` and `undefined`.
+Dropping the Lean external object releases its table slot.
 
-## Virtual Node Bindings
+## JavaScript Reachability
 
-The Node wrapper provides virtual document and element state for tests/tools:
+Ordinary composite values use the JavaScript object graph as their ownership
+graph:
+
+- a props object keeps its property values reachable;
+- an array keeps its elements reachable;
+- a React element keeps the graph React stores;
+- a closure keeps values in its lexical environment reachable;
+- returning or storing the same object does not create a VIR alias record.
+
+VIR neither mirrors that graph nor tries to infer framework ownership from a
+render, memo result, or commit. Consequently there is no resource cloning,
+borrow/take distinction, payload graph, or per-hook lifetime ledger for
+ordinary values.
+
+## Lean-Backed JavaScript Values
+
+JSL objects and Lean callbacks require one unavoidable bridge because their
+payload lives in the Lean heap.
+
+`Lean.Vir.JSL α` is represented by an ordinary empty JavaScript object. Private
+WeakMap state associates that object with one retained Lean pointer. The
+object's finalizer releases the pointer after collection, and runtime disposal
+releases it deterministically. There is no public `retain`, `release`, handle,
+or wrapper API.
+
+A Lean callback is represented by an ordinary JavaScript function. Private
+WeakMap state associates the function with one closure root. JavaScript code
+calls and stores it like any other function. Collection is a best-effort
+release backstop; runtime disposal deterministically invalidates remaining
+callbacks and releases their roots.
+
+`FinalizationRegistry` scheduling is nondeterministic. Applications that need
+deterministic cleanup dispose the VIR runtime. A callback invoked after its
+runtime is disposed fails instead of entering freed Lean state.
+
+## Active Resources
+
+Explicit lifecycle bookkeeping is reserved for activities with a real
+termination operation:
+
+- DOM event listeners;
+- timeouts and intervals;
+- animation frames;
+- React roots.
+
+The shared `HostLifecycle` registers each active value together with its exact
+cleanup function. Runtime disposal invokes those functions without inspecting
+or guessing methods on the value. Terminal host operations remove their
+registration before performing platform cleanup and are safe to repeat where
+the platform API is repeatable.
+
+Host calls are failure-atomic. Immediately before invoking a binding, the
+runtime opens a private transaction. An active resource created by that call
+registers an undo operation. The transaction commits only after the returned
+JavaScript value has been completely lowered to Lean. If the binding throws,
+returns a Promise, or result lowering fails, rollback terminates the newly
+created activity. This transaction is out of band and does not alter the
+returned value.
+
+Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
+resources. Runtime teardown attempts every cleanup and reports multiple
+failures as an `AggregateError`.
+
+## Browser Bindings
+
+The built-in groups closely follow their browser APIs:
+
+- `browser.document.*` exposes title, selectors, and element creation;
+- `browser.element.*` exposes queries, content, attributes, tree operations,
+  classes, styles, and event listeners;
+- `browser.event.*` exposes targets, keyboard keys, cancellation, and form
+  values;
+- `browser.htmlInputElement.*` and `browser.htmlCanvasElement.*` narrow and
+  operate on the actual browser objects;
+- `browser.canvas2d.*` forwards to the actual 2D context;
+- `browser.timer.*` and `browser.animation.*` return the exact native scheduling
+  tokens. VIR keeps only private cancellation records for interpreter teardown;
+- `infoview.*` and `proofwidgets.rpc.*` connect the widget host.
+
+Convenience conversions have separate Lean names. For example,
+`Document.querySelector` uses `Js String`, while `querySelectorString`
+explicitly converts a Lean `String` first. This keeps conversion out of the
+faithful low-level binding.
+
+Event-listener registration is the principal browser adapter in this slice.
+Unlike `EventTarget.addEventListener`, it returns an explicit removable
+subscription so Lean can unregister without reconstructing the original
+receiver/type/callback triple. The binding audit records this semantic change;
+ordinary DOM objects and scheduling tokens are never replaced with VIR handle
+objects.
+
+## React Bindings
+
+The browser React host uses official React 19 and ReactDOM:
+
+- props are actual JavaScript objects;
+- child collections and dependency lists are actual arrays;
+- `React.createElement` returns the actual React element;
+- `useState`, `useReducer`, `useRef`, and `useMemo` return or store the values
+  chosen by React;
+- setter and dispatcher functions are React's functions;
+- refs expose React's mutable `{ current }` object;
+- roots are the objects returned by `ReactDOMClient.createRoot`.
+
+VIR does not emulate hook state, render replay, reconciliation, lanes, or
+commit semantics. Official React running in Chromium is the semantic oracle.
+
+The Node virtual document remains useful for DOM-independent host tests, but
+its React bindings are explicit cleanup-safe unsupported shims. Attempting to
+construct nodes, roots, or use hooks there reports that the browser React host
+is required.
+
+The principal intentional React adapters are:
+
+- Lean builders for props, property descriptions, event-handler descriptions,
+  and child arrays;
+- `Root.render`, which invokes a Lean render callback once before forwarding
+  its result to `root.render`;
+- `Root.renderComponent`, which creates a no-props React function component so
+  React controls render timing and hooks. Its small calling-convention bridge
+  ignores React's renderer arguments and supplies the Lean callback's `Unit`.
+  One component type is stable for the lifetime of each root; later submissions
+  update its callback, while unmounting the root is the explicit remount
+  boundary;
+- the split setup/cleanup form of the Lean effect API.
+
+These adapters have declarations separate from the exact bindings.
+`Root.renderNode` is the direct `root.render(node)` boundary; `Root.render` is
+the Lean-construction adapter. Recurring application updates should normally
+use the component path. Direct `Root.renderNode` has no public React
+acknowledgement for superseded submissions.
+
+## Node Virtual Bindings
+
+Use the Node wrapper for virtual document and event tests:
 
 ```js
 import {
   createVirRuntime,
   createVirtualDocumentState,
   ensureVirtualElementState,
-  ensureVirtualElementStates,
 } from "lean-vir/vir-runtime-node";
 
 const virtualDocumentState = createVirtualDocumentState();
 ensureVirtualElementState(virtualDocumentState, "#target");
-ensureVirtualElementStates(virtualDocumentState, ".row", [
-  { textContent: "first" },
-  { textContent: "second" },
-]);
 
 const vir = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [packageMemberBytes],
+  irPackageSetBytes: [packageBytes],
   virtualDocumentState,
 });
 ```
 
-Virtual `Document.querySelector` follows DOM semantics and returns a nullable
-resource for missing selectors; `Document.querySelectorString` converts it to
-`none`. `Document.querySelectorAll` returns a static NodeList; use
-`ensureVirtualElementStates` to seed every match for a selector.
-Virtual elements accept a `queries` map for descendant
-`Element.querySelector` and `querySelectorAll` results, plus an `innerHTML`
-string. Setting inner HTML clears the descendant query map, mirroring
-replacement of the old child tree.
-`createVirtualElementState` and
-`createVirtualEventState` construct resources for direct virtual callback
-dispatch. `findVirtualReactElementById` and `virtualReactElementById` locate
-rendered virtual React nodes by DOM-like `id` props.
-`Document.createElement`, DOM tree/class/style mutation, and canvas targets are
-browser-only today; Node tests for those calls should install browser-like
-custom bindings or use a DOM implementation.
+Virtual elements and events are plain JavaScript test doubles. Values returned
+from one binding can be passed directly to another. Package replacement
+disposes the previous generation's active lifecycle, but does not invalidate
+ordinary JavaScript values merely because they were observed by that runtime.
 
 ## Custom Targets
 
-Custom imports can be declared directly:
+Declare the Lean boundary explicitly:
 
 ```lean
-import Vir.Js
-
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
-
-def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
-  let input ← Lean.Vir.JsValue.ofNat n
-  let output ← jsBumpNat input
-  Lean.Vir.JsValue.toNat output
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) :
+  Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 ```
 
-Bind custom targets when constructing the runtime. User bindings override the
-default `common.*` and `browser.*` bindings:
+Then bind the exact JavaScript operation:
 
 ```js
-const resources = createHostResourceState();
 const vir = await createVirRuntime({
-  wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
-  defaultHostBindings: createBrowserHostBindings({ resources }),
+  wasmBytes,
+  irPackageSetBytes: [packageBytes],
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
+    "demo.bumpNat": (n) => n + 1n,
   },
 });
-
-console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
-Host imports are a JavaScript-resource boundary by default: use `Unit`,
-`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` for JavaScript `null`
-semantics, and callback arguments whose own arguments/results are `Unit` or
-resources.
-Raw Lean scalars, structures, arrays, lists, options, and products are rejected
-unless they are part of a built-in conversion target such as `js.nat.value` or
-`js.value.react.property`. `Unit` returns use `undefined` or `null`.
-Function-valued Lean arguments are decoded as callable `VirCallback` objects. A
-host binding receives one transferable lease. It may store that lease for one
-owner, or call `callback.retain()` to create distinct leases for independent
-owners; every owner eventually calls `release()` on its own lease. Host imports
-are synchronous; returning a `Promise` is an error. Callback ownership
-transfers to the binding only when the complete host call, including result
-conversion, succeeds. A failed argument conversion, throwing binding, Promise
-result, or failed result conversion revokes the whole newly lifted callback
-root, including leases the failed binding created from it.
+Bindings are synchronous. Returning a Promise is an error. User bindings
+override built-ins with the same target name. Do not manually encode handles,
+wrap values, or perform conversions that belong in an explicitly named Lean
+adapter.
 
-## Resource Lifetime
+## Validation
 
-`createHostResourceState()` returns the shared host-resource store used when
-composing browser, React, timer, animation, and virtual binding groups. The
-store stamps opaque `HostResource` wrappers with one runtime-generation owner,
-validates them on every resolution, and owns active disposable host objects.
-It does not strongly retain ordinary resource wrappers. For every transferred
-retainable payload it retains an opaque, wrapper-independent release ticket,
-so `HostResourceState.dispose()` can enumerate and discharge the lease even if
-the wrapper is already unreachable and its finalizer has not run.
-See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for diagrams of the
-`Lean.Vir.Js α` resource path and the separate `VirCallback` closure-root path.
+Changes to the JavaScript-value boundary should cover:
 
-### Resource Ownership Policy
+- exact identity for objects, functions, arrays, `null`, and `undefined`;
+- successful callback invocation and runtime-disposal invalidation;
+- JSL and callback finalization as a best-effort backstop;
+- active-resource completion, explicit cancellation, package replacement, and
+  runtime disposal;
+- failure after active-resource creation but before result publication;
+- official React behavior in Chromium, including Strict Mode and Suspense.
 
-The ownership contract is intentionally small. An *owner* holds one
-independently releasable lease; JavaScript object identity is not lease
-identity. Host code uses these five operations:
-
-| Operation | Required postcondition |
-| --- | --- |
-| Borrow | The callee may inspect the value but neither consumes nor releases the caller's lease. Success and failure leave that lease live. |
-| Retain | The destination acquires a distinct lease and the source remains live. A failed retain leaves no partial destination lease. |
-| Transfer / take | Ownership moves from a named source to a named destination. The source is relinquished only after destination acquisition succeeds; failure either restores the source or releases an already-transferred argument during rollback. |
-| Stage | A scope temporarily owns every acquisition until one explicit commit point. Any exception before commit releases every staged lease and aggregates cleanup failures. |
-| Release | The owner first detaches its leases, then attempts every release. Release is idempotent; one throwing child must not suppress sibling cleanup. |
-
-For every retainable payload, the live-lease count after an operation is the
-previous count plus successful acquisitions minus successful releases. Every
-live lease must name exactly one current owner. Mutable payload identity,
-rewrapping, or storing the same payload twice does not merge those owners.
-Generic retain is legal only when the payload lifetime can create a real
-independent lease. A wrapper-level disposable without such a payload lifetime
-is move-only and `retainHostResource` rejects it.
-
-These are temporal-safety and failure-atomicity guarantees, not a promise that
-JavaScript will eventually collect every unreachable wrapper. Explicit release
-and runtime teardown are deterministic when invoked. `FinalizationRegistry`
-is only an abandonment backstop: the platform may delay or omit it. VIR owns
-root capabilities and semantic cleanup obligations, not JavaScript heap memory
-or the collector's schedule.
-
-The main owners and their commit points are:
-
-| Owner | Acquires | Commits or releases |
-| --- | --- | --- |
-| WASM lift/call scope | Callbacks and resource results materialized during recursive decoding | Commits only after the complete call and result conversion; otherwise rolls back all acquisitions. |
-| Composite resource | Independent leases for nullable values, props, handlers, children, and similar fields | Releases with the composite. Reading or materializing a live composite only borrows its child leases. |
-| Active registration | Its own callback or activity lease | Creation remains provisional until its returned handle is completely lowered. Failed result conversion rolls back a newly installed registration; committed registrations release on removal, cancellation, completion, unmount, or runtime disposal. |
-| JSL alias or owned externref root | One lease over the retained Lean object or host payload | Releases that alias/root without invalidating sibling owners. |
-| React queued update | Its own state/action payload lease | Render borrows or stages from it; queue-record collection or component disposal releases it. A commit in another React lane does not. |
-| React root pending generation | A node lease or component/render-callback owner before browser adapter submission | The matching layout boundary transfers it; adapter failure, supersession, unmount, or selector publication rollback cancels it. A stale boundary generation cannot adopt it. |
-| React render generation | Candidate nodes, callbacks, and hook payload leases | A real commit-phase hook transfers selected leases; render failure or abandoned-generation cleanup releases only the staged generation. |
-| React committed hook/effect | Committed state, reducer, ref, memo, and per-setup effect leases | Replacement or unmount releases the matching owner. A callback result remains staged until callback cleanup also succeeds. |
-
-Ownership tests need not use a generic framework. Direct regression tests are
-preferred, but each changed ownership path must cover its success case, a
-failure after acquisition, throwing cleanup, and repeated cleanup. Mutable or
-React-managed paths also cover same-identity replacement, aliases, replay,
-abandoned render, interleaved-priority updates, and unmount. Tests assert both
-that live values remain usable and that deterministic disposal restores the
-expected lease count; garbage-collection tests are reserved for genuinely
-unobservable abandonment backstops.
-
-Use this bounded matrix to decide when a lifetime review is complete. Add or
-change a row only when a patch changes that ownership handoff; unrelated
-hypothetical owners do not expand the review.
-
-| Handoff | Adversarial cases | Deterministic oracle |
-| --- | --- | --- |
-| Borrowed child → builder → parent | Release parent first and child first; reuse the surviving side. | The survivor remains usable; final release restores the payload-lease count. |
-| Callback-bearing result → WASM root | Fail result lowering after the host adopts the callback. | The adopted resource and callback root are both gone. |
-| Active registration → WASM result | Fail result lowering after listener/timer/frame/root creation; repeat with an alias of an existing root. | A registration created by the failed call is cancelled, while a pre-existing aliased root remains mounted. |
-| Borrowed caller resource → nested result rollback | Return a borrowed argument inside a product/array whose later field fails to decode. | Rollback releases no caller lease; the borrowed wrapper remains live. |
-| Retainable identity result → JS take → runtime teardown | Retain an input as an identity result, root it in Lean, take it back into JavaScript, then dispose before GC. | The clone has one deterministic owner/ticket at every step; teardown releases its payload lease and invalidates the published wrapper. |
-| Committed revocable capability → identity retain | Commit a listener/root/ref, attempt an identity-result retain, then invalidate its revocation group. | The immutable move-only policy rejects the retain; no alias survives invalidation. |
-| Active registration → throwing terminal cleanup | Make callback release throw during listener removal, timer/frame cancellation, or root unmount. | The owner and every public alias detach first; all remaining cleanup is attempted once. |
-| Selector-created root → initial render failure | Throw from the first node/component render, then repeat with a pre-existing root. | Only the newly created root is unmounted and removed from the owner set. |
-| Selector render → scalar result publication | Let node/component rendering succeed, then fail Bool result lowering; repeat while replacing an existing root. | The affected root is unmounted on both paths, so no mounted tree retains a callback revoked by call rollback. |
-| Browser-deferred root work → cancellation | Queue node/component work without entering React; invoke a component without its layout commit; supersede or unmount new/existing roots, including failed selector publication and throwing cleanup. | Pending records detach first, all leases release once, and stale generation callbacks cannot reacquire ownership. |
-| Browser component submission → replayed render generations | Invoke one staged replacement twice, commit either generation first, cancel its sibling, render again, and unmount. | Generations borrow the root-owned callback; the winner transfers it, while sibling cancellation releases only generation-local ownership. |
-| Abandoned browser generation → runtime teardown | Hand off a render that React never commits, then dispose the runtime before GC. | The opaque teardown ticket synchronously releases the staged leases without retaining its finalizer target. |
-| Updater/reducer inputs → callback | Succeed and throw while creating an unrelated resource. | Only synthetic input wrappers expire; unrelated allocations remain live. |
-| Deferred React owner → teardown | Dispose before the scheduled microtask; include throwing and non-throwing siblings. | Teardown drains once, attempts every sibling, and restores the owner count synchronously. |
-| Speculative browser owner → abandonment backstop | Remove `FinalizationRegistry` or `WeakRef`. | Browser binding construction fails before acquiring ownership. |
-| Borrowed Lean array element → boxed native adapter | Iterate resource elements, then drop the array. | The externref-root count returns to its prior baseline. |
-
-A direct host test is sufficient when the changed ownership transition is
-implemented entirely in JavaScript, even if the value originally came from a
-Lean callback. A change to packaged IR encoding, a boxed native adapter, or
-WASM rooting must also have an interpreted-Lean integration assertion. The
-review converges when every changed row is green, deterministic teardown
-returns all relevant counts to their baseline, and no ownership transition
-remains unnamed.
-
-`resourceForValue(value)` creates a fresh wrapper. Lean roots are classified as
-borrowed or owned: dropping a borrowed argument root only removes that root,
-while dropping an unclaimed owned host-result root also invokes the wrapper's
-idempotent disposer. Lifting a result to JavaScript *takes* the owned root
-before the result object is decremented. Extraction reports whether that take
-actually acquired an owned root; transactional rollback records only acquired
-result leases, never a borrowed caller alias. The returned wrapper remains live
-until its JavaScript owner releases it. Returned resource wrappers provide
-idempotent `release()` and `dispose()` methods (and `Symbol.dispose` where the
-host supports explicit resource management); `releaseHostResource(resource)`
-is the equivalent public helper. Retainable payloads are also registered for
-best-effort `FinalizationRegistry` cleanup, while explicit release remains the
-deterministic path. Browser React is stricter: its host bindings require
-`FinalizationRegistry` and `WeakRef` because React provides no deterministic
-notification when speculative render, effect, or queued-update work is
-abandoned. Passive DOM elements, strings, numeric values, `Js.Array`, and
-`Js.NodeList` have no payload disposer.
-
-Retainable payloads compose through containers. `Js.Nullable`, React event
-handler values, React props builders, and React child-list builders acquire
-independent child leases and release all children when abandoned. The
-explicitly registered payload-child graph rejects cycles rather than relying
-on cyclic reference counts. VIR cannot inspect ordinary JavaScript properties,
-closure environments, framework internals, or Lean fields, so arbitrary mixed
-Lean-to-JavaScript-to-Lean cycles are unsupported. Such a graph needs a weak
-edge or an explicit lifecycle boundary whose release or runtime teardown
-breaks it. A
-container may safely acquire a lease from a live runtime-created JSL wrapper
-even though that wrapper is not owned by the container's `HostResourceState`.
-After a React parent acquires its child lease, the original borrowed child
-wrapper keeps its independent lease. The parent and wrapper may be released in
-either order, and either surviving owner may reuse the node. These are sibling
-leases over one payload, not an ownership cycle. Selector-based render helpers
-also leave their borrowed node argument untouched when the selector is missing.
-Result lifting is transactional:
-arrays and structures roll back every callback/resource already lifted when a
-later field fails.
-
-Fresh wrappers deliberately avoid alias-invalidating-release semantics.
-Bindings do not explicitly release passive arguments/results. Weak interning
-may be added later as an allocation optimization, but it must not become a
-lifetime owner.
-
-Event listeners, timers, animation frames, and React roots are active owners,
-not passive values. Their registrations remain in the store's strong owner
-set until listener removal, timer/frame cancellation, root unmounting, or
-runtime teardown. A returned Lean handle names the registration but is not
-what keeps its activity alive. Selected active values use a weak reverse index
-so explicit cancellation can invalidate every still-reachable wrapper without
-making the index an owner. Creation bindings check for `WeakRef` before they
-install an activity that needs this index. The returned wrapper carries a
-provisional rollback until complete host-result conversion commits it; failed
-conversion removes a newly installed listener, cancels a new timer/frame, or
-unmounts a newly created root. Creating another handle for an existing root
-does not attach that rollback, so failure cannot unmount a committed sibling.
-Retention policy and revocation-group identity are immutable wrapper metadata:
-commit disarms provisional rollback but cannot make a move-only capability
-generically retainable. Terminal operations detach the runtime owner and all
-revocation aliases before attempting callback or platform cleanup.
-
-Lean-owned object handles created by `js.leanRef` use the same `Js` resource
-transport, but their payload is a lease over one retained Lean object pointer.
-`Lean.Vir.LeanRef.retainJSL` creates a distinct lease over the same object;
-`releaseJSL` invalidates only the supplied handle's lease. Ordinary Lean copies
-of one `JSL` value share that same handle and become invalid together; only
-`retainJSL` creates an independently releasable owner. Dropping an unclaimed Lean
-external wrapper now releases that lease automatically; `releaseJSL` remains
-the deterministic early-release API. The final lease release
-decrements the Lean object, while package/runtime teardown force-invalidates
-every remaining lease before decrementing it once. Rewrapping a JSL payload in
-another host-resource store also acquires an independent lease instead of
-sharing an alias-invalidating live/dead flag.
-
-The built-in React state, reducer, ref, and memo bindings acquire their own JSL
-leases whenever React starts storing a payload. A queued state action owns its
-source lease and produces an independently retained result on every replay.
-The render generation stages the selected result, and commit transfers that
-exact result lease to the hook without consuming other-lane actions. After
-React drops a queued action, finalizer cleanup releases its unused queue leases;
-replacement or unmount releases the matching committed lease.
-Callback-produced state and memo results remain staged until post-result
-callback cleanup also succeeds. A JSL handle retained by Lean remains
-independently owned by Lean and can still be released deterministically with
-`releaseJSL`. React tracks each acquisition with a distinct lease record even
-when a payload's `retain()` operation returns the same object, so payload
-identity is never used as lease identity.
-
-Some resources are callback-local rather than retained:
-
-- DOM and React event objects are callback-scoped. The event resource is
-  released after the Lean callback returns. Event targets and current targets
-  may be returned as separate element resources by the event host bindings.
-- `react.state.modify` gives the updater a synthetic
-  `previous : Lean.Vir.Js α` wrapper, and a reducer receives equivalent
-  synthetic state and action wrappers. Those input wrappers are callback-local
-  and must not escape. The callback does not otherwise run in a temporary
-  resource scope: unrelated `Lean.Vir.JsValue` resources that it allocates have
-  ordinary `RuntimeM` lifetime and may escape. The returned state payload is
-  retained or transferred into React independently of those input wrappers.
-- `useEffect` and `useEffectWithDeps` give `cleanup` the resource returned by
-  that setup invocation. This wrapper is released after `cleanup` returns and
-  must not escape; a later setup receives an independently owned wrapper.
-
-This callback-local rule is currently dynamic, not enforced by Lean's type
-system: `Lean.Vir.Js α` itself carries no scope parameter. Safe Lean can store
-or return one of these input wrappers, but the host invalidates it at callback
-exit and a later use fails resource-liveness validation. This work guarantees
-bounded ownership and cleanup; making callback-input escape unrepresentable is
-deferred to a scoped or generative borrow API.
-
-`VirCallback` values follow a separate ownership lane. JavaScript receives a
-callable lease around a rooted Lean closure. `callback.retain()` creates a
-distinct callable lease; `release()` is idempotent per lease, and the Lean root
-is released after its last lease. Built-in active owners acquire their own
-lease and relinquish the incoming transfer lease, then release the owned lease
-at their natural lifetime boundary. Package reload/runtime disposal
-force-revokes any leases that remain.
-
-Browser React root submissions enter one explicit pending record before the
-browser adapter receives them. Supersession, unmount, adapter failure, and
-selector-publication rollback detach and release that record; a generation
-token makes its stale layout callback inert. Once React invokes a component,
-its speculative render ownership moves into opaque teardown tickets that do
-not retain the finalizer target. Reducer, state, ref, component-node,
-render-callback, and root ownership swaps occur from a real `useLayoutEffect`
-commit hook. Effect setup and cleanup use fresh per-invocation callback leases,
-so React's development setup→cleanup→setup replay does not reuse a released
-lease. The virtual renderer keeps its explicit immediate-commit behavior.
-
-Finalizer failures cannot unwind through a WASM finalizer. Diagnostics retain
-only bounded strings, not failed payloads, and ordinary teardown still
-attempts every release before reporting one error or an `AggregateError`.
-Deferred React cleanup follows the same rule; microtask cleanup errors are
-reported out of band through the bounded runtime diagnostic recorder.
-
-`vir.dispose()` tears down runtime-side host state:
-
-- built-in browser bindings remove live event listeners, clear pending timers,
-  cancel pending animation frames, unmount live React roots, and release
-  retained callbacks;
-- the resource generation is invalidated, so stale passive wrappers cannot be
-  passed into later Lean calls;
-- custom host binding maps can expose `[VIR_HOST_DISPOSE]()` or `dispose()` for
-  their own cleanup;
-- any callback roots still tracked by the runtime are force-revoked, marking
-  every outstanding `VirCallback` lease released;
-- any JSL cells still tracked by the runtime are force-revoked, marking every
-  outstanding alias released before dropping the retained Lean object;
-- later calls through `vir.call(...)`, `exportsByName`, or a callback fail with
-  a disposed-runtime error.
-
-Teardown first enters a disposing phase in which cleanup callbacks and host
-imports remain usable. New active registrations are rejected and rolled back
-immediately during this phase. Teardown disposes active owners and invalidates
-the resource generation, releases reverse Lean references, then clears
-externref roots and marks the runtime terminal. Every item is attempted even
-when a disposer throws;
-failures are reported directly or as an `AggregateError` in cleanup order.
-Repeated disposal is a no-op. A disposed resource store is not reused by a new
-runtime generation.
-
-Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
-set loaded performs the same package-resource cleanup during fresh-instance
-handover. If old-instance cleanup throws, the prepared candidate is discarded
-and the public runtime is left disposed rather than half-switched.
+Relevant commands include `npm run test:runtime`,
+`npm run test:upstream:no-build`, and
+`CHROMIUM=/path/to/chromium npm run test:pages:browser`.
 
 ## References
 
-- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
-- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
-- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
-- [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll)
-- [MDN `Element.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector)
-- [MDN `Element.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll)
-- [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML)
-- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
-- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
-- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
-- [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target)
-- [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
-- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
-- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
-- [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key)
+- [MDN WebAssembly reference types](https://developer.mozilla.org/en-US/docs/WebAssembly/Reference_types)
+- [MDN `FinalizationRegistry`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
-- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
-- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
-- [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
-- [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
-- [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
-- [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval)
-- [MDN `clearInterval`](https://developer.mozilla.org/en-US/docs/Web/API/clearInterval)
-- [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
-- [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
+- [React `createElement`](https://react.dev/reference/react/createElement)
 - [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
-- [React `useState`](https://react.dev/reference/react/useState)
-- [React `useReducer`](https://react.dev/reference/react/useReducer)
-- [React `useEffect`](https://react.dev/reference/react/useEffect)
-- [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)
+- [React hooks](https://react.dev/reference/react/hooks)

@@ -131,11 +131,6 @@ private def isLeanObjectHandleSignature
     | "js.leanRef.value", some arg =>
         signature.args.size == 1 && isGenericJsResource arg.type &&
           isLeanObjectHandle signature.result
-    | "js.leanRef.retain", some arg =>
-        signature.args.size == 1 && isGenericJsResource arg.type &&
-          isGenericJsResource signature.result
-    | "js.leanRef.release", some arg =>
-        signature.args.size == 1 && isGenericJsResource arg.type && signature.result == .unit
     | _, _ => false
 
 /-- Apply VIR's JavaScript host-boundary policy to a classified signature. -/

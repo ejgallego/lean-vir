@@ -10,9 +10,8 @@ Author: Emilio J. Gallego Arias
 
 #include "runtime/object.h"
 
-extern "C" uint32_t vir_resource_root(__externref_t value, uint8_t owned);
-extern "C" __externref_t vir_resource_get(uint32_t root_id, uint8_t take);
-extern "C" uint8_t vir_resource_is_owned(uint32_t root_id);
+extern "C" uint32_t vir_resource_root(__externref_t value);
+extern "C" __externref_t vir_resource_get(uint32_t root_id);
 extern "C" void vir_resource_release(uint32_t root_id);
 
 namespace lean {
@@ -43,8 +42,8 @@ static lean_external_class * vir_resource_external_class() {
 
 } // namespace
 
-object * vir_resource_object_from_externref(__externref_t value, bool owned) {
-    uint32_t root_id = vir_resource_root(value, owned ? 1 : 0);
+object * vir_resource_object_from_externref(__externref_t value) {
+    uint32_t root_id = vir_resource_root(value);
     if (root_id == 0) {
         return nullptr;
     }
@@ -62,14 +61,13 @@ uint32_t vir_resource_root_id(object * value) {
     return resource->root_id;
 }
 
-__externref_t vir_resource_externref(object * value, bool take) {
+__externref_t vir_resource_externref(object * value) {
     uint32_t root_id = vir_resource_root_id(value);
-    return root_id == 0 ? __builtin_wasm_ref_null_extern() : vir_resource_get(root_id, take ? 1 : 0);
+    return root_id == 0 ? __builtin_wasm_ref_null_extern() : vir_resource_get(root_id);
 }
 
-bool vir_resource_is_owned(object * value) {
-    uint32_t root_id = vir_resource_root_id(value);
-    return root_id != 0 && ::vir_resource_is_owned(root_id) != 0;
+bool vir_resource_is_valid(object * value) {
+    return vir_resource_root_id(value) != 0;
 }
 
 }

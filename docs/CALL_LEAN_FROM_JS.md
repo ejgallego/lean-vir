@@ -101,10 +101,10 @@ const greeting = vir.call("MyApp.greeting", "Lean");
 const classified = vir.call("MyApp.classify", 4);
 const validated = vir.call("MyApp.validateName", "Lean");
 
-console.log(total);    // "18"
+console.log(total); // "18"
 console.log(greeting); // "Hello, Lean"
 console.log(classified); // { kind: "inr", value: "5" }
-console.log(validated);  // { kind: "ok", value: "Hello, Lean" }
+console.log(validated); // { kind: "ok", value: "Hello, Lean" }
 ```
 
 `vir.call(name, ...args)` accepts the Lean declaration name, manifest `id`, or
@@ -206,7 +206,10 @@ inductive Term where
 vir.call("MyApp.termSize", {
   kind: "app",
   fields: {
-    fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+    fn: {
+      kind: "lam",
+      fields: { binder: "x", body: { kind: "var", value: "x" } },
+    },
     arg: { kind: "var", value: "y" },
   },
 });
@@ -342,13 +345,11 @@ def bumpViaJavaScript (n : Nat) : Lean.Vir.RuntimeM Nat := do
 JavaScript:
 
 ```js
-const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
   irPackageSetBytes: [await fetchBytes("/assets/my-app.irpkg")],
-  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
+    "demo.bumpNat": (n) => n + 1n,
   },
 });
 

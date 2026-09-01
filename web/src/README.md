@@ -9,8 +9,8 @@ unrelated responsibilities.
 
 - `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
   convenience helpers, and host import wiring.
-- `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs virtual browser and
-  React host bindings.
+- `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs
+  virtual browser bindings and explicit unsupported React shims.
 - `vir-host-bindings.js`: public package/SDK common/browser host-binding factories and
   stable re-exports.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
@@ -26,15 +26,15 @@ unrelated responsibilities.
   attribution.
 - `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
   codec.
-- `runtime/callbacks.js`: JavaScript callable Lean closure wrappers,
-  callback state tracking, release, and disposal helpers.
+- `runtime/callbacks.js`: private Lean closure roots associated with ordinary
+  JavaScript functions, plus runtime-disposal helpers.
 - `runtime/cleanup.js`: shared cleanup error collection and deterministic
   single/aggregate reporting.
 - `runtime/core.js`: package loading, manifest export tables, call resolution,
   memory helpers, and runtime/callback lifecycle.
 - `runtime/object-values.js`: object ABI lowering and lifting between
   JavaScript values and owned Lean objects.
-- `runtime/host-state.js`: host import dispatch state, externref resource
+- `runtime/host-state.js`: host import dispatch state, exact-value externref
   roots, host-binding lookup, and host-binding disposal.
 - `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
   field packing, and unpacking helpers used by the object-value runtime.
@@ -45,16 +45,15 @@ unrelated responsibilities.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
   and type formatting helpers.
 - `runtime/interface-tags.js`: shared interface descriptor tag constants.
-- `host-resource.js`: opaque host-resource objects and externref root tables.
-- `host/vir-host-resources.js`: host-resource store, liveness, teardown,
-  timers, callbacks, and shared host-binding helpers.
+- `host-boundary.js`: exact-value externref roots and host-call rollback
+  transactions.
+- `host/vir-host-resources.js`: explicit teardown for active listeners,
+  timers, frames, and React roots.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
-  React host bindings for Node tests/tools.
-- `react/vir-react-node.js`: `Lean.Vir.React.Node` resource construction,
-  native/virtual React node creation, validation, virtual text rendering, and
-  callback release.
-- `react/vir-react-hooks.js`: shared React component hook runtime and typed
-  state setter host bindings for browser and virtual React roots.
+  unsupported React host bindings for Node tests/tools.
+- `react/vir-react-node.js`: browser React node/props/children operations and
+  the root-local component adapter.
+- `react/vir-react-hooks.js`: direct official browser React hook operations.
 
 ## Demo And Page Modules
 

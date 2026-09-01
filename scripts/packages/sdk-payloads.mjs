@@ -12,7 +12,7 @@ export const SDK_PAYLOADS = [
   ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],
   ["js/vir-react-host-bindings.js", "web/src/vir-react-host-bindings.js"],
   ["js/vir-react-dom-client.js", "web/src/vir-react-dom-client.js"],
-  ["js/host-resource.js", "web/src/host-resource.js"],
+  ["js/host-boundary.js", "web/src/host-boundary.js"],
   ["js/runtime/call-timing.js", "web/src/runtime/call-timing.js"],
   ["js/runtime/callbacks.js", "web/src/runtime/callbacks.js"],
   ["js/runtime/cleanup.js", "web/src/runtime/cleanup.js"],
@@ -22,14 +22,23 @@ export const SDK_PAYLOADS = [
   ["js/runtime/host-state.js", "web/src/runtime/host-state.js"],
   ["js/runtime/object-abi.js", "web/src/runtime/object-abi.js"],
   ["js/runtime/object-abi-exports.js", "web/src/runtime/object-abi-exports.js"],
-  ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
+  [
+    "js/runtime/vir-value-normalizers.js",
+    "web/src/runtime/vir-value-normalizers.js",
+  ],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
   ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
   ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
-  ["js/host/vir-js-collection-bindings.js", "web/src/host/vir-js-collection-bindings.js"],
+  [
+    "js/host/vir-js-collection-bindings.js",
+    "web/src/host/vir-js-collection-bindings.js",
+  ],
   ["js/host/vir-js-value-bindings.js", "web/src/host/vir-js-value-bindings.js"],
-  ["js/host/vir-virtual-host-bindings.js", "web/src/host/vir-virtual-host-bindings.js"],
+  [
+    "js/host/vir-virtual-host-bindings.js",
+    "web/src/host/vir-virtual-host-bindings.js",
+  ],
   ["js/react/vir-react-node.js", "web/src/react/vir-react-node.js"],
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
@@ -41,8 +50,7 @@ const SDK_METADATA_ENTRIES = [
   "lean-vir-artifact.json",
 ];
 
-export const SDK_JS_MODULES = SDK_PAYLOADS
-  .map(([dest]) => dest)
+export const SDK_JS_MODULES = SDK_PAYLOADS.map(([dest]) => dest)
   .filter((dest) => dest.startsWith("js/"))
   .map((dest) => dest.slice("js/".length));
 

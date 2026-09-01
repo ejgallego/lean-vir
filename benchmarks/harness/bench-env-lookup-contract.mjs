@@ -23,7 +23,7 @@ const environmentLookupSharedHarnessPaths = [
   "scripts/packages/irpkg-format.mjs",
   "scripts/packages/package-versions.mjs",
   "scripts/process-utils.mjs",
-  "web/src/host-resource.js",
+  "web/src/host-boundary.js",
   "web/src/host/vir-host-resources.js",
   "web/src/host/vir-js-collection-bindings.js",
   "web/src/host/vir-js-value-bindings.js",

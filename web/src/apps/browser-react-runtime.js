@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { createVirRuntimeFactory } from "../vir-runtime.js";
 import {
   createBrowserHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
 } from "../vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../vir-react-host-bindings.js";
 
@@ -15,7 +15,7 @@ export function createBrowserReactRuntimeFactory(options = {}) {
   return createVirRuntimeFactory({
     ...options,
     defaultHostBindings: () => {
-      const resources = createHostResourceState();
+      const resources = createHostLifecycle();
       return createBrowserHostBindings({
         resources,
         reactHostBindings: createBrowserReactHostBindings(resources),

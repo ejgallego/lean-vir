@@ -8,49 +8,16 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { registerHostResourcePayloadLifetime } from "../../web/src/host-resource.js";
-import { createHostResourceState } from "../../web/src/host/vir-host-resources.js";
 import { createBrowserReactHookRuntime } from "../../web/src/react/vir-react-hooks.js";
+import { createBrowserReactComponentNode } from "../../web/src/react/vir-react-node.js";
+import {
+  createHostLifecycle,
+  createReactRootHostBindings,
+} from "../../web/src/host/vir-host-resources.js";
 
 const resultKey = "__leanVirReactStrictModeSmoke";
-const stateKey = "__leanVirReactStrictModeLifetimeState";
-const cleanupKey = "__leanVirReactStrictModeLifetimeCleanup";
-const liveResourceStates = [];
 
-const lifetimeState = {
-  strict: {
-    renders: 0,
-    setups: 0,
-    cleanups: 0,
-    payloads: lifetimeCounter(),
-    setupCallbacks: lifetimeCounter(),
-    cleanupCallbacks: lifetimeCounter(),
-  },
-  abandoned: {
-    renders: 0,
-    payloads: lifetimeCounter(),
-  },
-  lanes: {
-    renders: [],
-    initialPayloads: lifetimeCounter(),
-    urgentPayloads: lifetimeCounter(),
-    transitionPayloads: lifetimeCounter(),
-  },
-};
-globalThis[stateKey] = lifetimeState;
-globalThis[cleanupKey] = () => {
-  const errors = [];
-  for (const resources of liveResourceStates.splice(0)) {
-    try {
-      resources.dispose();
-    } catch (error) {
-      errors.push(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-  if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) throw new AggregateError(errors, "React lifetime smoke cleanup failed");
-};
-globalThis[resultKey] = runReactLifetimeSmoke().then(
+globalThis[resultKey] = runReactSmoke().then(
   (value) => ({ ok: true, value }),
   (error) => ({
     ok: false,
@@ -61,281 +28,299 @@ globalThis[resultKey] = runReactLifetimeSmoke().then(
   }),
 );
 
-async function runReactLifetimeSmoke() {
+async function runReactSmoke() {
   return {
     strict: await runStrictModeEffectProbe(),
     lanes: await runInterleavedStateLaneProbe(),
+    reducer: await runReducerIdentityProbe(),
+    memo: await runMemoIdentityProbe(),
+    component: await runRepeatedComponentSubmissionProbe(),
     abandoned: await runAbandonedSuspenseProbe(),
   };
 }
 
-async function runStrictModeEffectProbe() {
-  const state = lifetimeState.strict;
-  const resources = createHostResourceState();
-  const hooks = createBrowserReactHookRuntime(resources, React);
-  const component = hooks.createComponentState();
+async function runRepeatedComponentSubmissionProbe() {
+  const lifecycle = createHostLifecycle();
   const container = document.createElement("div");
-  container.id = "react-strict-mode-lifetime-smoke-root";
   document.body.append(container);
-  const root = createRoot(container);
-  let unmounted = false;
-  let componentDisposed = false;
-  let resourcesPreserved = false;
+  const bindings = createReactRootHostBindings(lifecycle, createRoot, {
+    createComponentNode: (componentType) =>
+      createBrowserReactComponentNode(React.createElement, componentType),
+  });
+  let root = bindings["react.root.create"](container);
+  const state = { mounts: 0, cleanups: 0 };
+  let setter = null;
 
-  function Probe() {
-    state.renders++;
-    return hooks.withComponentRender(component, () => {
-      const payload = createPayloadLease(state.payloads, `Strict Mode render ${state.renders}`);
-      const ref = hooks.useRef(payload);
-      resources.releaseResource(ref);
-      hooks.useEffect(
-        createCallbackLease(state.setupCallbacks, () => {
-          state.setups++;
-          return null;
-        }),
-        createCallbackLease(state.cleanupCallbacks, () => {
-          state.cleanups++;
-        }),
-      );
-      hooks.commitComponentRender(component);
-      return null;
-    });
-  }
+  const component = (label) => () => {
+    const [count, setCount] = React.useState(0);
+    setter = setCount;
+    React.useEffect(() => {
+      state.mounts++;
+      return () => state.cleanups++;
+    }, []);
+    return React.createElement("div", null, `${label}:${count}`);
+  };
 
   try {
-    flushSync(() => {
-      root.render(React.createElement(React.StrictMode, null, React.createElement(Probe)));
-    });
-    await waitFor(() => state.setups === 2, "Strict Mode effect setup replay");
-    flushSync(() => root.unmount());
-    unmounted = true;
-    await waitFor(() => state.cleanups === 2, "Strict Mode effect cleanup replay");
-    hooks.disposeComponent(component);
-    componentDisposed = true;
-    liveResourceStates.push(resources);
-    resourcesPreserved = true;
-    return {
-      renders: state.renders,
-      setups: state.setups,
-      cleanups: state.cleanups,
-    };
+    flushSync(() =>
+      bindings["react.root.renderComponent"](root, component("first")),
+    );
+    flushSync(() => setter(1));
+    flushSync(() =>
+      bindings["react.root.renderComponent"](root, component("second")),
+    );
+    requireState(
+      container.textContent === "second:1",
+      "root-local component identity must preserve hook state",
+    );
+    requireState(
+      state.mounts === 1 && state.cleanups === 0,
+      "an update must not remount the root-local component adapter",
+    );
+
+    flushSync(() => bindings["react.root.unmount"](root));
+    requireState(state.cleanups === 1, "unmount must clean up the component");
+    root = bindings["react.root.create"](container);
+    flushSync(() =>
+      bindings["react.root.renderComponent"](root, component("replacement")),
+    );
+    requireState(
+      container.textContent === "replacement:0" && state.mounts === 2,
+      "an explicit root replacement must mount a fresh component identity",
+    );
+    return { ...state, text: container.textContent };
   } finally {
-    if (!unmounted) flushSync(() => root.unmount());
-    if (!componentDisposed) hooks.disposeComponent(component);
-    if (!resourcesPreserved) resources.dispose();
+    flushSync(() => bindings["react.root.unmount"](root));
+    lifecycle.dispose();
     container.remove();
   }
 }
 
-async function runAbandonedSuspenseProbe() {
-  const state = lifetimeState.abandoned;
-  const resources = createHostResourceState();
-  const hooks = createBrowserReactHookRuntime(resources, React);
-  const component = hooks.createComponentState();
+async function runStrictModeEffectProbe() {
+  const hooks = createBrowserReactHookRuntime(React);
+  const state = { renders: 0, setups: 0, cleanups: 0 };
   const container = document.createElement("div");
-  container.id = "react-suspense-lifetime-smoke-root";
   document.body.append(container);
   const root = createRoot(container);
-  const neverSettles = new Promise(() => undefined);
-  let unmounted = false;
-  let componentDisposed = false;
-  let resourcesPreserved = false;
 
-  function SuspendedProbe() {
+  function Probe() {
     state.renders++;
-    return hooks.withComponentRender(component, () => {
-      const payload = createPayloadLease(state.payloads, `suspended render ${state.renders}`);
-      const ref = hooks.useRef(payload);
-      resources.releaseResource(ref);
-      hooks.commitComponentRender(component);
-      throw neverSettles;
-    });
+    hooks.useEffect(
+      () => {
+        state.setups++;
+        return { setup: state.setups };
+      },
+      (token) => {
+        if (token?.setup === undefined)
+          throw new Error("effect cleanup lost its exact setup value");
+        state.cleanups++;
+      },
+    );
+    return null;
   }
 
   try {
     flushSync(() => {
-      root.render(React.createElement(
-        React.Suspense,
-        { fallback: React.createElement("div", { id: "react-suspense-fallback" }, "waiting") },
-        React.createElement(SuspendedProbe),
-      ));
+      root.render(
+        React.createElement(React.StrictMode, null, React.createElement(Probe)),
+      );
     });
-    requireState(
-      container.querySelector("#react-suspense-fallback") !== null,
-      "the suspended render must commit its fallback",
-      state,
-    );
-    flushSync(() => {
-      root.render(React.createElement("div", { id: "react-suspense-replacement" }, "replacement"));
-    });
-    requireState(
-      container.querySelector("#react-suspense-replacement") !== null,
-      "the replacement must retire the suspended render",
+    await waitFor(
+      () => state.setups === 2,
+      "Strict Mode effect setup replay",
       state,
     );
     flushSync(() => root.unmount());
-    unmounted = true;
-    hooks.disposeComponent(component);
-    componentDisposed = true;
-    liveResourceStates.push(resources);
-    resourcesPreserved = true;
-    return { renders: state.renders };
+    await waitFor(
+      () => state.cleanups === 2,
+      "Strict Mode effect cleanup replay",
+      state,
+    );
+    return state;
   } finally {
-    if (!unmounted) flushSync(() => root.unmount());
-    if (!componentDisposed) hooks.disposeComponent(component);
-    if (!resourcesPreserved) resources.dispose();
+    container.remove();
+  }
+}
+
+async function runReducerIdentityProbe() {
+  const hooks = createBrowserReactHookRuntime(React);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const initial = { label: "initial" };
+  const action = { label: "action" };
+  const calls = [];
+  let dispatch = null;
+
+  function reducer(state, nextAction) {
+    calls.push({ state, action: nextAction });
+    return nextAction;
+  }
+
+  function Probe() {
+    const result = hooks.useReducer(reducer, initial);
+    if (!Array.isArray(result))
+      throw new Error("useReducer must return React's array pair");
+    dispatch ??= result[1];
+    return React.createElement(
+      "div",
+      { id: "react-reducer-value" },
+      result[0].label,
+    );
+  }
+
+  try {
+    flushSync(() => root.render(React.createElement(Probe)));
+    flushSync(() => dispatch(action));
+    requireState(calls.length >= 1, "React must invoke the supplied reducer");
+    requireState(
+      calls[0].state === initial,
+      "the reducer must receive the exact state value",
+    );
+    requireState(
+      calls[0].action === action,
+      "the reducer must receive the exact action value",
+    );
+    requireState(
+      container.textContent === action.label,
+      "React must store the reducer result",
+    );
+    return { calls: calls.length, exact: true };
+  } finally {
+    flushSync(() => root.unmount());
     container.remove();
   }
 }
 
 async function runInterleavedStateLaneProbe() {
-  const state = lifetimeState.lanes;
-  const resources = createHostResourceState();
-  const hooks = createBrowserReactHookRuntime(resources, React);
-  const component = hooks.createComponentState();
+  const hooks = createBrowserReactHookRuntime(React);
+  const state = { renders: [] };
   const container = document.createElement("div");
-  container.id = "react-state-lane-lifetime-smoke-root";
   document.body.append(container);
   const root = createRoot(container);
+  const initial = { label: "initial" };
+  const urgent = { label: "urgent" };
+  const transition = { label: "transition" };
   let setter = null;
-  let renderNumber = 0;
-  let unmounted = false;
-  let componentDisposed = false;
-  let resourcesPreserved = false;
 
   function Probe() {
-    renderNumber++;
-    return hooks.withComponentRender(component, () => {
-      const initial = createAliasedPayloadLease(state.initialPayloads, `lane initial ${renderNumber}`);
-      const result = hooks.useState(initial);
-      setter ??= result.setter;
-      state.renders.push(result.value.label);
-      hooks.commitComponentRender(component);
-      return React.createElement("div", { id: "react-state-lane-value" }, result.value.label);
-    });
+    const result = hooks.useState(initial);
+    if (!Array.isArray(result))
+      throw new Error("useState must return React's array pair");
+    setter ??= result[1];
+    state.renders.push(result[0].label);
+    return React.createElement(
+      "div",
+      { id: "react-state-lane-value" },
+      result[0].label,
+    );
   }
 
   try {
     flushSync(() => root.render(React.createElement(Probe)));
-    requireState(setter !== null, "the initial state render must expose its setter", state);
-
-    const urgent = createAliasedPayloadLease(state.urgentPayloads, "urgent");
-    const transition = createAliasedPayloadLease(state.transitionPayloads, "transition");
     flushSync(() => {
-      setter.set(urgent);
-      React.startTransition(() => setter.set(transition));
+      setter(urgent);
+      React.startTransition(() => setter(transition));
     });
-    requireState(state.renders.includes("urgent"), "the urgent state update must commit", state);
-    requireState(
-      state.transitionPayloads.active > 0,
-      "an urgent commit must preserve the still-queued transition payload",
-      state,
-    );
     await waitFor(
-      () => container.querySelector("#react-state-lane-value")?.textContent === "transition",
+      () =>
+        container.querySelector("#react-state-lane-value")?.textContent ===
+        "transition",
       "transition state commit",
       state,
     );
-
-    flushSync(() => root.unmount());
-    unmounted = true;
-    hooks.disposeComponent(component);
-    componentDisposed = true;
-    requireState(state.initialPayloads.active === 0, "lane initial payloads must be released", state);
-    requireState(state.urgentPayloads.active === 0, "lane urgent payloads must be released", state);
-    requireState(state.transitionPayloads.active === 0, "lane transition payloads must be released", state);
-    liveResourceStates.push(resources);
-    resourcesPreserved = true;
-    return { renders: state.renders.slice() };
+    return {
+      renders: state.renders,
+      initialExact: state.renders[0] === initial.label,
+      finalExact: container.textContent === transition.label,
+    };
   } finally {
-    if (!unmounted) flushSync(() => root.unmount());
-    if (!componentDisposed) hooks.disposeComponent(component);
-    if (!resourcesPreserved) resources.dispose();
+    flushSync(() => root.unmount());
     container.remove();
   }
 }
 
-function createPayloadLease(counter, label) {
-  const payload = { kind: "browser React lifetime payload", label };
-  let leases = 1;
-  counter.created++;
-  counter.active++;
-  registerHostResourcePayloadLifetime(payload, {
-    retain() {
-      if (leases === 0) throw new Error(`cannot retain released payload: ${label}`);
-      leases++;
-      counter.created++;
-      counter.active++;
-      return payload;
-    },
-    release() {
-      if (leases === 0) return false;
-      leases--;
-      counter.active--;
-      counter.releases++;
-      return true;
-    },
-  });
-  return payload;
+async function runMemoIdentityProbe() {
+  const hooks = createBrowserReactHookRuntime(React);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const singleton = { exact: true };
+  const dependencies = [];
+  const seen = [];
+
+  function Probe({ dependency }) {
+    const value = hooks.useMemo(() => singleton, dependency);
+    seen.push(value);
+    return null;
+  }
+
+  try {
+    flushSync(() =>
+      root.render(React.createElement(Probe, { dependency: dependencies })),
+    );
+    flushSync(() =>
+      root.render(React.createElement(Probe, { dependency: [1] })),
+    );
+    return {
+      exactDependencies: dependencies.length === 0,
+      exactResult: seen.every((value) => value === singleton),
+      renders: seen.length,
+    };
+  } finally {
+    flushSync(() => root.unmount());
+    container.remove();
+  }
 }
 
-function createAliasedPayloadLease(counter, label) {
-  const cell = { live: true, aliases: new Set() };
-  const createAlias = () => {
-    if (!cell.live) throw new Error(`cannot retain released payload: ${label}`);
-    let live = true;
-    const alias = { kind: "browser React aliased lifetime payload", label };
-    cell.aliases.add(alias);
-    counter.created++;
-    counter.active++;
-    registerHostResourcePayloadLifetime(alias, {
-      retain() {
-        if (!live || !cell.live) throw new Error(`cannot retain released payload alias: ${label}`);
-        return createAlias();
-      },
-      release() {
-        if (!live) return false;
-        live = false;
-        cell.aliases.delete(alias);
-        if (cell.aliases.size === 0) cell.live = false;
-        counter.active--;
-        counter.releases++;
-        return true;
-      },
+async function runAbandonedSuspenseProbe() {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const neverSettles = new Promise(() => undefined);
+  let renders = 0;
+
+  function SuspendedProbe() {
+    renders++;
+    throw neverSettles;
+  }
+
+  try {
+    flushSync(() => {
+      root.render(
+        React.createElement(
+          React.Suspense,
+          {
+            fallback: React.createElement(
+              "div",
+              { id: "react-suspense-fallback" },
+              "waiting",
+            ),
+          },
+          React.createElement(SuspendedProbe),
+        ),
+      );
     });
-    return alias;
-  };
-  return createAlias();
+    if (container.querySelector("#react-suspense-fallback") === null) {
+      throw new Error("the suspended render must commit its fallback");
+    }
+    flushSync(() => {
+      root.render(
+        React.createElement(
+          "div",
+          { id: "react-suspense-replacement" },
+          "replacement",
+        ),
+      );
+    });
+    return { renders, replaced: container.textContent === "replacement" };
+  } finally {
+    flushSync(() => root.unmount());
+    container.remove();
+  }
 }
 
-function createCallbackLease(counter, invoke) {
-  let released = false;
-  const callback = Object.assign((...args) => {
-    if (released) throw new Error("React lifetime callback lease has been released");
-    return invoke(...args);
-  }, {
-    retain() {
-      if (released) throw new Error("cannot retain a released React lifetime callback");
-      return createCallbackLease(counter, invoke);
-    },
-    release() {
-      if (released) return false;
-      released = true;
-      counter.active--;
-      counter.releases++;
-      return true;
-    },
-  });
-  counter.created++;
-  counter.active++;
-  return callback;
-}
-
-function lifetimeCounter() {
-  return { created: 0, active: 0, releases: 0 };
-}
-
-async function waitFor(ready, label, details = lifetimeState.strict) {
+async function waitFor(ready, label, details) {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (ready()) return;
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -343,6 +328,6 @@ async function waitFor(ready, label, details = lifetimeState.strict) {
   throw new Error(`${label} did not complete: ${JSON.stringify(details)}`);
 }
 
-function requireState(condition, message, details) {
-  if (!condition) throw new Error(`${message}: ${JSON.stringify(details)}`);
+function requireState(condition, message) {
+  if (!condition) throw new Error(message);
 }
