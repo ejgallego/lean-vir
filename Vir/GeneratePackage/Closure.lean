@@ -109,14 +109,24 @@ def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
     (resolvedRootsForTarget index target).foldl
       (fun state root => collectName index root #[root] state) state) {}
 
+private def DeclIndex.opaqueImportedModuleForDecl?
+    (index : DeclIndex) (name : Name) : Option Name :=
+  index.envs.findSome? fun (_, env) => do
+    let decl ← findEnvDecl env name
+    if isOpaqueExternDecl decl then
+      environmentModuleForDecl? env name
+    else
+      none
+
 unsafe def resolveImportedModuleClosure
     (targets : Array Target)
     (index : DeclIndex) : IO DeclIndex := do
   if !targets.any (·.resolveImportedModules) then
     return index
   let closure := collectClosure targets index
-  let modules := closure.missingDecls.foldl (init := #[]) fun modules dependency =>
-    match index.moduleForDecl? dependency.name with
+  let deferred := closure.missingDecls ++ closure.missingExterns
+  let modules := deferred.foldl (init := #[]) fun modules dependency =>
+    match index.opaqueImportedModuleForDecl? dependency.name with
     | some moduleName =>
         if index.loadedModules.contains moduleName || modules.contains moduleName then
           modules

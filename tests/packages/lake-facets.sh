@@ -152,7 +152,7 @@ printf '%s\n' \
   'public meta import Vir.Attributes' \
   '' \
   '@[vir_export]' \
-  'public def Smoke.Dependency.importedValue : Nat := 41' > "$tmp/Smoke/Dependency.lean"
+  'public def Lean.SmokeDependency.importedValue : Nat := 41' > "$tmp/Smoke/Dependency.lean"
 
 printf '%s\n' \
   'module' \
@@ -161,7 +161,8 @@ printf '%s\n' \
   'public import Smoke.Dependency' \
   '' \
   '@[vir_export]' \
-  'public def Smoke.NewRuntime.value : Nat := 43' \
+  'public def Smoke.NewRuntime.value : Nat :=' \
+  '  Lean.SmokeDependency.importedValue + 2' \
   '' \
   '@[vir_startup]' \
   'public def Smoke.NewRuntime.start : Unit := ()' > "$tmp/Smoke/NewRuntime.lean"
@@ -343,7 +344,7 @@ node --input-type=module -e '
   if (manifest.exports.length !== 2) process.exit(1);
   if (entries["Smoke.NewRuntime.value"]?.startup !== false) process.exit(1);
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);
-  if (entries["Smoke.Dependency.importedValue"] !== undefined) process.exit(1);
+  if (entries["Lean.SmokeDependency.importedValue"] !== undefined) process.exit(1);
 ' "$tmp/module-package.json"
 
 printf '%s\n' \
