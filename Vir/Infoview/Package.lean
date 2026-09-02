@@ -25,6 +25,11 @@ structure IRPackage where
   roots : Array String
   deriving Server.RpcEncodable
 
+/--
+Meta-phase mirror of `IRPackage` for server RPC requests. `IRPackage` remains a
+runtime value because it is embedded in widget props; its generated
+`RpcEncodable` instance therefore cannot be called from a `meta` RPC handler.
+-/
 meta structure IRPackageRpc where
   roots : Array String
   deriving Server.RpcEncodable

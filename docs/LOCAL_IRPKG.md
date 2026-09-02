@@ -60,6 +60,12 @@ host imports, source targets, and resolved roots. The same data is embedded in
 Local package generation also builds `build/lean-lib`, which provides the
 project-owned `Vir.*` modules for host import declarations.
 
+When a selected declaration crosses an opaque module-system import, the local
+generator loads the owning module's compiled IR and folds the reached closure
+into its single output package. Lake's `:vir` facet uses the same closure logic
+but preserves module ownership in a package-set descriptor and dependency
+members.
+
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.
 

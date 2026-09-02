@@ -28,10 +28,13 @@ Targets have one of five modes:
   `@[vir_export]` or `@[vir_startup]` in a source file.
 - `--target-marked-module <driver.lean> <module>`: package marked declarations
   owned by one imported module while excluding marked declarations from its
-  dependencies, then follow opaque declaration ownership to load reached module
-  IR for composable package-set emission. The CLI's internal
+  dependencies. The CLI's internal
   `--module-set-output` arguments provide descriptor and shard destinations to
   the Lake `:vir` facet.
+
+Every target mode follows opaque declaration ownership and loads the reached
+module IR before validating the final closure. The module-marked mode also
+retains declaration ownership for composable package-set emission.
 
 ## Module Map
 

@@ -148,9 +148,10 @@ def Closure.moduleNames (closure : Closure) : Array Name :=
     | none => modules
 
 /--
-Filter Lean's canonical dependency-first module order to the modules reached by
-the package closure. The root is appended only for the legacy source path,
-where its declarations do not carry imported-module ownership.
+Filter the dependency-first order reconstructed from Lean's loaded module
+graphs to the modules reached by the package closure. The root is appended only
+for the legacy source path, where its declarations do not carry imported-module
+ownership.
 -/
 def Closure.moduleInitializationOrder
     (closure : Closure)

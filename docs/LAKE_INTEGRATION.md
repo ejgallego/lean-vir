@@ -31,7 +31,11 @@ Use `@[vir_startup]` for startup hooks that the browser host should run after
 loading the package.
 
 ```lean
-import Vir
+module
+
+public import Vir
+
+public section
 
 open Lean.Vir.Browser
 
@@ -98,8 +102,9 @@ public meta import Vir.Attributes
 public def MyModule.value : Nat := 42
 ```
 
-The canvas example below currently uses the legacy-source path because the
-broader browser library has not yet migrated to the module system.
+The canvas example below uses this same module-system path. The narrower
+`Vir.Attributes` import remains useful for packages that need marker metadata
+without the browser-facing library.
 
 ## Opt Into A Lean Extern Reference Body
 
@@ -148,13 +153,15 @@ MySlides/Runtime.parts/MySlides.Support.irpkg
 MySlides/Runtime.report.md
 ```
 
-For current, legacy Lean modules the generator re-elaborates the module source.
-When Lake supplies compiled module IR, the facet depends on that `.ir` and uses
-a generated `import all MySlides.Runtime` driver.
+For legacy Lean source files that do not produce compiled module IR, the
+generator re-elaborates the source. For module-system files, the facet depends
+on Lake's `.ir` artifact and uses a generated
+`import all MySlides.Runtime` driver.
 
 Every member is an ordinary format-10 `.irpkg` that owns its module's
-declarations and initializer metadata. The descriptor filters Lean's canonical
-dependency-first module order to the reached modules and puts the root last.
+declarations and initializer metadata. The descriptor reconstructs a
+dependency-first order from Lean's loaded module graphs, filters it to the
+reached modules, and puts the root last.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all
 members before running initializer globals in that module order. Duplicate

@@ -32,7 +32,11 @@ require lean_vir from git
 Then mark exports directly in Lean and build the containing module:
 
 ```lean
-import Vir
+module
+
+public import Vir
+
+public section
 
 @[vir_export]
 def answer : Nat := 42

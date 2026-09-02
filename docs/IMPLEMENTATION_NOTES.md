@@ -41,7 +41,7 @@ recorded in
 For module-system clients, the `:vir` facet uses Lean's owning-module
 index to resolve opaque imported dependencies on demand. It partitions the
 reached closure into format-10 dependency shards and one root package, then
-filters Lean's canonical module-initialization order into a dependency-first
+reconstructs a dependency-first order from the loaded module graphs for the
 JSON descriptor. Each shard retains its owning module's initializer metadata.
 The JavaScript runtime stages the complete set in a fresh instance, rejects
 identity conflicts, installs the root manifest last, and runs initializer

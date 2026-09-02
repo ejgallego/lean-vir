@@ -54,25 +54,30 @@ const packageInfoByModule = new Map(descriptor.packages.map((entry, index) => [
   entry.module,
   readIrPackageInfo(packageBytes[index]),
 ]));
-assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Shared")) > 4);
-assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Right")) > 4);
-assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.InternalBase")) > 4);
-assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Facade")) > 4);
+for (const moduleName of [
+  "ModuleSetFixture.Shared",
+  "ModuleSetFixture.Right",
+  "ModuleSetFixture.InternalBase",
+  "ModuleSetFixture.Facade",
+]) {
+  assert.ok(initSectionSize(packageInfoByModule.get(moduleName)) > 4);
+}
 assert.equal(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")), 4);
 const wasmBytes = await readFile(wasmPath);
+const expectedAnswer = "62";
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: packageBytes });
 assert.equal(runtime.packageInfo.packageCount, 6);
 assert.equal(runtime.packageInfo.count, 16);
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 assert.throws(
   () => runtime.loadIrPackageSetBytes([packageBytes[0], packageBytes[0], packageBytes[1]]),
   /duplicate IR declaration `ModuleSetFixture\./,
 );
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 runtime.loadIrPackageSetBytes(packageBytes);
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 runtime.dispose();
 
 const urlRuntime = await createVirRuntime({
@@ -80,7 +85,7 @@ const urlRuntime = await createVirRuntime({
   irPackageSetUrl: pathToFileURL(descriptorPath),
   fetchBytes: (path) => readFile(path),
 });
-assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), "62");
+assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 urlRuntime.dispose();
 
 console.log("module package-set smoke ok");
