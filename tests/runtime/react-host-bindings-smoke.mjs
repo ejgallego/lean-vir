@@ -250,7 +250,11 @@ assert.throws(
   bindings["react.state.modify"]((action) => {
     queuedUpdate = action;
   }, update);
-  assert.equal(typeof queuedUpdate, "function");
+  assert.equal(
+    queuedUpdate,
+    update,
+    "the state setter must receive the exact lifted updater function",
+  );
   const previous = { exact: true };
   assert.deepEqual(queuedUpdate(previous), { previous });
 }

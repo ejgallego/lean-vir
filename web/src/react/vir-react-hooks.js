@@ -103,10 +103,9 @@ export function createReactStateHostBindings(hookRuntime) {
       return undefined;
     },
     "react.state.modify": (setter, update) => {
-      requireFunction(
-        setter,
-        "ReactStateSetter",
-      )((previous) => requireFunction(update, "React state updater")(previous));
+      requireFunction(setter, "ReactStateSetter")(
+        requireFunction(update, "React state updater"),
+      );
       return undefined;
     },
     "react.reducer.dispatch": (dispatch, action) => {
