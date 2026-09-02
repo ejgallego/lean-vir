@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean
-import Lean.Compiler.ExternAttr
-import Vir.HostValidation
+module
+
+public import Lean
+public import Lean.Compiler.ExternAttr
+public import Vir.HostValidation
+
+public section
 
 open Lean
 

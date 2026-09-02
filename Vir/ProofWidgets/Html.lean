@@ -4,7 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.React
+module
+
+public import Vir.React
+
+public section
 
 namespace Lean.Vir.ProofWidgets
 

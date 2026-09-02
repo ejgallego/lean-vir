@@ -4,13 +4,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Js
-import Vir.Runtime
+module
+
+public import Vir.Js
+public import Vir.Runtime
+
+public section
 
 namespace Lean.Vir.Browser
 
 /-- Browser/DOM effect used by Lean-authored browser code. -/
-@[irreducible] def DomM (α : Type) : Type :=
+@[expose, irreducible] def DomM (α : Type) : Type :=
   Lean.Vir.RuntimeM α
 
 namespace DomM

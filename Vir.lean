@@ -4,12 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.ExternFallback
-import Vir.Attributes
-import Vir.Host
-import Vir.Runtime
-import Vir.Js
-import Vir.Common
-import Vir.Browser
-import Vir.React
-import Vir.ProofWidgets
+module
+
+public import Vir.ExternFallback
+public meta import Vir.ExternFallback
+public import Vir.Attributes
+public meta import Vir.Attributes
+public import Vir.Host
+public import Vir.Runtime
+public import Vir.Js
+public import Vir.Common
+public import Vir.Browser
+public import Vir.React
+public import Vir.ProofWidgets

@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Common
-import Vir.Js
-import Vir.Browser.Generated
+module
+
+public import Vir.Common
+public import Vir.Js
+public import Vir.Browser.Generated
+
+public section
 
 namespace Lean.Vir.Browser
 

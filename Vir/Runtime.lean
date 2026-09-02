@@ -4,6 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
+module
+
+public section
+
 namespace Lean.Vir
 
 /--
@@ -13,7 +17,7 @@ Runtime/JavaScript-resource effect.
 JavaScript-owned values and mutate VIR runtime bookkeeping, but do not by
 themselves mutate the browser DOM or enter React's render/root APIs.
 -/
-@[irreducible] def RuntimeM (α : Type) : Type :=
+@[expose, irreducible] def RuntimeM (α : Type) : Type :=
   IO α
 
 namespace RuntimeM
@@ -45,7 +49,7 @@ instance : Nonempty (RuntimeM α) :=
 end RuntimeM
 
 /-- Mutable Lean-owned state shared by VIR callbacks. -/
-@[irreducible] def RuntimeRef (α : Type) : Type :=
+@[expose, irreducible] def RuntimeRef (α : Type) : Type :=
   IO.Ref α
 
 namespace RuntimeRef

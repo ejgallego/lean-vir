@@ -4,15 +4,20 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean.Widget
-import Lean.Server.FileWorker.RequestHandling
-import Vir.Infoview.Package
+module
+
+public import Lean.Widget
+public meta import Lean.Widget
+public import Lean.Server.FileWorker.RequestHandling
+public import Vir.Infoview.Package
+
+public section
 
 namespace Lean.Vir.Infoview
 
 open Lean Server
 
-structure ProofWidgetsRpcRef where
+meta structure ProofWidgetsRpcRef where
   id : String
   label : String
   typeName : String
@@ -22,18 +27,18 @@ structure ProofWidgetsRpcRef where
   context : String
   deriving Server.RpcEncodable
 
-structure ProofWidgetsRpcRefRequest where
+meta structure ProofWidgetsRpcRefRequest where
   ref : ProofWidgetsRpcRef
   pos : Lsp.Position
   packageRevision : String
   deriving Server.RpcEncodable
 
-structure ProofWidgetsExprWithCtxAtPosRequest where
+meta structure ProofWidgetsExprWithCtxAtPosRequest where
   pos : Lsp.Position
   packageRevision : String
   deriving Server.RpcEncodable
 
-structure ProofWidgetsRpcRefInfo where
+meta structure ProofWidgetsRpcRefInfo where
   id : String
   label : String
   typeName : String
@@ -48,7 +53,7 @@ structure ProofWidgetsRpcRefInfo where
   knownConstant : Bool
   deriving Server.RpcEncodable
 
-structure StoredExprWithCtx where
+meta structure StoredExprWithCtx where
   storeKey : String
   id : String
   label : String
@@ -63,26 +68,26 @@ structure StoredExprWithCtx where
   knownConstant : Bool
   deriving TypeName
 
-structure SavedExprWithCtxRef where
+meta structure SavedExprWithCtxRef where
   ref : Server.WithRpcRef StoredExprWithCtx
   info : ProofWidgetsRpcRefInfo
   deriving Server.RpcEncodable
 
-structure StoredExprWithCtxRefRequest where
+meta structure StoredExprWithCtxRefRequest where
   ref : Server.WithRpcRef StoredExprWithCtx
   pos : Lsp.Position
   packageRevision : String
   deriving Server.RpcEncodable
 
-initialize proofWidgetsRpcRefStore : IO.Ref (Array StoredExprWithCtx) ← IO.mkRef #[]
+meta initialize proofWidgetsRpcRefStore : IO.Ref (Array StoredExprWithCtx) ← IO.mkRef #[]
 
-def maxStoredProofWidgetsRpcRefs : Nat :=
+meta def maxStoredProofWidgetsRpcRefs : Nat :=
   1024
 
-def proofWidgetsRpcRefStoreKey (packageRevision id : String) : String :=
+meta def proofWidgetsRpcRefStoreKey (packageRevision id : String) : String :=
   packageRevision ++ ":" ++ id
 
-def upsertStoredExprWithCtx
+meta def upsertStoredExprWithCtx
     (stored : StoredExprWithCtx)
     (items : Array StoredExprWithCtx) :
     Array StoredExprWithCtx :=
@@ -90,7 +95,7 @@ def upsertStoredExprWithCtx
     |>.take maxStoredProofWidgetsRpcRefs
     |>.toArray
 
-def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefInfo :=
+meta def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefInfo :=
   {
     id := stored.id
     label := stored.label
@@ -106,7 +111,7 @@ def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefIn
     knownConstant := stored.knownConstant
   }
 
-def mkStoredExprWithCtx
+meta def mkStoredExprWithCtx
     (ref : ProofWidgetsRpcRef)
     (source position packageRevision : String)
     (knownConstant : Bool) :
@@ -126,21 +131,21 @@ def mkStoredExprWithCtx
     knownConstant
   }
 
-def StoredExprWithCtx.refresh
+meta def StoredExprWithCtx.refresh
     (stored : StoredExprWithCtx)
     (source position : String)
     (knownConstant : Bool) :
     StoredExprWithCtx :=
   { stored with source, position, knownConstant }
 
-def rememberStoredExprWithCtx (stored : StoredExprWithCtx) : IO Unit :=
+meta def rememberStoredExprWithCtx (stored : StoredExprWithCtx) : IO Unit :=
   proofWidgetsRpcRefStore.modify (upsertStoredExprWithCtx stored)
 
-def lspPositionLabel (source : String) (pos : Lsp.Position) : String :=
+meta def lspPositionLabel (source : String) (pos : Lsp.Position) : String :=
   let fileName := (System.FilePath.mk source).fileName.getD source
   s!"{fileName}:{pos.line + 1}:{pos.character + 1}"
 
-def interactiveHypothesesContext (hyps : Array Widget.InteractiveHypothesisBundle) : String :=
+meta def interactiveHypothesesContext (hyps : Array Widget.InteractiveHypothesisBundle) : String :=
   String.intercalate "\n" <| hyps.toList.map fun hyp =>
     let names := String.intercalate " " hyp.names.toList
     let names := if names.isEmpty then "_" else names
@@ -150,12 +155,12 @@ def interactiveHypothesesContext (hyps : Array Widget.InteractiveHypothesisBundl
       | some value => s!" := {value.stripTags}"
     s!"{names} : {hyp.type.stripTags}{valueSuffix}"
 
-def interactiveGoalLabel (goal : Widget.InteractiveGoal) (index : Nat) : String :=
+meta def interactiveGoalLabel (goal : Widget.InteractiveGoal) (index : Nat) : String :=
   match goal.userName? with
   | some userName => s!"case {userName}"
   | none => s!"Goal {index + 1}"
 
-def interactiveGoalStoredExprWithCtx
+meta def interactiveGoalStoredExprWithCtx
     (goal : Widget.InteractiveGoal)
     (source position packageRevision : String)
     (index : Nat) :
@@ -178,28 +183,28 @@ def interactiveGoalStoredExprWithCtx
     knownConstant := false
   }
 
-def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExprWithCtxRef := do
+meta def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExprWithCtxRef := do
   rememberStoredExprWithCtx stored
   let ref ← Server.WithRpcRef.mk stored
   return { ref, info := stored.toInfo }
 
-def rpcRefName? (ref : ProofWidgetsRpcRef) : Option Name :=
+meta def rpcRefName? (ref : ProofWidgetsRpcRef) : Option Name :=
   match nameFromDotted ref.id with
   | .ok name => some name
   | .error _ => none
 
-def rpcRefKnownConstant (env : Environment) (ref : ProofWidgetsRpcRef) : Bool :=
+meta def rpcRefKnownConstant (env : Environment) (ref : ProofWidgetsRpcRef) : Bool :=
   match rpcRefName? ref with
   | none => false
   | some name => env.contains name
 
-def rpcRefIdKnownConstant (env : Environment) (id : String) : Bool :=
+meta def rpcRefIdKnownConstant (env : Environment) (id : String) : Bool :=
   match nameFromDotted id with
   | .ok name => env.contains name
   | .error _ => false
 
 @[server_rpc_method]
-def resolveProofWidgetsRpcRef
+meta def resolveProofWidgetsRpcRef
     (params : ProofWidgetsRpcRefRequest) :
     RequestM (RequestTask ProofWidgetsRpcRefInfo) := do
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
@@ -215,7 +220,7 @@ def resolveProofWidgetsRpcRef
     return stored.toInfo
 
 @[server_rpc_method]
-def createProofWidgetsExprWithCtxRef
+meta def createProofWidgetsExprWithCtxRef
     (params : ProofWidgetsRpcRefRequest) :
     RequestM (RequestTask SavedExprWithCtxRef) := do
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
@@ -232,7 +237,7 @@ def createProofWidgetsExprWithCtxRef
     return { ref, info := stored.toInfo }
 
 @[server_rpc_method]
-def createProofWidgetsExprWithCtxAtPos
+meta def createProofWidgetsExprWithCtxAtPos
     (params : ProofWidgetsExprWithCtxAtPosRequest) :
     RequestM (RequestTask (Option SavedExprWithCtxRef)) := do
   let doc ← RequestM.readDoc
@@ -255,7 +260,7 @@ def createProofWidgetsExprWithCtxAtPos
       return some (← saveStoredExprWithCtx stored)
 
 @[server_rpc_method]
-def resolveProofWidgetsExprWithCtxRef
+meta def resolveProofWidgetsExprWithCtxRef
     (params : StoredExprWithCtxRefRequest) :
     RequestM (RequestTask ProofWidgetsRpcRefInfo) := do
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
