@@ -48,6 +48,41 @@ function validateActiveEffect(value, context) {
   }
 }
 
+function validateSemanticPolicy(value, context, additionalFields = []) {
+  if (!object(value) || !nonemptyString(value.reason)) {
+    throw new Error(`${context} must define semantics and reason`);
+  }
+  validateKeys(value, ["semantics", "reason", ...additionalFields], context);
+  validateUpstreamSemantics(value.semantics, context);
+}
+
+function typeLeaf(value) {
+  return value.slice(value.lastIndexOf(".") + 1);
+}
+
+function resourceMapping(generation, id, context = `generation resource ${id}`) {
+  const mapping = generation.resources?.[id];
+  if (typeof mapping === "string") {
+    if (!nonemptyString(mapping) || typeLeaf(id) !== typeLeaf(mapping)) {
+      throw new Error(
+        `${context} changes the TypeScript marker and requires lean, semantics, and reason`,
+      );
+    }
+    return {
+      lean: mapping,
+      semantics: "preserving",
+      reason: `${mapping} preserves the TypeScript ${id} phantom marker.`,
+      explicit: false,
+    };
+  }
+  if (mapping === undefined) return null;
+  if (!object(mapping) || !nonemptyString(mapping.lean)) {
+    throw new Error(`${context} must define a Lean marker`);
+  }
+  validateSemanticPolicy(mapping, context, ["lean"]);
+  return { ...mapping, explicit: true };
+}
+
 function validateKeys(value, allowed, context) {
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) throw new Error(`${context} has unsupported field ${key}`);
@@ -152,12 +187,16 @@ export function validateGenerationProfile(generation, context = "generation") {
       !nonemptyString(profile.resource.nullableConstructor) ||
       !object(profile.resource.argument) || !object(profile.resource.result) ||
       !object(profile.receiver) || !object(profile.receiver.default) ||
-      !Array.isArray(profile.receiver.globalTypes) ||
-      !profile.receiver.globalTypes.every(nonemptyString)) {
+      !object(profile.receiver.globalTypes) || !object(generation.resources)) {
     throw new Error(`${context} does not define a valid ABI profile`);
   }
-  if (new Set(profile.receiver.globalTypes).size !== profile.receiver.globalTypes.length) {
-    throw new Error(`${context} ABI profile repeats a global receiver type`);
+  for (const [name, policy] of Object.entries(profile.receiver.globalTypes)) {
+    if (!nonemptyString(name)) throw new Error(`${context} global receiver type is empty`);
+    validateSemanticPolicy(policy, `${context} global receiver ${name}`);
+  }
+  for (const id of Object.keys(generation.resources)) {
+    if (!nonemptyString(id)) throw new Error(`${context} resource type is empty`);
+    resourceMapping(generation, id, `${context} resource ${id}`);
   }
   for (const [name, type] of Object.entries(profile.types)) {
     if (!object(type) || !nonemptyString(type.lean) ||
@@ -330,8 +369,12 @@ function translateType(shape, generation, profile, context) {
     }
   }
   if (shape?.kind === "option") return nullableResource(shape, generation, profile, context);
-  if (shape?.kind === "ref" && nonemptyString(generation.resources?.[shape.id])) {
-    const marker = generation.resources[shape.id];
+  if (shape?.kind === "ref") {
+    const mapping = resourceMapping(generation, shape.id, `${context} resource ${shape.id}`);
+    if (mapping === null) {
+      throw new Error(`${context} has unsupported faithful translation ${JSON.stringify(shape)}`);
+    }
+    const marker = mapping.lean;
     return translatedType(
       `${profile.resource.constructor} ${marker}`,
       "js-resource",
@@ -362,44 +405,96 @@ function methodPolicyChangesCall(policy) {
     (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
     (policy.omittedRestParameters?.length ?? 0) !== 0 ||
     Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
-    Object.keys(policy.fixedArguments ?? {}).length !== 0 ||
-    Object.keys(policy.parameterRenames ?? {}).length !== 0;
+    Object.keys(policy.fixedArguments ?? {}).length !== 0;
 }
 
-function derivedSemantics(exception, methodPolicy = null) {
+function combineSemantics(primary, policyFacts) {
+  if (primary.relation === "unreviewed") return primary;
+  const changing = policyFacts.filter((fact) => fact.relation === "changing");
+  if (changing.length === 0) return primary;
+  const details = [...new Set([
+    ...(primary.relation === "changing" ? [primary.detail] : []),
+    ...changing.map((fact) => fact.detail),
+  ])];
+  return {
+    relation: "changing",
+    evidence: primary.relation === "changing" ? primary.evidence : "abi-policy",
+    detail: details.join(" "),
+  };
+}
+
+function typePolicyFacts(shape, generation, context) {
+  if (shape?.kind === "option") {
+    return typePolicyFacts(shape.element, generation, context);
+  }
+  if (shape?.kind === "ref") {
+    const mapping = resourceMapping(generation, shape.id, `${context} resource ${shape.id}`);
+    return mapping?.explicit === true
+      ? [{
+        relation: mapping.semantics,
+        evidence: "resource-mapping",
+        detail: mapping.reason,
+      }]
+      : [];
+  }
+  return [];
+}
+
+function receiverPolicyFacts(member, generation, profile, { free = false } = {}) {
+  if (free) return [];
+  const owner = member.slice(0, member.lastIndexOf("."));
+  const globalPolicy = profile.receiver.globalTypes[owner];
+  if (globalPolicy !== undefined) {
+    return [{
+      relation: globalPolicy.semantics,
+      evidence: "global-receiver-policy",
+      detail: globalPolicy.reason,
+    }];
+  }
+  const mapping = resourceMapping(generation, owner, `${member} receiver resource ${owner}`);
+  return mapping?.explicit === true
+    ? [{
+      relation: mapping.semantics,
+      evidence: "resource-mapping",
+      detail: mapping.reason,
+    }]
+    : [];
+}
+
+function derivedSemantics(exception, methodPolicy = null, policyFacts = []) {
+  let primary;
   if (exception === null && methodPolicy?.semantics !== undefined) {
-    return {
+    primary = {
       relation: methodPolicy.semantics,
       evidence: "reviewed-method-policy",
       detail: methodPolicy.reason,
     };
-  }
-  if (exception === null && methodPolicy !== null && methodPolicyChangesCall(methodPolicy)) {
-    return {
+  } else if (exception === null && methodPolicy !== null && methodPolicyChangesCall(methodPolicy)) {
+    primary = {
       relation: "unreviewed",
       evidence: "method-policy",
       detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
     };
-  }
-  if (exception === null) {
-    return {
+  } else if (exception === null) {
+    primary = {
       relation: "preserving",
       evidence: "typescript-derived",
       detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
     };
-  }
-  if (exception.semantics === undefined) {
-    return {
+  } else if (exception.semantics === undefined) {
+    primary = {
       relation: "unreviewed",
       evidence: "operation-exception",
       detail: exception.reason,
     };
+  } else {
+    primary = {
+      relation: exception.semantics,
+      evidence: "reviewed-exception",
+      detail: exception.reason,
+    };
   }
-  return {
-    relation: exception.semantics,
-    evidence: "reviewed-exception",
-    detail: exception.reason,
-  };
+  return combineSemantics(primary, policyFacts);
 }
 
 function protocolSemantics(protocol) {
@@ -469,7 +564,7 @@ function modalityArgument(
 
 function receiverFor(member, identity, generation, profile, exception, defaultName = undefined) {
   const owner = member.slice(0, member.lastIndexOf("."));
-  const configuredGlobal = profile.receiver.globalTypes.includes(owner);
+  const configuredGlobal = profile.receiver.globalTypes[owner] !== undefined;
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
   if (!["global", "argument", "none"].includes(kind)) {
     throw new Error(`${identity.id} receiver exception kind must be global, argument, or none`);
@@ -509,7 +604,7 @@ function receiverFor(member, identity, generation, profile, exception, defaultNa
     exception?.receiver?.name ?? defaultName ?? ownerName[0].toLowerCase() + ownerName.slice(1),
     `${identity.id} receiver name`,
   );
-  const marker = generation.resources?.[owner];
+  const marker = resourceMapping(generation, owner, `${identity.id} receiver resource ${owner}`)?.lean;
   const type = exception?.receiver?.type === undefined
     ? (() => {
       if (!nonemptyString(marker)) {
@@ -688,6 +783,10 @@ function propertyOperation(
       throw new Error(`${anchor.id} exception references missing argument ${name}`);
     }
   }
+  const semanticFacts = [
+    ...receiverPolicyFacts(member, generation, profile),
+    ...typePolicyFacts(shape, generation, `${member} ${accessor}`),
+  ];
   return {
     id: anchor.id,
     library: config.id,
@@ -717,7 +816,7 @@ function propertyOperation(
     receiver,
     arguments: arguments_,
     result,
-    semantics: derivedSemantics(exception),
+    semantics: derivedSemantics(exception, null, semanticFacts),
     ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
@@ -900,6 +999,12 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     profile,
     exception,
   );
+  const semanticFacts = [
+    ...receiverPolicyFacts(member, generation, profile, { free }),
+    ...shape.args.flatMap((argument) =>
+      typePolicyFacts(argument.type, generation, `${member} argument ${argument.name}`)),
+    ...typePolicyFacts(shape.result, generation, `${member} result`),
+  ];
   return {
     id: operationId,
     library: config.id,
@@ -938,7 +1043,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     receiver,
     arguments: arguments_,
     result,
-    semantics: derivedSemantics(exception, policy),
+    semantics: derivedSemantics(exception, policy, semanticFacts),
     ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
@@ -1267,7 +1372,7 @@ export function materializeGeneratedAnchors(config, root, descriptor, anchorData
 export function generatedOperationDocument(config, generation, operations) {
   return {
     format: "lean-vir-binding-operation-ir",
-    version: 1,
+    version: 2,
     library: config.id,
     profile: generation.abiProfile,
     operations,

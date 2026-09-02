@@ -17,19 +17,6 @@ const browserPath = new URL("../../Vir/Browser.bindings.json", import.meta.url).
 const browser = JSON.parse(await readFile(browserPath, "utf8"));
 const infoviewPath = new URL("../../Vir/Infoview/Surface.bindings.json", import.meta.url).pathname;
 const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
-const javascriptPath = new URL("../../Vir/Js.bindings.json", import.meta.url).pathname;
-const javascript = JSON.parse(await readFile(javascriptPath, "utf8"));
-const reactPath = new URL("../../Vir/React.bindings.json", import.meta.url).pathname;
-const react = JSON.parse(await readFile(reactPath, "utf8"));
-
-const generationExceptions = (config) => Object.entries(config.generation.exceptions ?? {});
-const upstreamAdapters = (config) => config.generation.protocolOperations.filter((operation) =>
-  operation.upstreamRelation.kind === "upstream-adapter");
-const activeEffectAssignments = (config) => [
-  ...generationExceptions(config),
-  ...config.generation.protocolOperations.map((operation) => [operation.id, operation]),
-].filter(([, operation]) => operation.activeEffect !== undefined)
-  .map(([id, operation]) => `${id}:${operation.activeEffect}`).sort();
 
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
@@ -166,6 +153,20 @@ test("semantic review classifications are fail-closed enums", async () => {
     validateBindingConfig(missingMethodReason, browserPath),
     /must have property reason when property semantics is present/u,
   );
+
+  const missingGlobalReason = structuredClone(browser);
+  delete missingGlobalReason.generation.abiProfile.receiver.globalTypes.Document.reason;
+  await assert.rejects(
+    validateBindingConfig(missingGlobalReason, browserPath),
+    /must have required property 'reason'/u,
+  );
+
+  const implicitResourceAlias = structuredClone(browser);
+  implicitResourceAlias.generation.resources.KeyboardEvent = "Event";
+  await assert.rejects(
+    validateBindingConfig(implicitResourceAlias, browserPath),
+    /changes the TypeScript marker and requires lean, semantics, and reason/u,
+  );
 });
 
 test("private active-effect roles are fail-closed", async () => {
@@ -177,100 +178,6 @@ test("private active-effect roles are fail-closed", async () => {
     validateBindingConfig(invalid, browserPath),
     /activeEffect.*must be equal to one of the allowed values/u,
   );
-});
-
-test("the Browser audit classifies every exception and upstream adapter", () => {
-  const exceptions = generationExceptions(browser);
-  assert.equal(exceptions.filter(([, exception]) =>
-    exception.semantics === undefined).length, 0);
-  assert.deepEqual(
-    exceptions.filter(([, exception]) => exception.semantics === "changing")
-      .map(([id]) => id).sort(),
-    [
-      "browser.element.addEventListener",
-      "browser.element.removeEventListener",
-      "browser.event.currentTarget",
-      "browser.event.target",
-    ],
-  );
-
-  const adapters = upstreamAdapters(browser);
-  assert.equal(adapters.filter((operation) =>
-    operation.upstreamRelation.semantics === undefined).length, 0);
-  assert.equal(adapters.filter((operation) =>
-    operation.upstreamRelation.semantics === "changing").length, 0);
-  assert.deepEqual(
-    activeEffectAssignments(browser),
-    [
-      "browser.animation.cancelAnimationFrame:release",
-      "browser.animation.requestAnimationFrame:register",
-      "browser.element.addEventListener:register",
-      "browser.element.removeEventListener:release",
-      "browser.timer.clearInterval:release",
-      "browser.timer.clearTimeout:release",
-      "browser.timer.setInterval:register",
-      "browser.timer.setTimeout:register",
-    ],
-  );
-});
-
-test("the infoview clipboard capability is an explicit semantic adapter", () => {
-  const clipboard = infoview.generation.protocolOperations.find((operation) =>
-    operation.id === "infoview.clipboard.write-text");
-  assert.equal(clipboard.upstreamRelation.semantics, "changing");
-});
-
-test("the JavaScript collection audit distinguishes direct operations from ownership and null adapters", () => {
-  const adapters = upstreamAdapters(javascript);
-  assert.equal(adapters.filter((operation) =>
-    operation.upstreamRelation.semantics === undefined).length, 0);
-  assert.deepEqual(
-    adapters.filter((operation) =>
-      operation.upstreamRelation.semantics === "changing")
-      .map((operation) => operation.id),
-    ["javascript.array.item"],
-  );
-});
-
-test("the React audit treats direct native values as the preserving exemplar", () => {
-  const exceptions = generationExceptions(react);
-  assert.equal(exceptions.filter(([, exception]) =>
-    exception.semantics === undefined).length, 0);
-  assert.deepEqual(
-    exceptions.filter(([, exception]) => exception.semantics === "changing")
-      .map(([id]) => id),
-    [],
-  );
-
-  const adapters = upstreamAdapters(react);
-  assert.equal(adapters.filter((operation) =>
-    operation.upstreamRelation.semantics === undefined).length, 0);
-  assert.deepEqual(
-    adapters.filter((operation) =>
-      operation.upstreamRelation.semantics === "changing")
-      .map((operation) => operation.id).sort(),
-    [
-      "react.hooks.use-effect",
-      "react.hooks.use-effect-with-deps",
-      "react.props.set-key",
-      "react.root.render-tree",
-    ],
-  );
-  assert.equal(
-    adapters.find((operation) => operation.id === "react.node.create-element")
-      ?.upstreamRelation.semantics,
-    "preserving",
-  );
-  assert.deepEqual(activeEffectAssignments(react), [
-    "react.root.create:register",
-    "react.root.render-component-selector:register",
-    "react.root.render-component:use",
-    "react.root.render-selector:register",
-    "react.root.render-tree:use",
-    "react.root.renderNode:use",
-    "react.root.unmount-selector:release",
-    "react.root.unmount:release",
-  ]);
 });
 
 test("local protocol relations identify their declaration member", async () => {

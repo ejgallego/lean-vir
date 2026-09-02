@@ -50,10 +50,12 @@ Canonical operation IR records this separately from type-comparator evidence:
   come from an external upstream operation.
 
 A TypeScript-derived operation without an operation exception and with an
-unmodified single-signature call policy receives a `preserving` contract claim
-from its declaration plus ABI profile. A method policy that selects an overload
-or changes the exposed parameter list must set `semantics` and `reason`, unless
-an operation exception already supplies that review. Exceptions and
+unmodified single-signature call policy starts with a `preserving` contract
+claim. The generator then folds in the ABI profile's receiver and resource
+mapping facts; any changing fact makes the complete operation an adapter. A
+method policy that selects an overload or changes the exposed parameter list
+must set `semantics` and `reason`, unless an operation exception already
+supplies that review. Exceptions and
 `upstream-adapter` protocols likewise set `semantics` to `preserving` or
 `changing`; until then the operation remains `unreviewed` in the author
 workbench. This is a contract classification, not provider-behavior
@@ -94,10 +96,10 @@ ABI policy.
 
 These modes are runtime/ABI policy, not an affine Lean type system. `@&` marks
 borrowed arguments for Lean's calling convention; it does not prevent a caller
-from retaining a Lean alias. Likewise, `consumed` means the runtime takes the
-handle and dynamically revokes its aliases after the call. A later operation
-through an alias fails resource-liveness validation, but ordinary Lean typing
-does not make the second use unrepresentable.
+from retaining a Lean alias. `consumed` marks a terminal operation that takes
+the Lean argument and may terminate associated private effect state. It does
+not revoke ordinary JavaScript aliases or make a second use unrepresentable in
+Lean.
 
 ## ABI Profile
 
@@ -115,6 +117,14 @@ Each generated library has a named `generation.abiProfile` in its
 - operations run in `DomM`;
 - `Document` is a host-global receiver, while `Element` is an explicit
   borrowed receiver.
+
+Identity resource mappings may use the short string form. Resource mappings
+whose Lean marker name differs from the TypeScript type, and every host-global
+receiver choice, must instead carry `semantics` plus `reason`. These are
+operation-policy facts: a changing fact makes the generated operation an
+adapter, while only identity mappings and explicitly preserving facts can
+contribute to faithful coverage. This keeps widened phantom types and omitted
+receivers from being promoted silently.
 
 The profile is library policy, not user convenience policy. In particular, it
 does not turn JavaScript strings into Lean-owned `String` values. Applications
@@ -150,7 +160,8 @@ must not replace the public JavaScript value.
 `npm run generate:lean-bindings` creates a canonical operation record for every
 selected TypeScript operation and every reviewed protocol operation.
 It then renders all downstream views from those records. Ignored debugging
-artifacts are written per library under:
+artifacts use `lean-vir-binding-operation-ir` version 2 and are written per
+library under:
 
 ```text
 build/bindings/*.generated-operations.json
@@ -250,8 +261,10 @@ The browser slice includes global functions, DOM methods, and properties.
 Selected overloads, parameter projections and renames, fixed-arity rest
 specializations, callbacks, primitive resources, and receiver/result overrides
 are all recorded in the same IR. In particular, the event-listener pair records
-registration as returning a revocable handle and removal as a receiver-free
-disposer that dynamically revokes that handle and its aliases.
+registration as returning a removable listener value and removal as a
+receiver-free terminal operation. Removal clears VIR's private teardown record;
+ordinary JavaScript aliases still refer to the same already-removed listener
+value.
 
 ## Reviewed Protocol Operations
 
@@ -341,6 +354,8 @@ Authored configuration owns:
 - the pinned declaration inputs and selected member set;
 - correspondence among TypeScript operations, Lean names, and host targets;
 - resource marker names and the named ABI profile;
+- reviewed semantic policy for non-identity resource mappings and host-global
+  receivers;
 - documented semantic exceptions.
 
 Generation owns:

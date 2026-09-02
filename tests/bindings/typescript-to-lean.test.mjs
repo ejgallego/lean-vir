@@ -9,6 +9,7 @@ import test from "node:test";
 
 import {
   buildGeneratedOperations,
+  generatedOperationDocument,
   materializeGeneratedAnchors,
 } from "../../scripts/bindings/binding-modalities.mjs";
 import {
@@ -38,7 +39,7 @@ const generation = {
     },
     receiver: {
       default: { passing: "borrowed", retention: "call" },
-      globalTypes: [],
+      globalTypes: {},
     },
   },
   resources: { Widget: "Widget" },
@@ -184,6 +185,22 @@ test("operation IR records derived modalities and their provenance", () => {
     relation: "preserving",
     evidence: "typescript-derived",
     detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+  });
+  assert.equal(generatedOperationDocument(config, generation, operations).version, 2);
+
+  const widened = structuredClone(generation);
+  widened.resources.Widget = {
+    lean: "Event",
+    semantics: "changing",
+    reason: "The demo deliberately accepts a wider event marker.",
+  };
+  const widenedGetter = buildGeneratedOperations(config, widened, descriptors).find(
+    (operation) => operation.id === "widget.label.get",
+  );
+  assert.deepEqual(widenedGetter.semantics, {
+    relation: "changing",
+    evidence: "abi-policy",
+    detail: widened.resources.Widget.reason,
   });
 });
 
@@ -331,6 +348,18 @@ test("an explicit single-signature policy generates faithful methods and documen
     descriptors,
   );
   assert.match(namedReceiver, /opaque getAttribute\n    \(self : @& Lean\.Vir\.Js Widget\)/u);
+
+  const renamedGeneration = structuredClone(generation);
+  renamedGeneration.methodPolicies["Widget.getAttribute"].parameterRenames = {
+    name: "attribute",
+  };
+  const renamedOperation = buildGeneratedOperations(
+    config,
+    renamedGeneration,
+    descriptors,
+  ).find((operation) => operation.id === "demo.widget.getAttribute");
+  assert.equal(renamedOperation.arguments[0].name, "attribute");
+  assert.equal(renamedOperation.semantics.relation, "preserving");
 });
 
 test("generated exceptions distinguish unreviewed boundaries and semantic adapters", () => {
@@ -379,7 +408,7 @@ test("generated exceptions distinguish unreviewed boundaries and semantic adapte
   );
   assert.doesNotMatch(
     changedOutput,
-    /Generated reviewed JavaScript boundary specialization for the TypeScript `Widget\.getAttribute`/u,
+    /Generated reviewed method specialization of TypeScript `Widget\.getAttribute`/u,
   );
   assert.deepEqual(reviewed.semantics, {
     relation: "changing",

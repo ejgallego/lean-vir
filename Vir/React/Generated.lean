@@ -19,7 +19,6 @@ Uses the exact DOM tag string as a React ElementType value.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; tag js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -40,7 +39,6 @@ Explicitly lowers an event descriptor to a JavaScript object containing the exac
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; value lean-owned/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -61,7 +59,6 @@ Calls React.useReducer with the exact reducer and initial JavaScript value and r
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; reducer callback/owned/until-release; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -81,7 +78,6 @@ Projects the current state from React's useReducer array pair.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; reducerState js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -100,7 +96,6 @@ Projects React's dispatch function from its useReducer array pair.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; reducerState js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -119,7 +114,6 @@ Calls React.useState with the exact initial JavaScript value and returns React's
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -137,7 +131,6 @@ Projects the current value from React's useState array pair.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; state js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -155,7 +148,6 @@ Projects React's setter function from its useState array pair.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; state js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -173,7 +165,6 @@ Creates a typed React ref object initialized with a JavaScript-owned value.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -187,13 +178,10 @@ opaque useRef
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `React.useEffect`.
 
-Adapts separate Lean setup and cleanup functions to React's no-dependency effect callback shape.
-
-Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+Adapter policy: Adapts separate Lean setup and cleanup functions to React's no-dependency effect callback shape.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated explicit JavaScript semantic adapter for the TypeScript `React.useEffect` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -212,7 +200,6 @@ Passes the calculation and exact dependency array to React.useMemo.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; calculate callback/owned/call; deps js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -227,13 +214,10 @@ opaque useMemo
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `React.useEffect`.
 
-Adapts separate Lean setup and cleanup functions to React's effect callback shape and passes the exact dependency array.
-
-Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+Adapter policy: Adapts separate Lean setup and cleanup functions to React's effect callback shape and passes the exact dependency array.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated explicit JavaScript semantic adapter for the TypeScript `React.useEffect` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; deps js-resource/borrowed/call; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -257,7 +241,6 @@ Allocates an empty JavaScript dependency list for React hooks.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -272,7 +255,6 @@ Appends a JavaScript-owned identity value to a hook dependency list.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; deps js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -295,7 +277,6 @@ Uses the exact JavaScript string as a React text node.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -312,7 +293,6 @@ Calls React.createElement with the exact ElementType, props object, and child ar
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; elementType js-resource/borrowed/call; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -331,7 +311,6 @@ Calls React.createElement with React.Fragment, the exact props object, and child
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -353,7 +332,6 @@ Allocates an empty JavaScript-owned React child list.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -368,7 +346,6 @@ Appends the exact React node value to the native JavaScript child array.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; children js-resource/borrowed/call; child js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -390,7 +367,6 @@ Explicitly lowers VIR's reviewed React Property algebra to an ordinary JavaScrip
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -411,7 +387,6 @@ Allocates an empty JavaScript React props object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -422,13 +397,10 @@ opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Props)
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `React.Attributes.key`.
 
-Sets React's special key field on a JavaScript props object.
-
-Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+Adapter policy: Sets React's special key field on a JavaScript props object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated explicit JavaScript semantic adapter for the TypeScript `React.Attributes.key` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; key js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -446,7 +418,6 @@ Installs the reviewed descriptor's exact JavaScript value on the props object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; property js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -464,7 +435,6 @@ Installs the descriptor's exact callback function on the JavaScript props object
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; handler js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -482,7 +452,6 @@ Installs the exact React ref object on a JavaScript props object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; ref js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -505,7 +474,6 @@ Passes the exact JavaScript action to React's reducer dispatch function.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; dispatch js-resource/borrowed/call; action js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -529,7 +497,6 @@ Reads the current value from React's exact mutable ref object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; ref js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -547,7 +514,6 @@ Writes the exact JavaScript value to React's mutable ref object without scheduli
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; ref js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -566,9 +532,10 @@ namespace React.Root
 /--
 Generated reviewed method specialization of TypeScript `Root.render`.
 
+Specialization policy: Root rendering is a DOM effect; the exact ReactNode JavaScript value is forwarded without conversion.
+
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Root.render` method.
 ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -582,9 +549,10 @@ opaque renderNode
 /--
 Generated reviewed method specialization of TypeScript `Root.unmount`.
 
+Specialization policy: Unmount is terminal for the Lean root argument: it removes VIR's private active-root record and calls React's root.unmount without revoking JavaScript aliases.
+
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L63
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Root.unmount` method.
 ABI profile `vir-react-protocol-v1`: root js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -599,9 +567,10 @@ Generated reviewed function specialization of TypeScript `createRoot`.
 
 createRoot lets you create a root to display React components inside a browser DOM node.
 
+Specialization policy: VIR restricts the TypeScript Container union to Element and uses default RootOptions; within that supported lane it passes the exact container to createRoot and returns the exact Root.
+
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L86
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `createRoot` function.
 ABI profile `vir-react-protocol-v1`: receiver none; container js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -614,13 +583,10 @@ opaque create
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `Root.render`.
 
-Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.
-
-Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+Adapter policy: Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated explicit JavaScript semantic adapter for the TypeScript `Root.render` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; children callback/owned/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -638,7 +604,6 @@ Retains a Lean-authored component thunk as a real React function component until
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; component callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -656,7 +621,6 @@ VIR-owned convenience protocol that finds a selector, creates a root, and render
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -674,7 +638,6 @@ VIR-owned selector convenience protocol that mounts the explicit no-props Lean c
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; component callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -692,7 +655,6 @@ VIR-owned convenience protocol that unmounts and releases the root associated wi
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -713,7 +675,6 @@ Enqueues one concrete JavaScript-owned state value through a React setter.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -732,7 +693,6 @@ Passes the Lean updater as React's functional state action; React may invoke it 
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; update callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.

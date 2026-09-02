@@ -196,13 +196,30 @@ const boundaryEvidenceLabel = (value) => ({
   unclassified: "unclassified protocol",
 })[value] ?? value;
 const semanticRelation = (operation) => operation?.semantics?.relation ?? "unreviewed";
-const semanticRelationLabel = (value) => ({
-  preserving: "semantics-preserving contract",
-  changing: "explicit semantic adapter",
-  unreviewed: "semantic review required",
-  "vir-owned": "VIR-owned semantics",
-  "local-contract": "local contract semantics",
-})[value] ?? value;
+const semanticRelationDefinitions = new Map([
+  ["preserving", {
+    filter: "Semantics-preserving",
+    badge: "semantics-preserving contract",
+  }],
+  ["changing", {
+    filter: "Explicit semantic adapters",
+    badge: "explicit semantic adapter",
+  }],
+  ["unreviewed", {
+    filter: "Semantic review required",
+    badge: "semantic review required",
+  }],
+  ["vir-owned", {
+    filter: "VIR-owned semantics",
+    badge: "VIR-owned semantics",
+  }],
+  ["local-contract", {
+    filter: "Local contract semantics",
+    badge: "local contract semantics",
+  }],
+]);
+const semanticRelationLabel = (value) =>
+  semanticRelationDefinitions.get(value)?.badge ?? value;
 
 function operationsForSymbol(group, symbol) {
   return (group.generatedOperations ?? []).filter((operation) =>
@@ -257,6 +274,10 @@ const elements = Object.fromEntries([
 for (const status of Object.keys(generation.semanticCoverage)) {
   const label = semanticCoverageDefinitions.get(status)?.filter ?? status;
   elements.coverage.add(new Option(label, status));
+}
+for (const relation of Object.keys(generation.semanticRelations)) {
+  const label = semanticRelationDefinitions.get(relation)?.filter ?? relation;
+  elements.semantics.add(new Option(label, relation));
 }
 
 const typeBrowserOptionValues = {
@@ -581,12 +602,12 @@ function renderSemanticLeanType(value, provenance = []) {
 }
 
 const modalityDescriptions = {
-  "js-resource": "A JavaScript value represented by an opaque Lean resource handle.",
+  "js-resource": "The exact JavaScript value, rooted behind Lean's opaque Js marker.",
   immediate: "An immediate Lean value; no JavaScript resource handle is involved.",
   callback: "A Lean callback crossing the JavaScript boundary.",
   borrowed: "Borrowed by the host for this boundary call.",
-  owned: "Ownership transfers across this boundary.",
-  consumed: "The runtime takes this handle and dynamically revokes its aliases after the call; Lean does not enforce affine use.",
+  owned: "Passed as an owned Lean argument; ordinary JavaScript aliases remain unchanged.",
+  consumed: "A terminal operation takes this Lean argument and may clear private effect state; JavaScript aliases are not revoked and Lean does not enforce affine use.",
   call: "The host may retain this value only for the duration of the call.",
   "until-release": "The host retains this value until the matching release operation.",
   retained: "The host retains this value after the call.",

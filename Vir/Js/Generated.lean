@@ -19,7 +19,6 @@ Reads Array.length while keeping the array contents in JavaScript land.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -33,13 +32,10 @@ opaque lengthJs
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `Array`.
 
-Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.
-
-Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+Adapter policy: Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated explicit JavaScript semantic adapter for the TypeScript `Array` protocol operation.
 ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -62,7 +58,6 @@ Reads NodeList.length while keeping the collection in JavaScript land.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -80,7 +75,6 @@ Calls NodeList.item and represents a missing entry as JavaScript null.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -99,7 +93,6 @@ Copies a NodeList into a JavaScript Array without crossing its entries into Lean
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -121,7 +114,6 @@ Constructs a JavaScript null resource for a statically selected phantom type.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -138,7 +130,6 @@ Injects a JavaScript resource into VIR's JavaScript nullable representation.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -156,7 +147,6 @@ Tests a JavaScript nullable resource without decoding its payload.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -174,7 +164,6 @@ Extracts the non-null payload of a JavaScript nullable resource.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -196,7 +185,6 @@ Explicitly converts a Lean-owned String into a JavaScript string resource.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -213,7 +201,6 @@ Explicitly decodes a JavaScript string resource into a Lean-owned String.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
@@ -230,7 +217,6 @@ Explicitly converts a Lean Nat into a JavaScript number resource.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -247,7 +233,6 @@ Explicitly decodes a JavaScript number resource as a Lean Nat.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -264,7 +249,6 @@ Explicitly converts a Lean Bool into a JavaScript boolean resource.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -281,7 +265,6 @@ Explicitly decodes a JavaScript boolean resource as a Lean Bool.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -298,7 +281,6 @@ Explicitly preserves a Lean Float as a JavaScript IEEE-754 number resource.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -315,7 +297,6 @@ Explicitly decodes a JavaScript IEEE-754 number resource as a Lean Float.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -336,7 +317,6 @@ Creates an ordinary self-owning JavaScript object that retains the Lean-owned va
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -354,7 +334,6 @@ Returns a fresh owned Lean reference from a live self-owning JavaScript object.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.

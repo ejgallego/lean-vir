@@ -154,6 +154,11 @@ absence; generation rejects the latter two and optional properties until they
 have explicit representations. Convenience conversions belong in a separate
 application-facing layer and do not count as upstream bindings.
 
+Non-identity resource markers and host-global receiver choices are explicit
+semantic policy. Their reviewed relation is folded into each affected
+operation, so a widened marker or omitted instance receiver cannot become
+faithful merely because its Lean declaration and provider target exist.
+
 Faithfulness includes observable behavior, not only declaration shape. The
 canonical boundary preserves identity, mutation, argument reuse, success and
 failure behavior, callback retention, terminal behavior, and ownership. The

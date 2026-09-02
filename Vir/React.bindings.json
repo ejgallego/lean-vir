@@ -19,10 +19,14 @@
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
-      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {
-      "React.ReactNode": "Lean.Vir.React.Node",
+      "React.ReactNode": {
+        "lean": "Lean.Vir.React.Node",
+        "semantics": "preserving",
+        "reason": "Lean.Vir.React.Node is the phantom marker for the exact JavaScript ReactNode value."
+      },
       "Root": "Lean.Vir.React.Root"
     },
     "members": ["Root.render", "Root.unmount", "createRoot"],
@@ -54,7 +58,7 @@
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
       },
       "react.root.unmount": {
-        "reason": "Unmount consumes the Lean root handle, removes the active registration, and calls React's root.unmount.",
+        "reason": "Unmount is terminal for the Lean root argument: it removes VIR's private active-root record and calls React's root.unmount without revoking JavaScript aliases.",
         "semantics": "preserving",
         "activeEffect": "release",
         "receiver": { "passing": "consumed" },

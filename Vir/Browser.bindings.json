@@ -27,17 +27,34 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": ["Console", "Document"]
+        "globalTypes": {
+          "Console": {
+            "semantics": "changing",
+            "reason": "The shipped console boundary uses the host-global console instead of accepting an arbitrary Console receiver."
+          },
+          "Document": {
+            "semantics": "changing",
+            "reason": "The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver."
+          }
+        }
       }
     },
     "resources": {
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
-      "DOMTokenList": "Element",
+      "DOMTokenList": {
+        "lean": "Element",
+        "semantics": "changing",
+        "reason": "The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value."
+      },
       "Element": "Element",
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
-      "KeyboardEvent": "Event",
+      "KeyboardEvent": {
+        "lean": "Event",
+        "semantics": "changing",
+        "reason": "The shipped key getter accepts the wider Event marker and normalizes a missing key to the empty string."
+      },
       "TextMetrics": "TextMetrics"
     },
     "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
@@ -193,7 +210,7 @@
       },
       "browser.console.log": {
         "reason": "VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "arguments": {
           "message": {
             "type": {
@@ -207,7 +224,7 @@
       },
       "browser.document.createElement": {
         "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js Element",
@@ -218,7 +235,7 @@
       },
       "browser.document.querySelector": {
         "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -229,7 +246,7 @@
       },
       "browser.document.querySelectorAll": {
         "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -259,7 +276,7 @@
         }
       },
       "browser.element.addEventListener": {
-        "reason": "VIR specializes DOM listener registration to a Lean callback retained until an explicit revocable listener handle is consumed.",
+        "reason": "VIR specializes DOM listener registration to a Lean callback retained until the returned listener value is passed to terminal removal.",
         "semantics": "changing",
         "activeEffect": "register",
         "arguments": {
@@ -283,7 +300,7 @@
       },
       "browser.element.classList.add": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -295,7 +312,7 @@
       },
       "browser.element.classList.remove": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -307,7 +324,7 @@
       },
       "browser.element.classList.toggle": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -319,7 +336,7 @@
       },
       "browser.element.style.setProperty": {
         "reason": "The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.",
-        "semantics": "preserving",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -352,7 +369,7 @@
         }
       },
       "browser.element.removeEventListener": {
-        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the revocable listener handle returned by registration; consuming it removes the listener and releases the callback.",
+        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the listener value returned by registration; terminal removal removes the listener, releases the callback, and does not revoke JavaScript aliases.",
         "semantics": "changing",
         "activeEffect": "release",
         "receiver": { "kind": "none" },
@@ -428,7 +445,7 @@
         "id": "browser.canvas2d.set-fill-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setFillStyle",
         "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleJs", "marker": "vir_js",
         "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.fillStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.fillStyle", "accessor": "set", "semantics": "preserving" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.fillStyle", "accessor": "set", "semantics": "changing" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
@@ -440,7 +457,7 @@
         "id": "browser.canvas2d.set-stroke-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setStrokeStyle",
         "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleJs", "marker": "vir_js",
         "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.strokeStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.strokeStyle", "accessor": "set", "semantics": "preserving" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.strokeStyle", "accessor": "set", "semantics": "changing" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
@@ -512,7 +529,7 @@
         "target": "browser.timer.clearTimeout",
         "lean": "Lean.Vir.Browser.Timer.clearTimeout",
         "marker": "vir_js",
-        "reason": "The exact timeout token is passed unchanged to clearTimeout; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
+        "reason": "The exact timeout token is passed unchanged to clearTimeout; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout", "semantics": "preserving" },
         "activeEffect": "release",
         "effect": { "id": "dom", "lean": "DomM" },
@@ -543,7 +560,7 @@
         "target": "browser.timer.clearInterval",
         "lean": "Lean.Vir.Browser.Timer.clearInterval",
         "marker": "vir_js",
-        "reason": "The exact interval token is passed unchanged to clearInterval; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
+        "reason": "The exact interval token is passed unchanged to clearInterval; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval", "semantics": "preserving" },
         "activeEffect": "release",
         "effect": { "id": "dom", "lean": "DomM" },

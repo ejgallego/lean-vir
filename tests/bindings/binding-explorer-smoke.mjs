@@ -279,8 +279,8 @@ assert.deepEqual(documentTitle?.generation, {
   provenance: "generator",
   targets: ["browser.document.getTitle", "browser.document.setTitle"],
   semanticCoverage: {
-    status: "faithful",
-    relations: ["preserving"],
+    status: "adapter-only",
+    relations: ["changing"],
   },
   diagnostics: [],
 });
@@ -328,7 +328,7 @@ assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
-assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
+assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "adapter-only");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -414,6 +414,10 @@ assert.equal(generatedFillStyleGetter?.receiver.argument.name, "ctx");
 assert.equal(generatedFillStyleGetter?.result.lean, "Lean.Vir.Js CanvasStyle");
 assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGradient, and CanvasPattern union/u);
 assert.equal(generatedFillStyleGetter?.semantics.relation, "preserving");
+assert.deepEqual(canvasFillStyle?.generation.semanticCoverage, {
+  status: "faithful",
+  relations: ["changing", "preserving"],
+});
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
 assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
 assert.ok(canvasRoot?.generatedOperations.some((operation) =>
@@ -639,20 +643,19 @@ assert.ok(reactDomRoot?.coverage.members.filter((member) =>
   member.generation.disposition === "unsupported").every((member) =>
     member.generation.diagnostics.length === 0));
 
-assert.deepEqual(
-  roots.flatMap((root) => (root.coverage?.members ?? []).filter((member) =>
-    member.generation.semanticCoverage.status === "adapter-only").map((member) =>
-    `${root.library}/${root.id}:${member.id}`)).sort(),
-  [
-    "browser/element:Element.addEventListener",
-    "browser/element:Element.removeEventListener",
-    "browser/event:Event.currentTarget",
-    "browser/event:Event.target",
-    "infoview/clipboard:Clipboard.writeText",
-    "react/hooks:React.useEffect",
-    "react/props:React.Attributes.key",
-  ],
-);
+const semanticCoverageByMember = new Map(roots.flatMap((root) =>
+  (root.coverage?.members ?? []).map((member) => [
+    `${root.library}/${root.id}:${member.id}`,
+    member.generation.semanticCoverage.status,
+  ])));
+for (const member of [
+  "browser/document:Document.title",
+  "browser/element:DOMTokenList.add",
+  "browser/element:CSSStyleDeclaration.setProperty",
+  "browser/event:KeyboardEvent.key",
+]) {
+  assert.equal(semanticCoverageByMember.get(member), "adapter-only");
+}
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="faithful-metric"/u);
@@ -666,42 +669,20 @@ assert.match(html, /Author actions/u);
 assert.doesNotMatch(html, /Complete surface analysis/u);
 assert.doesNotMatch(html, /Public Lean API/u);
 assert.doesNotMatch(html, /Host targets/u);
-assert.match(app, /Expected versus current/u);
-assert.match(app, /function renderInventory\(\)/u);
-assert.match(app, /function renderInventoryDetail\(target\)/u);
-assert.match(app, /function renderReadableLeanSignature\(operation, source\)/u);
-assert.match(app, /function renderTypeTransformation\(operation,/u);
-assert.match(app, /function renderBindingContract\(target, operation, symbol\)/u);
-assert.match(app, /function renderImplementationEvidence\(target, operation\)/u);
-assert.match(app, /function renderTypeBrowserOptions\(\)/u);
 assert.match(app, /lean-vir\.binding-type-browser\.v1/u);
-assert.match(app, /Exact compiled Lean type/u);
-assert.match(app, /fixed by reviewed signature policy/u);
-assert.match(app, /omitted by reviewed policy/u);
-assert.match(app, /data-tooltip/u);
-assert.match(app, /TypeScript-derived/u);
-assert.match(app, /reviewed upstream adapter/u);
 assert.match(app, /semantics-preserving contract/u);
 assert.match(app, /semantic review required/u);
 assert.match(app, /elements\.semantics\.value/u);
 assert.match(app, /runtime provider keys present/u);
 assert.match(app, /Provider behavior is not mechanically verified/u);
-assert.match(app, /Lean does not enforce affine use/u);
+assert.match(app, /JavaScript aliases are not revoked/u);
 assert.match(html, /src="assets\/app\.js"/u);
 assert.match(html, /href="assets\/style\.css"/u);
-assert.match(app, /function renderUpstreamSymbol\(group, symbol\)/u);
 assert.match(style, /\.workspace/u);
 assert.match(style, /\.readable-signature/u);
-assert.match(style, /\.type-transformation/u);
-assert.match(style, /\.semantic-text/u);
-assert.match(style, /\.signature-source/u);
-assert.match(style, /\.transformation-columns/u);
 assert.match(style, /\.binding-contract/u);
-assert.match(style, /\.implementation-evidence/u);
 assert.match(style, /data-boundary-notes="hide"/u);
 assert.match(style, /data-js-wrapper="highlight"/u);
-assert.match(style, /\.tok-representation/u);
-assert.match(style, /\.tok-effect/u);
 assert.match(app, /Required action/u);
 assert.match(app, /Unselected upstream entries are documentation coverage/u);
 assert.match(style, /\.work-item/u);

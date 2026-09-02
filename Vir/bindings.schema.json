@@ -50,7 +50,7 @@
         "abiProfile": { "$ref": "#/$defs/abiProfile" },
         "resources": {
           "type": "object",
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "additionalProperties": { "$ref": "#/$defs/resourceMapping" }
         },
         "members": {
           "type": "array",
@@ -275,9 +275,8 @@
           "properties": {
             "default": { "$ref": "#/$defs/passingRetention" },
             "globalTypes": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/semanticPolicy" }
             }
           }
         }
@@ -324,6 +323,30 @@
         "representation": { "enum": ["immediate", "lean-owned", "js-resource", "callback"] },
         "resourceInner": { "type": "string", "minLength": 1 }
       }
+    },
+    "semanticPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantics", "reason"],
+      "properties": {
+        "semantics": { "$ref": "#/$defs/upstreamSemantics" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "resourceMapping": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lean", "semantics", "reason"],
+          "properties": {
+            "lean": { "type": "string", "minLength": 1 },
+            "semantics": { "$ref": "#/$defs/upstreamSemantics" },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
     },
     "generationException": {
       "type": "object",

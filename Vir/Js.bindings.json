@@ -22,7 +22,7 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": []
+        "globalTypes": {}
       }
     },
     "resources": {},
