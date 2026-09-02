@@ -31,13 +31,15 @@ opaque lengthJs
     RuntimeM (Lean.Vir.Js Nat)
 
 /--
-Generated binding for reviewed VIR protocol `javascript.array.item`.
+Generated explicit protocol operation semantic adapter for TypeScript `Array`.
 
 Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
+Generated explicit JavaScript semantic adapter for the TypeScript `Array` protocol operation.
 ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.

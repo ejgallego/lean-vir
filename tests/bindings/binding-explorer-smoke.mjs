@@ -210,6 +210,7 @@ assert.equal(
     item.code === "semantic-fidelity-review-required").length,
   report.summary.generation.semanticRelations.unreviewed,
 );
+assert.equal(report.workItems.length, 0);
 assert.ok(report.workItems.every((item) => item.disposition !== "unsupported"));
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.getTitleString"), false);
 assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), false);

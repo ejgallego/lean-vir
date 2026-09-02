@@ -335,7 +335,7 @@ test("an explicit single-signature policy generates faithful methods and documen
   assert.match(namedReceiver, /opaque getAttribute\n    \(self : @& Lean\.Vir\.Js Widget\)/u);
 });
 
-test("generated exceptions are documented as reviewed specializations", () => {
+test("generated exceptions distinguish unreviewed boundaries and semantic adapters", () => {
   const specialized = structuredClone(generation);
   specialized.exceptions["demo.widget.getAttribute"] = {
     reason: "The demo specializes the result representation.",
@@ -354,7 +354,7 @@ test("generated exceptions are documented as reviewed specializations", () => {
 
   assert.match(
     output,
-    /Generated reviewed method specialization of TypeScript `Widget\.getAttribute`\./u,
+    /Generated method boundary for TypeScript `Widget\.getAttribute`, awaiting semantic review\./u,
   );
   assert.doesNotMatch(
     output,
@@ -367,8 +367,21 @@ test("generated exceptions are documented as reviewed specializations", () => {
   });
 
   specialized.exceptions["demo.widget.getAttribute"].semantics = "changing";
+  const changedOutput = renderLeanBindings(config, specialized, descriptors);
   const reviewed = buildGeneratedOperations(config, specialized, descriptors).find(
     (candidate) => candidate.id === "demo.widget.getAttribute",
+  );
+  assert.match(
+    changedOutput,
+    /Generated explicit method semantic adapter for TypeScript `Widget\.getAttribute`\./u,
+  );
+  assert.match(
+    changedOutput,
+    /Adapter policy: The demo specializes the result representation\./u,
+  );
+  assert.doesNotMatch(
+    changedOutput,
+    /Generated reviewed JavaScript boundary specialization for the TypeScript `Widget\.getAttribute`/u,
   );
   assert.deepEqual(reviewed.semantics, {
     relation: "changing",

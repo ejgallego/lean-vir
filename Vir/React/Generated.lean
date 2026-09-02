@@ -185,13 +185,15 @@ opaque useRef
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)))
 
 /--
-Generated binding for reviewed VIR protocol `react.hooks.use-effect`.
+Generated explicit protocol operation semantic adapter for TypeScript `React.useEffect`.
 
 Adapts separate Lean setup and cleanup functions to React's no-dependency effect callback shape.
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
+Generated explicit JavaScript semantic adapter for the TypeScript `React.useEffect` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -223,13 +225,15 @@ opaque useMemo
     Lean.Vir.React.ReactM (Lean.Vir.Js α)
 
 /--
-Generated binding for reviewed VIR protocol `react.hooks.use-effect-with-deps`.
+Generated explicit protocol operation semantic adapter for TypeScript `React.useEffect`.
 
 Adapts separate Lean setup and cleanup functions to React's effect callback shape and passes the exact dependency array.
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
+Generated explicit JavaScript semantic adapter for the TypeScript `React.useEffect` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; deps js-resource/borrowed/call; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -416,13 +420,15 @@ This declaration is generated; edit the binding configuration.
 opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Props)
 
 /--
-Generated binding for reviewed VIR protocol `react.props.set-key`.
+Generated explicit protocol operation semantic adapter for TypeScript `React.Attributes.key`.
 
 Sets React's special key field on a JavaScript props object.
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
+Generated explicit JavaScript semantic adapter for the TypeScript `React.Attributes.key` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; key js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
@@ -606,13 +612,15 @@ opaque create
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
 /--
-Generated binding for reviewed VIR protocol `react.root.render-tree`.
+Generated explicit protocol operation semantic adapter for TypeScript `Root.render`.
 
 Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
+Generated explicit JavaScript semantic adapter for the TypeScript `Root.render` protocol operation.
 ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; children callback/owned/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.

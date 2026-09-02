@@ -227,8 +227,14 @@ test("the JavaScript collection audit distinguishes direct operations from owner
 });
 
 test("the React audit treats direct native values as the preserving exemplar", () => {
-  assert.equal(Object.values(react.generation.exceptions).filter((exception) =>
+  const exceptions = Object.entries(react.generation.exceptions);
+  assert.equal(exceptions.filter(([, exception]) =>
     exception.semantics === undefined).length, 0);
+  assert.deepEqual(
+    exceptions.filter(([, exception]) => exception.semantics === "changing")
+      .map(([id]) => id),
+    [],
+  );
 
   const adapters = react.generation.protocolOperations.filter((operation) =>
     operation.upstreamRelation.kind === "upstream-adapter");

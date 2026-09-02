@@ -596,11 +596,15 @@ end Document
 namespace Element
 
 /--
-Generated reviewed method specialization of TypeScript `Element.addEventListener`.
+Generated explicit method semantic adapter for TypeScript `Element.addEventListener`.
+
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
+Adapter policy: VIR specializes DOM listener registration to a Lean callback retained until an explicit revocable listener handle is consumed.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13915
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Element.addEventListener` method.
+Generated explicit JavaScript semantic adapter for the TypeScript `Element.addEventListener` method.
 ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -751,11 +755,15 @@ opaque remove
     DomM Unit
 
 /--
-Generated reviewed method specialization of TypeScript `Element.removeEventListener`.
+Generated explicit method semantic adapter for TypeScript `Element.removeEventListener`.
+
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
+Adapter policy: VIR replaces the DOM receiver, event name, and callback triple with the revocable listener handle returned by registration; consuming it removes the listener and releases the callback.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13917
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Element.removeEventListener` method.
+Generated explicit JavaScript semantic adapter for the TypeScript `Element.removeEventListener` method.
 ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -915,15 +923,19 @@ end Element.Style
 namespace Event
 
 /--
-Generated reviewed getter specialization of TypeScript `Event.currentTarget`.
+Generated explicit getter semantic adapter for TypeScript `Event.currentTarget`.
 
 The **`currentTarget`** read-only property of the Event interface identifies the element to which the event handler has been attached.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/currentTarget)
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
+Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
+
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Event.currentTarget` getter.
+Generated explicit JavaScript semantic adapter for the TypeScript `Event.currentTarget` getter.
 ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
@@ -972,15 +984,19 @@ opaque stopPropagation
     DomM Unit
 
 /--
-Generated reviewed getter specialization of TypeScript `Event.target`.
+Generated explicit getter semantic adapter for TypeScript `Event.target`.
 
 The read-only **`target`** property of the Event interface is a reference to the object onto which the event was dispatched. It is different from Event.currentTarget when the event handler is called during the bubbling or capturing phase of the event.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/target)
 
+Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.
+
+Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
+
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-Generated reviewed JavaScript boundary specialization for the TypeScript `Event.target` getter.
+Generated explicit JavaScript semantic adapter for the TypeScript `Event.target` getter.
 ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.

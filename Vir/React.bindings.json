@@ -34,8 +34,8 @@
     },
     "exceptions": {
       "react.root.create": {
-        "reason": "VIR specializes the TypeScript Container union to Element and omits RootOptions.",
-        "semantics": "changing",
+        "reason": "VIR restricts the TypeScript Container union to Element and uses default RootOptions; within that supported lane it passes the exact container to createRoot and returns the exact Root.",
+        "semantics": "preserving",
         "activeEffect": "register",
         "arguments": {
           "container": {
