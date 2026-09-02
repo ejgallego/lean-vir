@@ -14,6 +14,11 @@ The parser follows the familiar ProofWidgets JSX surface, but its lowering is
 deliberately native: lowercase tags lower directly to React-node construction
 actions and uppercase tags lower to Lean-authored component actions. It does
 not construct upstream ProofWidgets' serializable RPC `Html` tree.
+
+The parser structure is adapted under Apache-2.0 from
+`ProofWidgets/Data/Html.lean` at ProofWidgets4 commit
+`ef8377f31b5535430b6753a974d685b0019d0681`. VIR owns the rewritten lowering
+to native React values.
 -/
 
 namespace Lean.Vir.ProofWidgets.Jsx

@@ -8,7 +8,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { createBrowserReactHookRuntime } from "../../web/src/react/vir-react-hooks.js";
+import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
 import { createBrowserLeanComponentNode } from "../../web/src/react/vir-react-node.js";
 import {
   createHostLifecycle,
@@ -170,7 +170,7 @@ async function runRepeatedComponentSubmissionProbe() {
 }
 
 async function runStrictModeEffectProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const state = { renders: 0, setups: 0, cleanups: 0 };
   const container = document.createElement("div");
   document.body.append(container);
@@ -178,7 +178,7 @@ async function runStrictModeEffectProbe() {
 
   function Probe() {
     state.renders++;
-    hooks.useEffect(() => {
+    bindings["react.useEffect"](() => {
       state.setups++;
       const token = { setup: state.setups };
       return () => {
@@ -214,7 +214,7 @@ async function runStrictModeEffectProbe() {
 }
 
 async function runReducerIdentityProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -229,7 +229,7 @@ async function runReducerIdentityProbe() {
   }
 
   function Probe() {
-    const result = hooks.useReducer(reducer, initial);
+    const result = bindings["react.useReducer"](reducer, initial);
     if (!Array.isArray(result))
       throw new Error("useReducer must return React's array pair");
     dispatch ??= result[1];
@@ -264,7 +264,7 @@ async function runReducerIdentityProbe() {
 }
 
 async function runInterleavedStateLaneProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const state = { renders: [] };
   const container = document.createElement("div");
   document.body.append(container);
@@ -275,7 +275,7 @@ async function runInterleavedStateLaneProbe() {
   let setter = null;
 
   function Probe() {
-    const result = hooks.useState(initial);
+    const result = bindings["react.useState"](initial);
     if (!Array.isArray(result))
       throw new Error("useState must return React's array pair");
     setter ??= result[1];
@@ -312,7 +312,7 @@ async function runInterleavedStateLaneProbe() {
 }
 
 async function runMemoIdentityProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -321,7 +321,7 @@ async function runMemoIdentityProbe() {
   const seen = [];
 
   function Probe({ dependency }) {
-    const value = hooks.useMemo(() => singleton, dependency);
+    const value = bindings["react.useMemo"](() => singleton, dependency);
     seen.push(value);
     return null;
   }

@@ -71,9 +71,10 @@ boolean when the selector is missing. Root registration is tracked only so
 runtime disposal can unmount it. If a newly created root cannot be published
 back to Lean, the host-call transaction unmounts it.
 
-Direct root submissions have no public React commit acknowledgement. VIR does
-not infer when React has stopped retaining a submitted graph. Application code
-that needs normal evolving UI state should put that state behind a component.
+Direct root submissions need no VIR commit acknowledgement. React receives and
+retains the exact JavaScript node graph; ordinary JavaScript reachability keeps
+its callbacks and JSL values alive, and superseded graphs remain ordinary
+garbage-collection candidates.
 
 ## Hooks
 

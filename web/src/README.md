@@ -16,6 +16,10 @@ unrelated responsibilities.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.
+- `vir-react-dom-client.js`: seven-line import seam that exposes the official
+  `react-dom/client` entry to SDK consumers. The infoview bundler substitutes
+  Lean's provided `react-dom` external at this seam; it contains no ReactDOM
+  implementation.
 - `vir-infoview-widget.js`: repository live infoview widget shell that loads WASM,
   requests fresh `.irpkg` packages from Lean, and mounts Lean-authored React
   widgets.

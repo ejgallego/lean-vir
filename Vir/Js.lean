@@ -42,7 +42,18 @@ private def collectResourceItems {α : Type}
         | some value => values.push value
       collectResourceItems item remaining (index + 1) values
 
-private def collectionResourceItem? {α : Type}
+private def arrayResourceItem? {α : Type}
+    (size : Nat)
+    (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js α))
+    (index : Nat) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  if index < size then
+    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
+    some <$> item jsIndex
+  else
+    pure none
+
+private def nullableCollectionResourceItem? {α : Type}
     (size : Nat)
     (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js.Nullable α))
     (index : Nat) :
@@ -73,7 +84,7 @@ def item {α : Type}
     (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
     (index : Nat) :
     RuntimeM (Option (Lean.Vir.Js α)) := do
-  collectionResourceItem? (← length array) (itemNullable array) index
+  arrayResourceItem? (← length array) (getJs array) index
 
 /-- Materializes independent Lean resource handles for the entries of a JavaScript array. -/
 def toLeanArray {α : Type}
@@ -81,7 +92,7 @@ def toLeanArray {α : Type}
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size ← length array
   collectResourceItems
-    (collectionResourceItem? size (itemNullable array))
+    (arrayResourceItem? size (getJs array))
     size 0 (_root_.Array.mkEmpty size)
 
 end Array
@@ -97,7 +108,7 @@ def item {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
     (index : Nat) :
     RuntimeM (Option (Lean.Vir.Js α)) := do
-  collectionResourceItem? (← length nodes) (itemNullable nodes) index
+  nullableCollectionResourceItem? (← length nodes) (itemNullable nodes) index
 
 /-- Materializes independent Lean resource handles for the entries of a `NodeList`. -/
 def toLeanArray {α : Type}
@@ -105,7 +116,7 @@ def toLeanArray {α : Type}
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size ← length nodes
   collectResourceItems
-    (collectionResourceItem? size (itemNullable nodes))
+    (nullableCollectionResourceItem? size (itemNullable nodes))
     size 0 (_root_.Array.mkEmpty size)
 
 end NodeList

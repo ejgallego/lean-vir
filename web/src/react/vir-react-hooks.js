@@ -4,88 +4,63 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export function createBrowserReactHookRuntime(React) {
+export function createBrowserReactHookBindings(React) {
   return {
-    useState(initial) {
+    "react.useState": (initial) => {
       return requireReactHook(React, "useState")(initial);
     },
-
-    useReducer(reducer, initial) {
-      if (typeof reducer !== "function") {
-        throw new Error("React reducer must be a JavaScript function");
-      }
-      return requireReactHook(React, "useReducer")(reducer, initial);
+    "react.stateTuple.value": (state) =>
+      requireReactPair(state, "React.useState result")[0],
+    "react.stateTuple.setter": (state) =>
+      requireReactPair(state, "React.useState result")[1],
+    "react.useReducer": (reducer, initial) => {
+      return requireReactHook(React, "useReducer")(
+        requireFunction(reducer, "React reducer"),
+        initial,
+      );
     },
-
-    useRef(initial) {
+    "react.reducerTuple.value": (state) =>
+      requireReactPair(state, "React.useReducer result")[0],
+    "react.reducerTuple.dispatch": (state) =>
+      requireReactPair(state, "React.useReducer result")[1],
+    "react.useRef": (initial) => {
       return requireReactHook(React, "useRef")(initial);
     },
-
-    useMemo(calculate, deps) {
-      if (typeof calculate !== "function") {
-        throw new Error("React memo calculation must be a JavaScript function");
-      }
+    "react.useMemo": (calculate, deps) => {
       return requireReactHook(React, "useMemo")(
-        calculate,
+        requireFunction(calculate, "React memo calculation"),
         requireDependencyList(deps),
       );
     },
-
-    useCallback(callback, deps) {
+    "react.useCallback": (callback, deps) => {
       return requireReactHook(React, "useCallback")(
         requireFunction(callback, "React callback"),
         requireDependencyList(deps),
       );
     },
-
-    useContext(context) {
+    "react.useContext": (context) => {
       return requireReactHook(
         React,
         "useContext",
       )(requireObject(context, "React context"));
     },
-
-    useEffect(setup, deps = undefined) {
+    "react.useEffect": (setup) => {
       const effect = requireFunction(setup, "React effect setup");
-      if (deps === undefined) {
-        requireReactHook(React, "useEffect")(effect);
-      } else {
-        requireReactHook(React, "useEffect")(
-          effect,
-          requireDependencyList(deps),
-        );
-      }
+      requireReactHook(React, "useEffect")(effect);
       return undefined;
     },
-  };
-}
-
-export function createReactStateHostBindings(hookRuntime) {
-  return {
-    "react.useState": (initial) => hookRuntime.useState(initial),
-    "react.stateTuple.value": (state) =>
-      requireReactPair(state, "React.useState result")[0],
-    "react.stateTuple.setter": (state) =>
-      requireReactPair(state, "React.useState result")[1],
-    "react.useReducer": (reducer, initial) =>
-      hookRuntime.useReducer(reducer, initial),
-    "react.reducerTuple.value": (state) =>
-      requireReactPair(state, "React.useReducer result")[0],
-    "react.reducerTuple.dispatch": (state) =>
-      requireReactPair(state, "React.useReducer result")[1],
-    "react.useRef": (initial) => hookRuntime.useRef(initial),
-    "react.useMemo": (calculate, deps) => hookRuntime.useMemo(calculate, deps),
-    "react.useCallback": (callback, deps) =>
-      hookRuntime.useCallback(callback, deps),
-    "react.useContext": (context) => hookRuntime.useContext(context),
-    "react.useEffect": (setup) => hookRuntime.useEffect(setup),
+    "react.useEffectWithDeps": (setup, deps) => {
+      requireReactHook(React, "useEffect")(
+        requireFunction(setup, "React effect setup"),
+        requireDependencyList(deps),
+      );
+      return undefined;
+    },
     "react.deps.empty": () => [],
     "react.deps.push": (deps, value) => {
       requireDependencyList(deps).push(value);
       return undefined;
     },
-    "react.useEffectWithDeps": (setup, deps) =>
-      hookRuntime.useEffect(setup, deps),
     "react.ref.get": (ref) => requireObject(ref, "ReactRef").current,
     "react.ref.set": (ref, value) => {
       requireObject(ref, "ReactRef").current = value;

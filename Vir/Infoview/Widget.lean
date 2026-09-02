@@ -19,8 +19,7 @@ mount entry receives that function, a fresh DOM selector for the nested mount
 element, and a JavaScript-built surface structure from the real infoview panel
 props.
 If `unmountEntry` is set, it must have signature `String -> DomM Bool` and is
-called when the shell unmounts its nested element while keeping the runtime
-service alive for later remounts.
+called before the shell disposes its nested React root and VIR runtime.
 -/
 structure WidgetProps where
   wasmPath : String := ""
@@ -52,7 +51,8 @@ Users provide the real Lean-authored React component plus the exported entry
 names that the generated `.irpkg` should keep. The helper supplies the standard
 selector-owned React mount/unmount entries and widget props. Cursor movement
 updates the `Surface` props and rerenders through React; the runtime service is
-reloaded only when the widget IR package revision changes.
+kept stable across cursor updates and replaced when widget configuration or the
+IR package revision changes.
 -/
 structure ReactWidget where
   component : Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component Surface))
@@ -65,24 +65,6 @@ structure ReactWidget where
   setupHint : String := ReactWidget.defaultSetupHint
 
 namespace ReactWidget
-
-/-- Creates the exact JavaScript component function once per loaded runtime service. -/
-def createComponent (widget : ReactWidget) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component Surface)) :=
-  widget.component
-
-/-- Standard mount entry for a live React infoview widget component. -/
-def mount
-    (_widget : ReactWidget)
-    (selector : String)
-    (component : Lean.Vir.Js (Lean.Vir.React.Component Surface))
-    (surface : Surface) :
-    Lean.Vir.Browser.DomM Bool :=
-  Lean.Vir.React.Root.renderComponentIntoSelector selector component surface
-
-/-- Standard unmount entry for a live React infoview widget component. -/
-def unmount (_widget : ReactWidget) (selector : String) : Lean.Vir.Browser.DomM Bool :=
-  Lean.Vir.React.Root.unmountSelector selector
 
 /-- `.irpkg` roots for the standard live React widget entries. -/
 def irPackage (widget : ReactWidget) : IRPackage :=
@@ -131,15 +113,15 @@ private def expandReactWidgetCommand
 
       def $componentIdent : Lean.Vir.RuntimeM
           (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
-        Lean.Vir.Infoview.ReactWidget.createComponent $widgetSpecIdent
+        ($widgetSpecIdent).component
 
       def $mountIdent : String →
           Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
           Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
-        Lean.Vir.Infoview.ReactWidget.mount $widgetSpecIdent
+        Lean.Vir.React.Root.renderComponentIntoSelector
 
       def $unmountIdent : String → Lean.Vir.Browser.DomM Bool :=
-        Lean.Vir.Infoview.ReactWidget.unmount $widgetSpecIdent
+        Lean.Vir.React.Root.unmountSelector
 
       def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
         Lean.Vir.Infoview.ReactWidget.irPackage $widgetSpecIdent

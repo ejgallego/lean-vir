@@ -166,15 +166,15 @@
       },
       {
         "id": "javascript.array.item", "group": "array", "target": "js.array.item",
-        "lean": "Lean.Vir.Js.Array.itemNullable", "marker": "vir_js",
-        "reason": "Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "changing" },
+        "lean": "Lean.Vir.Js.Array.getJs", "marker": "vir_js",
+        "reason": "Reads the exact JavaScript value at a non-negative safe-integer Array index, including undefined for a hole or missing entry.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
           { "name": "index", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
         "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",

@@ -8,14 +8,6 @@ Author: Emilio J. Gallego Arias
 // in an ordinary JavaScript React program. VIR does not wrap nodes, props,
 // children, element types, refs, or callbacks in a second ownership graph.
 
-export function createBrowserReactRoot(root) {
-  return requireReactRoot(root);
-}
-
-export function createBrowserReactNodeText(value) {
-  return reactNodeTextValue(value);
-}
-
 export function createReactElementTypeTag(value) {
   return reactNodeName(value, "element type tag");
 }
@@ -103,18 +95,6 @@ function setReactObjectProperty(target, name, value) {
     configurable: true,
     writable: true,
   });
-}
-
-function requireReactRoot(root) {
-  if (
-    root === null ||
-    typeof root !== "object" ||
-    typeof root.render !== "function" ||
-    typeof root.unmount !== "function"
-  ) {
-    throw new Error("React root must be a ReactDOM root");
-  }
-  return root;
 }
 
 function requireCreateElement(createElement) {

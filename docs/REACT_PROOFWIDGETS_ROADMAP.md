@@ -187,23 +187,25 @@ A realistic path has three layers:
    from the active Lean server snapshot through
    `Lean.Vir.Infoview.buildIRPackage`, so the local demo no longer requires the
    repository Vite dev server or a package watcher.
-   `statIRPackage` provides a package-root revision token for cache lookup and
-   later refreshes. The token is derived from the compiled IR declaration
+   `statIRPackage` provides a package-root revision token for later refreshes.
+   The token is derived from the compiled IR declaration
    closure plus source ranges for local declarations, so imported helper-module
    changes are detected once they are present in the active Lean snapshot.
-   Cursor movement is not part of the runtime cache key, and ordinary proof
-   edits outside the widget closure should not rebuild the package. With
+   Cursor movement does not replace the widget-owned runtime, and ordinary
+   proof edits outside the widget closure should not rebuild the package. With
    `autoReloadMs` set, the demo detects widget-code edits with a stat-only poll
    and emits fresh package bytes again only when that token changes. It compiles
-   each WASM asset revision to a cached
+   the current revision of each WASM asset as a compiled
    `WebAssembly.Module`, which avoids recompiling the Lean IR interpreter module
-   on ordinary infoview refreshes. For stable widget configuration it also keeps
-   a module-level VIR runtime service alive across React component remounts and
-   calls the entry again only when the semantic proof surface or package
-   revision changes. It reuses the component value produced by
+   on ordinary infoview refreshes without retaining superseded revisions. Each
+   widget shell owns its mutable VIR runtime service directly; services are not
+   shared between widget instances.
+   The shell keeps that service across cursor and proof-surface updates and
+   replaces it when the package revision or widget configuration changes. It
+   reuses the component value produced by
    `ReactProofWidget.createComponent`, so `ReactProofWidget.mount` rerenders the
-   existing React root without changing the component type. Idle cached services have a bounded TTL,
-   and superseded services are disposed after their active widgets release them.
+   existing React root without changing the component type. Superseded and
+   unmounted services are disposed immediately by their owning widget.
    The shell consumes widget mouse/click events at its outer container and calls
    `ReactProofWidget.unmount` when a selector is genuinely dropped. Removing the
    base64 byte transport remains a separate infoview/webview asset API

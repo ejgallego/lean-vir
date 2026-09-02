@@ -1035,10 +1035,10 @@ def mountFromSelector
       pure true
 
 /--
-Renders a Lean-authored React function component into a React root.
+Renders an exact JavaScript React function component into a React root.
 
-The host wraps the Lean function in a JavaScript React component, so hooks such
-as `Hooks.useState` are evaluated by React during the component render.
+Create the component once with `Component.ofLean` and reuse that value when
+React should preserve its component identity and hook state.
 -/
 def renderComponent
     (root : @& Lean.Vir.Js Root)

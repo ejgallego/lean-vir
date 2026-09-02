@@ -73,10 +73,10 @@ keeps explicit teardown only for active resources with public termination:
 listeners, timers, animation frames, and React roots. A host-call transaction
 rolls back a newly created active resource if result publication fails.
 
-React does not expose a commit acknowledgement for every direct root
-submission. Recurring application updates should therefore use the component
-path, where React owns render timing, rather than expecting VIR to infer when a
-directly submitted tree is no longer retained.
+Direct root submission needs no VIR commit protocol: React receives the exact
+JavaScript node graph, and JavaScript reachability owns that graph. VIR tracks
+only the foreign Lean obligations attached to reachable callback and JSL
+values, plus explicit root teardown.
 
 ## Future Wasm Features
 

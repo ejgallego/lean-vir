@@ -204,8 +204,9 @@ The principal intentional React conveniences are:
 
 The conversions have declarations separate from the exact bindings. The React
 hook host contains no Lean-specific hook path, and the React root host contains
-no callback-render or component-render path. Direct `Root.renderNode` has no
-public React acknowledgement for superseded submissions.
+no callback-render or component-render path. Direct `Root.renderNode` needs no
+VIR acknowledgement for superseded submissions because React retains the exact
+JavaScript node graph.
 
 ## Node Virtual Bindings
 

@@ -14,18 +14,17 @@ import {
   createBrowserLeanComponentNode,
   createBrowserReactNodeElement,
   createBrowserReactNodeFragment,
-  createBrowserReactNodeText,
   createReactElementTypeTag,
   createReactProps,
+  reactNodeTextValue,
   setReactPropsEventHandler,
   setReactPropsProperty,
   setReactPropsRef,
 } from "../../web/src/react/vir-react-node.js";
 
 import {
-  createBrowserReactHookRuntime,
+  createBrowserReactHookBindings,
   createReactJsValueHostBindings,
-  createReactStateHostBindings,
 } from "../../web/src/react/vir-react-hooks.js";
 import {
   createVirtualDocumentHostBindings,
@@ -94,8 +93,8 @@ for (const name of ["__proto__", "constructor", "prototype"]) {
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
 
 const children = [];
-const first = createBrowserReactNodeText("goal: ");
-const second = createBrowserReactNodeText("⊢ True");
+const first = reactNodeTextValue("goal: ");
+const second = reactNodeTextValue("⊢ True");
 children.push(first, second);
 assert.deepEqual(children, [first, second]);
 
@@ -170,7 +169,7 @@ assert.throws(
   const reducer = (state, action) => ({ state, action });
   const dispatch = () => undefined;
   const reducerPair = [initial, dispatch];
-  const hooks = createBrowserReactHookRuntime({
+  const bindings = createBrowserReactHookBindings({
     useState(value) {
       assert.equal(value, initial);
       return statePair;
@@ -181,7 +180,6 @@ assert.throws(
       return reducerPair;
     },
   });
-  const bindings = createReactStateHostBindings(hooks);
   assert.equal(bindings["react.useState"](initial), statePair);
   assert.equal(bindings["react.stateTuple.value"](statePair), initial);
   assert.equal(bindings["react.stateTuple.setter"](statePair), setter);
@@ -197,7 +195,7 @@ assert.throws(
   const effect = () => undefined;
   const deps = [];
   const calls = [];
-  const hooks = createBrowserReactHookRuntime({
+  const bindings = createBrowserReactHookBindings({
     useCallback(value, valueDeps) {
       calls.push(["callback", value, valueDeps]);
       return value;
@@ -214,7 +212,6 @@ assert.throws(
       return value();
     },
   });
-  const bindings = createReactStateHostBindings(hooks);
   assert.equal(bindings["react.useCallback"](callback, deps), callback);
   assert.equal(bindings["react.useContext"](context), "context");
   assert.equal(bindings["react.useMemo"](calculation, deps), "memo");
@@ -255,7 +252,7 @@ assert.throws(
 {
   let queuedUpdate = null;
   const update = (previous) => ({ previous });
-  const bindings = createReactStateHostBindings({});
+  const bindings = createBrowserReactHookBindings({});
   bindings["react.state.modify"]((action) => {
     queuedUpdate = action;
   }, update);

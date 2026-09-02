@@ -13,7 +13,7 @@ export function createJsCollectionHostBindings() {
     "js.array.length": (array) => jsArrayValue(array).length,
     "js.array.item": (array, index) => {
       const values = jsArrayValue(array);
-      return createNullableValue(values[jsCollectionIndex(index)] ?? null);
+      return values[jsCollectionIndex(index)];
     },
     "js.nodeList.length": (nodeList) => jsNodeListValue(nodeList).length,
     "js.nodeList.item": (nodeList, index) => {
@@ -63,11 +63,7 @@ function jsNodeListValue(value) {
 }
 
 function jsCollectionIndex(value) {
-  if (
-    typeof value !== "number" ||
-    !Number.isSafeInteger(value) ||
-    value < 0
-  ) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
     throw new Error(
       "JavaScript collection index must be a non-negative safe-integer Number",
     );

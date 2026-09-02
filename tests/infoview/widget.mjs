@@ -38,9 +38,7 @@ const smokeWidgetSource =
   widgetSource
     .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
     .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"') +
-  "\nexport { retainRuntimeService as retainRuntimeServiceForTests, " +
-  "releaseRuntimeService as releaseRuntimeServiceForTests, " +
-  "retireRuntimeService as retireRuntimeServiceForTests };\n";
+  "\nexport { disposeRuntimeService as disposeRuntimeServiceForTests };\n";
 await writeFile(
   new URL("vir-infoview-widget-smoke.mjs", buildDir),
   smokeWidgetSource,
@@ -48,15 +46,12 @@ await writeFile(
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
-  clearRuntimeServiceCacheForTests,
   createProofWidgetsExprWithCtxAtPos,
   createProofWidgetsExprWithCtxRef,
+  disposeRuntimeServiceForTests,
   loadAssetBytes,
   loadRuntimeOptions,
   loadRuntimeService,
-  releaseRuntimeServiceForTests,
-  retainRuntimeServiceForTests,
-  retireRuntimeServiceForTests,
   loadWasmModule,
   proofWidgetsExprFromSavedRef,
   resolveProofWidgetsRpcRef,
@@ -589,8 +584,14 @@ const irPackageServiceConfig = {
   position: { line: 0, character: 0 },
   setupHint: "",
 };
+const irPackageHostContext = {
+  rpcSession,
+  editorConnection: null,
+  position: { line: 0, character: 0 },
+};
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
+  hostContext: irPackageHostContext,
   config: irPackageServiceConfig,
 });
 const jsBoolValue = (_service, value) => value;
@@ -785,26 +786,54 @@ assert.deepEqual(serverOwnedCallbackInfo, {
   storeKey: "server-package-v1:ReactProofWidget.mount",
   knownConstant: true,
 });
+let movedSessionCalls = 0;
+irPackageHostContext.rpcSession = {
+  async call(method, params) {
+    movedSessionCalls += 1;
+    return rpcSession.call(method, params);
+  },
+};
+irPackageHostContext.position = { line: 87, character: 3 };
+const resolvedBeforeMove = resolvedRpcRefRequests.length;
+assert.equal(
+  jsBoolValue(
+    irPackageFirstService,
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "proofwidgets.rpc.inspectRef"
+    ](
+      rpcRefResource(irPackageFirstService, {
+        id: "ReactProofWidget.mount",
+        label: "mount",
+        typeName: "Const",
+        summary: "moved host context smoke",
+        expression: "ReactProofWidget.mount",
+        typeText: "String -> Surface -> DomM Bool",
+        context: "",
+      }),
+    ),
+  ),
+  true,
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(movedSessionCalls, 1);
+assert.equal(resolvedRpcRefRequests.length, resolvedBeforeMove + 1);
+assert.deepEqual(resolvedRpcRefRequests.at(-1).pos, {
+  line: 87,
+  character: 3,
+});
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
 });
-assert.equal(irPackageSecondService, irPackageFirstService);
-assert.equal(irPackageBuildCount, firstIRPackageBuildCount);
+assert.notEqual(
+  irPackageSecondService,
+  irPackageFirstService,
+  "stateful runtime services must remain local to one widget consumer",
+);
+assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
 assert.ok(irPackageStatCount > firstIRPackageStatCount);
-const afterSecondIRPackageStatCount = irPackageStatCount;
-const irPackageMovedPositionService = await loadRuntimeService({
-  rpcSession,
-  config: {
-    ...irPackageServiceConfig,
-    position: { line: 87, character: 3 },
-  },
-});
-assert.equal(irPackageMovedPositionService, irPackageFirstService);
-assert.equal(irPackageBuildCount, firstIRPackageBuildCount);
-assert.ok(irPackageStatCount > afterSecondIRPackageStatCount);
 irPackageRevision = "ir-package-v2";
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,
@@ -812,33 +841,15 @@ const irPackageThirdService = await loadRuntimeService({
 });
 assert.notEqual(irPackageThirdService, irPackageFirstService);
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-retainRuntimeServiceForTests(irPackageThirdService);
-retainRuntimeServiceForTests(irPackageThirdService);
-releaseRuntimeServiceForTests(irPackageThirdService);
-retireRuntimeServiceForTests(irPackageThirdService);
-assert.equal(
-  irPackageThirdService.disposed,
-  false,
-  "one failed mount must not dispose a runtime retained by another consumer",
-);
-const replacementAfterFailure = await loadRuntimeService({
-  rpcSession,
-  config: irPackageServiceConfig,
-});
-assert.notEqual(replacementAfterFailure, irPackageThirdService);
-retireRuntimeServiceForTests(irPackageThirdService);
-assert.equal(
-  await loadRuntimeService({ rpcSession, config: irPackageServiceConfig }),
-  replacementAfterFailure,
-  "a stale failing consumer must not evict the replacement cache entry",
-);
-releaseRuntimeServiceForTests(irPackageThirdService);
+disposeRuntimeServiceForTests(irPackageFirstService);
+disposeRuntimeServiceForTests(irPackageSecondService);
+disposeRuntimeServiceForTests(irPackageThirdService);
+disposeRuntimeServiceForTests(irPackageThirdService);
 assert.equal(
   irPackageThirdService.disposed,
   true,
-  "a retired runtime must dispose after its final consumer releases it",
+  "runtime service disposal must be idempotent",
 );
-await clearRuntimeServiceCacheForTests();
 
 runtime.dispose();
 console.log("vir infoview widget smoke ok");

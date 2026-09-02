@@ -42,8 +42,8 @@ assert.equal(
 );
 assert.equal(
   collectionBindings["js.array.item"](nativeArray, 1),
-  null,
-  "the explicit safe lookup adapter normalizes a missing item to null",
+  undefined,
+  "JavaScript array lookup must preserve the native missing value",
 );
 
 let retainedCallback = null;

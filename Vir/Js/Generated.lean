@@ -64,9 +64,9 @@ opaque lengthJs
     RuntimeM (Lean.Vir.Js Float)
 
 /--
-Generated explicit protocol operation semantic adapter for TypeScript `Array`.
+Generated binding for reviewed VIR protocol `javascript.array.item`.
 
-Adapter policy: Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.
+Reads the exact JavaScript value at a non-negative safe-integer Array index, including undefined for a hole or missing entry.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -75,11 +75,11 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.array.item"]
-opaque itemNullable
+opaque getJs
     {α : Type}
     (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
     (index : @& Lean.Vir.Js Float) :
-    RuntimeM (Lean.Vir.Js.Nullable α)
+    RuntimeM (Lean.Vir.Js α)
 
 end Js.Array
 
