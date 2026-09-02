@@ -783,13 +783,13 @@ def keyedComponent
   let jsKey ← Lean.Vir.JsValue.ofString key
   keyedComponentJs component jsProps jsKey
 
-/-- ProofWidgets-style alias for rendering a Lean function component. -/
+/-- ProofWidgets-style alias for an exact reusable component value. -/
 def ofComponent
     (component : @& Lean.Vir.Js (Component props))
     (props : props) : ReactM (Lean.Vir.Js Node) :=
   Node.component component props
 
-/-- ProofWidgets-style alias for a keyed Lean component boundary. -/
+/-- ProofWidgets-style alias for a keyed exact component value. -/
 def keyedOfComponent
     (key : @& String)
     (component : @& Lean.Vir.Js (Component props))
@@ -797,7 +797,7 @@ def keyedOfComponent
     ReactM (Lean.Vir.Js Node) :=
   Node.keyedComponent key component props
 
-/-- Renders a nullary Lean function component. -/
+/-- Creates an element from an exact component whose Lean props are `Unit`. -/
 def componentUnit
     (component : @& Lean.Vir.Js (Component Unit)) : ReactM (Lean.Vir.Js Node) :=
   Node.component component ()

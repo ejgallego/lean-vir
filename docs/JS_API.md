@@ -92,7 +92,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `host-boundary.js`                  | Exact-value externref roots and host-call rollback transactions.                                          |
 | `host/vir-host-resources.js`        | Explicit teardown for listeners, schedules, frames, and React roots.                                      |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
-| `react/vir-react-node.js`           | Browser React node, props, children, and component-adapter operations.                                    |
+| `react/vir-react-node.js`           | Browser React node, props, children, and component element construction.                                  |
 | `react/vir-react-hooks.js`          | Direct official browser React hook operations.                                                            |
 | `vir-react-host-bindings.js`        | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
 | `runtime/interface-manifest.js`     | Manifest validation, diagnostics, and type formatting helpers.                                            |
