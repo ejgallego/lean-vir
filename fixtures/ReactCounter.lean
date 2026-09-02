@@ -42,8 +42,9 @@ partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
       #[text]
 
 def mount (selector : String) : DomM Bool := do
-  let component ← counter
-  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
+  Root.mountFromSelector selector fun root => do
+    let component ← counter
+    Root.renderComponent root component ()
 
 def mountDefault : DomM Bool :=
   mount "#react-counter-root"
