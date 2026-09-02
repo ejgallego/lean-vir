@@ -134,9 +134,9 @@ const dispositionLabel = (value) => ({
 })[value] ?? value;
 const semanticCoverageDefinitions = new Map([
   ["faithful", {
-    filter: "Faithful bindings",
-    badge: "faithful VIR binding",
-    summary: "faithful",
+    filter: "Has faithful boundary",
+    badge: "faithful boundary available",
+    summary: "with faithful boundary",
   }],
   ["adapter-only", {
     filter: "Adapter only",
@@ -962,6 +962,19 @@ function renderGenerationPolicy(group, symbol) {
     operations.map(renderOperationPolicy).join("") + "</details>";
 }
 
+function leanPaneTitle(semanticCoverage) {
+  if (semanticCoverage?.status === "faithful" &&
+      semanticCoverage.relations?.includes("changing")) {
+    return "Lean boundaries and explicit adapters";
+  }
+  return ({
+    faithful: "Faithful Lean boundary",
+    "adapter-only": "Explicit Lean semantic adapter",
+    unreviewed: "Lean boundary — semantic review required",
+    "local-contract": "Repository-local Lean contract",
+  })[semanticCoverage?.status] ?? "Lean boundary";
+}
+
 function renderUpstreamSymbol(group, symbol) {
   const member = coverageMember(group, symbol.id);
   const state = member?.generation;
@@ -977,16 +990,10 @@ function renderUpstreamSymbol(group, symbol) {
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
   const relation = state?.semanticCoverage.status;
-  const leanPaneTitle = ({
-    faithful: "Faithful Lean boundary",
-    "adapter-only": "Explicit Lean semantic adapter",
-    unreviewed: "Lean boundary — semantic review required",
-    "local-contract": "Repository-local Lean contract",
-  })[relation] ?? "Lean boundary";
   const lean = state !== undefined && !["candidate", "not-provided"].includes(relation)
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
       renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
-      escapeHtml(leanPaneTitle) + '</div>' +
+      escapeHtml(leanPaneTitle(state.semanticCoverage)) + '</div>' +
       renderLeanCards(state.targets) + "</div></div>"
     : renderCode(symbol.display, "typescript") +
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");

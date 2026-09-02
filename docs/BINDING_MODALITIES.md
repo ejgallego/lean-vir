@@ -118,9 +118,10 @@ Each generated library has a named `generation.abiProfile` in its
 - `Document` is a host-global receiver, while `Element` is an explicit
   borrowed receiver.
 
-Identity resource mappings may use the short string form. Resource mappings
-whose Lean marker name differs from the TypeScript type, and every host-global
-receiver choice, must instead carry `semantics` plus `reason`. These are
+Binding-library configuration format version 2 makes semantic policy explicit.
+Only exactly identical resource marker names may use the short string form.
+Qualified or renamed Lean markers, and every host-global receiver choice, must
+instead carry `semantics` plus `reason`. These are
 operation-policy facts: a changing fact makes the generated operation an
 adapter, while only identity mappings and explicitly preserving facts can
 contribute to faithful coverage. This keeps widened phantom types and omitted

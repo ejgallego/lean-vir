@@ -1,6 +1,6 @@
 {
   "$schema": "../bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "infoview",
   "title": "Infoview client surface",
   "description": "Browser capabilities supplied to the Lean infoview and its editor-facing command bridge.",

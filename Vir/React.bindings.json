@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "react",
   "title": "React",
   "description": "React elements, properties, hooks, state, references, and React DOM roots.",
@@ -27,7 +27,11 @@
         "semantics": "preserving",
         "reason": "Lean.Vir.React.Node is the phantom marker for the exact JavaScript ReactNode value."
       },
-      "Root": "Lean.Vir.React.Root"
+      "Root": {
+        "lean": "Lean.Vir.React.Root",
+        "semantics": "preserving",
+        "reason": "Lean.Vir.React.Root is the qualified phantom marker for the exact JavaScript ReactDOM Root value."
+      }
     },
     "members": ["Root.render", "Root.unmount", "createRoot"],
     "methodPolicies": {

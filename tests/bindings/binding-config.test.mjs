@@ -20,6 +20,7 @@ const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
+  assert.equal(loaded.version, 2);
   assert.equal(loaded.id, "browser");
   assert.equal(loaded.path, "Vir/Browser.bindings.json");
 });
@@ -166,6 +167,20 @@ test("semantic review classifications are fail-closed enums", async () => {
   await assert.rejects(
     validateBindingConfig(implicitResourceAlias, browserPath),
     /changes the TypeScript marker and requires lean, semantics, and reason/u,
+  );
+
+  const sameLeafResourceAlias = structuredClone(browser);
+  sameLeafResourceAlias.generation.resources.Element = "Unrelated.Namespace.Element";
+  await assert.rejects(
+    validateBindingConfig(sameLeafResourceAlias, browserPath),
+    /changes the TypeScript marker and requires lean, semantics, and reason/u,
+  );
+
+  const previousFormat = structuredClone(browser);
+  previousFormat.version = 1;
+  await assert.rejects(
+    validateBindingConfig(previousFormat, browserPath),
+    /version.*must be equal to constant/u,
   );
 });
 

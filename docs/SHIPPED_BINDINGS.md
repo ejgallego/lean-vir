@@ -92,9 +92,11 @@ Each upstream member has a generation record with three independent facts:
   the canonical operations associated with the member. A changing adapter no
   longer appears as faithful coverage merely because its provider key exists.
   `unreviewed` dominates mixed coverage; otherwise one preserving operation is
-  enough for `faithful`, while a member with only changing operations is
-  `adapter-only`. Thus a faithful primitive can coexist with named convenience
-  adapters without hiding either fact.
+  enough for the machine status `faithful`, while a member with only changing
+  operations is `adapter-only`. The UI describes that status as “has faithful
+  boundary,” and calls out mixed faithful/adapter members explicitly, so a
+  faithful primitive can coexist with named convenience adapters without
+  hiding either fact.
 - **provenance** records whether upstream-correspondence evidence comes from
   direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
   annotation, or no implementation. This is distinct from declaration

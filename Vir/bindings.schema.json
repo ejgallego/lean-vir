@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://leanprover.github.io/lean-vir/schemas/binding-library-v1.json",
+  "$id": "https://leanprover.github.io/lean-vir/schemas/binding-library-v2.json",
   "title": "Lean VIR binding library",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "id", "title", "description", "lean", "generation", "roots"],
   "properties": {
     "$schema": { "type": "string" },
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "id": { "$ref": "#/$defs/id" },
     "title": { "type": "string", "minLength": 1 },
     "description": { "type": "string", "minLength": 1 },

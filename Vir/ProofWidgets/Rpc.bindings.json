@@ -1,6 +1,6 @@
 {
   "$schema": "../bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "proofwidgets",
   "title": "ProofWidgets RPC",
   "description": "ProofWidgets reference transport and inspection calls implemented by the VIR host.",

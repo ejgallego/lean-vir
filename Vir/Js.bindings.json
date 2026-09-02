@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "javascript",
   "title": "JavaScript values",
   "description": "Core JavaScript resources, nullable values, collections, primitive conversions, and retained Lean references.",

@@ -56,14 +56,10 @@ function validateSemanticPolicy(value, context, additionalFields = []) {
   validateUpstreamSemantics(value.semantics, context);
 }
 
-function typeLeaf(value) {
-  return value.slice(value.lastIndexOf(".") + 1);
-}
-
 function resourceMapping(generation, id, context = `generation resource ${id}`) {
   const mapping = generation.resources?.[id];
   if (typeof mapping === "string") {
-    if (!nonemptyString(mapping) || typeLeaf(id) !== typeLeaf(mapping)) {
+    if (!nonemptyString(mapping) || mapping !== id) {
       throw new Error(
         `${context} changes the TypeScript marker and requires lean, semantics, and reason`,
       );

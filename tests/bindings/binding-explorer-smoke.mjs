@@ -7,11 +7,13 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { Script } from "node:vm";
 
 const report = JSON.parse(await readFile("build/bindings/report.json", "utf8"));
 const html = await readFile("build/bindings/index.html", "utf8");
 const app = await readFile("build/bindings/assets/app.js", "utf8");
 const style = await readFile("build/bindings/assets/style.css", "utf8");
+new Script(app, { filename: "build/bindings/assets/app.js" });
 const roots = report.libraries.flatMap((library) =>
   library.apiGroups.map((root) => ({ library: library.id, ...root })));
 const targets = roots.flatMap((root) => root.bindings.map((binding) => binding.target));
@@ -659,6 +661,7 @@ for (const member of [
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="faithful-metric"/u);
+assert.match(html, /upstream entries with a faithful boundary/u);
 assert.match(html, /id="adapter-metric"/u);
 assert.match(html, /id="coverage" aria-label="Filter upstream semantic coverage"/u);
 assert.match(html, /id="search" type="search"/u);
@@ -671,6 +674,7 @@ assert.doesNotMatch(html, /Public Lean API/u);
 assert.doesNotMatch(html, /Host targets/u);
 assert.match(app, /lean-vir\.binding-type-browser\.v1/u);
 assert.match(app, /semantics-preserving contract/u);
+assert.match(app, /Lean boundaries and explicit adapters/u);
 assert.match(app, /semantic review required/u);
 assert.match(app, /elements\.semantics\.value/u);
 assert.match(app, /runtime provider keys present/u);

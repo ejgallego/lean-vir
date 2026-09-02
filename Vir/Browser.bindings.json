@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "browser",
   "title": "Browser APIs",
   "description": "DOM, events, canvas, animation, timers, and browser-owned values exposed by Vir.Browser.",
