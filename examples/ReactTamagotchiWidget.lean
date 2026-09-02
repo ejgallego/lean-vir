@@ -29,7 +29,7 @@ def captionStyle : Props.Entry := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def View : Component Surface := fun surface => do
+def View : Component Surface := .named "ReactTamagotchiWidget.View" fun surface => do
   let caption ← Node.pTextWith
     #[
       Props.id "react-tamagotchi-widget-caption",

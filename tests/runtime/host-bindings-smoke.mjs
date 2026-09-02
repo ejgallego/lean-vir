@@ -29,6 +29,23 @@ const hostRuntime = await createVirRuntime({
   hostBindings: createCallbackHostBindings(),
 });
 
+const collectionBindings = hostRuntime.hostState.defaultBindings;
+const nativeArray = collectionBindings["js.array.empty"]();
+const nativeItem = { kind: "exact-array-item" };
+assert.equal(Array.isArray(nativeArray), true);
+assert.equal(collectionBindings["js.array.push"](nativeArray, nativeItem), 1);
+assert.equal(collectionBindings["js.array.length"](nativeArray), 1);
+assert.equal(
+  collectionBindings["js.array.item"](nativeArray, 0),
+  nativeItem,
+  "JavaScript array bindings must preserve item identity",
+);
+assert.equal(
+  collectionBindings["js.array.item"](nativeArray, 1),
+  null,
+  "the explicit safe lookup adapter normalizes a missing item to null",
+);
+
 let retainedCallback = null;
 const retainedCallbackRuntime = await createVirRuntime({
   wasmBytes,

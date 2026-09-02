@@ -886,7 +886,8 @@ def reduceViewStateJs
 
 def useViewState (initial : ViewState := initialViewState) : ReactM ViewReducerState := do
   let initialJs ← Lean.Vir.LeanRef.toJSL (normalizeView initial)
-  Hooks.useReducer reduceViewStateJs initialJs
+  let reducer ← Reducer.ofLean reduceViewStateJs
+  ReducerTuple.toState (← Hooks.useReducer reducer initialJs)
 
 def dispatchViewAction (hook : ViewReducerState) (action : ViewAction) : DomM Unit := do
   let actionJs ← Lean.Vir.LeanRef.toJSL action
@@ -897,9 +898,10 @@ def tick (hook : ViewReducerState) : DomM Unit :=
 
 def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
   let deps ← Hooks.DependencyList.empty
-  Hooks.useEffectWithDeps deps
+  Hooks.useLeanEffect
     (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
+    (some deps)
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text widgetCss
@@ -944,7 +946,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     ]
     #[bar, counter]
 
-def View : Component Unit := fun _ => do
+def View : Component Unit := .named "ReactTamagotchi.View" fun _ => do
   let hook ← useViewState
   let view ← Lean.Vir.LeanRef.fromJSL hook.value
   let state := normalizeViewState view.state

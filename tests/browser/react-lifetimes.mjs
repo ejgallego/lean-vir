@@ -92,6 +92,9 @@ async function smokeBrowserReactStrictModeLifetime(cdp) {
   assert.equal(result.value.component.mounts, 2);
   assert.equal(result.value.component.cleanups, 1);
   assert.equal(result.value.component.text, "replacement:0");
+  assert.equal(result.value.nestedComponent.mounts, 2);
+  assert.equal(result.value.nestedComponent.cleanups, 1);
+  assert.equal(result.value.nestedComponent.text, "replacement:0");
   assert.ok(
     result.value.abandoned.renders >= 1,
     "Suspense must start at least one discarded render",

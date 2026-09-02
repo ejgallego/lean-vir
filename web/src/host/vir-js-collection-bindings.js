@@ -8,13 +8,14 @@ import { createNullableValue } from "./vir-js-value-bindings.js";
 
 export function createJsCollectionHostBindings() {
   return {
-    "js.array.length": (array) => BigInt(jsArrayValue(array).length),
+    "js.array.empty": () => [],
+    "js.array.push": (array, value) => jsArrayValue(array).push(value),
+    "js.array.length": (array) => jsArrayValue(array).length,
     "js.array.item": (array, index) => {
       const values = jsArrayValue(array);
       return createNullableValue(values[jsCollectionIndex(index)] ?? null);
     },
-    "js.nodeList.length": (nodeList) =>
-      BigInt(jsNodeListValue(nodeList).length),
+    "js.nodeList.length": (nodeList) => jsNodeListValue(nodeList).length,
     "js.nodeList.item": (nodeList, index) => {
       const value = jsNodeListValue(nodeList).item(jsCollectionIndex(index));
       return createNullableValue(value ?? null);
@@ -63,13 +64,13 @@ function jsNodeListValue(value) {
 
 function jsCollectionIndex(value) {
   if (
-    typeof value !== "bigint" ||
-    value < 0n ||
-    value > BigInt(Number.MAX_SAFE_INTEGER)
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < 0
   ) {
     throw new Error(
-      "JavaScript collection index must be a Js Nat in the safe integer range",
+      "JavaScript collection index must be a non-negative safe-integer Number",
     );
   }
-  return Number(value);
+  return value;
 }

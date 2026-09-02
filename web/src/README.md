@@ -52,7 +52,7 @@ unrelated responsibilities.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   unsupported React host bindings for Node tests/tools.
 - `react/vir-react-node.js`: browser React node/props/children operations and
-  the root-local component adapter.
+  the explicit-ID Lean component adapter.
 - `react/vir-react-hooks.js`: direct official browser React hook operations.
 
 ## Demo And Page Modules

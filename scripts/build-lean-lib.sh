@@ -106,6 +106,7 @@ build_module Vir/GeneratePackage/Emit.lean
 build_module Vir/GeneratePackage/Report.lean
 build_module Vir/GeneratePackage/Run.lean
 build_module Vir/ProofWidgets/Html.lean
+build_module Vir/ProofWidgets/Jsx.lean
 build_module Vir/ProofWidgets/Rpc/Types.lean
 build_module Vir/ProofWidgets/Rpc/Generated.lean
 build_module Vir/ProofWidgets/Rpc.lean

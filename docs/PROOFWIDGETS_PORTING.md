@@ -24,28 +24,26 @@ Initial VIR porting order:
 
 ## Current Gap
 
-The current VIR demo proves that a Lean-authored React component can receive a
-real infoview surface, render goals/selections, use host commands, and reload a
-fresh IR package. It is not yet a faithful port of an upstream ProofWidgets
-demo.
+The current VIR demos prove both directions: a Lean-authored React component
+can receive a real infoview surface, and a VIR-native goals/hypotheses panel can
+be assembled from nested Lean components with ordinary React state.
 
 The first compatibility slice is `Vir.ProofWidgets.Html`, backed directly by
 native `ReactNode` resources instead of a second recursive HTML tree.
 `Html.ofComponent` passes `ComponentProps` with props and child `Html` values,
 so component children are rendered by ordinary Lean component functions. The
 `fixtures/ProofWidgetsHtml.lean` and `fixtures/ProofWidgetsJsxSubset.lean`
-demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and
-`Handler` aliases in an upstream-recognizable shape and are included in the
-`demo-host.irpkg` runtime smoke package.
+demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, `Handler`,
+and native JSX in an upstream-recognizable shape.
 
 `ProofWidgetsJsxSubset.lean` now ports the static surface of upstream
-`ProofWidgets/Demos/Jsx.lean` with explicit combinators plus the first narrow
-reference-shaped interactive case:
+`ProofWidgets/Demos/Jsx.lean` through `Vir.ProofWidgets.Jsx`, plus the first
+narrow reference-shaped interactive case:
 
 - lowercase HTML tags such as `b`, `img`, `span`, and `hr`;
 - string and interpolated attributes such as `src`, `alt`, and `style`;
 - child array spread and string interpolation;
-- an uppercase `MarkdownDisplay`-shaped component with props;
+- uppercase components, typed props, component keys, and child spreads;
 - a small callback to keep handler coverage in the same fixture;
 - an `InteractiveExpr`-shaped component whose props carry
   `WithRpcRef ExprWithCtx` and whose click handler calls
@@ -85,8 +83,6 @@ Before attempting a port, keep the authoring model shallow and familiar:
 Known first-slice limits:
 
 - Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
-- JSX syntax is intentionally deferred; `ProofWidgetsJsxSubset.lean` keeps the
-  porting shape as explicit combinators for now.
 - The upstream `InteractiveExpr` example still needs elaborator-backed
   `ExprWithCtx` objects and rendering before it can be considered faithfully
   ported.

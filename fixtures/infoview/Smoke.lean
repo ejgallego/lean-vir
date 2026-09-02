@@ -51,8 +51,9 @@ def expectRootsError (roots : Array String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
-def AuthoringComponent : Lean.Vir.React.Component Lean.Vir.Infoview.Surface := fun _surface =>
-  Lean.Vir.React.Node.text "authoring smoke"
+def AuthoringComponent : Lean.Vir.React.Component Lean.Vir.Infoview.Surface :=
+  .named "SmokeInfoviewLean.AuthoringComponent" fun _surface =>
+    Lean.Vir.React.Node.text "authoring smoke"
 
 vir_proof_widget AuthoringComponent with mountId := "vir-smoke-widget"
 

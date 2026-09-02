@@ -20,9 +20,9 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
-def Counter : Component Unit := fun _ => do
+def Counter : Component Unit := .named "ReactCounterTutorial.Counter" fun _ => do
   let initial ← JsValue.ofNat 0
-  let count ← Hooks.useState initial
+  let count ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toNat count.value
   let label ← Node.text s!"Count: {value}"
   Node.buttonWith #[

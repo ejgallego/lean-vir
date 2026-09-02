@@ -16,9 +16,9 @@ def label (value : Nat) : String :=
   "react:" ++ toString value
 
 def counter : Component Unit :=
-  fun _ => do
+  .named "ReactCounter.counter" fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let countValue ← JsValue.toNat count.value
     let text ← Node.text (label countValue)
     Node.buttonWith
@@ -56,18 +56,20 @@ def renderStatic (selector : String) : DomM Bool :=
     Root.render root staticTree
 
 def renderStaticIntoSelector (selector : String) : DomM Bool :=
-  Root.renderComponentIntoSelector selector (fun _ => staticTree) ()
+  Root.renderComponentIntoSelector selector
+    (.named "ReactCounter.staticTree" fun _ => staticTree) ()
 
 def effectProbe : Component Unit :=
-  fun _ => do
-    Hooks.useEffect
+  .named "ReactCounter.effectProbe" fun _ => do
+    Hooks.useLeanEffect
       (JsValue.ofNat 0)
       (fun _ => pure ())
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
-    Hooks.useEffectWithDeps deps
+    Hooks.useLeanEffect
       (JsValue.ofNat 0)
       (fun _ => pure ())
+      (some deps)
     let text ← Node.text "react:effect"
     Node.spanWith #[Props.id "react-effect-label"] #[text]
 
@@ -75,12 +77,13 @@ def mountEffect (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
 
 def memoProbe : Component Unit :=
-  fun _ => do
+  .named "ReactCounter.memoProbe" fun _ => do
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
     let calculate : ReactM (Lean.Vir.Js Nat) := do
       JsValue.ofNat 42
-    let value ← Hooks.useMemo calculate deps
+    let calculation ← MemoCalculation.ofLean calculate
+    let value ← Hooks.useMemo calculation deps
     let memoValue ← JsValue.toNat value
     let text ← Node.text s!"react:memo:{memoValue}"
     Node.spanWith #[Props.id "react-memo-label"] #[text]
@@ -89,11 +92,12 @@ def mountMemo (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root memoProbe ()
 
 def memoStableProbe : Component Unit :=
-  fun _ => do
+  .named "ReactCounter.memoStableProbe" fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let deps ← Hooks.DependencyList.empty
-    let memoValue ← Hooks.useMemo (pure count.value) deps
+    let calculation ← MemoCalculation.ofLean (pure count.value)
+    let memoValue ← Hooks.useMemo calculation deps
     let countValue ← JsValue.toNat count.value
     let cachedValue ← JsValue.toNat memoValue
     let text ← Node.text s!"react:memo-stable:{countValue}:{cachedValue}"
@@ -111,9 +115,9 @@ def mountMemoStable (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root memoStableProbe ()
 
 def refFragmentProbe : Component Unit :=
-  fun _ => do
+  .named "ReactCounter.refFragmentProbe" fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let lastClick ← Hooks.useRef initial
     let countValue ← JsValue.toNat count.value
     let lastValueResource ← Ref.get lastClick

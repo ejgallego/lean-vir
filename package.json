@@ -131,7 +131,7 @@
     "test:pages": "node tests/browser/artifacts.mjs",
     "test:benchmark-pages": "node tests/browser/benchmark-pages.mjs",
     "test:pages:browser": "node tests/browser/runner.mjs",
-    "test:infoview": "lake build VirInfoview VirInfoviewFixtures && npm run check:infoview-bundle && lake env lean fixtures/infoview/Smoke.lean && node tests/infoview/widget.mjs",
+    "test:infoview": "lake build VirInfoview VirInfoviewFixtures && npm run check:infoview-bundle && lake env lean fixtures/infoview/Smoke.lean && lake env lean examples/VirNativeInfoview.lean && node tests/infoview/widget.mjs",
     "test:runtime": "npm run test:runtime:unit && node tests/runtime/runner.mjs",
     "test:runtime:lean": "node tests/runtime/runner.mjs --group lean",
     "test:runtime:pure": "node tests/runtime/runner.mjs --group pure",

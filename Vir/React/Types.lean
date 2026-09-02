@@ -59,8 +59,29 @@ opaque ElementType : Type
 /-- React state setter function returned by `useState`. -/
 opaque StateSetter (α : Type) : Type
 
+/-- Native JavaScript reducer function accepted by `React.useReducer`. -/
+opaque Reducer (state action : Type) : Type
+
 /-- React reducer dispatch function returned by `useReducer`. -/
 opaque ReducerDispatch (state action : Type) : Type
+
+/-- Exact JavaScript array returned by `React.useState`. -/
+opaque StateTuple (α : Type) : Type
+
+/-- Exact JavaScript array returned by `React.useReducer`. -/
+opaque ReducerTuple (state action : Type) : Type
+
+/-- Native JavaScript calculation function accepted by `React.useMemo`. -/
+opaque MemoCalculation (α : Type) : Type
+
+/-- Native JavaScript setup function accepted by `React.useEffect`. -/
+opaque EffectCallback : Type
+
+/-- Native unary JavaScript callback used by React and component props. -/
+opaque Callback (α : Type) : Type
+
+/-- Native React context object carrying JavaScript values of type `α`. -/
+opaque Context (α : Type) : Type
 
 /-- React ref object returned by `useRef`. -/
 opaque Ref (α : Type) : Type
@@ -116,14 +137,29 @@ structure ReducerState (state action : Type) where
 /-- React node object created by the JavaScript host through React's public API. -/
 opaque Node : Type
 
-/-- JavaScript-owned React child list. -/
-opaque NodeChildren : Type
-
 /-- JavaScript-owned React hook dependency list. -/
 opaque DependencyList : Type
 
-/-- A React function component authored in Lean. -/
-abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Node)
+/--
+An explicitly identified React function component authored in Lean.
+
+`id` supplies the React component-type identity for VIR's small Lean-component
+adapter. Values with the same ID update one component type at a stable tree
+position; changing the ID asks React to unmount the old type and mount a new
+one. IDs should be declaration-stable constants, not values derived from props
+or keys. The render function remains subject to the same hook and purity rules
+as an ordinary TypeScript React component.
+-/
+structure Component (props : Type := Unit) where
+  id : String
+  render : props → ReactM (Lean.Vir.Js Node)
+
+namespace Component
+
+/-- Creates a Lean-authored React component with an explicit stable type ID. -/
+def named (id : String) (render : props → ReactM (Lean.Vir.Js Node)) : Component props :=
+  { id, render }
+
+end Component
 
 end Lean.Vir.React

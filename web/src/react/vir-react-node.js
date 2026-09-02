@@ -29,7 +29,7 @@ export function createBrowserReactNodeElement(
   return requireCreateElement(createElement)(
     reactElementTypeValue(elementType),
     reactPropsValue(props),
-    ...reactNodeChildrenValue(children),
+    ...requireReactNodeArray(children),
   );
 }
 
@@ -45,18 +45,44 @@ export function createBrowserReactNodeFragment(
   return requireCreateElement(createElement)(
     Fragment,
     reactFragmentPropsValue(props),
-    ...reactNodeChildrenValue(children),
+    ...requireReactNodeArray(children),
   );
 }
 
-// The root host supplies a stable function component and updates its private
-// callback slot between submissions. This helper creates React's exact element
-// value without introducing another component type.
-export function createBrowserReactComponentNode(createElement, componentType) {
-  if (typeof componentType !== "function") {
-    throw new Error("React component must be a JavaScript function");
+// This is the one deliberate component adapter in the React value layer. Each
+// explicit Lean component ID maps to one ordinary React function type. The
+// render callback remains an exact JavaScript function in props, so React owns
+// render/replay behavior and JavaScript reachability owns its Lean closure.
+export function createBrowserLeanComponentNodeFactory(createElement) {
+  const create = requireCreateElement(createElement);
+  const boundariesByType = new Map();
+
+  function boundaryFor(componentType) {
+    const identity = reactNodeName(componentType, "component type");
+    const existing = boundariesByType.get(identity);
+    if (existing !== undefined) return existing;
+    const LeanComponent = ({ renderCallback }) =>
+      requireFunction(
+        renderCallback,
+        "Lean component render callback",
+      )(undefined);
+    LeanComponent.displayName = `LeanComponent(${identity})`;
+    boundariesByType.set(identity, LeanComponent);
+    return LeanComponent;
   }
-  return requireCreateElement(createElement)(componentType);
+
+  return (componentType, renderCallback, key = null) => {
+    const props = {
+      renderCallback: requireFunction(
+        renderCallback,
+        "Lean component render callback",
+      ),
+    };
+    if (key !== null && key !== undefined) {
+      props.key = reactNodeName(key, "component key");
+    }
+    return create(boundaryFor(componentType), props);
+  };
 }
 
 export function createReactProps() {
@@ -82,15 +108,6 @@ export function setReactPropsProperty(props, property) {
 export function setReactPropsEventHandler(props, handler) {
   const [name, callback] = reactNodeEventHandlerEntry(handler);
   setReactObjectProperty(reactPropsValue(props), name, callback);
-  return undefined;
-}
-
-export function createReactNodeChildren() {
-  return [];
-}
-
-export function pushReactNodeChild(children, child) {
-  reactNodeChildrenValue(children).push(child);
   return undefined;
 }
 
@@ -129,6 +146,13 @@ function requireCreateElement(createElement) {
   return createElement;
 }
 
+function requireFunction(value, label) {
+  if (typeof value !== "function") {
+    throw new Error(`${label} must be a JavaScript function`);
+  }
+  return value;
+}
+
 function reactPropsValue(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("React props must be a JavaScript object");
@@ -136,7 +160,7 @@ function reactPropsValue(value) {
   return value;
 }
 
-function reactNodeChildrenValue(value) {
+function requireReactNodeArray(value) {
   if (!Array.isArray(value)) {
     throw new Error("React children must be a JavaScript Array");
   }

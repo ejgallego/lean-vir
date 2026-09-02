@@ -92,9 +92,14 @@ private def isLeanObjectHandle : InterfaceType → Bool
   | .leanObject => true
   | _ => false
 
-private def isExplicitConversionValue : InterfaceType → Bool
+private def isExplicitConversionResult : InterfaceType → Bool
   | .resource ..
   | .function ..
+  | .leanObject => false
+  | _ => true
+
+private def isExplicitConversionArgument : InterfaceType → Bool
+  | .resource ..
   | .leanObject => false
   | _ => true
 
@@ -115,8 +120,8 @@ private def isJsValueConversionSignature (signature : ClassifiedSignature) : Boo
     match signature.args[0]? with
     | some arg =>
         signature.args.size == 1 &&
-          ((isGenericJsResource arg.type && isExplicitConversionValue signature.result) ||
-            (isExplicitConversionValue arg.type && isGenericJsResource signature.result))
+          ((isGenericJsResource arg.type && isExplicitConversionResult signature.result) ||
+            (isExplicitConversionArgument arg.type && isGenericJsResource signature.result))
     | none => false
 
 private def isLeanObjectHandleSignature

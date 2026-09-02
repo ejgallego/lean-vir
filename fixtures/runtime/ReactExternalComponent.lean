@@ -10,14 +10,14 @@ open Lean.Vir.React
 opaque externalBadge : ReactM (Lean.Vir.Js ElementType)
 
 def externalComponentProbe : Component Unit :=
-  fun _ => do
+  .named "Vir.Fixtures.ReactExternalComponent.externalComponentProbe" fun _ => do
     let component ← externalBadge
     let initial ← JsValue.ofString "unset"
     let ref ← Hooks.useRef initial
     let text ← Node.text "external child"
-    Node.createElement component
-      #[Props.id "react-external-badge", Props.ref ref]
-      #[text]
+    let props ← Props.fromEntries #[Props.id "react-external-badge", Props.ref ref]
+    let children ← Lean.Vir.Js.Array.ofArray #[text]
+    Node.createElement component props children
 
 def mount (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root externalComponentProbe ()

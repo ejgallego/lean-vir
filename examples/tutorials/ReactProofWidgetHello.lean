@@ -187,7 +187,7 @@ def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
         hypothesis
       ]
 
-def View : Component Surface := fun surface => do
+def View : Component Surface := .named "ReactProofWidgetHello.View" fun surface => do
   let titleText ← Node.text "Hello ProofWidget from IRIF"
   let title ← Node.h3With #[Props.id "react-proof-hello-title", Style.title] #[
     titleText

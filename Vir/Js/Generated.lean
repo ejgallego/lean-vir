@@ -13,9 +13,43 @@ namespace Lean.Vir
 namespace Js.Array
 
 /--
+Generated binding for reviewed VIR protocol `javascript.array.empty`.
+
+Constructs an empty native JavaScript Array.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.empty"]
+opaque empty
+    {α : Type} :
+    RuntimeM (Lean.Vir.Js.Array (Lean.Vir.Js α))
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.push`.
+
+Calls Array.push with the exact native array and item and returns its JavaScript Number result.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.push"]
+opaque push
+    {α : Type}
+    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM (Lean.Vir.Js Float)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.array.length`.
 
-Reads Array.length while keeping the array contents in JavaScript land.
+Returns the exact native JavaScript Number stored in Array.length.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -27,7 +61,7 @@ This declaration is generated; edit the binding configuration.
 opaque lengthJs
     {α : Type}
     (array : @& Lean.Vir.Js.Array α) :
-    RuntimeM (Lean.Vir.Js Nat)
+    RuntimeM (Lean.Vir.Js Float)
 
 /--
 Generated explicit protocol operation semantic adapter for TypeScript `Array`.
@@ -44,7 +78,7 @@ This declaration is generated; edit the binding configuration.
 opaque itemNullable
     {α : Type}
     (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
-    (index : @& Lean.Vir.Js Nat) :
+    (index : @& Lean.Vir.Js Float) :
     RuntimeM (Lean.Vir.Js.Nullable α)
 
 end Js.Array
@@ -54,7 +88,7 @@ namespace Js.NodeList
 /--
 Generated binding for reviewed VIR protocol `javascript.node-list.length`.
 
-Reads NodeList.length while keeping the collection in JavaScript land.
+Returns the exact native JavaScript Number stored in NodeList.length.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -66,7 +100,7 @@ This declaration is generated; edit the binding configuration.
 opaque lengthJs
     {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList α) :
-    RuntimeM (Lean.Vir.Js Nat)
+    RuntimeM (Lean.Vir.Js Float)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.node-list.item`.
@@ -83,7 +117,7 @@ This declaration is generated; edit the binding configuration.
 opaque itemNullable
     {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
-    (index : @& Lean.Vir.Js Nat) :
+    (index : @& Lean.Vir.Js Float) :
     RuntimeM (Lean.Vir.Js.Nullable α)
 
 /--

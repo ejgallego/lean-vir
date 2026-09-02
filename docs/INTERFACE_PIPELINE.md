@@ -215,10 +215,10 @@ structure of the rendered tree is the ordinary React/JavaScript object graph
 created by `react.node.text` and `react.node.createElement`. Text inputs are explicit
 `Lean.Vir.Js String` resources. Element construction receives an explicit
 `Lean.Vir.Js ElementType` value; `react.elementType.tag` preserves DOM tag
-strings unchanged, and future component bindings can provide component element
-types directly. Props, children, and dependency lists are ordinary JavaScript
-objects and arrays built by `react.props.*`, `react.node.children.*`, and
-`react.deps.*`. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
+strings unchanged, and component bindings can provide component element types
+directly. Props and dependency lists are ordinary JavaScript objects and arrays
+built by `react.props.*` and `react.deps.*`; children use the generic
+`js.array.*` surface. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
 cross only through explicit
 `js.value.react.property` and `js.value.react.eventHandler` conversion targets.
 

@@ -9,7 +9,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import { createBrowserReactHookRuntime } from "../../web/src/react/vir-react-hooks.js";
-import { createBrowserReactComponentNode } from "../../web/src/react/vir-react-node.js";
+import { createBrowserLeanComponentNodeFactory } from "../../web/src/react/vir-react-node.js";
 import {
   createHostLifecycle,
   createReactRootHostBindings,
@@ -35,17 +35,87 @@ async function runReactSmoke() {
     reducer: await runReducerIdentityProbe(),
     memo: await runMemoIdentityProbe(),
     component: await runRepeatedComponentSubmissionProbe(),
+    nestedComponent: await runNestedComponentIdentityProbe(),
     abandoned: await runAbandonedSuspenseProbe(),
   };
+}
+
+async function runNestedComponentIdentityProbe() {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
+    React.createElement,
+  );
+  const state = { mounts: 0, cleanups: 0 };
+  let setter = null;
+  const renderCallback = (label) => () => {
+    const [count, setCount] = React.useState(0);
+    setter = setCount;
+    React.useEffect(() => {
+      state.mounts++;
+      return () => state.cleanups++;
+    }, []);
+    return React.createElement("div", null, `${label}:${count}`);
+  };
+
+  try {
+    flushSync(() =>
+      root.render(
+        createLeanComponentNode(
+          "NestedComponentProbe",
+          renderCallback("first"),
+          "stable",
+        ),
+      ),
+    );
+    flushSync(() => setter(1));
+    flushSync(() =>
+      root.render(
+        createLeanComponentNode(
+          "NestedComponentProbe",
+          renderCallback("second"),
+          "stable",
+        ),
+      ),
+    );
+    requireState(
+      container.textContent === "second:1" &&
+        state.mounts === 1 &&
+        state.cleanups === 0,
+      "a stable nested component ID and key must preserve hook state",
+    );
+    flushSync(() =>
+      root.render(
+        createLeanComponentNode(
+          "NestedReplacementProbe",
+          renderCallback("replacement"),
+          "stable",
+        ),
+      ),
+    );
+    requireState(
+      container.textContent === "replacement:0" &&
+        state.mounts === 2 &&
+        state.cleanups === 1,
+      "changing a nested component ID must remount it",
+    );
+    return { ...state, text: container.textContent };
+  } finally {
+    flushSync(() => root.unmount());
+    container.remove();
+  }
 }
 
 async function runRepeatedComponentSubmissionProbe() {
   const lifecycle = createHostLifecycle();
   const container = document.createElement("div");
   document.body.append(container);
+  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
+    React.createElement,
+  );
   const bindings = createReactRootHostBindings(lifecycle, createRoot, {
-    createComponentNode: (componentType) =>
-      createBrowserReactComponentNode(React.createElement, componentType),
+    createLeanComponentNode,
   });
   let root = bindings["react.root.create"](container);
   const state = { mounts: 0, cleanups: 0 };
@@ -63,30 +133,41 @@ async function runRepeatedComponentSubmissionProbe() {
 
   try {
     flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("first")),
+      bindings["react.root.renderComponent"](
+        root,
+        "RepeatedComponentProbe",
+        component("first"),
+      ),
     );
     flushSync(() => setter(1));
     flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("second")),
+      bindings["react.root.renderComponent"](
+        root,
+        "RepeatedComponentProbe",
+        component("second"),
+      ),
     );
     requireState(
       container.textContent === "second:1",
-      "root-local component identity must preserve hook state",
+      "a stable component ID must preserve hook state",
     );
     requireState(
       state.mounts === 1 && state.cleanups === 0,
-      "an update must not remount the root-local component adapter",
+      "a same-ID update must not remount the component adapter",
     );
 
-    flushSync(() => bindings["react.root.unmount"](root));
-    requireState(state.cleanups === 1, "unmount must clean up the component");
-    root = bindings["react.root.create"](container);
     flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("replacement")),
+      bindings["react.root.renderComponent"](
+        root,
+        "ReplacementComponentProbe",
+        component("replacement"),
+      ),
     );
     requireState(
-      container.textContent === "replacement:0" && state.mounts === 2,
-      "an explicit root replacement must mount a fresh component identity",
+      container.textContent === "replacement:0" &&
+        state.mounts === 2 &&
+        state.cleanups === 1,
+      "changing the explicit component ID must remount the component",
     );
     return { ...state, text: container.textContent };
   } finally {
@@ -105,17 +186,15 @@ async function runStrictModeEffectProbe() {
 
   function Probe() {
     state.renders++;
-    hooks.useEffect(
-      () => {
-        state.setups++;
-        return { setup: state.setups };
-      },
-      (token) => {
-        if (token?.setup === undefined)
-          throw new Error("effect cleanup lost its exact setup value");
+    hooks.useEffect(() => {
+      state.setups++;
+      const token = { setup: state.setups };
+      return () => {
+        if (token.setup === undefined)
+          throw new Error("effect cleanup lost its exact setup closure");
         state.cleanups++;
-      },
-    );
+      };
+    });
     return null;
   }
 

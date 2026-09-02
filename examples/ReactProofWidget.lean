@@ -165,7 +165,7 @@ structure StateHook where
 
 def useStatus : ReactM StateHook := do
   let initial ← JsValue.ofString "Choose an action to insert it at the editor cursor."
-  let status ← Hooks.useState initial
+  let status ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toString status.value
   pure { status, value }
 
@@ -282,7 +282,7 @@ structure ViewProps where
   copyContext : DomM Unit
   revealCursor : DomM Unit
 
-def View : Component ViewProps := fun props => do
+def View : Component ViewProps := .named "ReactProofWidget.View" fun props => do
   let title ← Node.h3TextWith #[Props.id "react-proof-selected-title", Style.heading] "Proof actions"
   let summary ← Node.pTextWith #[Props.id "react-proof-summary", Style.summary]
     (goalName props.goal ++ " · " ++ s!"{props.goal.hypotheses.size} " ++
@@ -320,7 +320,7 @@ def View : Component ViewProps := fun props => do
     status
   ]
 
-def EmptyView : Component Surface := fun surface => do
+def EmptyView : Component Surface := .named "ReactProofWidget.EmptyView" fun surface => do
   let title ← Node.h3TextWith #[Style.heading] "Proof actions"
   let empty ← Node.pTextWith #[Style.empty]
     ("Move the cursor into a tactic proof to get actions at " ++ surface.cursor.label ++ ".")
@@ -331,7 +331,7 @@ def EmptyView : Component Surface := fun surface => do
     Style.shell
   ] #[title, empty]
 
-def App : Component Surface := fun surface => do
+def App : Component Surface := .named "ReactProofWidget.App" fun surface => do
   let state ← useStatus
   match surface.goals[0]? with
   | none => Node.component EmptyView surface

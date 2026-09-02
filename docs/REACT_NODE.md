@@ -12,7 +12,7 @@ values:
 - `Js Node` is an actual React node or element;
 - `Js ElementType` is the tag, component, symbol, or React type object;
 - `Js Props` is a JavaScript object;
-- `Js NodeChildren` and `Js DependencyList` are JavaScript arrays;
+- `Js.Array (Js Node)` and `Js DependencyList` are JavaScript arrays;
 - `Js ReactRef` is React's `{ current }` object;
 - state values, actions, setters, and dispatchers are the values returned or
   stored by React.
@@ -31,8 +31,8 @@ import Vir.React
 open Lean.Vir.React
 
 def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
-  Node.element "section"
-    #[Property.className "greeting"]
+  Node.sectionWith
+    #[Props.className "greeting"]
     #[← Node.text s!"Hello, {name}"]
 ```
 
@@ -40,8 +40,7 @@ The builders are explicit adapters:
 
 - `react.props.empty` creates `{}`;
 - property and event-handler operations mutate that object;
-- `react.node.children.empty` creates `[]`;
-- `react.node.children.push` calls the array's normal mutation path;
+- generic `js.array.empty` / `js.array.push` build the exact child array;
 - `react.node.createElement` forwards the values to `React.createElement`;
 - fragment construction forwards to `React.Fragment`.
 
@@ -61,11 +60,14 @@ component adapter: it supplies an actual JavaScript function component so
 React controls invocation, replay, hooks, and commits. Use the component path
 for recurring application updates.
 
-The adapter keeps one function-component type per root. Repeated component
-submissions update its callback without resetting React state or mount effects;
-unmounting and recreating the root is the explicit remount boundary. As in a
-TypeScript component, updates must preserve valid hook ordering. Submitters
-that intentionally change the component's hook shape must unmount first.
+Each Lean component has an explicit string ID. The adapter keeps one ordinary
+React function type while that ID is stable, so repeated submissions update
+without resetting state or mount effects. Changing the ID changes the React
+type and therefore remounts. Nested `Node.component` and keyed component nodes
+use the same rule. Component IDs should be declaration-stable constants; use
+React keys for instance identity. The adapter is only an identity bridge; the
+render callback is an ordinary JavaScript function prop and React controls
+replay and hooks.
 
 Selector helpers keep one active root per selected container and return a
 boolean when the selector is missing. Root registration is tracked only so
@@ -80,21 +82,34 @@ that needs normal evolving UI state should put that state behind a component.
 
 The browser hook runtime delegates directly to official React:
 
-- `useState` returns React's current value and setter;
-- `useReducer` installs the supplied reducer and returns React's dispatch;
+- `useState` returns React's exact JavaScript tuple;
+- `useReducer` accepts an exact JavaScript reducer and returns React's tuple;
 - `useRef` returns React's ref object;
 - `useMemo` receives the actual dependency array and returns React's result;
-- `useEffect` and `useEffectWithDeps` register official effects;
+- `useCallback`, `useContext`, `useEffect`, and `useEffectWithDeps` call the
+  corresponding official hooks with exact JavaScript inputs;
 - state setters and reducer dispatchers receive the exact JavaScript value.
 
-The Lean effect API splits setup and cleanup into two callbacks and is
-therefore an explicit adapter. Apart from that adapter, VIR does not keep
-committed/speculative hook slots, action queues, dependency leases, or render
-generation records.
+`StateTuple.toState` and `ReducerTuple.toState` are explicit projection
+conveniences. `Reducer.ofLean`, `MemoCalculation.ofLean`, and
+`Callback.ofUnary` explicitly turn a Lean callback into an ordinary JavaScript
+function. `useLeanEffect` splits setup and cleanup and is therefore a named
+semantic adapter. VIR keeps no committed/speculative hook slots, action queues,
+dependency leases, or render-generation records.
 
 React restrictions remain programmer responsibilities. Lean does not add
 purity, valid hook ordering, complete dependency lists, replay-safe reducers,
 or lane acknowledgements that TypeScript React lacks.
+
+## JavaScript Provenance
+
+The hook and element providers are shallow calls to public React 19 APIs; VIR
+ships no copied reconciler or hook implementation. The only React-specific
+semantic adapter in `vir-react-node.js` maps an explicit Lean component ID to
+an ordinary JavaScript function type and places the exact render callback in
+props. Root selector caching, unmount registration, and host-call rollback are
+VIR browser-host policy rather than React emulation. Binding metadata marks
+these adapters `vir-owned` and marks direct public-API calls as preserving.
 
 ## Refs And Events
 
@@ -136,6 +151,7 @@ The browser matrix covers:
 - interleaved state lanes;
 - suspended and abandoned renders;
 - root render and unmount behavior.
+- stable and changed IDs for root and nested Lean component adapters.
 
 Run:
 

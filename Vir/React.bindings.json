@@ -89,6 +89,39 @@
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EventHandler", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EventHandler" } }
       },
       {
+        "id": "react.reducer.of-lean", "group": "value-conversions", "target": "js.value.react.reducer",
+        "lean": "Lean.Vir.React.Reducer.ofLean", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean reducer callback into an ordinary JavaScript function; React remains responsible for invocation and replay semantics.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["state", "action"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "reducer", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Reducer state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Reducer state action" } }
+      },
+      {
+        "id": "react.memo-calculation.of-lean", "group": "value-conversions", "target": "js.value.react.memoCalculation",
+        "lean": "Lean.Vir.React.MemoCalculation.ofLean", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean calculation into an ordinary zero-argument JavaScript function.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "calculate", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js α)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.MemoCalculation α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.MemoCalculation α" } }
+      },
+      {
+        "id": "react.callback.of-unary", "group": "value-conversions", "target": "js.value.react.callback",
+        "lean": "Lean.Vir.React.Callback.ofUnary", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean unary callback into an ordinary JavaScript function.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } }
+      },
+      {
         "id": "react.props.empty", "group": "props", "target": "react.props.empty",
         "lean": "Lean.Vir.React.Props.empty", "marker": "vir_js",
         "reason": "Allocates an empty JavaScript React props object.",
@@ -182,59 +215,59 @@
       },
       {
         "id": "react.hooks.use-reducer", "group": "hooks", "target": "react.useReducer",
-        "lean": "Lean.Vir.React.Hooks.useReducerJs", "marker": "vir_js",
-        "reason": "Calls React.useReducer with the exact reducer and initial JavaScript value and returns React's array pair.",
+        "lean": "Lean.Vir.React.Hooks.useReducer", "marker": "vir_js",
+        "reason": "Passes the caller's native reducer and initial value unchanged to React.useReducer and returns React's exact result array.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useReducer", "semantics": "preserving" },
         "typeParameters": ["state", "action"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "reducer", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state)", "representation": "callback" } },
+          { "name": "reducer", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Reducer state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Reducer state action" } },
           { "name": "initial", "type": { "lean": "Lean.Vir.Js state", "representation": "js-resource", "resourceInner": "state" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerState state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerState state action" } }
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple state action" } }
       },
       {
-        "id": "react.reducer-state.value", "group": "reducers", "target": "react.reducerState.value",
-        "lean": "Lean.Vir.React.Hooks.reducerStateValueJs", "marker": "vir_js",
-        "reason": "Projects the current state from React's useReducer array pair.",
+        "id": "react.reducer-tuple.value", "group": "reducers", "target": "react.reducerTuple.value",
+        "lean": "Lean.Vir.React.ReducerTuple.value", "marker": "vir_js",
+        "reason": "Projects index zero from the exact JavaScript array returned by React.useReducer.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["state", "action"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [{ "name": "reducerState", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerState state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerState state action" } }],
+        "arguments": [{ "name": "result", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple state action" } }],
         "result": { "type": { "lean": "Lean.Vir.Js state", "representation": "js-resource", "resourceInner": "state" } }
       },
       {
-        "id": "react.reducer-state.dispatch", "group": "reducers", "target": "react.reducerState.dispatch",
-        "lean": "Lean.Vir.React.Hooks.reducerStateDispatchJs", "marker": "vir_js",
-        "reason": "Projects React's dispatch function from its useReducer array pair.",
+        "id": "react.reducer-tuple.dispatch", "group": "reducers", "target": "react.reducerTuple.dispatch",
+        "lean": "Lean.Vir.React.ReducerTuple.dispatch", "marker": "vir_js",
+        "reason": "Projects the exact native dispatch function from index one of React.useReducer's result array.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["state", "action"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [{ "name": "reducerState", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerState state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerState state action" } }],
+        "arguments": [{ "name": "result", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple state action" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerDispatch state action" } }
       },
       {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
-        "lean": "Lean.Vir.React.Hooks.useStateJs", "marker": "vir_js",
-        "reason": "Calls React.useState with the exact initial JavaScript value and returns React's array pair.",
+        "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
+        "reason": "Passes the initial value unchanged to React.useState and returns React's exact result array.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.State (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.State (Lean.Vir.Js α)" } }
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple (Lean.Vir.Js α)" } }
       },
       {
-        "id": "react.state.value", "group": "state", "target": "react.state.value",
-        "lean": "Lean.Vir.React.Hooks.stateValueJs", "marker": "vir_js",
-        "reason": "Projects the current value from React's useState array pair.",
+        "id": "react.state-tuple.value", "group": "state", "target": "react.stateTuple.value",
+        "lean": "Lean.Vir.React.StateTuple.value", "marker": "vir_js",
+        "reason": "Projects index zero from the exact JavaScript array returned by React.useState.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [{ "name": "state", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.State (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.State (Lean.Vir.Js α)" } }],
+        "arguments": [{ "name": "result", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple (Lean.Vir.Js α)" } }],
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
-        "id": "react.state.setter", "group": "state", "target": "react.state.setter",
-        "lean": "Lean.Vir.React.Hooks.stateSetterJs", "marker": "vir_js",
-        "reason": "Projects React's setter function from its useState array pair.",
+        "id": "react.state-tuple.setter", "group": "state", "target": "react.stateTuple.setter",
+        "lean": "Lean.Vir.React.StateTuple.setter", "marker": "vir_js",
+        "reason": "Projects the exact native setter function from index one of React.useState's result array.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [{ "name": "state", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.State (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.State (Lean.Vir.Js α)" } }],
+        "arguments": [{ "name": "result", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple (Lean.Vir.Js α)" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateSetter (Lean.Vir.Js α)" } }
       },
       {
@@ -248,9 +281,20 @@
       },
       {
         "id": "react.hooks.use-effect", "group": "hooks", "target": "react.useEffect",
-        "lean": "Lean.Vir.React.Hooks.useEffect", "marker": "vir_js",
-        "reason": "Adapts separate Lean setup and cleanup functions to React's no-dependency effect callback shape.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "changing" },
+        "lean": "Lean.Vir.React.Hooks.useEffectWithoutDeps", "marker": "vir_js",
+        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "setup", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "react.hooks.use-lean-effect", "group": "hooks", "target": "react.useLeanEffect",
+        "lean": "Lean.Vir.React.Hooks.useLeanEffectWithoutDepsJs", "marker": "vir_js",
+        "reason": "Explicitly adapts separate transferred Lean setup and cleanup callbacks to React's effect callback shape.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "setup", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Browser.DomM (Lean.Vir.Js α)", "representation": "callback" } },
@@ -281,20 +325,55 @@
       {
         "id": "react.hooks.use-memo", "group": "hooks", "target": "react.useMemo",
         "lean": "Lean.Vir.React.Hooks.useMemo", "marker": "vir_js",
-        "reason": "Passes the calculation and exact dependency array to React.useMemo.",
+        "reason": "Passes the caller's native calculation function and dependency array unchanged to React.useMemo.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useMemo", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "calculate", "role": "callback", "passing": "owned", "retention": "call", "type": { "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js α)", "representation": "callback" } },
+          { "name": "calculate", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.MemoCalculation α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.MemoCalculation α" } },
           { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
+        "id": "react.hooks.use-callback", "group": "hooks", "target": "react.useCallback",
+        "lean": "Lean.Vir.React.Hooks.useCallback", "marker": "vir_js",
+        "reason": "Passes the caller's native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useCallback", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } },
+          { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } }
+      },
+      {
+        "id": "react.hooks.use-context", "group": "hooks", "target": "react.useContext",
+        "lean": "Lean.Vir.React.Hooks.useContext", "marker": "vir_js",
+        "reason": "Passes a native React context object unchanged to React.useContext and returns its current JavaScript-owned value.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useContext", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "context", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Context α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Context α" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
         "id": "react.hooks.use-effect-with-deps", "group": "hooks", "target": "react.useEffectWithDeps",
-        "lean": "Lean.Vir.React.Hooks.useEffectWithDepsJs", "marker": "vir_js",
-        "reason": "Adapts separate Lean setup and cleanup functions to React's effect callback shape and passes the exact dependency array.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "changing" },
+        "lean": "Lean.Vir.React.Hooks.useEffectWithDeps", "marker": "vir_js",
+        "reason": "Passes the caller's native setup function and dependency array unchanged to React.useEffect.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "setup", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } },
+          { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "react.hooks.use-lean-effect-with-deps", "group": "hooks", "target": "react.useLeanEffectWithDeps",
+        "lean": "Lean.Vir.React.Hooks.useLeanEffectWithDepsJs", "marker": "vir_js",
+        "reason": "Explicitly adapts separate transferred Lean setup and cleanup callbacks under a native dependency array.",
+        "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } },
@@ -344,14 +423,39 @@
       },
       {
         "id": "react.node.create-element", "group": "nodes", "target": "react.node.createElement",
-        "lean": "Lean.Vir.React.Node.createElementJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.createElement", "marker": "vir_js",
         "reason": "Calls React.createElement with the exact ElementType, props object, and child array values.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.createElement", "semantics": "preserving" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "elementType", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.ElementType", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ElementType" } },
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.NodeChildren", "representation": "js-resource", "resourceInner": "Lean.Vir.React.NodeChildren" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js Lean.Vir.React.Node)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
+      },
+      {
+        "id": "react.node.component", "group": "nodes", "target": "react.node.component",
+        "lean": "Lean.Vir.React.Node.componentThunkJs", "marker": "vir_js",
+        "reason": "Creates a React element for the explicit Lean-component adapter using a stable component type ID and render callback.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
+      },
+      {
+        "id": "react.node.keyed-component", "group": "nodes", "target": "react.node.keyedComponent",
+        "lean": "Lean.Vir.React.Node.keyedComponentThunkJs", "marker": "vir_js",
+        "reason": "Creates a keyed React element for the explicit Lean-component adapter using a stable component type ID and render callback.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } },
+          { "name": "key", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
@@ -363,29 +467,9 @@
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.NodeChildren", "representation": "js-resource", "resourceInner": "Lean.Vir.React.NodeChildren" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js Lean.Vir.React.Node)" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-      },
-      {
-        "id": "react.node.children.empty", "group": "nodes", "target": "react.node.children.empty",
-        "lean": "Lean.Vir.React.Node.NodeChildren.empty", "marker": "vir_js",
-        "reason": "Allocates an empty JavaScript-owned React child list.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" }, "arguments": [],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.NodeChildren", "representation": "js-resource", "resourceInner": "Lean.Vir.React.NodeChildren" } }
-      },
-      {
-        "id": "react.node.children.push", "group": "nodes", "target": "react.node.children.push",
-        "lean": "Lean.Vir.React.Node.NodeChildren.push", "marker": "vir_js",
-        "reason": "Appends the exact React node value to the native JavaScript child array.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "children", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.NodeChildren", "representation": "js-resource", "resourceInner": "Lean.Vir.React.NodeChildren" } },
-          { "name": "child", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "react.root.render-tree", "group": "react-dom-root", "target": "react.root.render",
@@ -403,12 +487,13 @@
       {
         "id": "react.root.render-component", "group": "react-dom-root", "target": "react.root.renderComponent",
         "lean": "Lean.Vir.React.Root.renderComponentThunk", "marker": "vir_js",
-        "reason": "Retains a Lean-authored component thunk as a real React function component until rerender or unmount.",
+        "reason": "Renders the explicit Lean-component adapter and preserves its React type while the supplied component ID remains stable.",
         "upstreamRelation": { "kind": "vir-owned" },
         "activeEffect": "use",
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [
           { "name": "root", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } },
+          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
           { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
@@ -429,12 +514,13 @@
       {
         "id": "react.root.render-component-selector", "group": "react-dom-root", "target": "react.root.renderComponentIntoSelector",
         "lean": "Lean.Vir.React.Root.renderComponentIntoSelectorThunkJs", "marker": "vir_js",
-        "reason": "VIR-owned selector convenience protocol that mounts the explicit no-props Lean component adapter.",
+        "reason": "VIR-owned selector convenience protocol that mounts the explicitly identified Lean-component adapter.",
         "upstreamRelation": { "kind": "vir-owned" },
         "activeEffect": "register",
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [
           { "name": "selector", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
           { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
@@ -490,8 +576,8 @@
     {
       "id": "reducers",
       "title": "Reducers",
-      "targets": ["react.reducer.*", "react.reducerState.*"],
-      "lean": { "public": ["Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerState"] },
+      "targets": ["react.reducer.*", "react.reducerTuple.*"],
+      "lean": { "public": ["Lean.Vir.React.Reducer", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.ReducerState"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.Reducer", "React.Dispatch"] }
     },
     {
@@ -635,8 +721,8 @@
     {
       "id": "state",
       "title": "State",
-      "targets": ["react.state.*"],
-      "lean": { "public": ["Lean.Vir.React.State", "Lean.Vir.React.StateSetter"] },
+      "targets": ["react.state.*", "react.stateTuple.*"],
+      "lean": { "public": ["Lean.Vir.React.State", "Lean.Vir.React.StateSetter", "Lean.Vir.React.StateTuple"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.SetStateAction", "React.Dispatch"] }
     },
     {
@@ -644,7 +730,7 @@
       "title": "Hooks",
       "targets": ["react.use*"],
       "lean": { "public": ["Lean.Vir.React.Hooks"] },
-      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.useEffect", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] }
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.useCallback", "React.useContext", "React.useEffect", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] }
     }
   ]
 }

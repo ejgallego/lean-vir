@@ -16,7 +16,7 @@ structure StatProps where
   label : String
   value : String
 
-def Stat : Component StatProps := fun ctx =>
+def Stat : Component StatProps := .named "ProofWidgetsHtml.Stat" fun ctx =>
   Html.liWith
     #[
       Attr.className "pw-html-stat",
@@ -27,7 +27,7 @@ def Stat : Component StatProps := fun ctx =>
       Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text ctx.props.value]
     ]
 
-def View : Component Unit := fun _ =>
+def View : Component Unit := .named "ProofWidgetsHtml.View" fun _ =>
   Html.sectionWith
     #[
       Attr.id "proofwidgets-html-demo",

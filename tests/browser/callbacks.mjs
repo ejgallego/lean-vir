@@ -120,6 +120,36 @@ export async function smokeBrowserCallbacks(cdp, origin) {
   assert.match(reactClicked.text, /^react:[12]$/);
   assert.equal(reactClicked.status, "Ready");
 
+  await runDemoHostEntry(cdp, origin, "ProofWidgetsJsxSubset.mount", {
+    runInputs: ["#proofwidgets-jsx-smoke-root"],
+    target: { id: "proofwidgets-jsx-smoke-root" },
+  });
+  const jsxSurface = await waitForBrowserState(cdp, `(() => {
+    const surface = document.querySelector("#proofwidgets-jsx-subset");
+    const card = document.querySelector("#proofwidgets-jsx-card");
+    const badge = document.querySelector("#proofwidgets-jsx-badge-info");
+    const rows = document.querySelectorAll("#proofwidgets-jsx-rows > li");
+    return {
+      ready: surface !== null && card !== null && badge !== null && rows.length === 3,
+      value: {
+        cardComponent: card?.getAttribute("data-component"),
+        badgeText: badge?.textContent?.trim(),
+        rowCount: rows.length,
+        headline: document.querySelector("#proofwidgets-jsx-headline")?.textContent,
+        status: document.querySelector("#status")?.textContent?.trim(),
+      },
+    };
+  })()`, { timeoutMessage: "native ProofWidgets JSX fixture did not mount" });
+  assert.deepEqual(jsxSurface, {
+    cardComponent: "Card",
+    badgeText: "component children",
+    rowCount: 3,
+    headline: "What, HTML in Lean?!",
+    status: "Ready",
+  });
+  await clickSelector(cdp, "#proofwidgets-jsx-action");
+  await waitForDocumentTitle(cdp, "ProofWidgets JSX subset clicked");
+
   const proofSurface = createProofSurfaceFixture();
   const emptyProofSurface = {
     ...proofSurface,

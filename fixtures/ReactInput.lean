@@ -19,9 +19,9 @@ def selectTextareaLabel (note flavor : String) : String :=
   "note:" ++ note ++ "; flavor:" ++ flavor
 
 def inputComponent : Component Unit :=
-  fun _ => do
+  .named "ReactInput.inputComponent" fun _ => do
     let initial ← JsValue.ofString ""
-    let name ← Hooks.useState initial
+    let name ← StateTuple.toState (← Hooks.useState initial)
     let nameValue ← JsValue.toString name.value
     let labelText ← Node.text "name:"
     let label ← Node.labelWith #[Props.htmlFor "react-name-input"] #[labelText]
@@ -44,9 +44,9 @@ def inputComponent : Component Unit :=
     Node.divWith #[Props.id "react-input-widget"] #[label, input, output]
 
 def changeInputComponent : Component Unit :=
-  fun _ => do
+  .named "ReactInput.changeInputComponent" fun _ => do
     let initial ← JsValue.ofString ""
-    let value ← Hooks.useState initial
+    let value ← StateTuple.toState (← Hooks.useState initial)
     let currentValue ← JsValue.toString value.value
     let labelText ← Node.text "change:"
     let label ← Node.labelWith #[Props.htmlFor "react-change-input"] #[labelText]
@@ -79,9 +79,9 @@ def changeInputComponent : Component Unit :=
       #[label, input, output]
 
 def checkboxComponent : Component Unit :=
-  fun _ => do
+  .named "ReactInput.checkboxComponent" fun _ => do
     let initial ← JsValue.ofBool false
-    let checked ← Hooks.useState initial
+    let checked ← StateTuple.toState (← Hooks.useState initial)
     let checkedValue ← JsValue.toBool checked.value
     let input ←
       Node.input
@@ -104,12 +104,12 @@ def checkboxComponent : Component Unit :=
     Node.divWith #[Props.id "react-checkbox-widget"] #[input, output]
 
 def selectTextareaComponent : Component Unit :=
-  fun _ => do
+  .named "ReactInput.selectTextareaComponent" fun _ => do
     let initialNote ← JsValue.ofString "draft"
-    let note ← Hooks.useState initialNote
+    let note ← StateTuple.toState (← Hooks.useState initialNote)
     let noteValue ← JsValue.toString note.value
     let initialFlavor ← JsValue.ofString "vanilla"
-    let flavor ← Hooks.useState initialFlavor
+    let flavor ← StateTuple.toState (← Hooks.useState initialFlavor)
     let flavorValue ← JsValue.toString flavor.value
     let sectionText ← Node.text "fields"
     let sectionNode ← Node.spanWith #[Props.classList #["react-select-textarea-section"]] #[sectionText]
