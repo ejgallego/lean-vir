@@ -132,23 +132,45 @@ const dispositionLabel = (value) => ({
   unsupported: "unsupported",
   "not-selected": "not selected",
 })[value] ?? value;
-const semanticCoverageLabel = (value) => ({
-  faithful: "faithful VIR binding",
-  "adapter-only": "explicit adapter only",
-  unreviewed: "semantic review required",
-  "local-contract": "local contract",
-  candidate: "correspondence not confirmed",
-  "not-provided": "not provided",
-})[value] ?? value;
-const semanticCoverageSummary = (coverage) => [
-  ["faithful", "faithful"],
-  ["adapter-only", "adapter only"],
-  ["unreviewed", "unreviewed"],
-  ["local-contract", "local contract"],
-  ["candidate", "candidate"],
-  ["not-provided", "not provided"],
-].filter(([status]) => (coverage[status] ?? 0) !== 0)
-  .map(([status, label]) => `${coverage[status]} ${label}`).join(" · ");
+const semanticCoverageDefinitions = new Map([
+  ["faithful", {
+    filter: "Faithful bindings",
+    badge: "faithful VIR binding",
+    summary: "faithful",
+  }],
+  ["adapter-only", {
+    filter: "Adapter only",
+    badge: "explicit adapter only",
+    summary: "adapter only",
+  }],
+  ["unreviewed", {
+    filter: "Semantic review required",
+    badge: "semantic review required",
+    summary: "unreviewed",
+  }],
+  ["local-contract", {
+    filter: "Local contracts",
+    badge: "local contract",
+    summary: "local contract",
+  }],
+  ["candidate", {
+    filter: "Unconfirmed candidates",
+    badge: "correspondence not confirmed",
+    summary: "candidate",
+  }],
+  ["not-provided", {
+    filter: "Not provided",
+    badge: "not provided",
+    summary: "not provided",
+  }],
+]);
+const semanticCoverageLabel = (value) =>
+  semanticCoverageDefinitions.get(value)?.badge ?? value;
+const semanticCoverageSummary = (coverage) => Object.entries(coverage)
+  .filter(([, count]) => count !== 0)
+  .map(([status, count]) =>
+    `${count} ${semanticCoverageDefinitions.get(status)?.summary ?? status}`)
+  .join(" · ");
 const evidenceLabel = (value) => ({
   exact: "exact comparator match",
   compatible: "comparator-compatible",
@@ -232,6 +254,10 @@ const elements = Object.fromEntries([
   "inventory-view",
   "workbench-view",
 ].map((id) => [id, document.querySelector("#" + id)]));
+for (const status of Object.keys(generation.semanticCoverage)) {
+  const label = semanticCoverageDefinitions.get(status)?.filter ?? status;
+  elements.coverage.add(new Option(label, status));
+}
 
 const typeBrowserOptionValues = {
   boundaryNotes: new Set(["show", "hide"]),

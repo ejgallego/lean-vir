@@ -168,16 +168,6 @@ test("semantic review classifications are fail-closed enums", async () => {
   );
 });
 
-test("ABI profiles require direct JavaScript value transport", async () => {
-  const invalid = structuredClone(browser);
-  invalid.generation.abiProfile.resource.valueTransport = "wrapper";
-
-  await assert.rejects(
-    validateBindingConfig(invalid, browserPath),
-    /valueTransport.*must be equal to constant/u,
-  );
-});
-
 test("private active-effect roles are fail-closed", async () => {
   const invalid = structuredClone(browser);
   invalid.generation.exceptions["browser.animation.requestAnimationFrame"]

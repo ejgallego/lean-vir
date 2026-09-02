@@ -255,11 +255,10 @@
         "resource": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["constructor", "nullableConstructor", "valueTransport", "argument", "result"],
+          "required": ["constructor", "nullableConstructor", "argument", "result"],
           "properties": {
             "constructor": { "type": "string", "minLength": 1 },
             "nullableConstructor": { "type": "string", "minLength": 1 },
-            "valueTransport": { "const": "direct" },
             "argument": { "$ref": "#/$defs/passingRetention" },
             "result": {
               "type": "object",

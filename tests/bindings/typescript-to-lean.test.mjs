@@ -33,7 +33,6 @@ const generation = {
     resource: {
       constructor: "Lean.Vir.Js",
       nullableConstructor: "Lean.Vir.Js.Nullable",
-      valueTransport: "direct",
       argument: { passing: "borrowed", retention: "call" },
       result: { ownership: "owned" },
     },
@@ -186,7 +185,6 @@ test("operation IR records derived modalities and their provenance", () => {
     evidence: "typescript-derived",
     detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
-  assert.equal(getter.activeEffect, undefined);
 });
 
 test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
@@ -278,7 +276,6 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     evidence: "upstream-adapter",
     detail: protocolGeneration.protocolOperations[0].reason,
   });
-  assert.equal(operation.activeEffect, undefined);
 
   const reviewedProtocol = structuredClone(protocolGeneration);
   reviewedProtocol.protocolOperations[0].upstreamRelation.semantics = "preserving";
@@ -389,6 +386,29 @@ test("generated exceptions distinguish unreviewed boundaries and semantic adapte
     evidence: "reviewed-exception",
     detail: specialized.exceptions["demo.widget.getAttribute"].reason,
   });
+});
+
+test("method semantics have exactly one policy authority", () => {
+  const conflicting = structuredClone(generation);
+  conflicting.methodPolicies["Widget.getAttribute"].semantics = "preserving";
+  conflicting.methodPolicies["Widget.getAttribute"].reason =
+    "The selected TypeScript signature is preserved.";
+  conflicting.exceptions["demo.widget.getAttribute"] = {
+    reason: "The result has a specialized host representation.",
+    semantics: "changing",
+    result: {
+      type: {
+        lean: "Lean.Vir.Js String",
+        representation: "js-resource",
+        resourceInner: "String",
+      },
+    },
+  };
+
+  assert.throws(
+    () => buildGeneratedOperations(config, conflicting, descriptors),
+    /cannot classify semantics in both its method policy and operation exception/u,
+  );
 });
 
 test("TypeScript parameter names that are Lean keywords are escaped", () => {

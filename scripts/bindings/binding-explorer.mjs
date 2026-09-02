@@ -403,13 +403,14 @@ function generationRecord(
     });
   }
 
+  const targets = [...new Set([...confirmedTargets, ...adaptedTargets])].sort();
   return {
     disposition,
     provenance,
-    targets: [...new Set([...confirmedTargets, ...adaptedTargets])].sort(),
+    targets,
     semanticCoverage: semanticCoverageRecord(
       generatedOperations,
-      [...new Set([...confirmedTargets, ...adaptedTargets])],
+      targets,
       candidateTargets,
     ),
     ...(candidateTargets.length === 0 ? {} : { candidateTargets }),

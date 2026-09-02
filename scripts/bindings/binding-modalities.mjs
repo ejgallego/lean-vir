@@ -150,7 +150,6 @@ export function validateGenerationProfile(generation, context = "generation") {
       !object(profile.types) || !object(profile.resource) ||
       !nonemptyString(profile.resource.constructor) ||
       !nonemptyString(profile.resource.nullableConstructor) ||
-      profile.resource.valueTransport !== "direct" ||
       !object(profile.resource.argument) || !object(profile.resource.result) ||
       !object(profile.receiver) || !object(profile.receiver.default) ||
       !Array.isArray(profile.receiver.globalTypes) ||
@@ -761,6 +760,11 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const fixedArguments = policy.fixedArguments ?? {};
   const parameterRenames = policy.parameterRenames ?? {};
   const exception = exceptionFor(generation, operationId);
+  if (policy.semantics !== undefined && exception !== null) {
+    throw new Error(
+      `${member} cannot classify semantics in both its method policy and operation exception`,
+    );
+  }
   for (const name of omitted) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);

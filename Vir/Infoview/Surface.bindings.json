@@ -15,7 +15,7 @@
       "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
       "types": { "void": { "lean": "Unit", "representation": "immediate" } },
       "resource": {
-        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable", "valueTransport": "direct",
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },

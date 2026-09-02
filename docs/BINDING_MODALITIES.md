@@ -140,10 +140,10 @@ Generation rejects `T | undefined`, `T | null | undefined`, and optional
 properties until their distinct JavaScript semantics have an explicit ABI
 representation.
 
-The required `valueTransport: "direct"` profile field makes this boundary
-machine-readable. It covers ordinary objects, functions, native timer/frame
-tokens, and `null` payloads. Resource liveness and cleanup state stay
-out-of-band; they must not replace the public JavaScript value.
+Direct-value transport is a generator invariant rather than a configurable
+policy. It covers ordinary objects, functions, native timer/frame tokens, and
+`null` payloads. Resource liveness and cleanup state stay out-of-band; they
+must not replace the public JavaScript value.
 
 ## Canonical Operation IR
 
@@ -165,8 +165,7 @@ Each operation records:
 - global or argument receiver policy;
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
-- the ABI profile's direct-value invariant and any operation-specific private
-  active-effect role;
+- any operation-specific private active-effect role;
 - correspondence and semantic fidelity as separate operation facts;
 - provenance for every derived choice;
 - the reason for any explicit exception;

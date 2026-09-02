@@ -22,7 +22,6 @@
       "resource": {
         "constructor": "Lean.Vir.Js",
         "nullableConstructor": "Lean.Vir.Js.Nullable",
-        "valueTransport": "direct",
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
