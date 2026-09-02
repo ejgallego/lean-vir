@@ -161,6 +161,23 @@ export function createDOMTokenListHostBindings() {
   };
 }
 
+export function createCSSStyleDeclarationHostBindings({ fromElement }) {
+  return {
+    "browser.elementCSSInlineStyle.fromElement": (element) =>
+      createNullableValue(fromElement(element)),
+    "browser.elementCSSInlineStyle.getStyle": (element) => element.style,
+    "browser.elementCSSInlineStyle.setStyle": (element, style) => {
+      element.style = style;
+      return undefined;
+    },
+    "browser.cssStyleDeclaration.setProperty":
+      (declaration, property, value) => {
+        declaration.setProperty(property, nullablePayload(value));
+        return undefined;
+      },
+  };
+}
+
 export function createKeyboardEventHostBindings({ fromEvent }) {
   return {
     "browser.keyboardEvent.fromEvent": (event) =>

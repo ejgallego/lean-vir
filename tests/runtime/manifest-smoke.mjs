@@ -421,6 +421,26 @@ const keyboardEventKeyImport = hostImportTarget(
 );
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
+const inlineStyleNarrowingImport = hostImportTarget(
+  "browser.elementCSSInlineStyle.fromElement",
+);
+assert.equal(inlineStyleNarrowingImport?.args[0]?.type?.type, "Element");
+assert.equal(inlineStyleNarrowingImport?.result?.type, "Js");
+const inlineStyleGetterImport = hostImportTarget(
+  "browser.elementCSSInlineStyle.getStyle",
+);
+assert.equal(
+  inlineStyleGetterImport?.args[0]?.type?.type,
+  "ElementCSSInlineStyle",
+);
+assert.equal(inlineStyleGetterImport?.result?.type, "CSSStyleDeclaration");
+const setStylePropertyImport = hostImportTarget(
+  "browser.cssStyleDeclaration.setProperty",
+);
+assert.equal(
+  setStylePropertyImport?.args[0]?.type?.type,
+  "CSSStyleDeclaration",
+);
 const getCheckedImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.htmlInputElement.getChecked",
 );
@@ -708,6 +728,33 @@ virtualQueryHost["browser.element.setClassList"](
   "reset",
 );
 assert.equal(virtualPresentElement.attributes.get("class"), "reset");
+assert.equal(
+  virtualQueryHost["browser.elementCSSInlineStyle.fromElement"](
+    virtualPresentElement,
+  ),
+  virtualPresentElement,
+);
+const virtualStyle =
+  virtualQueryHost["browser.elementCSSInlineStyle.getStyle"](
+    virtualPresentElement,
+  );
+virtualQueryHost["browser.cssStyleDeclaration.setProperty"](
+  virtualStyle,
+  "color",
+  "red",
+);
+assert.equal(virtualStyle.properties.get("color"), "red");
+virtualQueryHost["browser.elementCSSInlineStyle.setStyle"](
+  virtualPresentElement,
+  "color: blue",
+);
+assert.equal(virtualStyle.cssText, "color: blue");
+assert.equal(
+  virtualQueryHost["browser.elementCSSInlineStyle.fromElement"](
+    createVirtualElementState({ inlineStyle: null }),
+  ),
+  null,
+);
 let virtualMissingEventTarget = "not-dispatched";
 let virtualMissingEventCurrentTarget = "not-dispatched";
 const virtualMissingEventCallback = (event) => {
@@ -827,6 +874,16 @@ assert.equal(
   ),
   "<svg></svg>",
 );
+assert.equal(
+  hostRuntime.call(
+    "HostInterop.setInlineStyleProperty",
+    "#element-query",
+    "color",
+    "purple",
+  ),
+  true,
+);
+assert.equal(elementQueryRoot.style.properties.get("color"), "purple");
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
 const keyTarget = ensureVirtualElementState(
   virtualDocumentState,

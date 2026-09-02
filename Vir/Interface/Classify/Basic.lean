@@ -101,8 +101,10 @@ def optParamType? (e : Lean.Expr) : Option Lean.Expr := do
 def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   let name ← constName? e
   match name with
+  | `Lean.Vir.Browser.CSSStyleDeclaration => some (name, "CSSStyleDeclaration")
   | `Lean.Vir.Browser.Element => some (name, "Element")
   | `Lean.Vir.Browser.DOMTokenList => some (name, "DOMTokenList")
+  | `Lean.Vir.Browser.ElementCSSInlineStyle => some (name, "ElementCSSInlineStyle")
   | `Lean.Vir.Browser.Event => some (name, "Event")
   | `Lean.Vir.Browser.KeyboardEvent => some (name, "KeyboardEvent")
   | `Lean.Vir.Browser.EventListener => some (name, "EventListener")

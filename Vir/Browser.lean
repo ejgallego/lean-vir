@@ -118,6 +118,43 @@ def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
 
 end Document
 
+namespace CSSStyleDeclaration
+
+/-- Converts Lean strings around the exact `CSSStyleDeclaration.setProperty` binding. -/
+def setPropertyString
+    (declaration : @& Lean.Vir.Js CSSStyleDeclaration)
+    (name value : @& String) : DomM Unit := do
+  let jsName ← Lean.Vir.JsValue.ofString name
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  setProperty declaration jsName (← Lean.Vir.Js.Nullable.ofJs jsValue)
+
+end CSSStyleDeclaration
+
+namespace ElementCSSInlineStyle
+
+/--
+Checks whether an element implements `ElementCSSInlineStyle` without changing
+its JavaScript identity.
+-/
+def fromElement
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Option (Lean.Vir.Js ElementCSSInlineStyle)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromElementNullable element)
+
+/-- Converts a Lean string before replacing the element's inline style text. -/
+def setStyleString
+    (element : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (style : @& String) : DomM Unit := do
+  setStyle element (← Lean.Vir.JsValue.ofString style)
+
+/-- Sets a property through the element's exact `CSSStyleDeclaration` value. -/
+def setPropertyString
+    (element : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (name value : @& String) : DomM Unit := do
+  CSSStyleDeclaration.setPropertyString (← getStyle element) name value
+
+end ElementCSSInlineStyle
+
 namespace Element
 
 /-- Converts a Lean selector before calling the faithful `Element.querySelector` binding. -/
@@ -175,18 +212,6 @@ def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Boo
     (← DOMTokenList.toggle tokenList (← Lean.Vir.JsValue.ofString className))
 
 end ClassList
-
-namespace Style
-
-/-- Sets a CSS custom or ordinary property on an element's inline style. -/
-def setProperty
-    (element : @& Lean.Vir.Js Element)
-    (name value : @& String) : DomM Unit := do
-  let jsName ← Lean.Vir.JsValue.ofString name
-  let jsValue ← Lean.Vir.JsValue.ofString value
-  setPropertyJs element jsName (← Lean.Vir.Js.Nullable.ofJs jsValue)
-
-end Style
 
 /--
 Registers a browser event listener backed by a Lean callback closure.

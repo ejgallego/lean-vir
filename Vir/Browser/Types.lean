@@ -62,6 +62,12 @@ opaque Element : Type
 /-- Exact browser `DOMTokenList` value returned by `Element.classList`. -/
 opaque DOMTokenList : Type
 
+/-- Exact element value implementing the browser `ElementCSSInlineStyle` interface. -/
+opaque ElementCSSInlineStyle : Type
+
+/-- Exact browser `CSSStyleDeclaration` value returned by `ElementCSSInlineStyle.style`. -/
+opaque CSSStyleDeclaration : Type
+
 /-- Browser event object class. Event values are callback-scoped resources. -/
 opaque Event : Type
 

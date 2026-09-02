@@ -346,15 +346,15 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
   compatible: 2,
-  derived: 13,
+  derived: 14,
   "protocol-linked": 0,
   "contract-linked": 0,
   weak: 0,
   unreviewed: 0,
   suggested: 0,
   ambiguous: 0,
-  missing: 727,
-  mappedTargets: 18,
+  missing: 728,
+  mappedTargets: 21,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
@@ -660,7 +660,6 @@ const semanticCoverageByMember = new Map(roots.flatMap((root) =>
   ])));
 for (const member of [
   "browser/document:Document.title",
-  "browser/element:CSSStyleDeclaration.setProperty",
 ]) {
   assert.equal(semanticCoverageByMember.get(member), "adapter-only");
 }
@@ -669,6 +668,8 @@ for (const member of [
   "browser/element:DOMTokenList.add",
   "browser/element:DOMTokenList.remove",
   "browser/element:DOMTokenList.toggle",
+  "browser/element:ElementCSSInlineStyle.style",
+  "browser/element:CSSStyleDeclaration.setProperty",
   "browser/event:KeyboardEvent.key",
 ]) {
   assert.equal(semanticCoverageByMember.get(member), "faithful");

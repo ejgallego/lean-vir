@@ -82,6 +82,23 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     })()`,
   });
 
+  await runDemoHostEntry(cdp, origin, "HostInterop.setInlineStyleProperty", {
+    runInputs: ["#inline-style-target", "--vir-accent", "tomato"],
+    expectedResult: "true",
+    target: {
+      id: "inline-style-target",
+      tag: "div",
+    },
+  });
+  assert.equal(
+    await evaluate(
+      cdp,
+      `document.querySelector("#inline-style-target")
+        .style.getPropertyValue("--vir-accent")`,
+    ),
+    "tomato",
+  );
+
   await runDemoHostEntry(cdp, origin, "HostInterop.mountCallbackText", {
     runInputs: ["#callback-smoke-target"],
     expectedResult: "1",

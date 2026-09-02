@@ -41,15 +41,17 @@
     },
     "resources": {
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
+      "CSSStyleDeclaration": "CSSStyleDeclaration",
       "DOMTokenList": "DOMTokenList",
       "Element": "Element",
+      "ElementCSSInlineStyle": "ElementCSSInlineStyle",
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "KeyboardEvent",
       "TextMetrics": "TextMetrics"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "ElementCSSInlineStyle.style", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": {
@@ -82,7 +84,12 @@
       "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
       "CanvasRenderingContext2D.translate": { "signature": "only" },
       "Console.log": { "signature": "only", "fixedRestParameters": { "data": ["message"] } },
-      "CSSStyleDeclaration.setProperty": { "signature": "only", "omittedOptionalParameters": ["priority"] },
+      "CSSStyleDeclaration.setProperty": {
+        "signature": "only",
+        "omittedOptionalParameters": ["priority"],
+        "semantics": "preserving",
+        "reason": "Omitting priority preserves CSSStyleDeclaration.setProperty's default empty priority while passing the exact declaration, property, value, and result unchanged."
+      },
       "Document.createElement": { "signature": 2, "omittedOptionalParameters": ["options"] },
       "Document.querySelector": { "signature": 4 },
       "Document.querySelectorAll": { "signature": 4 },
@@ -305,18 +312,6 @@
           }
         }
       },
-      "browser.element.style.setProperty": {
-        "reason": "The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.",
-        "semantics": "changing",
-        "receiver": {
-          "name": "element",
-          "type": {
-            "lean": "Lean.Vir.Js Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
-          }
-        }
-      },
       "browser.element.querySelector": {
         "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
         "semantics": "preserving",
@@ -435,6 +430,20 @@
           { "name": "style", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "browser.element-css-inline-style.from-element",
+        "group": "element",
+        "target": "browser.elementCSSInlineStyle.fromElement",
+        "lean": "Lean.Vir.Browser.ElementCSSInlineStyle.fromElementNullable",
+        "marker": "vir_js",
+        "reason": "This checked structural narrowing preserves the exact JavaScript element value when it implements ElementCSSInlineStyle.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [
+          { "name": "element", "type": { "lean": "Lean.Vir.Js Element", "representation": "js-resource", "resourceInner": "Element" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable ElementCSSInlineStyle", "representation": "js-resource", "resourceInner": "ElementCSSInlineStyle" } }
       },
       {
         "id": "browser.input.fromElement",
@@ -711,9 +720,9 @@
     {
       "id": "element",
       "title": "Element",
-      "targets": ["browser.element.*", "browser.domTokenList.*"],
-      "lean": { "public": ["Lean.Vir.Browser.Element"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
+      "targets": ["browser.element.*", "browser.domTokenList.*", "browser.elementCSSInlineStyle.*", "browser.cssStyleDeclaration.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Element", "Lean.Vir.Browser.ElementCSSInlineStyle", "Lean.Vir.Browser.CSSStyleDeclaration"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "ElementCSSInlineStyle", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
       "comparison": { "report": "build/type-descriptors/element-v1.report.json" },
       "mappings": [
         { "typescript": "Element.querySelector", "targets": ["browser.element.querySelector"], "lean": ["Lean.Vir.Browser.Element.querySelector"] },
@@ -746,7 +755,14 @@
         { "typescript": "DOMTokenList.add", "targets": ["browser.domTokenList.add"], "lean": ["Lean.Vir.Browser.DOMTokenList.add"], "receiverName": "tokenList" },
         { "typescript": "DOMTokenList.remove", "targets": ["browser.domTokenList.remove"], "lean": ["Lean.Vir.Browser.DOMTokenList.remove"], "receiverName": "tokenList" },
         { "typescript": "DOMTokenList.toggle", "targets": ["browser.domTokenList.toggle"], "lean": ["Lean.Vir.Browser.DOMTokenList.toggle"], "receiverName": "tokenList" },
-        { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.element.style.setProperty"], "lean": ["Lean.Vir.Browser.Element.Style.setPropertyJs"] },
+        {
+          "typescript": "ElementCSSInlineStyle.style",
+          "accessors": {
+            "get": { "target": "browser.elementCSSInlineStyle.getStyle", "lean": "Lean.Vir.Browser.ElementCSSInlineStyle.getStyle" },
+            "set": { "target": "browser.elementCSSInlineStyle.setStyle", "lean": "Lean.Vir.Browser.ElementCSSInlineStyle.setStyle" }
+          }
+        },
+        { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.cssStyleDeclaration.setProperty"], "lean": ["Lean.Vir.Browser.CSSStyleDeclaration.setProperty"], "receiverName": "declaration" },
         { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
         { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }
       ],

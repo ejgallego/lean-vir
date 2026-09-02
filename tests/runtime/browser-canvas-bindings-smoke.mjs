@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   createBrowserCanvasHostBindings,
   createBrowserElementHostBindings,
+  createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
@@ -37,8 +38,15 @@ const element = {
   set classList(value) {
     elementCalls.push(["class.set", value]);
   },
-  style: {
-    setProperty: (name, value) => elementCalls.push(["style", name, value]),
+  _style: {
+    setProperty: (name, value) =>
+      elementCalls.push(["style.property", name, value]),
+  },
+  get style() {
+    return this._style;
+  },
+  set style(value) {
+    elementCalls.push(["style.text", value]);
   },
   appendChild: (value) => elementCalls.push(["append", value]),
   remove: () => elementCalls.push(["remove"]),
@@ -53,6 +61,10 @@ const element = {
 };
 const elementBindings = createBrowserElementHostBindings(state);
 const tokenBindings = createDOMTokenListHostBindings();
+const styleBindings = createCSSStyleDeclarationHostBindings({
+  fromElement: (value) =>
+    typeof value?.style?.setProperty === "function" ? value : null,
+});
 assert.equal(
   elementBindings["browser.element.appendChild"](element, child),
   child,
@@ -66,10 +78,30 @@ assert.equal(
   true,
 );
 elementBindings["browser.element.setClassList"](element, "ready selected");
-elementBindings["browser.element.style.setProperty"](
+assert.equal(
+  styleBindings["browser.elementCSSInlineStyle.fromElement"](element),
   element,
+);
+assert.equal(
+  styleBindings["browser.elementCSSInlineStyle.fromElement"]({}),
+  null,
+);
+const declaration =
+  styleBindings["browser.elementCSSInlineStyle.getStyle"](element);
+assert.equal(declaration, element.style);
+styleBindings["browser.cssStyleDeclaration.setProperty"](
+  declaration,
   "color",
   createNullableValue("red"),
+);
+styleBindings["browser.cssStyleDeclaration.setProperty"](
+  declaration,
+  "display",
+  null,
+);
+styleBindings["browser.elementCSSInlineStyle.setStyle"](
+  element,
+  "color: blue",
 );
 elementBindings["browser.element.remove"](element);
 assert.deepEqual(elementCalls, [
@@ -78,7 +110,9 @@ assert.deepEqual(elementCalls, [
   ["class.remove", "hidden"],
   ["class.toggle", "ready"],
   ["class.set", "ready selected"],
-  ["style", "color", "red"],
+  ["style.property", "color", "red"],
+  ["style.property", "display", null],
+  ["style.text", "color: blue"],
   ["remove"],
 ]);
 

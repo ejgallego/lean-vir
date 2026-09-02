@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 export const demoHostImportTargets = [
   "browser.animation.cancelAnimationFrame",
   "browser.animation.requestAnimationFrame",
+  "browser.cssStyleDeclaration.setProperty",
   "browser.document.getTitle",
   "browser.document.querySelector",
   "browser.document.querySelectorAll",
@@ -21,6 +22,8 @@ export const demoHostImportTargets = [
   "browser.element.setAttribute",
   "browser.element.setInnerHTML",
   "browser.element.setTextContent",
+  "browser.elementCSSInlineStyle.fromElement",
+  "browser.elementCSSInlineStyle.getStyle",
   "browser.event.currentTarget",
   "browser.event.formValue",
   "browser.event.preventDefault",

@@ -490,6 +490,32 @@ opaque logJs
 
 end Console
 
+namespace CSSStyleDeclaration
+
+/--
+Generated reviewed method call policy for TypeScript `CSSStyleDeclaration.setProperty`.
+
+The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CSSStyleDeclaration/setProperty)
+
+Call policy: Omitting priority preserves CSSStyleDeclaration.setProperty's default empty priority while passing the exact declaration, property, value, and result unchanged.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
+
+ABI profile `browser-dom-faithful-v1`: declaration js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.cssStyleDeclaration.setProperty"]
+opaque setProperty
+    (declaration : @& Lean.Vir.Js CSSStyleDeclaration)
+    (property : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js.Nullable String) :
+    DomM Unit
+
+end CSSStyleDeclaration
+
 namespace Document
 
 /--
@@ -924,31 +950,58 @@ opaque setTextContent
 
 end Element
 
-namespace Element.Style
+namespace ElementCSSInlineStyle
 
 /--
-Generated explicit method semantic adapter for TypeScript `CSSStyleDeclaration.setProperty`.
+Faithful generated getter binding for TypeScript `ElementCSSInlineStyle.style`.
 
-The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLElement/style)
 
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/CSSStyleDeclaration/setProperty)
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
 
-Adapter policy: The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.style.setProperty"]
-opaque setPropertyJs
-    (element : @& Lean.Vir.Js Element)
-    (property : @& Lean.Vir.Js String)
-    (value : @& Lean.Vir.Js.Nullable String) :
+@[vir_js "browser.elementCSSInlineStyle.getStyle"]
+opaque getStyle
+    (elementCSSInlineStyle : @& Lean.Vir.Js ElementCSSInlineStyle) :
+    DomM (Lean.Vir.Js CSSStyleDeclaration)
+
+/--
+Faithful generated setter binding for TypeScript `ElementCSSInlineStyle.style`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLElement/style)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
+
+ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.elementCSSInlineStyle.setStyle"]
+opaque setStyle
+    (elementCSSInlineStyle : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (style : @& Lean.Vir.Js String) :
     DomM Unit
 
-end Element.Style
+/--
+Generated binding for reviewed VIR protocol `browser.element-css-inline-style.from-element`.
+
+This checked structural narrowing preserves the exact JavaScript element value when it implements ElementCSSInlineStyle.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.elementCSSInlineStyle.fromElement"]
+opaque fromElementNullable
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js.Nullable ElementCSSInlineStyle)
+
+end ElementCSSInlineStyle
 
 namespace Event
 

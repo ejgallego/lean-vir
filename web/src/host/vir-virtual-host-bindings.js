@@ -8,6 +8,7 @@ import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
+  createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
@@ -61,8 +62,9 @@ export function createVirtualElementState({
   checked = false,
   value = "",
   listeners = new Map(),
+  inlineStyle = createVirtualCSSStyleDeclarationState(),
 } = {}) {
-  return {
+  const element = {
     innerHTML,
     textContent,
     attributes,
@@ -70,6 +72,29 @@ export function createVirtualElementState({
     checked,
     value,
     listeners,
+  };
+  if (inlineStyle !== null) {
+    Object.defineProperty(element, "style", {
+      enumerable: true,
+      get: () => inlineStyle,
+      set: (cssText) => {
+        inlineStyle.cssText = String(cssText);
+      },
+    });
+  }
+  return element;
+}
+
+function createVirtualCSSStyleDeclarationState() {
+  const properties = new Map();
+  return {
+    cssText: "",
+    properties,
+    setProperty: (property, value) => {
+      const text = value ?? "";
+      if (text === "") properties.delete(property);
+      else properties.set(property, text);
+    },
   };
 }
 
@@ -206,6 +231,10 @@ export function createVirtualDocumentHostBindings(
         ),
     }),
     ...createDOMTokenListHostBindings(),
+    ...createCSSStyleDeclarationHostBindings({
+      fromElement: (element) =>
+        typeof element?.style?.setProperty === "function" ? element : null,
+    }),
     ...createHtmlInputElementHostBindings({
       fromElement: (element) => element,
     }),

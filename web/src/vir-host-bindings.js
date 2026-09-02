@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
+  createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
@@ -42,6 +43,7 @@ export {
   requireExternrefTableSupport,
 } from "./host-boundary.js";
 export {
+  createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
   createHostLifecycle,
 } from "./host/vir-host-resources.js";
@@ -116,6 +118,10 @@ export function createBrowserElementHostBindings(
   state = createHostLifecycle(),
 ) {
   return {
+    ...createCSSStyleDeclarationHostBindings({
+      fromElement: (element) =>
+        isElementCSSInlineStyle(element) ? element : null,
+    }),
     ...createElementHostBindings(state, {
       querySelector: (target, selector) => target.querySelector(selector),
       querySelectorAll: (target, selector) => target.querySelectorAll(selector),
@@ -147,10 +153,6 @@ export function createBrowserElementHostBindings(
     },
     "browser.element.remove": (element) => {
       element.remove();
-      return undefined;
-    },
-    "browser.element.style.setProperty": (element, name, value) => {
-      element.style.setProperty(name, nullablePayload(value));
       return undefined;
     },
   };
@@ -625,6 +627,13 @@ function isInputElement(value) {
   return (
     typeof globalThis.HTMLInputElement === "function" &&
     value instanceof globalThis.HTMLInputElement
+  );
+}
+
+function isElementCSSInlineStyle(value) {
+  return (
+    typeof globalThis.CSSStyleDeclaration === "function" &&
+    value?.style instanceof globalThis.CSSStyleDeclaration
   );
 }
 

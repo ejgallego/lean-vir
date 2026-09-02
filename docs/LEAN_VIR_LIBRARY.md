@@ -316,9 +316,10 @@ effect and is recognized by the package generator as a synchronous host effect.
 Use `DomM.run` only at an explicit exported `IO` boundary.
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
-- object markers: `Element`, `DOMTokenList`, `Event`, `KeyboardEvent`,
-  `EventListener`, `HTMLInputElement`, `HTMLCanvasElement`,
-  `CanvasRenderingContext2D`, `Timeout`, and `AnimationFrame`
+- object markers: `Element`, `DOMTokenList`, `ElementCSSInlineStyle`,
+  `CSSStyleDeclaration`, `Event`, `KeyboardEvent`, `EventListener`,
+  `HTMLInputElement`, `HTMLCanvasElement`, `CanvasRenderingContext2D`,
+  `Timeout`, and `AnimationFrame`
 - `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
 - `Lean.Vir.Browser.Document.setTitle : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)`
@@ -359,7 +360,15 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
   generated `Lean.Vir.Browser.DOMTokenList.add`, `remove`, and `toggle`
   operations act on that value directly. `Element.ClassList` keeps compact
   convenience wrappers for callers that do not need to retain the token list.
-- `Lean.Vir.Browser.Element.Style.setProperty` updates inline style properties.
+- `Lean.Vir.Browser.ElementCSSInlineStyle.fromElement` checks the structural
+  inline-style capability without changing the element's JavaScript identity.
+  Its generated `getStyle` and `setStyle` declarations faithfully expose the
+  upstream asymmetric property: the getter returns the exact
+  `CSSStyleDeclaration`, while the setter accepts a JavaScript string.
+- `Lean.Vir.Browser.CSSStyleDeclaration.setProperty` acts on that exact style
+  object and preserves `string | null`; `setPropertyString` is the explicit
+  Lean-string convenience. `ElementCSSInlineStyle.setPropertyString` composes
+  the faithful getter and method for callers that do not retain the style.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
 - `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
