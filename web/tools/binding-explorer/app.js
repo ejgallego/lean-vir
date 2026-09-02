@@ -42,8 +42,8 @@ document.querySelector("#scope").replaceChildren(
     `${generation.semanticRelations.preserving} contracts claim semantics preservation, ` +
     `${generation.semanticRelations.changing} are explicit semantic adapters, and ` +
     `${generation.semanticRelations.unreviewed} require semantic review. ` +
-    `${generation.hostPolicies.exactValueTransport} operations transport exact JavaScript values, and ` +
-    `${Object.values(generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} ` +
+    "All JavaScript resources use the required direct-value transport, and " +
+    `${Object.values(generation.activeEffects).reduce((sum, count) => sum + count, 0)} ` +
     "operations register, use, or release private active-effect teardown records. " +
     "Provider behavior is not mechanically verified by this name reconciliation. " +
     "Unselected upstream entries are documentation coverage, not binding defects.",
@@ -1082,12 +1082,9 @@ function renderGenerationDecisions(operation) {
     operation.exception === undefined
       ? undefined
       : "Reviewed specialization: " + operation.exception.reason,
-    operation.hostPolicy.valueTransport === "direct"
-      ? "Value transport: exact JavaScript value (no public host wrapper)"
-      : undefined,
-    operation.hostPolicy.activeEffect === "none"
+    operation.activeEffect === undefined
       ? undefined
-      : "Private active-effect teardown: " + operation.hostPolicy.activeEffect,
+      : "Private active-effect teardown: " + operation.activeEffect,
   ].filter(Boolean);
   return '<section class="evidence-unit"><h4>Generation decisions</h4>' +
     (decisions.length

@@ -165,8 +165,8 @@ Each operation records:
 - global or argument receiver policy;
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
-- the declared host policy: exact-value transport and any private active-effect
-  role;
+- the ABI profile's direct-value invariant and any operation-specific private
+  active-effect role;
 - correspondence and semantic fidelity as separate operation facts;
 - provenance for every derived choice;
 - the reason for any explicit exception;

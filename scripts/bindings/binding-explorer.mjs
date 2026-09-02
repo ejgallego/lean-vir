@@ -1212,15 +1212,10 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     generatedOperations.filter((operation) =>
       operation.semantics?.relation === relation).length,
   ]));
-  const hostPolicies = {
-    exactValueTransport: generatedOperations.filter((operation) =>
-      operation.hostPolicy.valueTransport === "direct").length,
-    activeEffects: Object.fromEntries(["register", "use", "release"].map((role) => [
-      role,
-      generatedOperations.filter((operation) =>
-        operation.hostPolicy.activeEffect === role).length,
-    ])),
-  };
+  const activeEffects = Object.fromEntries(["register", "use", "release"].map((role) => [
+    role,
+    generatedOperations.filter((operation) => operation.activeEffect === role).length,
+  ]));
   const generatedSources = new Set(configs.flatMap((config) =>
     config.generation === undefined ? [] : [config.generation.output]));
   const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
@@ -1235,7 +1230,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     },
     protocolRelations,
     semanticRelations,
-    hostPolicies,
+    activeEffects,
     disposition: Object.fromEntries(generationDispositions.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
@@ -1367,7 +1362,7 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
   console.log(`  upstream semantic coverage: ${report.summary.generation.semanticCoverage.faithful} faithful, ${report.summary.generation.semanticCoverage["adapter-only"]} adapter-only, ${report.summary.generation.semanticCoverage.unreviewed} unreviewed, ${report.summary.generation.semanticCoverage["local-contract"]} local-contract, ${report.summary.generation.semanticCoverage.candidate} candidate, ${report.summary.generation.semanticCoverage["not-provided"]} not provided`);
-  console.log(`  host policy: ${report.summary.generation.hostPolicies.exactValueTransport} exact-value transports, ${Object.values(report.summary.generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} private active-effect operations`);
+  console.log(`  private active effects: ${report.summary.generation.activeEffects.register} register, ${report.summary.generation.activeEffects.use} use, ${report.summary.generation.activeEffects.release} release`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);
   const unresolvedSemanticMissing = Math.max(

@@ -186,10 +186,7 @@ test("operation IR records derived modalities and their provenance", () => {
     evidence: "typescript-derived",
     detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
-  assert.deepEqual(getter.hostPolicy, {
-    valueTransport: "direct",
-    activeEffect: "none",
-  });
+  assert.equal(getter.activeEffect, undefined);
 });
 
 test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
@@ -281,10 +278,7 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     evidence: "upstream-adapter",
     detail: protocolGeneration.protocolOperations[0].reason,
   });
-  assert.deepEqual(operation.hostPolicy, {
-    valueTransport: "direct",
-    activeEffect: "none",
-  });
+  assert.equal(operation.activeEffect, undefined);
 
   const reviewedProtocol = structuredClone(protocolGeneration);
   reviewedProtocol.protocolOperations[0].upstreamRelation.semantics = "preserving";

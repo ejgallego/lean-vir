@@ -425,22 +425,6 @@ function protocolSemantics(protocol) {
   };
 }
 
-function hostPolicy(operation, profile) {
-  const positions = [
-    ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
-    ...operation.arguments,
-    operation.result,
-  ];
-  const transportsJavaScriptValue = positions.some((position) =>
-    position.modalities.representation === "js-resource");
-  return {
-    valueTransport: transportsJavaScriptValue
-      ? profile.resource.valueTransport
-      : "not-applicable",
-    activeEffect: operation.activeEffect ?? "none",
-  };
-}
-
 function modalityArgument(
   name,
   role,
@@ -1199,10 +1183,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     operationIds.add(protocol.id);
     targets.add(protocol.target);
   }
-  return operations.map((operation) => ({
-    ...operation,
-    hostPolicy: hostPolicy(operation, profile),
-  }));
+  return operations;
 }
 
 function projectedPortIntent(anchor, operation) {
@@ -1241,7 +1222,7 @@ function modalityContract(operation, profile) {
     arguments: operation.arguments,
     result: operation.result,
     semantics: operation.semantics,
-    hostPolicy: operation.hostPolicy,
+    ...(operation.activeEffect === undefined ? {} : { activeEffect: operation.activeEffect }),
     ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
     ...(operation.exception === undefined ? {} : { exception: operation.exception }),
   };
