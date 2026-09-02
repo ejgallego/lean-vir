@@ -28,22 +28,41 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
       if roots.isEmpty then
         throw s!"target `{source}` has no roots"
       let target : Vir.GeneratePackage.Target :=
-        { source := source, roots := roots.toArray.map nameFromDotted }
+        {
+          source := source
+          roots := roots.toArray.map nameFromDotted
+          resolveImportedModules := true
+        }
       return (#[target] ++ (← parseTargets rest))
   | "--package-target" :: source :: rest => do
       let (roots, rest) := takeTargetRoots rest []
       if roots.isEmpty then
         throw s!"package target `{source}` has no roots"
       let target : Vir.GeneratePackage.Target :=
-        { source := source, roots := roots.toArray.map nameFromDotted, packageOnly := true }
+        {
+          source := source
+          roots := roots.toArray.map nameFromDotted
+          resolveImportedModules := true
+          packageOnly := true
+        }
       return (#[target] ++ (← parseTargets rest))
   | "--target-all" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
-        { source := source, roots := #[], includeAll := true }
+        {
+          source := source
+          roots := #[]
+          includeAll := true
+          resolveImportedModules := true
+        }
       return (#[target] ++ (← parseTargets rest))
   | "--target-marked" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
-        { source := source, roots := #[], includeMarked := true }
+        {
+          source := source
+          roots := #[]
+          includeMarked := true
+          resolveImportedModules := true
+        }
       return (#[target] ++ (← parseTargets rest))
   | "--target-marked-module" :: source :: moduleName :: rest => do
       let target : Vir.GeneratePackage.Target := {

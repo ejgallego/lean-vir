@@ -28,6 +28,14 @@ def isInterfaceDeclInfo : ConstantInfo → Bool
   | .opaqueInfo _ => true
   | _ => false
 
+private def DeclIndex.hasCompiledDefinition (index : DeclIndex) (name : Name) : Bool :=
+  match index.find? name with
+  | some loaded =>
+      match loaded.decl with
+      | .fdecl .. => true
+      | _ => false
+  | _ => false
+
 def isGeneratedAuxName (n : Name) : Bool :=
   match boxedBaseName? n with
   | some _ => true
@@ -111,7 +119,7 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     match env.find? name with
     | none => return .error { name, source, reason := "missing elaborated Lean declaration" }
     | some info =>
-        if !isInterfaceDeclInfo info then
+        if !isInterfaceDeclInfo info && !index.hasCompiledDefinition name then
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           let startup := index.virStartups.contains name
