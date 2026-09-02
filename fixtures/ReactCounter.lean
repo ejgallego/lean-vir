@@ -15,10 +15,10 @@ open Lean.Vir.React
 def label (value : Nat) : String :=
   "react:" ++ toString value
 
-def counter : Component Unit :=
-  fun _ => do
+def counter : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let countValue ← JsValue.toNat count.value
     let text ← Node.text (label countValue)
     Node.buttonWith
@@ -41,8 +41,10 @@ partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
       ]
       #[text]
 
-def mount (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root counter ()
+def mount (selector : String) : DomM Bool := do
+  Root.mountFromSelector selector fun root => do
+    let component ← counter
+    Root.renderComponent root component ()
 
 def mountDefault : DomM Bool :=
   mount "#react-counter-root"
@@ -55,45 +57,51 @@ def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
     Root.render root staticTree
 
-def renderStaticIntoSelector (selector : String) : DomM Bool :=
-  Root.renderComponentIntoSelector selector (fun _ => staticTree) ()
+def renderStaticIntoSelector (selector : String) : DomM Bool := do
+  let component ← Component.ofLean fun _ => staticTree
+  Root.renderComponentIntoSelector selector component ()
 
-def effectProbe : Component Unit :=
-  fun _ => do
-    Hooks.useEffect
+def effectProbe : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
+    Hooks.useLeanEffect
       (JsValue.ofNat 0)
       (fun _ => pure ())
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
-    Hooks.useEffectWithDeps deps
+    Hooks.useLeanEffect
       (JsValue.ofNat 0)
       (fun _ => pure ())
+      (some deps)
     let text ← Node.text "react:effect"
     Node.spanWith #[Props.id "react-effect-label"] #[text]
 
-def mountEffect (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
+def mountEffect (selector : String) : DomM Bool := do
+  let component ← effectProbe
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def memoProbe : Component Unit :=
-  fun _ => do
+def memoProbe : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
     let calculate : ReactM (Lean.Vir.Js Nat) := do
       JsValue.ofNat 42
-    let value ← Hooks.useMemo calculate deps
+    let calculation ← MemoCalculation.ofLean calculate
+    let value ← Hooks.useMemo calculation deps
     let memoValue ← JsValue.toNat value
     let text ← Node.text s!"react:memo:{memoValue}"
     Node.spanWith #[Props.id "react-memo-label"] #[text]
 
-def mountMemo (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root memoProbe ()
+def mountMemo (selector : String) : DomM Bool := do
+  let component ← memoProbe
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def memoStableProbe : Component Unit :=
-  fun _ => do
+def memoStableProbe : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let deps ← Hooks.DependencyList.empty
-    let memoValue ← Hooks.useMemo (pure count.value) deps
+    let calculation ← MemoCalculation.ofLean (pure count.value)
+    let memoValue ← Hooks.useMemo calculation deps
     let countValue ← JsValue.toNat count.value
     let cachedValue ← JsValue.toNat memoValue
     let text ← Node.text s!"react:memo-stable:{countValue}:{cachedValue}"
@@ -107,13 +115,14 @@ def memoStableProbe : Component Unit :=
       ]
       #[text]
 
-def mountMemoStable (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root memoStableProbe ()
+def mountMemoStable (selector : String) : DomM Bool := do
+  let component ← memoStableProbe
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def refFragmentProbe : Component Unit :=
-  fun _ => do
+def refFragmentProbe : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← StateTuple.toState (← Hooks.useState initial)
     let lastClick ← Hooks.useRef initial
     let countValue ← JsValue.toNat count.value
     let lastValueResource ← Ref.get lastClick
@@ -135,8 +144,9 @@ def refFragmentProbe : Component Unit :=
     let marker ← Node.spanWith #[Props.id "react-fragment-marker"] #[markerText]
     Node.fragment #[button, marker]
 
-def mountRefFragment (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root refFragmentProbe ()
+def mountRefFragment (selector : String) : DomM Bool := do
+  let component ← refFragmentProbe
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)

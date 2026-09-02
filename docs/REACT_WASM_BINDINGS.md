@@ -56,14 +56,11 @@ graph. React purity, hook ordering, replay safety, dependency correctness, and
 lane behavior remain programmer responsibilities just as they are in
 TypeScript.
 
-Lean-specific builders and component/effect conveniences are explicit
-adapters above this exact value boundary. They should remain separately named
-and should not be described as properties of React itself.
-
-The component adapter keeps one stable function-component type per root and
-updates its Lean callback on later submissions. This preserves ordinary hook
-state; unmounting the root is the explicit remount boundary. Hook-order
-correctness across those updates remains the programmer's responsibility.
+Lean-specific builders and component/effect conversions remain explicit above
+this exact value boundary. `Component.ofLean` returns one ordinary JavaScript
+function whose identity React observes directly. `EffectCallback.ofLean`
+returns the setup function passed unchanged to `useEffect`. Hook-order and
+effect correctness remain the programmer's responsibility.
 
 Official React 19, ReactDOM, and Chromium are the sole semantic oracle. The
 Node virtual document supplies cleanup-safe unsupported React shims and does
@@ -76,10 +73,10 @@ keeps explicit teardown only for active resources with public termination:
 listeners, timers, animation frames, and React roots. A host-call transaction
 rolls back a newly created active resource if result publication fails.
 
-React does not expose a commit acknowledgement for every direct root
-submission. Recurring application updates should therefore use the component
-path, where React owns render timing, rather than expecting VIR to infer when a
-directly submitted tree is no longer retained.
+Direct root submission needs no VIR commit protocol: React receives the exact
+JavaScript node graph, and JavaScript reachability owns that graph. VIR tracks
+only the foreign Lean obligations attached to reachable callback and JSL
+values, plus explicit root teardown.
 
 ## Future Wasm Features
 

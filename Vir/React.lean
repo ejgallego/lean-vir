@@ -12,6 +12,34 @@ private def stringToJs (value : String) : ReactM (Lean.Vir.Js String) := do
   let jsValue ← Lean.Vir.JsValue.ofString value
   pure jsValue
 
+namespace Component
+
+/--
+Converts a Lean render function into one reusable JavaScript React component.
+
+The returned JavaScript function is the component type. Reuse the same value
+where React should preserve hook state; creating another value intentionally
+creates another component type.
+-/
+def ofLean
+    (render : props → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js (Component props)) :=
+  ofLeanJs fun props => do
+    render (← Lean.Vir.LeanRef.fromJSL props)
+
+end Component
+
+namespace EffectCallback
+
+/-- Explicitly builds React's native setup-function shape from Lean setup and cleanup actions. -/
+def ofLean
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js EffectCallback) :=
+  ofLeanJs { setup, cleanup }
+
+end EffectCallback
+
 namespace Property
 
 /-- Raw string-valued prop escape hatch. Prefer named helpers in the v0 surface. -/
@@ -558,8 +586,8 @@ def onSubmitWith
   eventHandler <| EventHandler.onSubmitWith callback
 
 def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit := do
-  let jsKey ← stringToJs key
-  setKeyJs props jsKey
+  let property ← Property.toJs (Property.string "key" key)
+  setProperty props property
 
 def pushEntry (props : @& Lean.Vir.Js Lean.Vir.React.Props) : Entry → ReactM Unit
   | .key value => setKey props value
@@ -592,21 +620,31 @@ def dispatch {state action : Type}
 
 end ReducerDispatch
 
-namespace Hooks
+namespace StateTuple
 
-def useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α)) := do
-  let state ← useStateJs initial
-  let value ← stateValueJs state
-  let setter ← stateSetterJs state
+/-- Explicitly projects React's native `useState` result array into a Lean structure. -/
+def toState {α : Type}
+    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    Lean.Vir.RuntimeM (State (Lean.Vir.Js α)) := do
+  let value ← StateTuple.value result
+  let setter ← StateTuple.setter result
   pure { value, setter }
 
-def useReducer {state action : Type}
-    (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state))
-    (initial : @& Lean.Vir.Js state) : ReactM (ReducerState state action) := do
-  let reducerStateJs ← useReducerJs reducer initial
-  let valueJs ← reducerStateValueJs reducerStateJs
-  let dispatch ← reducerStateDispatchJs reducerStateJs
-  pure { value := valueJs, dispatch }
+end StateTuple
+
+namespace ReducerTuple
+
+/-- Explicitly projects React's native `useReducer` result array into a Lean structure. -/
+def toState {state action : Type}
+    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
+    Lean.Vir.RuntimeM (ReducerState state action) := do
+  let value ← ReducerTuple.value result
+  let dispatch ← ReducerTuple.dispatch result
+  pure { value, dispatch }
+
+end ReducerTuple
+
+namespace Hooks
 
 namespace DependencyList
 
@@ -627,41 +665,50 @@ def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := 
 end DependencyList
 
 def useMemoWithArrayDeps {α β : Type}
-    (calculate : ReactM (Lean.Vir.Js α))
+    (calculate : @& Lean.Vir.Js (MemoCalculation α))
     (deps : @& Array (Lean.Vir.Js β)) :
     ReactM (Lean.Vir.Js α) := do
   let jsDeps ← DependencyList.ofArray deps
   useMemo calculate jsDeps
 
 def useMemoWithStringDeps {α : Type}
-    (calculate : ReactM (Lean.Vir.Js α))
+    (calculate : @& Lean.Vir.Js (MemoCalculation α))
     (deps : @& Array String) :
     ReactM (Lean.Vir.Js α) := do
   let jsDeps ← DependencyList.ofStrings deps
   useMemo calculate jsDeps
 
-def useEffectWithDeps {α : Type}
-    (deps : @& Lean.Vir.Js DependencyList)
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+def useEffect
+    (setup : @& Lean.Vir.Js EffectCallback)
+    (dependencies : Option (Lean.Vir.Js DependencyList) := none) :
     ReactM Unit :=
-  useEffectWithDepsJs deps setup cleanup
+  match dependencies with
+  | none => useEffectWithoutDeps setup
+  | some deps => useEffectWithDeps setup deps
 
-def useEffectWithArrayDeps {α β : Type}
-    (deps : @& Array (Lean.Vir.Js β))
+/-- Lean convenience over `EffectCallback.ofLean` and the exact `useEffect` binding. -/
+def useLeanEffect {α : Type}
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
+    (dependencies : Option (Lean.Vir.Js DependencyList) := none) : ReactM Unit := do
+  let effect ← EffectCallback.ofLean setup cleanup
+  useEffect effect dependencies
+
+def useLeanEffectWithArrayDeps {α β : Type}
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
+    (deps : @& Array (Lean.Vir.Js β)) :
     ReactM Unit := do
   let jsDeps ← DependencyList.ofArray deps
-  useEffectWithDeps jsDeps setup cleanup
+  useLeanEffect setup cleanup (some jsDeps)
 
-def useEffectWithStringDeps {α : Type}
-    (deps : @& Array String)
+def useLeanEffectWithStringDeps {α : Type}
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
+    (deps : @& Array String) :
     ReactM Unit := do
   let jsDeps ← DependencyList.ofStrings deps
-  useEffectWithDeps jsDeps setup cleanup
+  useLeanEffect setup cleanup (some jsDeps)
 
 end Hooks
 
@@ -692,33 +739,14 @@ end ElementType
 
 namespace Node
 
-namespace NodeChildren
-
-def ofArray (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js NodeChildren) := do
-  let jsChildren ← empty
-  for child in children do
-    push jsChildren child
-  pure jsChildren
-
-end NodeChildren
-
 def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
   let jsValue ← Lean.Vir.JsValue.ofString value
   textJs jsValue
 
-def createElement
-    (elementType : @& Lean.Vir.Js ElementType)
-    (props : Array Props.Entry := #[])
-    (children : Array (Lean.Vir.Js Node)) :
-    ReactM (Lean.Vir.Js Node) := do
-  let jsProps ← Props.fromEntries props
-  let jsChildren ← NodeChildren.ofArray children
-  createElementJs elementType jsProps jsChildren
-
 def createElementTag
     (tag : @& String)
-    (props : Array Props.Entry := #[])
-    (children : Array (Lean.Vir.Js Node)) :
+    (props : @& Lean.Vir.Js Props)
+    (children : @& Lean.Vir.Js.Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) := do
   let elementType ← ElementType.ofTag tag
   createElement elementType props children
@@ -729,7 +757,7 @@ def fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node))
     match key? with
     | none => Props.empty
     | some key => Props.fromEntries #[Props.key key]
-  let jsChildren ← NodeChildren.ofArray children
+  let jsChildren ← Lean.Vir.Js.Array.ofArray children
   fragmentWithKeyJs props jsChildren
 
 def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
@@ -738,25 +766,51 @@ def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :
 def keyedFragment (key : String) (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
   fragmentWithKey (some key) children
 
-/-- Renders a Lean function component with typed props. -/
-def component (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=
-  component props
+/-- Creates a React element from an exact reusable JavaScript component function. -/
+def component
+    (component : @& Lean.Vir.Js (Component props))
+    (props : props) : ReactM (Lean.Vir.Js Node) := do
+  let jsProps ← Lean.Vir.LeanRef.toJSL props
+  componentJs component jsProps
 
-/-- ProofWidgets-style alias for rendering a Lean function component. -/
-def ofComponent (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=
+/-- Creates a keyed React element from an exact reusable JavaScript component function. -/
+def keyedComponent
+    (key : @& String)
+    (component : @& Lean.Vir.Js (Component props))
+    (props : props) :
+    ReactM (Lean.Vir.Js Node) := do
+  let jsProps ← Lean.Vir.LeanRef.toJSL props
+  let jsKey ← Lean.Vir.JsValue.ofString key
+  keyedComponentJs component jsProps jsKey
+
+/-- ProofWidgets-style alias for an exact reusable component value. -/
+def ofComponent
+    (component : @& Lean.Vir.Js (Component props))
+    (props : props) : ReactM (Lean.Vir.Js Node) :=
   Node.component component props
 
-/-- Renders a nullary Lean function component. -/
-def componentUnit (component : Component Unit) : ReactM (Lean.Vir.Js Node) :=
-  component ()
+/-- ProofWidgets-style alias for a keyed exact component value. -/
+def keyedOfComponent
+    (key : @& String)
+    (component : @& Lean.Vir.Js (Component props))
+    (props : props) :
+    ReactM (Lean.Vir.Js Node) :=
+  Node.keyedComponent key component props
+
+/-- Creates an element from an exact component whose Lean props are `Unit`. -/
+def componentUnit
+    (component : @& Lean.Vir.Js (Component Unit)) : ReactM (Lean.Vir.Js Node) :=
+  Node.component component ()
 
 /-- Raw element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
 def elementWith
     (tag : String)
     (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
-    ReactM (Lean.Vir.Js Node) :=
-  createElementTag tag props children
+    ReactM (Lean.Vir.Js Node) := do
+  let jsProps ← Props.fromEntries props
+  let jsChildren ← Lean.Vir.Js.Array.ofArray children
+  createElementTag tag jsProps jsChildren
 
 /-- Raw keyed element escape hatch. Prefer `Props.key` in React-shaped code. -/
 def keyedElementWith
@@ -764,7 +818,7 @@ def keyedElementWith
     (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  createElementTag tag (props.push (Props.key key)) children
+  elementWith tag (props.push (Props.key key)) children
 
 private def childElement (tag : String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) :=
@@ -949,6 +1003,13 @@ end Node
 
 namespace Root
 
+/-- Builds a node in Lean, then passes that exact node to React DOM's `Root.render`. -/
+def render
+    (root : @& Lean.Vir.Js Root)
+    (tree : ReactM (Lean.Vir.Js Node)) : Lean.Vir.Browser.DomM Unit := do
+  let node ← ReactM.run tree
+  renderNode root node
+
 /--
 Creates a React root for the first element matching a CSS selector.
 -/
@@ -974,17 +1035,18 @@ def mountFromSelector
       pure true
 
 /--
-Renders a Lean-authored React function component into a React root.
+Renders an exact JavaScript React function component into a React root.
 
-The host wraps the Lean function in a JavaScript React component, so hooks such
-as `Hooks.useState` are evaluated by React during the component render.
+Create the component once with `Component.ofLean` and reuse that value when
+React should preserve its component identity and hook state.
 -/
 def renderComponent
     (root : @& Lean.Vir.Js Root)
-    (component : Component props)
+    (component : @& Lean.Vir.Js (Component props))
     (props : props) :
-    Lean.Vir.Browser.DomM Unit :=
-  renderComponentThunk root fun _ => component props
+    Lean.Vir.Browser.DomM Unit := do
+  let node ← ReactM.run (Node.component component props)
+  renderNode root node
 
 def renderIntoSelector
     (selector : @& String)
@@ -994,20 +1056,13 @@ def renderIntoSelector
   let rendered ← renderIntoSelectorJs jsSelector node
   Lean.Vir.JsValue.toBool rendered
 
-private def renderComponentIntoSelectorThunk
-    (selector : @& String)
-    (component : Unit → ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.Browser.DomM Bool := do
-  let jsSelector ← Lean.Vir.JsValue.ofString selector
-  let rendered ← renderComponentIntoSelectorThunkJs jsSelector component
-  Lean.Vir.JsValue.toBool rendered
-
 def renderComponentIntoSelector
     (selector : @& String)
-    (component : Component props)
+    (component : @& Lean.Vir.Js (Component props))
     (props : props) :
-    Lean.Vir.Browser.DomM Bool :=
-  renderComponentIntoSelectorThunk selector fun _ => component props
+    Lean.Vir.Browser.DomM Bool := do
+  let node ← ReactM.run (Node.component component props)
+  renderIntoSelector selector node
 
 /-- Unmounts the React root associated with a selector, when present. -/
 def unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool := do

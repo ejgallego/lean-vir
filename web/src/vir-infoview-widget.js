@@ -19,8 +19,6 @@ import { INTERFACE_TAG } from "./runtime/interface-tags.js";
 const e = React.createElement;
 let nextMountId = 0;
 const wasmModuleCache = new Map();
-const runtimeServiceCache = new Map();
-const runtimeServiceIdleTtlMs = 60_000;
 
 const shellStyle = {
   display: "grid",
@@ -42,8 +40,12 @@ const statusStyle = {
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
   const editorConnection = React.useContext(EditorContext);
-  const rpcSessionRef = React.useRef(rpcSession);
-  const editorConnectionRef = React.useRef(editorConnection);
+  const hostContextRef = React.useRef({
+    rpcSession,
+    editorConnection,
+    position: null,
+  });
+  const setupHintRef = React.useRef("");
   const [status, setStatus] = React.useState({
     kind: "loading",
     message: "Loading VIR widget...",
@@ -54,6 +56,7 @@ export default function VirInfoviewWidget(props) {
   const [runtimeToken, setRuntimeToken] = React.useState(0);
   const [proofWidgetsExpr, setProofWidgetsExpr] = React.useState(null);
   const irPackageRevisionRef = React.useRef("");
+  const refreshGenerationRef = React.useRef(0);
   const baseSurface = surfaceFromInfoviewProps(props);
   const baseSurfaceKey = surfaceCacheKey(baseSurface);
   const surface = surfaceFromInfoviewProps(props, proofWidgetsExpr);
@@ -63,45 +66,72 @@ export default function VirInfoviewWidget(props) {
       ? ""
       : JSON.stringify(props.irPackage);
 
-  React.useEffect(() => {
-    rpcSessionRef.current = rpcSession;
-  }, [rpcSession]);
-
-  React.useEffect(() => {
-    editorConnectionRef.current = editorConnection;
-  }, [editorConnection]);
+  React.useLayoutEffect(() => {
+    let position = null;
+    let setupHint = "";
+    try {
+      position = requiredPosition(props.pos, "pos");
+      setupHint = optionalString(props.setupHint, "setupHint");
+    } catch {
+      // The loading effect reports invalid widget configuration.
+    }
+    hostContextRef.current.rpcSession = rpcSession;
+    hostContextRef.current.editorConnection = editorConnection;
+    hostContextRef.current.position = position;
+    setupHintRef.current = setupHint;
+  }, [rpcSession, editorConnection, props.pos, props.setupHint]);
 
   async function refreshLoadedWidget(isDisposed) {
     let setupHint = "";
+    let service = null;
     try {
       const config = widgetRuntimeConfigFromProps(props);
       setupHint = config.setupHint;
-      const service = await loadRuntimeService({
-        rpcSession: rpcSessionRef.current,
-        editorConnectionRef,
+      service = await loadRuntimeService({
+        rpcSession: hostContextRef.current.rpcSession,
+        hostContext: hostContextRef.current,
         config,
       });
       if (isDisposed()) {
+        disposeRuntimeService(service);
         return;
       }
+      const componentEntry = validateWidgetComponentEntry(
+        service.runtime,
+        config.componentEntry,
+      );
       const entry = validateWidgetEntry(service.runtime, config.entry);
       const unmountEntry = validateWidgetUnmountEntry(
         service.runtime,
         config.unmountEntry,
       );
-      const current = loadedRef.current;
-      if (sameLoadedWidget(current, service, entry, unmountEntry, setupHint)) {
-        return;
+      const component = service.runtime.call(componentEntry.entry);
+      if (typeof component !== "function") {
+        throw new Error(
+          `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
+        );
       }
       irPackageRevisionRef.current = service.packageRevision;
-      retainRuntimeService(service);
+      const current = loadedRef.current;
+      loadedRef.current = null;
       if (current !== null) {
         releaseLoadedWidget(current, mountId);
       }
-      loadedRef.current = { service, entry, unmountEntry, setupHint };
+      loadedRef.current = {
+        service,
+        componentEntry,
+        component,
+        entry,
+        unmountEntry,
+      };
+      service = null;
       setProofWidgetsExpr(null);
+      setReloadToken(0);
       setRuntimeToken((token) => token + 1);
     } catch (error) {
+      if (service !== null) {
+        disposeRuntimeService(service);
+      }
       if (!isDisposed()) {
         setStatus({ kind: "error", message: errorMessage(error, setupHint) });
       }
@@ -110,7 +140,10 @@ export default function VirInfoviewWidget(props) {
 
   React.useEffect(() => {
     let disposed = false;
-    refreshLoadedWidget(() => disposed);
+    const generation = ++refreshGenerationRef.current;
+    refreshLoadedWidget(
+      () => disposed || generation !== refreshGenerationRef.current,
+    );
     return () => {
       disposed = true;
       const loaded = loadedRef.current;
@@ -125,9 +158,9 @@ export default function VirInfoviewWidget(props) {
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
-    props.setupHint,
     mountId,
   ]);
 
@@ -136,16 +169,19 @@ export default function VirInfoviewWidget(props) {
       return undefined;
     }
     let disposed = false;
-    refreshLoadedWidget(() => disposed);
+    const generation = ++refreshGenerationRef.current;
+    refreshLoadedWidget(
+      () => disposed || generation !== refreshGenerationRef.current,
+    );
     return () => {
       disposed = true;
     };
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
-    props.setupHint,
     mountId,
     reloadToken,
   ]);
@@ -163,9 +199,9 @@ export default function VirInfoviewWidget(props) {
           }
           inFlight = true;
           shouldReloadIRPackage({
-            rpcSession: rpcSessionRef.current,
+            rpcSession: hostContextRef.current.rpcSession,
             irPackage: config.irPackage,
-            position: config.position,
+            position: hostContextRef.current.position,
             currentRevision: irPackageRevisionRef.current,
           })
             .then((shouldReload) => {
@@ -177,7 +213,7 @@ export default function VirInfoviewWidget(props) {
               if (!disposed) {
                 setStatus({
                   kind: "error",
-                  message: errorMessage(error, config.setupHint),
+                  message: errorMessage(error, setupHintRef.current),
                 });
               }
             })
@@ -198,10 +234,10 @@ export default function VirInfoviewWidget(props) {
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
     props.autoReloadMs,
-    props.setupHint,
   ]);
 
   React.useEffect(() => {
@@ -211,8 +247,8 @@ export default function VirInfoviewWidget(props) {
       const loaded = loadedRef.current;
       if (
         loaded === null ||
-        rpcSessionRef.current === null ||
-        typeof rpcSessionRef.current?.call !== "function"
+        hostContextRef.current.rpcSession === null ||
+        typeof hostContextRef.current.rpcSession?.call !== "function"
       ) {
         if (!disposed) {
           setProofWidgetsExpr(null);
@@ -236,7 +272,7 @@ export default function VirInfoviewWidget(props) {
       }
       try {
         const saved = await createProofWidgetsExprWithCtxAtPos(
-          rpcSessionRef.current,
+          hostContextRef.current.rpcSession,
           config.position,
           loaded.service.packageRevision,
         );
@@ -269,6 +305,7 @@ export default function VirInfoviewWidget(props) {
       const mounted = loaded.service.runtime.call(
         loaded.entry.entry,
         selector,
+        loaded.component,
         surface,
       );
       if (mounted !== true) {
@@ -282,10 +319,9 @@ export default function VirInfoviewWidget(props) {
         loadedRef.current = null;
       }
       releaseLoadedWidget(loaded, mountId);
-      retireRuntimeService(loaded.service);
       setStatus({
         kind: "error",
-        message: errorMessage(error, loaded.setupHint),
+        message: errorMessage(error, setupHintRef.current),
       });
     }
   }, [runtimeToken, surfaceKey, mountId]);
@@ -321,28 +357,36 @@ function stopInfoviewEvent(event) {
 }
 
 export function validateWidgetEntry(runtime, entryName) {
-  const entry =
-    runtime.findManifestEntry?.(entryName) ??
-    runtime.interfaceManifest?.exports?.find(
-      (candidate) =>
-        candidate.entry === entryName ||
-        candidate.id === entryName ||
-        candidate.jsName === entryName,
-    );
-  if (entry === null || entry === undefined) {
-    throw new Error(`VIR widget entry not found: ${entryName}`);
-  }
+  const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 2 ||
+    entry.args?.length !== 3 ||
     entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
+    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
+    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
+    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
     entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
   ) {
     throw new Error(
-      `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry ` +
-        `(Lean: String -> Surface -> DomM Bool)`,
+      `VIR widget entry ${entryName} must be an effectful String -> Component -> Surface -> Bool entry`,
+    );
+  }
+  return entry;
+}
+
+export function validateWidgetComponentEntry(runtime, entryName) {
+  const entry = requireWidgetManifestEntry(
+    runtime,
+    entryName,
+    "component entry",
+  );
+  if (
+    !isEffectfulInterfaceEffect(entry.effect) ||
+    entry.args?.length !== 0 ||
+    entry.result?.interfaceTag !== INTERFACE_TAG.RESOURCE
+  ) {
+    throw new Error(
+      `VIR widget component entry ${entryName} must be an effectful () -> Component entry`,
     );
   }
   return entry;
@@ -352,17 +396,7 @@ export function validateWidgetUnmountEntry(runtime, entryName) {
   if (entryName.length === 0) {
     return null;
   }
-  const entry =
-    runtime.findManifestEntry?.(entryName) ??
-    runtime.interfaceManifest?.exports?.find(
-      (candidate) =>
-        candidate.entry === entryName ||
-        candidate.id === entryName ||
-        candidate.jsName === entryName,
-    );
-  if (entry === null || entry === undefined) {
-    throw new Error(`VIR widget unmount entry not found: ${entryName}`);
-  }
+  const entry = requireWidgetManifestEntry(runtime, entryName, "unmount entry");
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 1 ||
@@ -373,6 +407,21 @@ export function validateWidgetUnmountEntry(runtime, entryName) {
       `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry ` +
         `(Lean: String -> DomM Bool)`,
     );
+  }
+  return entry;
+}
+
+function requireWidgetManifestEntry(runtime, entryName, label) {
+  const entry =
+    runtime.findManifestEntry?.(entryName) ??
+    runtime.interfaceManifest?.exports?.find(
+      (candidate) =>
+        candidate.entry === entryName ||
+        candidate.id === entryName ||
+        candidate.jsName === entryName,
+    );
+  if (entry === null || entry === undefined) {
+    throw new Error(`VIR widget ${label} not found: ${entryName}`);
   }
   return entry;
 }
@@ -390,7 +439,7 @@ function unmountWidgetSelector(loaded, mountId) {
 
 function releaseLoadedWidget(loaded, mountId) {
   unmountWidgetSelector(loaded, mountId);
-  releaseRuntimeService(loaded.service);
+  disposeRuntimeService(loaded.service);
 }
 
 export function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
@@ -686,6 +735,7 @@ function widgetRuntimeConfigFromProps(props) {
   return {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
+    componentEntry: requiredString(props.componentEntry, "componentEntry"),
     entry: requiredString(props.entry, "entry"),
     unmountEntry: optionalString(props.unmountEntry, "unmountEntry"),
     position: requiredPosition(props.pos, "pos"),
@@ -738,87 +788,24 @@ function optionalNonNegativeInteger(value, label) {
   return value;
 }
 
-function sameLoadedWidget(loaded, service, entry, unmountEntry, setupHint) {
-  return (
-    loaded !== null &&
-    loaded.service === service &&
-    loaded.entry.entry === entry.entry &&
-    (loaded.unmountEntry?.entry ?? "") === (unmountEntry?.entry ?? "") &&
-    loaded.setupHint === setupHint
-  );
-}
-
-function runtimeBaseKey(config) {
-  return JSON.stringify({
-    wasmPath: config.wasmPath,
-    irPackage: config.irPackage,
-  });
-}
-
 export async function loadRuntimeService({
   rpcSession,
-  editorConnectionRef = null,
+  hostContext = null,
   config,
 }) {
-  return loadRuntimeServiceWithHost({
-    rpcSession,
-    editorConnectionRef,
-    config,
-  });
-}
-
-async function loadRuntimeServiceWithHost({
-  rpcSession,
-  editorConnectionRef,
-  config,
-}) {
-  const baseKey = runtimeBaseKey(config);
   const sources = await resolveRuntimeSources(rpcSession, config);
-  const key = runtimeServiceKey(baseKey, sources);
-  let cached = runtimeServiceCache.get(key);
-  if (cached === undefined) {
-    cached = createRuntimeService({
+  return createRuntimeService({
+    rpcSession,
+    hostContext: hostContext ?? {
       rpcSession,
-      editorConnectionRef,
-      config,
-      baseKey,
-      key,
-      sources,
-    });
-    runtimeServiceCache.set(key, cached);
-    cached
-      .then((service) => {
-        service.cacheEntry = cached;
-        retireRuntimeServicesForBaseKey(baseKey, key);
-      })
-      .catch(() => {
-        if (runtimeServiceCache.get(key) === cached) {
-          runtimeServiceCache.delete(key);
-        }
-      });
-  }
-  const service = await cached;
-  service.lastUsed = Date.now();
-  scheduleRuntimeServiceIdleDispose(service);
-  return service;
-}
-
-function runtimeServiceKey(baseKey, sources) {
-  return JSON.stringify({
-    baseKey,
-    wasmRevision: sources.wasmSource.revision ?? "",
-    packageRevision: sources.packageSource.revision ?? "",
+      editorConnection: null,
+      position: config.position,
+    },
+    sources,
   });
 }
 
-async function createRuntimeService({
-  rpcSession,
-  editorConnectionRef,
-  config,
-  baseKey,
-  key,
-  sources,
-}) {
+async function createRuntimeService({ rpcSession, hostContext, sources }) {
   const resources = createHostLifecycle();
   const runtimeOptions = await loadRuntimeOptionsFromSources({
     rpcSession,
@@ -829,35 +816,38 @@ async function createRuntimeService({
       resources,
       runtimeRef,
       infoviewCommandDispatcher: createInfoviewCommandDispatcher({
-        editorConnectionRef,
-        rpcSession,
-        position: config.position,
+        hostContext,
         packageRevision: sources.packageSource.revision ?? "",
       }),
       reactHostBindings: createBrowserReactHostBindings,
     });
-  return {
-    baseKey,
-    cacheEntry: null,
-    key,
-    activeRefs: 0,
-    packageRevision: sources.packageSource.revision ?? "",
-    idleTimer: null,
-    lastUsed: Date.now(),
-    stale: false,
-    disposed: false,
-    resources,
-    runtime: await createBundledVirRuntime(runtimeOptions),
-  };
+  try {
+    return {
+      packageRevision: sources.packageSource.revision ?? "",
+      disposed: false,
+      resources,
+      runtime: await createBundledVirRuntime(runtimeOptions),
+    };
+  } catch (error) {
+    try {
+      resources.dispose();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "VIR runtime creation failed during host cleanup",
+      );
+    }
+    throw error;
+  }
 }
 
 function createInfoviewCommandDispatcher({
-  editorConnectionRef,
-  rpcSession = null,
-  position = null,
+  hostContext,
   packageRevision = "",
 }) {
   const resolveRef = (ref) => {
+    const rpcSession = hostContext.rpcSession ?? null;
+    const position = hostContext.position ?? null;
     if (
       rpcSession === null ||
       typeof rpcSession.call !== "function" ||
@@ -874,7 +864,7 @@ function createInfoviewCommandDispatcher({
   };
   return {
     revealPosition(position) {
-      const editorConnection = editorConnectionRef?.current ?? null;
+      const editorConnection = hostContext.editorConnection ?? null;
       if (
         editorConnection === null ||
         typeof editorConnection !== "object" ||
@@ -888,7 +878,7 @@ function createInfoviewCommandDispatcher({
       return true;
     },
     insertText(position, text) {
-      const editorConnection = editorConnectionRef?.current ?? null;
+      const editorConnection = hostContext.editorConnection ?? null;
       if (
         editorConnection === null ||
         typeof editorConnection !== "object" ||
@@ -935,93 +925,10 @@ function createInfoviewCommandDispatcher({
   };
 }
 
-function retainRuntimeService(service) {
-  clearRuntimeServiceIdleTimer(service);
-  service.activeRefs += 1;
-  service.lastUsed = Date.now();
-}
-
-function releaseRuntimeService(service) {
-  service.activeRefs = Math.max(0, service.activeRefs - 1);
-  disposeStaleRuntimeServiceIfIdle(service);
-  scheduleRuntimeServiceIdleDispose(service);
-}
-
-function retireRuntimeService(service) {
-  service.stale = true;
-  if (runtimeServiceCache.get(service.key) === service.cacheEntry) {
-    runtimeServiceCache.delete(service.key);
-  }
-  disposeStaleRuntimeServiceIfIdle(service);
-}
-
-function disposeStaleRuntimeServiceIfIdle(service) {
-  if (service.stale && service.activeRefs === 0) {
-    disposeRuntimeServiceNow(service);
-  }
-}
-
-function disposeRuntimeServiceNow(service) {
+function disposeRuntimeService(service) {
   if (!service.disposed) {
-    clearRuntimeServiceIdleTimer(service);
     service.disposed = true;
     service.runtime.dispose?.();
-  }
-}
-
-function clearRuntimeServiceIdleTimer(service) {
-  if (service.idleTimer !== null) {
-    clearTimeout(service.idleTimer);
-    service.idleTimer = null;
-  }
-}
-
-function scheduleRuntimeServiceIdleDispose(service) {
-  if (
-    service.disposed ||
-    service.stale ||
-    service.activeRefs !== 0 ||
-    service.idleTimer !== null
-  ) {
-    return;
-  }
-  service.idleTimer = setTimeout(() => {
-    service.idleTimer = null;
-    if (!service.disposed && !service.stale && service.activeRefs === 0) {
-      if (runtimeServiceCache.get(service.key) === service.cacheEntry) {
-        runtimeServiceCache.delete(service.key);
-      }
-      disposeRuntimeServiceNow(service);
-    }
-  }, runtimeServiceIdleTtlMs);
-}
-
-function retireRuntimeServicesForBaseKey(baseKey, keepKey) {
-  for (const [key, cached] of runtimeServiceCache) {
-    if (key === keepKey) {
-      continue;
-    }
-    cached
-      .then((service) => {
-        if (service.baseKey === baseKey) {
-          retireRuntimeService(service);
-        }
-      })
-      .catch(() => {});
-  }
-}
-
-export async function clearRuntimeServiceCacheForTests() {
-  const services = await Promise.allSettled(
-    Array.from(runtimeServiceCache.values()),
-  );
-  runtimeServiceCache.clear();
-  for (const service of services) {
-    if (service.status === "fulfilled") {
-      service.value.activeRefs = 0;
-      service.value.stale = true;
-      disposeRuntimeServiceNow(service.value);
-    }
   }
 }
 
@@ -1093,18 +1000,20 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
 }
 
 export async function loadWasmModule(rpcSession, source) {
+  const sourceKey = `${source.kind}:${source.value}`;
   const key = assetSourceCacheKey(source);
-  let cached = wasmModuleCache.get(key);
-  if (cached === undefined) {
-    cached = compileWasmModule(rpcSession, source);
-    wasmModuleCache.set(key, cached);
-    cached.catch(() => {
-      if (wasmModuleCache.get(key) === cached) {
-        wasmModuleCache.delete(key);
+  let cached = wasmModuleCache.get(sourceKey);
+  if (cached?.key !== key) {
+    const module = compileWasmModule(rpcSession, source);
+    cached = { key, module };
+    wasmModuleCache.set(sourceKey, cached);
+    module.catch(() => {
+      if (wasmModuleCache.get(sourceKey) === cached) {
+        wasmModuleCache.delete(sourceKey);
       }
     });
   }
-  return cached;
+  return cached.module;
 }
 
 async function compileWasmModule(rpcSession, source) {

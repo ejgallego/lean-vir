@@ -29,22 +29,24 @@ def captionStyle : Props.Entry := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def View : Component Surface := fun surface => do
-  let caption ← Node.pTextWith
-    #[
-      Props.id "react-tamagotchi-widget-caption",
-      captionStyle
-    ]
-    ("Shared React Tamagotchi component at " ++ surface.cursor.label)
-  let pet ← Node.component ReactTamagotchi.View ()
-  Node.sectionWith
-    #[
-      Props.id "react-tamagotchi-proof-widget",
-      Props.role "region",
-      Props.ariaLabel "Lean React Tamagotchi proof widget",
-      shellStyle
-    ]
-    #[caption, pet]
+def View : Lean.Vir.RuntimeM (Lean.Vir.Js (Component Surface)) := do
+  let petComponent ← ReactTamagotchi.View
+  Component.ofLean fun surface => do
+    let caption ← Node.pTextWith
+      #[
+        Props.id "react-tamagotchi-widget-caption",
+        captionStyle
+      ]
+      ("Shared React Tamagotchi component at " ++ surface.cursor.label)
+    let pet ← Node.component petComponent ()
+    Node.sectionWith
+      #[
+        Props.id "react-tamagotchi-proof-widget",
+        Props.role "region",
+        Props.ariaLabel "Lean React Tamagotchi proof widget",
+        shellStyle
+      ]
+      #[caption, pet]
 
 vir_proof_widget View with mountId := "vir-react-tamagotchi-widget"
 

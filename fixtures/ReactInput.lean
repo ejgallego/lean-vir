@@ -18,10 +18,10 @@ def checkedLabel (checked : Bool) : String :=
 def selectTextareaLabel (note flavor : String) : String :=
   "note:" ++ note ++ "; flavor:" ++ flavor
 
-def inputComponent : Component Unit :=
-  fun _ => do
+def inputComponent : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofString ""
-    let name ← Hooks.useState initial
+    let name ← StateTuple.toState (← Hooks.useState initial)
     let nameValue ← JsValue.toString name.value
     let labelText ← Node.text "name:"
     let label ← Node.labelWith #[Props.htmlFor "react-name-input"] #[labelText]
@@ -43,10 +43,10 @@ def inputComponent : Component Unit :=
     let output ← Node.spanWith #[Props.id "react-name-output"] #[outputText]
     Node.divWith #[Props.id "react-input-widget"] #[label, input, output]
 
-def changeInputComponent : Component Unit :=
-  fun _ => do
+def changeInputComponent : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofString ""
-    let value ← Hooks.useState initial
+    let value ← StateTuple.toState (← Hooks.useState initial)
     let currentValue ← JsValue.toString value.value
     let labelText ← Node.text "change:"
     let label ← Node.labelWith #[Props.htmlFor "react-change-input"] #[labelText]
@@ -78,10 +78,10 @@ def changeInputComponent : Component Unit :=
       ]
       #[label, input, output]
 
-def checkboxComponent : Component Unit :=
-  fun _ => do
+def checkboxComponent : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initial ← JsValue.ofBool false
-    let checked ← Hooks.useState initial
+    let checked ← StateTuple.toState (← Hooks.useState initial)
     let checkedValue ← JsValue.toBool checked.value
     let input ←
       Node.input
@@ -103,13 +103,13 @@ def checkboxComponent : Component Unit :=
         #[outputText]
     Node.divWith #[Props.id "react-checkbox-widget"] #[input, output]
 
-def selectTextareaComponent : Component Unit :=
-  fun _ => do
+def selectTextareaComponent : RuntimeM (Js (Component Unit)) :=
+  Component.ofLean fun _ => do
     let initialNote ← JsValue.ofString "draft"
-    let note ← Hooks.useState initialNote
+    let note ← StateTuple.toState (← Hooks.useState initialNote)
     let noteValue ← JsValue.toString note.value
     let initialFlavor ← JsValue.ofString "vanilla"
-    let flavor ← Hooks.useState initialFlavor
+    let flavor ← StateTuple.toState (← Hooks.useState initialFlavor)
     let flavorValue ← JsValue.toString flavor.value
     let sectionText ← Node.text "fields"
     let sectionNode ← Node.spanWith #[Props.classList #["react-select-textarea-section"]] #[sectionText]
@@ -217,17 +217,21 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
       ]
       #[label, input, output]
 
-def mountInput (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root inputComponent ()
+def mountInput (selector : String) : DomM Bool := do
+  let component ← inputComponent
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def mountChangeInput (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root changeInputComponent ()
+def mountChangeInput (selector : String) : DomM Bool := do
+  let component ← changeInputComponent
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def mountSelectTextarea (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root selectTextareaComponent ()
+def mountSelectTextarea (selector : String) : DomM Bool := do
+  let component ← selectTextareaComponent
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
-def mountCheckbox (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root checkboxComponent ()
+def mountCheckbox (selector : String) : DomM Bool := do
+  let component ← checkboxComponent
+  Root.mountFromSelector selector fun root => Root.renderComponent root component ()
 
 def mountAttributes (selector : String) : DomM Bool :=
   Root.mountFromSelector selector renderAttributesInto

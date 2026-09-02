@@ -11,105 +11,71 @@ namespace ProofWidgetsJsxSubset
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.ProofWidgets
+open scoped ProofWidgets.Jsx
 
 /-!
-Combinator-only port of the static surface from upstream
-`ProofWidgets/Demos/Jsx.lean`.
-
-The upstream file demonstrates JSX notation. This fixture keeps the same shape
-with explicit `Html` combinators so the compatibility layer can grow from real
-ProofWidgets examples before adding syntax sugar.
+Native VIR port of the static surface from upstream
+`ProofWidgets/Demos/Jsx.lean`, including attributes, components, callbacks,
+keys, and child / prop spreads.
 -/
 
 structure CardProps where
   title : String
 
-def Card : Component CardProps := fun ctx =>
-  Html.sectionWith
-    #[
-      Attr.id "proofwidgets-jsx-card",
-      Attr.className "pw-jsx-card",
-      Attr.data "component" "Card"
-    ]
-    #[
-      Html.h3With #[Attr.className "pw-jsx-card-title"] #[Html.text ctx.props.title],
-      Html.divWith #[Attr.id "proofwidgets-jsx-card-body", Attr.className "pw-jsx-card-body"] ctx.children
-    ]
+def Card : RuntimeM (Component CardProps) := Component.ofLean fun ctx =>
+  <section id="proofwidgets-jsx-card" className="pw-jsx-card"
+      {...#[Lean.Vir.React.Props.data "component" "Card"]}>
+    <h3 className="pw-jsx-card-title">{Html.text ctx.props.title}</h3>
+    <div id="proofwidgets-jsx-card-body" className="pw-jsx-card-body">
+      {...ctx.children}
+    </div>
+  </section>
 
 structure MarkdownProps where
   contents : String
 
-def MarkdownDisplay : Component MarkdownProps := fun ctx =>
-  Html.sectionWith
-    #[
-      Attr.id "proofwidgets-jsx-markdown",
-      Attr.className "pw-jsx-markdown",
-      Attr.data "component" "MarkdownDisplay"
-    ]
-    #[
-      Html.h3With #[Attr.className "pw-jsx-markdown-title"] #[Html.text "MarkdownDisplay"],
-      Html.element "pre" #[Attr.className "pw-jsx-markdown-source"] #[
-        Html.text ctx.props.contents
-      ]
-    ]
+def MarkdownDisplay : RuntimeM (Component MarkdownProps) := Component.ofLean fun ctx =>
+  <section id="proofwidgets-jsx-markdown" className="pw-jsx-markdown"
+      {...#[Lean.Vir.React.Props.data "component" "MarkdownDisplay"]}>
+    <h3 className="pw-jsx-markdown-title">MarkdownDisplay</h3>
+    <pre className="pw-jsx-markdown-source">{Html.text ctx.props.contents}</pre>
+  </section>
 
 def htmlLetters : Array Html := #[
-  Html.spanWith
-    #[Attr.id "proofwidgets-jsx-letter-h", Attr.stylePairs #[("color", "red")]]
-    #[Html.text "H"],
-  Html.spanWith
-    #[Attr.id "proofwidgets-jsx-letter-t", Attr.stylePairs #[("color", "yellow")]]
-    #[Html.text "T"],
-  Html.spanWith
-    #[Attr.id "proofwidgets-jsx-letter-m", Attr.stylePairs #[("color", "green")]]
-    #[Html.text "M"],
-  Html.spanWith
-    #[Attr.id "proofwidgets-jsx-letter-l", Attr.stylePairs #[("color", "blue")]]
-    #[Html.text "L"]
+  <span id="proofwidgets-jsx-letter-h" style={#[("color", "red")]}>H</span>,
+  <span id="proofwidgets-jsx-letter-t" style={#[("color", "yellow")]}>T</span>,
+  <span id="proofwidgets-jsx-letter-m" style={#[("color", "green")]}>M</span>,
+  <span id="proofwidgets-jsx-letter-l" style={#[("color", "blue")]}>L</span>
 ]
 
 def htmlHeadline : Html :=
-  Html.bWith #[Attr.id "proofwidgets-jsx-headline"] #[
-    Html.text "What, HTML in Lean?!"
-  ]
+  <b id="proofwidgets-jsx-headline">What, HTML in Lean?!</b>
 
 def parrotImage : Html :=
-  Html.img #[
-    Attr.id "proofwidgets-jsx-parrot",
-    Attr.src ("https://" ++ "upload.wikimedia.org/wikipedia/commons/a/a5/Parrot_montage.jpg"),
-    Attr.alt "Six photos of parrots arranged in a grid."
-  ]
+  <img id="proofwidgets-jsx-parrot"
+    src={"https://" ++ "upload.wikimedia.org/wikipedia/commons/a/a5/Parrot_montage.jpg"}
+    alt="Six photos of parrots arranged in a grid." />
 
 def spreadInterpolation : Html :=
-  Html.bWith #[Attr.id "proofwidgets-jsx-spread"] <|
-    #[Html.text "You can use "] ++
-    htmlLetters ++
-    #[
-      Html.text s!" in Lean {1 + 3}! ",
-      Html.hr #[Attr.id "proofwidgets-jsx-divider"]
-    ]
+  <b id="proofwidgets-jsx-spread">You can use {...htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
 
-def markdownExample : Html :=
-  Html.ofComponent MarkdownDisplay {
-    contents := "
+def markdownExample (MarkdownDisplay : Component MarkdownProps) : Html :=
+  <MarkdownDisplay contents={"
   ## Hello, Markdown
   We have **bold text**, _italic text_, `example : True := by trivial`,
   and $3*19 = \\int\\limits_0^{57}1~dx$.
-"
-  }
+"} />
 
 structure BadgeProps where
   tone : String
   label : String
 
-def Badge : Component BadgeProps := fun ctx =>
-  Html.spanWith
-    #[
-      Attr.id ("proofwidgets-jsx-badge-" ++ ctx.props.tone),
-      Attr.className ("pw-jsx-badge pw-jsx-badge-" ++ ctx.props.tone),
-      Attr.data "tone" ctx.props.tone
-    ]
-    (#[Html.text ctx.props.label] ++ ctx.children)
+def Badge : RuntimeM (Component BadgeProps) := Component.ofLean fun ctx =>
+  <span id={"proofwidgets-jsx-badge-" ++ ctx.props.tone}
+      className={"pw-jsx-badge pw-jsx-badge-" ++ ctx.props.tone}
+      {...#[Lean.Vir.React.Props.data "tone" ctx.props.tone]}>
+    {Html.text ctx.props.label}{...ctx.children}
+  </span>
 
 def sampleExpr : WithRpcRef ExprWithCtx :=
   ExprWithCtx.save
@@ -121,9 +87,11 @@ def sampleExpr : WithRpcRef ExprWithCtx :=
 structure InteractiveExprProps where
   expr : WithRpcRef ExprWithCtx
 
-def InteractiveExpr : Component InteractiveExprProps := fun ctx => do
+def InteractiveExpr : RuntimeM (Component InteractiveExprProps) :=
+  Component.ofLean fun ctx => do
   let initialStatus ← JsValue.ofString "ready"
-  let status ← Lean.Vir.React.Hooks.useState initialStatus
+  let status ← Lean.Vir.React.StateTuple.toState
+    (← Lean.Vir.React.Hooks.useState initialStatus)
   let statusText ← JsValue.toString status.value
   Html.buttonWith
     #[
@@ -158,46 +126,49 @@ def InteractiveExpr : Component InteractiveExprProps := fun ctx => do
     ]
 
 def row (key label value : String) : Html :=
-  Html.keyedElement "li" key #[Attr.className "pw-jsx-row"] #[
-    Html.strongWith #[Attr.className "pw-jsx-row-label"] #[Html.text label],
-    Html.spanWith #[Attr.className "pw-jsx-row-value"] #[Html.text value]
-  ]
+  <li key={key} className="pw-jsx-row">
+    <strong className="pw-jsx-row-label">{Html.text label}</strong>
+    <span className="pw-jsx-row-value">{Html.text value}</span>
+  </li>
 
-def View : Component Unit := fun _ => do
-  let renderedRows := 3
-  Html.sectionWith
-    #[
-      Attr.id "proofwidgets-jsx-subset",
-      Attr.role "region",
-      Attr.ariaLabel "ProofWidgets JSX subset combinator demo",
-      Attr.dataTestId "proofwidgets-jsx-subset"
+-- Uppercase JSX tags consume these local component values during macro expansion,
+-- which Lean's unused-variable linter does not count as an explicit reference.
+set_option linter.unusedVariables false in
+def View : RuntimeM (Component Unit) := do
+  let Card ← Card
+  let MarkdownDisplay ← MarkdownDisplay
+  let Badge ← Badge
+  let InteractiveExpr ← InteractiveExpr
+  Component.ofLean fun _ => do
+    let renderedRows := 3
+    let surfaceProps : Array PropEntry := #[
+      Lean.Vir.React.Props.role "region",
+      Lean.Vir.React.Props.ariaLabel "ProofWidgets JSX subset combinator demo"
     ]
-    #[
-      Html.ofComponent Card { title := "JSX-shaped combinators" } #[
-        htmlHeadline,
-        parrotImage,
-        spreadInterpolation,
-        markdownExample,
-        Html.ofComponent Badge { tone := "info", label := "component" } #[
-          Html.text " children"
-        ],
-        Html.ofComponent InteractiveExpr { expr := sampleExpr },
-        Html.buttonWith
-          #[Attr.id "proofwidgets-jsx-action", Attr.className "pw-jsx-action"]
-          #[Handler.onClick do
-            let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
-            Lean.Vir.Browser.Document.setTitle title]
-          #[Html.text "mark"],
-        Html.ulWith #[Attr.id "proofwidgets-jsx-rows", Attr.className "pw-jsx-rows"] #[
-          row "tags" "lowercase tags" "b, img, span, hr",
-          row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr",
-          row "interpolation" "interpolation" s!"{renderedRows} rendered rows"
-        ]
-      ]
-    ]
+    let view : Html := <section {...surfaceProps} id="proofwidgets-jsx-subset"
+        dataTestId="proofwidgets-jsx-subset">
+      <Card title="JSX-shaped combinators">
+        {htmlHeadline}{parrotImage}{spreadInterpolation}{markdownExample MarkdownDisplay}
+        <Badge key="info-badge" tone="info" label="component"> children</Badge>
+        <InteractiveExpr expr={sampleExpr} />
+        <button id="proofwidgets-jsx-action" className="pw-jsx-action"
+            onClick={do
+              let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
+              Lean.Vir.Browser.Document.setTitle title}>
+          {Html.text "mark"}
+        </button>
+        <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
+          {row "tags" "lowercase tags" "b, img, span, hr"}
+          {row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr"}
+          {row "interpolation" "interpolation" s!"{renderedRows} rendered rows"}
+        </ul>
+      </Card>
+    </section>
+    view
 
-def mount (selector : String) : DomM Bool :=
-  Lean.Vir.React.Root.renderComponentIntoSelector selector View (componentProps ())
+def mount (selector : String) : DomM Bool := do
+  let component ← View
+  Lean.Vir.React.Root.renderComponentIntoSelector selector component (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-jsx-subset-root"

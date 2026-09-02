@@ -165,7 +165,7 @@ structure StateHook where
 
 def useStatus : ReactM StateHook := do
   let initial ← JsValue.ofString "Choose an action to insert it at the editor cursor."
-  let status ← Hooks.useState initial
+  let status ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toString status.value
   pure { status, value }
 
@@ -282,7 +282,7 @@ structure ViewProps where
   copyContext : DomM Unit
   revealCursor : DomM Unit
 
-def View : Component ViewProps := fun props => do
+def View : RuntimeM (Js (Component ViewProps)) := Component.ofLean fun props => do
   let title ← Node.h3TextWith #[Props.id "react-proof-selected-title", Style.heading] "Proof actions"
   let summary ← Node.pTextWith #[Props.id "react-proof-summary", Style.summary]
     (goalName props.goal ++ " · " ++ s!"{props.goal.hypotheses.size} " ++
@@ -320,7 +320,7 @@ def View : Component ViewProps := fun props => do
     status
   ]
 
-def EmptyView : Component Surface := fun surface => do
+def EmptyView : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
   let title ← Node.h3TextWith #[Style.heading] "Proof actions"
   let empty ← Node.pTextWith #[Style.empty]
     ("Move the cursor into a tactic proof to get actions at " ++ surface.cursor.label ++ ".")
@@ -331,11 +331,14 @@ def EmptyView : Component Surface := fun surface => do
     Style.shell
   ] #[title, empty]
 
-def App : Component Surface := fun surface => do
-  let state ← useStatus
-  match surface.goals[0]? with
-  | none => Node.component EmptyView surface
-  | some goal =>
+def App : RuntimeM (Js (Component Surface)) := do
+  let view ← View
+  let emptyView ← EmptyView
+  Component.ofLean fun surface => do
+    let state ← useStatus
+    match surface.goals[0]? with
+    | none => Node.component emptyView surface
+    | some goal =>
       let runTactic (tactic : String) : DomM Unit := do
         let inserted ← Lean.Vir.Infoview.Command.insertAtCursor surface (tactic ++ "\n")
         if inserted then
@@ -352,7 +355,7 @@ def App : Component Surface := fun surface => do
       let revealCursor : DomM Unit := do
         let revealed ← Lean.Vir.Infoview.Command.revealCursor surface
         setStatus state <| if revealed then "Cursor revealed" else "Editor unavailable"
-      Node.component View {
+      Node.component view {
         surface,
         goal,
         state := state.value,
@@ -362,6 +365,15 @@ def App : Component Surface := fun surface => do
       }
 
 vir_proof_widget App with mountId := "vir-react-proof-widget"
+
+/--
+Standalone dev-runner entry for exercising surface snapshots without passing a
+JavaScript component handle through the runner's text fields. Each call creates
+a fresh component type; the live infoview instead uses `createComponent` once
+and passes that exact value to `mount` on every update.
+-/
+def renderSnapshotIntoSelector (selector : String) (surface : Surface) : DomM Bool := do
+  Root.renderComponentIntoSelector selector (← App) surface
 
 end ReactProofWidget
 

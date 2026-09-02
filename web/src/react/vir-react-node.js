@@ -8,14 +8,6 @@ Author: Emilio J. Gallego Arias
 // in an ordinary JavaScript React program. VIR does not wrap nodes, props,
 // children, element types, refs, or callbacks in a second ownership graph.
 
-export function createBrowserReactRoot(root) {
-  return requireReactRoot(root);
-}
-
-export function createBrowserReactNodeText(value) {
-  return reactNodeTextValue(value);
-}
-
 export function createReactElementTypeTag(value) {
   return reactNodeName(value, "element type tag");
 }
@@ -29,7 +21,7 @@ export function createBrowserReactNodeElement(
   return requireCreateElement(createElement)(
     reactElementTypeValue(elementType),
     reactPropsValue(props),
-    ...reactNodeChildrenValue(children),
+    ...requireReactNodeArray(children),
   );
 }
 
@@ -45,27 +37,31 @@ export function createBrowserReactNodeFragment(
   return requireCreateElement(createElement)(
     Fragment,
     reactFragmentPropsValue(props),
-    ...reactNodeChildrenValue(children),
+    ...requireReactNodeArray(children),
   );
 }
 
-// The root host supplies a stable function component and updates its private
-// callback slot between submissions. This helper creates React's exact element
-// value without introducing another component type.
-export function createBrowserReactComponentNode(createElement, componentType) {
-  if (typeof componentType !== "function") {
-    throw new Error("React component must be a JavaScript function");
+// The component argument is already the exact reusable JavaScript function
+// that React uses as its component type. The only VIR-specific prop is the JSL
+// object carrying the corresponding Lean value.
+export function createBrowserLeanComponentNode(
+  createElement,
+  component,
+  leanProps,
+  key = null,
+) {
+  const create = requireCreateElement(createElement);
+  const props = {
+    leanProps: requireObject(leanProps, "Lean component JSL props"),
+  };
+  if (key !== null && key !== undefined) {
+    props.key = reactNodeName(key, "component key");
   }
-  return requireCreateElement(createElement)(componentType);
+  return create(requireFunction(component, "Lean component"), props);
 }
 
 export function createReactProps() {
   return {};
-}
-
-export function setReactPropsKey(props, key) {
-  setReactObjectProperty(reactPropsValue(props), "key", reactNodeKey(key));
-  return undefined;
 }
 
 export function setReactPropsRef(props, ref) {
@@ -85,15 +81,6 @@ export function setReactPropsEventHandler(props, handler) {
   return undefined;
 }
 
-export function createReactNodeChildren() {
-  return [];
-}
-
-export function pushReactNodeChild(children, child) {
-  reactNodeChildrenValue(children).push(child);
-  return undefined;
-}
-
 export function reactNodeTextValue(value) {
   if (typeof value !== "string") {
     throw new Error("React Node text value must be a string");
@@ -110,23 +97,25 @@ function setReactObjectProperty(target, name, value) {
   });
 }
 
-function requireReactRoot(root) {
-  if (
-    root === null ||
-    typeof root !== "object" ||
-    typeof root.render !== "function" ||
-    typeof root.unmount !== "function"
-  ) {
-    throw new Error("React root must be a ReactDOM root");
-  }
-  return root;
-}
-
 function requireCreateElement(createElement) {
   if (typeof createElement !== "function") {
     throw new Error("React.createElement is not available");
   }
   return createElement;
+}
+
+function requireFunction(value, label) {
+  if (typeof value !== "function") {
+    throw new Error(`${label} must be a JavaScript function`);
+  }
+  return value;
+}
+
+function requireObject(value, label) {
+  if (value === null || typeof value !== "object") {
+    throw new Error(`${label} must be a JavaScript object`);
+  }
+  return value;
 }
 
 function reactPropsValue(value) {
@@ -136,7 +125,7 @@ function reactPropsValue(value) {
   return value;
 }
 
-function reactNodeChildrenValue(value) {
+function requireReactNodeArray(value) {
   if (!Array.isArray(value)) {
     throw new Error("React children must be a JavaScript Array");
   }
@@ -186,13 +175,6 @@ function reactNodeEventHandlerEntry(handler) {
     );
   }
   return [name, handler.callback];
-}
-
-function reactNodeKey(key) {
-  if (typeof key !== "string") {
-    throw new Error("React Node element key must be a string");
-  }
-  return key;
 }
 
 function reactNodeRef(ref) {

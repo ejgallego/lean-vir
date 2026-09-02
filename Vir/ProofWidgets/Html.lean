@@ -25,14 +25,27 @@ Props passed to a ProofWidgets-style component.
 
 `children` stays in `Html` form so child-bearing components can decide where to
 render nested markup, matching the usual `props.children` role without adding a
-second React tree representation.
+second React tree representation. Each child is a deferred React construction
+action, not an already-built node: component implementations should normally
+evaluate each selected child exactly once. Hooks belong in component render
+functions, not in arbitrary child actions whose evaluation is conditional.
 -/
 structure ComponentProps (props : Type) where
   props : props
   children : Array Html := #[]
 
 abbrev Component (props : Type := Unit) : Type :=
-  ComponentProps props → Html
+  Lean.Vir.Js (Lean.Vir.React.Component (ComponentProps props))
+
+namespace Component
+
+/-- Creates one reusable JavaScript React function for a ProofWidgets-style component. -/
+def ofLean
+    (render : ComponentProps props → ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.RuntimeM (Component props) :=
+  Lean.Vir.React.Component.ofLean render
+
+end Component
 
 def componentProps {props : Type} (value : props) (children : Array Html := #[]) :
     ComponentProps props :=
@@ -43,6 +56,27 @@ abbrev Attr : Type :=
 
 abbrev Handler : Type :=
   Lean.Vir.React.EventHandler
+
+/-- Unified native React prop entry used as the lowering target for JSX. -/
+abbrev PropEntry : Type 1 :=
+  Lean.Vir.React.Props.Entry
+
+namespace PropEntry
+
+def key (value : String) : PropEntry :=
+  Lean.Vir.React.Props.key value
+
+def property (value : Attr) : PropEntry :=
+  Lean.Vir.React.Props.property value
+
+def eventHandler (value : Handler) : PropEntry :=
+  Lean.Vir.React.Props.eventHandler value
+
+def ref {α : Type}
+    (value : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) : PropEntry :=
+  Lean.Vir.React.Props.ref value
+
+end PropEntry
 
 namespace Attr
 
@@ -158,14 +192,30 @@ def children (items : Array Html) :
     ReactM (Array (Lean.Vir.Js Lean.Vir.React.Node)) :=
   items.mapM fun item => item
 
+/-- Builds a native React element from a single unified prop array. -/
+def elementWithProps
+    (tag : String)
+    (props : Array PropEntry := #[])
+    (children : Array Html := #[]) :
+    Html := do
+  let childNodes ← Html.children children
+  Lean.Vir.React.Node.elementWith tag props childNodes
+
+def fragment (children : Array Html := #[]) : Html := do
+  let childNodes ← Html.children children
+  Lean.Vir.React.Node.fragment childNodes
+
+def keyedFragment (key : String) (children : Array Html := #[]) : Html := do
+  let childNodes ← Html.children children
+  Lean.Vir.React.Node.keyedFragment key childNodes
+
 def elementWith
     (tag : String)
     (attrs : Array Attr := #[])
     (handlers : Array Handler := #[])
     (children : Array Html := #[]) :
-    Html := do
-  let childNodes ← Html.children children
-  Lean.Vir.React.Node.elementWith tag (propsFrom attrs handlers) childNodes
+    Html :=
+  elementWithProps tag (propsFrom attrs handlers) children
 
 def keyedElementWith
     (tag key : String)
@@ -197,12 +247,29 @@ def ofComponent
     Html :=
   Lean.Vir.React.Node.ofComponent component (componentProps props children)
 
+/-- Builds a keyed native React component node without placing `key` in typed props. -/
+def keyedOfComponent
+    (key : String)
+    (component : Component props)
+    (props : props)
+    (children : Array Html := #[]) :
+    Html :=
+  Lean.Vir.React.Node.keyedOfComponent key component (componentProps props children)
+
 def component
     (component : Component props)
     (props : props)
     (children : Array Html := #[]) :
     Html :=
   ofComponent component props children
+
+def keyedComponent
+    (key : String)
+    (component : Component props)
+    (props : props)
+    (children : Array Html := #[]) :
+    Html :=
+  keyedOfComponent key component props children
 
 def div (children : Array Html) : Html :=
   element "div" #[] children

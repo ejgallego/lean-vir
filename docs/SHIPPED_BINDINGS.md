@@ -166,7 +166,8 @@ canonical boundary preserves identity, mutation, argument reuse, success and
 failure behavior, callback retention, terminal behavior, and ownership. The
 runtime may acquire independent leases internally, but it may not expose a
 stronger consumption or conversion policy as though it were upstream
-semantics. Managed handles and ergonomic conversions remain explicit adapters.
+semantics. Ownership-changing conveniences and ergonomic conversions remain
+explicit adapters.
 
 The explorer reports a semantic relation independently of type evidence. An
 exact or compatible comparator result says only that the represented types

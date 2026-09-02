@@ -264,12 +264,12 @@ assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseStateImports[0]?.result?.type, "Js");
 const reactStateValueImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.state.value",
+  (entry) => entry.target === "react.stateTuple.value",
 );
 assert.equal(reactStateValueImport?.args[0]?.type?.type, "Js");
 assert.equal(reactStateValueImport?.result?.type, "Js");
 const reactStateSetterImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.state.setter",
+  (entry) => entry.target === "react.stateTuple.setter",
 );
 assert.equal(reactStateSetterImport?.args[0]?.type?.type, "Js");
 assert.equal(reactStateSetterImport?.result?.type, "Js");
@@ -279,11 +279,8 @@ const reactUseReducerImports = hostRuntime.interfaceManifest.hostImports.filter(
 assert.equal(reactUseReducerImports.length, 1);
 for (const entry of reactUseReducerImports) {
   assert.equal(entry.effect, "react");
-  assert.equal(entry.args[0]?.type?.kind, "function");
-  assert.equal(entry.args[0]?.type?.effect, "runtime");
-  assert.equal(entry.args[0]?.type?.args[0]?.type?.type, "Js");
-  assert.equal(entry.args[0]?.type?.args[1]?.type?.type, "Js");
-  assert.equal(entry.args[0]?.type?.result?.type, "Js");
+  assert.equal(entry.args[0]?.type?.kind, "resource");
+  assert.equal(entry.args[0]?.type?.type, "Js");
   assert.equal(entry.args[1]?.type?.type, "Js");
   assert.equal(entry.result?.type, "Js");
 }
@@ -300,14 +297,14 @@ for (const entry of reactReducerDispatchImports) {
 }
 const reactReducerStateValueImport =
   hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.reducerState.value",
+    (entry) => entry.target === "react.reducerTuple.value",
   );
 assert.equal(reactReducerStateValueImport?.effect, "runtime");
 assert.equal(reactReducerStateValueImport?.args[0]?.type?.type, "Js");
 assert.equal(reactReducerStateValueImport?.result?.type, "Js");
 const reactReducerStateDispatchImport =
   hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.reducerState.dispatch",
+    (entry) => entry.target === "react.reducerTuple.dispatch",
   );
 assert.equal(reactReducerStateDispatchImport?.effect, "runtime");
 assert.equal(reactReducerStateDispatchImport?.args[0]?.type?.type, "Js");
@@ -320,41 +317,25 @@ assert.equal(reactUseRefImports[0]?.effect, "react");
 assert.equal(reactUseRefImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseRefImports[0]?.result?.type, "Js");
 assert.equal(reactUseRefImports[0]?.result?.name, "Lean.Vir.Js");
-const reactUseEffectImports = hostRuntime.interfaceManifest.hostImports.filter(
-  (entry) => entry.target === "react.useEffect",
-);
-assert.equal(reactUseEffectImports.length, 1);
-assert.equal(reactUseEffectImports[0]?.effect, "react");
-assert.equal(reactUseEffectImports[0]?.args[0]?.type?.kind, "function");
-assert.equal(reactUseEffectImports[0]?.args[0]?.type?.effect, "dom");
-assert.equal(reactUseEffectImports[0]?.args[1]?.type?.kind, "function");
-assert.equal(reactUseEffectImports[0]?.args[1]?.type?.effect, "dom");
-const reactUseEffectWithDepsImports =
-  hostRuntime.interfaceManifest.hostImports.filter(
-    (entry) => entry.target === "react.useEffectWithDeps",
-  );
-assert.equal(reactUseEffectWithDepsImports.length, 1);
-assert.equal(reactUseEffectWithDepsImports[0]?.effect, "react");
-assert.equal(reactUseEffectWithDepsImports[0]?.args[0]?.type?.type, "Js");
-assert.equal(
-  reactUseEffectWithDepsImports[0]?.args[0]?.type?.name,
-  "Lean.Vir.Js",
-);
-assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.kind, "function");
-assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.effect, "dom");
-assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.kind, "function");
-assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.effect, "dom");
 const reactUseMemoImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useMemo",
 );
 assert.equal(reactUseMemoImports.length, 1);
 assert.equal(reactUseMemoImports[0]?.effect, "react");
-assert.equal(reactUseMemoImports[0]?.args[0]?.type?.kind, "function");
-assert.equal(reactUseMemoImports[0]?.args[0]?.type?.effect, "react");
-assert.equal(reactUseMemoImports[0]?.args[0]?.type?.result?.type, "Js");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseMemoImports[0]?.args[1]?.type?.type, "Js");
 assert.equal(reactUseMemoImports[0]?.args[1]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseMemoImports[0]?.result?.type, "Js");
+for (const target of [
+  "js.value.react.reducer",
+  "js.value.react.memoCalculation",
+]) {
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.boundary, "explicitConversion");
+  assert.equal(entry?.args[0]?.type?.kind, "function");
+  assert.equal(entry?.result?.type, "Js");
+}
 const reactRefGetImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.ref.get",
 );
@@ -533,35 +514,12 @@ const testRecordNatImport = hostRuntime.interfaceManifest.hostImports.find(
 );
 assert.equal(testRecordNatImport?.effect, "dom");
 assert.equal(testRecordNatImport?.args[0]?.type?.type, "Js");
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.kind,
-  "function",
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.effect,
-  "react",
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.args?.length,
-  0,
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.result?.type,
-  "Js",
-);
 const reactRenderNodeImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.root.renderNode",
 );
 if (reactRenderNodeImport !== undefined) {
-  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "Js");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "ReactRoot");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.kind, "resource");
   assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
@@ -573,12 +531,6 @@ if (reactRenderIntoSelectorImport !== undefined) {
   assert.equal(reactRenderIntoSelectorImport.args[0]?.type?.type, "Js");
   assert.equal(reactRenderIntoSelectorImport.result?.type, "Js");
 }
-const reactRenderComponentIntoSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.renderComponentIntoSelector",
-  );
-assert.equal(reactRenderComponentIntoSelectorImport?.args[0]?.type?.type, "Js");
-assert.equal(reactRenderComponentIntoSelectorImport?.result?.type, "Js");
 const reactUnmountSelectorImport =
   hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "react.root.unmountSelector",
@@ -603,6 +555,15 @@ assert.equal(
   "Lean.Vir.React.EventHandler",
 );
 assert.equal(reactEventHandlerImport?.result?.type, "Js");
+for (const target of [
+  "js.value.react.component",
+  "js.value.react.effectCallback",
+]) {
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.effect, "runtime");
+  assert.equal(entry?.boundary, "explicitConversion");
+  assert.equal(entry?.result?.type, "Js");
+}
 const reactDepsEmptyImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.deps.empty",
 );
@@ -623,7 +584,6 @@ assert.equal(reactPropsEmptyImport?.effect, "react");
 assert.equal(reactPropsEmptyImport?.args.length, 0);
 assert.equal(reactPropsEmptyImport?.result?.type, "Js");
 for (const target of [
-  "react.props.setKey",
   "react.props.setProperty",
   "react.props.setEventHandler",
   "react.props.setRef",
@@ -636,19 +596,12 @@ for (const target of [
   assert.equal(entry?.args[1]?.type?.type, "Js");
   assert.equal(entry?.result?.type, "Unit");
 }
-const reactChildrenEmptyImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.node.children.empty",
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.some((entry) =>
+    entry.target.startsWith("react.node.children."),
+  ),
+  false,
 );
-assert.equal(reactChildrenEmptyImport?.effect, "react");
-assert.equal(reactChildrenEmptyImport?.args.length, 0);
-assert.equal(reactChildrenEmptyImport?.result?.type, "Js");
-const reactChildrenPushImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.node.children.push",
-);
-assert.equal(reactChildrenPushImport?.effect, "react");
-assert.equal(reactChildrenPushImport?.args[0]?.type?.type, "Js");
-assert.equal(reactChildrenPushImport?.args[1]?.type?.type, "Js");
-assert.equal(reactChildrenPushImport?.result?.type, "Unit");
 const reactTextImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.text",
 );
@@ -666,6 +619,14 @@ const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
 assert.equal(reactCreateElementImport?.args[0]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[1]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[2]?.type?.type, "Js");
+for (const target of ["react.node.component", "react.node.keyedComponent"]) {
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.effect, "react");
+  assert.equal(entry?.args[0]?.type?.type, "Js");
+  assert.equal(entry?.args[1]?.type?.type, "Js");
+  assert.equal(entry?.args[1]?.type?.kind, "resource");
+  assert.equal(entry?.result?.type, "Js");
+}
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.fragment",
 );

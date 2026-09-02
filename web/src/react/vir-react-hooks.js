@@ -4,65 +4,63 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export function createBrowserReactHookRuntime(React) {
+export function createBrowserReactHookBindings(React) {
   return {
-    useState(initial) {
+    "react.useState": (initial) => {
       return requireReactHook(React, "useState")(initial);
     },
-
-    useReducer(reducer, initial) {
-      if (typeof reducer !== "function") {
-        throw new Error("React reducer must be a JavaScript function");
-      }
-      return requireReactHook(React, "useReducer")(reducer, initial);
+    "react.stateTuple.value": (state) =>
+      requireReactPair(state, "React.useState result")[0],
+    "react.stateTuple.setter": (state) =>
+      requireReactPair(state, "React.useState result")[1],
+    "react.useReducer": (reducer, initial) => {
+      return requireReactHook(React, "useReducer")(
+        requireFunction(reducer, "React reducer"),
+        initial,
+      );
     },
-
-    useRef(initial) {
+    "react.reducerTuple.value": (state) =>
+      requireReactPair(state, "React.useReducer result")[0],
+    "react.reducerTuple.dispatch": (state) =>
+      requireReactPair(state, "React.useReducer result")[1],
+    "react.useRef": (initial) => {
       return requireReactHook(React, "useRef")(initial);
     },
-
-    useMemo(calculate, deps) {
-      if (typeof calculate !== "function") {
-        throw new Error("React memo calculation must be a JavaScript function");
-      }
+    "react.useMemo": (calculate, deps) => {
       return requireReactHook(React, "useMemo")(
-        calculate,
+        requireFunction(calculate, "React memo calculation"),
         requireDependencyList(deps),
       );
     },
-
-    useEffect(setup, cleanup) {
-      return useReactEffect(React, setup, cleanup);
+    "react.useCallback": (callback, deps) => {
+      return requireReactHook(React, "useCallback")(
+        requireFunction(callback, "React callback"),
+        requireDependencyList(deps),
+      );
     },
-
-    useEffectWithDeps(deps, setup, cleanup) {
-      return useReactEffect(React, setup, cleanup, requireDependencyList(deps));
+    "react.useContext": (context) => {
+      return requireReactHook(
+        React,
+        "useContext",
+      )(requireObject(context, "React context"));
     },
-  };
-}
-
-export function createReactStateHostBindings(hookRuntime) {
-  return {
-    "react.useState": (initial) => hookRuntime.useState(initial),
-    "react.state.value": (state) => requireReactPair(state, "ReactState")[0],
-    "react.state.setter": (state) => requireReactPair(state, "ReactState")[1],
-    "react.useReducer": (reducer, initial) =>
-      hookRuntime.useReducer(reducer, initial),
-    "react.reducerState.value": (state) =>
-      requireReactPair(state, "ReactReducerState")[0],
-    "react.reducerState.dispatch": (state) =>
-      requireReactPair(state, "ReactReducerState")[1],
-    "react.useRef": (initial) => hookRuntime.useRef(initial),
-    "react.useMemo": (calculate, deps) => hookRuntime.useMemo(calculate, deps),
-    "react.useEffect": (setup, cleanup) =>
-      hookRuntime.useEffect(setup, cleanup),
+    "react.useEffect": (setup) => {
+      const effect = requireFunction(setup, "React effect setup");
+      requireReactHook(React, "useEffect")(effect);
+      return undefined;
+    },
+    "react.useEffectWithDeps": (setup, deps) => {
+      requireReactHook(React, "useEffect")(
+        requireFunction(setup, "React effect setup"),
+        requireDependencyList(deps),
+      );
+      return undefined;
+    },
     "react.deps.empty": () => [],
     "react.deps.push": (deps, value) => {
       requireDependencyList(deps).push(value);
       return undefined;
     },
-    "react.useEffectWithDeps": (deps, setup, cleanup) =>
-      hookRuntime.useEffectWithDeps(deps, setup, cleanup),
     "react.ref.get": (ref) => requireObject(ref, "ReactRef").current,
     "react.ref.set": (ref, value) => {
       requireObject(ref, "ReactRef").current = value;
@@ -76,7 +74,7 @@ export function createReactStateHostBindings(hookRuntime) {
       requireFunction(
         setter,
         "ReactStateSetter",
-      )((previous) => requireFunction(update, "React state updater")(previous));
+      )(requireFunction(update, "React state updater"));
       return undefined;
     },
     "react.reducer.dispatch": (dispatch, action) => {
@@ -94,22 +92,38 @@ export function createReactJsValueHostBindings() {
       requireFunction(eventHandler.callback, "React event handler callback");
       return eventHandler;
     },
+    "js.value.react.reducer": (reducer) =>
+      requireFunction(reducer, "React reducer"),
+    "js.value.react.memoCalculation": (calculate) =>
+      requireFunction(calculate, "React memo calculation"),
+    "js.value.react.callback": (callback) =>
+      requireFunction(callback, "React callback"),
+    "js.value.react.effectCallback": (effect) => {
+      const descriptor = requireObject(effect, "Lean React effect");
+      const runSetup = requireFunction(descriptor.setup, "React effect setup");
+      const runCleanup = requireFunction(
+        descriptor.cleanup,
+        "React effect cleanup",
+      );
+      return () => {
+        const value = runSetup();
+        return () => runCleanup(value);
+      };
+    },
+    "js.value.react.component": (render) => {
+      const runRender = requireFunction(render, "Lean component render");
+      return function LeanComponent(props) {
+        return runRender(requireLeanComponentProps(props));
+      };
+    },
   };
 }
 
-function useReactEffect(React, setup, cleanup, deps = undefined) {
-  const runSetup = requireFunction(setup, "React effect setup");
-  const runCleanup = requireFunction(cleanup, "React effect cleanup");
-  const effect = () => {
-    const value = runSetup();
-    return () => runCleanup(value);
-  };
-  if (deps === undefined) {
-    requireReactHook(React, "useEffect")(effect);
-  } else {
-    requireReactHook(React, "useEffect")(effect, deps);
+function requireLeanComponentProps(props) {
+  if (props === null || typeof props !== "object" || !("leanProps" in props)) {
+    throw new Error("Lean component props must contain leanProps");
   }
-  return undefined;
+  return props.leanProps;
 }
 
 function requireReactHook(React, name) {

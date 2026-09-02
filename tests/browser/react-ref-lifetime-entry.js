@@ -8,10 +8,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import {
-  createBrowserReactHookRuntime,
-  createReactStateHostBindings,
-} from "../../web/src/react/vir-react-hooks.js";
+import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 
@@ -27,8 +24,7 @@ globalThis[resultKey] = runReactRefSmoke().then(
 );
 
 async function runReactRefSmoke() {
-  const hookRuntime = createBrowserReactHookRuntime(React);
-  const bindings = createReactStateHostBindings(hookRuntime);
+  const bindings = createBrowserReactHookBindings(React);
   const container = document.createElement("div");
   container.id = "react-ref-smoke-root";
   document.body.append(container);

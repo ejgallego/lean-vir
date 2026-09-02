@@ -8,8 +8,8 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { createBrowserReactHookRuntime } from "../../web/src/react/vir-react-hooks.js";
-import { createBrowserReactComponentNode } from "../../web/src/react/vir-react-node.js";
+import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
+import { createBrowserLeanComponentNode } from "../../web/src/react/vir-react-node.js";
 import {
   createHostLifecycle,
   createReactRootHostBindings,
@@ -35,23 +35,18 @@ async function runReactSmoke() {
     reducer: await runReducerIdentityProbe(),
     memo: await runMemoIdentityProbe(),
     component: await runRepeatedComponentSubmissionProbe(),
+    nestedComponent: await runNestedComponentIdentityProbe(),
     abandoned: await runAbandonedSuspenseProbe(),
   };
 }
 
-async function runRepeatedComponentSubmissionProbe() {
-  const lifecycle = createHostLifecycle();
+async function runNestedComponentIdentityProbe() {
   const container = document.createElement("div");
   document.body.append(container);
-  const bindings = createReactRootHostBindings(lifecycle, createRoot, {
-    createComponentNode: (componentType) =>
-      createBrowserReactComponentNode(React.createElement, componentType),
-  });
-  let root = bindings["react.root.create"](container);
+  const root = createRoot(container);
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
-
-  const component = (label) => () => {
+  const component = ({ leanProps: { label } }) => {
     const [count, setCount] = React.useState(0);
     setter = setCount;
     React.useEffect(() => {
@@ -60,33 +55,111 @@ async function runRepeatedComponentSubmissionProbe() {
     }, []);
     return React.createElement("div", null, `${label}:${count}`);
   };
+  const replacement = ({ leanProps }) => component({ leanProps });
 
   try {
     flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("first")),
+      root.render(
+        createBrowserLeanComponentNode(
+          React.createElement,
+          component,
+          { label: "first" },
+          "stable",
+        ),
+      ),
     );
     flushSync(() => setter(1));
     flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("second")),
+      root.render(
+        createBrowserLeanComponentNode(
+          React.createElement,
+          component,
+          { label: "second" },
+          "stable",
+        ),
+      ),
     );
     requireState(
+      container.textContent === "second:1" &&
+        state.mounts === 1 &&
+        state.cleanups === 0,
+      "the same nested component function and key must preserve hook state",
+    );
+    flushSync(() =>
+      root.render(
+        createBrowserLeanComponentNode(
+          React.createElement,
+          replacement,
+          { label: "replacement" },
+          "stable",
+        ),
+      ),
+    );
+    requireState(
+      container.textContent === "replacement:0" &&
+        state.mounts === 2 &&
+        state.cleanups === 1,
+      "changing the nested component function must remount it",
+    );
+    return { ...state, text: container.textContent };
+  } finally {
+    flushSync(() => root.unmount());
+    container.remove();
+  }
+}
+
+async function runRepeatedComponentSubmissionProbe() {
+  const lifecycle = createHostLifecycle();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const bindings = createReactRootHostBindings(lifecycle, createRoot, {
+    createLeanComponentNode: (component, props, key) =>
+      createBrowserLeanComponentNode(
+        React.createElement,
+        component,
+        props,
+        key,
+      ),
+  });
+  let root = bindings["react.root.create"](container);
+  const state = { mounts: 0, cleanups: 0 };
+  let setter = null;
+
+  const component = ({ leanProps: { label } }) => {
+    const [count, setCount] = React.useState(0);
+    setter = setCount;
+    React.useEffect(() => {
+      state.mounts++;
+      return () => state.cleanups++;
+    }, []);
+    return React.createElement("div", null, `${label}:${count}`);
+  };
+  const replacement = ({ leanProps }) => component({ leanProps });
+
+  function render(valueComponent, props) {
+    const node = bindings["react.node.component"](valueComponent, props);
+    bindings["react.root.renderNode"](root, node);
+  }
+
+  try {
+    flushSync(() => render(component, { label: "first" }));
+    flushSync(() => setter(1));
+    flushSync(() => render(component, { label: "second" }));
+    requireState(
       container.textContent === "second:1",
-      "root-local component identity must preserve hook state",
+      "the same component function must preserve hook state",
     );
     requireState(
       state.mounts === 1 && state.cleanups === 0,
-      "an update must not remount the root-local component adapter",
+      "an exact component-function update must not remount",
     );
 
-    flushSync(() => bindings["react.root.unmount"](root));
-    requireState(state.cleanups === 1, "unmount must clean up the component");
-    root = bindings["react.root.create"](container);
-    flushSync(() =>
-      bindings["react.root.renderComponent"](root, component("replacement")),
-    );
+    flushSync(() => render(replacement, { label: "replacement" }));
     requireState(
-      container.textContent === "replacement:0" && state.mounts === 2,
-      "an explicit root replacement must mount a fresh component identity",
+      container.textContent === "replacement:0" &&
+        state.mounts === 2 &&
+        state.cleanups === 1,
+      "changing the component function must remount the component",
     );
     return { ...state, text: container.textContent };
   } finally {
@@ -97,7 +170,7 @@ async function runRepeatedComponentSubmissionProbe() {
 }
 
 async function runStrictModeEffectProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const state = { renders: 0, setups: 0, cleanups: 0 };
   const container = document.createElement("div");
   document.body.append(container);
@@ -105,17 +178,15 @@ async function runStrictModeEffectProbe() {
 
   function Probe() {
     state.renders++;
-    hooks.useEffect(
-      () => {
-        state.setups++;
-        return { setup: state.setups };
-      },
-      (token) => {
-        if (token?.setup === undefined)
-          throw new Error("effect cleanup lost its exact setup value");
+    bindings["react.useEffect"](() => {
+      state.setups++;
+      const token = { setup: state.setups };
+      return () => {
+        if (token.setup === undefined)
+          throw new Error("effect cleanup lost its exact setup closure");
         state.cleanups++;
-      },
-    );
+      };
+    });
     return null;
   }
 
@@ -143,7 +214,7 @@ async function runStrictModeEffectProbe() {
 }
 
 async function runReducerIdentityProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -158,7 +229,7 @@ async function runReducerIdentityProbe() {
   }
 
   function Probe() {
-    const result = hooks.useReducer(reducer, initial);
+    const result = bindings["react.useReducer"](reducer, initial);
     if (!Array.isArray(result))
       throw new Error("useReducer must return React's array pair");
     dispatch ??= result[1];
@@ -193,7 +264,7 @@ async function runReducerIdentityProbe() {
 }
 
 async function runInterleavedStateLaneProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const state = { renders: [] };
   const container = document.createElement("div");
   document.body.append(container);
@@ -204,7 +275,7 @@ async function runInterleavedStateLaneProbe() {
   let setter = null;
 
   function Probe() {
-    const result = hooks.useState(initial);
+    const result = bindings["react.useState"](initial);
     if (!Array.isArray(result))
       throw new Error("useState must return React's array pair");
     setter ??= result[1];
@@ -241,7 +312,7 @@ async function runInterleavedStateLaneProbe() {
 }
 
 async function runMemoIdentityProbe() {
-  const hooks = createBrowserReactHookRuntime(React);
+  const bindings = createBrowserReactHookBindings(React);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -250,7 +321,7 @@ async function runMemoIdentityProbe() {
   const seen = [];
 
   function Probe({ dependency }) {
-    const value = hooks.useMemo(() => singleton, dependency);
+    const value = bindings["react.useMemo"](() => singleton, dependency);
     seen.push(value);
     return null;
   }

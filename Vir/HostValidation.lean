@@ -92,21 +92,26 @@ private def isLeanObjectHandle : InterfaceType → Bool
   | .leanObject => true
   | _ => false
 
-private def isExplicitConversionValue : InterfaceType → Bool
+private def isExplicitConversionResult : InterfaceType → Bool
   | .resource ..
   | .function ..
   | .leanObject => false
   | _ => true
 
-private def isHostResourceValueType : InterfaceType → Bool
+private def isExplicitConversionArgument : InterfaceType → Bool
+  | .resource ..
+  | .leanObject => false
+  | _ => true
+
+private def isJsBoundaryValueType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
   | _ => false
 
-private def isHostResourceArgType : InterfaceType → Bool
+private def isJsBoundaryArgType : InterfaceType → Bool
   | .function args result _ =>
-      args.all (fun (_, type) => isHostResourceValueType type) && isHostResourceValueType result
-  | type => isHostResourceValueType type
+      args.all (fun (_, type) => isJsBoundaryValueType type) && isJsBoundaryValueType result
+  | type => isJsBoundaryValueType type
 
 private def isJsValueConversionSignature (signature : ClassifiedSignature) : Bool :=
   if signature.effect != .runtime then
@@ -115,8 +120,8 @@ private def isJsValueConversionSignature (signature : ClassifiedSignature) : Boo
     match signature.args[0]? with
     | some arg =>
         signature.args.size == 1 &&
-          ((isGenericJsResource arg.type && isExplicitConversionValue signature.result) ||
-            (isExplicitConversionValue arg.type && isGenericJsResource signature.result))
+          ((isGenericJsResource arg.type && isExplicitConversionResult signature.result) ||
+            (isExplicitConversionArgument arg.type && isGenericJsResource signature.result))
     | none => false
 
 private def isLeanObjectHandleSignature
@@ -148,13 +153,13 @@ public def validateHostImportBoundary
         .ok .objectHandle
       else
         match signature.args.findSome? fun arg =>
-            if isHostResourceArgType arg.type then
+            if isJsBoundaryArgType arg.type then
               none
             else
               some (.unsupportedArgument arg.name arg.type) with
         | some error => .error error
         | none =>
-            if isHostResourceValueType signature.result then
+            if isJsBoundaryValueType signature.result then
               .ok .hostResource
             else
               .error (.unsupportedResult signature.result)

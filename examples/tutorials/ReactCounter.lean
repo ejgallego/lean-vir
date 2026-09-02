@@ -20,9 +20,9 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
-def Counter : Component Unit := fun _ => do
+def Counter : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
-  let count ← Hooks.useState initial
+  let count ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toNat count.value
   let label ← Node.text s!"Count: {value}"
   Node.buttonWith #[
@@ -32,8 +32,9 @@ def Counter : Component Unit := fun _ => do
         JsValue.ofNat (current + 1)
   ] #[label]
 
-def mount (selector : String) : DomM Bool :=
+def mount (selector : String) : DomM Bool := do
+  let component ← Counter
   Root.mountFromSelector selector fun root =>
-    Root.renderComponent root Counter ()
+    Root.renderComponent root component ()
 
 end ReactCounterTutorial

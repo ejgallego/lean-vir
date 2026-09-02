@@ -16,6 +16,10 @@ unrelated responsibilities.
 - `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.
+- `vir-react-dom-client.js`: seven-line import seam that exposes the official
+  `react-dom/client` entry to SDK consumers. The infoview bundler substitutes
+  Lean's provided `react-dom` external at this seam; it contains no ReactDOM
+  implementation.
 - `vir-infoview-widget.js`: repository live infoview widget shell that loads WASM,
   requests fresh `.irpkg` packages from Lean, and mounts Lean-authored React
   widgets.
@@ -51,9 +55,10 @@ unrelated responsibilities.
   timers, frames, and React roots.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   unsupported React host bindings for Node tests/tools.
-- `react/vir-react-node.js`: browser React node/props/children operations and
-  the root-local component adapter.
-- `react/vir-react-hooks.js`: direct official browser React hook operations.
+- `react/vir-react-node.js`: browser React node/props/children operations over
+  exact JavaScript component values.
+- `react/vir-react-hooks.js`: direct official browser React hook operations and
+  explicit Lean-to-JavaScript function conversions.
 
 ## Demo And Page Modules
 

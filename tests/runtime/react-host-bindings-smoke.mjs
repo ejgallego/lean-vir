@@ -11,47 +11,55 @@ import { createHostLifecycle } from "../../web/src/host/vir-host-resources.js";
 import { createReactRootHostBindings } from "../../web/src/host/vir-host-resources.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import {
-  createBrowserReactComponentNode,
+  createBrowserLeanComponentNode,
   createBrowserReactNodeElement,
   createBrowserReactNodeFragment,
-  createBrowserReactNodeText,
   createReactElementTypeTag,
-  createReactNodeChildren,
   createReactProps,
-  pushReactNodeChild,
+  reactNodeTextValue,
   setReactPropsEventHandler,
-  setReactPropsKey,
   setReactPropsProperty,
   setReactPropsRef,
 } from "../../web/src/react/vir-react-node.js";
 
-{
-  const renderedNode = { kind: "rendered-node" };
-  let receivedType = null;
-  const componentType = () => ({ kind: "component-result" });
-  const node = createBrowserReactComponentNode((type) => {
-    receivedType = type;
-    return renderedNode;
-  }, componentType);
-  assert.equal(node, renderedNode);
-  assert.equal(receivedType, componentType);
-}
 import {
-  createBrowserReactHookRuntime,
+  createBrowserReactHookBindings,
   createReactJsValueHostBindings,
-  createReactStateHostBindings,
 } from "../../web/src/react/vir-react-hooks.js";
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
 } from "../../web/src/host/vir-virtual-host-bindings.js";
 
+{
+  const component = ({ leanProps }) => leanProps.label;
+  const leanProps = { label: "first" };
+  const firstNode = createBrowserLeanComponentNode(
+    React.createElement,
+    component,
+    leanProps,
+  );
+  assert.equal(firstNode.type, component);
+  assert.equal(firstNode.props.leanProps, leanProps);
+  assert.equal(firstNode.type(firstNode.props), "first");
+  const keyed = createBrowserLeanComponentNode(
+    React.createElement,
+    component,
+    leanProps,
+    "counter-key",
+  );
+  assert.equal(keyed.key, "counter-key");
+}
+
 const lifecycle = createHostLifecycle();
 const callback = () => "clicked";
 const ref = { current: null };
 const props = createReactProps();
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
-setReactPropsKey(props, "stable");
+setReactPropsProperty(props, {
+  name: "key",
+  value: { kind: "string", value: "stable" },
+});
 setReactPropsRef(props, ref);
 setReactPropsProperty(props, {
   name: "className",
@@ -84,11 +92,10 @@ for (const name of ["__proto__", "constructor", "prototype"]) {
 }
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
 
-const children = createReactNodeChildren();
-const first = createBrowserReactNodeText("goal: ");
-const second = createBrowserReactNodeText("⊢ True");
-pushReactNodeChild(children, first);
-pushReactNodeChild(children, second);
+const children = [];
+const first = reactNodeTextValue("goal: ");
+const second = reactNodeTextValue("⊢ True");
+children.push(first, second);
 assert.deepEqual(children, [first, second]);
 
 const tag = createReactElementTypeTag("section");
@@ -106,7 +113,10 @@ assert.equal(element.props.children[0], first);
 assert.equal(element.props.children[1], second);
 
 const fragmentProps = createReactProps();
-setReactPropsKey(fragmentProps, "fragment-key");
+setReactPropsProperty(fragmentProps, {
+  name: "key",
+  value: { kind: "string", value: "fragment-key" },
+});
 const fragment = createBrowserReactNodeFragment(
   React.createElement,
   React.Fragment,
@@ -130,8 +140,26 @@ assert.throws(
   const conversions = createReactJsValueHostBindings();
   const property = { name: "title", value: { kind: "string", value: "proof" } };
   const handler = { name: "onClick", callback };
+  const reducer = (state, action) => ({ state, action });
+  const calculate = () => property;
   assert.equal(conversions["js.value.react.property"](property), property);
   assert.equal(conversions["js.value.react.eventHandler"](handler), handler);
+  assert.equal(conversions["js.value.react.reducer"](reducer), reducer);
+  assert.equal(
+    conversions["js.value.react.memoCalculation"](calculate),
+    calculate,
+  );
+  assert.equal(conversions["js.value.react.callback"](callback), callback);
+  const setup = () => property;
+  const cleanup = (value) => value;
+  const effect = conversions["js.value.react.effectCallback"]({
+    setup,
+    cleanup,
+  });
+  assert.equal(effect()(), property);
+  const render = (leanProps) => leanProps;
+  const component = conversions["js.value.react.component"](render);
+  assert.equal(component({ leanProps: property }), property);
 }
 
 {
@@ -141,7 +169,7 @@ assert.throws(
   const reducer = (state, action) => ({ state, action });
   const dispatch = () => undefined;
   const reducerPair = [initial, dispatch];
-  const hooks = createBrowserReactHookRuntime({
+  const bindings = createBrowserReactHookBindings({
     useState(value) {
       assert.equal(value, initial);
       return statePair;
@@ -152,13 +180,50 @@ assert.throws(
       return reducerPair;
     },
   });
-  const bindings = createReactStateHostBindings(hooks);
   assert.equal(bindings["react.useState"](initial), statePair);
-  assert.equal(bindings["react.state.value"](statePair), initial);
-  assert.equal(bindings["react.state.setter"](statePair), setter);
+  assert.equal(bindings["react.stateTuple.value"](statePair), initial);
+  assert.equal(bindings["react.stateTuple.setter"](statePair), setter);
   assert.equal(bindings["react.useReducer"](reducer, initial), reducerPair);
-  assert.equal(bindings["react.reducerState.value"](reducerPair), initial);
-  assert.equal(bindings["react.reducerState.dispatch"](reducerPair), dispatch);
+  assert.equal(bindings["react.reducerTuple.value"](reducerPair), initial);
+  assert.equal(bindings["react.reducerTuple.dispatch"](reducerPair), dispatch);
+}
+
+{
+  const callback = () => "callback";
+  const calculation = () => "memo";
+  const context = { current: "context" };
+  const effect = () => undefined;
+  const deps = [];
+  const calls = [];
+  const bindings = createBrowserReactHookBindings({
+    useCallback(value, valueDeps) {
+      calls.push(["callback", value, valueDeps]);
+      return value;
+    },
+    useContext(value) {
+      calls.push(["context", value]);
+      return value.current;
+    },
+    useEffect(value, valueDeps) {
+      calls.push(["effect", value, valueDeps]);
+    },
+    useMemo(value, valueDeps) {
+      calls.push(["memo", value, valueDeps]);
+      return value();
+    },
+  });
+  assert.equal(bindings["react.useCallback"](callback, deps), callback);
+  assert.equal(bindings["react.useContext"](context), "context");
+  assert.equal(bindings["react.useMemo"](calculation, deps), "memo");
+  assert.equal(bindings["react.useEffect"](effect), undefined);
+  assert.equal(bindings["react.useEffectWithDeps"](effect, deps), undefined);
+  assert.deepEqual(calls, [
+    ["callback", callback, deps],
+    ["context", context],
+    ["memo", calculation, deps],
+    ["effect", effect, undefined],
+    ["effect", effect, deps],
+  ]);
 }
 
 {
@@ -187,11 +252,15 @@ assert.throws(
 {
   let queuedUpdate = null;
   const update = (previous) => ({ previous });
-  const bindings = createReactStateHostBindings({});
+  const bindings = createBrowserReactHookBindings({});
   bindings["react.state.modify"]((action) => {
     queuedUpdate = action;
   }, update);
-  assert.equal(typeof queuedUpdate, "function");
+  assert.equal(
+    queuedUpdate,
+    update,
+    "the state setter must receive the exact lifted updater function",
+  );
   const previous = { exact: true };
   assert.deepEqual(queuedUpdate(previous), { previous });
 }
@@ -220,46 +289,6 @@ assert.throws(
 }
 
 {
-  const componentLifecycle = createHostLifecycle();
-  const rendered = [];
-  const root = {
-    render(node) {
-      rendered.push(node);
-    },
-    unmount() {},
-  };
-  const otherRoot = {
-    render(node) {
-      rendered.push(node);
-    },
-    unmount() {},
-  };
-  const bindings = createReactRootHostBindings(componentLifecycle, () => root, {
-    createComponentNode: (type) => ({ type }),
-  });
-  const first = () => "first";
-  const second = (unit) => {
-    assert.equal(unit, undefined);
-    return "second";
-  };
-  bindings["react.root.renderComponent"](root, first);
-  bindings["react.root.renderComponent"](root, second);
-  assert.equal(
-    rendered[0].type,
-    rendered[1].type,
-    "repeated submissions to one root must retain the React component type",
-  );
-  assert.equal(rendered[1].type(), "second");
-  bindings["react.root.renderComponent"](otherRoot, first);
-  assert.notEqual(
-    rendered[1].type,
-    rendered[2].type,
-    "a different root must receive a distinct component identity",
-  );
-  componentLifecycle.dispose();
-}
-
-{
   const target = {};
   const rendered = [];
   let unmounts = 0;
@@ -279,7 +308,11 @@ assert.throws(
     },
     {
       querySelector: (selector) => (selector === "#app" ? target : null),
-      createComponentNode: (component) => ({ component }),
+      createLeanComponentNode: (component, props, key = null) => ({
+        component,
+        props,
+        key,
+      }),
       createNodeText: (value) => value,
       createNodeElement: (type, valueProps, valueChildren) => ({
         type,
@@ -296,9 +329,11 @@ assert.throws(
   bindings["react.root.renderNode"](root, element);
   assert.equal(rendered.at(-1), element);
   const component = () => element;
-  bindings["react.root.renderComponent"](root, component);
-  assert.equal(typeof rendered.at(-1).component, "function");
-  assert.equal(rendered.at(-1).component(), element);
+  const leanProps = {};
+  const componentNode = bindings["react.node.component"](component, leanProps);
+  bindings["react.root.renderNode"](root, componentNode);
+  assert.equal(rendered.at(-1).component, component);
+  assert.equal(rendered.at(-1).props, leanProps);
   assert.equal(
     bindings["react.root.renderIntoSelector"]("#missing", element),
     false,

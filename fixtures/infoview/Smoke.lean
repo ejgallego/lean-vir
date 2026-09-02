@@ -51,12 +51,20 @@ def expectRootsError (roots : Array String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
-def AuthoringComponent : Lean.Vir.React.Component Lean.Vir.Infoview.Surface := fun _surface =>
-  Lean.Vir.React.Node.text "authoring smoke"
+def AuthoringComponent : Lean.Vir.RuntimeM
+    (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
+  Lean.Vir.React.Component.ofLean fun _surface =>
+    Lean.Vir.React.Node.text "authoring smoke"
 
 vir_proof_widget AuthoringComponent with mountId := "vir-smoke-widget"
 
-example : String → Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
+example : Lean.Vir.RuntimeM
+    (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
+  createComponent
+
+example : String →
+    Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
+    Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
   mount
 
 example : String → Lean.Vir.Browser.DomM Bool :=
@@ -64,7 +72,11 @@ example : String → Lean.Vir.Browser.DomM Bool :=
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
   expect "authoring package roots" <|
-    package.roots == #["SmokeInfoviewLean.mount", "SmokeInfoviewLean.unmount"]
+    package.roots == #[
+      "SmokeInfoviewLean.createComponent",
+      "SmokeInfoviewLean.mount",
+      "SmokeInfoviewLean.unmount"
+    ]
 
 def smokeVar : Lean.IR.VarId :=
   { idx := 0 }
@@ -123,15 +135,18 @@ def expectImportedDecl
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["ReactProofWidget.mount", "ReactProofWidget.unmount"] #[
+  expectRootsOk #["ReactProofWidget.createComponent", "ReactProofWidget.mount", "ReactProofWidget.unmount"] #[
+    `ReactProofWidget.createComponent,
     `ReactProofWidget.mount,
     `ReactProofWidget.unmount
   ]
-  expectRootsOk #["ReactProofWidgetHello.mount", "ReactProofWidgetHello.unmount"] #[
+  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.mount", "ReactProofWidgetHello.unmount"] #[
+    `ReactProofWidgetHello.createComponent,
     `ReactProofWidgetHello.mount,
     `ReactProofWidgetHello.unmount
   ]
-  expectRootsOk #["ReactTamagotchiWidget.mount", "ReactTamagotchiWidget.unmount"] #[
+  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.mount", "ReactTamagotchiWidget.unmount"] #[
+    `ReactTamagotchiWidget.createComponent,
     `ReactTamagotchiWidget.mount,
     `ReactTamagotchiWidget.unmount
   ]
@@ -140,6 +155,8 @@ def expectImportedDecl
   ]
   expectRootsError #[]
   expectRootsError #["ReactProofWidget."]
+  expect "authoring widget component entry"
+    (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
   expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.mount")
   expect "authoring widget unmount entry" (widgetProps.unmountEntry == "SmokeInfoviewLean.unmount")
   expect "authoring widget mount id" (widgetProps.mountId == "vir-smoke-widget")

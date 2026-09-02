@@ -59,8 +59,34 @@ opaque ElementType : Type
 /-- React state setter function returned by `useState`. -/
 opaque StateSetter (α : Type) : Type
 
+/-- Native JavaScript reducer function accepted by `React.useReducer`. -/
+opaque Reducer (state action : Type) : Type
+
 /-- React reducer dispatch function returned by `useReducer`. -/
 opaque ReducerDispatch (state action : Type) : Type
+
+/-- Exact JavaScript array returned by `React.useState`. -/
+opaque StateTuple (α : Type) : Type
+
+/-- Exact JavaScript array returned by `React.useReducer`. -/
+opaque ReducerTuple (state action : Type) : Type
+
+/-- Native JavaScript calculation function accepted by `React.useMemo`. -/
+opaque MemoCalculation (α : Type) : Type
+
+/-- Native JavaScript setup function accepted by `React.useEffect`. -/
+opaque EffectCallback : Type
+
+/-- Lean source value explicitly converted to React's setup-function shape. -/
+structure LeanEffect (value : Type) where
+  setup : Lean.Vir.Browser.DomM (Lean.Vir.Js value)
+  cleanup : Lean.Vir.Js value → Lean.Vir.Browser.DomM Unit
+
+/-- Native unary JavaScript callback used by React and component props. -/
+opaque Callback (α : Type) : Type
+
+/-- Native React context object carrying JavaScript values of type `α`. -/
+opaque Context (α : Type) : Type
 
 /-- React ref object returned by `useRef`. -/
 opaque Ref (α : Type) : Type
@@ -116,14 +142,17 @@ structure ReducerState (state action : Type) where
 /-- React node object created by the JavaScript host through React's public API. -/
 opaque Node : Type
 
-/-- JavaScript-owned React child list. -/
-opaque NodeChildren : Type
-
 /-- JavaScript-owned React hook dependency list. -/
 opaque DependencyList : Type
 
-/-- A React function component authored in Lean. -/
-abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Node)
+/--
+An exact JavaScript React function component whose props originate in Lean.
+
+The JavaScript function value itself is the React component type and therefore
+its identity. Construct it once with `Component.ofLean` and reuse that value
+where React should preserve hook state. VIR does not maintain a parallel string
+identity registry.
+-/
+opaque Component (props : Type := Unit) : Type
 
 end Lean.Vir.React

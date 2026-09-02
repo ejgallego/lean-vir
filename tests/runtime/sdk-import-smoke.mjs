@@ -62,7 +62,6 @@ try {
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(Object.hasOwn(runtime, "VirCallback"), false);
-  assert.equal(Object.hasOwn(runtime, "releaseHostResource"), false);
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
@@ -135,14 +134,11 @@ try {
   );
   assert.equal(typeof bindings["react.node.text"], "function");
   assert.equal(typeof bindings["react.node.createElement"], "function");
+  assert.equal(typeof bindings["js.value.react.component"], "function");
+  assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
-  assert.equal(typeof bindings["react.root.render"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
   assert.equal(typeof bindings["react.root.renderIntoSelector"], "function");
-  assert.equal(
-    typeof bindings["react.root.renderComponentIntoSelector"],
-    "function",
-  );
   assert.equal(typeof bindings["react.root.unmount"], "function");
   assert.equal(typeof bindings["react.root.unmountSelector"], "function");
 } finally {

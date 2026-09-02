@@ -119,13 +119,12 @@ ported without redesigning their component model.
 
 Current RF status:
 
-- Function components render through stable JavaScript component identities, so
-  hook state is preserved across prop-only rerenders.
-- `useState`, `useReducer`, and resource-shaped `useEffect` are delegated to
-  React's hook runtime. `useReducer` is JS-shaped: reducers receive
-  `Lean.Vir.Js state` and `Lean.Vir.Js action` values. Lean-owned structured
-  values use explicit `Lean.Vir.JSL` handles, distinct from JavaScript-shaped
-  `Js` values.
+- `Component.ofLean` creates the actual JavaScript function identity seen by
+  React. Reusing that value preserves hook state; constructing another value
+  remounts under React's normal rules. No string identity registry remains.
+- `useState`, `useReducer`, `useMemo`, `useCallback`, `useContext`, and native
+  `useEffect` delegate exact JavaScript values to React. Explicit callback
+  conversions and tuple projections are separate helpers.
 - `useEffectWithDeps` exposes React's dependency-array shape through
   an actual JavaScript dependency array. React decides when dependencies are
   unchanged; VIR keeps no parallel dependency ownership state.
@@ -134,13 +133,11 @@ Current RF status:
 
 Remaining RF gaps to close in order:
 
-1. Add the next common hook bindings that existing React/ProofWidgets code
-   naturally expects: `useCallback` and later `useContext`.
-2. Add the remaining common DOM attributes/events needed by real ProofWidgets
+1. Add the remaining common DOM attributes/events needed by real ProofWidgets
    examples.
-3. Add lightweight Lean-side linting for hook order and obvious render-time IO
-   footguns, without changing the shallow React-compatible API.
-4. Keep StrictMode/concurrent-render callback-root behavior documented and
+2. Fill missing official call shapes such as root options and the reducer
+   initializer without adding a second semantic model.
+3. Keep StrictMode/concurrent-render callback-root behavior documented and
    audited; do not invent non-React lifetime semantics to hide it.
 
 ## ProofWidgets Compatibility Layers
@@ -152,14 +149,13 @@ A realistic path has three layers:
    widgets from Lean without a Lean server.
 2. **ProofWidgets programming model.** Provide a Lean API close to
    `ProofWidgets.Data.Html`, `ProofWidgets.Component`, and JSX-like usage, and
-   compile it to this narrow `ReactNode`/React host boundary. This should cover
-   text, attributes, children, component nodes, basic events, reusable Lean
-   components, and a JS-like component entry mode in which the infoview shell
-   renders a real React component while Lean computes its returned tree. Raw
-   hook-like APIs can be accepted at this layer if they are called only under
-   that React render context; early tooling should document and lint the normal
-   React rules rather than replacing them with a new model. Before adding that
-   API layer,
+   compile it to the direct React host boundary. The current native JSX slice
+   covers text, attributes, children, component nodes, basic events, reusable
+   Lean components, and a JS-like component entry mode in which the infoview
+   shell renders a real React component while Lean computes its returned tree.
+   Raw hook APIs are accepted only under that React render context; documentation
+   leaves the normal React rules with the programmer rather than replacing
+   them with a new model.
    `examples/tutorials/ReactProofWidgetHello.lean` provides the first copyable
    infoview-only proof-widget example: it compiles through the existing React
    renderer, mounts a live `Surface`, and keeps the required widget package
@@ -184,27 +180,32 @@ A realistic path has three layers:
    That shell embeds an esbuild bundle of the VIR JavaScript runtime graph,
    keeps React/ReactDOM/infoview imports external so they resolve to the Lean
    infoview dependencies, loads the WASM through `Lean.Vir.Infoview.readAsset`,
-   and derives the standard mount/unmount, `IRPackage`, and `WidgetProps`
-   declarations from the supplied component. The package bytes are still built
+   and derives the standard component-factory/mount/unmount, `IRPackage`, and
+   `WidgetProps` declarations from the supplied component action. The shell
+   creates the component once per runtime service and passes that exact
+   function to each mount update. The package bytes are still built
    from the active Lean server snapshot through
    `Lean.Vir.Infoview.buildIRPackage`, so the local demo no longer requires the
    repository Vite dev server or a package watcher.
-   `statIRPackage` provides a package-root revision token for cache lookup and
-   later refreshes. The token is derived from the compiled IR declaration
+   `statIRPackage` provides a package-root revision token for later refreshes.
+   The token is derived from the compiled IR declaration
    closure plus source ranges for local declarations, so imported helper-module
    changes are detected once they are present in the active Lean snapshot.
-   Cursor movement is not part of the runtime cache key, and ordinary proof
-   edits outside the widget closure should not rebuild the package. With
+   Cursor movement does not replace the widget-owned runtime, and ordinary
+   proof edits outside the widget closure should not rebuild the package. With
    `autoReloadMs` set, the demo detects widget-code edits with a stat-only poll
    and emits fresh package bytes again only when that token changes. It compiles
-   each WASM asset revision to a cached
+   the current revision of each WASM asset as a compiled
    `WebAssembly.Module`, which avoids recompiling the Lean IR interpreter module
-   on ordinary infoview refreshes. For stable widget configuration it also keeps
-   a module-level VIR runtime service alive across React component remounts and
-   calls the entry again only when the semantic proof surface or package
-   revision changes; `ReactProofWidget.mount` is idempotent for a selector and
-   rerenders the existing React root. Idle cached services have a bounded TTL,
-   and superseded services are disposed after their active widgets release them.
+   on ordinary infoview refreshes without retaining superseded revisions. Each
+   widget shell owns its mutable VIR runtime service directly; services are not
+   shared between widget instances.
+   The shell keeps that service across cursor and proof-surface updates and
+   replaces it when the package revision or widget configuration changes. It
+   reuses the component value produced by
+   `ReactProofWidget.createComponent`, so `ReactProofWidget.mount` rerenders the
+   existing React root without changing the component type. Superseded and
+   unmounted services are disposed immediately by their owning widget.
    The shell consumes widget mouse/click events at its outer container and calls
    `ReactProofWidget.unmount` when a selector is genuinely dropped. Removing the
    base64 byte transport remains a separate infoview/webview asset API
@@ -235,7 +236,7 @@ enough to prevent us from designing an API in a vacuum:
 
 1. `ProofWidgets/Demos/Jsx.lean`: verifies JSX-like Lean syntax, lowercase HTML
    tags, string/JSON attributes, children interpolation, and uppercase component
-   embedding. The current combinator-only fixture also includes the first
+   embedding. The current native-JSX fixture also includes the first
    `InteractiveExpr`-shaped `WithRpcRef`/`resolveRef` case.
 2. `ProofWidgets/Component/HtmlDisplay.lean` and
    `ProofWidgets/Data/Html.lean`: verify the core `Html` and component-node

@@ -363,6 +363,7 @@ end Tamagotchi
 
 namespace ReactTamagotchi
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
@@ -886,7 +887,8 @@ def reduceViewStateJs
 
 def useViewState (initial : ViewState := initialViewState) : ReactM ViewReducerState := do
   let initialJs ← Lean.Vir.LeanRef.toJSL (normalizeView initial)
-  Hooks.useReducer reduceViewStateJs initialJs
+  let reducer ← Reducer.ofLean reduceViewStateJs
+  ReducerTuple.toState (← Hooks.useReducer reducer initialJs)
 
 def dispatchViewAction (hook : ViewReducerState) (action : ViewAction) : DomM Unit := do
   let actionJs ← Lean.Vir.LeanRef.toJSL action
@@ -897,9 +899,10 @@ def tick (hook : ViewReducerState) : DomM Unit :=
 
 def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
   let deps ← Hooks.DependencyList.empty
-  Hooks.useEffectWithDeps deps
+  Hooks.useLeanEffect
     (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
+    (some deps)
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text widgetCss
@@ -944,7 +947,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     ]
     #[bar, counter]
 
-def View : Component Unit := fun _ => do
+def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
   let hook ← useViewState
   let view ← Lean.Vir.LeanRef.fromJSL hook.value
   let state := normalizeViewState view.state
@@ -1050,8 +1053,9 @@ def View : Component Unit := fun _ => do
     ]
     #[css, body]
 
-def mount (selector : String) : DomM Bool :=
-  Root.renderComponentIntoSelector selector View ()
+def mount (selector : String) : DomM Bool := do
+  let component ← View
+  Root.renderComponentIntoSelector selector component ()
 
 def mountDefault : DomM Bool :=
   mount "#react-pet-root"

@@ -306,7 +306,6 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     evidence: "reviewed-protocol",
     detail: reviewedProtocol.protocolOperations[0].reason,
   });
-
   const unclassifiedProtocol = structuredClone(protocolGeneration);
   unclassifiedProtocol.protocolOperations[0].upstreamRelation = { kind: "unclassified" };
   const unclassifiedOutput = renderLeanBindings(config, unclassifiedProtocol, descriptors);

@@ -136,34 +136,54 @@
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
-        "id": "javascript.array.length", "group": "array", "target": "js.array.length",
-        "lean": "Lean.Vir.Js.Array.lengthJs", "marker": "vir_js",
-        "reason": "Reads Array.length while keeping the array contents in JavaScript land.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        "id": "javascript.array.empty", "group": "array", "target": "js.array.empty",
+        "lean": "Lean.Vir.Js.Array.empty", "marker": "vir_js",
+        "reason": "Constructs an empty native JavaScript Array.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } }
       },
       {
-        "id": "javascript.array.item", "group": "array", "target": "js.array.item",
-        "lean": "Lean.Vir.Js.Array.itemNullable", "marker": "vir_js",
-        "reason": "Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "changing" },
+        "id": "javascript.array.push", "group": "array", "target": "js.array.push",
+        "lean": "Lean.Vir.Js.Array.push", "marker": "vir_js",
+        "reason": "Calls Array.push with the exact native array and item and returns its JavaScript Number result.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.push", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
-          { "name": "index", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.array.length", "group": "array", "target": "js.array.length",
+        "lean": "Lean.Vir.Js.Array.lengthJs", "marker": "vir_js",
+        "reason": "Returns the exact native JavaScript Number stored in Array.length.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.array.item", "group": "array", "target": "js.array.item",
+        "lean": "Lean.Vir.Js.Array.getJs", "marker": "vir_js",
+        "reason": "Reads the exact JavaScript value at a non-negative safe-integer Array index, including undefined for a hole or missing entry.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
+          { "name": "index", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
         "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",
         "lean": "Lean.Vir.Js.NodeList.lengthJs", "marker": "vir_js",
-        "reason": "Reads NodeList.length while keeping the collection in JavaScript land.",
+        "reason": "Returns the exact native JavaScript Number stored in NodeList.length.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.length", "accessor": "get", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value α" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
       {
         "id": "javascript.node-list.item", "group": "node-list", "target": "js.nodeList.item",
@@ -173,7 +193,7 @@
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value (Lean.Vir.Js α)" } },
-          { "name": "index", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+          { "name": "index", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Nullable α", "representation": "js-resource", "resourceInner": "α" } }
       },

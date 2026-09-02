@@ -381,8 +381,9 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - object marker: `Lean.Vir.React.StateSetter α`
 - object marker: `Lean.Vir.React.Ref α`
 - object marker: `Lean.Vir.React.Props`
-- object marker: `Lean.Vir.React.NodeChildren`
 - object marker: `Lean.Vir.React.DependencyList`
+- object markers: `Reducer`, `StateTuple`, `ReducerTuple`,
+  `MemoCalculation`, `EffectCallback`, `Callback`, and `Context`
 - `Lean.Vir.React.Node`
 - `Lean.Vir.React.Property`
 - `Lean.Vir.React.PropValue`
@@ -390,11 +391,12 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.State α`
 - `Lean.Vir.React.ReducerState state action`
-- `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Component props` marks the exact reusable JavaScript function
+  returned by `Component.ofLean`
 - `Lean.Vir.React.ElementType.ofTag : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElementTag : @& String -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> @& Lean.Vir.Js Lean.Vir.React.Props -> @& Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElementTag` is the explicit tag-string convenience over that exact binding
 - `Lean.Vir.React.Props.key : String -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Props.ref : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)) -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
@@ -402,27 +404,31 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
 - `Lean.Vir.React.Root.renderNode : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Node -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Component.ofLean : (props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) -> Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component props))`
+- `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js (Lean.Vir.React.Component props) -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
-- `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α)))`
+- `Lean.Vir.React.Hooks.useReducer : @& Lean.Vir.Js (Lean.Vir.React.Reducer state action) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action))`
 - `Lean.Vir.React.Hooks.useRef : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)))`
 - `Lean.Vir.React.Hooks.DependencyList.empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
 - `Lean.Vir.React.Hooks.DependencyList.push : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> @& Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.Hooks.DependencyList.ofArray : @& Array (Lean.Vir.Js α) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
-- `Lean.Vir.React.Hooks.useMemo : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
-- `Lean.Vir.React.Hooks.useMemoWithArrayDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array (Lean.Vir.Js β) -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
-- `Lean.Vir.React.Hooks.useMemoWithStringDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array String -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
-- `Lean.Vir.React.Hooks.useEffectWithDeps : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
-- `Lean.Vir.React.Hooks.useEffectWithStringDeps : @& Array String -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.useMemo` accepts an exact `Js MemoCalculation` and dependency array
+- `Lean.Vir.React.Hooks.useCallback`, `useContext`, and `useEffect` accept their exact JavaScript values
+- `Reducer.ofLean`, `MemoCalculation.ofLean`, and `Callback.ofUnary` are explicit Lean-callback conversions
+- `StateTuple.toState` and `ReducerTuple.toState` are explicit tuple projections
+- `EffectCallback.ofLean` explicitly converts Lean setup/cleanup actions to a
+  native JavaScript effect function; `Hooks.useLeanEffect` composes it with the
+  exact hook binding
 - `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
 `Node` is an opaque JavaScript-owned renderable marker. Lean constructs values
-with `Node.text` and `Node.createElement`; those public helpers explicitly
-convert text through `JsValue`, build JavaScript-owned `Props`/`NodeChildren`
-resources, and then call the low-level `react.node.*` host targets.
+with `Node.text` and `Node.createElement`; convenience helpers explicitly
+convert text through `JsValue`, build an ordinary JavaScript props object and
+generic JavaScript child array, and then call the low-level `react.node.*`
+host targets.
 `Node.createElement` takes a JavaScript-owned `ElementType` resource, matching
 React's `type` parameter; `Node.createElementTag` and DOM helpers explicitly
 wrap ordinary tag strings with `ElementType.ofTag`. Browser hosts construct
@@ -431,22 +437,21 @@ the same object graph React would retain in JavaScript; VIR adds no parallel
 node or callback ownership graph.
 
 `Root.renderNode` is the faithful host boundary for borrowing a JavaScript-owned
-React node. `Root.render` is the generated convenience adapter for rendering a
-`ReactM` tree into an existing root: the JavaScript host invokes the received
-render action once and forwards the concrete `Js Node`.
-`Root.renderComponent` wraps a Lean `Component props` plus
-concrete props in a real JavaScript React function component. The public hook
-surface is
-resource-typed: `useState`, `State.set`, and `State.modify` accept
+React node. `Root.render` is a Lean convenience that evaluates the `ReactM`
+construction action and calls `renderNode`; it introduces no additional host
+target. `Component.ofLean` returns the real JavaScript function type, and
+`Root.renderComponent` constructs an element from that exact value before
+calling `renderNode`. The public hook surface is resource-typed: `useState`, `State.set`, and `State.modify` accept
 `Lean.Vir.Js α`, not raw Lean scalar values. Use the explicit
 `Lean.Vir.JsValue` helpers when a component needs scalar state. State setters
 are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
-`Hooks.useReducer` keeps reducer state and actions in JavaScript-land. The
-reducer receives `Lean.Vir.Js state` and `Lean.Vir.Js action` values and returns
-the next `Lean.Vir.Js state`. Structured Lean-owned reducer values should use
+`Hooks.useReducer` keeps reducer state and actions in JavaScript-land and takes
+an exact `Js Reducer`. `Reducer.ofLean` explicitly converts a callback that
+receives `Lean.Vir.Js state` and `Lean.Vir.Js action` values and returns the
+next `Lean.Vir.Js state`. Structured Lean-owned reducer values should use
 `Lean.Vir.JSL` handles and explicit `Lean.Vir.LeanRef.toJSL` / `fromJSL` calls at
 the application boundary, so React stores retained-Lean handles instead of
 JavaScript-shaped copies.
@@ -542,20 +547,23 @@ with the `infoview.documentPosition` conversion target from explicit
 `WidgetProps` deliberately keeps one blessed activation path: the bundled
 infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
 entry names. The package roots are built from the active Lean server snapshot.
-The mount entry must have signature `String -> Surface -> DomM Bool`; the
+The component entry must have signature
+`RuntimeM (Js (React.Component Surface))`; the mount entry must accept
+`String -> Js (React.Component Surface) -> Surface -> DomM Bool`; and the
 optional unmount entry must have signature `String -> DomM Bool`. The shell
-creates a nested mount element, passes its selector plus the current infoview
-`Surface`, and rerenders the React component with fresh surface props on cursor
-movement. It reloads the runtime service only when the widget IR package
-revision changes. That revision token hashes the compiled IR closure and local
-source ranges, so imported helper changes are detected once the active Lean
-snapshot contains them.
+creates the exact JavaScript component function once per loaded runtime
+service, then passes that same value with the selector and current infoview
+`Surface` on every render. It reloads the runtime service only when the widget
+IR package revision changes. That revision token hashes the compiled IR closure
+and local source ranges, so imported helper changes are detected once the
+active Lean snapshot contains them.
 
 `vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
-widgets: users provide a `React.Component Surface`, and the command declares the
-standard selector-owned `mount`/`unmount` entries, `irPackage`, and
-`widgetProps` in the current namespace. `ReactWidget` is the lower-level
-expansion target when a caller needs to assemble those pieces manually.
+widgets: users provide a `RuntimeM (Js (React.Component Surface))` factory, and
+the command declares the standard `createComponent`, selector-owned
+`mount`/`unmount`, `irPackage`, and `widgetProps` entries in the current
+namespace. `ReactWidget` is the lower-level expansion target when a caller
+needs to assemble those pieces manually.
 `examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and
 `examples/ReactProofWidget.lean` is the next rung: a focused editor tool that
 uses the goal surface and editor edit command without duplicating the infoview.

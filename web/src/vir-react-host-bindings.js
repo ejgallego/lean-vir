@@ -7,16 +7,14 @@ Author: Emilio J. Gallego Arias
 import * as React from "react";
 import * as ReactDOMClient from "./vir-react-dom-client.js";
 import {
-  createBrowserReactHookRuntime,
+  createBrowserReactHookBindings,
   createReactJsValueHostBindings,
-  createReactStateHostBindings,
 } from "./react/vir-react-hooks.js";
 import {
-  createBrowserReactComponentNode,
+  createBrowserLeanComponentNode,
   createBrowserReactNodeElement,
   createBrowserReactNodeFragment,
-  createBrowserReactNodeText,
-  createBrowserReactRoot,
+  reactNodeTextValue,
 } from "./react/vir-react-node.js";
 import {
   createHostLifecycle,
@@ -27,16 +25,20 @@ export function createBrowserReactHostBindings(
   state = createHostLifecycle(),
   { querySelector = queryBrowserElement } = {},
 ) {
-  const hookRuntime = createBrowserReactHookRuntime(React);
   return {
     ...createReactRootHostBindings(
       state,
-      (target) => createBrowserReactRoot(ReactDOMClient.createRoot(target)),
+      (target) => ReactDOMClient.createRoot(target),
       {
         querySelector,
-        createComponentNode: (component) =>
-          createBrowserReactComponentNode(React.createElement, component),
-        createNodeText: createBrowserReactNodeText,
+        createLeanComponentNode: (component, props, key) =>
+          createBrowserLeanComponentNode(
+            React.createElement,
+            component,
+            props,
+            key,
+          ),
+        createNodeText: reactNodeTextValue,
         createNodeElement: (elementType, props, children) =>
           createBrowserReactNodeElement(
             React.createElement,
@@ -54,7 +56,7 @@ export function createBrowserReactHostBindings(
       },
     ),
     ...createReactJsValueHostBindings(),
-    ...createReactStateHostBindings(hookRuntime),
+    ...createBrowserReactHookBindings(React),
   };
 }
 

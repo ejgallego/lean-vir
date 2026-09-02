@@ -42,26 +42,58 @@ private def collectResourceItems {α : Type}
         | some value => values.push value
       collectResourceItems item remaining (index + 1) values
 
+private def arrayResourceItem? {α : Type}
+    (size : Nat)
+    (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js α))
+    (index : Nat) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  if index < size then
+    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
+    some <$> item jsIndex
+  else
+    pure none
+
+private def nullableCollectionResourceItem? {α : Type}
+    (size : Nat)
+    (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js.Nullable α))
+    (index : Nat) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  if index < size then
+    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
+    Lean.Vir.Js.Nullable.toOption (← item jsIndex)
+  else
+    pure none
+
 namespace Array
+
+/-- Builds a native JavaScript array from JavaScript-owned values. -/
+def ofArray {α : Type}
+    (values : _root_.Array (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js.Array (Lean.Vir.Js α)) := do
+  let array ← empty
+  for value in values do
+    let _ ← push array value
+  pure array
 
 /-- Returns the current JavaScript array length as a Lean `Nat`. -/
 def length {α : Type} (array : @& Lean.Vir.Js.Array α) : RuntimeM Nat := do
-  Lean.Vir.JsValue.toNat (← lengthJs array)
+  return (← Lean.Vir.JsValue.toFloat (← lengthJs array)).toUInt64.toNat
 
 /-- Returns the resource at `index`, or `none` when the index is out of bounds. -/
 def item {α : Type}
     (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
     (index : Nat) :
     RuntimeM (Option (Lean.Vir.Js α)) := do
-  let jsIndex ← Lean.Vir.JsValue.ofNat index
-  Lean.Vir.Js.Nullable.toOption (← itemNullable array jsIndex)
+  arrayResourceItem? (← length array) (getJs array) index
 
 /-- Materializes independent Lean resource handles for the entries of a JavaScript array. -/
 def toLeanArray {α : Type}
     (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α)) :
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size ← length array
-  collectResourceItems (item array) size 0 (_root_.Array.mkEmpty size)
+  collectResourceItems
+    (arrayResourceItem? size (getJs array))
+    size 0 (_root_.Array.mkEmpty size)
 
 end Array
 
@@ -69,22 +101,23 @@ namespace NodeList
 
 /-- Returns the current `NodeList.length` as a Lean `Nat`. -/
 def length {α : Type} (nodes : @& Lean.Vir.Js.NodeList α) : RuntimeM Nat := do
-  Lean.Vir.JsValue.toNat (← lengthJs nodes)
+  return (← Lean.Vir.JsValue.toFloat (← lengthJs nodes)).toUInt64.toNat
 
 /-- Calls `NodeList.item`, returning `none` when the index is out of bounds. -/
 def item {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
     (index : Nat) :
     RuntimeM (Option (Lean.Vir.Js α)) := do
-  let jsIndex ← Lean.Vir.JsValue.ofNat index
-  Lean.Vir.Js.Nullable.toOption (← itemNullable nodes jsIndex)
+  nullableCollectionResourceItem? (← length nodes) (itemNullable nodes) index
 
 /-- Materializes independent Lean resource handles for the entries of a `NodeList`. -/
 def toLeanArray {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α)) :
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size ← length nodes
-  collectResourceItems (item nodes) size 0 (_root_.Array.mkEmpty size)
+  collectResourceItems
+    (nullableCollectionResourceItem? size (itemNullable nodes))
+    size 0 (_root_.Array.mkEmpty size)
 
 end NodeList
 
