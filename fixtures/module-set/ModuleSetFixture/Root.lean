@@ -9,11 +9,13 @@ module
 public meta import Vir.Attributes
 public import ModuleSetFixture.Left
 public import ModuleSetFixture.Right
+public import ModuleSetFixture.Facade
 
 namespace ModuleSetFixture.Root
 
 @[vir_export]
 public def answer : Nat :=
-  ModuleSetFixture.Left.value + ModuleSetFixture.Right.value
+  ModuleSetFixture.Left.value + ModuleSetFixture.Right.value +
+    ModuleSetFixture.Facade.value
 
 end ModuleSetFixture.Root

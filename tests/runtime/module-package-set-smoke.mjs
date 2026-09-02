@@ -42,6 +42,8 @@ assert.deepEqual(
     ["ModuleSetFixture.Shared", "dependency"],
     ["ModuleSetFixture.Left", "dependency"],
     ["ModuleSetFixture.Right", "dependency"],
+    ["ModuleSetFixture.InternalBase", "dependency"],
+    ["ModuleSetFixture.Facade", "dependency"],
     ["ModuleSetFixture.Root", "root"],
   ],
 );
@@ -54,21 +56,23 @@ const packageInfoByModule = new Map(descriptor.packages.map((entry, index) => [
 ]));
 assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Shared")) > 4);
 assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Right")) > 4);
+assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.InternalBase")) > 4);
+assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Facade")) > 4);
 assert.equal(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")), 4);
 const wasmBytes = await readFile(wasmPath);
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: packageBytes });
-assert.equal(runtime.packageInfo.packageCount, 4);
-assert.equal(runtime.packageInfo.count, 10);
+assert.equal(runtime.packageInfo.packageCount, 6);
+assert.equal(runtime.packageInfo.count, 16);
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "42");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
 assert.throws(
   () => runtime.loadIrPackageSetBytes([packageBytes[0], packageBytes[0], packageBytes[1]]),
   /duplicate IR declaration `ModuleSetFixture\./,
 );
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "42");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
 runtime.loadIrPackageSetBytes(packageBytes);
-assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "42");
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "62");
 runtime.dispose();
 
 const urlRuntime = await createVirRuntime({
@@ -76,7 +80,7 @@ const urlRuntime = await createVirRuntime({
   irPackageSetUrl: pathToFileURL(descriptorPath),
   fetchBytes: (path) => readFile(path),
 });
-assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), "42");
+assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), "62");
 urlRuntime.dispose();
 
 console.log("module package-set smoke ok");

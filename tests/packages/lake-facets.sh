@@ -40,6 +40,8 @@ assert_module_fixture_descriptor() {
       ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
       ["ModuleSetFixture.Left", "dependency", "Root.parts/ModuleSetFixture.Left.irpkg"],
       ["ModuleSetFixture.Right", "dependency", "Root.parts/ModuleSetFixture.Right.irpkg"],
+      ["ModuleSetFixture.InternalBase", "dependency", "Root.parts/ModuleSetFixture.InternalBase.irpkg"],
+      ["ModuleSetFixture.Facade", "dependency", "Root.parts/ModuleSetFixture.Facade.irpkg"],
       ["ModuleSetFixture.Root", "root", "Root.irpkg"],
     ];
     if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);

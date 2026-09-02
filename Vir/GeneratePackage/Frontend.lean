@@ -196,15 +196,57 @@ def DeclIndex.moduleForDecl? (index : DeclIndex) (name : Name) : Option Name :=
   | some moduleName => some moduleName
   | none => index.envs.findSome? fun (_, env) => environmentModuleForDecl? env name
 
+private def DeclIndex.loadedModuleGraph
+    (index : DeclIndex) : Array Name × NameMap (Array Name) := Id.run do
+  let mut modules := #[]
+  let mut importsByModule : NameMap (Array Name) := {}
+  for (_, env) in index.envs do
+    for h : moduleIdx in [:env.header.moduleNames.size] do
+      let moduleName := env.header.moduleNames[moduleIdx]
+      if !modules.contains moduleName then
+        modules := modules.push moduleName
+      let some data := env.header.moduleData[moduleIdx]? | continue
+      let mut imports := importsByModule.find? moduleName |>.getD #[]
+      for imported in data.imports do
+        if !imports.contains imported.module then
+          imports := imports.push imported.module
+      importsByModule := importsByModule.insert moduleName imports
+  return (modules, importsByModule)
+
 /--
-Return Lean's dependency-first module-initialization order for the environment
-built from `target`. Lean records a module after recursively visiting its
-imports; the caller may filter this complete order to a reached closure.
+Return a dependency-first initialization order across the target environment
+and every loaded owner-module environment.
+
+A module-system root environment does not expose modules reached only through
+private implementation imports. Package closure resolution loads those owner
+modules separately; their module metadata is therefore part of the same order.
+The marked root is considered last whenever possible, matching Lean's order
+for a direct `import all` driver.
 -/
 def DeclIndex.moduleInitializationOrderForTarget?
-    (index : DeclIndex) (target : Target) : Option (Array Name) :=
-  index.envs.findSome? fun (source, env) =>
-    if source == target.source.toString then some env.header.moduleNames else none
+    (index : DeclIndex) (target : Target) : Option (Array Name) := Id.run do
+  unless index.envs.any (fun (source, _) => source == target.source.toString) do
+    return none
+  let (modules, importsByModule) := index.loadedModuleGraph
+  let moduleSet := modules.foldl (init := ({} : NameSet)) fun names moduleName =>
+    names.insert moduleName
+  let mut remaining := modules
+  let mut ordered := #[]
+  let mut orderedSet : NameSet := {}
+  while !remaining.isEmpty do
+    let preferred := match target.markedModule? with
+      | some rootModule =>
+          let withoutRoot := remaining.filter (· != rootModule)
+          if withoutRoot.isEmpty then remaining else withoutRoot
+      | none => remaining
+    let some next := preferred.find? fun moduleName =>
+        (importsByModule.find? moduleName |>.getD #[]).all fun imported =>
+          !moduleSet.contains imported || orderedSet.contains imported
+      | return none
+    ordered := ordered.push next
+    orderedSet := orderedSet.insert next
+    remaining := remaining.filter (· != next)
+  return some ordered
 
 unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) : IO DeclIndex := do
   if index.loadedModules.contains moduleName then
