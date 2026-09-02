@@ -11,14 +11,13 @@ import { createHostLifecycle } from "../../web/src/host/vir-host-resources.js";
 import { createReactRootHostBindings } from "../../web/src/host/vir-host-resources.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import {
-  createBrowserLeanComponentNodeFactory,
+  createBrowserLeanComponentNode,
   createBrowserReactNodeElement,
   createBrowserReactNodeFragment,
   createBrowserReactNodeText,
   createReactElementTypeTag,
   createReactProps,
   setReactPropsEventHandler,
-  setReactPropsKey,
   setReactPropsProperty,
   setReactPropsRef,
 } from "../../web/src/react/vir-react-node.js";
@@ -34,28 +33,22 @@ import {
 } from "../../web/src/host/vir-virtual-host-bindings.js";
 
 {
-  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
+  const component = ({ leanProps }) => leanProps.label;
+  const leanProps = { label: "first" };
+  const firstNode = createBrowserLeanComponentNode(
     React.createElement,
+    component,
+    leanProps,
   );
-  const first = () => "first";
-  const second = () => "second";
-  const firstNode = createLeanComponentNode("Counter", first);
-  const secondNode = createLeanComponentNode("Counter", second);
-  const replacementNode = createLeanComponentNode("Replacement", first);
-  assert.equal(
-    firstNode.type,
-    secondNode.type,
-    "one explicit component ID must map to one React function type",
-  );
-  assert.notEqual(
-    firstNode.type,
-    replacementNode.type,
-    "different component IDs must map to different React function types",
-  );
-  assert.equal(firstNode.props.renderCallback, first);
-  assert.equal(secondNode.props.renderCallback, second);
+  assert.equal(firstNode.type, component);
+  assert.equal(firstNode.props.leanProps, leanProps);
   assert.equal(firstNode.type(firstNode.props), "first");
-  const keyed = createLeanComponentNode("Counter", first, "counter-key");
+  const keyed = createBrowserLeanComponentNode(
+    React.createElement,
+    component,
+    leanProps,
+    "counter-key",
+  );
   assert.equal(keyed.key, "counter-key");
 }
 
@@ -64,7 +57,10 @@ const callback = () => "clicked";
 const ref = { current: null };
 const props = createReactProps();
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
-setReactPropsKey(props, "stable");
+setReactPropsProperty(props, {
+  name: "key",
+  value: { kind: "string", value: "stable" },
+});
 setReactPropsRef(props, ref);
 setReactPropsProperty(props, {
   name: "className",
@@ -118,7 +114,10 @@ assert.equal(element.props.children[0], first);
 assert.equal(element.props.children[1], second);
 
 const fragmentProps = createReactProps();
-setReactPropsKey(fragmentProps, "fragment-key");
+setReactPropsProperty(fragmentProps, {
+  name: "key",
+  value: { kind: "string", value: "fragment-key" },
+});
 const fragment = createBrowserReactNodeFragment(
   React.createElement,
   React.Fragment,
@@ -152,6 +151,16 @@ assert.throws(
     calculate,
   );
   assert.equal(conversions["js.value.react.callback"](callback), callback);
+  const setup = () => property;
+  const cleanup = (value) => value;
+  const effect = conversions["js.value.react.effectCallback"]({
+    setup,
+    cleanup,
+  });
+  assert.equal(effect()(), property);
+  const render = (leanProps) => leanProps;
+  const component = conversions["js.value.react.component"](render);
+  assert.equal(component({ leanProps: property }), property);
 }
 
 {
@@ -283,55 +292,6 @@ assert.throws(
 }
 
 {
-  const componentLifecycle = createHostLifecycle();
-  const rendered = [];
-  const root = {
-    render(node) {
-      rendered.push(node);
-    },
-    unmount() {},
-  };
-  const otherRoot = {
-    render(node) {
-      rendered.push(node);
-    },
-    unmount() {},
-  };
-  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
-    (type, props) => ({ type, props }),
-  );
-  const bindings = createReactRootHostBindings(componentLifecycle, () => root, {
-    createLeanComponentNode,
-  });
-  const first = () => "first";
-  const second = (unit) => {
-    assert.equal(unit, undefined);
-    return "second";
-  };
-  bindings["react.root.renderComponent"](root, "Counter", first);
-  bindings["react.root.renderComponent"](root, "Counter", second);
-  assert.equal(
-    rendered[0].type,
-    rendered[1].type,
-    "repeated submissions to one root must retain the React component type",
-  );
-  assert.equal(rendered[1].props.renderCallback(undefined), "second");
-  bindings["react.root.renderComponent"](root, "Replacement", first);
-  assert.notEqual(
-    rendered[1].type,
-    rendered[2].type,
-    "changing the explicit component ID must replace the React type",
-  );
-  bindings["react.root.renderComponent"](otherRoot, "Counter", first);
-  assert.equal(
-    rendered[1].type,
-    rendered[3].type,
-    "one explicit component ID must use the same component type across roots",
-  );
-  componentLifecycle.dispose();
-}
-
-{
   const target = {};
   const rendered = [];
   let unmounts = 0;
@@ -351,9 +311,9 @@ assert.throws(
     },
     {
       querySelector: (selector) => (selector === "#app" ? target : null),
-      createLeanComponentNode: (componentType, component, key = null) => ({
-        componentType,
+      createLeanComponentNode: (component, props, key = null) => ({
         component,
+        props,
         key,
       }),
       createNodeText: (value) => value,
@@ -372,9 +332,11 @@ assert.throws(
   bindings["react.root.renderNode"](root, element);
   assert.equal(rendered.at(-1), element);
   const component = () => element;
-  bindings["react.root.renderComponent"](root, "Component", component);
-  assert.equal(typeof rendered.at(-1).component, "function");
-  assert.equal(rendered.at(-1).component(), element);
+  const leanProps = {};
+  const componentNode = bindings["react.node.component"](component, leanProps);
+  bindings["react.root.renderNode"](root, componentNode);
+  assert.equal(rendered.at(-1).component, component);
+  assert.equal(rendered.at(-1).props, leanProps);
   assert.equal(
     bindings["react.root.renderIntoSelector"]("#missing", element),
     false,

@@ -9,7 +9,6 @@ import {
   createReactElementTypeTag,
   createReactProps,
   setReactPropsEventHandler,
-  setReactPropsKey,
   setReactPropsProperty,
   setReactPropsRef,
 } from "../react/vir-react-node.js";
@@ -257,41 +256,6 @@ export function createReactRootHostBindings(
     return { root, created };
   }
 
-  function requireComponent(component) {
-    if (typeof component !== "function") {
-      throw new Error("React component must be a JavaScript function");
-    }
-    return component;
-  }
-
-  function renderComponent(root, componentTypeValue, component) {
-    const componentType = jsStringValue(
-      componentTypeValue,
-      "React component type",
-    );
-    root.render(
-      requireLeanComponentNodeFactory(createLeanComponentNode)(
-        componentType,
-        requireComponent(component),
-      ),
-    );
-  }
-
-  function renderComponentIntoSelector(
-    selectorValue,
-    componentType,
-    component,
-  ) {
-    const selector = jsStringValue(selectorValue, "React root selector");
-    const selected = selectorRoot(selector, () => undefined);
-    if (selected === null) return false;
-    return publishSelectorRender(
-      selected,
-      () => renderComponent(selected.root, componentType, component),
-      "React selector component render failed during root rollback",
-    );
-  }
-
   function selectorPublication(root) {
     return resources.stageResult(true, {
       onAbort: () => releaseRoot(root),
@@ -327,7 +291,6 @@ export function createReactRootHostBindings(
     "react.elementType.tag": (tag) =>
       createReactElementTypeTag(jsStringValue(tag, "React element type tag")),
     "react.props.empty": createReactProps,
-    "react.props.setKey": (props, key) => setReactPropsKey(props, key),
     "react.props.setProperty": (props, property) =>
       setReactPropsProperty(props, property),
     "react.props.setEventHandler": (props, handler) =>
@@ -339,15 +302,15 @@ export function createReactRootHostBindings(
         props,
         children,
       ),
-    "react.node.component": (componentType, component) =>
-      requireLeanComponentNodeFactory(createLeanComponentNode)(
-        componentType,
+    "react.node.component": (component, props) =>
+      requireLeanComponentNodeCreator(createLeanComponentNode)(
         component,
+        props,
       ),
-    "react.node.keyedComponent": (componentType, component, key) =>
-      requireLeanComponentNodeFactory(createLeanComponentNode)(
-        componentType,
+    "react.node.keyedComponent": (component, props, key) =>
+      requireLeanComponentNodeCreator(createLeanComponentNode)(
         component,
+        props,
         key,
       ),
     "react.node.fragment": (props, children) =>
@@ -358,17 +321,8 @@ export function createReactRootHostBindings(
         onAbort: () => releaseRoot(root),
       });
     },
-    "react.root.render": (root, renderTree) => {
-      const render = requireReactRenderCallback(renderTree);
-      root.render(render());
-      return undefined;
-    },
     "react.root.renderNode": (root, node) => {
       root.render(node);
-      return undefined;
-    },
-    "react.root.renderComponent": (root, componentType, component) => {
-      renderComponent(root, componentType, component);
       return undefined;
     },
     "react.root.renderIntoSelector": (selector, node) => {
@@ -387,13 +341,6 @@ export function createReactRootHostBindings(
         "React selector render failed during root rollback",
       );
     },
-    "react.root.renderComponentIntoSelector": (
-      selector,
-      componentType,
-      component,
-    ) => {
-      return renderComponentIntoSelector(selector, componentType, component);
-    },
     "react.root.unmount": (root) => {
       releaseRoot(root);
       return undefined;
@@ -409,13 +356,6 @@ export function createReactRootHostBindings(
       return true;
     },
   };
-}
-
-function requireReactRenderCallback(renderTree) {
-  if (typeof renderTree !== "function") {
-    throw new Error("react.root.render requires a JavaScript function");
-  }
-  return renderTree;
 }
 
 function requireReactNodeTextFactory(factory) {
@@ -436,13 +376,13 @@ function requireReactNodeElementFactory(factory) {
   return factory;
 }
 
-function requireLeanComponentNodeFactory(factory) {
-  if (typeof factory !== "function") {
+function requireLeanComponentNodeCreator(createNode) {
+  if (typeof createNode !== "function") {
     throw new Error(
-      "react.node.component host binding requires the browser Lean-component adapter",
+      "react.node.component host binding requires a browser node creator",
     );
   }
-  return factory;
+  return createNode;
 }
 
 function requireReactNodeFragmentFactory(factory) {

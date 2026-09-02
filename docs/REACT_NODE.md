@@ -36,7 +36,7 @@ def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
     #[← Node.text s!"Hello, {name}"]
 ```
 
-The builders are explicit adapters:
+The builders are explicit construction conveniences:
 
 - `react.props.empty` creates `{}`;
 - property and event-handler operations mutate that object;
@@ -54,20 +54,17 @@ Browser roots are the objects returned by `ReactDOMClient.createRoot`.
 `Root.renderNode` forwards an actual node to `root.render`, and `Root.unmount`
 forwards to `root.unmount`.
 
-`Root.render` is a Lean-construction convenience that invokes a Lean render
-callback once and forwards its resulting node. `Root.renderComponent` is the
-component adapter: it supplies an actual JavaScript function component so
-React controls invocation, replay, hooks, and commits. Use the component path
-for recurring application updates.
+`Root.render` is ordinary Lean composition: it builds the node, then calls the
+exact `Root.renderNode` binding. `Root.renderComponent` similarly builds an
+element from an already-created component function and forwards that node.
+There are no separate root-render host protocols.
 
-Each Lean component has an explicit string ID. The adapter keeps one ordinary
-React function type while that ID is stable, so repeated submissions update
-without resetting state or mount effects. Changing the ID changes the React
-type and therefore remounts. Nested `Node.component` and keyed component nodes
-use the same rule. Component IDs should be declaration-stable constants; use
-React keys for instance identity. The adapter is only an identity bridge; the
-render callback is an ordinary JavaScript function prop and React controls
-replay and hooks.
+`Component.ofLean` explicitly creates one ordinary JavaScript function. That
+exact function is the React component type. Reusing it preserves component
+identity; calling `Component.ofLean` again creates a distinct type and asks
+React to remount it. `Node.component` passes Lean props through one `JSL`
+object stored in the native props object. React controls invocation, replay,
+hooks, keys, and commits.
 
 Selector helpers keep one active root per selected container and return a
 boolean when the selector is missing. Root registration is tracked only so
@@ -93,9 +90,10 @@ The browser hook runtime delegates directly to official React:
 `StateTuple.toState` and `ReducerTuple.toState` are explicit projection
 conveniences. `Reducer.ofLean`, `MemoCalculation.ofLean`, and
 `Callback.ofUnary` explicitly turn a Lean callback into an ordinary JavaScript
-function. `useLeanEffect` splits setup and cleanup and is therefore a named
-semantic adapter. VIR keeps no committed/speculative hook slots, action queues,
-dependency leases, or render-generation records.
+function. `EffectCallback.ofLean` performs the analogous one-time conversion
+for a setup/cleanup pair; `useLeanEffect` is Lean-only composition over that
+value and exact `useEffect`. VIR keeps no committed/speculative hook slots,
+action queues, dependency leases, or render-generation records.
 
 React restrictions remain programmer responsibilities. Lean does not add
 purity, valid hook ordering, complete dependency lists, replay-safe reducers,
@@ -104,12 +102,12 @@ or lane acknowledgements that TypeScript React lacks.
 ## JavaScript Provenance
 
 The hook and element providers are shallow calls to public React 19 APIs; VIR
-ships no copied reconciler or hook implementation. The only React-specific
-semantic adapter in `vir-react-node.js` maps an explicit Lean component ID to
-an ordinary JavaScript function type and places the exact render callback in
-props. Root selector caching, unmount registration, and host-call rollback are
-VIR browser-host policy rather than React emulation. Binding metadata marks
-these adapters `vir-owned` and marks direct public-API calls as preserving.
+ships no copied reconciler or hook implementation. Its explicit Lean-function
+conversions create ordinary JavaScript functions. The
+node provider only places a `JSL` props value under `leanProps` before calling
+`React.createElement`. Root selector caching, unmount registration, and
+host-call rollback are browser-host policy rather than React emulation. No
+React binding in this surface is classified as semantics-changing.
 
 ## Refs And Events
 
@@ -150,8 +148,8 @@ The browser matrix covers:
 - dependency changes that return the same memo result;
 - interleaved state lanes;
 - suspended and abandoned renders;
-- root render and unmount behavior.
-- stable and changed IDs for root and nested Lean component adapters.
+- root render and unmount behavior;
+- reused and replaced JavaScript component-function identity.
 
 Run:
 

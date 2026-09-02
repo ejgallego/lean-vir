@@ -35,7 +35,17 @@ structure ComponentProps (props : Type) where
   children : Array Html := #[]
 
 abbrev Component (props : Type := Unit) : Type :=
-  Lean.Vir.React.Component (ComponentProps props)
+  Lean.Vir.Js (Lean.Vir.React.Component (ComponentProps props))
+
+namespace Component
+
+/-- Creates one reusable JavaScript React function for a ProofWidgets-style component. -/
+def ofLean
+    (render : ComponentProps props → ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.RuntimeM (Component props) :=
+  Lean.Vir.React.Component.ofLean render
+
+end Component
 
 def componentProps {props : Type} (value : props) (children : Array Html := #[]) :
     ComponentProps props :=

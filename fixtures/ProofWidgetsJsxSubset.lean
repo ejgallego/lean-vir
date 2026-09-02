@@ -22,7 +22,7 @@ keys, and child / prop spreads.
 structure CardProps where
   title : String
 
-def Card : Component CardProps := .named "ProofWidgetsJsxSubset.Card" fun ctx =>
+def Card : RuntimeM (Component CardProps) := Component.ofLean fun ctx =>
   <section id="proofwidgets-jsx-card" className="pw-jsx-card"
       {...#[Lean.Vir.React.Props.data "component" "Card"]}>
     <h3 className="pw-jsx-card-title">{Html.text ctx.props.title}</h3>
@@ -34,7 +34,7 @@ def Card : Component CardProps := .named "ProofWidgetsJsxSubset.Card" fun ctx =>
 structure MarkdownProps where
   contents : String
 
-def MarkdownDisplay : Component MarkdownProps := .named "ProofWidgetsJsxSubset.MarkdownDisplay" fun ctx =>
+def MarkdownDisplay : RuntimeM (Component MarkdownProps) := Component.ofLean fun ctx =>
   <section id="proofwidgets-jsx-markdown" className="pw-jsx-markdown"
       {...#[Lean.Vir.React.Props.data "component" "MarkdownDisplay"]}>
     <h3 className="pw-jsx-markdown-title">MarkdownDisplay</h3>
@@ -59,7 +59,7 @@ def parrotImage : Html :=
 def spreadInterpolation : Html :=
   <b id="proofwidgets-jsx-spread">You can use {...htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
 
-def markdownExample : Html :=
+def markdownExample (MarkdownDisplay : Component MarkdownProps) : Html :=
   <MarkdownDisplay contents={"
   ## Hello, Markdown
   We have **bold text**, _italic text_, `example : True := by trivial`,
@@ -70,7 +70,7 @@ structure BadgeProps where
   tone : String
   label : String
 
-def Badge : Component BadgeProps := .named "ProofWidgetsJsxSubset.Badge" fun ctx =>
+def Badge : RuntimeM (Component BadgeProps) := Component.ofLean fun ctx =>
   <span id={"proofwidgets-jsx-badge-" ++ ctx.props.tone}
       className={"pw-jsx-badge pw-jsx-badge-" ++ ctx.props.tone}
       {...#[Lean.Vir.React.Props.data "tone" ctx.props.tone]}>
@@ -87,8 +87,8 @@ def sampleExpr : WithRpcRef ExprWithCtx :=
 structure InteractiveExprProps where
   expr : WithRpcRef ExprWithCtx
 
-def InteractiveExpr : Component InteractiveExprProps :=
-    .named "ProofWidgetsJsxSubset.InteractiveExpr" fun ctx => do
+def InteractiveExpr : RuntimeM (Component InteractiveExprProps) :=
+  Component.ofLean fun ctx => do
   let initialStatus ← JsValue.ofString "ready"
   let status ← Lean.Vir.React.StateTuple.toState
     (← Lean.Vir.React.Hooks.useState initialStatus)
@@ -131,35 +131,44 @@ def row (key label value : String) : Html :=
     <span className="pw-jsx-row-value">{Html.text value}</span>
   </li>
 
-def View : Component Unit := .named "ProofWidgetsJsxSubset.View" fun _ => do
-  let renderedRows := 3
-  let surfaceProps : Array PropEntry := #[
-    Lean.Vir.React.Props.role "region",
-    Lean.Vir.React.Props.ariaLabel "ProofWidgets JSX subset combinator demo"
-  ]
-  let view : Html := <section {...surfaceProps} id="proofwidgets-jsx-subset"
-      dataTestId="proofwidgets-jsx-subset">
-    <Card title="JSX-shaped combinators">
-      {htmlHeadline}{parrotImage}{spreadInterpolation}{markdownExample}
-      <Badge key="info-badge" tone="info" label="component"> children</Badge>
-      <InteractiveExpr expr={sampleExpr} />
-      <button id="proofwidgets-jsx-action" className="pw-jsx-action"
-          onClick={do
-            let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
-            Lean.Vir.Browser.Document.setTitle title}>
-        {Html.text "mark"}
-      </button>
-      <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
-        {row "tags" "lowercase tags" "b, img, span, hr"}
-        {row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr"}
-        {row "interpolation" "interpolation" s!"{renderedRows} rendered rows"}
-      </ul>
-    </Card>
-  </section>
-  view
+-- Uppercase JSX tags consume these local component values during macro expansion,
+-- which Lean's unused-variable linter does not count as an explicit reference.
+set_option linter.unusedVariables false in
+def View : RuntimeM (Component Unit) := do
+  let Card ← Card
+  let MarkdownDisplay ← MarkdownDisplay
+  let Badge ← Badge
+  let InteractiveExpr ← InteractiveExpr
+  Component.ofLean fun _ => do
+    let renderedRows := 3
+    let surfaceProps : Array PropEntry := #[
+      Lean.Vir.React.Props.role "region",
+      Lean.Vir.React.Props.ariaLabel "ProofWidgets JSX subset combinator demo"
+    ]
+    let view : Html := <section {...surfaceProps} id="proofwidgets-jsx-subset"
+        dataTestId="proofwidgets-jsx-subset">
+      <Card title="JSX-shaped combinators">
+        {htmlHeadline}{parrotImage}{spreadInterpolation}{markdownExample MarkdownDisplay}
+        <Badge key="info-badge" tone="info" label="component"> children</Badge>
+        <InteractiveExpr expr={sampleExpr} />
+        <button id="proofwidgets-jsx-action" className="pw-jsx-action"
+            onClick={do
+              let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
+              Lean.Vir.Browser.Document.setTitle title}>
+          {Html.text "mark"}
+        </button>
+        <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
+          {row "tags" "lowercase tags" "b, img, span, hr"}
+          {row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr"}
+          {row "interpolation" "interpolation" s!"{renderedRows} rendered rows"}
+        </ul>
+      </Card>
+    </section>
+    view
 
-def mount (selector : String) : DomM Bool :=
-  Lean.Vir.React.Root.renderComponentIntoSelector selector View (componentProps ())
+def mount (selector : String) : DomM Bool := do
+  let component ← View
+  Lean.Vir.React.Root.renderComponentIntoSelector selector component (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-jsx-subset-root"

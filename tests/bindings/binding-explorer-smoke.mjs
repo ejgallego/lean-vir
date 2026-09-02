@@ -625,12 +625,11 @@ const reactRootRenderCoverage = reactDomRoot?.coverage.members.find((member) =>
 assert.equal(reactRootRender?.status, "compatible");
 assert.equal(reactRootRender?.target, "react.root.renderNode");
 assert.equal(reactRootRenderCoverage?.status, "faithful");
-assert.deepEqual(reactRootRenderCoverage?.relations, ["changing", "preserving"]);
+assert.deepEqual(reactRootRenderCoverage?.relations, ["preserving"]);
 assert.ok(!(reactRootRender?.diagnostics ?? []).some((diagnostic) =>
   diagnostic.code === "typescript_dependency_abstract"));
-assert.ok(reactDomRoot?.generatedOperations.some((operation) =>
-  operation.host.target === "react.root.render" &&
-  operation.protocol?.upstreamRelation.member === "Root.render"));
+assert.ok(!(reactDomRoot?.generatedOperations ?? []).some((operation) =>
+  operation.host.target === "react.root.render"));
 assert.ok(reactDomRoot?.comparison.results.some((result) =>
   result.id === "react_dom.hydration.entrypoint" &&
   result.status === "missing" &&

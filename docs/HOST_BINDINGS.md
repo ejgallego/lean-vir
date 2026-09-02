@@ -191,25 +191,21 @@ its React bindings are explicit cleanup-safe unsupported shims. Attempting to
 construct nodes, roots, or use hooks there reports that the browser React host
 is required.
 
-The principal intentional React adapters are:
+The principal intentional React conveniences are:
 
 - Lean builders for props, property descriptions, event-handler descriptions,
   and child arrays;
-- `Root.render`, which invokes a Lean render callback once before forwarding
-  its result to `root.render`;
-- `Root.renderComponent`, which creates a no-props React function component so
-  React controls render timing and hooks. Its small calling-convention bridge
-  ignores React's renderer arguments and supplies the Lean callback's `Unit`.
-  One component type is stable for the lifetime of each root; later submissions
-  update its callback, while unmounting the root is the explicit remount
-  boundary;
-- the split setup/cleanup form of the Lean effect API.
+- `Component.ofLean`, which explicitly creates an ordinary reusable JavaScript
+  component function whose identity React observes;
+- `EffectCallback.ofLean`, which explicitly creates React's setup-function
+  shape from a Lean setup/cleanup descriptor;
+- `Root.render` and `Root.renderComponent`, which are Lean composition over
+  node construction and the exact `Root.renderNode` boundary.
 
-These adapters have declarations separate from the exact bindings.
-`Root.renderNode` is the direct `root.render(node)` boundary; `Root.render` is
-the Lean-construction adapter. Recurring application updates should normally
-use the component path. Direct `Root.renderNode` has no public React
-acknowledgement for superseded submissions.
+The conversions have declarations separate from the exact bindings. The React
+hook host contains no Lean-specific hook path, and the React root host contains
+no callback-render or component-render path. Direct `Root.renderNode` has no
+public React acknowledgement for superseded submissions.
 
 ## Node Virtual Bindings
 

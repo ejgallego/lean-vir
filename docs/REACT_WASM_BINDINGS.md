@@ -56,15 +56,11 @@ graph. React purity, hook ordering, replay safety, dependency correctness, and
 lane behavior remain programmer responsibilities just as they are in
 TypeScript.
 
-Lean-specific builders and component/effect conveniences are explicit
-adapters above this exact value boundary. They should remain separately named
-and should not be described as properties of React itself.
-
-The component adapter maps each explicit Lean component ID to one ordinary
-function-component type and passes the current Lean callback as a normal prop.
-Stable IDs preserve ordinary hook state; changing an ID requests React's normal
-component-type remount. Hook-order correctness across updates remains the
-programmer's responsibility.
+Lean-specific builders and component/effect conversions remain explicit above
+this exact value boundary. `Component.ofLean` returns one ordinary JavaScript
+function whose identity React observes directly. `EffectCallback.ofLean`
+returns the setup function passed unchanged to `useEffect`. Hook-order and
+effect correctness remain the programmer's responsibility.
 
 Official React 19, ReactDOM, and Chromium are the sole semantic oracle. The
 Node virtual document supplies cleanup-safe unsupported React shims and does

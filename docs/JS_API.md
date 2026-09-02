@@ -536,7 +536,7 @@ def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
 
 Bind custom targets when constructing the runtime. User bindings override the
 default `common.*`, `browser.*`, and `react.*` bindings, including selector
-helpers such as `react.root.renderComponentIntoSelector`:
+helpers such as `react.root.renderIntoSelector`:
 
 ```js
 const vir = await createVirRuntime({

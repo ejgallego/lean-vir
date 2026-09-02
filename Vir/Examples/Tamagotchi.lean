@@ -363,6 +363,7 @@ end Tamagotchi
 
 namespace ReactTamagotchi
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
@@ -946,7 +947,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     ]
     #[bar, counter]
 
-def View : Component Unit := .named "ReactTamagotchi.View" fun _ => do
+def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
   let hook ← useViewState
   let view ← Lean.Vir.LeanRef.fromJSL hook.value
   let state := normalizeViewState view.state
@@ -1052,8 +1053,9 @@ def View : Component Unit := .named "ReactTamagotchi.View" fun _ => do
     ]
     #[css, body]
 
-def mount (selector : String) : DomM Bool :=
-  Root.renderComponentIntoSelector selector View ()
+def mount (selector : String) : DomM Bool := do
+  let component ← View
+  Root.renderComponentIntoSelector selector component ()
 
 def mountDefault : DomM Bool :=
   mount "#react-pet-root"

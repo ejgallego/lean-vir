@@ -514,35 +514,12 @@ const testRecordNatImport = hostRuntime.interfaceManifest.hostImports.find(
 );
 assert.equal(testRecordNatImport?.effect, "dom");
 assert.equal(testRecordNatImport?.args[0]?.type?.type, "Js");
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.kind,
-  "function",
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.effect,
-  "react",
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.args?.length,
-  0,
-);
-assert.equal(
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.render",
-  )?.args[1]?.type?.result?.type,
-  "Js",
-);
 const reactRenderNodeImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.root.renderNode",
 );
 if (reactRenderNodeImport !== undefined) {
-  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "Js");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.type, "ReactRoot");
+  assert.equal(reactRenderNodeImport.args[0]?.type?.kind, "resource");
   assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
@@ -554,25 +531,6 @@ if (reactRenderIntoSelectorImport !== undefined) {
   assert.equal(reactRenderIntoSelectorImport.args[0]?.type?.type, "Js");
   assert.equal(reactRenderIntoSelectorImport.result?.type, "Js");
 }
-const reactRenderComponentImport = hostImportTarget(
-  "react.root.renderComponent",
-);
-assert.equal(reactRenderComponentImport?.args[0]?.type?.type, "ReactRoot");
-assert.equal(reactRenderComponentImport?.args[0]?.type?.kind, "resource");
-assert.equal(reactRenderComponentImport?.args[1]?.type?.type, "Js");
-assert.equal(reactRenderComponentImport?.args[2]?.type?.kind, "function");
-assert.equal(reactRenderComponentImport?.args[2]?.type?.effect, "react");
-const reactRenderComponentIntoSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.renderComponentIntoSelector",
-  );
-assert.equal(reactRenderComponentIntoSelectorImport?.args[0]?.type?.type, "Js");
-assert.equal(reactRenderComponentIntoSelectorImport?.args[1]?.type?.type, "Js");
-assert.equal(
-  reactRenderComponentIntoSelectorImport?.args[2]?.type?.kind,
-  "function",
-);
-assert.equal(reactRenderComponentIntoSelectorImport?.result?.type, "Js");
 const reactUnmountSelectorImport =
   hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "react.root.unmountSelector",
@@ -597,6 +555,15 @@ assert.equal(
   "Lean.Vir.React.EventHandler",
 );
 assert.equal(reactEventHandlerImport?.result?.type, "Js");
+for (const target of [
+  "js.value.react.component",
+  "js.value.react.effectCallback",
+]) {
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.effect, "runtime");
+  assert.equal(entry?.boundary, "explicitConversion");
+  assert.equal(entry?.result?.type, "Js");
+}
 const reactDepsEmptyImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.deps.empty",
 );
@@ -617,7 +584,6 @@ assert.equal(reactPropsEmptyImport?.effect, "react");
 assert.equal(reactPropsEmptyImport?.args.length, 0);
 assert.equal(reactPropsEmptyImport?.result?.type, "Js");
 for (const target of [
-  "react.props.setKey",
   "react.props.setProperty",
   "react.props.setEventHandler",
   "react.props.setRef",
@@ -657,8 +623,8 @@ for (const target of ["react.node.component", "react.node.keyedComponent"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "react");
   assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.kind, "function");
-  assert.equal(entry?.args[1]?.type?.effect, "react");
+  assert.equal(entry?.args[1]?.type?.type, "Js");
+  assert.equal(entry?.args[1]?.type?.kind, "resource");
   assert.equal(entry?.result?.type, "Js");
 }
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(

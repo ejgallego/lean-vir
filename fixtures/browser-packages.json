@@ -146,6 +146,7 @@
         {
           "source": "examples/tutorials/ReactProofWidgetHello.lean",
           "roots": [
+            "ReactProofWidgetHello.createComponent",
             "ReactProofWidgetHello.mount",
             "ReactProofWidgetHello.unmount"
           ]
@@ -153,8 +154,10 @@
         {
           "source": "examples/ReactProofWidget.lean",
           "roots": [
+            "ReactProofWidget.createComponent",
             "ReactProofWidget.mount",
-            "ReactProofWidget.unmount"
+            "ReactProofWidget.unmount",
+            "ReactProofWidget.renderSnapshotIntoSelector"
           ]
         }
       ],

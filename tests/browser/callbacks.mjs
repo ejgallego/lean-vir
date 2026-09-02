@@ -157,7 +157,7 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     selectedLocations: [],
     selections: [],
   };
-  await runDemoHostEntry(cdp, origin, "ReactProofWidget.mount", {
+  await runDemoHostEntry(cdp, origin, "ReactProofWidget.renderSnapshotIntoSelector", {
     runInputs: ["#react-proof-transition-root", JSON.stringify(emptyProofSurface)],
     target: { id: "react-proof-transition-root" },
   });

@@ -77,6 +77,11 @@ opaque MemoCalculation (α : Type) : Type
 /-- Native JavaScript setup function accepted by `React.useEffect`. -/
 opaque EffectCallback : Type
 
+/-- Lean source value explicitly converted to React's setup-function shape. -/
+structure LeanEffect (value : Type) where
+  setup : Lean.Vir.Browser.DomM (Lean.Vir.Js value)
+  cleanup : Lean.Vir.Js value → Lean.Vir.Browser.DomM Unit
+
 /-- Native unary JavaScript callback used by React and component props. -/
 opaque Callback (α : Type) : Type
 
@@ -141,25 +146,13 @@ opaque Node : Type
 opaque DependencyList : Type
 
 /--
-An explicitly identified React function component authored in Lean.
+An exact JavaScript React function component whose props originate in Lean.
 
-`id` supplies the React component-type identity for VIR's small Lean-component
-adapter. Values with the same ID update one component type at a stable tree
-position; changing the ID asks React to unmount the old type and mount a new
-one. IDs should be declaration-stable constants, not values derived from props
-or keys. The render function remains subject to the same hook and purity rules
-as an ordinary TypeScript React component.
+The JavaScript function value itself is the React component type and therefore
+its identity. Construct it once with `Component.ofLean` and reuse that value
+where React should preserve hook state. VIR does not maintain a parallel string
+identity registry.
 -/
-structure Component (props : Type := Unit) where
-  id : String
-  render : props → ReactM (Lean.Vir.Js Node)
-
-namespace Component
-
-/-- Creates a Lean-authored React component with an explicit stable type ID. -/
-def named (id : String) (render : props → ReactM (Lean.Vir.Js Node)) : Component props :=
-  { id, render }
-
-end Component
+opaque Component (props : Type := Unit) : Type
 
 end Lean.Vir.React

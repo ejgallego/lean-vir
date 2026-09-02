@@ -84,21 +84,47 @@ export default function VirInfoviewWidget(props) {
       if (isDisposed()) {
         return;
       }
+      const componentEntry = validateWidgetComponentEntry(
+        service.runtime,
+        config.componentEntry,
+      );
       const entry = validateWidgetEntry(service.runtime, config.entry);
       const unmountEntry = validateWidgetUnmountEntry(
         service.runtime,
         config.unmountEntry,
       );
       const current = loadedRef.current;
-      if (sameLoadedWidget(current, service, entry, unmountEntry, setupHint)) {
+      if (
+        sameLoadedWidget(
+          current,
+          service,
+          componentEntry,
+          entry,
+          unmountEntry,
+          setupHint,
+        )
+      ) {
         return;
+      }
+      const component = service.runtime.call(componentEntry.entry);
+      if (typeof component !== "function") {
+        throw new Error(
+          `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
+        );
       }
       irPackageRevisionRef.current = service.packageRevision;
       retainRuntimeService(service);
       if (current !== null) {
         releaseLoadedWidget(current, mountId);
       }
-      loadedRef.current = { service, entry, unmountEntry, setupHint };
+      loadedRef.current = {
+        service,
+        componentEntry,
+        component,
+        entry,
+        unmountEntry,
+        setupHint,
+      };
       setProofWidgetsExpr(null);
       setRuntimeToken((token) => token + 1);
     } catch (error) {
@@ -125,6 +151,7 @@ export default function VirInfoviewWidget(props) {
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
     props.setupHint,
@@ -143,6 +170,7 @@ export default function VirInfoviewWidget(props) {
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
     props.setupHint,
@@ -198,6 +226,7 @@ export default function VirInfoviewWidget(props) {
   }, [
     props.wasmPath,
     irPackageKey,
+    props.componentEntry,
     props.entry,
     props.unmountEntry,
     props.autoReloadMs,
@@ -269,6 +298,7 @@ export default function VirInfoviewWidget(props) {
       const mounted = loaded.service.runtime.call(
         loaded.entry.entry,
         selector,
+        loaded.component,
         surface,
       );
       if (mounted !== true) {
@@ -334,15 +364,39 @@ export function validateWidgetEntry(runtime, entryName) {
   }
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 2 ||
+    entry.args?.length !== 3 ||
     entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
+    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
+    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
+    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
     entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
   ) {
     throw new Error(
-      `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry ` +
-        `(Lean: String -> Surface -> DomM Bool)`,
+      `VIR widget entry ${entryName} must be an effectful String -> Component -> Surface -> Bool entry`,
+    );
+  }
+  return entry;
+}
+
+export function validateWidgetComponentEntry(runtime, entryName) {
+  const entry =
+    runtime.findManifestEntry?.(entryName) ??
+    runtime.interfaceManifest?.exports?.find(
+      (candidate) =>
+        candidate.entry === entryName ||
+        candidate.id === entryName ||
+        candidate.jsName === entryName,
+    );
+  if (entry === null || entry === undefined) {
+    throw new Error(`VIR widget component entry not found: ${entryName}`);
+  }
+  if (
+    !isEffectfulInterfaceEffect(entry.effect) ||
+    entry.args?.length !== 0 ||
+    entry.result?.interfaceTag !== INTERFACE_TAG.RESOURCE
+  ) {
+    throw new Error(
+      `VIR widget component entry ${entryName} must be an effectful () -> Component entry`,
     );
   }
   return entry;
@@ -686,6 +740,7 @@ function widgetRuntimeConfigFromProps(props) {
   return {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
+    componentEntry: requiredString(props.componentEntry, "componentEntry"),
     entry: requiredString(props.entry, "entry"),
     unmountEntry: optionalString(props.unmountEntry, "unmountEntry"),
     position: requiredPosition(props.pos, "pos"),
@@ -738,10 +793,18 @@ function optionalNonNegativeInteger(value, label) {
   return value;
 }
 
-function sameLoadedWidget(loaded, service, entry, unmountEntry, setupHint) {
+function sameLoadedWidget(
+  loaded,
+  service,
+  componentEntry,
+  entry,
+  unmountEntry,
+  setupHint,
+) {
   return (
     loaded !== null &&
     loaded.service === service &&
+    loaded.componentEntry.entry === componentEntry.entry &&
     loaded.entry.entry === entry.entry &&
     (loaded.unmountEntry?.entry ?? "") === (unmountEntry?.entry ?? "") &&
     loaded.setupHint === setupHint

@@ -27,12 +27,11 @@ VIR does not enforce a property that TypeScript React does not enforce. Render
 purity, hook order, replay-safe reducers, effect discipline, and complete
 dependency arrays remain programmer responsibilities.
 
-The acceptable deltas are explicit adapters forced by the boundary. For
-example, `Component props` contains a stable string ID and a
-`props -> ReactM (Js Node)` render function. The ID supplies the JavaScript
-function identity that React normally gets from a TypeScript declaration; the
-render callback still runs under React's normal rules. A separate Lean-first
-HTML/component DSL must elaborate directly to React-shaped operations.
+The acceptable deltas are explicit value conversions forced by the boundary.
+For example, `Component.ofLean` creates an ordinary JavaScript function once;
+that returned function, rather than a VIR string registry, is the component
+identity seen by React. A separate Lean-first HTML/component DSL must elaborate
+directly to React-shaped operations.
 
 ## Official Baseline
 
@@ -53,9 +52,9 @@ The audit baseline is the public React 19.2 reference, checked on
 
 | React concept          | React shape                                                                         | Current Lean shape                                                                                          | Fidelity                                                                                                                                                                                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Function component     | `function Component(props) { ... }`                                                 | `Component { id : String, render : props -> ReactM (Js Node) }`                                             | Explicit VIR adapter. The ID supplies stable React type identity; React still invokes and replays the ordinary JS render callback.                                                                                                            |
+| Function component     | `function Component(props) { ... }`                                                 | `Component.ofLean : (props -> ReactM (Js Node)) -> RuntimeM (Js (Component props))`                         | Explicit representation conversion. The result is the ordinary JavaScript function and therefore has native React identity.                                                                                                                  |
 | Root creation          | `createRoot(domNode, options?)`                                                     | `Root.create : Js Element -> DomM (Js Root)`                                                                | Close. Missing root options. Selector helpers are convenience, not core React.                                                                                                                                                                |
-| Root render            | `root.render(reactNode)`                                                            | `Root.renderNode root (Js Node)`; convenience `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Good core match. `renderNode` is the faithful resource boundary; the other two APIs are explicit generated adapters for Lean tree construction and real function components.                                                                  |
+| Root render            | `root.render(reactNode)`                                                            | `Root.renderNode root (Js Node)`; Lean conveniences build the node first                                   | Good core match. `renderNode` is the sole host boundary; `Root.render` and `Root.renderComponent` are ordinary Lean composition over it.                                                                                                       |
 | Root unmount           | `root.unmount()`                                                                    | `Root.unmount : Js Root -> DomM Unit`                                                                       | Good. Resource cleanup is an explicit runtime concern.                                                                                                                                                                                        |
 | Element construction   | `createElement(type, props, ...children)`                                           | `Node.createElement : Js ElementType -> Js Props -> Js.Array (Js Node) -> ReactM (Js Node)`                 | Faithful boundary. Props and children are the exact JS values. Lean builders are separate conveniences.                                                                                                                                       |
 | JSX                    | JSX elaborates to React elements                                                    | `Vir.ProofWidgets.Jsx` lowers to native React elements/components                                           | Good explicit syntax layer; it creates no serializable or virtual tree.                                                                                                                                                                      |
@@ -69,7 +68,7 @@ The audit baseline is the public React 19.2 reference, checked on
 | `useReducer`           | `useReducer(reducer, initialArg, init?)`                                            | exact `Js Reducer`, initial `Js state`, exact `Js ReducerTuple`                                             | Good core match; initializer form is missing. `Reducer.ofLean` is an explicit callback conversion, and purity/replay remain the programmer's responsibility.                                                                                  |
 | dispatch               | `dispatch(action)`                                                                  | `ReducerDispatch.dispatch dispatch action`                                                                  | Close. Action is explicitly `Js action`, which matches the JS-land reducer surface.                                                                                                                                                           |
 | `useRef`               | returns ref object with `.current`                                                  | `Hooks.useRef`, `Ref.get`, `Ref.set`                                                                        | Good. The explicit get/set API reflects the Wasm/Lean boundary.                                                                                                                                                                               |
-| `useEffect`            | `useEffect(setup, dependencies?)`; cleanup optional                                 | exact `Js EffectCallback` forms plus named `useLeanEffect` adapter                                          | Good native binding. The Lean setup/cleanup split is visibly separate because it changes the callback shape.                                                                                                                                 |
+| `useEffect`            | `useEffect(setup, dependencies?)`; cleanup optional                                 | exact `Js EffectCallback`; `EffectCallback.ofLean` is an explicit conversion                               | Good native binding. `Hooks.useLeanEffect` is only Lean composition of that conversion with exact `useEffect`; the hook host has no alternate effect protocol.                                                                                |
 | effect dependencies    | any reactive JS values compared with `Object.is`                                    | `Js DependencyList` built from `Js α` values                                                                | Close. Dependency values now stay JavaScript-owned; string deps are a convenience wrapper.                                                                                                                                                    |
 | `useMemo`              | `useMemo(calculateValue, dependencies)`                                             | `Hooks.useMemo calculate deps`                                                                              | Good. Calculate runs when React chooses, dependencies are the actual JavaScript array, and the result is the exact `Js` value. Purity remains the programmer's responsibility.                                                                |
 | `useCallback`          | `useCallback(fn, dependencies)`                                                     | exact `Js Callback` and `Js DependencyList`                                                                 | Good. React selects and returns the exact function.                                                                                                                                                                                           |
@@ -90,10 +89,8 @@ The main remaining gaps are breadth rather than a second semantic model:
 - `useReducer` does not expose its initializer form;
 - context creation/providers and a wider external-component library surface
   are not yet bound;
-- Lean-authored effect setup needs the explicitly named `useLeanEffect`
-  callback-shape adapter;
-- `Component` is a deliberate VIR adapter because a Lean definition does not
-  itself provide a JavaScript function object for React identity.
+- Lean callbacks require explicit conversions such as `Component.ofLean` and
+  `EffectCallback.ofLean` before React can receive JavaScript function values.
 
 External component bindings should expose values as `Js ElementType`. Their
 authoring path remains `Node.createElement component props children`.

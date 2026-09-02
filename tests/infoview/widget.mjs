@@ -67,6 +67,7 @@ const {
   surfaceFromInfoviewProps,
   taggedTextToPlain,
   validateWidgetEntry,
+  validateWidgetComponentEntry,
   validateWidgetUnmountEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
@@ -204,6 +205,11 @@ const rpcSession = {
 
 assert.equal(typeof infoviewWidgetComponent, "function");
 assert.equal(
+  validateWidgetComponentEntry(runtime, "ReactProofWidget.createComponent")
+    .entry,
+  "ReactProofWidget.createComponent",
+);
+assert.equal(
   validateWidgetEntry(runtime, "ReactProofWidget.mount").entry,
   "ReactProofWidget.mount",
 );
@@ -214,7 +220,7 @@ assert.equal(
 assert.equal(validateWidgetUnmountEntry(runtime, ""), null);
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /String -> Surface -> DomM Bool/,
+  /String -> Component -> Surface -> Bool/,
 );
 assert.throws(
   () =>
@@ -227,6 +233,7 @@ assert.throws(
               effect: "dom",
               args: [
                 { type: { interfaceTag: INTERFACE_TAG.STRING } },
+                { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
                 {
                   type: {
                     interfaceTag: INTERFACE_TAG.STRUCTURE,
@@ -241,7 +248,7 @@ assert.throws(
       },
       "WrongSurface.mount",
     ),
-  /String -> Surface -> DomM Bool/,
+  /String -> Component -> Surface -> Bool/,
 );
 assert.throws(
   () => validateWidgetUnmountEntry(runtime, "ReactProofWidget.mount"),
@@ -333,7 +340,13 @@ assert.equal(
   (
     await statIRPackage(
       rpcSession,
-      { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
+      {
+        roots: [
+          "ReactProofWidget.createComponent",
+          "ReactProofWidget.mount",
+          "ReactProofWidget.unmount",
+        ],
+      },
       { line: 0, character: 0 },
     )
   ).revision,
@@ -506,7 +519,13 @@ await assert.rejects(
 const runtimeOptions = await loadRuntimeOptions({
   rpcSession,
   wasmPath: "web/public/vir-upstream.wasm",
-  irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
+  irPackage: {
+    roots: [
+      "ReactProofWidget.createComponent",
+      "ReactProofWidget.mount",
+      "ReactProofWidget.unmount",
+    ],
+  },
   position: { line: 0, character: 0 },
 });
 assert.ok(runtimeOptions.wasmModule instanceof WebAssembly.Module);
@@ -521,7 +540,11 @@ assert.equal(
   runtimeOptions.wasmModule,
 );
 const reloadIRPackage = {
-  roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"],
+  roots: [
+    "ReactProofWidget.createComponent",
+    "ReactProofWidget.mount",
+    "ReactProofWidget.unmount",
+  ],
 };
 const reloadPosition = { line: 0, character: 0 };
 const reloadStatCount = irPackageStatCount;
@@ -553,7 +576,14 @@ assert.ok(irPackageStatCount > changedReloadStatCount);
 irPackageRevision = "ir-package-v1";
 const irPackageServiceConfig = {
   wasmPath: "web/public/vir-upstream.wasm",
-  irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
+  irPackage: {
+    roots: [
+      "ReactProofWidget.createComponent",
+      "ReactProofWidget.mount",
+      "ReactProofWidget.unmount",
+    ],
+  },
+  componentEntry: "ReactProofWidget.createComponent",
   entry: "ReactProofWidget.mount",
   unmountEntry: "ReactProofWidget.unmount",
   position: { line: 0, character: 0 },

@@ -31,6 +31,48 @@ opaque ofUnary
 
 end React.Callback
 
+namespace React.Component
+
+/--
+Generated binding for reviewed VIR protocol `react.component.of-lean`.
+
+Explicitly converts a transferred Lean render callback into one reusable JavaScript React function component; that returned function is the React component identity.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1`: receiver none; render callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.react.component"]
+opaque ofLeanJs
+    {props : Type}
+    (render : Lean.Vir.JSL props → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component props))
+
+end React.Component
+
+namespace React.EffectCallback
+
+/--
+Generated binding for reviewed VIR protocol `react.effect-callback.of-lean`.
+
+Explicitly converts separate transferred Lean setup and cleanup callbacks into the ordinary JavaScript setup function shape accepted by React.useEffect.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1`: receiver none; effect lean-owned/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.react.effectCallback"]
+opaque ofLeanJs
+    {α : Type}
+    (effect : Lean.Vir.React.LeanEffect α) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Lean.Vir.React.EffectCallback)
+
+end React.EffectCallback
+
 namespace React.ElementType
 
 /--
@@ -143,24 +185,6 @@ opaque useEffectWithoutDeps
     Lean.Vir.React.ReactM Unit
 
 /--
-Generated binding for reviewed VIR protocol `react.hooks.use-lean-effect`.
-
-Explicitly adapts separate transferred Lean setup and cleanup callbacks to React's effect callback shape.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.useLeanEffect"]
-opaque useLeanEffectWithoutDepsJs
-    {α : Type}
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.React.ReactM Unit
-
-/--
 Generated binding for reviewed VIR protocol `react.hooks.use-memo`.
 
 Passes the caller's native calculation function and dependency array unchanged to React.useMemo.
@@ -228,25 +252,6 @@ This declaration is generated; edit the binding configuration.
 opaque useEffectWithDeps
     (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
     (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
-    Lean.Vir.React.ReactM Unit
-
-/--
-Generated binding for reviewed VIR protocol `react.hooks.use-lean-effect-with-deps`.
-
-Explicitly adapts separate transferred Lean setup and cleanup callbacks under a native dependency array.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; deps js-resource/borrowed/call; setup callback/owned/until-release; cleanup callback/owned/until-release; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.useLeanEffectWithDeps"]
-opaque useLeanEffectWithDepsJs
-    {α : Type}
-    (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList)
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     Lean.Vir.React.ReactM Unit
 
 end React.Hooks
@@ -347,35 +352,37 @@ opaque createElement
 /--
 Generated binding for reviewed VIR protocol `react.node.component`.
 
-Creates a React element for the explicit Lean-component adapter using a stable component type ID and render callback.
+Calls React.createElement with the exact JavaScript function component and JSL-backed Lean props.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; componentType js-resource/borrowed/call; component callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.component"]
-opaque componentThunkJs
-    (componentType : @& Lean.Vir.Js String)
-    (component : Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+opaque componentJs
+    {props : Type}
+    (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
+    (props : @& Lean.Vir.JSL props) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
 Generated binding for reviewed VIR protocol `react.node.keyed-component`.
 
-Creates a keyed React element for the explicit Lean-component adapter using a stable component type ID and render callback.
+Calls React.createElement with the exact JavaScript function component, JSL-backed Lean props, and key.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; componentType js-resource/borrowed/call; component callback/owned/until-release; key js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; key js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.keyedComponent"]
-opaque keyedComponentThunkJs
-    (componentType : @& Lean.Vir.Js String)
-    (component : Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node))
+opaque keyedComponentJs
+    {props : Type}
+    (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
+    (props : @& Lean.Vir.JSL props)
     (key : @& Lean.Vir.Js String) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
@@ -433,23 +440,6 @@ This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.props.empty"]
 opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Props)
-
-/--
-Generated explicit protocol operation semantic adapter for TypeScript `React.Attributes.key`.
-
-Adapter policy: Sets React's special key field on a JavaScript props object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; key js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.props.setKey"]
-opaque setKeyJs
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (key : @& Lean.Vir.Js String) :
-    Lean.Vir.React.ReactM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.props.set-property`.
@@ -683,41 +673,6 @@ opaque create
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
 /--
-Generated explicit protocol operation semantic adapter for TypeScript `Root.render`.
-
-Adapter policy: Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; children callback/owned/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.render"]
-opaque render
-    (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (children : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
-    Lean.Vir.Browser.DomM Unit
-
-/--
-Generated binding for reviewed VIR protocol `react.root.render-component`.
-
-Renders the explicit Lean-component adapter and preserves its React type while the supplied component ID remains stable.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; root js-resource/borrowed/call; componentType js-resource/borrowed/call; component callback/owned/until-release; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.renderComponent"]
-opaque renderComponentThunk
-    (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (componentType : @& Lean.Vir.Js String)
-    (component : Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
-    Lean.Vir.Browser.DomM Unit
-
-/--
 Generated binding for reviewed VIR protocol `react.root.render-selector`.
 
 VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.
@@ -732,24 +687,6 @@ This declaration is generated; edit the binding configuration.
 opaque renderIntoSelectorJs
     (selector : @& Lean.Vir.Js String)
     (node : @& Lean.Vir.Js Lean.Vir.React.Node) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `react.root.render-component-selector`.
-
-VIR-owned selector convenience protocol that mounts the explicitly identified Lean-component adapter.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; componentType js-resource/borrowed/call; component callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.renderComponentIntoSelector"]
-opaque renderComponentIntoSelectorThunkJs
-    (selector : @& Lean.Vir.Js String)
-    (componentType : @& Lean.Vir.Js String)
-    (component : Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
 /--

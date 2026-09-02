@@ -16,7 +16,7 @@ structure StatProps where
   label : String
   value : String
 
-def Stat : Component StatProps := .named "ProofWidgetsHtml.Stat" fun ctx =>
+def Stat : RuntimeM (Component StatProps) := Component.ofLean fun ctx =>
   Html.liWith
     #[
       Attr.className "pw-html-stat",
@@ -27,8 +27,10 @@ def Stat : Component StatProps := .named "ProofWidgetsHtml.Stat" fun ctx =>
       Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text ctx.props.value]
     ]
 
-def View : Component Unit := .named "ProofWidgetsHtml.View" fun _ =>
-  Html.sectionWith
+def View : RuntimeM (Component Unit) := do
+  let stat ← Stat
+  Component.ofLean fun _ =>
+    Html.sectionWith
     #[
       Attr.id "proofwidgets-html-demo",
       Attr.role "region",
@@ -44,8 +46,8 @@ def View : Component Unit := .named "ProofWidgetsHtml.View" fun _ =>
         Html.text "This tree is written through a shallow Html facade and rendered as native React nodes."
       ],
       Html.ulWith #[Attr.className "pw-html-stats"] #[
-        Html.ofComponent Stat { label := "Elements", value := "5" },
-        Html.ofComponent Stat { label := "Components", value := "1" },
+        Html.ofComponent stat { label := "Elements", value := "5" },
+        Html.ofComponent stat { label := "Components", value := "1" },
         Html.liWith #[Attr.className "pw-html-stat"] #[
           Html.spanWith #[Attr.className "pw-html-stat-label"] #[Html.text "Text"],
           Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text "native"]
@@ -56,8 +58,9 @@ def View : Component Unit := .named "ProofWidgetsHtml.View" fun _ =>
       ]
     ]
 
-def mount (selector : String) : DomM Bool :=
-  Lean.Vir.React.Root.renderComponentIntoSelector selector View (componentProps ())
+def mount (selector : String) : DomM Bool := do
+  let component ← View
+  Lean.Vir.React.Root.renderComponentIntoSelector selector component (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-html-root"

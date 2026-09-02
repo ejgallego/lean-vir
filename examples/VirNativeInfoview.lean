@@ -193,8 +193,8 @@ def hypothesisNames (hypothesis : Hypothesis) : String :=
   else
     " ".intercalate hypothesis.names.toList
 
-def HypothesisRow : Lean.Vir.ProofWidgets.Component Hypothesis :=
-    .named "VirNativeInfoview.HypothesisRow" fun (ctx : ComponentProps Hypothesis) =>
+def HypothesisRow : RuntimeM (Lean.Vir.ProofWidgets.Component Hypothesis) :=
+  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Hypothesis) =>
   let hypothesis := ctx.props
   let value : Array Html :=
     match hypothesis.value with
@@ -222,122 +222,126 @@ def HypothesisRow : Lean.Vir.ProofWidgets.Component Hypothesis :=
     ] #[Html.text hypothesis.type]
   ] ++ value)
 
-def GoalCard : Lean.Vir.ProofWidgets.Component Goal :=
-    .named "VirNativeInfoview.GoalCard" fun (ctx : ComponentProps Goal) => do
-  let goal := ctx.props
-  let initialCollapsed ← JsValue.ofBool false
-  let collapsedState ← Lean.Vir.React.StateTuple.toState
-    (← Lean.Vir.React.Hooks.useState initialCollapsed)
-  let collapsed ← JsValue.toBool collapsedState.value
-  let detailsId := s!"vir-native-infoview-goal-{goal.index}-details"
-  let toggle : DomM Unit := do
-    let next ← JsValue.ofBool (!collapsed)
-    Lean.Vir.React.State.set collapsedState next
-  let hypotheses : Array Html := goal.hypotheses.map fun hypothesis =>
-    Html.keyedOfComponent hypothesis.id HypothesisRow hypothesis
-  let context : Html :=
-    if hypotheses.isEmpty then
-      Html.elementWithProps "p" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-no-hypotheses",
-        Style.empty
-      ] #[Html.text "No local hypotheses."]
-    else
-      Html.elementWithProps "ul" #[
-        Lean.Vir.React.Props.id detailsId,
-        Lean.Vir.React.Props.className "vir-native-infoview-context",
-        Lean.Vir.React.Props.role "list",
-        Lean.Vir.React.Props.ariaLabel "Local hypotheses",
-        Style.context
-      ] hypotheses
-  let target : Html := Html.elementWithProps "div" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-target",
-      Style.target
-    ] #[
-      Html.elementWithProps "span" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-turnstile",
-        Lean.Vir.React.Props.ariaHidden true,
-        Style.turnstile
-      ] #[Html.text "⊢"],
-      Html.elementWithProps "code" #[
-        Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}-target",
-        Lean.Vir.React.Props.className "vir-native-infoview-target-code",
-        Style.targetCode
-      ] #[Html.text goal.target]
+def GoalCard : RuntimeM (Lean.Vir.ProofWidgets.Component Goal) := do
+  let hypothesisRow ← HypothesisRow
+  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Goal) => do
+    let goal := ctx.props
+    let initialCollapsed ← JsValue.ofBool false
+    let collapsedState ← Lean.Vir.React.StateTuple.toState
+      (← Lean.Vir.React.Hooks.useState initialCollapsed)
+    let collapsed ← JsValue.toBool collapsedState.value
+    let detailsId := s!"vir-native-infoview-goal-{goal.index}-details"
+    let toggle : DomM Unit := do
+      let next ← JsValue.ofBool (!collapsed)
+      Lean.Vir.React.State.set collapsedState next
+    let hypotheses : Array Html := goal.hypotheses.map fun hypothesis =>
+      Html.keyedOfComponent hypothesis.id hypothesisRow hypothesis
+    let context : Html :=
+      if hypotheses.isEmpty then
+        Html.elementWithProps "p" #[
+          Lean.Vir.React.Props.className "vir-native-infoview-no-hypotheses",
+          Style.empty
+        ] #[Html.text "No local hypotheses."]
+      else
+        Html.elementWithProps "ul" #[
+          Lean.Vir.React.Props.id detailsId,
+          Lean.Vir.React.Props.className "vir-native-infoview-context",
+          Lean.Vir.React.Props.role "list",
+          Lean.Vir.React.Props.ariaLabel "Local hypotheses",
+          Style.context
+        ] hypotheses
+    let target : Html := Html.elementWithProps "div" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-target",
+        Style.target
+      ] #[
+        Html.elementWithProps "span" #[
+          Lean.Vir.React.Props.className "vir-native-infoview-turnstile",
+          Lean.Vir.React.Props.ariaHidden true,
+          Style.turnstile
+        ] #[Html.text "⊢"],
+        Html.elementWithProps "code" #[
+          Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}-target",
+          Lean.Vir.React.Props.className "vir-native-infoview-target-code",
+          Style.targetCode
+        ] #[Html.text goal.target]
+      ]
+    let details : Array Html := if collapsed then #[] else #[
+      context,
+      target
     ]
-  let details : Array Html := if collapsed then #[] else #[
-    context,
-    target
-  ]
-  let heading : Html := Html.elementWithProps "h3" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-goal-heading",
-      Style.goalHeading
-    ] #[Html.text (goalName goal ++ " · " ++ goal.status)]
-  let collapseButton : Html := Html.elementWithProps "button" #[
-      Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}-collapse",
-      Lean.Vir.React.Props.className "vir-native-infoview-collapse",
-      Lean.Vir.React.Props.type "button",
-      Lean.Vir.React.Props.title (if collapsed then "Expand goal" else "Collapse goal"),
-      Lean.Vir.React.Props.ariaLabel (if collapsed then "Expand goal" else "Collapse goal"),
-      Lean.Vir.React.Props.ariaExpanded (!collapsed),
-      Lean.Vir.React.Props.ariaControls detailsId,
-      Lean.Vir.React.Props.onClick toggle,
-      Style.collapseButton
-    ] #[Html.text (if collapsed then "+" else "−")]
-  let header : Html := Html.elementWithProps "header" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-goal-header",
-      Style.goalHeader
-    ] #[heading, collapseButton]
-  Html.elementWithProps "article" #[
-    Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}",
-    Lean.Vir.React.Props.className "vir-native-infoview-goal",
-    Lean.Vir.React.Props.data "goal-id" goal.id,
-    Lean.Vir.React.Props.data "goal-status" goal.status,
-    Style.goalCard
-  ] (#[header] ++ details)
+    let heading : Html := Html.elementWithProps "h3" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-goal-heading",
+        Style.goalHeading
+      ] #[Html.text (goalName goal ++ " · " ++ goal.status)]
+    let collapseButton : Html := Html.elementWithProps "button" #[
+        Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}-collapse",
+        Lean.Vir.React.Props.className "vir-native-infoview-collapse",
+        Lean.Vir.React.Props.type "button",
+        Lean.Vir.React.Props.title (if collapsed then "Expand goal" else "Collapse goal"),
+        Lean.Vir.React.Props.ariaLabel (if collapsed then "Expand goal" else "Collapse goal"),
+        Lean.Vir.React.Props.ariaExpanded (!collapsed),
+        Lean.Vir.React.Props.ariaControls detailsId,
+        Lean.Vir.React.Props.onClick toggle,
+        Style.collapseButton
+      ] #[Html.text (if collapsed then "+" else "−")]
+    let header : Html := Html.elementWithProps "header" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-goal-header",
+        Style.goalHeader
+      ] #[heading, collapseButton]
+    Html.elementWithProps "article" #[
+      Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goal.index}",
+      Lean.Vir.React.Props.className "vir-native-infoview-goal",
+      Lean.Vir.React.Props.data "goal-id" goal.id,
+      Lean.Vir.React.Props.data "goal-status" goal.status,
+      Style.goalCard
+    ] (#[header] ++ details)
 
-def View : Lean.Vir.ProofWidgets.Component Surface :=
-    .named "VirNativeInfoview.View" fun (ctx : ComponentProps Surface) =>
-  let surface := ctx.props
-  let goalCount := surface.goals.size
-  let goals : Array Html := surface.goals.map fun goal =>
-    Html.keyedOfComponent goal.id GoalCard goal
-  let body : Html := if goals.isEmpty then
-    Html.elementWithProps "p" #[
-      Lean.Vir.React.Props.id "vir-native-infoview-empty",
-      Lean.Vir.React.Props.className "vir-native-infoview-empty",
-      Style.empty
-    ] #[Html.text ("No goals at " ++ surface.cursor.label ++ ".")]
-  else
-    Html.elementWithProps "div" #[
-      Lean.Vir.React.Props.id "vir-native-infoview-goals",
-      Lean.Vir.React.Props.className "vir-native-infoview-goals",
-      Style.goalList
-    ] goals
-  let heading : Html := Html.elementWithProps "h2" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-title",
-      Style.title
-    ] #[Html.text "Goals"]
-  let summary : Html := Html.elementWithProps "p" #[
-      Lean.Vir.React.Props.id "vir-native-infoview-summary",
-      Lean.Vir.React.Props.className "vir-native-infoview-summary",
-      Style.summary
-    ] #[Html.text <| s!"{goalCount} " ++ plural goalCount "goal" "goals" ++
-      " · " ++ surface.cursor.label]
-  let toolbar : Html := Html.elementWithProps "header" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-toolbar",
-      Style.toolbar
-    ] #[heading, summary]
-  Html.elementWithProps "section" #[
-    Lean.Vir.React.Props.id "vir-native-infoview",
-    Lean.Vir.React.Props.className "vir-native-infoview",
-    Lean.Vir.React.Props.role "region",
-    Lean.Vir.React.Props.ariaLabel "VIR native Lean goals",
-    Style.shell
-  ] #[toolbar, body]
+def View : RuntimeM (Lean.Vir.ProofWidgets.Component Surface) := do
+  let goalCard ← GoalCard
+  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Surface) =>
+    let surface := ctx.props
+    let goalCount := surface.goals.size
+    let goals : Array Html := surface.goals.map fun goal =>
+      Html.keyedOfComponent goal.id goalCard goal
+    let body : Html := if goals.isEmpty then
+      Html.elementWithProps "p" #[
+        Lean.Vir.React.Props.id "vir-native-infoview-empty",
+        Lean.Vir.React.Props.className "vir-native-infoview-empty",
+        Style.empty
+      ] #[Html.text ("No goals at " ++ surface.cursor.label ++ ".")]
+    else
+      Html.elementWithProps "div" #[
+        Lean.Vir.React.Props.id "vir-native-infoview-goals",
+        Lean.Vir.React.Props.className "vir-native-infoview-goals",
+        Style.goalList
+      ] goals
+    let heading : Html := Html.elementWithProps "h2" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-title",
+        Style.title
+      ] #[Html.text "Goals"]
+    let summary : Html := Html.elementWithProps "p" #[
+        Lean.Vir.React.Props.id "vir-native-infoview-summary",
+        Lean.Vir.React.Props.className "vir-native-infoview-summary",
+        Style.summary
+      ] #[Html.text <| s!"{goalCount} " ++ plural goalCount "goal" "goals" ++
+        " · " ++ surface.cursor.label]
+    let toolbar : Html := Html.elementWithProps "header" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-toolbar",
+        Style.toolbar
+      ] #[heading, summary]
+    Html.elementWithProps "section" #[
+      Lean.Vir.React.Props.id "vir-native-infoview",
+      Lean.Vir.React.Props.className "vir-native-infoview",
+      Lean.Vir.React.Props.role "region",
+      Lean.Vir.React.Props.ariaLabel "VIR native Lean goals",
+      Style.shell
+    ] #[toolbar, body]
 
-/-- Root adapter consumed by the live VIR infoview shell. -/
-def App : Lean.Vir.React.Component Surface := .named "VirNativeInfoview.App" fun surface =>
-  Lean.Vir.React.Node.component View (componentProps surface)
+/-- Root component factory consumed by the live VIR infoview shell. -/
+def App : RuntimeM (Js (Lean.Vir.React.Component Surface)) := do
+  let view ← View
+  Lean.Vir.React.Component.ofLean fun surface =>
+    Lean.Vir.React.Node.component view (componentProps surface)
 
 vir_proof_widget App with mountId := "vir-native-infoview-widget"
 

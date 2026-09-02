@@ -10,6 +10,7 @@ import Vir.React
 
 namespace ReactProofWidgetHello
 
+open Lean.Vir
 open Lean.Vir.React
 open Lean.Vir.Infoview (Goal Hypothesis Surface)
 
@@ -187,7 +188,7 @@ def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
         hypothesis
       ]
 
-def View : Component Surface := .named "ReactProofWidgetHello.View" fun surface => do
+def View : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
   let titleText ← Node.text "Hello ProofWidget from IRIF"
   let title ← Node.h3With #[Props.id "react-proof-hello-title", Style.title] #[
     titleText
@@ -212,8 +213,8 @@ def View : Component Surface := .named "ReactProofWidgetHello.View" fun surface 
       details
     ]
 
-def view (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
-  Node.component View surface
+def view (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
+  Node.component (← View) surface
 
 def render (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
   view surface
@@ -226,7 +227,7 @@ end ReactProofWidgetHello
 This is the smallest live VIR proof-widget example. It demonstrates the
 required shape:
 
-- a `Component Surface`;
+- a `RuntimeM (Js (Component Surface))` factory whose result is reused by the shell;
 - a `vir_proof_widget` declaration that derives the standard entries and props;
 - a `show_panel_widgets` command that loads the package in the infoview.
 

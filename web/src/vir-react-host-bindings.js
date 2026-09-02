@@ -12,7 +12,7 @@ import {
   createReactStateHostBindings,
 } from "./react/vir-react-hooks.js";
 import {
-  createBrowserLeanComponentNodeFactory,
+  createBrowserLeanComponentNode,
   createBrowserReactNodeElement,
   createBrowserReactNodeFragment,
   createBrowserReactNodeText,
@@ -28,16 +28,19 @@ export function createBrowserReactHostBindings(
   { querySelector = queryBrowserElement } = {},
 ) {
   const hookRuntime = createBrowserReactHookRuntime(React);
-  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
-    React.createElement,
-  );
   return {
     ...createReactRootHostBindings(
       state,
       (target) => createBrowserReactRoot(ReactDOMClient.createRoot(target)),
       {
         querySelector,
-        createLeanComponentNode,
+        createLeanComponentNode: (component, props, key) =>
+          createBrowserLeanComponentNode(
+            React.createElement,
+            component,
+            props,
+            key,
+          ),
         createNodeText: createBrowserReactNodeText,
         createNodeElement: (elementType, props, children) =>
           createBrowserReactNodeElement(

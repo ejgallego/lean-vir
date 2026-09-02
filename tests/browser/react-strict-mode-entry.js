@@ -9,7 +9,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import { createBrowserReactHookRuntime } from "../../web/src/react/vir-react-hooks.js";
-import { createBrowserLeanComponentNodeFactory } from "../../web/src/react/vir-react-node.js";
+import { createBrowserLeanComponentNode } from "../../web/src/react/vir-react-node.js";
 import {
   createHostLifecycle,
   createReactRootHostBindings,
@@ -44,12 +44,9 @@ async function runNestedComponentIdentityProbe() {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
-    React.createElement,
-  );
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
-  const renderCallback = (label) => () => {
+  const component = ({ leanProps: { label } }) => {
     const [count, setCount] = React.useState(0);
     setter = setCount;
     React.useEffect(() => {
@@ -58,13 +55,15 @@ async function runNestedComponentIdentityProbe() {
     }, []);
     return React.createElement("div", null, `${label}:${count}`);
   };
+  const replacement = ({ leanProps }) => component({ leanProps });
 
   try {
     flushSync(() =>
       root.render(
-        createLeanComponentNode(
-          "NestedComponentProbe",
-          renderCallback("first"),
+        createBrowserLeanComponentNode(
+          React.createElement,
+          component,
+          { label: "first" },
           "stable",
         ),
       ),
@@ -72,9 +71,10 @@ async function runNestedComponentIdentityProbe() {
     flushSync(() => setter(1));
     flushSync(() =>
       root.render(
-        createLeanComponentNode(
-          "NestedComponentProbe",
-          renderCallback("second"),
+        createBrowserLeanComponentNode(
+          React.createElement,
+          component,
+          { label: "second" },
           "stable",
         ),
       ),
@@ -83,13 +83,14 @@ async function runNestedComponentIdentityProbe() {
       container.textContent === "second:1" &&
         state.mounts === 1 &&
         state.cleanups === 0,
-      "a stable nested component ID and key must preserve hook state",
+      "the same nested component function and key must preserve hook state",
     );
     flushSync(() =>
       root.render(
-        createLeanComponentNode(
-          "NestedReplacementProbe",
-          renderCallback("replacement"),
+        createBrowserLeanComponentNode(
+          React.createElement,
+          replacement,
+          { label: "replacement" },
           "stable",
         ),
       ),
@@ -98,7 +99,7 @@ async function runNestedComponentIdentityProbe() {
       container.textContent === "replacement:0" &&
         state.mounts === 2 &&
         state.cleanups === 1,
-      "changing a nested component ID must remount it",
+      "changing the nested component function must remount it",
     );
     return { ...state, text: container.textContent };
   } finally {
@@ -111,17 +112,20 @@ async function runRepeatedComponentSubmissionProbe() {
   const lifecycle = createHostLifecycle();
   const container = document.createElement("div");
   document.body.append(container);
-  const createLeanComponentNode = createBrowserLeanComponentNodeFactory(
-    React.createElement,
-  );
   const bindings = createReactRootHostBindings(lifecycle, createRoot, {
-    createLeanComponentNode,
+    createLeanComponentNode: (component, props, key) =>
+      createBrowserLeanComponentNode(
+        React.createElement,
+        component,
+        props,
+        key,
+      ),
   });
   let root = bindings["react.root.create"](container);
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
 
-  const component = (label) => () => {
+  const component = ({ leanProps: { label } }) => {
     const [count, setCount] = React.useState(0);
     setter = setCount;
     React.useEffect(() => {
@@ -130,44 +134,32 @@ async function runRepeatedComponentSubmissionProbe() {
     }, []);
     return React.createElement("div", null, `${label}:${count}`);
   };
+  const replacement = ({ leanProps }) => component({ leanProps });
+
+  function render(valueComponent, props) {
+    const node = bindings["react.node.component"](valueComponent, props);
+    bindings["react.root.renderNode"](root, node);
+  }
 
   try {
-    flushSync(() =>
-      bindings["react.root.renderComponent"](
-        root,
-        "RepeatedComponentProbe",
-        component("first"),
-      ),
-    );
+    flushSync(() => render(component, { label: "first" }));
     flushSync(() => setter(1));
-    flushSync(() =>
-      bindings["react.root.renderComponent"](
-        root,
-        "RepeatedComponentProbe",
-        component("second"),
-      ),
-    );
+    flushSync(() => render(component, { label: "second" }));
     requireState(
       container.textContent === "second:1",
-      "a stable component ID must preserve hook state",
+      "the same component function must preserve hook state",
     );
     requireState(
       state.mounts === 1 && state.cleanups === 0,
-      "a same-ID update must not remount the component adapter",
+      "an exact component-function update must not remount",
     );
 
-    flushSync(() =>
-      bindings["react.root.renderComponent"](
-        root,
-        "ReplacementComponentProbe",
-        component("replacement"),
-      ),
-    );
+    flushSync(() => render(replacement, { label: "replacement" }));
     requireState(
       container.textContent === "replacement:0" &&
         state.mounts === 2 &&
         state.cleanups === 1,
-      "changing the explicit component ID must remount the component",
+      "changing the component function must remount the component",
     );
     return { ...state, text: container.textContent };
   } finally {

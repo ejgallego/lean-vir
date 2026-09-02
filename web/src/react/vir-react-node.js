@@ -49,49 +49,27 @@ export function createBrowserReactNodeFragment(
   );
 }
 
-// This is the one deliberate component adapter in the React value layer. Each
-// explicit Lean component ID maps to one ordinary React function type. The
-// render callback remains an exact JavaScript function in props, so React owns
-// render/replay behavior and JavaScript reachability owns its Lean closure.
-export function createBrowserLeanComponentNodeFactory(createElement) {
+// The component argument is already the exact reusable JavaScript function
+// that React uses as its component type. The only VIR-specific prop is the JSL
+// object carrying the corresponding Lean value.
+export function createBrowserLeanComponentNode(
+  createElement,
+  component,
+  leanProps,
+  key = null,
+) {
   const create = requireCreateElement(createElement);
-  const boundariesByType = new Map();
-
-  function boundaryFor(componentType) {
-    const identity = reactNodeName(componentType, "component type");
-    const existing = boundariesByType.get(identity);
-    if (existing !== undefined) return existing;
-    const LeanComponent = ({ renderCallback }) =>
-      requireFunction(
-        renderCallback,
-        "Lean component render callback",
-      )(undefined);
-    LeanComponent.displayName = `LeanComponent(${identity})`;
-    boundariesByType.set(identity, LeanComponent);
-    return LeanComponent;
-  }
-
-  return (componentType, renderCallback, key = null) => {
-    const props = {
-      renderCallback: requireFunction(
-        renderCallback,
-        "Lean component render callback",
-      ),
-    };
-    if (key !== null && key !== undefined) {
-      props.key = reactNodeName(key, "component key");
-    }
-    return create(boundaryFor(componentType), props);
+  const props = {
+    leanProps: requireObject(leanProps, "Lean component JSL props"),
   };
+  if (key !== null && key !== undefined) {
+    props.key = reactNodeName(key, "component key");
+  }
+  return create(requireFunction(component, "Lean component"), props);
 }
 
 export function createReactProps() {
   return {};
-}
-
-export function setReactPropsKey(props, key) {
-  setReactObjectProperty(reactPropsValue(props), "key", reactNodeKey(key));
-  return undefined;
 }
 
 export function setReactPropsRef(props, ref) {
@@ -153,6 +131,13 @@ function requireFunction(value, label) {
   return value;
 }
 
+function requireObject(value, label) {
+  if (value === null || typeof value !== "object") {
+    throw new Error(`${label} must be a JavaScript object`);
+  }
+  return value;
+}
+
 function reactPropsValue(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("React props must be a JavaScript object");
@@ -210,13 +195,6 @@ function reactNodeEventHandlerEntry(handler) {
     );
   }
   return [name, handler.callback];
-}
-
-function reactNodeKey(key) {
-  if (typeof key !== "string") {
-    throw new Error("React Node element key must be a string");
-  }
-  return key;
 }
 
 function reactNodeRef(ref) {

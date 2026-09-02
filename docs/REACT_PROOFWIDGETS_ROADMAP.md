@@ -119,9 +119,9 @@ ported without redesigning their component model.
 
 Current RF status:
 
-- Lean components carry explicit IDs that map to stable JavaScript function
-  identities, so hook state is preserved across same-ID rerenders and changed
-  IDs remount under React's normal rules.
+- `Component.ofLean` creates the actual JavaScript function identity seen by
+  React. Reusing that value preserves hook state; constructing another value
+  remounts under React's normal rules. No string identity registry remains.
 - `useState`, `useReducer`, `useMemo`, `useCallback`, `useContext`, and native
   `useEffect` delegate exact JavaScript values to React. Explicit callback
   conversions and tuple projections are separate helpers.
@@ -180,8 +180,10 @@ A realistic path has three layers:
    That shell embeds an esbuild bundle of the VIR JavaScript runtime graph,
    keeps React/ReactDOM/infoview imports external so they resolve to the Lean
    infoview dependencies, loads the WASM through `Lean.Vir.Infoview.readAsset`,
-   and derives the standard mount/unmount, `IRPackage`, and `WidgetProps`
-   declarations from the supplied component. The package bytes are still built
+   and derives the standard component-factory/mount/unmount, `IRPackage`, and
+   `WidgetProps` declarations from the supplied component action. The shell
+   creates the component once per runtime service and passes that exact
+   function to each mount update. The package bytes are still built
    from the active Lean server snapshot through
    `Lean.Vir.Infoview.buildIRPackage`, so the local demo no longer requires the
    repository Vite dev server or a package watcher.
@@ -198,8 +200,9 @@ A realistic path has three layers:
    on ordinary infoview refreshes. For stable widget configuration it also keeps
    a module-level VIR runtime service alive across React component remounts and
    calls the entry again only when the semantic proof surface or package
-   revision changes; `ReactProofWidget.mount` is idempotent for a selector and
-   rerenders the existing React root. Idle cached services have a bounded TTL,
+   revision changes. It reuses the component value produced by
+   `ReactProofWidget.createComponent`, so `ReactProofWidget.mount` rerenders the
+   existing React root without changing the component type. Idle cached services have a bounded TTL,
    and superseded services are disposed after their active widgets release them.
    The shell consumes widget mouse/click events at its outer container and calls
    `ReactProofWidget.unmount` when a selector is genuinely dropped. Removing the

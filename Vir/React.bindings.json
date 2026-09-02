@@ -122,24 +122,34 @@
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } }
       },
       {
+        "id": "react.effect-callback.of-lean", "group": "value-conversions", "target": "js.value.react.effectCallback",
+        "lean": "Lean.Vir.React.EffectCallback.ofLeanJs", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts separate transferred Lean setup and cleanup callbacks into the ordinary JavaScript setup function shape accepted by React.useEffect.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "effect", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.React.LeanEffect α", "representation": "lean-owned" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } }
+      },
+      {
+        "id": "react.component.of-lean", "group": "value-conversions", "target": "js.value.react.component",
+        "lean": "Lean.Vir.React.Component.ofLeanJs", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean render callback into one reusable JavaScript React function component; that returned function is the React component identity.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["props"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "render", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.JSL props → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } }
+      },
+      {
         "id": "react.props.empty", "group": "props", "target": "react.props.empty",
         "lean": "Lean.Vir.React.Props.empty", "marker": "vir_js",
         "reason": "Allocates an empty JavaScript React props object.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" }, "arguments": [],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } }
-      },
-      {
-        "id": "react.props.set-key", "group": "props", "target": "react.props.setKey",
-        "lean": "Lean.Vir.React.Props.setKeyJs", "marker": "vir_js",
-        "reason": "Sets React's special key field on a JavaScript props object.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.Attributes.key", "accessor": "set", "semantics": "changing" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "props", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "key", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "react.props.set-property", "group": "props", "target": "react.props.setProperty",
@@ -291,18 +301,6 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
-        "id": "react.hooks.use-lean-effect", "group": "hooks", "target": "react.useLeanEffect",
-        "lean": "Lean.Vir.React.Hooks.useLeanEffectWithoutDepsJs", "marker": "vir_js",
-        "reason": "Explicitly adapts separate transferred Lean setup and cleanup callbacks to React's effect callback shape.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "setup", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Browser.DomM (Lean.Vir.Js α)", "representation": "callback" } },
-          { "name": "cleanup", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "@& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "react.dependencies.empty", "group": "dependencies", "target": "react.deps.empty",
         "lean": "Lean.Vir.React.Hooks.DependencyList.empty", "marker": "vir_js",
         "reason": "Allocates an empty JavaScript dependency list for React hooks.",
@@ -370,19 +368,6 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
-        "id": "react.hooks.use-lean-effect-with-deps", "group": "hooks", "target": "react.useLeanEffectWithDeps",
-        "lean": "Lean.Vir.React.Hooks.useLeanEffectWithDepsJs", "marker": "vir_js",
-        "reason": "Explicitly adapts separate transferred Lean setup and cleanup callbacks under a native dependency array.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } },
-          { "name": "setup", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Browser.DomM (Lean.Vir.Js α)", "representation": "callback" } },
-          { "name": "cleanup", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "@& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "react.ref.get", "group": "references", "target": "react.ref.get",
         "lean": "Lean.Vir.React.Ref.get", "marker": "vir_js",
         "reason": "Reads the current value from React's exact mutable ref object.",
@@ -436,27 +421,29 @@
       },
       {
         "id": "react.node.component", "group": "nodes", "target": "react.node.component",
-        "lean": "Lean.Vir.React.Node.componentThunkJs", "marker": "vir_js",
-        "reason": "Creates a React element for the explicit Lean-component adapter using a stable component type ID and render callback.",
+        "lean": "Lean.Vir.React.Node.componentJs", "marker": "vir_js",
+        "reason": "Calls React.createElement with the exact JavaScript function component and JSL-backed Lean props.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
+          { "name": "component", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } },
+          { "name": "props", "type": { "lean": "Lean.Vir.JSL props", "representation": "js-resource", "resourceInner": "props" } }
         ],
+        "typeParameters": ["props"],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
         "id": "react.node.keyed-component", "group": "nodes", "target": "react.node.keyedComponent",
-        "lean": "Lean.Vir.React.Node.keyedComponentThunkJs", "marker": "vir_js",
-        "reason": "Creates a keyed React element for the explicit Lean-component adapter using a stable component type ID and render callback.",
+        "lean": "Lean.Vir.React.Node.keyedComponentJs", "marker": "vir_js",
+        "reason": "Calls React.createElement with the exact JavaScript function component, JSL-backed Lean props, and key.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } },
+          { "name": "component", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } },
+          { "name": "props", "type": { "lean": "Lean.Vir.JSL props", "representation": "js-resource", "resourceInner": "props" } },
           { "name": "key", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
         ],
+        "typeParameters": ["props"],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
@@ -472,33 +459,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
-        "id": "react.root.render-tree", "group": "react-dom-root", "target": "react.root.render",
-        "lean": "Lean.Vir.React.Root.render", "marker": "vir_js",
-        "reason": "Runs a Lean ReactM construction action once and forwards its JavaScript-owned ReactNode to Root.render.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Root.render", "semantics": "changing" },
-        "activeEffect": "use",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [
-          { "name": "root", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } },
-          { "name": "children", "role": "callback", "passing": "owned", "retention": "call", "type": { "lean": "Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "react.root.render-component", "group": "react-dom-root", "target": "react.root.renderComponent",
-        "lean": "Lean.Vir.React.Root.renderComponentThunk", "marker": "vir_js",
-        "reason": "Renders the explicit Lean-component adapter and preserves its React type while the supplied component ID remains stable.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "activeEffect": "use",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [
-          { "name": "root", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Root", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Root" } },
-          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "react.root.render-selector", "group": "react-dom-root", "target": "react.root.renderIntoSelector",
         "lean": "Lean.Vir.React.Root.renderIntoSelectorJs", "marker": "vir_js",
         "reason": "VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.",
@@ -508,20 +468,6 @@
         "arguments": [
           { "name": "selector", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
           { "name": "node", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-        ],
-        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
-      },
-      {
-        "id": "react.root.render-component-selector", "group": "react-dom-root", "target": "react.root.renderComponentIntoSelector",
-        "lean": "Lean.Vir.React.Root.renderComponentIntoSelectorThunkJs", "marker": "vir_js",
-        "reason": "VIR-owned selector convenience protocol that mounts the explicitly identified Lean-component adapter.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "activeEffect": "register",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [
-          { "name": "selector", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "componentType", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "component", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Unit → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
       },

@@ -39,9 +39,10 @@ export function createBrowserReactHookRuntime(React) {
     },
 
     useContext(context) {
-      return requireReactHook(React, "useContext")(
-        requireObject(context, "React context"),
-      );
+      return requireReactHook(
+        React,
+        "useContext",
+      )(requireObject(context, "React context"));
     },
 
     useEffect(setup, deps = undefined) {
@@ -55,10 +56,6 @@ export function createBrowserReactHookRuntime(React) {
         );
       }
       return undefined;
-    },
-
-    useLeanEffect(setup, cleanup, deps = undefined) {
-      return useReactEffect(React, setup, cleanup, deps);
     },
   };
 }
@@ -82,8 +79,6 @@ export function createReactStateHostBindings(hookRuntime) {
       hookRuntime.useCallback(callback, deps),
     "react.useContext": (context) => hookRuntime.useContext(context),
     "react.useEffect": (setup) => hookRuntime.useEffect(setup),
-    "react.useLeanEffect": (setup, cleanup) =>
-      hookRuntime.useLeanEffect(setup, cleanup),
     "react.deps.empty": () => [],
     "react.deps.push": (deps, value) => {
       requireDependencyList(deps).push(value);
@@ -91,8 +86,6 @@ export function createReactStateHostBindings(hookRuntime) {
     },
     "react.useEffectWithDeps": (setup, deps) =>
       hookRuntime.useEffect(setup, deps),
-    "react.useLeanEffectWithDeps": (deps, setup, cleanup) =>
-      hookRuntime.useLeanEffect(setup, cleanup, requireDependencyList(deps)),
     "react.ref.get": (ref) => requireObject(ref, "ReactRef").current,
     "react.ref.set": (ref, value) => {
       requireObject(ref, "ReactRef").current = value;
@@ -103,9 +96,10 @@ export function createReactStateHostBindings(hookRuntime) {
       return undefined;
     },
     "react.state.modify": (setter, update) => {
-      requireFunction(setter, "ReactStateSetter")(
-        requireFunction(update, "React state updater"),
-      );
+      requireFunction(
+        setter,
+        "ReactStateSetter",
+      )(requireFunction(update, "React state updater"));
       return undefined;
     },
     "react.reducer.dispatch": (dispatch, action) => {
@@ -129,22 +123,32 @@ export function createReactJsValueHostBindings() {
       requireFunction(calculate, "React memo calculation"),
     "js.value.react.callback": (callback) =>
       requireFunction(callback, "React callback"),
+    "js.value.react.effectCallback": (effect) => {
+      const descriptor = requireObject(effect, "Lean React effect");
+      const runSetup = requireFunction(descriptor.setup, "React effect setup");
+      const runCleanup = requireFunction(
+        descriptor.cleanup,
+        "React effect cleanup",
+      );
+      return () => {
+        const value = runSetup();
+        return () => runCleanup(value);
+      };
+    },
+    "js.value.react.component": (render) => {
+      const runRender = requireFunction(render, "Lean component render");
+      return function LeanComponent(props) {
+        return runRender(requireLeanComponentProps(props));
+      };
+    },
   };
 }
 
-function useReactEffect(React, setup, cleanup, deps = undefined) {
-  const runSetup = requireFunction(setup, "React effect setup");
-  const runCleanup = requireFunction(cleanup, "React effect cleanup");
-  const effect = () => {
-    const value = runSetup();
-    return () => runCleanup(value);
-  };
-  if (deps === undefined) {
-    requireReactHook(React, "useEffect")(effect);
-  } else {
-    requireReactHook(React, "useEffect")(effect, requireDependencyList(deps));
+function requireLeanComponentProps(props) {
+  if (props === null || typeof props !== "object" || !("leanProps" in props)) {
+    throw new Error("Lean component props must contain leanProps");
   }
-  return undefined;
+  return props.leanProps;
 }
 
 function requireReactHook(React, name) {
