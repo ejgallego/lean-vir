@@ -64,7 +64,7 @@ const requiredFunctionExports = [
   "vir_obj_name_string_size",
   "vir_obj_resource",
   "vir_obj_resource_externref",
-  "vir_obj_resource_is_owned",
+  "vir_obj_resource_is_valid",
   "vir_obj_scalar",
   "vir_obj_is_scalar",
   "vir_obj_scalar_value",
@@ -90,9 +90,7 @@ const requiredFunctionExports = [
 ];
 
 const invalidMagicPackage = Uint8Array.from([
-  3, 0, 0, 0, 98, 97, 100,
-  1, 0, 0, 0,
-  0, 0, 0, 0,
+  3, 0, 0, 0, 98, 97, 100, 1, 0, 0, 0, 0, 0, 0, 0,
 ]);
 
 export async function instantiateVirModule(wasmModule) {
@@ -120,8 +118,14 @@ export function loadIrPackageSet(exports, packageMembers) {
   for (const packageBytes of packageMembers) {
     const packagePtr = exports.vir_alloc_bytes(packageBytes.byteLength);
     try {
-      new Uint8Array(exports.memory.buffer, packagePtr, packageBytes.byteLength).set(packageBytes);
-      if (exports.vir_append_ir_package(packagePtr, packageBytes.byteLength) === 0) {
+      new Uint8Array(
+        exports.memory.buffer,
+        packagePtr,
+        packageBytes.byteLength,
+      ).set(packageBytes);
+      if (
+        exports.vir_append_ir_package(packagePtr, packageBytes.byteLength) === 0
+      ) {
         throw new Error("IR package-set member load failed");
       }
     } finally {
@@ -131,7 +135,9 @@ export function loadIrPackageSet(exports, packageMembers) {
   const loadedDecls = exports.vir_finish_ir_package_set();
   if (loadedDecls === 0) throw new Error("IR package-set finalization failed");
   if (exports.vir_package_decl_count() !== loadedDecls) {
-    throw new Error("loaded declaration count does not match package provider state");
+    throw new Error(
+      "loaded declaration count does not match package provider state",
+    );
   }
   return loadedDecls;
 }
@@ -152,7 +158,9 @@ function assertRequiredExports(exports) {
     throw new Error("memory export is missing");
   }
   if (exports.vir_package_decl_count() !== 0) {
-    throw new Error("package declaration provider should be empty before an .irpkg is loaded");
+    throw new Error(
+      "package declaration provider should be empty before an .irpkg is loaded",
+    );
   }
   if (exports.vir_upstream_target_pointer_bytes() !== 4) {
     throw new Error("upstream wasm target layout guard failed");
@@ -165,14 +173,23 @@ function assertInvalidPackageDiagnostic(exports) {
   }
   const badPackagePtr = exports.vir_alloc_bytes(invalidMagicPackage.byteLength);
   try {
-    new Uint8Array(exports.memory.buffer, badPackagePtr, invalidMagicPackage.byteLength).set(invalidMagicPackage);
-    const loadedDecls = exports.vir_append_ir_package(badPackagePtr, invalidMagicPackage.byteLength);
+    new Uint8Array(
+      exports.memory.buffer,
+      badPackagePtr,
+      invalidMagicPackage.byteLength,
+    ).set(invalidMagicPackage);
+    const loadedDecls = exports.vir_append_ir_package(
+      badPackagePtr,
+      invalidMagicPackage.byteLength,
+    );
     if (loadedDecls !== 0) {
       throw new Error("invalid IR package unexpectedly loaded");
     }
     const error = lastPackageError(exports);
     if (!error.includes("invalid IR package magic")) {
-      throw new Error(`invalid package diagnostic did not mention magic: ${error}`);
+      throw new Error(
+        `invalid package diagnostic did not mention magic: ${error}`,
+      );
     }
   } finally {
     exports.vir_free_bytes?.(badPackagePtr);
@@ -180,7 +197,9 @@ function assertInvalidPackageDiagnostic(exports) {
 }
 
 function readWasmString(exports, ptr, len) {
-  return new TextDecoder().decode(new Uint8Array(exports.memory.buffer, ptr, len));
+  return new TextDecoder().decode(
+    new Uint8Array(exports.memory.buffer, ptr, len),
+  );
 }
 
 function lastPackageError(exports) {

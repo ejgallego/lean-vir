@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir-runtime.js";
 import {
   createNodeHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
   createVirtualDocumentState,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
@@ -19,9 +19,7 @@ export {
   fetchBytes,
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
-  releaseHostResource,
   VIR_HOST_DISPOSE,
-  VirCallback,
   VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";
@@ -32,23 +30,25 @@ export {
   createVirtualElementState,
   ensureVirtualElementState,
   ensureVirtualElementStates,
-  findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
-  virtualReactElementById,
 } from "./vir-host-bindings.js";
 
 export function createVirRuntimeFactory(options = {}) {
-  const { hostBindings = null, virtualDocumentState = createVirtualDocumentState(), ...browserOptions } = options;
+  const {
+    hostBindings = null,
+    virtualDocumentState = createVirtualDocumentState(),
+    ...browserOptions
+  } = options;
   let firstGeneration = true;
   return createBrowserVirRuntimeFactory({
     ...browserOptions,
     defaultHostBindings: () => {
       const resources = firstGeneration
         ? virtualDocumentState.resources
-        : createHostResourceState();
+        : createHostLifecycle();
       firstGeneration = false;
       return createNodeHostBindings(virtualDocumentState, resources);
     },
@@ -57,11 +57,7 @@ export function createVirRuntimeFactory(options = {}) {
 }
 
 export async function createVirRuntime(options = {}) {
-  const {
-    irPackageSetBytes,
-    irPackageSetUrl,
-    ...factoryOptions
-  } = options;
+  const { irPackageSetBytes, irPackageSetUrl, ...factoryOptions } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
   return factory.createRuntime({
     irPackageSetBytes,

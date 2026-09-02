@@ -1,207 +1,117 @@
 # React-First Wasm Bindings
 
-This note records the current direction for using newer WebAssembly interop
-features in Lean VIR. The product goal is excellent support for writing React
-apps in Lean. Generic host interop improvements are useful when they make that
-React path simpler, safer, or faster.
-
-Status in this note was checked on 2026-06-12 against the WebAssembly proposal
-repositories.
+This note records how WebAssembly interop supports VIR's React surface. The
+product goal is semantic fidelity with ordinary JavaScript React, with a small
+and replaceable interpreter transport.
 
 ## Current Boundary
 
-The runtime still targets a portable core `wasm32-wasip1` artifact:
+The runtime targets a `wasm32-wasip1` core module:
 
-- JavaScript calls Lean through the generic `vir_call` byte-payload export.
-- Lean calls JavaScript through package-scoped `@[vir_js]` host imports routed
-  to `env.vir_js_call`.
-- Opaque browser and React resources cross the JS/Wasm boundary through
-  `externref` side-channel imports. Lean stores them as GC-finalized external
-  objects that root JavaScript `HostResource` objects in the host runtime.
-- Lean closures passed to JavaScript cross through an internal closure-root
-  side channel and appear as callable `VirCallback` objects that must be
-  released by the host binding or runtime teardown.
+- JavaScript calls exported Lean declarations through the generic object ABI.
+- Lean calls synchronous JavaScript bindings through package-scoped
+  `@[vir_js]` imports.
+- JavaScript values use an `externref` root table while they are represented
+  by Lean external objects.
+- Lean callbacks and JSL objects carry private Lean roots associated with
+  ordinary JavaScript functions or objects.
 
-That baseline describes the current implementation. The experimental React
-resource prototype can intentionally require newer browser/Wasm support instead
-of carrying compatibility code for older engines.
-
-## Feature Fit
-
-`externref` is the right term and the right first feature to prototype. It is
-part of the finished Reference Types proposal and lets host references cross
-the Wasm boundary without encoding them through linear memory or integer table
-handles. For Lean VIR, the first candidate values are React and DOM resources:
-`Element`, callback-scoped `Event`, `ReactRoot`, event listener handles, timer
-handles, and animation-frame handles.
-
-The experimental `externref` path should be strict:
-
-- feature-detect support at runtime and fail fast on unsupported engines;
-- do not design a long-term numeric-resource fallback for the prototype;
-- keep the Lean-facing resource API centered on `Lean.Vir.Js α` object values;
-- keep explicit Lean closure root/release semantics.
-
-The prototype uses direct side channels for opaque values while keeping the
-generic byte-payload dispatcher for ordinary scalar and structured values.
-`INTERFACE_TAG.RESOURCE` and `INTERFACE_TAG.FUNCTION` carry no serialized numeric payload.
-JavaScript queues opaque `HostResource` objects before entering Wasm, and the
-shim queues those same objects back before JavaScript decodes resource results
-or host-import arguments. Lean closures are rooted in the shim and queued back
-as internal closure root ids before JavaScript decodes `VirCallback` values.
-Lean resource values are external objects whose finalizers release the host
-root table entry.
-
-The resource transport shape is:
+The `externref` table stores the actual JavaScript value. VIR does not put a
+runtime wrapper between React and the value:
 
 ```text
-JavaScript HostResource object
-  private WeakMap state -> { value, label }
-
-          | externref
-          v
-
-JavaScript externref root table
-  root_id -> HostResource
-
-          ^ root_id
-          |
-
-Lean external object
-  { root_id }
+React/JavaScript value
+        │
+        ▼
+externref table slot  ◀── root id ──▶  Lean external object
 ```
 
-The JavaScript API treats resources as opaque runtime objects and does not
-accept raw numeric resource tokens or expose a supported numeric `.handle`
-field. The host-side lifetime and ownership policy is documented in
-[HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
+The root id is private interpreter transport. Host bindings see only the exact
+JavaScript value. `null`, `undefined`, primitives, objects, and functions are
+all valid table values; a separate live-id set distinguishes an absent root.
 
-`externref` replaces opaque resource transport, not the entire call ABI. Plain
-scalars and structured Lean values still use the manifest-described byte
-payload because they must be reconstructed as Lean heap objects inside the
-interpreter. Replacing `vir_js_call(slot, payload)` for those values would
-require generated per-package Wasm imports with typed lowering rules, or a
-component-model/WIT-style resource and value ABI. The current prototype keeps
-that larger ABI change separate from the React resource path.
+## Why Externref Is Not The Whole ABI
 
-`externref` does not replace callback rooting. Lean callbacks are still Lean
-heap objects owned by the interpreter runtime. JavaScript may retain a callback
-across React renders, event listeners, timers, or animation frames, so the
-`VirCallback` lease contract remains the ownership boundary. Each React node,
-component, reducer, effect, or pending state updater acquires its own lease;
-replacing or disposing that owner releases only that lease. The Lean closure
-root is released after its final lease.
+Reference types remove serialization for JavaScript values. They do not
+replace construction of ordinary Lean scalars, structures, arrays, variants,
+or recursive values inside the interpreter. Those still use the
+manifest-described object ABI.
 
-JS Promise Integration (JSPI) should be deferred until there is a concrete
-Promise-shaped React app API. The proposal is active at Phase 4 and exposes
-`WebAssembly.Suspending` plus `WebAssembly.promising` to let synchronous Wasm
-code call Promise-returning JavaScript imports. That fits future APIs such as
-`fetch`, IndexedDB, async local storage, or server RPC from Lean, but it should
-not change the existing synchronous `vir.call(...)` surface. If adopted, it
-should be exposed through a distinct async API such as `vir.callAsync(...)`.
+Similarly, `externref` does not eliminate the need to root a Lean closure or
+Lean heap value while JavaScript can reach it. VIR handles that obligation in
+private WeakMap/finalizer state attached to an otherwise ordinary JavaScript
+function or object.
 
-Stack Switching remains a tracking item for coroutine-shaped runtimes. The
-Component Model and WIT resources remain the long-term semantic target for
-typed resources, but the current browser runtime should not depend on a
-component-model artifact yet. Wasm GC and typed function references are useful
-platform work, but they do not replace Lean's own heap representation in this
-phase.
+## React Fidelity
 
-## React API Priorities
+The browser adapter installs official React and ReactDOM behavior:
 
-React authoring ergonomics can improve independently of Wasm extensions:
+- actual props objects and child/dependency arrays;
+- actual React elements returned by `React.createElement`;
+- React's setter, dispatch, ref, memo, reducer, and effect behavior;
+- actual roots returned by `ReactDOMClient.createRoot`.
 
-- expand blessed `Property` and `EventHandler` helpers for common DOM/React
-  props and events;
-- document app patterns for controlled inputs, form submission, state updates,
-  and component-like helper functions over `Node`;
-- keep `Node`, `Property`, `PropValue`, `EventHandler`, and `Root` object
-  markers as the stable Lean-facing shape while the lower boundary evolves;
-- continue testing rapid rerender, unmount, package reload, and runtime dispose
-  cleanup for retained callbacks.
+VIR does not infer React's internal state or maintain a parallel hook/resource
+graph. React purity, hook ordering, replay safety, dependency correctness, and
+lane behavior remain programmer responsibilities just as they are in
+TypeScript.
 
-The strict `externref` resource path is implemented. JSPI should wait for an
-async Lean app use case that cannot be expressed cleanly with callback
-registration.
+Lean-specific builders and component/effect conveniences are explicit
+adapters above this exact value boundary. They should remain separately named
+and should not be described as properties of React itself.
 
-## WIT Alignment
+The component adapter keeps one stable function-component type per root and
+updates its Lean callback on later submissions. This preserves ordinary hook
+state; unmounting the root is the explicit remount boundary. Hook-order
+correctness across those updates remains the programmer's responsibility.
 
-The current runtime should stay morally aligned with WIT even while the browser
-artifact remains a core `wasm32-wasip1` module. WIT already has enums and
-variants, so the main mismatch for `Lean.Vir.React.Node` is not enum support.
-The current `Node` marker is resource-like: Lean constructs a
-JavaScript-owned `ReactNode` through `react.node.text` and
-`react.node.createElement`, and event-handler records placed in explicit
-`Props` resources can embed callback closures.
+Official React 19, ReactDOM, and Chromium are the sole semantic oracle. The
+Node virtual document supplies cleanup-safe unsupported React shims and does
+not emulate nodes, hooks, reconciliation, roots, or commits.
 
-The intended alignment is:
+## Lifecycle Boundary
 
-- keep `Lean.Vir.Js Lean.Vir.React.Node` as the shallow native-node resource
-  authored through Lean combinators;
-- treat browser values such as `Element`, callback-scoped `Event`, and
-  `ReactRoot` as resource-like handles;
-- keep records, variants/enums, lists, options, strings, numeric scalars, and
-  resources close to WIT's value/resource categories;
-- keep JavaScript resource/runtime effects such as scalar boxing and resource
-  identity under `RuntimeM`, separate from both raw `IO` and DOM/root mutation;
-- keep the host-side resource ownership policy centralized in
-  [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy);
-- keep the initial
-  `Component props := props -> ReactM (Lean.Vir.Js Node)` boundary shallow and
-  React-like while treating future node-sharing or batching encodings as an
-  optimization question, not a user-facing API requirement.
+Ordinary React and JavaScript values use their native reference graph. VIR
+keeps explicit teardown only for active resources with public termination:
+listeners, timers, animation frames, and React roots. A host-call transaction
+rolls back a newly created active resource if result publication fails.
 
-The benchmark suite includes rows that should be sensitive to future WIT
-binding choices:
+React does not expose a commit acknowledgement for every direct root
+submission. Recurring application updates should therefore use the component
+path, where React owns render timing, rather than expecting VIR to infer when a
+directly submitted tree is no longer retained.
 
-- JavaScript codec-only encoding for scalar records/enums,
-  nested records/lists/options, and recursive custom inductives;
-- end-to-end scalar record plus enum conversion;
-- end-to-end nested record/list/option conversion;
-- end-to-end recursive custom-inductive conversion as a proxy for shapes that
-  WIT cannot represent directly;
-- React text-tree render conversion;
-- React callback-heavy render conversion.
+## Future Wasm Features
 
-These rows are meant to catch conversion-cost regressions separately from the
-pure `fib`/`sort` controls and the broader React root lifecycle benchmark.
+JS Promise Integration should wait for a concrete asynchronous Lean API.
+Promise-returning host imports do not fit the current synchronous interpreter
+transaction and should eventually use a distinct async call surface.
 
-The public JavaScript entrypoints keep React separate from the generic runtime
-surface:
+The Component Model and WIT remain useful long-term directions for typed
+resources and values, but the current core module should not emulate their
+ownership model in JavaScript. Stack switching, Wasm GC, and typed function
+references likewise need a concrete runtime benefit before changing this
+boundary.
 
-- `lean-vir` exports the generic runtime API.
-- `lean-vir/host-bindings` exports common and browser host-binding factories,
-  but does not export React bindings or import React packages.
-- `lean-vir/react-host-bindings` exports browser React root/component/hook
-  bindings and is the only browser entrypoint that imports `react` and
-  `react-dom/client`.
-- `lean-vir/vir-runtime-node` composes virtual browser and React bindings for
-  Node tests and tools.
+## Entry Points
+
+- `lean-vir` exports the generic runtime.
+- `lean-vir/host-bindings` exports common/browser factories and
+  `createHostLifecycle`.
+- `lean-vir/react-host-bindings` imports React and ReactDOM and exports the
+  browser React binding factory.
+- `lean-vir/vir-runtime-node` installs virtual DOM bindings and unsupported
+  React shims for tests and tools.
 
 ## Local Probes
 
-Run:
-
-```bash
-npm run test:wasm-extensions
-```
-
-The probe script checks the local JavaScript engine used by Node for:
-
-- `externref` table support for host-resource storage;
-- `externref` identity round-tripping through a tiny Wasm module;
-- JSPI availability through `WebAssembly.Suspending` and
-  `WebAssembly.promising`.
-
-Missing `externref` support is reported as a failure because the experimental
-React resource prototype requires it. JSPI remains optional and is reported as
-skipped when the local engine does not expose it.
+Run `npm run test:wasm-extensions`. The probe requires `externref` table
+support and identity round-tripping. JSPI remains optional and is reported
+independently.
 
 ## References
 
-- WebAssembly active proposals: <https://github.com/WebAssembly/proposals>
-- WebAssembly finished proposals:
-  <https://raw.githubusercontent.com/WebAssembly/proposals/main/finished-proposals.md>
-- Reference Types proposal: <https://github.com/WebAssembly/reference-types>
-- JS Promise Integration proposal:
-  <https://github.com/WebAssembly/js-promise-integration>
+- [WebAssembly reference types](https://github.com/WebAssembly/reference-types)
+- [WebAssembly active proposals](https://github.com/WebAssembly/proposals)
+- [JS Promise Integration](https://github.com/WebAssembly/js-promise-integration)
+- [React API reference](https://react.dev/reference/react)

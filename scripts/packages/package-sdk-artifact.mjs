@@ -45,11 +45,36 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
 
 await copyArtifactMetadata(repositoryRoot, artifactPaths.bundleDir);
 
-const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
-const leanToolchain = (await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")).trim();
-const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, capture: true });
-const gitStatus = runSync("git", ["status", "--short"], { cwd: repositoryRoot, capture: true });
-const leanVersion = runSync("lean", ["--version"], { cwd: repositoryRoot, capture: true });
+const packageJson = JSON.parse(
+  await readFile(join(repositoryRoot, "package.json"), "utf8"),
+);
+const packageLock = JSON.parse(
+  await readFile(join(repositoryRoot, "package-lock.json"), "utf8"),
+);
+const externalDependencies = Object.fromEntries(
+  ["react", "react-dom"].map((name) => {
+    const version = packageLock.packages?.[`node_modules/${name}`]?.version;
+    if (typeof version !== "string" || version.length === 0) {
+      throw new Error(`package-lock.json does not pin ${name}`);
+    }
+    return [name, version];
+  }),
+);
+const leanToolchain = (
+  await readFile(join(repositoryRoot, "lean-toolchain"), "utf8")
+).trim();
+const gitCommit = runSync("git", ["rev-parse", "HEAD"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const gitStatus = runSync("git", ["status", "--short"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
+const leanVersion = runSync("lean", ["--version"], {
+  cwd: repositoryRoot,
+  capture: true,
+});
 const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
@@ -58,10 +83,14 @@ const artifactManifest = {
   leanToolchain,
   leanVersion,
   ...PACKAGE_VERSIONS,
+  externalDependencies,
   generatedAt: new Date().toISOString(),
   files,
 };
-await writeFile(join(artifactPaths.bundleDir, "lean-vir-artifact.json"), `${JSON.stringify(artifactManifest, null, 2)}\n`);
+await writeFile(
+  join(artifactPaths.bundleDir, "lean-vir-artifact.json"),
+  `${JSON.stringify(artifactManifest, null, 2)}\n`,
+);
 await writeFile(
   join(artifactPaths.bundleDir, "README.txt"),
   `Lean VIR SDK
@@ -72,7 +101,9 @@ for the matching lean_vir package revision.
 
 The JavaScript files are ES modules. The generic runtime and host-binding
 modules do not import React; js/vir-react-host-bindings.js imports react and
-react-dom/client and should only be used by browser React integrations.
+react-dom/client and should only be used by browser React integrations. Their
+exact build-time versions are recorded under externalDependencies in
+lean-vir-artifact.json.
 
 Application code should import the entry modules directly under js/:
 
@@ -129,14 +160,14 @@ Browser React root usage:
   import { createVirRuntimeFactory } from "./js/vir-runtime.js";
   import {
     createBrowserHostBindings,
-    createHostResourceState,
+    createHostLifecycle,
   } from "./js/vir-host-bindings.js";
   import { createBrowserReactHostBindings } from "./js/vir-react-host-bindings.js";
 
   const factory = createVirRuntimeFactory({
     wasmUrl: "./wasm/vir-upstream.wasm",
     defaultHostBindings: () => {
-      const resources = createHostResourceState();
+      const resources = createHostLifecycle();
       return createBrowserHostBindings({
         resources,
         reactHostBindings: createBrowserReactHostBindings(resources),

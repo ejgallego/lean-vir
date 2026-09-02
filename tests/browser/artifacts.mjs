@@ -109,6 +109,13 @@ async function assertSdkBundle(path) {
   assert.equal(manifest.packageFormatVersion, PACKAGE_FORMAT_VERSION);
   assert.equal(manifest.manifestVersion, INTERFACE_MANIFEST_VERSION);
   assert.equal(manifest.runtimeAbiVersion, RUNTIME_ABI_VERSION);
+  const packageLock = JSON.parse(
+    await readFile(new URL("../../package-lock.json", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(manifest.externalDependencies, {
+    react: packageLock.packages["node_modules/react"].version,
+    "react-dom": packageLock.packages["node_modules/react-dom"].version,
+  });
   assert.ok(Array.isArray(manifest.files));
 }
 

@@ -15,7 +15,7 @@ namespace React.ElementType
 /--
 Generated binding for reviewed VIR protocol `react.element-type.tag`.
 
-Represents a DOM tag string as a React ElementType resource.
+Uses the exact DOM tag string as a React ElementType value.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -36,7 +36,7 @@ namespace React.EventHandler
 /--
 Generated binding for reviewed VIR protocol `react.event-handler.to-js`.
 
-Lowers an event descriptor and transfers its Lean callback into a host-owned React handler resource.
+Explicitly lowers an event descriptor to a JavaScript object containing the exact callback function.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -57,7 +57,7 @@ namespace React.Hooks
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-reducer`.
 
-Retains a replay-safe Lean reducer protocol and initializes its JavaScript-owned state.
+Calls React.useReducer with the exact reducer and initial JavaScript value and returns React's array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -77,7 +77,7 @@ opaque useReducerJs
 /--
 Generated binding for reviewed VIR protocol `react.reducer-state.value`.
 
-Projects the current JavaScript-owned state from VIR's reducer-state resource.
+Projects the current state from React's useReducer array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -96,7 +96,7 @@ opaque reducerStateValueJs
 /--
 Generated binding for reviewed VIR protocol `react.reducer-state.dispatch`.
 
-Projects the typed dispatch handle from VIR's reducer-state resource.
+Projects React's dispatch function from its useReducer array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -115,7 +115,7 @@ opaque reducerStateDispatchJs
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-state`.
 
-Initializes React state from a JavaScript-owned value and returns the host state pair resource.
+Calls React.useState with the exact initial JavaScript value and returns React's array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -133,7 +133,7 @@ opaque useStateJs
 /--
 Generated binding for reviewed VIR protocol `react.state.value`.
 
-Projects the current value from VIR's useState pair resource.
+Projects the current value from React's useState array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -151,7 +151,7 @@ opaque stateValueJs
 /--
 Generated binding for reviewed VIR protocol `react.state.setter`.
 
-Projects the setter handle from VIR's useState pair resource.
+Projects React's setter function from its useState array pair.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -187,7 +187,7 @@ opaque useRef
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-effect`.
 
-Retains resource-shaped setup and cleanup callbacks for React's no-dependency effect lifecycle.
+Adapts separate Lean setup and cleanup functions to React's no-dependency effect callback shape.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -206,7 +206,7 @@ opaque useEffect
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-memo`.
 
-Runs a render-safe calculation under React useMemo with an explicit dependency resource.
+Passes the calculation and exact dependency array to React.useMemo.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -225,7 +225,7 @@ opaque useMemo
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-effect-with-deps`.
 
-Retains resource-shaped setup and cleanup callbacks under an explicit React dependency list.
+Adapts separate Lean setup and cleanup functions to React's effect callback shape and passes the exact dependency array.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -287,7 +287,7 @@ namespace React.Node
 /--
 Generated binding for reviewed VIR protocol `react.node.text`.
 
-Creates a React text node from a JavaScript string resource.
+Uses the exact JavaScript string as a React text node.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -304,7 +304,7 @@ opaque textJs
 /--
 Generated binding for reviewed VIR protocol `react.node.create-element`.
 
-Calls React.createElement with explicit ElementType, props, and children resources.
+Calls React.createElement with the exact ElementType, props object, and child array values.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -323,7 +323,7 @@ opaque createElementJs
 /--
 Generated binding for reviewed VIR protocol `react.node.fragment`.
 
-Creates a React fragment from explicit props and child-list resources.
+Calls React.createElement with React.Fragment, the exact props object, and child array values.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -360,7 +360,7 @@ opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.NodeChildren)
 /--
 Generated binding for reviewed VIR protocol `react.node.children.push`.
 
-Appends a React node resource to a JavaScript-owned child list.
+Appends the exact React node value to the native JavaScript child array.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -382,7 +382,7 @@ namespace React.Property
 /--
 Generated binding for reviewed VIR protocol `react.property.to-js`.
 
-Explicitly lowers VIR's reviewed React Property algebra to a JavaScript property resource.
+Explicitly lowers VIR's reviewed React Property algebra to an ordinary JavaScript descriptor object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -436,7 +436,7 @@ opaque setKeyJs
 /--
 Generated binding for reviewed VIR protocol `react.props.set-property`.
 
-Installs a reviewed non-event property resource on a JavaScript props object.
+Installs the reviewed descriptor's exact JavaScript value on the props object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -454,7 +454,7 @@ opaque setProperty
 /--
 Generated binding for reviewed VIR protocol `react.props.set-event-handler`.
 
-Installs a host-owned event-handler resource on a JavaScript props object.
+Installs the descriptor's exact callback function on the JavaScript props object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -472,7 +472,7 @@ opaque setEventHandler
 /--
 Generated binding for reviewed VIR protocol `react.props.set-ref`.
 
-Installs a typed React ref resource on a JavaScript props object.
+Installs the exact React ref object on a JavaScript props object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -495,7 +495,7 @@ namespace React.ReducerDispatch
 /--
 Generated binding for reviewed VIR protocol `react.reducer.dispatch`.
 
-Dispatches a JavaScript-owned action through a typed reducer dispatch resource.
+Passes the exact JavaScript action to React's reducer dispatch function.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -519,7 +519,7 @@ namespace React.Ref
 /--
 Generated binding for reviewed VIR protocol `react.ref.get`.
 
-Reads the current JavaScript-owned value from a typed React ref resource.
+Reads the current value from React's exact mutable ref object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -537,7 +537,7 @@ opaque get
 /--
 Generated binding for reviewed VIR protocol `react.ref.set`.
 
-Writes a JavaScript-owned value to a typed React ref resource without scheduling a render.
+Writes the exact JavaScript value to React's mutable ref object without scheduling a render.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -644,7 +644,7 @@ opaque renderComponentThunk
 /--
 Generated binding for reviewed VIR protocol `react.root.render-selector`.
 
-VIR-owned convenience protocol that finds a selector, creates a root, and renders an existing node resource.
+VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -662,7 +662,7 @@ opaque renderIntoSelectorJs
 /--
 Generated binding for reviewed VIR protocol `react.root.render-component-selector`.
 
-VIR-owned selector convenience protocol that retains a Lean-authored React component thunk.
+VIR-owned selector convenience protocol that mounts the explicit no-props Lean component adapter.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -720,12 +720,12 @@ opaque set
 /--
 Generated binding for reviewed VIR protocol `react.state.modify`.
 
-Invokes an effectful Lean updater exactly once and enqueues its concrete result, avoiding React replay.
+Passes the Lean updater as React's functional state action; React may invoke it according to normal updater semantics.
 
 Binding contract: `generation.protocolOperations`.
 
 Generated reviewed VIR protocol boundary.
-ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; update callback/owned/call; result immediate/value.
+ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; update callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/

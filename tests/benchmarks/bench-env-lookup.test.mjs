@@ -54,22 +54,36 @@ test("environment lookup identity covers package content but ignores generation 
   changedMetadata.manifest.metadata.generator = "different-generator";
   assert.notDeepEqual(
     identity,
-    environmentLookupPackageIdentity(Buffer.from("declmanifest"), changedMetadata),
+    environmentLookupPackageIdentity(
+      Buffer.from("declmanifest"),
+      changedMetadata,
+    ),
   );
 
   const report = (packageIdentity) => ({
-    report: { comparisonIdentity: { workload: "environment-lookup-v2", package: packageIdentity } },
-  });
-  assert.throws(() => assertComparableBenchmarkReportIdentities([
-    { label: "before", report: report(identity) },
-    {
-      label: "after",
-      report: report(environmentLookupPackageIdentity(
-        Buffer.from("diffmanifest"),
-        packageInfo("2026-08-05T10:00:00Z"),
-      )),
+    report: {
+      comparisonIdentity: {
+        workload: "environment-lookup-v2",
+        package: packageIdentity,
+      },
     },
-  ]), /comparison identity mismatch/);
+  });
+  assert.throws(
+    () =>
+      assertComparableBenchmarkReportIdentities([
+        { label: "before", report: report(identity) },
+        {
+          label: "after",
+          report: report(
+            environmentLookupPackageIdentity(
+              Buffer.from("diffmanifest"),
+              packageInfo("2026-08-05T10:00:00Z"),
+            ),
+          ),
+        },
+      ]),
+    /comparison identity mismatch/,
+  );
   assert.notDeepEqual(
     identity,
     environmentLookupPackageIdentity(Buffer.from("declmanifest"), {
@@ -81,16 +95,34 @@ test("environment lookup identity covers package content but ignores generation 
 
 test("environment lookup harness identity covers every named source", () => {
   const original = environmentLookupHarnessIdentity([
-    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
-    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("sampler") },
+    {
+      path: "benchmarks/harness/bench-env-lookup.mjs",
+      bytes: Buffer.from("main"),
+    },
+    {
+      path: "benchmarks/harness/bench-differential.mjs",
+      bytes: Buffer.from("sampler"),
+    },
   ]);
   const reordered = environmentLookupHarnessIdentity([
-    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("sampler") },
-    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
+    {
+      path: "benchmarks/harness/bench-differential.mjs",
+      bytes: Buffer.from("sampler"),
+    },
+    {
+      path: "benchmarks/harness/bench-env-lookup.mjs",
+      bytes: Buffer.from("main"),
+    },
   ]);
   const changedSampler = environmentLookupHarnessIdentity([
-    { path: "benchmarks/harness/bench-env-lookup.mjs", bytes: Buffer.from("main") },
-    { path: "benchmarks/harness/bench-differential.mjs", bytes: Buffer.from("changed") },
+    {
+      path: "benchmarks/harness/bench-env-lookup.mjs",
+      bytes: Buffer.from("main"),
+    },
+    {
+      path: "benchmarks/harness/bench-differential.mjs",
+      bytes: Buffer.from("changed"),
+    },
   ]);
 
   assert.deepEqual(original, reordered);
@@ -98,54 +130,95 @@ test("environment lookup harness identity covers every named source", () => {
 });
 
 test("environment lookup harness identity covers the loaded runtime source closure", async () => {
-  const runtimeDirectories = ["web/src/host", "web/src/react", "web/src/runtime"];
-  const expectedRuntimeSources = (await Promise.all(runtimeDirectories.map(async (directory) =>
-    (await readdir(new URL(`../../${directory}`, import.meta.url)))
-      .filter((path) => path.endsWith(".js"))
-      .map((path) => `${directory}/${path}`),
-  ))).flat().sort();
+  const runtimeDirectories = [
+    "web/src/host",
+    "web/src/react",
+    "web/src/runtime",
+  ];
+  const expectedRuntimeSources = (
+    await Promise.all(
+      runtimeDirectories.map(async (directory) =>
+        (await readdir(new URL(`../../${directory}`, import.meta.url)))
+          .filter((path) => path.endsWith(".js"))
+          .map((path) => `${directory}/${path}`),
+      ),
+    )
+  )
+    .flat()
+    .sort();
   const declaredRuntimeSources = environmentLookupHarnessPaths
-    .filter((path) => runtimeDirectories.some((directory) => path.startsWith(`${directory}/`)))
+    .filter((path) =>
+      runtimeDirectories.some((directory) => path.startsWith(`${directory}/`)),
+    )
     .sort();
   assert.deepEqual(declaredRuntimeSources, expectedRuntimeSources);
   for (const required of [
     "benchmarks/harness/bench-utils.mjs",
-    "web/src/host-resource.js",
+    "web/src/host-boundary.js",
     "web/src/pages/browser-package-config.js",
     "web/src/runtime/core.js",
     "web/src/runtime/object-values.js",
     "web/src/vir-host-bindings.js",
     "web/src/vir-runtime.js",
   ]) {
-    assert.ok(environmentLookupHarnessPaths.includes(required), `missing harness source ${required}`);
+    assert.ok(
+      environmentLookupHarnessPaths.includes(required),
+      `missing harness source ${required}`,
+    );
   }
-  assert.equal(new Set(environmentLookupHarnessPaths).size, environmentLookupHarnessPaths.length);
-  assert.ok(environmentLookupPairHarnessPaths.includes("benchmarks/harness/bench-env-lookup-wasm-pair.mjs"));
+  assert.equal(
+    new Set(environmentLookupHarnessPaths).size,
+    environmentLookupHarnessPaths.length,
+  );
+  assert.ok(
+    environmentLookupPairHarnessPaths.includes(
+      "benchmarks/harness/bench-env-lookup-wasm-pair.mjs",
+    ),
+  );
   assert.equal(
     new Set(environmentLookupPairHarnessPaths).size,
     environmentLookupPairHarnessPaths.length,
   );
 
-  const files = await Promise.all(environmentLookupHarnessPaths.map(async (path) => ({
-    path,
-    bytes: await readFile(new URL(`../../${path}`, import.meta.url)),
-  })));
+  const files = await Promise.all(
+    environmentLookupHarnessPaths.map(async (path) => ({
+      path,
+      bytes: await readFile(new URL(`../../${path}`, import.meta.url)),
+    })),
+  );
   const original = environmentLookupHarnessIdentity(files);
-  const changedRuntime = environmentLookupHarnessIdentity(files.map((file) =>
-    file.path === "web/src/runtime/core.js"
-      ? { ...file, bytes: Buffer.concat([file.bytes, Buffer.from("\n// changed")]) }
-      : file,
-  ));
+  const changedRuntime = environmentLookupHarnessIdentity(
+    files.map((file) =>
+      file.path === "web/src/runtime/core.js"
+        ? {
+            ...file,
+            bytes: Buffer.concat([file.bytes, Buffer.from("\n// changed")]),
+          }
+        : file,
+    ),
+  );
   assert.notEqual(original.sha256, changedRuntime.sha256);
 });
 
 test("environment lookup outputs must resolve to distinct paths", () => {
-  assert.doesNotThrow(() => validateEnvironmentLookupOutputPaths({
-    jsonPath: "reports/result.json",
-    cpuProfilePath: "reports/result.cpuprofile",
-  }, "/tmp/vir-bench"));
-  assert.throws(() => validateEnvironmentLookupOutputPaths({
-    jsonPath: "reports/result.json",
-    cpuProfilePath: "reports/../reports/result.json",
-  }, "/tmp/vir-bench"), /distinct output paths/);
+  assert.doesNotThrow(() =>
+    validateEnvironmentLookupOutputPaths(
+      {
+        jsonPath: "reports/result.json",
+        cpuProfilePath: "reports/result.cpuprofile",
+      },
+      "/tmp/vir-bench",
+    ),
+  );
+  assert.throws(
+    () =>
+      validateEnvironmentLookupOutputPaths(
+        {
+          jsonPath: "reports/result.json",
+          cpuProfilePath: "reports/../reports/result.json",
+        },
+        "/tmp/vir-bench",
+      ),
+    /distinct output paths/,
+  );
 });

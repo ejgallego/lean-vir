@@ -6,11 +6,11 @@ Author: Emilio J. Gallego Arias
 
 import {
   callLeanEventCallback,
-  createAnimationResourceHostBindings,
-  createElementResourceHostBindings,
-  createHostResourceState,
-  createHtmlInputElementResourceHostBindings,
-  createTimerResourceHostBindings,
+  createAnimationHostBindings,
+  createElementHostBindings,
+  createHostLifecycle,
+  createHtmlInputElementHostBindings,
+  createTimerHostBindings,
   once,
   performanceNow,
   preventDefaultOnEvent,
@@ -29,93 +29,90 @@ import {
   nullablePayload,
 } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
-import { VIR_HOST_DISPOSE, hostResourceOwnerPhase } from "./host-resource.js";
-import { takeCallbackLease } from "./runtime/callbacks.js";
-import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
+import { VIR_HOST_DISPOSE } from "./host-boundary.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "./runtime/cleanup.js";
 
 export {
   hasExternrefTableSupport,
-  releaseHostResource,
   requireExternrefTableSupport,
-} from "./host-resource.js";
-export {
-  createHostResourceState,
-} from "./host/vir-host-resources.js";
+} from "./host-boundary.js";
+export { createHostLifecycle } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
   createVirtualElementState,
   ensureVirtualElementState,
   ensureVirtualElementStates,
-  findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
   normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
-  virtualReactElementById,
 } from "./host/vir-virtual-host-bindings.js";
 
-export function createCommonHostBindings(state = createHostResourceState()) {
+export function createCommonHostBindings() {
   return {
-    ...createJsValueHostBindings(state),
-    ...createJsCollectionHostBindings(state),
-    "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
-    "common.addNat": (lhs, rhs) =>
-      state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat")),
+    ...createJsValueHostBindings(),
+    ...createJsCollectionHostBindings(),
+    "common.echoString": (value) => value,
+    "common.addNat": (lhs, rhs) => lhs + rhs,
   };
 }
 
-export function createConsoleHostBindings(state = createHostResourceState()) {
+export function createConsoleHostBindings() {
   return {
     "browser.console.log": (message) => {
-      console.log(state.resolveResource(message, "JsString"));
+      console.log(message);
       return undefined;
     },
   };
 }
 
-export function createBrowserDocumentHostBindings(state = createHostResourceState()) {
+export function createBrowserDocumentHostBindings() {
   return {
-    "browser.document.getTitle": () => state.resourceForValue(browserDocument().title),
+    "browser.document.getTitle": () => browserDocument().title,
     "browser.document.setTitle": (title) => {
-      browserDocument().title = state.resolveResource(title, "JsString");
+      browserDocument().title = title;
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      adoptResourceForValue(state, createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+      createNullableValue(queryDocumentElement(selector)),
     "browser.document.querySelectorAll": (selector) =>
-      state.resourceForValue(queryDocumentElements(state.resolveResource(selector, "JsString"))),
+      queryDocumentElements(selector),
     "browser.document.createElement": (tagName) =>
-      state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString"))),
+      browserDocument().createElement(tagName),
   };
 }
 
-export function createBrowserEventHostBindings(state = createHostResourceState()) {
+export function createBrowserEventHostBindings() {
   return {
-    "browser.event.target": (event) =>
-      adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").target)),
+    "browser.event.target": (event) => nullableElementTarget(event.target),
     "browser.event.currentTarget": (event) =>
-      adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
+      nullableElementTarget(event.currentTarget),
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(state.resolveResource(event, "Event"));
+      preventDefaultOnEvent(event);
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(state.resolveResource(event, "Event"));
+      stopPropagationOnEvent(event);
       return undefined;
     },
     "browser.event.key": (event) => {
-      const key = state.resolveResource(event, "Event")?.key;
-      return state.resourceForValue(typeof key === "string" ? key : "");
+      const key = event?.key;
+      return typeof key === "string" ? key : "";
     },
     "browser.event.formValue": (event) =>
-      adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event")))),
+      createNullableValue(formControlEventValue(event)),
   };
 }
 
-export function createBrowserElementHostBindings(state = createHostResourceState()) {
+export function createBrowserElementHostBindings(
+  state = createHostLifecycle(),
+) {
   return {
-    ...createElementResourceHostBindings(state, {
+    ...createElementHostBindings(state, {
       querySelector: (target, selector) => target.querySelector(selector),
       querySelectorAll: (target, selector) => target.querySelectorAll(selector),
       getInnerHTML: (target) => target.innerHTML ?? "",
@@ -129,211 +126,166 @@ export function createBrowserElementHostBindings(state = createHostResourceState
       getAttribute: (target, name) => target.getAttribute(name) ?? null,
       setAttribute: (target, name, value) => target.setAttribute(name, value),
       createEventListener: (target, eventName, callback) =>
-        createBrowserEventListenerResource(state, target, eventName, callback),
+        createBrowserEventListenerSubscription(
+          state,
+          target,
+          eventName,
+          callback,
+        ),
     }),
     "browser.element.appendChild": (parent, child) => {
-      const childValue = state.resolveResource(child, "Element");
-      state.resolveResource(parent, "Element").appendChild(childValue);
-      return state.resourceForValue(childValue);
+      parent.appendChild(child);
+      return child;
     },
     "browser.element.remove": (element) => {
-      state.resolveResource(element, "Element").remove();
+      element.remove();
       return undefined;
     },
     "browser.element.classList.add": (element, className) => {
-      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
+      element.classList.add(className);
       return undefined;
     },
     "browser.element.classList.remove": (element, className) => {
-      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
+      element.classList.remove(className);
       return undefined;
     },
     "browser.element.classList.toggle": (element, className) =>
-      state.resourceForValue(
-        state.resolveResource(element, "Element").classList.toggle(
-          state.resolveResource(className, "JsString"),
-        ),
-      ),
+      element.classList.toggle(className),
     "browser.element.style.setProperty": (element, name, value) => {
-      state.resolveResource(element, "Element").style.setProperty(
-        state.resolveResource(name, "JsString"),
-        nullablePayload(state, value),
-      );
+      element.style.setProperty(name, nullablePayload(value));
       return undefined;
     },
   };
 }
 
-export function createBrowserCanvasHostBindings(state = createHostResourceState()) {
-  const value = (resource, label) => state.resolveResource(resource, label);
+export function createBrowserCanvasHostBindings() {
   return {
     "browser.htmlCanvasElement.fromElement": (element) => {
-      const candidate = value(element, "Element");
-      const canvas = isCanvasElement(candidate) ? candidate : null;
-      return adoptResourceForValue(state, createNullableValue(canvas));
+      return createNullableValue(isCanvasElement(element) ? element : null);
     },
-    "browser.htmlCanvasElement.getWidth": (canvas) =>
-      state.resourceForValue(Number(value(canvas, "HTMLCanvasElement").width)),
+    "browser.htmlCanvasElement.getWidth": (canvas) => Number(canvas.width),
     "browser.htmlCanvasElement.setWidth": (canvas, width) => {
-      value(canvas, "HTMLCanvasElement").width = value(width, "JsFloat");
+      canvas.width = width;
       return undefined;
     },
-    "browser.htmlCanvasElement.getHeight": (canvas) =>
-      state.resourceForValue(Number(value(canvas, "HTMLCanvasElement").height)),
+    "browser.htmlCanvasElement.getHeight": (canvas) => Number(canvas.height),
     "browser.htmlCanvasElement.setHeight": (canvas, height) => {
-      value(canvas, "HTMLCanvasElement").height = value(height, "JsFloat");
+      canvas.height = height;
       return undefined;
     },
     "browser.htmlCanvasElement.getContext2D": (canvas) =>
-      adoptResourceForValue(state, createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+      createNullableValue(canvas.getContext("2d")),
     "browser.canvas2d.clearRect": (ctx, x, y, width, height) =>
-      withCanvasNumbers(state, [x, y, width, height], (...args) =>
-        value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
+      ctx.clearRect(x, y, width, height),
     "browser.canvas2d.fillRect": (ctx, x, y, width, height) =>
-      withCanvasNumbers(state, [x, y, width, height], (...args) =>
-        value(ctx, "CanvasRenderingContext2D").fillRect(...args)),
+      ctx.fillRect(x, y, width, height),
     "browser.canvas2d.strokeRect": (ctx, x, y, width, height) =>
-      withCanvasNumbers(state, [x, y, width, height], (...args) =>
-        value(ctx, "CanvasRenderingContext2D").strokeRect(...args)),
-    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
-    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
-    "browser.canvas2d.moveTo": (ctx, x, y) =>
-      withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
-    "browser.canvas2d.lineTo": (ctx, x, y) =>
-      withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
-    "browser.canvas2d.measureText": (ctx, text) =>
-      state.resourceForValue(
-        value(ctx, "CanvasRenderingContext2D").measureText(value(text, "JsString")),
-      ),
+      ctx.strokeRect(x, y, width, height),
+    "browser.canvas2d.beginPath": (ctx) => ctx.beginPath(),
+    "browser.canvas2d.closePath": (ctx) => ctx.closePath(),
+    "browser.canvas2d.moveTo": (ctx, x, y) => ctx.moveTo(x, y),
+    "browser.canvas2d.lineTo": (ctx, x, y) => ctx.lineTo(x, y),
+    "browser.canvas2d.measureText": (ctx, text) => ctx.measureText(text),
     "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) =>
-      withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) =>
-        value(ctx, "CanvasRenderingContext2D").arc(...args)),
-    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
-    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
-    "browser.canvas2d.getFillStyle": (ctx) =>
-      state.resourceForValue(value(ctx, "CanvasRenderingContext2D").fillStyle),
+      ctx.arc(x, y, radius, startAngle, endAngle),
+    "browser.canvas2d.fill": (ctx) => ctx.fill(),
+    "browser.canvas2d.stroke": (ctx) => ctx.stroke(),
+    "browser.canvas2d.getFillStyle": (ctx) => ctx.fillStyle,
     "browser.canvas2d.setFillStyleValue": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "CanvasStyle");
+      ctx.fillStyle = style;
       return undefined;
     },
     "browser.canvas2d.setFillStyle": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+      ctx.fillStyle = style;
       return undefined;
     },
-    "browser.canvas2d.getStrokeStyle": (ctx) =>
-      state.resourceForValue(value(ctx, "CanvasRenderingContext2D").strokeStyle),
+    "browser.canvas2d.getStrokeStyle": (ctx) => ctx.strokeStyle,
     "browser.canvas2d.setStrokeStyleValue": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "CanvasStyle");
+      ctx.strokeStyle = style;
       return undefined;
     },
     "browser.canvas2d.setStrokeStyle": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
+      ctx.strokeStyle = style;
       return undefined;
     },
-    "browser.canvas2d.getLineWidth": (ctx) =>
-      state.resourceForValue(Number(value(ctx, "CanvasRenderingContext2D").lineWidth)),
-    "browser.canvas2d.setLineWidth": (ctx, width) =>
-      withCanvasNumbers(state, [width], (resolvedWidth) => {
-        value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
-        return undefined;
-      }),
-    "browser.canvas2d.textMetrics.getWidth": (metrics) =>
-      state.resourceForValue(Number(value(metrics, "TextMetrics").width)),
-    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
-    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
-    "browser.canvas2d.translate": (ctx, x, y) =>
-      withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").translate(...args)),
-    "browser.canvas2d.rotate": (ctx, angle) =>
-      withCanvasNumbers(state, [angle], (resolvedAngle) =>
-        value(ctx, "CanvasRenderingContext2D").rotate(resolvedAngle)),
+    "browser.canvas2d.getLineWidth": (ctx) => Number(ctx.lineWidth),
+    "browser.canvas2d.setLineWidth": (ctx, width) => {
+      ctx.lineWidth = width;
+      return undefined;
+    },
+    "browser.canvas2d.textMetrics.getWidth": (metrics) => Number(metrics.width),
+    "browser.canvas2d.save": (ctx) => ctx.save(),
+    "browser.canvas2d.restore": (ctx) => ctx.restore(),
+    "browser.canvas2d.translate": (ctx, x, y) => ctx.translate(x, y),
+    "browser.canvas2d.rotate": (ctx, angle) => ctx.rotate(angle),
   };
 }
 
-function withCanvasNumbers(state, resources, run) {
-  return run(...resources.map((resource) => state.resolveResource(resource, "JsFloat")));
-}
-
-export function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
-  return createHtmlInputElementResourceHostBindings(state, {
-    fromElement: (element) => isInputElement(element) ? element : null,
+export function createBrowserHtmlInputElementHostBindings() {
+  return createHtmlInputElementHostBindings({
+    fromElement: (element) => (isInputElement(element) ? element : null),
   });
 }
 
-export function createBrowserTimerHostBindings(state = createHostResourceState()) {
-  return createTimerResourceHostBindings(state);
+export function createBrowserTimerHostBindings(state = createHostLifecycle()) {
+  return createTimerHostBindings(state);
 }
 
-export function createBrowserAnimationHostBindings(state = createHostResourceState()) {
+export function createBrowserAnimationHostBindings(
+  state = createHostLifecycle(),
+) {
   const requestFrame =
     typeof globalThis.requestAnimationFrame === "function"
       ? globalThis.requestAnimationFrame.bind(globalThis)
-      : (callback) => globalThis.setTimeout(() => callback(performanceNow()), 16);
+      : (callback) =>
+          globalThis.setTimeout(() => callback(performanceNow()), 16);
   const cancelFrame =
     typeof globalThis.cancelAnimationFrame === "function"
       ? globalThis.cancelAnimationFrame.bind(globalThis)
       : globalThis.clearTimeout.bind(globalThis);
-  return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
+  return createAnimationHostBindings(state, { requestFrame, cancelFrame });
 }
 
-export function createInfoviewHostBindings({ resources = createHostResourceState(), commandDispatcher = null } = {}) {
+export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
   return {
-    "infoview.documentPosition": (uri, fileName, line, character, label) =>
-      resources.resourceForValue({
-        uri: resources.resolveResource(uri, "JsString"),
-        fileName: resources.resolveResource(fileName, "JsString"),
-        line: resources.resolveResource(line, "JsNat"),
-        character: resources.resolveResource(character, "JsNat"),
-        label: resources.resolveResource(label, "JsString"),
-      }),
-    "infoview.clipboard.writeText": (text) =>
-      resources.resourceForValue(writeTextToHostClipboard(resources.resolveResource(text, "JsString"))),
+    "infoview.documentPosition": (uri, fileName, line, character, label) => ({
+      uri,
+      fileName,
+      line,
+      character,
+      label,
+    }),
+    "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
     "infoview.command.revealPosition": (position) =>
-      resources.resourceForValue(revealInfoviewPosition(
-        commandDispatcher,
-        resources.resolveResource(position, "DocumentPosition"),
-      )),
+      revealInfoviewPosition(commandDispatcher, position),
     "infoview.command.insertText": (position, text) =>
-      resources.resourceForValue(insertInfoviewText(
-        commandDispatcher,
-        resources.resolveResource(position, "DocumentPosition"),
-        resources.resolveResource(text, "JsString"),
-      )),
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>
-      resources.resourceForValue({
-        id: resources.resolveResource(id, "JsString"),
-        label: resources.resolveResource(label, "JsString"),
-        typeName: resources.resolveResource(typeName, "JsString"),
-        summary: resources.resolveResource(summary, "JsString"),
-        expression: resources.resolveResource(expression, "JsString"),
-        typeText: "",
-        context: "",
-      }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) =>
-      resources.resourceForValue({
-        ...resources.resolveResource(ref, "RpcRef"),
-        typeText: resources.resolveResource(typeText, "JsString"),
-        context: resources.resolveResource(context, "JsString"),
-        ...nullableField(resources, serverRef, "serverRef"),
-      }),
+      insertInfoviewText(commandDispatcher, position, text),
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
+      id,
+      label,
+      typeName,
+      summary,
+      expression,
+      typeText: "",
+      context: "",
+    }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => ({
+      ...ref,
+      typeText,
+      context,
+      ...nullableField(serverRef, "serverRef"),
+    }),
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+      normalizeProofWidgetsResolvedRef(ref),
     "proofwidgets.rpc.inspectRef": (ref) =>
-      resources.resourceForValue(inspectProofWidgetsRpcRef(
-        commandDispatcher,
-        resources.resolveResource(ref, "RpcRef"),
-      )),
+      inspectProofWidgetsRpcRef(commandDispatcher, ref),
     "proofwidgets.rpc.resolveRef": (ref, callback) =>
-      resources.resourceForValue(resolveProofWidgetsRpcRef(
-        resources,
-        commandDispatcher,
-        resources.resolveResource(ref, "RpcRef"),
-        callback,
-      )),
+      resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
   };
 }
 
 export function createBrowserHostBindings({
-  resources = createHostResourceState(),
+  resources = createHostLifecycle(),
   infoviewCommandDispatcher = null,
   reactHostBindings = null,
 } = {}) {
@@ -342,18 +294,23 @@ export function createBrowserHostBindings({
     typeof reactHostBindings === "function"
       ? reactHostBindings(state, { querySelector: queryDocumentElement })
       : reactHostBindings;
-  const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
+  const reactBindings = normalizeOptionalHostBindingMap(
+    reactBindingsSource,
+    "reactHostBindings",
+  );
   return {
-    ...createCommonHostBindings(state),
-    ...createConsoleHostBindings(state),
-    ...createBrowserDocumentHostBindings(state),
-    ...createBrowserEventHostBindings(state),
+    ...createCommonHostBindings(),
+    ...createConsoleHostBindings(),
+    ...createBrowserDocumentHostBindings(),
+    ...createBrowserEventHostBindings(),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
-    ...createBrowserCanvasHostBindings(state),
+    ...createBrowserCanvasHostBindings(),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
-    ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
+    ...createInfoviewHostBindings({
+      commandDispatcher: infoviewCommandDispatcher,
+    }),
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => state.dispose(),
   };
@@ -361,13 +318,13 @@ export function createBrowserHostBindings({
 
 export function createNodeHostBindings(
   state = createVirtualDocumentState(),
-  resources = state.resources ?? createHostResourceState(),
+  resources = state.resources ?? createHostLifecycle(),
 ) {
   const previousResources = state.resources;
   state.resources = resources;
   const bindings = {
-    ...createCommonHostBindings(resources),
-    ...createConsoleHostBindings(resources),
+    ...createCommonHostBindings(),
+    ...createConsoleHostBindings(),
     ...createVirtualDocumentHostBindings(state, resources),
   };
   const dispose = bindings[VIR_HOST_DISPOSE];
@@ -375,8 +332,10 @@ export function createNodeHostBindings(
     try {
       return dispose?.();
     } finally {
-      if (state.resources === resources &&
-          hostResourceOwnerPhase(previousResources?.owner) === "active") {
+      if (
+        state.resources === resources &&
+        previousResources?.phase === "active"
+      ) {
         state.resources = previousResources;
       }
     }
@@ -413,7 +372,9 @@ function isCanvasElement(value) {
   const Canvas = globalThis.HTMLCanvasElement;
   return typeof Canvas === "function"
     ? value instanceof Canvas
-    : value !== null && typeof value === "object" && typeof value.getContext === "function";
+    : value !== null &&
+        typeof value === "object" &&
+        typeof value.getContext === "function";
 }
 
 function writeTextToHostClipboard(text) {
@@ -422,7 +383,11 @@ function writeTextToHostClipboard(text) {
     return true;
   }
   const clipboard = globalThis.navigator?.clipboard;
-  if (clipboard !== null && typeof clipboard === "object" && typeof clipboard.writeText === "function") {
+  if (
+    clipboard !== null &&
+    typeof clipboard === "object" &&
+    typeof clipboard.writeText === "function"
+  ) {
     try {
       clipboard.writeText(text).catch((error) => {
         reportEventHandlerError(error);
@@ -441,7 +406,11 @@ function revealInfoviewPosition(commandDispatcher, position) {
   if (normalized === null) {
     return false;
   }
-  return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+  return dispatchInfoviewCommand(
+    commandDispatcher,
+    "revealPosition",
+    normalized,
+  );
 }
 
 function insertInfoviewText(commandDispatcher, position, text) {
@@ -449,11 +418,16 @@ function insertInfoviewText(commandDispatcher, position, text) {
   if (normalized === null || typeof text !== "string") {
     return false;
   }
-  return dispatchInfoviewCommand(commandDispatcher, "insertText", normalized, text);
+  return dispatchInfoviewCommand(
+    commandDispatcher,
+    "insertText",
+    normalized,
+    text,
+  );
 }
 
-function nullableField(resources, value, name) {
-  const payload = nullablePayload(resources, value);
+function nullableField(value, name) {
+  const payload = nullablePayload(value);
   return payload === null ? {} : { [name]: payload };
 }
 
@@ -462,18 +436,23 @@ function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   if (normalized === null) {
     return false;
   }
-  return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
+  return dispatchInfoviewCommand(
+    commandDispatcher,
+    "proofwidgetsRpcInspectRef",
+    normalized,
+  );
 }
 
-function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) {
+function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null || typeof callback !== "function") {
-    releaseCallback(callback);
     return false;
   }
-  const handler = infoviewCommandHandler(commandDispatcher, "proofwidgetsRpcResolveRef");
+  const handler = infoviewCommandHandler(
+    commandDispatcher,
+    "proofwidgetsRpcResolveRef",
+  );
   if (handler === null) {
-    releaseCallback(callback);
     return false;
   }
   let result;
@@ -481,28 +460,29 @@ function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) 
     result = handler(normalized);
   } catch (error) {
     reportEventHandlerError(error);
-    releaseCallback(callback);
     return false;
   }
   if (result === false) {
-    releaseCallback(callback);
     return false;
   }
-  if (result !== null && typeof result === "object" && typeof result.then === "function") {
-    const ownedCallback = takeCallbackLease(callback, "proofwidgets.rpc.resolveRef callback");
+  if (
+    result !== null &&
+    typeof result === "object" &&
+    typeof result.then === "function"
+  ) {
     try {
-      result.then((info) => {
-        callAndReleaseCallback(ownedCallback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
-      }).catch((error) => {
-        reportEventHandlerError(error);
-        releaseCallback(ownedCallback);
-      });
+      result
+        .then((info) => {
+          callHostCallback(callback, normalizeProofWidgetsResolvedRef(info));
+        })
+        .catch((error) => {
+          reportEventHandlerError(error);
+        });
     } catch (error) {
-      releaseCallback(ownedCallback);
       throw error;
     }
   } else {
-    callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
+    callHostCallback(callback, normalizeProofWidgetsResolvedRef(result));
   }
   return true;
 }
@@ -525,7 +505,9 @@ export function normalizeInfoviewDocumentPosition(position) {
 
 function nonNegativeInteger(value) {
   if (typeof value === "bigint") {
-    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(value)
+      : null;
   }
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -544,7 +526,11 @@ function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
   }
   try {
     const result = handler(...payload);
-    if (result !== null && typeof result === "object" && typeof result.then === "function") {
+    if (
+      result !== null &&
+      typeof result === "object" &&
+      typeof result.then === "function"
+    ) {
       result.catch((error) => {
         reportEventHandlerError(error);
       });
@@ -558,35 +544,36 @@ function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
 }
 
 function infoviewCommandHandler(commandDispatcher, name) {
-  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
+  const dispatcher =
+    commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
   if (typeof dispatcher === "function") {
     return (value) => dispatcher(name, value);
   }
-  if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
+  if (
+    dispatcher !== null &&
+    typeof dispatcher === "object" &&
+    typeof dispatcher[name] === "function"
+  ) {
     return (value) => dispatcher[name](value);
   }
   return null;
 }
 
-function callAndReleaseCallback(callback, value) {
+function callHostCallback(callback, value) {
   try {
     callback(value);
   } catch (error) {
     reportEventHandlerError(error);
-  } finally {
-    releaseCallback(callback);
-  }
-}
-
-function releaseCallback(callback) {
-  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
-    callback.release();
   }
 }
 
 function copyTextWithExecCommand(text) {
   const document = globalThis.document;
-  if (document === null || typeof document !== "object" || typeof document.execCommand !== "function") {
+  if (
+    document === null ||
+    typeof document !== "object" ||
+    typeof document.execCommand !== "function"
+  ) {
     return false;
   }
   const body = document.body;
@@ -612,22 +599,23 @@ function copyTextWithExecCommand(text) {
   }
 }
 
-function createBrowserEventListenerResource(resources, target, eventName, callback) {
-  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
-  const handler = (event) => callLeanEventCallback(resources, event, ownedCallback);
-  try {
-    target.addEventListener(eventName, handler);
-  } catch (error) {
-    const errors = [error];
-    collectCleanupError(errors, () => ownedCallback.release());
-    throwCollectedErrors(errors, "browser event listener registration failed during callback cleanup");
-  }
+function createBrowserEventListenerSubscription(
+  resources,
+  target,
+  eventName,
+  callback,
+) {
+  if (typeof callback !== "function")
+    throw new Error("browser event listener callback must be a function");
+  const handler = (event) => callLeanEventCallback(event, callback);
+  target.addEventListener(eventName, handler);
   const listener = {
     remove: once(() => {
       const errors = [];
       resources.removeDisposable(listener);
-      collectCleanupError(errors, () => target.removeEventListener(eventName, handler));
-      collectCleanupError(errors, () => ownedCallback.release());
+      collectCleanupError(errors, () =>
+        target.removeEventListener(eventName, handler),
+      );
       throwCollectedErrors(errors, "browser event listener removal failed");
     }),
   };
@@ -635,30 +623,35 @@ function createBrowserEventListenerResource(resources, target, eventName, callba
 }
 
 function isInputElement(value) {
-  return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
+  return (
+    typeof globalThis.HTMLInputElement === "function" &&
+    value instanceof globalThis.HTMLInputElement
+  );
 }
 
 function isTextAreaElement(value) {
-  return typeof globalThis.HTMLTextAreaElement === "function" && value instanceof globalThis.HTMLTextAreaElement;
+  return (
+    typeof globalThis.HTMLTextAreaElement === "function" &&
+    value instanceof globalThis.HTMLTextAreaElement
+  );
 }
 
 function isSelectElement(value) {
-  return typeof globalThis.HTMLSelectElement === "function" && value instanceof globalThis.HTMLSelectElement;
+  return (
+    typeof globalThis.HTMLSelectElement === "function" &&
+    value instanceof globalThis.HTMLSelectElement
+  );
 }
 
 function isElement(value) {
-  return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
+  return (
+    typeof globalThis.Element === "function" &&
+    value instanceof globalThis.Element
+  );
 }
 
 function nullableElementTarget(value) {
   return createNullableValue(isElement(value) ? value : null);
-}
-
-function adoptResourceForValue(state, value) {
-  if (typeof state.adoptResourceForValue === "function") {
-    return state.adoptResourceForValue(value);
-  }
-  return state.resourceForValue(value);
 }
 
 function formControlEventValue(event) {
@@ -668,7 +661,11 @@ function formControlEventValue(event) {
 }
 
 function formControlValue(value) {
-  if (!isInputElement(value) && !isTextAreaElement(value) && !isSelectElement(value)) {
+  if (
+    !isInputElement(value) &&
+    !isTextAreaElement(value) &&
+    !isSelectElement(value)
+  ) {
     return null;
   }
   return String(value.value ?? "");

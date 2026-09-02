@@ -34,10 +34,17 @@ const widgetSource = await readFile(
   new URL("build/generated/infoview/vir-infoview-widget.js", repoRoot),
   "utf8",
 );
-const smokeWidgetSource = widgetSource
-  .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
-  .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
-await writeFile(new URL("vir-infoview-widget-smoke.mjs", buildDir), smokeWidgetSource);
+const smokeWidgetSource =
+  widgetSource
+    .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
+    .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"') +
+  "\nexport { retainRuntimeService as retainRuntimeServiceForTests, " +
+  "releaseRuntimeService as releaseRuntimeServiceForTests, " +
+  "retireRuntimeService as retireRuntimeServiceForTests };\n";
+await writeFile(
+  new URL("vir-infoview-widget-smoke.mjs", buildDir),
+  smokeWidgetSource,
+);
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
@@ -47,6 +54,9 @@ const {
   loadAssetBytes,
   loadRuntimeOptions,
   loadRuntimeService,
+  releaseRuntimeServiceForTests,
+  retainRuntimeServiceForTests,
+  retireRuntimeServiceForTests,
   loadWasmModule,
   proofWidgetsExprFromSavedRef,
   resolveProofWidgetsRpcRef,
@@ -60,9 +70,16 @@ const {
   validateWidgetUnmountEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
-const wasmBytes = await readFile(new URL("web/public/vir-upstream.wasm", repoRoot));
-const packageBytes = await readFile(new URL("web/public/demo-host.irpkg", repoRoot));
-const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [packageBytes] });
+const wasmBytes = await readFile(
+  new URL("web/public/vir-upstream.wasm", repoRoot),
+);
+const packageBytes = await readFile(
+  new URL("web/public/demo-host.irpkg", repoRoot),
+);
+const runtime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [packageBytes],
+});
 let assetReadCount = 0;
 let assetStatCount = 0;
 let irPackageBuildCount = 0;
@@ -165,7 +182,9 @@ const rpcSession = {
     const bytes = await readFile(new URL(params.path, repoRoot));
     const metadata = {
       path: params.path,
-      mime: params.path.endsWith(".wasm") ? "application/wasm" : "application/octet-stream",
+      mime: params.path.endsWith(".wasm")
+        ? "application/wasm"
+        : "application/octet-stream",
       byteSize: String(bytes.length),
       modified: "100.0",
       revision: assetRevisions.get(params.path) ?? "asset-v1",
@@ -184,27 +203,44 @@ const rpcSession = {
 };
 
 assert.equal(typeof infoviewWidgetComponent, "function");
-assert.equal(validateWidgetEntry(runtime, "ReactProofWidget.mount").entry, "ReactProofWidget.mount");
-assert.equal(validateWidgetUnmountEntry(runtime, "ReactProofWidget.unmount").entry, "ReactProofWidget.unmount");
+assert.equal(
+  validateWidgetEntry(runtime, "ReactProofWidget.mount").entry,
+  "ReactProofWidget.mount",
+);
+assert.equal(
+  validateWidgetUnmountEntry(runtime, "ReactProofWidget.unmount").entry,
+  "ReactProofWidget.unmount",
+);
 assert.equal(validateWidgetUnmountEntry(runtime, ""), null);
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
   /String -> Surface -> DomM Bool/,
 );
 assert.throws(
-  () => validateWidgetEntry({
-    interfaceManifest: {
-      exports: [{
-        entry: "WrongSurface.mount",
-        effect: "dom",
-        args: [
-          { type: { interfaceTag: INTERFACE_TAG.STRING } },
-          { type: { interfaceTag: INTERFACE_TAG.STRUCTURE, name: "Wrong.Surface" } },
-        ],
-        result: { interfaceTag: INTERFACE_TAG.BOOL },
-      }],
-    },
-  }, "WrongSurface.mount"),
+  () =>
+    validateWidgetEntry(
+      {
+        interfaceManifest: {
+          exports: [
+            {
+              entry: "WrongSurface.mount",
+              effect: "dom",
+              args: [
+                { type: { interfaceTag: INTERFACE_TAG.STRING } },
+                {
+                  type: {
+                    interfaceTag: INTERFACE_TAG.STRUCTURE,
+                    name: "Wrong.Surface",
+                  },
+                },
+              ],
+              result: { interfaceTag: INTERFACE_TAG.BOOL },
+            },
+          ],
+        },
+      },
+      "WrongSurface.mount",
+    ),
   /String -> Surface -> DomM Bool/,
 );
 assert.throws(
@@ -212,7 +248,9 @@ assert.throws(
   /String -> DomM Bool/,
 );
 assert.equal(
-  taggedTextToPlain({ append: [{ text: "List " }, { tag: [{}, { text: "Nat" }] }] }),
+  taggedTextToPlain({
+    append: [{ text: "List " }, { tag: [{}, { text: "Nat" }] }],
+  }),
   "List Nat",
 );
 const infoviewPropsFixture = {
@@ -273,19 +311,32 @@ assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture), {
   ],
   proofWidgetsExpr: null,
 });
-assert.equal(surfaceFromInfoviewProps(infoviewPropsFixture).goals[0].target, "xs.reverse.reverse = xs");
+assert.equal(
+  surfaceFromInfoviewProps(infoviewPropsFixture).goals[0].target,
+  "xs.reverse.reverse = xs",
+);
 assert.equal(
   surfaceCacheKey(surfaceFromInfoviewProps(infoviewPropsFixture)),
-  surfaceCacheKey(surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture))),
+  surfaceCacheKey(
+    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture)),
+  ),
 );
-assert.equal(decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2], "r".charCodeAt(0));
-assert.equal((await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision, "wasm-v1");
 assert.equal(
-  (await statIRPackage(
-    rpcSession,
-    { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
-    { line: 0, character: 0 },
-  )).revision,
+  decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2],
+  "r".charCodeAt(0),
+);
+assert.equal(
+  (await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision,
+  "wasm-v1",
+);
+assert.equal(
+  (
+    await statIRPackage(
+      rpcSession,
+      { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
+      { line: 0, character: 0 },
+    )
+  ).revision,
   "ir-package-v1",
 );
 assert.deepEqual(
@@ -437,15 +488,19 @@ assert.deepEqual(
   },
 );
 await assert.rejects(
-  () => loadAssetBytes({
-    async call() {
-      return {
-        path: "web/public/other.wasm",
-        mime: "application/wasm",
-        dataBase64: Buffer.from("vir").toString("base64"),
-      };
-    },
-  }, "web/public/vir-upstream.wasm"),
+  () =>
+    loadAssetBytes(
+      {
+        async call() {
+          return {
+            path: "web/public/other.wasm",
+            mime: "application/wasm",
+            dataBase64: Buffer.from("vir").toString("base64"),
+          };
+        },
+      },
+      "web/public/vir-upstream.wasm",
+    ),
   /path mismatch/,
 );
 const runtimeOptions = await loadRuntimeOptions({
@@ -465,7 +520,9 @@ assert.equal(
   }),
   runtimeOptions.wasmModule,
 );
-const reloadIRPackage = { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] };
+const reloadIRPackage = {
+  roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"],
+};
 const reloadPosition = { line: 0, character: 0 };
 const reloadStatCount = irPackageStatCount;
 const reloadBuildCount = irPackageBuildCount;
@@ -502,15 +559,43 @@ const irPackageServiceConfig = {
   position: { line: 0, character: 0 },
   setupHint: "",
 };
-const irPackageFirstService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
-const jsBoolValue = (service, value) => service.resources.resolveResource(value, "JsBool");
-const rpcRefResource = (service, ref) => service.resources.resourceForValue(ref);
-assert.equal(typeof irPackageFirstService.resources.resourceForValue, "function");
-assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.create"], "function");
-assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.node.text"], "function");
-assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.node.createElement"], "function");
-assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.renderIntoSelector"], "function");
-assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.unmountSelector"], "function");
+const irPackageFirstService = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+});
+const jsBoolValue = (_service, value) => value;
+const rpcRefResource = (_service, ref) => ref;
+assert.equal(irPackageFirstService.resources.phase, "active");
+assert.equal(
+  typeof irPackageFirstService.runtime.hostState.defaultBindings[
+    "react.root.create"
+  ],
+  "function",
+);
+assert.equal(
+  typeof irPackageFirstService.runtime.hostState.defaultBindings[
+    "react.node.text"
+  ],
+  "function",
+);
+assert.equal(
+  typeof irPackageFirstService.runtime.hostState.defaultBindings[
+    "react.node.createElement"
+  ],
+  "function",
+);
+assert.equal(
+  typeof irPackageFirstService.runtime.hostState.defaultBindings[
+    "react.root.renderIntoSelector"
+  ],
+  "function",
+);
+assert.equal(
+  typeof irPackageFirstService.runtime.hostState.defaultBindings[
+    "react.root.unmountSelector"
+  ],
+  "function",
+);
 const serverOwnedExpr = proofWidgetsExprFromSavedRef({
   ref: { __rpcref: 18 },
   info: {
@@ -522,24 +607,34 @@ const serverOwnedExpr = proofWidgetsExprFromSavedRef({
     typeText: "String -> Surface -> DomM Bool",
     context: "",
   },
-}, irPackageFirstService.resources);
-assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr).proofWidgetsExpr.value, {
-  code: "ReactProofWidget.mount",
-  typeText: "String -> Surface -> DomM Bool",
-  context: "",
 });
-const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
-assert.equal(
-  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.inspectRef"](
-    rpcRefResource(irPackageFirstService, {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "host binding smoke",
-    expression: "ReactProofWidget.mount",
+assert.deepEqual(
+  surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr)
+    .proofWidgetsExpr.value,
+  {
+    code: "ReactProofWidget.mount",
     typeText: "String -> Surface -> DomM Bool",
     context: "",
-  }))),
+  },
+);
+const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
+assert.equal(
+  jsBoolValue(
+    irPackageFirstService,
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "proofwidgets.rpc.inspectRef"
+    ](
+      rpcRefResource(irPackageFirstService, {
+        id: "ReactProofWidget.mount",
+        label: "mount",
+        typeName: "Const",
+        summary: "host binding smoke",
+        expression: "ReactProofWidget.mount",
+        typeText: "String -> Surface -> DomM Bool",
+        context: "",
+      }),
+    ),
+  ),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -558,27 +653,32 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
   packageRevision: "ir-package-v1",
 });
 let resolvedCallbackInfo = null;
-let resolvedCallbackReleased = false;
-const resolvedCallback = Object.assign((info) => {
+const resolvedCallback = (info) => {
   resolvedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings["js.value.proofwidgets.resolvedRef.value"](info);
-}, {
-  release() {
-    resolvedCallbackReleased = true;
-  },
-});
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "js.value.proofwidgets.resolvedRef.value"
+    ](info);
+};
+assert.equal(Object.hasOwn(resolvedCallback, "release"), false);
 const resolvedBeforeHostResolve = resolvedRpcRefRequests.length;
 assert.equal(
-  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"](
-    rpcRefResource(irPackageFirstService, {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "host resolve smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
-    context: "",
-  }), resolvedCallback)),
+  jsBoolValue(
+    irPackageFirstService,
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "proofwidgets.rpc.resolveRef"
+    ](
+      rpcRefResource(irPackageFirstService, {
+        id: "ReactProofWidget.mount",
+        label: "mount",
+        typeName: "Const",
+        summary: "host resolve smoke",
+        expression: "ReactProofWidget.mount",
+        typeText: "String -> Surface -> DomM Bool",
+        context: "",
+      }),
+      resolvedCallback,
+    ),
+  ),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -610,27 +710,32 @@ assert.deepEqual(resolvedCallbackInfo, {
   storeKey: "ir-package-v1:ReactProofWidget.mount",
   knownConstant: true,
 });
-assert.equal(resolvedCallbackReleased, true);
 let serverOwnedCallbackInfo = null;
-let serverOwnedCallbackReleased = false;
-const serverOwnedCallback = Object.assign((info) => {
+const serverOwnedCallback = (info) => {
   serverOwnedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings["js.value.proofwidgets.resolvedRef.value"](info);
-}, {
-  release() {
-    serverOwnedCallbackReleased = true;
-  },
-});
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "js.value.proofwidgets.resolvedRef.value"
+    ](info);
+};
+assert.equal(Object.hasOwn(serverOwnedCallback, "release"), false);
 const serverOwnedBeforeHostResolve = resolvedExprWithCtxRefRequests.length;
 assert.equal(
-  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"](
-    rpcRefResource(irPackageFirstService, serverOwnedExpr.ref),
-    serverOwnedCallback,
-  )),
+  jsBoolValue(
+    irPackageFirstService,
+    irPackageFirstService.runtime.hostState.defaultBindings[
+      "proofwidgets.rpc.resolveRef"
+    ](
+      rpcRefResource(irPackageFirstService, serverOwnedExpr.ref),
+      serverOwnedCallback,
+    ),
+  ),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(resolvedExprWithCtxRefRequests.length, serverOwnedBeforeHostResolve + 1);
+assert.equal(
+  resolvedExprWithCtxRefRequests.length,
+  serverOwnedBeforeHostResolve + 1,
+);
 assert.deepEqual(resolvedExprWithCtxRefRequests.at(-1), {
   ref: { __rpcref: 18 },
   pos: { line: 0, character: 0 },
@@ -650,10 +755,12 @@ assert.deepEqual(serverOwnedCallbackInfo, {
   storeKey: "server-package-v1:ReactProofWidget.mount",
   knownConstant: true,
 });
-assert.equal(serverOwnedCallbackReleased, true);
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
-const irPackageSecondService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
+const irPackageSecondService = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+});
 assert.equal(irPackageSecondService, irPackageFirstService);
 assert.equal(irPackageBuildCount, firstIRPackageBuildCount);
 assert.ok(irPackageStatCount > firstIRPackageStatCount);
@@ -669,9 +776,38 @@ assert.equal(irPackageMovedPositionService, irPackageFirstService);
 assert.equal(irPackageBuildCount, firstIRPackageBuildCount);
 assert.ok(irPackageStatCount > afterSecondIRPackageStatCount);
 irPackageRevision = "ir-package-v2";
-const irPackageThirdService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
+const irPackageThirdService = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+});
 assert.notEqual(irPackageThirdService, irPackageFirstService);
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
+retainRuntimeServiceForTests(irPackageThirdService);
+retainRuntimeServiceForTests(irPackageThirdService);
+releaseRuntimeServiceForTests(irPackageThirdService);
+retireRuntimeServiceForTests(irPackageThirdService);
+assert.equal(
+  irPackageThirdService.disposed,
+  false,
+  "one failed mount must not dispose a runtime retained by another consumer",
+);
+const replacementAfterFailure = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+});
+assert.notEqual(replacementAfterFailure, irPackageThirdService);
+retireRuntimeServiceForTests(irPackageThirdService);
+assert.equal(
+  await loadRuntimeService({ rpcSession, config: irPackageServiceConfig }),
+  replacementAfterFailure,
+  "a stale failing consumer must not evict the replacement cache entry",
+);
+releaseRuntimeServiceForTests(irPackageThirdService);
+assert.equal(
+  irPackageThirdService.disposed,
+  true,
+  "a retired runtime must dispose after its final consumer releases it",
+);
 await clearRuntimeServiceCacheForTests();
 
 runtime.dispose();

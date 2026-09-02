@@ -17,5 +17,5 @@ await smokeVirtualHostRuntime(context);
 const fixtureCount = await smokeFixtureManifest(context);
 
 console.log(
-  `upstream smoke ok: fib 17 = 1597, Lean DOM and React Tamagotchi work, editable SortDemo works, ${fixtureCount} fixtures run`,
+  `upstream smoke ok: fib 17 = 1597, Lean DOM Tamagotchi works, Node React is explicitly unsupported, editable SortDemo works, ${fixtureCount} fixtures run`,
 );

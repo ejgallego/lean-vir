@@ -330,7 +330,7 @@ namespace LeanRef
 /--
 Generated binding for reviewed VIR protocol `javascript.lean-ref.create`.
 
-Retains a Lean-owned value behind an independently tracked JavaScript resource lease.
+Creates an ordinary self-owning JavaScript object that retains the Lean-owned value until JavaScript collection or runtime teardown.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -348,7 +348,7 @@ opaque toJSL
 /--
 Generated binding for reviewed VIR protocol `javascript.lean-ref.value`.
 
-Returns a fresh owned Lean reference from a live retained-value lease.
+Returns a fresh owned Lean reference from a live self-owning JavaScript object.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -362,42 +362,6 @@ opaque fromJSL
     {α : Type}
     (value : @& JSL α) :
     RuntimeM (α)
-
-/--
-Generated binding for reviewed VIR protocol `javascript.lean-ref.retain`.
-
-Creates an independently releasable lease for the same retained Lean value.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "js.leanRef.retain"]
-opaque retainJSL
-    {α : Type}
-    (value : @& JSL α) :
-    RuntimeM (JSL α)
-
-/--
-Generated binding for reviewed VIR protocol `javascript.lean-ref.release`.
-
-Consumes one retained-value lease and invalidates aliases of that same handle.
-
-Binding contract: `generation.protocolOperations`.
-
-Generated reviewed VIR protocol boundary.
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/consumed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "js.leanRef.release"]
-opaque releaseJSL
-    {α : Type}
-    (value : JSL α) :
-    RuntimeM Unit
 
 end LeanRef
 

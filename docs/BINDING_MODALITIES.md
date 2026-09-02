@@ -22,13 +22,13 @@ Every operation answers separate representation, passing, and lifetime
 questions. Combining these into a single “ownership” label hides important
 differences.
 
-| Axis | Examples | Meaning |
-| --- | --- | --- |
-| Representation | `immediate`, `js-resource` | How a TypeScript value crosses the Lean/JavaScript boundary. |
-| Argument passing | `value`, `borrowed`, `owned`, `consumed` | What the runtime does with the argument for this invocation. `value` applies to immediate values; the other modes apply to resources. |
-| Argument retention | `call`, `until-release`, `runtime` | How long the host may retain a resource. |
-| Result ownership | `value`, `owned`, `borrowed` | Whether a result is immediate or which side owns the returned resource. |
-| Effect | for example `dom` / `DomM` | Which Lean host-effect carrier wraps the result. |
+| Axis               | Examples                                 | Meaning                                                                                                                               |
+| ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Representation     | `immediate`, `js-resource`               | How a TypeScript value crosses the Lean/JavaScript boundary.                                                                          |
+| Argument passing   | `value`, `borrowed`, `owned`, `consumed` | What the runtime does with the argument for this invocation. `value` applies to immediate values; the other modes apply to resources. |
+| Argument retention | `call`, `until-release`, `runtime`       | How long the host may retain a resource.                                                                                              |
+| Result ownership   | `value`, `owned`, `borrowed`             | Whether a result is immediate or which side owns the returned resource.                                                               |
+| Effect             | for example `dom` / `DomM`               | Which Lean host-effect carrier wraps the result.                                                                                      |
 
 A borrowed resource cannot have retention beyond `call`. The generator rejects
 that combination instead of emitting a declaration that contradicts its host
@@ -62,14 +62,14 @@ can add conversions at their own API layer.
 
 The normal property rules are therefore mechanical:
 
-| TypeScript position | Generated rule |
-| --- | --- |
-| `string` argument | `@& Lean.Vir.Js String`, retained for the call |
-| `string` result | `Lean.Vir.Js String`, owned result |
-| `string \| null` argument | `@& Lean.Vir.Js.Nullable String`, retained for the call |
-| instance receiver | profiled resource marker with receiver passing/lifetime |
-| configured host-global receiver | no Lean receiver argument |
-| `void` result | `Unit` |
+| TypeScript position             | Generated rule                                          |
+| ------------------------------- | ------------------------------------------------------- |
+| `string` argument               | `@& Lean.Vir.Js String`, retained for the call          |
+| `string` result                 | `Lean.Vir.Js String`, owned result                      |
+| `string \| null` argument       | `@& Lean.Vir.Js.Nullable String`, retained for the call |
+| instance receiver               | profiled resource marker with receiver passing/lifetime |
+| configured host-global receiver | no Lean receiver argument                               |
+| `void` result                   | `Unit`                                                  |
 
 Unsupported TypeScript shapes fail generation. They are not silently converted
 to opaque Lean types.
@@ -185,7 +185,7 @@ disposer that dynamically revokes that handle and its aliases.
 
 Some shipped targets intentionally have no one-to-one TypeScript declaration:
 examples include retained Lean references, checked resource casts, selector
-conveniences, and replay-safe React callbacks. These are authored as structured
+conveniences, and explicit React builder adapters. These are authored as structured
 `generation.protocolOperations`, never as handwritten `@[vir_js]`
 declarations. Protocol records carry their type parameters, complete Lean
 types, representation, passing, retention, effect, target, and justification.

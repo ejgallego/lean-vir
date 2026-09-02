@@ -93,7 +93,7 @@
     },
     "exceptions": {
       "browser.animation.cancelAnimationFrame": {
-        "reason": "VIR represents the numeric browser registration id as a typed animation-frame resource.",
+        "reason": "Lean gives the exact browser animation-frame token a phantom Js AnimationFrame type; the host passes that token unchanged to cancelAnimationFrame.",
         "arguments": {
           "handle": {
             "passing": "consumed",
@@ -106,7 +106,7 @@
         }
       },
       "browser.animation.requestAnimationFrame": {
-        "reason": "The host retains the callback until it fires or its generated animation-frame resource is cancelled.",
+        "reason": "VIR adapts the Lean callback and privately records pending cancellation for teardown, while returning the exact token produced by requestAnimationFrame.",
         "arguments": {
           "callback": {
             "passing": "owned",
@@ -183,7 +183,7 @@
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" }
       },
       "browser.document.createElement": {
-        "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the common Element resource marker.",
+        "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type.",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js Element",
@@ -193,7 +193,7 @@
         }
       },
       "browser.document.querySelector": {
-        "reason": "The non-generic selector overload is represented by VIR's common Element resource marker.",
+        "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -203,7 +203,7 @@
         }
       },
       "browser.document.querySelectorAll": {
-        "reason": "The non-generic selector overload is represented as a JavaScript NodeList of Element resources.",
+        "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -213,7 +213,7 @@
         }
       },
       "browser.element.appendChild": {
-        "reason": "VIR currently specializes Node's generic appendChild operation to Element resources.",
+        "reason": "VIR currently specializes Node's generic appendChild operation to exact values carrying the Element phantom type.",
         "arguments": {
           "node": {
             "type": {
@@ -253,7 +253,7 @@
         }
       },
       "browser.element.classList.add": {
-        "reason": "The VIR host target flattens DOMTokenList access onto its owning Element resource and specializes the variadic token list to one token.",
+        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
         "receiver": {
           "name": "element",
           "type": {
@@ -264,7 +264,7 @@
         }
       },
       "browser.element.classList.remove": {
-        "reason": "The VIR host target flattens DOMTokenList access onto its owning Element resource and specializes the variadic token list to one token.",
+        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
         "receiver": {
           "name": "element",
           "type": {
@@ -275,7 +275,7 @@
         }
       },
       "browser.element.classList.toggle": {
-        "reason": "The VIR host target flattens DOMTokenList access onto its owning Element resource and omits the optional force argument.",
+        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument.",
         "receiver": {
           "name": "element",
           "type": {
@@ -286,7 +286,7 @@
         }
       },
       "browser.element.style.setProperty": {
-        "reason": "The VIR host target flattens CSSStyleDeclaration access onto its owning Element resource and omits optional priority.",
+        "reason": "The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.",
         "receiver": {
           "name": "element",
           "type": {
@@ -297,7 +297,7 @@
         }
       },
       "browser.element.querySelector": {
-        "reason": "The non-generic selector overload is represented by VIR's common Element resource marker.",
+        "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -307,7 +307,7 @@
         }
       },
       "browser.element.querySelectorAll": {
-        "reason": "The non-generic selector overload is represented as a JavaScript NodeList of Element resources.",
+        "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -362,7 +362,7 @@
         "target": "js.string.owned",
         "lean": "Lean.Vir.Browser.Internal.ownedString",
         "marker": "vir_js_explicit_conversion",
-        "reason": "Browser convenience wrappers require an owned JavaScript string resource before calling a consuming or asynchronous host protocol.",
+        "reason": "This explicit convenience conversion creates a JavaScript string value before calling the lower-level binding.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
@@ -376,7 +376,7 @@
         "target": "js.float.owned",
         "lean": "Lean.Vir.Browser.Internal.ownedFloat",
         "marker": "vir_js_explicit_conversion",
-        "reason": "Canvas convenience wrappers require an owned JavaScript number resource for a generated raw canvas operation.",
+        "reason": "This explicit convenience conversion creates a JavaScript number value for the lower-level canvas binding.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
@@ -414,7 +414,7 @@
         "target": "browser.htmlInputElement.fromElement",
         "lean": "Lean.Vir.Browser.HTMLInputElement.fromElementNullable",
         "marker": "vir_js",
-        "reason": "This checked host-resource narrowing has no corresponding JavaScript method.",
+        "reason": "This checked narrowing preserves the exact JavaScript value and has no corresponding JavaScript method.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
@@ -428,7 +428,7 @@
         "target": "browser.htmlCanvasElement.fromElement",
         "lean": "Lean.Vir.Browser.HTMLCanvasElement.fromElementNullable",
         "marker": "vir_js",
-        "reason": "This checked host-resource narrowing has no corresponding JavaScript method.",
+        "reason": "This checked narrowing preserves the exact JavaScript value and has no corresponding JavaScript method.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
@@ -456,7 +456,7 @@
         "target": "browser.timer.setTimeout",
         "lean": "Lean.Vir.Browser.Timer.setTimeoutJs",
         "marker": "vir_js",
-        "reason": "VIR represents the numeric timeout id as a revocable resource and retains the callback until firing or cancellation.",
+        "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
@@ -471,7 +471,7 @@
         "target": "browser.timer.clearTimeout",
         "lean": "Lean.Vir.Browser.Timer.clearTimeout",
         "marker": "vir_js",
-        "reason": "Cancellation consumes the revocable timeout resource and releases its retained callback.",
+        "reason": "The exact timeout token is passed unchanged to clearTimeout; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
@@ -485,7 +485,7 @@
         "target": "browser.timer.setInterval",
         "lean": "Lean.Vir.Browser.Timer.setIntervalJs",
         "marker": "vir_js",
-        "reason": "VIR represents the numeric interval id as a revocable resource and retains the callback until cancellation.",
+        "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
@@ -500,7 +500,7 @@
         "target": "browser.timer.clearInterval",
         "lean": "Lean.Vir.Browser.Timer.clearInterval",
         "marker": "vir_js",
-        "reason": "Cancellation consumes the revocable interval resource and releases its retained callback.",
+        "reason": "The exact interval token is passed unchanged to clearInterval; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [

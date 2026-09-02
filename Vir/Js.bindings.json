@@ -189,7 +189,7 @@
       {
         "id": "javascript.lean-ref.create", "group": "lean-reference", "target": "js.leanRef",
         "lean": "Lean.Vir.LeanRef.toJSL", "marker": "vir_js",
-        "reason": "Retains a Lean-owned value behind an independently tracked JavaScript resource lease.",
+        "reason": "Creates an ordinary self-owning JavaScript object that retains the Lean-owned value until JavaScript collection or runtime teardown.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "α", "representation": "lean-owned" } }],
@@ -198,29 +198,11 @@
       {
         "id": "javascript.lean-ref.value", "group": "lean-reference", "target": "js.leanRef.value",
         "lean": "Lean.Vir.LeanRef.fromJSL", "marker": "vir_js",
-        "reason": "Returns a fresh owned Lean reference from a live retained-value lease.",
+        "reason": "Returns a fresh owned Lean reference from a live self-owning JavaScript object.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
         "result": { "type": { "lean": "α", "representation": "lean-owned" } }
-      },
-      {
-        "id": "javascript.lean-ref.retain", "group": "lean-reference", "target": "js.leanRef.retain",
-        "lean": "Lean.Vir.LeanRef.retainJSL", "marker": "vir_js",
-        "reason": "Creates an independently releasable lease for the same retained Lean value.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "value", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
-        "result": { "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }
-      },
-      {
-        "id": "javascript.lean-ref.release", "group": "lean-reference", "target": "js.leanRef.release",
-        "lean": "Lean.Vir.LeanRef.releaseJSL", "marker": "vir_js",
-        "reason": "Consumes one retained-value lease and invalidates aliases of that same handle.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "value", "passing": "consumed", "type": { "lean": "JSL α", "representation": "js-resource", "resourceInner": "LeanRef.Handle α" } }],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       }
     ]
   },

@@ -7,20 +7,17 @@ Author: Emilio J. Gallego Arias
 import { VirRuntime } from "./runtime/core.js";
 import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
-import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "./runtime/cleanup.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
-export {
-  releaseHostResource,
-  VIR_HOST_DISPOSE,
-} from "./host-resource.js";
-export {
-  VirCallback,
-} from "./runtime/callbacks.js";
+export { VIR_HOST_DISPOSE } from "./host-boundary.js";
 
 export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
 export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";
@@ -31,7 +28,9 @@ export const IR_PACKAGE_SET_VERSION = 1;
 function rejectUnknownOptions(options, label) {
   const names = Object.keys(options);
   if (names.length !== 0) {
-    throw new TypeError(`${label} received unknown option${names.length === 1 ? "" : "s"}: ${names.join(", ")}`);
+    throw new TypeError(
+      `${label} received unknown option${names.length === 1 ? "" : "s"}: ${names.join(", ")}`,
+    );
   }
 }
 
@@ -50,7 +49,9 @@ export function debugWasmUrlFor(wasmUrl = VIR_WASM_RELEASE_FILE) {
   const value = wasmUrl instanceof URL ? wasmUrl.href : String(wasmUrl);
   const match = /(\.wasm)([?#].*)?$/.exec(value);
   if (match === null) {
-    throw new Error("debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl");
+    throw new Error(
+      "debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl",
+    );
   }
   return `${value.slice(0, match.index)}.dev.wasm${match[2] ?? ""}`;
 }
@@ -62,11 +63,16 @@ export function createVirImports(module, overrides = {}, hostState = null) {
     imports[spec.module] ??= {};
     if (spec.kind === "function") {
       imports[spec.module][spec.name] = (...args) => {
-        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
+        if (
+          spec.module === "wasi_snapshot_preview1" &&
+          spec.name === "proc_exit"
+        ) {
           throw new Error(`WASI proc_exit(${args[0]})`);
         }
         if (spec.module === "env" && spec.name === "vir_js_call_objects") {
-          throw new Error("Vir JavaScript host import called without an attached host state");
+          throw new Error(
+            "Vir JavaScript host import called without an attached host state",
+          );
         }
         return 0;
       };
@@ -90,10 +96,11 @@ export function createVirImports(module, overrides = {}, hostState = null) {
         return 0;
       }
     };
-    imports.env.vir_resource_root = (value, owned) => hostState.rootResource(value, owned);
-    imports.env.vir_resource_get = (rootId, take) => hostState.getRootedResource(rootId, take);
-    imports.env.vir_resource_is_owned = (rootId) => hostState.rootedResourceIsOwned(rootId);
-    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResourceFromFinalizer(rootId);
+    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
+    imports.env.vir_resource_get = (rootId) =>
+      hostState.getRootedResource(rootId);
+    imports.env.vir_resource_release = (rootId) =>
+      hostState.releaseRootedResourceFromFinalizer(rootId);
   }
 
   return imports;
@@ -104,11 +111,7 @@ export function createVirRuntimeFactory(options = {}) {
 }
 
 export async function createVirRuntime(options = {}) {
-  const {
-    irPackageSetBytes,
-    irPackageSetUrl,
-    ...factoryOptions
-  } = options;
+  const { irPackageSetBytes, irPackageSetUrl, ...factoryOptions } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
   return factory.createRuntime({
     irPackageSetBytes,
@@ -156,7 +159,9 @@ export class VirRuntimeFactory {
       }
       this.wasmBytes = await this.fetchBytes(this.wasmUrl);
     }
-    this.wasmModule = new WebAssembly.Module(asBytes(this.wasmBytes, "wasmBytes"));
+    this.wasmModule = new WebAssembly.Module(
+      asBytes(this.wasmBytes, "wasmBytes"),
+    );
     return this.wasmModule;
   }
 
@@ -171,7 +176,9 @@ export class VirRuntimeFactory {
       typeof this.defaultHostBindings === "function"
         ? this.defaultHostBindings()
         : (this.defaultHostBindings ?? createBrowserHostBindings());
-    const defaultHostBindingsLease = this.defaultHostBindingsLease ?? new HostBindingsLease(defaultHostBindings);
+    const defaultHostBindingsLease =
+      this.defaultHostBindingsLease ??
+      new HostBindingsLease(defaultHostBindings);
     const defaultBindings = defaultHostBindingsLease.acquire();
     const hostState = new VirHostState({
       hostBindings: hostBindings.value,
@@ -190,14 +197,20 @@ export class VirRuntimeFactory {
       return new VirRuntime(instance.exports, {
         module,
         hostState,
-        createReplacementRuntime: () => this.instantiateModule(module, {
-          disposeBindingsOnFailure: false,
-        }),
+        createReplacementRuntime: () =>
+          this.instantiateModule(module, {
+            disposeBindingsOnFailure: false,
+          }),
       });
     } catch (error) {
       const errors = [error];
-      collectCleanupError(errors, () => hostState.dispose({ disposeBindings: disposeBindingsOnFailure }));
-      throwCollectedErrors(errors, "VirRuntime instantiation failed during cleanup");
+      collectCleanupError(errors, () =>
+        hostState.dispose({ disposeBindings: disposeBindingsOnFailure }),
+      );
+      throwCollectedErrors(
+        errors,
+        "VirRuntime instantiation failed during cleanup",
+      );
     }
   }
 
@@ -230,8 +243,11 @@ export class VirRuntimeFactory {
   async fetchIrPackageSet(descriptorUrl) {
     const descriptorBytes = await this.fetchBytes(descriptorUrl);
     const descriptor = parseIrPackageSetDescriptor(descriptorBytes);
-    return Promise.all(descriptor.packages.map((entry) =>
-      this.fetchBytes(resolvePackageSetUrl(entry.path, descriptorUrl))));
+    return Promise.all(
+      descriptor.packages.map((entry) =>
+        this.fetchBytes(resolvePackageSetUrl(entry.path, descriptorUrl)),
+      ),
+    );
   }
 }
 
@@ -240,23 +256,29 @@ const packageSetTextDecoder = new TextDecoder();
 function parseIrPackageSetDescriptor(bytes) {
   let descriptor;
   try {
-    descriptor = JSON.parse(packageSetTextDecoder.decode(asBytes(bytes, "IR package-set descriptor")));
+    descriptor = JSON.parse(
+      packageSetTextDecoder.decode(asBytes(bytes, "IR package-set descriptor")),
+    );
   } catch (error) {
     throw new Error(`invalid IR package-set descriptor JSON: ${error.message}`);
   }
-  if (descriptor === null || typeof descriptor !== "object" || Array.isArray(descriptor)) {
+  if (
+    descriptor === null ||
+    typeof descriptor !== "object" ||
+    Array.isArray(descriptor)
+  ) {
     throw new Error("IR package-set descriptor must be a JSON object");
   }
   if (descriptor.format !== IR_PACKAGE_SET_FORMAT) {
     throw new Error(
       `unsupported IR package-set descriptor format ${JSON.stringify(descriptor.format)}; ` +
-      `expected ${JSON.stringify(IR_PACKAGE_SET_FORMAT)}`,
+        `expected ${JSON.stringify(IR_PACKAGE_SET_FORMAT)}`,
     );
   }
   if (descriptor.version !== IR_PACKAGE_SET_VERSION) {
     throw new Error(
       `unsupported IR package-set descriptor version ${JSON.stringify(descriptor.version)}; ` +
-      `expected ${IR_PACKAGE_SET_VERSION}`,
+        `expected ${IR_PACKAGE_SET_VERSION}`,
     );
   }
   if (!Array.isArray(descriptor.packages) || descriptor.packages.length === 0) {
@@ -273,7 +295,9 @@ function parseIrPackageSetDescriptor(bytes) {
       throw new Error(`${label} has no module`);
     }
     if (modules.has(entry.module)) {
-      throw new Error(`${label} duplicates module ${JSON.stringify(entry.module)}`);
+      throw new Error(
+        `${label} duplicates module ${JSON.stringify(entry.module)}`,
+      );
     }
     modules.add(entry.module);
     if (typeof entry.path !== "string" || entry.path.trim() === "") {
@@ -283,7 +307,8 @@ function parseIrPackageSetDescriptor(bytes) {
       throw new Error(`${label} duplicates path ${JSON.stringify(entry.path)}`);
     }
     paths.add(entry.path);
-    const expectedRole = index === descriptor.packages.length - 1 ? "root" : "dependency";
+    const expectedRole =
+      index === descriptor.packages.length - 1 ? "root" : "dependency";
     if (entry.role !== expectedRole) {
       throw new Error(
         `${label} must have role ${JSON.stringify(expectedRole)}, got ${JSON.stringify(entry.role)}`,
@@ -294,9 +319,10 @@ function parseIrPackageSetDescriptor(bytes) {
 }
 
 function resolvePackageSetUrl(path, descriptorUrl) {
-  const base = descriptorUrl instanceof URL
-    ? descriptorUrl
-    : new URL(String(descriptorUrl), globalThis.location?.href ?? "file:///");
+  const base =
+    descriptorUrl instanceof URL
+      ? descriptorUrl
+      : new URL(String(descriptorUrl), globalThis.location?.href ?? "file:///");
   return new URL(path, base);
 }
 

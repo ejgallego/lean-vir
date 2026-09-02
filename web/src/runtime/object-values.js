@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirCallback } from "./callbacks.js";
+import { createVirCallback, releaseCallbackRoot } from "./callbacks.js";
 import {
   customInductiveConstructorAt,
   normalizeUint32,
@@ -16,14 +16,6 @@ import {
 } from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
-import {
-  createHostResource,
-  hostResourceValue,
-  isHostResource,
-  normalizeHostResource,
-  registerHostResourcePayloadLifetime,
-  releaseHostResource,
-} from "../host-resource.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import {
   OBJECT_VALUE_EXPORTS,
@@ -56,18 +48,31 @@ import {
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
-const LEAN_OBJECT_HANDLE = Symbol("lean-vir.leanObjectHandle");
+// A JSL value is an ordinary JavaScript object. Its Lean root lives only in
+// this out-of-band cell, and ordinary JavaScript reachability controls when
+// that root is released.
+const leanObjectHandleStates = new WeakMap();
+const leanObjectHandleFinalizer =
+  typeof FinalizationRegistry === "function"
+    ? new FinalizationRegistry((cell) => {
+        try {
+          releaseLeanObjectHandleCell(cell, true);
+        } catch (error) {
+          cell?.runtime?.hostState?.recordFinalizerError(error);
+        }
+      })
+    : null;
 
-class ObjectValueOwnershipScope {
+class ObjectLiftRollbackScope {
   constructor(label) {
     this.label = label;
     this.cleanups = [];
     this.closed = false;
   }
 
-  own(cleanup) {
+  add(cleanup) {
     if (this.closed) {
-      throw new Error(`${this.label} ownership scope is already closed`);
+      throw new Error(`${this.label} rollback scope is already closed`);
     }
     this.cleanups.push(cleanup);
   }
@@ -77,14 +82,17 @@ class ObjectValueOwnershipScope {
     this.cleanups.length = 0;
   }
 
-  rollback(error) {
+  fail(error) {
     this.closed = true;
     const errors = [error instanceof Error ? error : new Error(String(error))];
     for (let index = this.cleanups.length - 1; index >= 0; index -= 1) {
       collectCleanupError(errors, this.cleanups[index]);
     }
     this.cleanups.length = 0;
-    throwCollectedErrors(errors, `${this.label} failed during ownership rollback`);
+    throwCollectedErrors(
+      errors,
+      `${this.label} failed during object-lift rollback`,
+    );
   }
 }
 
@@ -95,7 +103,7 @@ function normalizeObjectPointer(value, label) {
   return value >>> 0;
 }
 
-function releaseLeanObjectHandleCell(cell) {
+function releaseLeanObjectHandleCell(cell, fromFinalizer = false) {
   const onRelease = cell?.onRelease;
   if (cell !== null && cell !== undefined) {
     cell.onRelease = null;
@@ -105,10 +113,9 @@ function releaseLeanObjectHandleCell(cell) {
     return false;
   }
   cell.live = false;
-  for (const lease of cell.leases) {
-    lease.released = true;
+  if (!fromFinalizer) {
+    leanObjectHandleFinalizer?.unregister(cell);
   }
-  cell.leases.clear();
   try {
     cell.runtime.exports.vir_obj_dec(cell.object);
   } finally {
@@ -117,117 +124,98 @@ function releaseLeanObjectHandleCell(cell) {
   return true;
 }
 
-function releaseLeanObjectHandleLease(lease) {
-  if (lease?.released !== false || lease.cell?.live !== true) return false;
-  lease.released = true;
-  lease.cell.leases.delete(lease);
-  if (lease.cell.leases.size === 0) {
-    releaseLeanObjectHandleCell(lease.cell);
-  }
-  return true;
-}
-
-function createLeanObjectHandleAlias(cell) {
+function createLeanObjectHandle(cell) {
   if (cell?.live !== true) {
-    throw new Error("cannot retain a released Lean object handle");
+    throw new Error("cannot create a released Lean object handle");
   }
-  const lease = {
-    cell,
-    released: false,
-  };
-  const handle = Object.freeze({
-    [LEAN_OBJECT_HANDLE]: true,
-    runtime: cell.runtime,
-    object: cell.object,
-    cell,
-    lease,
-  });
-  cell.leases.add(lease);
-  registerHostResourcePayloadLifetime(handle, {
-    retain: () => createLeanObjectHandleAlias(cell),
-    release: () => releaseLeanObjectHandleLease(lease),
-  });
+  const handle = {};
+  leanObjectHandleStates.set(handle, cell);
+  leanObjectHandleFinalizer?.register(handle, cell, cell);
   return handle;
 }
 
-function createLeanObjectHandleResource(cell, label) {
-  const handle = createLeanObjectHandleAlias(cell);
-  try {
-    return createHostResource(handle, label, {
-      dispose: () => {
-        releaseLeanObjectHandleLease(handle.lease);
-        return undefined;
-      },
-      reportFinalizerError: (error) => cell.runtime.hostState?.recordFinalizerError(error),
-    });
-  } catch (error) {
-    releaseLeanObjectHandleLease(handle.lease);
-    throw error;
-  }
+function createLeanObjectHandleResource(cell, _label) {
+  return createLeanObjectHandle(cell);
 }
 
-function requireLeanObjectHandleLease(resource, runtime, label) {
-  const handle = hostResourceValue(resource);
-  const cell = handle?.cell;
-  const lease = handle?.lease;
-  if (handle?.[LEAN_OBJECT_HANDLE] !== true ||
-      handle.runtime !== runtime ||
-      cell?.runtime !== runtime ||
-      lease?.cell !== cell ||
-      lease.released !== false ||
-      cell.live !== true ||
-      !cell.leases.has(lease)) {
+function requireLeanObjectHandle(resource, runtime, label) {
+  const handle = resource;
+  const cell = leanObjectHandleStates.get(handle);
+  if (cell?.runtime !== runtime || cell.live !== true) {
     throw new Error(`${label} must be a live Lean object handle resource`);
   }
   normalizeObjectPointer(cell.object, label);
-  return lease;
+  return { handle, cell };
 }
 
 export class ObjectValueRuntime {
   hasObjectValueExports() {
-    return ["vir_call_resolved_objects", ...OBJECT_VALUE_EXPORTS]
-      .every((name) => typeof this.exports[name] === "function");
+    return ["vir_call_resolved_objects", ...OBJECT_VALUE_EXPORTS].every(
+      (name) => typeof this.exports[name] === "function",
+    );
   }
 
-  makeHostResourceObjectValue(type, value, label) {
+  makeJsObjectValue(type, value, label) {
     if (!hostResourceResultSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host resource result type`);
+      throw new Error(
+        `${label} has unsupported JavaScript host resource result type`,
+      );
     }
-    return this.makeObjectValue(type, value, label, null, true);
+    return this.makeObjectValue(type, value, label);
   }
 
   makeExplicitConversionObjectValue(type, value, label) {
-    return this.makeObjectValue(type, value, label, null, true);
+    return this.makeObjectValue(type, value, label);
   }
 
-  makeObjectValue(type, value, label, selfType = null, ownResources = false) {
+  makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
-          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+          throw new Error(
+            `${label} has a recursive self reference without an enclosing type`,
+          );
         }
-        return this.makeObjectValue(selfType, value, label, selfType, ownResources);
+        return this.makeObjectValue(selfType, value, label, selfType);
       case INTERFACE_TAG.UNIT:
-        if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
+        if (value !== undefined && value !== null)
+          throw new Error(`${label} must be undefined or null`);
         return this.makeObjectScalar(0, label);
       case INTERFACE_TAG.RESOURCE:
-        return this.makeObjectResource(value, label, ownResources);
+        return this.makeObjectResource(value, label);
       case INTERFACE_TAG.FUNCTION:
-        throw new Error(`${label} cannot be a JavaScript function at this boundary`);
+        throw new Error(
+          `${label} cannot be a JavaScript function at this boundary`,
+        );
       case INTERFACE_TAG.BOOL:
-        if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+        if (typeof value !== "boolean")
+          throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
       case INTERFACE_TAG.UINT8:
-        return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xff), label);
+        return this.makeObjectScalar(
+          normalizeInteger(value, label, 0, 0xff),
+          label,
+        );
       case INTERFACE_TAG.UINT16:
-        return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xffff), label);
+        return this.makeObjectScalar(
+          normalizeInteger(value, label, 0, 0xffff),
+          label,
+        );
       case INTERFACE_TAG.SIMPLE_ENUM:
         return this.makeObjectScalar(normalizeEnum(value, type, label), label);
       case INTERFACE_TAG.NAT:
-        return this.makeObjectDecimal("vir_obj_nat", normalizeDecimal(value, label, { signed: false }), label);
+        return this.makeObjectDecimal(
+          "vir_obj_nat",
+          normalizeDecimal(value, label, { signed: false }),
+          label,
+        );
       case INTERFACE_TAG.INT:
-        return this.makeObjectDecimal("vir_obj_int", normalizeDecimal(value, label, { signed: true }), label);
+        return this.makeObjectDecimal(
+          "vir_obj_int",
+          normalizeDecimal(value, label, { signed: true }),
+          label,
+        );
       case INTERFACE_TAG.STRING:
         return this.makeObjectString(value, label);
       case INTERFACE_TAG.UINT32:
@@ -241,7 +229,12 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.USIZE:
         return this.makeObjectDecimal(
           "vir_obj_usize",
-          normalizeBoundedUnsignedDecimal(value, label, this.usizeMaxValue(), "USize"),
+          normalizeBoundedUnsignedDecimal(
+            value,
+            label,
+            this.usizeMaxValue(),
+            "USize",
+          ),
           label,
         );
       case INTERFACE_TAG.BYTE_ARRAY:
@@ -254,25 +247,28 @@ export class ObjectValueRuntime {
         return this.makeObjectExpr(value, label);
       case INTERFACE_TAG.ARRAY:
       case INTERFACE_TAG.LIST:
-        return this.makeObjectSequenceValue(type, value, label, selfType, ownResources);
+        return this.makeObjectSequenceValue(type, value, label, selfType);
       case INTERFACE_TAG.OPTION:
-        return this.makeObjectOptionValue(type, value, label, selfType, ownResources);
+        return this.makeObjectOptionValue(type, value, label, selfType);
       case INTERFACE_TAG.PROD:
-        return this.makeObjectProdValue(type, value, label, selfType, ownResources);
+        return this.makeObjectProdValue(type, value, label, selfType);
       case INTERFACE_TAG.STRUCTURE:
-        return this.makeObjectStructureValue(type, value, label, ownResources);
+        return this.makeObjectStructureValue(type, value, label);
       case INTERFACE_TAG.TAGGED_UNION:
-        return this.makeObjectTaggedUnionValue(type, value, label, ownResources);
+        return this.makeObjectTaggedUnionValue(type, value, label);
       case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-        return this.makeObjectCustomInductiveValue(type, value, label, ownResources);
+        return this.makeObjectCustomInductiveValue(type, value, label);
       default:
         throw new Error(`${label} has unsupported object ABI argument type`);
     }
   }
 
-  makeObjectSequenceValue(sequenceType, value, label, selfType, ownResources) {
+  makeObjectSequenceValue(sequenceType, value, label, selfType) {
     const sequenceTag = sequenceType?.interfaceTag;
-    if (sequenceTag !== INTERFACE_TAG.ARRAY && sequenceTag !== INTERFACE_TAG.LIST) {
+    if (
+      sequenceTag !== INTERFACE_TAG.ARRAY &&
+      sequenceTag !== INTERFACE_TAG.LIST
+    ) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
     }
     const values = normalizeArray(value, label);
@@ -284,13 +280,14 @@ export class ObjectValueRuntime {
     const elementObjs = [];
     try {
       for (let index = 0; index < values.length; index++) {
-        elementObjs.push(this.makeObjectValue(
-          elementType,
-          values[index],
-          `${label}[${index}]`,
-          selfType,
-          ownResources,
-        ));
+        elementObjs.push(
+          this.makeObjectValue(
+            elementType,
+            values[index],
+            `${label}[${index}]`,
+            selfType,
+          ),
+        );
       }
       return sequenceTag === INTERFACE_TAG.ARRAY
         ? this.makeObjectArrayFromOwnedElements(elementObjs, label)
@@ -300,7 +297,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectOptionValue(type, value, label, selfType, ownResources) {
+  makeObjectOptionValue(type, value, label, selfType) {
     const option = normalizeOption(value, label);
     if (!option.some) {
       return this.makeObjectScalar(0, label);
@@ -311,7 +308,6 @@ export class ObjectValueRuntime {
         option.value,
         `${label}.value`,
         selfType,
-        ownResources,
       ),
     ];
     try {
@@ -321,51 +317,80 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectProdValue(type, value, label, selfType, ownResources) {
+  makeObjectProdValue(type, value, label, selfType) {
     const pair = normalizePair(value, label);
     const fields = [];
     try {
-      fields.push(this.makeObjectValue(
-        requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType, ownResources,
-      ));
-      fields.push(this.makeObjectValue(
-        requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType, ownResources,
-      ));
+      fields.push(
+        this.makeObjectValue(
+          requireTypeField(type, "fst", label),
+          pair.fst,
+          `${label}.fst`,
+          selfType,
+        ),
+      );
+      fields.push(
+        this.makeObjectValue(
+          requireTypeField(type, "snd", label),
+          pair.snd,
+          `${label}.snd`,
+          selfType,
+        ),
+      );
       return this.makeObjectCtorFromOwnedFields(0, fields, label);
     } finally {
       this.releaseOwnedObjects(fields);
     }
   }
 
-  makeObjectStructureValue(type, value, label, ownResources) {
+  makeObjectStructureValue(type, value, label) {
     const fields = requireStructureFields(type, label);
     const record = normalizeStructure(value, fields, label);
     const trivial = trivialStructureField(type, fields);
     if (trivial !== null) {
       return this.makeObjectValue(
-        trivial.type, record[trivial.name], `${label}.${trivial.name}`, type, ownResources,
+        trivial.type,
+        record[trivial.name],
+        `${label}.${trivial.name}`,
+        type,
       );
     }
-    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type, ownResources);
+    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type);
   }
 
-  makeObjectTaggedUnionValue(type, value, label, ownResources) {
+  makeObjectTaggedUnionValue(type, value, label) {
     const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
     const field = taggedUnionField(ctor);
     return this.makeObjectCtorFromLayout(
-      index, ctor, [field], { [field.name]: payload }, label, type, ownResources,
+      index,
+      ctor,
+      [field],
+      { [field.name]: payload },
+      label,
+      type,
     );
   }
 
-  makeObjectCustomInductiveValue(type, value, label, ownResources) {
-    const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
+  makeObjectCustomInductiveValue(type, value, label) {
+    const { index, ctor, fields } = normalizeCustomInductive(
+      value,
+      type,
+      label,
+    );
     if (ctor.fields.length === 0) {
       return this.makeObjectScalar(index, label);
     }
-    return this.makeObjectCtorFromLayout(index, ctor, ctor.fields, fields, label, type, ownResources);
+    return this.makeObjectCtorFromLayout(
+      index,
+      ctor,
+      ctor.fields,
+      fields,
+      label,
+      type,
+    );
   }
 
-  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType, ownResources) {
+  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
     const plan = objectLayoutPlan(owner, fields, label);
     const layout = objectLayoutSlotsFromPlan(plan);
     try {
@@ -377,7 +402,6 @@ export class ObjectValueRuntime {
           values[field.name],
           `${label}.${field.name}`,
           selfType,
-          ownResources,
         );
       }
       return this.makeObjectCtorFromOwnedLayout(tag, layout, label);
@@ -386,20 +410,34 @@ export class ObjectValueRuntime {
     }
   }
 
-  writeObjectLayoutField(layout, fieldPlan, value, label, selfType, ownResources) {
+  writeObjectLayoutField(layout, fieldPlan, value, label, selfType) {
     const field = fieldPlan.field;
     switch (fieldPlan.kind) {
       case "object":
         layout.objectFields[fieldPlan.index] = this.makeObjectValue(
-          field.type, value, label, selfType, ownResources,
+          field.type,
+          value,
+          label,
+          selfType,
         );
         return;
       case "usize":
-        layout.usizeFields[fieldPlan.index] =
-          normalizeBoundedUnsignedBigInt(value, label, this.usizeMaxValue(), "USize");
+        layout.usizeFields[fieldPlan.index] = normalizeBoundedUnsignedBigInt(
+          value,
+          label,
+          this.usizeMaxValue(),
+          "USize",
+        );
         return;
       case "scalar":
-        writeObjectScalarField(layout.scalarBytes, field.type, field.layout, value, label, fieldPlan.offset);
+        writeObjectScalarField(
+          layout.scalarBytes,
+          field.type,
+          field.layout,
+          value,
+          label,
+          fieldPlan.offset,
+        );
         return;
       default:
         throw new Error(`${label} has unsupported object ABI layout`);
@@ -432,9 +470,14 @@ export class ObjectValueRuntime {
     const bytes = asByteArrayBytes(value);
     const inputPtr = this.allocBytes(bytes);
     try {
-      const argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
+      const argObj = this.exports.vir_obj_byte_array(
+        inputPtr,
+        bytes.byteLength,
+      );
       if (argObj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean ByteArray object`);
+        throw new Error(
+          `${label} could not be lowered to a Lean ByteArray object`,
+        );
       }
       return argObj;
     } finally {
@@ -446,20 +489,33 @@ export class ObjectValueRuntime {
     return this.withWasmString(value, label, (inputPtr, inputLen) => {
       const argObj = this.exports.vir_obj_string(inputPtr, inputLen);
       if (argObj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean string object`);
+        throw new Error(
+          `${label} could not be lowered to a Lean string object`,
+        );
       }
       return argObj;
     });
   }
 
-  makeObjectStringConstructor(constructorName, value, stringLabel, objectLabel) {
-    return this.withWasmString(requireString(value, stringLabel), stringLabel, (inputPtr, inputLen) => {
-      const obj = this.exports[constructorName](inputPtr, inputLen);
-      if (obj === 0) {
-        throw new Error(`${objectLabel} could not be lowered to a Lean object`);
-      }
-      return obj;
-    });
+  makeObjectStringConstructor(
+    constructorName,
+    value,
+    stringLabel,
+    objectLabel,
+  ) {
+    return this.withWasmString(
+      requireString(value, stringLabel),
+      stringLabel,
+      (inputPtr, inputLen) => {
+        const obj = this.exports[constructorName](inputPtr, inputLen);
+        if (obj === 0) {
+          throw new Error(
+            `${objectLabel} could not be lowered to a Lean object`,
+          );
+        }
+        return obj;
+      },
+    );
   }
 
   withWasmString(value, label, callback) {
@@ -489,18 +545,21 @@ export class ObjectValueRuntime {
   }
 
   makeObjectFloat32(value, label) {
-    const argObj = this.exports.vir_obj_float32(Math.fround(normalizeFloat(value, label)));
+    const argObj = this.exports.vir_obj_float32(
+      Math.fround(normalizeFloat(value, label)),
+    );
     if (argObj === 0) {
       throw new Error(`${label} could not be lowered to a Lean Float32 object`);
     }
     return argObj;
   }
 
-  makeObjectResource(value, label, owned = false) {
-    const resource = normalizeHostResource(value, label);
-    const argObj = this.exports.vir_obj_resource(resource, owned ? 1 : 0);
+  makeObjectResource(value, label) {
+    const argObj = this.exports.vir_obj_resource(value);
     if (argObj === 0) {
-      throw new Error(`${label} could not be lowered to a Lean host resource object`);
+      throw new Error(
+        `${label} could not be lowered to a Lean host resource object`,
+      );
     }
     return argObj;
   }
@@ -512,10 +571,15 @@ export class ObjectValueRuntime {
       runtime: this,
       object,
       live: true,
-      leases: new Set(),
       onRelease: null,
     };
     try {
+      if (typeof this.hostState?.trackLeanObjectHandleCell !== "function") {
+        throw new Error(
+          `${label} requires deterministic Lean object handle tracking`,
+        );
+      }
+      this.hostState.trackLeanObjectHandleCell(cell);
       return createLeanObjectHandleResource(cell, label);
     } catch (error) {
       releaseLeanObjectHandleCell(cell);
@@ -524,42 +588,52 @@ export class ObjectValueRuntime {
   }
 
   leanObjectHandleCell(resource, label) {
-    return requireLeanObjectHandleLease(resource, this, label).cell;
+    return requireLeanObjectHandle(resource, this, label).cell;
   }
 
   releaseLeanObjectHandleCell(cell) {
     return releaseLeanObjectHandleCell(cell);
   }
 
-  releaseLeanObjectHandleResource(resource, label) {
-    return releaseLeanObjectHandleLease(requireLeanObjectHandleLease(resource, this, label));
-  }
-
-  retainLeanObjectHandleResource(resource, label) {
-    const cell = requireLeanObjectHandleLease(resource, this, label).cell;
-    return createLeanObjectHandleResource(cell, label);
-  }
-
   makeObjectExpr(value, label) {
-    const expr = typeof value === "string"
-      ? { kind: "const", name: value, levels: [] }
-      : value;
+    const expr =
+      typeof value === "string"
+        ? { kind: "const", name: value, levels: [] }
+        : value;
     switch (expr?.kind) {
       case "bvar":
         return this.makeObjectDecimal(
           "vir_obj_expr_bvar",
-          normalizeDecimal(expr.index ?? expr.deBruijnIndex, `${label}.index`, { signed: false }),
+          normalizeDecimal(expr.index ?? expr.deBruijnIndex, `${label}.index`, {
+            signed: false,
+          }),
           label,
         );
       case "fvar":
-        return this.makeObjectStringConstructor("vir_obj_expr_fvar", expr.name, `${label}.name`, label);
+        return this.makeObjectStringConstructor(
+          "vir_obj_expr_fvar",
+          expr.name,
+          `${label}.name`,
+          label,
+        );
       case "mvar":
-        return this.makeObjectStringConstructor("vir_obj_expr_mvar", expr.name, `${label}.name`, label);
+        return this.makeObjectStringConstructor(
+          "vir_obj_expr_mvar",
+          expr.name,
+          `${label}.name`,
+          label,
+        );
       case "sort": {
-        let level = this.makeObjectLevel(expr.level ?? expr.u, `${label}.level`);
+        let level = this.makeObjectLevel(
+          expr.level ?? expr.u,
+          `${label}.level`,
+        );
         try {
           const obj = this.exports.vir_obj_expr_sort(level);
-          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr sort object`);
+          if (obj === 0)
+            throw new Error(
+              `${label} could not be lowered to a Lean.Expr sort object`,
+            );
           level = 0;
           return obj;
         } finally {
@@ -567,20 +641,41 @@ export class ObjectValueRuntime {
         }
       }
       case "const": {
-        let levels = this.makeObjectLevelList(expr.levels ?? [], `${label}.levels`);
+        let levels = this.makeObjectLevelList(
+          expr.levels ?? [],
+          `${label}.levels`,
+        );
         try {
-          return this.withWasmString(requireString(expr.name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
-            const obj = this.exports.vir_obj_expr_const(namePtr, nameLen, levels);
-            if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr const object`);
-            levels = 0;
-            return obj;
-          });
+          return this.withWasmString(
+            requireString(expr.name, `${label}.name`),
+            `${label}.name`,
+            (namePtr, nameLen) => {
+              const obj = this.exports.vir_obj_expr_const(
+                namePtr,
+                nameLen,
+                levels,
+              );
+              if (obj === 0)
+                throw new Error(
+                  `${label} could not be lowered to a Lean.Expr const object`,
+                );
+              levels = 0;
+              return obj;
+            },
+          );
         } finally {
           this.releaseOwnedObjects([levels]);
         }
       }
       case "app":
-        return this.makeObjectExprBinary("vir_obj_expr_app", expr.fn, `${label}.fn`, expr.arg, `${label}.arg`, label);
+        return this.makeObjectExprBinary(
+          "vir_obj_expr_app",
+          expr.fn,
+          `${label}.fn`,
+          expr.arg,
+          `${label}.arg`,
+          label,
+        );
       case "lam":
       case "lambda":
         return this.makeObjectExprBinding(
@@ -588,7 +683,10 @@ export class ObjectValueRuntime {
           expr.name ?? expr.binderName,
           expr.type ?? expr.binderType,
           expr.body,
-          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          normalizeBinderInfo(
+            expr.binderInfo ?? "default",
+            `${label}.binderInfo`,
+          ),
           label,
         );
       case "forall":
@@ -598,17 +696,26 @@ export class ObjectValueRuntime {
           expr.name ?? expr.binderName,
           expr.type ?? expr.binderType,
           expr.body,
-          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          normalizeBinderInfo(
+            expr.binderInfo ?? "default",
+            `${label}.binderInfo`,
+          ),
           label,
         );
       case "let":
       case "letE":
         return this.makeObjectExprLet(expr, label);
       case "lit": {
-        let literal = this.makeObjectLiteral(expr.literal ?? expr.value, `${label}.literal`);
+        let literal = this.makeObjectLiteral(
+          expr.literal ?? expr.value,
+          `${label}.literal`,
+        );
         try {
           const obj = this.exports.vir_obj_expr_lit(literal);
-          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr literal object`);
+          if (obj === 0)
+            throw new Error(
+              `${label} could not be lowered to a Lean.Expr literal object`,
+            );
           literal = 0;
           return obj;
         } finally {
@@ -620,23 +727,35 @@ export class ObjectValueRuntime {
       case "proj":
         return this.makeObjectExprProj(expr, label);
       default:
-        throw new Error(`${label} has unsupported Lean.Expr kind ${expr?.kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Expr kind ${expr?.kind}`,
+        );
     }
   }
 
   makeObjectLevel(value, label) {
-    const level = typeof value === "string" ? { kind: value } : value ?? { kind: "zero" };
+    const level =
+      typeof value === "string" ? { kind: value } : (value ?? { kind: "zero" });
     switch (level.kind) {
       case "zero": {
         const obj = this.exports.vir_obj_level_zero();
-        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level zero object`);
+        if (obj === 0)
+          throw new Error(
+            `${label} could not be lowered to a Lean.Level zero object`,
+          );
         return obj;
       }
       case "succ": {
-        let child = this.makeObjectLevel(level.of ?? level.level, `${label}.of`);
+        let child = this.makeObjectLevel(
+          level.of ?? level.level,
+          `${label}.of`,
+        );
         try {
           const obj = this.exports.vir_obj_level_succ(child);
-          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level succ object`);
+          if (obj === 0)
+            throw new Error(
+              `${label} could not be lowered to a Lean.Level succ object`,
+            );
           child = 0;
           return obj;
         } finally {
@@ -662,11 +781,23 @@ export class ObjectValueRuntime {
           label,
         );
       case "param":
-        return this.makeObjectStringConstructor("vir_obj_level_param", level.name, `${label}.name`, label);
+        return this.makeObjectStringConstructor(
+          "vir_obj_level_param",
+          level.name,
+          `${label}.name`,
+          label,
+        );
       case "mvar":
-        return this.makeObjectStringConstructor("vir_obj_level_mvar", level.name, `${label}.name`, label);
+        return this.makeObjectStringConstructor(
+          "vir_obj_level_mvar",
+          level.name,
+          `${label}.name`,
+          label,
+        );
       default:
-        throw new Error(`${label} has unsupported Lean.Level kind ${level.kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Level kind ${level.kind}`,
+        );
     }
   }
 
@@ -685,7 +816,9 @@ export class ObjectValueRuntime {
 
   makeObjectLiteral(value, label) {
     const literal =
-      typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "bigint"
         ? { kind: typeof value === "string" ? "string" : "nat", value }
         : value;
     switch (literal?.kind) {
@@ -696,19 +829,34 @@ export class ObjectValueRuntime {
           label,
         );
       case "string":
-        return this.makeObjectStringConstructor("vir_obj_literal_string", literal.value, `${label}.value`, label);
+        return this.makeObjectStringConstructor(
+          "vir_obj_literal_string",
+          literal.value,
+          `${label}.value`,
+          label,
+        );
       default:
-        throw new Error(`${label} has unsupported Lean.Literal kind ${literal?.kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Literal kind ${literal?.kind}`,
+        );
     }
   }
 
-  makeObjectLevelBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+  makeObjectLevelBinary(
+    constructorName,
+    leftValue,
+    leftLabel,
+    rightValue,
+    rightLabel,
+    label,
+  ) {
     let left = this.makeObjectLevel(leftValue, leftLabel);
     let right = 0;
     try {
       right = this.makeObjectLevel(rightValue, rightLabel);
       const obj = this.exports[constructorName](left, right);
-      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level object`);
+      if (obj === 0)
+        throw new Error(`${label} could not be lowered to a Lean.Level object`);
       left = 0;
       right = 0;
       return obj;
@@ -717,13 +865,21 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectExprBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+  makeObjectExprBinary(
+    constructorName,
+    leftValue,
+    leftLabel,
+    rightValue,
+    rightLabel,
+    label,
+  ) {
     let left = this.makeObjectExpr(leftValue, leftLabel);
     let right = 0;
     try {
       right = this.makeObjectExpr(rightValue, rightLabel);
       const obj = this.exports[constructorName](left, right);
-      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr object`);
+      if (obj === 0)
+        throw new Error(`${label} could not be lowered to a Lean.Expr object`);
       left = 0;
       right = 0;
       return obj;
@@ -732,18 +888,38 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectExprBinding(constructorName, name, typeValue, bodyValue, binderInfo, label) {
+  makeObjectExprBinding(
+    constructorName,
+    name,
+    typeValue,
+    bodyValue,
+    binderInfo,
+    label,
+  ) {
     let type = this.makeObjectExpr(typeValue, `${label}.type`);
     let body = 0;
     try {
       body = this.makeObjectExpr(bodyValue, `${label}.body`);
-      return this.withWasmString(requireString(name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
-        const obj = this.exports[constructorName](namePtr, nameLen, type, body, binderInfo);
-        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr binding object`);
-        type = 0;
-        body = 0;
-        return obj;
-      });
+      return this.withWasmString(
+        requireString(name, `${label}.name`),
+        `${label}.name`,
+        (namePtr, nameLen) => {
+          const obj = this.exports[constructorName](
+            namePtr,
+            nameLen,
+            type,
+            body,
+            binderInfo,
+          );
+          if (obj === 0)
+            throw new Error(
+              `${label} could not be lowered to a Lean.Expr binding object`,
+            );
+          type = 0;
+          body = 0;
+          return obj;
+        },
+      );
     } finally {
       this.releaseOwnedObjects([type, body]);
     }
@@ -768,7 +944,10 @@ export class ObjectValueRuntime {
             body,
             expr.nondep ? 1 : 0,
           );
-          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr let object`);
+          if (obj === 0)
+            throw new Error(
+              `${label} could not be lowered to a Lean.Expr let object`,
+            );
           type = 0;
           value = 0;
           body = 0;
@@ -781,21 +960,37 @@ export class ObjectValueRuntime {
   }
 
   makeObjectExprProj(expr, label) {
-    let structure = this.makeObjectExpr(expr.struct ?? expr.expr, `${label}.struct`);
+    let structure = this.makeObjectExpr(
+      expr.struct ?? expr.expr,
+      `${label}.struct`,
+    );
     try {
-      return this.withWasmString(requireString(expr.typeName, `${label}.typeName`), `${label}.typeName`, (
-        typeNamePtr,
-        typeNameLen,
-      ) => this.withWasmString(
-        normalizeDecimal(expr.index ?? expr.idx, `${label}.index`, { signed: false }),
-        `${label}.index`,
-        (indexPtr, indexLen) => {
-          const obj = this.exports.vir_obj_expr_proj(typeNamePtr, typeNameLen, indexPtr, indexLen, structure);
-          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr proj object`);
-          structure = 0;
-          return obj;
-        },
-      ));
+      return this.withWasmString(
+        requireString(expr.typeName, `${label}.typeName`),
+        `${label}.typeName`,
+        (typeNamePtr, typeNameLen) =>
+          this.withWasmString(
+            normalizeDecimal(expr.index ?? expr.idx, `${label}.index`, {
+              signed: false,
+            }),
+            `${label}.index`,
+            (indexPtr, indexLen) => {
+              const obj = this.exports.vir_obj_expr_proj(
+                typeNamePtr,
+                typeNameLen,
+                indexPtr,
+                indexLen,
+                structure,
+              );
+              if (obj === 0)
+                throw new Error(
+                  `${label} could not be lowered to a Lean.Expr proj object`,
+                );
+              structure = 0;
+              return obj;
+            },
+          ),
+      );
     } finally {
       this.releaseOwnedObjects([structure]);
     }
@@ -805,10 +1000,16 @@ export class ObjectValueRuntime {
     let valuesPtr = 0;
     try {
       if (elementObjs.length !== 0) {
-        valuesPtr = this.allocByteLength(elementObjs.length * 4, `${label} pointer array`);
+        valuesPtr = this.allocByteLength(
+          elementObjs.length * 4,
+          `${label} pointer array`,
+        );
         this.writePointerArray(valuesPtr, elementObjs);
       }
-      const sequenceObj = this.exports.vir_obj_array(valuesPtr, elementObjs.length);
+      const sequenceObj = this.exports.vir_obj_array(
+        valuesPtr,
+        elementObjs.length,
+      );
       if (sequenceObj === 0) {
         throw new Error(`${label} could not be lowered to a Lean array object`);
       }
@@ -826,7 +1027,11 @@ export class ObjectValueRuntime {
     try {
       for (let index = elementObjs.length - 1; index >= 0; index--) {
         const fields = [elementObjs[index], tail];
-        const cons = this.makeObjectCtorFromOwnedFields(1, fields, `${label}[${index}]`);
+        const cons = this.makeObjectCtorFromOwnedFields(
+          1,
+          fields,
+          `${label}[${index}]`,
+        );
         elementObjs[index] = 0;
         tail = cons;
       }
@@ -845,12 +1050,17 @@ export class ObjectValueRuntime {
     let fieldsPtr = 0;
     try {
       if (fields.length !== 0) {
-        fieldsPtr = this.allocByteLength(fields.length * 4, `${label} field pointer array`);
+        fieldsPtr = this.allocByteLength(
+          fields.length * 4,
+          `${label} field pointer array`,
+        );
         this.writePointerArray(fieldsPtr, fields);
       }
       const obj = this.exports.vir_obj_ctor(tag, fieldsPtr, fields.length);
       if (obj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+        throw new Error(
+          `${label} could not be lowered to a Lean constructor object`,
+        );
       }
       fields.length = 0;
       return obj;
@@ -867,7 +1077,10 @@ export class ObjectValueRuntime {
     let scalarFieldsPtr = 0;
     try {
       if (layout.objectFields.length !== 0) {
-        objectFieldsPtr = this.allocByteLength(layout.objectFields.length * 4, `${label} object field pointer array`);
+        objectFieldsPtr = this.allocByteLength(
+          layout.objectFields.length * 4,
+          `${label} object field pointer array`,
+        );
         this.writePointerArray(objectFieldsPtr, layout.objectFields);
       }
       if (layout.usizeFields.length !== 0) {
@@ -876,7 +1089,11 @@ export class ObjectValueRuntime {
           layout.usizeFields.length * pointerBytes,
           `${label} usize field array`,
         );
-        const view = new DataView(this.exports.memory.buffer, usizeFieldsPtr, layout.usizeFields.length * pointerBytes);
+        const view = new DataView(
+          this.exports.memory.buffer,
+          usizeFieldsPtr,
+          layout.usizeFields.length * pointerBytes,
+        );
         for (let index = 0; index < layout.usizeFields.length; index++) {
           const value = layout.usizeFields[index];
           if (pointerBytes === 4) {
@@ -899,7 +1116,9 @@ export class ObjectValueRuntime {
         layout.scalarBytes.byteLength,
       );
       if (obj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+        throw new Error(
+          `${label} could not be lowered to a Lean constructor object`,
+        );
       }
       layout.objectFields.length = 0;
       return obj;
@@ -935,7 +1154,10 @@ export class ObjectValueRuntime {
       if (argObjs.length !== 0) {
         const marshalStarted = timing?.beginPhase();
         try {
-          argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
+          argvPtr = this.allocByteLength(
+            argObjs.length * 4,
+            `${entry.entry} argv pointer array`,
+          );
           this.writePointerArray(argvPtr, argObjs);
         } finally {
           if (timing !== null) timing.endMarshal(marshalStarted);
@@ -943,12 +1165,20 @@ export class ObjectValueRuntime {
       }
 
       if (timing === null) {
-        resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+        resultObj = this.exports.vir_call_resolved_objects(
+          callSlot,
+          argvPtr,
+          argObjs.length,
+        );
       } else {
         this.hostState?.beginCallTiming(timing);
         const executeStarted = timing.beginPhase();
         try {
-          resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+          resultObj = this.exports.vir_call_resolved_objects(
+            callSlot,
+            argvPtr,
+            argObjs.length,
+          );
         } finally {
           try {
             timing.endExecute(executeStarted);
@@ -1071,11 +1301,16 @@ export class ObjectValueRuntime {
           level: this.liftObjectLevel(level, `${label}.level`),
         }));
       case 4:
-        return this.withOwnedObjectFields(obj, [0, 1], label, ([name, levels]) => ({
-          kind: "const",
-          name: this.readObjectName(name),
-          levels: this.liftObjectLevelList(levels, `${label}.levels`),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1],
+          label,
+          ([name, levels]) => ({
+            kind: "const",
+            name: this.readObjectName(name),
+            levels: this.liftObjectLevelList(levels, `${label}.levels`),
+          }),
+        );
       case 5:
         return this.withOwnedObjectFields(obj, [0, 1], label, ([fn, arg]) => ({
           kind: "app",
@@ -1083,30 +1318,49 @@ export class ObjectValueRuntime {
           arg: this.liftObjectExpr(arg, `${label}.arg`),
         }));
       case 6:
-        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
-          kind: "lam",
-          name: this.readObjectName(name),
-          type: this.liftObjectExpr(type, `${label}.type`),
-          body: this.liftObjectExpr(body, `${label}.body`),
-          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3)),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1, 2],
+          label,
+          ([name, type, body]) => ({
+            kind: "lam",
+            name: this.readObjectName(name),
+            type: this.liftObjectExpr(type, `${label}.type`),
+            body: this.liftObjectExpr(body, `${label}.body`),
+            binderInfo: decodeBinderInfo(
+              this.exports.vir_obj_expr_scalar_u8(obj, 3),
+            ),
+          }),
+        );
       case 7:
-        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
-          kind: "forall",
-          name: this.readObjectName(name),
-          type: this.liftObjectExpr(type, `${label}.type`),
-          body: this.liftObjectExpr(body, `${label}.body`),
-          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3)),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1, 2],
+          label,
+          ([name, type, body]) => ({
+            kind: "forall",
+            name: this.readObjectName(name),
+            type: this.liftObjectExpr(type, `${label}.type`),
+            body: this.liftObjectExpr(body, `${label}.body`),
+            binderInfo: decodeBinderInfo(
+              this.exports.vir_obj_expr_scalar_u8(obj, 3),
+            ),
+          }),
+        );
       case 8:
-        return this.withOwnedObjectFields(obj, [0, 1, 2, 3], label, ([name, type, value, body]) => ({
-          kind: "let",
-          name: this.readObjectName(name),
-          type: this.liftObjectExpr(type, `${label}.type`),
-          value: this.liftObjectExpr(value, `${label}.value`),
-          body: this.liftObjectExpr(body, `${label}.body`),
-          nondep: this.exports.vir_obj_expr_scalar_u8(obj, 4) !== 0,
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1, 2, 3],
+          label,
+          ([name, type, value, body]) => ({
+            kind: "let",
+            name: this.readObjectName(name),
+            type: this.liftObjectExpr(type, `${label}.type`),
+            value: this.liftObjectExpr(value, `${label}.value`),
+            body: this.liftObjectExpr(body, `${label}.body`),
+            nondep: this.exports.vir_obj_expr_scalar_u8(obj, 4) !== 0,
+          }),
+        );
       case 9:
         return this.withOwnedObjectField(obj, 0, label, (literal) => ({
           kind: "lit",
@@ -1118,14 +1372,21 @@ export class ObjectValueRuntime {
           expr: this.liftObjectExpr(expr, `${label}.expr`),
         }));
       case 11:
-        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([typeName, index, structure]) => ({
-          kind: "proj",
-          typeName: this.readObjectName(typeName),
-          index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
-          struct: this.liftObjectExpr(structure, `${label}.struct`),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1, 2],
+          label,
+          ([typeName, index, structure]) => ({
+            kind: "proj",
+            typeName: this.readObjectName(typeName),
+            index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+            struct: this.liftObjectExpr(structure, `${label}.struct`),
+          }),
+        );
       default:
-        throw new Error(`${label} has unsupported Lean.Expr result kind ${kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Expr result kind ${kind}`,
+        );
     }
   }
 
@@ -1143,17 +1404,27 @@ export class ObjectValueRuntime {
           of: this.liftObjectLevel(child, `${label}.of`),
         }));
       case 2:
-        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
-          kind: "max",
-          left: this.liftObjectLevel(left, `${label}.left`),
-          right: this.liftObjectLevel(right, `${label}.right`),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1],
+          label,
+          ([left, right]) => ({
+            kind: "max",
+            left: this.liftObjectLevel(left, `${label}.left`),
+            right: this.liftObjectLevel(right, `${label}.right`),
+          }),
+        );
       case 3:
-        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
-          kind: "imax",
-          left: this.liftObjectLevel(left, `${label}.left`),
-          right: this.liftObjectLevel(right, `${label}.right`),
-        }));
+        return this.withOwnedObjectFields(
+          obj,
+          [0, 1],
+          label,
+          ([left, right]) => ({
+            kind: "imax",
+            left: this.liftObjectLevel(left, `${label}.left`),
+            right: this.liftObjectLevel(right, `${label}.right`),
+          }),
+        );
       case 4:
         return this.withOwnedObjectField(obj, 0, label, (name) => ({
           kind: "param",
@@ -1165,13 +1436,16 @@ export class ObjectValueRuntime {
           name: this.readObjectName(name),
         }));
       default:
-        throw new Error(`${label} has unsupported Lean.Level result kind ${kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Level result kind ${kind}`,
+        );
     }
   }
 
   liftObjectLevelList(obj, label) {
     return this.liftObjectConstructorList(obj, label, (head, index) =>
-      this.liftObjectLevel(head, `${label}[${index}]`));
+      this.liftObjectLevel(head, `${label}[${index}]`),
+    );
   }
 
   liftObjectLiteral(obj, label) {
@@ -1188,36 +1462,40 @@ export class ObjectValueRuntime {
           value: this.readObjectString(value),
         }));
       default:
-        throw new Error(`${label} has unsupported Lean.Literal result kind ${kind}`);
+        throw new Error(
+          `${label} has unsupported Lean.Literal result kind ${kind}`,
+        );
     }
   }
 
   liftOwnedObjectValue(type, obj, label) {
-    const ownership = new ObjectValueOwnershipScope(label);
+    const rollback = new ObjectLiftRollbackScope(label);
     try {
-      const value = this.liftObjectValue(type, obj, label, null, ownership);
-      ownership.commit();
+      const value = this.liftObjectValue(type, obj, label, null, rollback);
+      rollback.commit();
       return value;
     } catch (error) {
-      ownership.rollback(error);
+      rollback.fail(error);
     }
   }
 
-  liftObjectValue(type, obj, label, selfType = null, ownership = null) {
+  liftObjectValue(type, obj, label, selfType = null, rollback = null) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
-          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+          throw new Error(
+            `${label} has a recursive self reference without an enclosing type`,
+          );
         }
-        return this.liftObjectValue(selfType, obj, label, selfType, ownership);
+        return this.liftObjectValue(selfType, obj, label, selfType, rollback);
       case INTERFACE_TAG.UNIT:
         return undefined;
       case INTERFACE_TAG.RESOURCE:
-        return this.liftOwnedObjectResource(obj, label, ownership);
+        return this.liftObjectResource(obj, label);
       case INTERFACE_TAG.FUNCTION: {
         const callback = this.liftObjectFunction(type, obj, label);
-        ownership?.own(() => callback.release());
+        rollback?.add(() => releaseCallbackRoot(callback));
         return callback;
       }
       case INTERFACE_TAG.BOOL:
@@ -1249,27 +1527,29 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
       case INTERFACE_TAG.ARRAY:
-        return this.liftObjectArrayValue(type, obj, label, selfType, ownership);
+        return this.liftObjectArrayValue(type, obj, label, selfType, rollback);
       case INTERFACE_TAG.LIST:
-        return this.liftObjectListValue(type, obj, label, selfType, ownership);
+        return this.liftObjectListValue(type, obj, label, selfType, rollback);
       case INTERFACE_TAG.OPTION:
-        return this.liftObjectOptionValue(type, obj, label, selfType, ownership);
+        return this.liftObjectOptionValue(type, obj, label, selfType, rollback);
       case INTERFACE_TAG.PROD:
-        return this.liftObjectProdValue(type, obj, label, selfType, ownership);
+        return this.liftObjectProdValue(type, obj, label, selfType, rollback);
       case INTERFACE_TAG.STRUCTURE:
-        return this.liftObjectStructureValue(type, obj, label, ownership);
+        return this.liftObjectStructureValue(type, obj, label, rollback);
       case INTERFACE_TAG.TAGGED_UNION:
-        return this.liftObjectTaggedUnionValue(type, obj, label, ownership);
+        return this.liftObjectTaggedUnionValue(type, obj, label, rollback);
       case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-        return this.liftObjectCustomInductiveValue(type, obj, label, ownership);
+        return this.liftObjectCustomInductiveValue(type, obj, label, rollback);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
   }
 
-  liftHostResourceObjectValue(type, obj, label) {
+  liftJsObjectValue(type, obj, label) {
     if (!hostResourceArgumentSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host resource argument type`);
+      throw new Error(
+        `${label} has unsupported JavaScript host resource argument type`,
+      );
     }
     return this.liftObjectValue(type, obj, label);
   }
@@ -1286,35 +1566,22 @@ export class ObjectValueRuntime {
     return value;
   }
 
-  liftOwnedObjectResource(obj, label, ownership) {
-    const lifted = this.liftObjectResourceWithOwnership(obj, label, ownership !== null);
-    if (lifted.acquired) {
-      ownership?.own(() => releaseHostResource(lifted.resource));
-    }
-    return lifted.resource;
-  }
-
-  liftObjectResource(obj, label, take = false) {
-    return this.liftObjectResourceWithOwnership(obj, label, take).resource;
-  }
-
-  liftObjectResourceWithOwnership(obj, label, take = false) {
-    const acquired = take && this.exports.vir_obj_resource_is_owned(obj) !== 0;
-    const resource = this.exports.vir_obj_resource_externref(obj, take ? 1 : 0);
-    if (isHostResource(resource) && hostResourceValue(resource) !== null) {
-      return { resource, acquired };
+  liftObjectResource(obj, label) {
+    if (this.exports.vir_obj_resource_is_valid(obj) !== 0) {
+      return this.exports.vir_obj_resource_externref(obj);
     }
     // Some effect callback paths can expose one IO.ok wrapper around a Js result
     // at the JS lift boundary. Keep this resource-only; ordinary Lean tag-0
     // constructors must continue through their declared value decoders.
-    if (this.exports.vir_obj_is_scalar(obj) === 0 && this.exports.vir_obj_tag(obj) === 0) {
+    if (
+      this.exports.vir_obj_is_scalar(obj) === 0 &&
+      this.exports.vir_obj_tag(obj) === 0
+    ) {
       const field = this.exports.vir_obj_field(obj, 0);
       if (field !== 0) {
         try {
-          const nestedAcquired = take && this.exports.vir_obj_resource_is_owned(field) !== 0;
-          const nested = this.exports.vir_obj_resource_externref(field, take ? 1 : 0);
-          if (isHostResource(nested) && hostResourceValue(nested) !== null) {
-            return { resource: nested, acquired: nestedAcquired };
+          if (this.exports.vir_obj_resource_is_valid(field) !== 0) {
+            return this.exports.vir_obj_resource_externref(field);
           }
         } finally {
           this.exports.vir_obj_dec(field);
@@ -1325,7 +1592,7 @@ export class ObjectValueRuntime {
   }
 
   retainLeanObjectHandleValue(resource, label) {
-    const cell = requireLeanObjectHandleLease(resource, this, label).cell;
+    const cell = requireLeanObjectHandle(resource, this, label).cell;
     const object = normalizeObjectPointer(cell.object, label);
     this.exports.vir_obj_inc(object);
     return object;
@@ -1345,7 +1612,7 @@ export class ObjectValueRuntime {
     return createVirCallback(this, rootId, type);
   }
 
-  liftObjectArrayValue(type, obj, label, selfType, ownership) {
+  liftObjectArrayValue(type, obj, label, selfType, rollback) {
     const len = this.exports.vir_obj_array_size(obj);
     const elementType = requireTypeField(type, "element", label);
     const values = [];
@@ -1355,13 +1622,15 @@ export class ObjectValueRuntime {
         throw new Error(`${label}[${index}] is unavailable`);
       }
       try {
-        values.push(this.liftObjectValue(
-          elementType,
-          element,
-          `${label}[${index}]`,
-          selfType,
-          ownership,
-        ));
+        values.push(
+          this.liftObjectValue(
+            elementType,
+            element,
+            `${label}[${index}]`,
+            selfType,
+            rollback,
+          ),
+        );
       } finally {
         this.exports.vir_obj_dec(element);
       }
@@ -1369,10 +1638,17 @@ export class ObjectValueRuntime {
     return values;
   }
 
-  liftObjectListValue(type, obj, label, selfType, ownership) {
+  liftObjectListValue(type, obj, label, selfType, rollback) {
     const elementType = requireTypeField(type, "element", label);
     return this.liftObjectConstructorList(obj, label, (head, index) =>
-      this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType, ownership));
+      this.liftObjectValue(
+        elementType,
+        head,
+        `${label}[${index}]`,
+        selfType,
+        rollback,
+      ),
+    );
   }
 
   liftObjectConstructorList(obj, label, liftElement) {
@@ -1384,13 +1660,17 @@ export class ObjectValueRuntime {
         if (this.exports.vir_obj_is_scalar(cursor) !== 0) {
           const tag = this.exports.vir_obj_scalar_value(cursor) >>> 0;
           if (tag !== 0) {
-            throw new Error(`${label} has unsupported Lean.List scalar tag ${tag}`);
+            throw new Error(
+              `${label} has unsupported Lean.List scalar tag ${tag}`,
+            );
           }
           return values;
         }
         const tag = this.exports.vir_obj_tag(cursor);
         if (tag !== 1) {
-          throw new Error(`${label} has unsupported Lean.List constructor tag ${tag}`);
+          throw new Error(
+            `${label} has unsupported Lean.List constructor tag ${tag}`,
+          );
         }
         const index = values.length;
         const head = this.ownedObjectField(cursor, 0, `${label}[${index}]`);
@@ -1400,7 +1680,11 @@ export class ObjectValueRuntime {
           this.exports.vir_obj_dec(head);
         }
 
-        let tail = this.ownedObjectField(cursor, 1, `${label} tail after index ${index}`);
+        let tail = this.ownedObjectField(
+          cursor,
+          1,
+          `${label} tail after index ${index}`,
+        );
         try {
           if (ownsCursor) {
             this.exports.vir_obj_dec(cursor);
@@ -1421,7 +1705,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectOptionValue(type, obj, label, selfType, ownership) {
+  liftObjectOptionValue(type, obj, label, selfType, rollback) {
     const tag = this.exports.vir_obj_tag(obj);
     if (tag === 0) {
       return null;
@@ -1432,24 +1716,36 @@ export class ObjectValueRuntime {
     const field = this.ownedObjectField(obj, 0, label);
     try {
       return this.liftObjectValue(
-        requireTypeField(type, "element", label), field, `${label}.value`, selfType, ownership,
+        requireTypeField(type, "element", label),
+        field,
+        `${label}.value`,
+        selfType,
+        rollback,
       );
     } finally {
       this.exports.vir_obj_dec(field);
     }
   }
 
-  liftObjectProdValue(type, obj, label, selfType, ownership) {
+  liftObjectProdValue(type, obj, label, selfType, rollback) {
     const fst = this.ownedObjectField(obj, 0, label);
     try {
       const snd = this.ownedObjectField(obj, 1, label);
       try {
         return {
           fst: this.liftObjectValue(
-            requireTypeField(type, "fst", label), fst, `${label}.fst`, selfType, ownership,
+            requireTypeField(type, "fst", label),
+            fst,
+            `${label}.fst`,
+            selfType,
+            rollback,
           ),
           snd: this.liftObjectValue(
-            requireTypeField(type, "snd", label), snd, `${label}.snd`, selfType, ownership,
+            requireTypeField(type, "snd", label),
+            snd,
+            `${label}.snd`,
+            selfType,
+            rollback,
           ),
         };
       } finally {
@@ -1460,13 +1756,17 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectStructureValue(type, obj, label, ownership) {
+  liftObjectStructureValue(type, obj, label, rollback) {
     const fields = requireStructureFields(type, label);
     const trivial = trivialStructureField(type, fields);
     if (trivial !== null) {
       return {
         [trivial.name]: this.liftObjectValue(
-          trivial.type, obj, `${label}.${trivial.name}`, type, ownership,
+          trivial.type,
+          obj,
+          `${label}.${trivial.name}`,
+          type,
+          rollback,
         ),
       };
     }
@@ -1475,13 +1775,18 @@ export class ObjectValueRuntime {
     for (const fieldPlan of plan.fields) {
       const field = fieldPlan.field;
       values[field.name] = this.liftObjectLayoutField(
-        type, obj, fieldPlan, `${label}.${field.name}`, type, ownership,
+        type,
+        obj,
+        fieldPlan,
+        `${label}.${field.name}`,
+        type,
+        rollback,
       );
     }
     return flattenStructureSubobjects(type, values);
   }
 
-  liftObjectTaggedUnionValue(type, obj, label, ownership) {
+  liftObjectTaggedUnionValue(type, obj, label, rollback) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = taggedUnionConstructorAt(type, tag, label);
     const field = taggedUnionField(ctor);
@@ -1489,12 +1794,17 @@ export class ObjectValueRuntime {
     return {
       kind: ctor.jsName,
       value: this.liftObjectLayoutField(
-        ctor, obj, plan.fields[0], `${label}.${ctor.jsName}`, type, ownership,
+        ctor,
+        obj,
+        plan.fields[0],
+        `${label}.${ctor.jsName}`,
+        type,
+        rollback,
       ),
     };
   }
 
-  liftObjectCustomInductiveValue(type, obj, label, ownership) {
+  liftObjectCustomInductiveValue(type, obj, label, rollback) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = customInductiveConstructorAt(type, tag, label);
     if (ctor.fields.length === 0) {
@@ -1510,25 +1820,40 @@ export class ObjectValueRuntime {
         fieldPlan,
         `${label}.${ctor.jsName}.${field.name}`,
         type,
-        ownership,
+        rollback,
       );
     }
-    return ctor.fields.length === 1 ? {
-      kind: ctor.jsName,
-      value: values[ctor.fields[0].name],
-    } : {
-      kind: ctor.jsName,
-      fields: values,
-    };
+    return ctor.fields.length === 1
+      ? {
+          kind: ctor.jsName,
+          value: values[ctor.fields[0].name],
+        }
+      : {
+          kind: ctor.jsName,
+          fields: values,
+        };
   }
 
-  liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner, ownership = null) {
+  liftObjectLayoutField(
+    owner,
+    obj,
+    fieldPlan,
+    label,
+    selfType = owner,
+    rollback = null,
+  ) {
     const field = fieldPlan.field;
     switch (fieldPlan.kind) {
       case "object": {
         const fieldObj = this.ownedObjectField(obj, fieldPlan.index, label);
         try {
-          return this.liftObjectValue(field.type, fieldObj, label, selfType, ownership);
+          return this.liftObjectValue(
+            field.type,
+            fieldObj,
+            label,
+            selfType,
+            rollback,
+          );
         } finally {
           this.exports.vir_obj_dec(fieldObj);
         }
@@ -1536,7 +1861,14 @@ export class ObjectValueRuntime {
       case "usize":
         return this.readObjectUSizeField(obj, field.layout.index, label);
       case "scalar":
-        return this.readObjectScalarField(owner, obj, field.type, field.layout, label, fieldPlan.offset);
+        return this.readObjectScalarField(
+          owner,
+          obj,
+          field.type,
+          field.layout,
+          label,
+          fieldPlan.offset,
+        );
       default:
         throw new Error(`${label} has unsupported object ABI layout`);
     }
@@ -1551,7 +1883,10 @@ export class ObjectValueRuntime {
   }
 
   readObjectScalarField(owner, obj, type, layout, label, offset = null) {
-    const data = this.exports.vir_obj_ctor_scalar_data(obj, owner.usizeFieldCount);
+    const data = this.exports.vir_obj_ctor_scalar_data(
+      obj,
+      owner.usizeFieldCount,
+    );
     if (data === 0) {
       throw new Error(`${label} scalar data is unavailable`);
     }
@@ -1566,7 +1901,13 @@ export class ObjectValueRuntime {
 }
 
 function normalizeBinderInfo(value, label) {
-  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
+  if (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 3
+  )
+    return value;
   switch (value) {
     case "default":
       return 0;
@@ -1577,12 +1918,17 @@ function normalizeBinderInfo(value, label) {
     case "instImplicit":
       return 3;
     default:
-      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
+      throw new Error(
+        `${label} must be default, implicit, strictImplicit, or instImplicit`,
+      );
   }
 }
 
 function decodeBinderInfo(value) {
-  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
+  return (
+    ["default", "implicit", "strictImplicit", "instImplicit"][value] ??
+    String(value)
+  );
 }
 
 function requireString(value, label) {

@@ -11,49 +11,90 @@ const runtimeTestDirectory = "tests/runtime";
 function freezeRuntimeTest(test) {
   return Object.freeze({
     ...test,
-    ...(test.nodeArgs === undefined ? {} : { nodeArgs: Object.freeze([...test.nodeArgs]) }),
+    ...(test.nodeArgs === undefined
+      ? {}
+      : { nodeArgs: Object.freeze([...test.nodeArgs]) }),
   });
 }
 
-export const runtimeTests = Object.freeze([
-  { id: "manifest", file: "manifest-smoke.mjs", group: "pure" },
-  { id: "call-timing", file: "call-timing-smoke.mjs", group: "pure" },
-  { id: "js-float", file: "js-float-fidelity-smoke.mjs", group: "pure" },
-  { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },
-  { id: "host-resource-lifecycle", file: "host-resource-lifecycle-smoke.mjs", group: "pure" },
-  {
-    id: "host-resource-gc",
-    file: "host-resource-gc-smoke.mjs",
-    group: "pure",
-    nodeArgs: ["--expose-gc"],
-  },
-  { id: "browser-canvas-bindings", file: "browser-canvas-bindings-smoke.mjs", group: "pure" },
-  { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
-  { id: "callback-lifecycle", file: "callback-lifecycle-smoke.mjs", group: "pure" },
-  { id: "react-host-bindings", file: "react-host-bindings-smoke.mjs", group: "pure" },
-  {
-    id: "custom-inductive-normalization",
-    file: "custom-inductive-normalization-smoke.mjs",
-    group: "pure",
-  },
-  { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
-  { id: "package-decoder", file: "package-decoder-smoke.mjs", group: "pure" },
-  { id: "package-set-descriptor", file: "package-set-descriptor-smoke.mjs", group: "pure" },
-  { id: "package-generator", file: "package-generator-smoke.mjs", group: "lean" },
-  {
-    id: "interpreter-constant-cache",
-    file: "interpreter-constant-cache-smoke.mjs",
-    group: "lean",
-  },
-  { id: "module-package-set", file: "module-package-set-smoke.mjs", group: "lean" },
-  { id: "slides-canvas", file: "slides-canvas-runtime-smoke.mjs", group: "lean" },
-  { id: "package-generation", file: "package-generation-smoke.mjs", group: "lean" },
-  { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
-].map(freezeRuntimeTest));
+export const runtimeTests = Object.freeze(
+  [
+    { id: "manifest", file: "manifest-smoke.mjs", group: "pure" },
+    { id: "call-timing", file: "call-timing-smoke.mjs", group: "pure" },
+    { id: "js-float", file: "js-float-fidelity-smoke.mjs", group: "pure" },
+    { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },
+    { id: "host-boundary", file: "host-boundary-smoke.mjs", group: "pure" },
+    {
+      id: "js-value-gc",
+      file: "js-value-gc-smoke.mjs",
+      group: "pure",
+      nodeArgs: ["--expose-gc"],
+    },
+    {
+      id: "browser-canvas-bindings",
+      file: "browser-canvas-bindings-smoke.mjs",
+      group: "pure",
+    },
+    { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
+    {
+      id: "callback-lifecycle",
+      file: "callback-lifecycle-smoke.mjs",
+      group: "pure",
+    },
+    {
+      id: "react-host-bindings",
+      file: "react-host-bindings-smoke.mjs",
+      group: "pure",
+    },
+    {
+      id: "custom-inductive-normalization",
+      file: "custom-inductive-normalization-smoke.mjs",
+      group: "pure",
+    },
+    { id: "object-abi", file: "object-abi-smoke.mjs", group: "pure" },
+    {
+      id: "object-abi-structural",
+      file: "object-abi-structural-smoke.mjs",
+      group: "pure",
+    },
+    { id: "package-decoder", file: "package-decoder-smoke.mjs", group: "pure" },
+    {
+      id: "package-set-descriptor",
+      file: "package-set-descriptor-smoke.mjs",
+      group: "pure",
+    },
+    {
+      id: "package-generator",
+      file: "package-generator-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "interpreter-constant-cache",
+      file: "interpreter-constant-cache-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "module-package-set",
+      file: "module-package-set-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "slides-canvas",
+      file: "slides-canvas-runtime-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "package-generation",
+      file: "package-generation-smoke.mjs",
+      group: "lean",
+    },
+    { id: "sdk-import", file: "sdk-import-smoke.mjs", group: "lean" },
+  ].map(freezeRuntimeTest),
+);
 
-export const runtimeGroupNames = Object.freeze([
-  ...new Set(runtimeTests.map((test) => test.group)),
-].sort());
+export const runtimeGroupNames = Object.freeze(
+  [...new Set(runtimeTests.map((test) => test.group))].sort(),
+);
 
 const serialRuntimeGroups = Object.freeze(["lean"]);
 
@@ -82,7 +123,9 @@ function parseRuntimeArgs(argv) {
       continue;
     }
     if (arg.startsWith("--")) {
-      throw new Error(`unknown argument: ${arg}; run node tests/runtime/runner.mjs --help`);
+      throw new Error(
+        `unknown argument: ${arg}; run node tests/runtime/runner.mjs --help`,
+      );
     }
     positionalFilters.push(arg);
   }
@@ -101,7 +144,9 @@ function runtimeFilters(positionalFilters, envFilter = "") {
     .map((filter) => filter.trim())
     .filter(Boolean);
   return Object.freeze(
-    [...positionalFilters, ...environmentFilters].map((filter) => filter.toLowerCase()),
+    [...positionalFilters, ...environmentFilters].map((filter) =>
+      filter.toLowerCase(),
+    ),
   );
 }
 
@@ -132,19 +177,33 @@ function testMatchesGroup(test, group) {
 
 export function selectRuntimeTests(tests, { filters = [], group = null } = {}) {
   return Object.freeze(
-    tests.filter((test) => testMatchesGroup(test, group) && testMatchesFilter(test, filters)),
+    tests.filter(
+      (test) =>
+        testMatchesGroup(test, group) && testMatchesFilter(test, filters),
+    ),
   );
 }
 
-export function parseRuntimeRunnerConfig({ argv = [], env = {}, parallelism = 1 } = {}) {
+export function parseRuntimeRunnerConfig({
+  argv = [],
+  env = {},
+  parallelism = 1,
+} = {}) {
   const cli = parseRuntimeArgs(argv);
-  const configuredJobs = parseRunnerJobLimit(env.VIR_RUNTIME_JOBS, "VIR_RUNTIME_JOBS");
+  const configuredJobs = parseRunnerJobLimit(
+    env.VIR_RUNTIME_JOBS,
+    "VIR_RUNTIME_JOBS",
+  );
   return Object.freeze({
     ...cli,
-    filters: runtimeFilters(cli.positionalFilters, env.VIR_RUNTIME_TEST_FILTER ?? ""),
+    filters: runtimeFilters(
+      cli.positionalFilters,
+      env.VIR_RUNTIME_TEST_FILTER ?? "",
+    ),
     group: cli.help ? null : runtimeGroup(cli.group),
     configuredJobs,
-    parallelism: Number.isInteger(parallelism) && parallelism > 0 ? parallelism : 1,
+    parallelism:
+      Number.isInteger(parallelism) && parallelism > 0 ? parallelism : 1,
     verbose: env.VIR_RUNTIME_VERBOSE === "1",
   });
 }
@@ -166,14 +225,18 @@ export function planRuntimeTestBatches(tests) {
 
   function flushParallelBatch() {
     if (parallelBatch.length === 0) return;
-    batches.push(Object.freeze({ mode: "parallel", tests: Object.freeze(parallelBatch) }));
+    batches.push(
+      Object.freeze({ mode: "parallel", tests: Object.freeze(parallelBatch) }),
+    );
     parallelBatch = [];
   }
 
   for (const test of tests) {
     if (isSerialRuntimeTest(test)) {
       flushParallelBatch();
-      batches.push(Object.freeze({ mode: "serial", tests: Object.freeze([test]) }));
+      batches.push(
+        Object.freeze({ mode: "serial", tests: Object.freeze([test]) }),
+      );
     } else {
       parallelBatch.push(test);
     }

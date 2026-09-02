@@ -230,8 +230,8 @@ Together they supply:
   with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
 - Lean closure roots for function-valued host-import arguments. The closure ABI owns
   `vir_obj_closure_root`, `vir_closure_call_objects`, and
-  `vir_closure_release`; JavaScript owns the host-side lifetime policy for
-  `VirCallback` objects.
+  `vir_closure_release`; JavaScript associates each root with an ordinary
+  callable function and releases remaining roots during runtime teardown.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The exported `vir_obj_*`, `vir_call_resolved_objects`, closure-root, and
@@ -640,9 +640,10 @@ lookup.
 Function-valued host-import arguments use the same package-scoped policy. The
 JavaScript runtime roots the Lean closure with `vir_obj_closure_root`, passing
 only the callback arity and effect bit to the shim. JavaScript keeps the full
-manifest function descriptor on the `VirCallback` wrapper, lowers callback
-arguments to owned objects, and lifts the owned object result returned by
-`vir_closure_call_objects`. JavaScript must eventually release the root through
+manifest function descriptor in private state associated with the ordinary
+function, lowers callback arguments to owned objects, and lifts the owned
+object result returned by `vir_closure_call_objects`. Collection is a
+best-effort release backstop and runtime disposal deterministically calls
 `vir_closure_release`. The closure root table is re-entrant: executing a callback
 can register nested closures and may reallocate the table while a callback is
 running.
@@ -744,10 +745,10 @@ The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
 Ordinary scalar and structured values use descriptor-guided object lowering over
 the object ABI. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
-objects that root JavaScript `HostResource` objects in the host runtime.
-`INTERFACE_TAG.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain
-represented by runtime-owned closure roots surfaced to JavaScript as opaque
-`VirCallback` objects.
+objects that root the exact JavaScript values in the host runtime.
+`INTERFACE_TAG.FUNCTION` likewise avoids a serialized numeric token; Lean
+closures remain runtime-owned roots associated with ordinary JavaScript
+functions.
 
 See `docs/REACT_WASM_BINDINGS.md` for the React-first binding plan and local
 feature probes. This repository uses `externref` terminology for host
@@ -758,10 +759,10 @@ plain JavaScript map fallback.
 Useful WebAssembly features to track before widening the ABI:
 
 - Reference Types are already part of the finished proposal set, and `externref`
-  is now required for JavaScript host resources. Direct `externref` values for
-  `Element`, callback-scoped `Event`, and `ReactRoot` now cross the C++/Wasm
-  ABI through a resource side channel; `externref` does not remove the need to
-  root and release Lean heap closures explicitly.
+  is now required for JavaScript values. Exact values such as `Element`,
+  `Event`, and `ReactRoot` cross the C++/Wasm ABI through a side channel;
+  `externref` does not remove the need to root Lean heap closures while their
+  JavaScript functions remain live.
 - The Component Model is still proposal-track and is the right semantic target
   for typed resources once this project moves beyond an internal `.irpkg`
   manifest. The current `Lean.Vir.Js α` marker model is intentionally

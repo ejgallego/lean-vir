@@ -301,16 +301,16 @@ extern "C" float vir_obj_float32_value(lean::object * value) {
     return lean_unbox_float32(value);
 }
 
-extern "C" lean::object * vir_obj_resource(__externref_t value, uint8_t owned) {
-    return lean::vir_resource_object_from_externref(value, owned != 0);
+extern "C" lean::object * vir_obj_resource(__externref_t value) {
+    return lean::vir_resource_object_from_externref(value);
 }
 
-extern "C" __externref_t vir_obj_resource_externref(lean::object * value, uint8_t take) {
-    return lean::vir_resource_externref(value, take != 0);
+extern "C" __externref_t vir_obj_resource_externref(lean::object * value) {
+    return lean::vir_resource_externref(value);
 }
 
-extern "C" uint8_t vir_obj_resource_is_owned(lean::object * value) {
-    return lean::vir_resource_is_owned(value) ? 1 : 0;
+extern "C" uint8_t vir_obj_resource_is_valid(lean::object * value) {
+    return lean::vir_resource_is_valid(value) ? 1 : 0;
 }
 
 extern "C" uint32_t vir_obj_closure_root(

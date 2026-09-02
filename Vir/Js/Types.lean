@@ -51,12 +51,12 @@ end Js
 
 namespace LeanRef
 
-/-- Phantom marker for a Lean-owned value retained behind a JavaScript host resource. -/
+/-- Phantom marker for a Lean-owned value retained by a self-owning JavaScript object. -/
 opaque Handle (α : Type) : Type
 
 end LeanRef
 
-/-- JavaScript host resource containing a retained Lean-owned value. -/
+/-- JavaScript object whose reachability owns a retained Lean value. -/
 abbrev JSL (α : Type) : Type :=
   Js (LeanRef.Handle α)
 

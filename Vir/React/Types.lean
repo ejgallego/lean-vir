@@ -56,7 +56,7 @@ opaque Root : Type
 /-- React element type accepted by `React.createElement`. -/
 opaque ElementType : Type
 
-/-- React state setter object returned by `useState`. -/
+/-- React state setter function returned by `useState`. -/
 opaque StateSetter (α : Type) : Type
 
 /-- React reducer dispatch function returned by `useReducer`. -/
@@ -87,7 +87,7 @@ structure Property where
   name : String
   value : PropValue
 
-/-- A DOM-like React event handler backed by a retained Lean closure. -/
+/-- A DOM-like React event handler containing an ordinary Lean-backed JavaScript callback. -/
 structure EventHandler where
   name : String
   callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit

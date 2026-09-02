@@ -1,161 +1,80 @@
 # Event Callback And Closure Roadmap
 
-The authoritative current resource and callback ownership contract is
-[Resource Ownership Policy](HOST_BINDINGS.md#resource-ownership-policy). This
-document keeps callback-specific context, test history, and future directions.
+The authoritative JavaScript-value and active-resource contract is in
+[HOST_BINDINGS.md](HOST_BINDINGS.md). This note records callback-specific
+behavior and remaining work.
 
-`Lean.Vir.Browser.Element.addEventListener`, `Timer.setTimeout`, and
-`Animation.requestAnimationFrame` are the callback APIs for browser-driven
-reentry into Lean. Event listeners use retained Lean closures directly.
+## Current Model
 
-## Callback Surface Snapshot
+A Lean function passed to a host import appears as an ordinary JavaScript
+function. The public function has no numeric handle and no VIR-specific
+`retain`, `release`, or `dispose` methods. Private WeakMap state associates it
+with one rooted Lean closure.
 
-- Opaque browser resources are represented in Lean as `Lean.Vir.Js` handles
-  over abstract marker classes such as `Element`, `Event`, `EventListener`,
-  `Timeout`, and `AnimationFrame`.
-- Opaque resources cross the JS/Wasm boundary through `externref` side-channel
-  imports. Lean stores them as GC-finalized external objects that root
-  JavaScript `HostResource` objects in the host runtime.
-- Lean function values in host-import arguments are queued as internal closure
-  root ids, not serialized into `INTERFACE_TAG.FUNCTION` payloads. JavaScript receives
-  callable `VirCallback` objects, not raw numeric roots.
-- `VirCallback.retain()` returns a distinct callable lease over the same closure
-  root. `release()` is idempotent per lease; releasing one owner does not
-  invalidate another, and the last release calls the WASM
-  `vir_closure_release` export.
-- Browser listener, timeout, interval, animation-frame, asynchronous RPC, and
-  React owners acquire their own callback lease and relinquish the incoming
-  transfer lease. They release the owned lease when the registration fires, is
-  cancelled/removed/replaced, or the runtime is disposed.
-- A host import may retain its lifted callbacks only after argument conversion,
-  binding execution, synchronous-result validation, and result conversion all
-  succeed. Failure in any phase revokes the whole callback root, including any
-  leases the failed binding created from it; callbacks transferred by
-  successful nested calls remain live.
-- Synchronous host exceptions are relayed to the owning top-level call or
-  retained callback call instead of accepting the trampoline's placeholder
-  result as success.
-- `VirRuntime.dispose()` runs host-binding cleanup and releases any remaining
-  callback roots. Cleanup attempts every binding, resource, object handle, and
-  callback before reporting failures, and the runtime remains terminal even if
-  cleanup throws. After disposal, `vir.call(...)` and callback calls fail.
-- Loading a new package into an existing runtime validates a fresh candidate
-  before tearing down host-owned registrations and callback roots from the
-  previous package. If old-instance cleanup fails, the candidate is discarded
-  and the public runtime remains disposed.
+JavaScript code follows normal reachability rules: a listener, timer, React
+element, closure, or application object that stores the function keeps it
+reachable. A `FinalizationRegistry` releases the Lean root after collection as
+a best-effort backstop. Runtime disposal releases all still-live closure roots
+deterministically and makes subsequent callback calls fail.
 
-The runtime is still synchronous at the host-import boundary. A JavaScript host
-binding must not return a `Promise`; asynchronous browser APIs are represented by
-registering a Lean callback and returning an opaque cancellation handle.
+Host imports remain synchronous. Returning a Promise is an error. Asynchronous
+work starts by registering a callback and returning an explicit cancellation
+value or success result.
 
-## Event APIs
+## Active Callback APIs
 
-`Element.addEventListener`:
+`Element.addEventListener`, timer registration, and animation-frame
+registration are active resources. VIR tracks the registration—not a second
+lease over the callback—until it is removed, cancelled, completed, replaced,
+or disposed. The platform registration's ordinary reference to the function
+keeps the callback alive.
 
-- Lean passes a `Lean.Vir.Js Event -> DomM Unit` closure directly.
-- The host creates a DOM listener and calls the retained Lean closure when the
-  event fires.
-- The `Event` resource is callback-scoped and is released after dispatch.
-- `Element.removeEventListener` removes the listener and releases its retained
-  callback.
-- `Event.target` and `Event.currentTarget` return `some (Js Element)` when the
-  underlying event target is a DOM element, and `none` otherwise.
-- `Event.preventDefault` and `Event.stopPropagation` forward to the underlying
-  browser event and are also modeled in the virtual test host.
-- `Event.inputElement?`, `Event.inputValue?`, `Event.formValue?`, and
-  `Event.inputChecked?` are Lean helpers for controlled input handlers; they
-  check `currentTarget` before falling back to `target`.
+Creation is transactional. If a registration succeeds but its return value
+cannot be published to Lean, the host-call transaction removes or cancels the
+new registration. A callback lifted for a failed host call is likewise
+invalidated before the error returns to JavaScript.
 
-## Timer And Frame APIs
+DOM and React event objects are ordinary JavaScript values. Their practical
+validity follows the browser or framework API; VIR does not add a dynamic
+callback scope or invalidate them after callback return.
 
-`Timer.setTimeout` and `Animation.requestAnimationFrame` deliberately exercise
-callback retention without relying on DOM events:
+## Error And Teardown Behavior
 
-- `Timer.setTimeout delay callback` maps to browser `setTimeout`.
-- `Timer.clearTimeout timeout` cancels a pending timeout and releases the
-  callback.
-- `Animation.requestAnimationFrame callback` maps to
-  `requestAnimationFrame`, with a `setTimeout(..., 16)` fallback in virtual Node
-  tests.
-- `Animation.cancelAnimationFrame frame` cancels a pending frame and releases the
-  callback.
+Synchronous host exceptions are relayed to the owning top-level or callback
+call. Cleanup detaches active registrations before invoking platform teardown,
+attempts every sibling cleanup, and reports multiple failures as an
+`AggregateError`.
 
-These APIs are one-shot. A loop is written in Lean by registering the next
-callback from the current callback.
+Package replacement constructs and validates the new runtime before disposing
+the previous runtime's listeners, schedules, roots, and Lean-backed callback
+roots. Rejected replacement leaves the active runtime intact.
 
 ## Tests
 
-`tests/runtime/runner.mjs` covers the current callback surface:
+The runtime suite covers:
 
-- resource-shaped `RuntimeM` callback round-trip through a custom
-  `test.callNatCallback` host import using explicit `Js Nat` values;
-- double release, call-after-release, and stale closure root failure;
-- independent multi-owner leases, last-lease root release, and force-revocation
-  of leases created by a failed binding;
-- nested callback argument errors while Lean is inside a host import;
-- retained-callback host-error propagation through direct, event, timer, and
-  animation calls;
-- failed host-import callback rollback during argument conversion, binding
-  execution, Promise-result validation, and result conversion, including
-  reentrant ownership isolation;
-- callback-backed event listener dispatch, listener removal, and runtime
-  teardown cleanup;
-- one-shot `setTimeout`, cancelled timeout, and a recursive timeout loop;
-- one-shot `requestAnimationFrame`, cancelled frame, and a recursive frame loop;
-- package reload cleanup for pending listeners, timers, frames, and callback
-  roots;
-- callback-scoped event target/currentTarget access through React input,
-  textarea/select, change, and checkbox callbacks;
-- `preventDefault`/`stopPropagation` dispatch through virtual events and real
-  browser `onChange`/`onSubmit` smoke coverage;
-- virtual event helper coverage through `createVirtualEventState`;
-- browser-page smoke coverage for real DOM click dispatch, `setTimeout`,
-  `requestAnimationFrame`, cancellation/removal, package reload cleanup, and
-  direct runtime disposal;
-- callback, resource, binding, and package-handover cleanup when disposers throw,
-  including preservation of simultaneous primary and cleanup failures;
-- manifest descriptor round-trips for host-import function types.
+- ordinary callable shape and identity;
+- invocation, exception propagation, wrong arity, and disposal invalidation;
+- finalization as an optional GC backstop;
+- listener dispatch/removal and timer/frame completion/cancellation;
+- package replacement and runtime teardown;
+- failure after listener creation but before host-result publication;
+- cleanup that throws while sibling cleanup still runs;
+- real browser events and official React behavior.
 
 ## Remaining Work
 
-1. Replace the dynamic callback-local `Js Event` contract with a scoped or
-   generative borrow API that makes safe-Lean escape unrepresentable. Today an
-   escaped wrapper is invalidated after dispatch and fails on later use.
-2. Add more focused helpers for common events while keeping `Event` opaque.
-3. Keep the closure-root table simple. If release overhead becomes visible,
-   optimize root-id allocation/release in a second phase, after leak tests make
-   the ownership contract hard to regress.
-4. Keep async host imports out of the current synchronous boundary.
-   Promise-returning host bindings need a later JSPI or task-queue design that
-   can report rejection without leaving the interpreter state ambiguous.
-
-## Wasm Extension Direction
-
-- `externref` is now required by the experimental JavaScript resource path for
-  opaque host resources. Resource values cross the C++/Wasm ABI through an
-  `externref` side channel; `externref` does not by itself solve Lean closure
-  rooting, release ownership, or WASI portability.
-- The Component Model and WIT `resource` semantics are the right long-term
-  interface shape for typed host resources. The current manifest is intentionally
-  an internal ABI and should remain replaceable.
-- JS Promise Integration and Stack Switching are the relevant proposal-track
-  work for future async host calls. They are not required for the synchronous
-  callback registration model implemented here.
-- Wasm GC and typed function references are useful to track, but Lean closures
-  are currently Lean heap objects managed by Lean's runtime. They are not a
-  replacement for the explicit root/release bridge in this phase.
-- Research whether `funcref`/typed-function-reference tables can simplify the
-  host callback path. The key question is whether a table can remove meaningful
-  JavaScript dispatch/root bookkeeping without obscuring Lean closure ownership
-  or making package reload/dispose semantics harder to enforce.
+- Keep async host imports out of the synchronous dispatcher until there is a
+  concrete JSPI or task-queue design.
+- Add event conveniences only as explicitly named Lean adapters; do not change
+  the underlying event value.
+- Optimize closure-root allocation only if profiling shows it matters.
+- Continue testing browser APIs against their official implementations rather
+  than extending the Node virtual host into a browser or React emulator.
 
 References:
 
-- [WebAssembly finished proposals](https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md)
-- [WebAssembly active proposals](https://github.com/WebAssembly/proposals)
-- [WebAssembly feature status](https://webassembly.org/features/)
+- [MDN `FinalizationRegistry`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
-- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
-- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
 - [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)

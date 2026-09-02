@@ -1130,7 +1130,7 @@ opaque setWidth
 /--
 Generated binding for reviewed VIR protocol `browser.canvas.fromElement`.
 
-This checked host-resource narrowing has no corresponding JavaScript method.
+This checked narrowing preserves the exact JavaScript value and has no corresponding JavaScript method.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1229,7 +1229,7 @@ opaque setValue
 /--
 Generated binding for reviewed VIR protocol `browser.input.fromElement`.
 
-This checked host-resource narrowing has no corresponding JavaScript method.
+This checked narrowing preserves the exact JavaScript value and has no corresponding JavaScript method.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1250,7 +1250,7 @@ namespace Internal
 /--
 Generated binding for reviewed VIR protocol `browser.internal.ownedString`.
 
-Browser convenience wrappers require an owned JavaScript string resource before calling a consuming or asynchronous host protocol.
+This explicit convenience conversion creates a JavaScript string value before calling the lower-level binding.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1267,7 +1267,7 @@ opaque ownedString
 /--
 Generated binding for reviewed VIR protocol `browser.internal.ownedFloat`.
 
-Canvas convenience wrappers require an owned JavaScript number resource for a generated raw canvas operation.
+This explicit convenience conversion creates a JavaScript number value for the lower-level canvas binding.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1311,7 +1311,7 @@ namespace Timer
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setTimeout`.
 
-VIR represents the numeric timeout id as a revocable resource and retains the callback until firing or cancellation.
+VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1329,7 +1329,7 @@ opaque setTimeoutJs
 /--
 Generated binding for reviewed VIR protocol `browser.timer.clearTimeout`.
 
-Cancellation consumes the revocable timeout resource and releases its retained callback.
+The exact timeout token is passed unchanged to clearTimeout; consuming its Lean Js value also removes VIR's private pending-cancellation record.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1346,7 +1346,7 @@ opaque clearTimeout
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setInterval`.
 
-VIR represents the numeric interval id as a revocable resource and retains the callback until cancellation.
+VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -1364,7 +1364,7 @@ opaque setIntervalJs
 /--
 Generated binding for reviewed VIR protocol `browser.timer.clearInterval`.
 
-Cancellation consumes the revocable interval resource and releases its retained callback.
+The exact interval token is passed unchanged to clearInterval; consuming its Lean Js value also removes VIR's private pending-cancellation record.
 
 Binding contract: `generation.protocolOperations`.
 

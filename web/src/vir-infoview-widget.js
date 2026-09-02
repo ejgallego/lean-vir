@@ -8,7 +8,7 @@ import * as React from "react";
 import { EditorContext, useRpcSession } from "@leanprover/infoview";
 import {
   createBrowserHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
   normalizeProofWidgetsRpcRef,
 } from "./vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "./vir-react-host-bindings.js";
@@ -44,7 +44,10 @@ export default function VirInfoviewWidget(props) {
   const editorConnection = React.useContext(EditorContext);
   const rpcSessionRef = React.useRef(rpcSession);
   const editorConnectionRef = React.useRef(editorConnection);
-  const [status, setStatus] = React.useState({ kind: "loading", message: "Loading VIR widget..." });
+  const [status, setStatus] = React.useState({
+    kind: "loading",
+    message: "Loading VIR widget...",
+  });
   const [mountId] = React.useState(() => freshMountId(props.mountId));
   const loadedRef = React.useRef(null);
   const [reloadToken, setReloadToken] = React.useState(0);
@@ -55,9 +58,10 @@ export default function VirInfoviewWidget(props) {
   const baseSurfaceKey = surfaceCacheKey(baseSurface);
   const surface = surfaceFromInfoviewProps(props, proofWidgetsExpr);
   const surfaceKey = surfaceCacheKey(surface);
-  const irPackageKey = props.irPackage === null || props.irPackage === undefined
-    ? ""
-    : JSON.stringify(props.irPackage);
+  const irPackageKey =
+    props.irPackage === null || props.irPackage === undefined
+      ? ""
+      : JSON.stringify(props.irPackage);
 
   React.useEffect(() => {
     rpcSessionRef.current = rpcSession;
@@ -81,7 +85,10 @@ export default function VirInfoviewWidget(props) {
         return;
       }
       const entry = validateWidgetEntry(service.runtime, config.entry);
-      const unmountEntry = validateWidgetUnmountEntry(service.runtime, config.unmountEntry);
+      const unmountEntry = validateWidgetUnmountEntry(
+        service.runtime,
+        config.unmountEntry,
+      );
       const current = loadedRef.current;
       if (sameLoadedWidget(current, service, entry, unmountEntry, setupHint)) {
         return;
@@ -168,7 +175,10 @@ export default function VirInfoviewWidget(props) {
             })
             .catch((error) => {
               if (!disposed) {
-                setStatus({ kind: "error", message: errorMessage(error, config.setupHint) });
+                setStatus({
+                  kind: "error",
+                  message: errorMessage(error, config.setupHint),
+                });
               }
             })
             .finally(() => {
@@ -199,7 +209,11 @@ export default function VirInfoviewWidget(props) {
 
     async function refreshProofWidgetsExpr() {
       const loaded = loadedRef.current;
-      if (loaded === null || rpcSessionRef.current === null || typeof rpcSessionRef.current?.call !== "function") {
+      if (
+        loaded === null ||
+        rpcSessionRef.current === null ||
+        typeof rpcSessionRef.current?.call !== "function"
+      ) {
         if (!disposed) {
           setProofWidgetsExpr(null);
         }
@@ -227,7 +241,9 @@ export default function VirInfoviewWidget(props) {
           loaded.service.packageRevision,
         );
         if (!disposed && loadedRef.current === loaded) {
-          setProofWidgetsExpr(saved === null ? null : proofWidgetsExprFromSavedRef(saved, loaded.service.resources));
+          setProofWidgetsExpr(
+            saved === null ? null : proofWidgetsExprFromSavedRef(saved),
+          );
         }
       } catch (error) {
         if (!disposed) {
@@ -250,9 +266,15 @@ export default function VirInfoviewWidget(props) {
     }
     try {
       const selector = `#${mountId}`;
-      const mounted = loaded.service.runtime.call(loaded.entry.entry, selector, surface);
+      const mounted = loaded.service.runtime.call(
+        loaded.entry.entry,
+        selector,
+        surface,
+      );
       if (mounted !== true) {
-        throw new Error(`VIR widget entry ${loaded.entry.entry} did not mount ${selector}`);
+        throw new Error(
+          `VIR widget entry ${loaded.entry.entry} did not mount ${selector}`,
+        );
       }
       setStatus({ kind: "ready", message: loaded.entry.entry });
     } catch (error) {
@@ -260,8 +282,11 @@ export default function VirInfoviewWidget(props) {
         loadedRef.current = null;
       }
       releaseLoadedWidget(loaded, mountId);
-      dropRuntimeService(loaded.service);
-      setStatus({ kind: "error", message: errorMessage(error, loaded.setupHint) });
+      retireRuntimeService(loaded.service);
+      setStatus({
+        kind: "error",
+        message: errorMessage(error, loaded.setupHint),
+      });
     }
   }, [runtimeToken, surfaceKey, mountId]);
 
@@ -283,7 +308,11 @@ export default function VirInfoviewWidget(props) {
     }),
     status.kind === "ready"
       ? null
-      : e("pre", { className: "vir-infoview-widget-status", style: statusStyle }, status.message),
+      : e(
+          "pre",
+          { className: "vir-infoview-widget-status", style: statusStyle },
+          status.message,
+        ),
   );
 }
 
@@ -292,9 +321,14 @@ function stopInfoviewEvent(event) {
 }
 
 export function validateWidgetEntry(runtime, entryName) {
-  const entry = runtime.findManifestEntry?.(entryName)
-    ?? runtime.interfaceManifest?.exports?.find((candidate) =>
-      candidate.entry === entryName || candidate.id === entryName || candidate.jsName === entryName);
+  const entry =
+    runtime.findManifestEntry?.(entryName) ??
+    runtime.interfaceManifest?.exports?.find(
+      (candidate) =>
+        candidate.entry === entryName ||
+        candidate.id === entryName ||
+        candidate.jsName === entryName,
+    );
   if (entry === null || entry === undefined) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
@@ -318,9 +352,14 @@ export function validateWidgetUnmountEntry(runtime, entryName) {
   if (entryName.length === 0) {
     return null;
   }
-  const entry = runtime.findManifestEntry?.(entryName)
-    ?? runtime.interfaceManifest?.exports?.find((candidate) =>
-      candidate.entry === entryName || candidate.id === entryName || candidate.jsName === entryName);
+  const entry =
+    runtime.findManifestEntry?.(entryName) ??
+    runtime.interfaceManifest?.exports?.find(
+      (candidate) =>
+        candidate.entry === entryName ||
+        candidate.id === entryName ||
+        candidate.jsName === entryName,
+    );
   if (entry === null || entry === undefined) {
     throw new Error(`VIR widget unmount entry not found: ${entryName}`);
   }
@@ -356,12 +395,16 @@ function releaseLoadedWidget(loaded, mountId) {
 
 export function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
   const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
-    goalFromInteractiveGoal(goal, index, "goal"));
-  const termGoal = props?.termGoal === null || props?.termGoal === undefined
-    ? []
-    : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
+    goalFromInteractiveGoal(goal, index, "goal"),
+  );
+  const termGoal =
+    props?.termGoal === null || props?.termGoal === undefined
+      ? []
+      : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
   const cursor = documentPositionFromInfoviewPosition(props?.pos);
-  const selections = arrayOrEmpty(props?.selectedLocations).map(selectedLocationFromInfoviewLocation);
+  const selections = arrayOrEmpty(props?.selectedLocations).map(
+    selectedLocationFromInfoviewLocation,
+  );
   return {
     position: cursor.label,
     cursor,
@@ -376,10 +419,7 @@ export function surfaceCacheKey(surface) {
   return JSON.stringify(surface);
 }
 
-export function proofWidgetsExprFromSavedRef(saved, resources) {
-  if (resources === null || typeof resources !== "object" || typeof resources.resourceForValue !== "function") {
-    throw new Error("VIR widget ProofWidgets server ref requires a host resource state");
-  }
+export function proofWidgetsExprFromSavedRef(saved) {
   const info = saved?.info;
   const ref = requiredRpcRefObject(saved?.ref, "proofwidgets stored expr ref");
   return {
@@ -393,25 +433,30 @@ export function proofWidgetsExprFromSavedRef(saved, resources) {
       label: optionalString(info?.label, "proofwidgets expr label"),
       typeName: optionalString(info?.typeName, "proofwidgets expr typeName"),
       summary: optionalString(info?.summary, "proofwidgets expr summary"),
-      expression: optionalString(info?.expression, "proofwidgets expr expression"),
+      expression: optionalString(
+        info?.expression,
+        "proofwidgets expr expression",
+      ),
       typeText: optionalString(info?.typeText, "proofwidgets expr typeText"),
       context: optionalString(info?.context, "proofwidgets expr context"),
-      serverRef: resources.resourceForValue(ref),
+      serverRef: ref,
     },
   };
 }
 
 function goalFromInteractiveGoal(goal, index, kind) {
-  const userName = optionalStringValue(readOption(goal?.userName ?? goal?.["userName?"]));
+  const userName = optionalStringValue(
+    readOption(goal?.userName ?? goal?.["userName?"]),
+  );
   const mvarId = optionalStringValue(goal?.mvarId?.name ?? goal?.mvarId);
-  const title = kind === "term"
-    ? "Term goal"
-    : userName.length === 0
-      ? `Goal ${index + 1}`
-      : `case ${userName}`;
-  const idSeed = kind === "term"
-    ? `term-${index}`
-    : optionalStringValue(mvarId || userName);
+  const title =
+    kind === "term"
+      ? "Term goal"
+      : userName.length === 0
+        ? `Goal ${index + 1}`
+        : `case ${userName}`;
+  const idSeed =
+    kind === "term" ? `term-${index}` : optionalStringValue(mvarId || userName);
   const id = safeDomId(idSeed.length === 0 ? `${kind}-${index}` : idSeed);
   return {
     id,
@@ -423,21 +468,30 @@ function goalFromInteractiveGoal(goal, index, kind) {
     status: goalStatus(goal, index, kind),
     target: nonEmptyText(taggedTextToPlain(goal?.type), "(unavailable target)"),
     hypotheses: arrayOrEmpty(goal?.hyps).map((hypothesis, hypothesisIndex) =>
-      hypothesisFromBundle(hypothesis, id, hypothesisIndex)),
+      hypothesisFromBundle(hypothesis, id, hypothesisIndex),
+    ),
   };
 }
 
 function hypothesisFromBundle(hypothesis, goalId, index) {
-  const names = arrayOrEmpty(hypothesis?.names).filter((name) => typeof name === "string");
-  const fvarIds = arrayOrEmpty(hypothesis?.fvarIds).map(infoviewIdToString).filter((id) => id.length !== 0);
-  const idSeed = names.length === 0
-    ? optionalStringValue(fvarIds[0] ?? `hyp-${index}`)
-    : names.join("-");
+  const names = arrayOrEmpty(hypothesis?.names).filter(
+    (name) => typeof name === "string",
+  );
+  const fvarIds = arrayOrEmpty(hypothesis?.fvarIds)
+    .map(infoviewIdToString)
+    .filter((id) => id.length !== 0);
+  const idSeed =
+    names.length === 0
+      ? optionalStringValue(fvarIds[0] ?? `hyp-${index}`)
+      : names.join("-");
   return {
     id: safeDomId(`${goalId}-${idSeed}`),
     names,
     fvarIds,
-    type: nonEmptyText(taggedTextToPlain(hypothesis?.type), "(unavailable type)"),
+    type: nonEmptyText(
+      taggedTextToPlain(hypothesis?.type),
+      "(unavailable type)",
+    ),
     value: optionalTaggedTextToPlain(hypothesis?.val ?? hypothesis?.["val?"]),
   };
 }
@@ -505,8 +559,12 @@ function goalStatus(goal, index, kind) {
 
 function documentPositionFromInfoviewPosition(pos) {
   const hasPosition = pos !== null && typeof pos === "object";
-  const line = hasPosition && Number.isInteger(pos.line) && pos.line >= 0 ? pos.line : 0;
-  const character = hasPosition && Number.isInteger(pos.character) && pos.character >= 0 ? pos.character : 0;
+  const line =
+    hasPosition && Number.isInteger(pos.line) && pos.line >= 0 ? pos.line : 0;
+  const character =
+    hasPosition && Number.isInteger(pos.character) && pos.character >= 0
+      ? pos.character
+      : 0;
   const uri = hasPosition && typeof pos.uri === "string" ? pos.uri : "";
   const fileName = fileNameFromUri(uri);
   const label = hasPosition
@@ -523,7 +581,9 @@ function documentPositionFromInfoviewPosition(pos) {
 
 function formatDocumentPositionLabel(fileName, line, character) {
   const label = `line ${line + 1}:${character + 1}`;
-  return fileName.length === 0 ? label : `${fileName}:${line + 1}:${character + 1}`;
+  return fileName.length === 0
+    ? label
+    : `${fileName}:${line + 1}:${character + 1}`;
 }
 
 function fileNameFromUri(uri) {
@@ -551,7 +611,10 @@ function formatSelectedLocation(location, index) {
     return location;
   }
   if (typeof location === "object") {
-    return optionalStringValue(location.kind ?? location.type ?? location.id) || `location-${index}`;
+    return (
+      optionalStringValue(location.kind ?? location.type ?? location.id) ||
+      `location-${index}`
+    );
   }
   return String(location);
 }
@@ -626,7 +689,10 @@ function widgetRuntimeConfigFromProps(props) {
     entry: requiredString(props.entry, "entry"),
     unmountEntry: optionalString(props.unmountEntry, "unmountEntry"),
     position: requiredPosition(props.pos, "pos"),
-    autoReloadMs: optionalNonNegativeInteger(props.autoReloadMs, "autoReloadMs"),
+    autoReloadMs: optionalNonNegativeInteger(
+      props.autoReloadMs,
+      "autoReloadMs",
+    ),
     setupHint: optionalString(props.setupHint, "setupHint"),
   };
 }
@@ -646,9 +712,15 @@ function requiredPosition(value, label) {
   if (value === null || typeof value !== "object") {
     throw new Error(`VIR widget ${label} must be an LSP position`);
   }
-  if (!Number.isInteger(value.line) || value.line < 0 ||
-      !Number.isInteger(value.character) || value.character < 0) {
-    throw new Error(`VIR widget ${label} must contain non-negative line and character`);
+  if (
+    !Number.isInteger(value.line) ||
+    value.line < 0 ||
+    !Number.isInteger(value.character) ||
+    value.character < 0
+  ) {
+    throw new Error(
+      `VIR widget ${label} must contain non-negative line and character`,
+    );
   }
   return {
     line: value.line,
@@ -667,11 +739,13 @@ function optionalNonNegativeInteger(value, label) {
 }
 
 function sameLoadedWidget(loaded, service, entry, unmountEntry, setupHint) {
-  return loaded !== null
-    && loaded.service === service
-    && loaded.entry.entry === entry.entry
-    && (loaded.unmountEntry?.entry ?? "") === (unmountEntry?.entry ?? "")
-    && loaded.setupHint === setupHint;
+  return (
+    loaded !== null &&
+    loaded.service === service &&
+    loaded.entry.entry === entry.entry &&
+    (loaded.unmountEntry?.entry ?? "") === (unmountEntry?.entry ?? "") &&
+    loaded.setupHint === setupHint
+  );
 }
 
 function runtimeBaseKey(config) {
@@ -686,10 +760,18 @@ export async function loadRuntimeService({
   editorConnectionRef = null,
   config,
 }) {
-  return loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, config });
+  return loadRuntimeServiceWithHost({
+    rpcSession,
+    editorConnectionRef,
+    config,
+  });
 }
 
-async function loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, config }) {
+async function loadRuntimeServiceWithHost({
+  rpcSession,
+  editorConnectionRef,
+  config,
+}) {
   const baseKey = runtimeBaseKey(config);
   const sources = await resolveRuntimeSources(rpcSession, config);
   const key = runtimeServiceKey(baseKey, sources);
@@ -704,13 +786,16 @@ async function loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, con
       sources,
     });
     runtimeServiceCache.set(key, cached);
-    cached.then(() => {
-      retireRuntimeServicesForBaseKey(baseKey, key);
-    }).catch(() => {
-      if (runtimeServiceCache.get(key) === cached) {
-        runtimeServiceCache.delete(key);
-      }
-    });
+    cached
+      .then((service) => {
+        service.cacheEntry = cached;
+        retireRuntimeServicesForBaseKey(baseKey, key);
+      })
+      .catch(() => {
+        if (runtimeServiceCache.get(key) === cached) {
+          runtimeServiceCache.delete(key);
+        }
+      });
   }
   const service = await cached;
   service.lastUsed = Date.now();
@@ -734,21 +819,26 @@ async function createRuntimeService({
   key,
   sources,
 }) {
-  const resources = createHostResourceState();
-  const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
-  runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
-    resources,
-    runtimeRef,
-    infoviewCommandDispatcher: createInfoviewCommandDispatcher({
-      editorConnectionRef,
-      rpcSession,
-      position: config.position,
-      packageRevision: sources.packageSource.revision ?? "",
-    }),
-    reactHostBindings: createBrowserReactHostBindings,
+  const resources = createHostLifecycle();
+  const runtimeOptions = await loadRuntimeOptionsFromSources({
+    rpcSession,
+    sources,
   });
+  runtimeOptions.defaultHostBindings = (runtimeRef) =>
+    createBrowserHostBindings({
+      resources,
+      runtimeRef,
+      infoviewCommandDispatcher: createInfoviewCommandDispatcher({
+        editorConnectionRef,
+        rpcSession,
+        position: config.position,
+        packageRevision: sources.packageSource.revision ?? "",
+      }),
+      reactHostBindings: createBrowserReactHostBindings,
+    });
   return {
     baseKey,
+    cacheEntry: null,
     key,
     activeRefs: 0,
     packageRevision: sources.packageSource.revision ?? "",
@@ -768,10 +858,19 @@ function createInfoviewCommandDispatcher({
   packageRevision = "",
 }) {
   const resolveRef = (ref) => {
-    if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+    if (
+      rpcSession === null ||
+      typeof rpcSession.call !== "function" ||
+      position === null
+    ) {
       return false;
     }
-    return resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision);
+    return resolveProofWidgetsRpcRef(
+      rpcSession,
+      ref,
+      position,
+      packageRevision,
+    );
   };
   return {
     revealPosition(position) {
@@ -802,10 +901,16 @@ function createInfoviewCommandDispatcher({
       const cursor = { line: position.line, character: position.character };
       const edit = editorConnection.api.applyEdit({
         changes: {
-          [position.uri]: [{ range: { start: cursor, end: cursor }, newText: text }],
+          [position.uri]: [
+            { range: { start: cursor, end: cursor }, newText: text },
+          ],
         },
       });
-      if (edit !== null && typeof edit === "object" && typeof edit.catch === "function") {
+      if (
+        edit !== null &&
+        typeof edit === "object" &&
+        typeof edit.catch === "function"
+      ) {
         edit.catch((error) => {
           console.error(error);
         });
@@ -817,11 +922,13 @@ function createInfoviewCommandDispatcher({
       if (result === false) {
         return false;
       }
-      result.then((info) => {
-        console.info("VIR ProofWidgets RPC reference", info);
-      }).catch((error) => {
-        console.error(error);
-      });
+      result
+        .then((info) => {
+          console.info("VIR ProofWidgets RPC reference", info);
+        })
+        .catch((error) => {
+          console.error(error);
+        });
       return true;
     },
     proofwidgetsRpcResolveRef: resolveRef,
@@ -842,7 +949,7 @@ function releaseRuntimeService(service) {
 
 function retireRuntimeService(service) {
   service.stale = true;
-  if (runtimeServiceCache.get(service.key) !== undefined) {
+  if (runtimeServiceCache.get(service.key) === service.cacheEntry) {
     runtimeServiceCache.delete(service.key);
   }
   disposeStaleRuntimeServiceIfIdle(service);
@@ -870,13 +977,18 @@ function clearRuntimeServiceIdleTimer(service) {
 }
 
 function scheduleRuntimeServiceIdleDispose(service) {
-  if (service.disposed || service.stale || service.activeRefs !== 0 || service.idleTimer !== null) {
+  if (
+    service.disposed ||
+    service.stale ||
+    service.activeRefs !== 0 ||
+    service.idleTimer !== null
+  ) {
     return;
   }
   service.idleTimer = setTimeout(() => {
     service.idleTimer = null;
     if (!service.disposed && !service.stale && service.activeRefs === 0) {
-      if (runtimeServiceCache.get(service.key) !== undefined) {
+      if (runtimeServiceCache.get(service.key) === service.cacheEntry) {
         runtimeServiceCache.delete(service.key);
       }
       disposeRuntimeServiceNow(service);
@@ -889,26 +1001,20 @@ function retireRuntimeServicesForBaseKey(baseKey, keepKey) {
     if (key === keepKey) {
       continue;
     }
-    cached.then((service) => {
-      if (service.baseKey === baseKey) {
-        retireRuntimeService(service);
-      }
-    }).catch(() => {});
+    cached
+      .then((service) => {
+        if (service.baseKey === baseKey) {
+          retireRuntimeService(service);
+        }
+      })
+      .catch(() => {});
   }
-}
-
-function dropRuntimeService(service) {
-  const cached = runtimeServiceCache.get(service.key);
-  if (cached !== undefined) {
-    runtimeServiceCache.delete(service.key);
-  }
-  service.activeRefs = 0;
-  service.stale = true;
-  disposeRuntimeServiceNow(service);
 }
 
 export async function clearRuntimeServiceCacheForTests() {
-  const services = await Promise.allSettled(Array.from(runtimeServiceCache.values()));
+  const services = await Promise.allSettled(
+    Array.from(runtimeServiceCache.values()),
+  );
   runtimeServiceCache.clear();
   for (const service of services) {
     if (service.status === "fulfilled") {
@@ -919,7 +1025,12 @@ export async function clearRuntimeServiceCacheForTests() {
   }
 }
 
-export async function shouldReloadIRPackage({ rpcSession, irPackage, position, currentRevision }) {
+export async function shouldReloadIRPackage({
+  rpcSession,
+  irPackage,
+  position,
+  currentRevision,
+}) {
   const info = await statIRPackage(rpcSession, irPackage, position);
   return info.revision !== currentRevision;
 }
@@ -949,7 +1060,11 @@ async function resolveRuntimeSources(rpcSession, config) {
 
 async function resolveAssetSource(rpcSession, source) {
   if (source.kind === "irPackage") {
-    const info = await statIRPackage(rpcSession, source.package, source.position);
+    const info = await statIRPackage(
+      rpcSession,
+      source.package,
+      source.position,
+    );
     return { ...source, revision: info.revision, source: info.source };
   }
   const info = await statAsset(rpcSession, source.value);
@@ -960,9 +1075,18 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
   const { wasmSource, packageSource } = sources;
   const options = {};
   options.wasmModule = await loadWasmModule(rpcSession, wasmSource);
-  const irPackage = await buildIRPackage(rpcSession, packageSource.package, packageSource.position);
-  if ((packageSource.revision ?? "") !== "" && irPackage.revision !== packageSource.revision) {
-    throw new Error("VIR IR package changed while loading; retrying with the latest Lean snapshot");
+  const irPackage = await buildIRPackage(
+    rpcSession,
+    packageSource.package,
+    packageSource.position,
+  );
+  if (
+    (packageSource.revision ?? "") !== "" &&
+    irPackage.revision !== packageSource.revision
+  ) {
+    throw new Error(
+      "VIR IR package changed while loading; retrying with the latest Lean snapshot",
+    );
   }
   options.irPackageSetBytes = [decodeBase64Bytes(irPackage.dataBase64)];
   return options;
@@ -1020,7 +1144,9 @@ function irPackageSource(config) {
 }
 
 export async function loadAssetBytes(rpcSession, path) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.readAsset", { path });
+  const response = await rpcSession.call("Lean.Vir.Infoview.readAsset", {
+    path,
+  });
   return decodeBase64Bytes(assetDataBase64(response, path));
 }
 
@@ -1040,47 +1166,71 @@ export async function buildIRPackage(rpcSession, irPackage, position) {
   return irPackageInfo(response, irPackage.roots);
 }
 
-export async function resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision = "") {
+export async function resolveProofWidgetsRpcRef(
+  rpcSession,
+  ref,
+  position,
+  packageRevision = "",
+) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null) {
     throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
   }
   const pos = requiredPosition(position, "proofwidgets rpc position");
-  const response = normalized.serverRef === undefined
-    ? await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
-        ref: proofWidgetsRpcRefRequest(normalized),
-        pos,
-        packageRevision,
-      })
-    : await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef", {
-        ref: normalized.serverRef,
-        pos,
-        packageRevision,
-      });
+  const response =
+    normalized.serverRef === undefined
+      ? await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
+          ref: proofWidgetsRpcRefRequest(normalized),
+          pos,
+          packageRevision,
+        })
+      : await rpcSession.call(
+          "Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef",
+          {
+            ref: normalized.serverRef,
+            pos,
+            packageRevision,
+          },
+        );
   return proofWidgetsRpcRefInfo(response, normalized);
 }
 
-export async function createProofWidgetsExprWithCtxRef(rpcSession, ref, position, packageRevision = "") {
+export async function createProofWidgetsExprWithCtxRef(
+  rpcSession,
+  ref,
+  position,
+  packageRevision = "",
+) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null) {
     throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
   }
-  const response = await rpcSession.call("Lean.Vir.Infoview.createProofWidgetsExprWithCtxRef", {
-    ref: proofWidgetsRpcRefRequest(normalized),
-    pos: requiredPosition(position, "proofwidgets rpc position"),
-    packageRevision,
-  });
+  const response = await rpcSession.call(
+    "Lean.Vir.Infoview.createProofWidgetsExprWithCtxRef",
+    {
+      ref: proofWidgetsRpcRefRequest(normalized),
+      pos: requiredPosition(position, "proofwidgets rpc position"),
+      packageRevision,
+    },
+  );
   return {
     ref: requiredRpcRefObject(response?.ref, "proofwidgets stored expr ref"),
     info: proofWidgetsRpcRefInfo(response?.info, normalized),
   };
 }
 
-export async function createProofWidgetsExprWithCtxAtPos(rpcSession, position, packageRevision = "") {
-  const response = await rpcSession.call("Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos", {
-    pos: requiredPosition(position, "proofwidgets expr position"),
-    packageRevision,
-  });
+export async function createProofWidgetsExprWithCtxAtPos(
+  rpcSession,
+  position,
+  packageRevision = "",
+) {
+  const response = await rpcSession.call(
+    "Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos",
+    {
+      pos: requiredPosition(position, "proofwidgets expr position"),
+      packageRevision,
+    },
+  );
   const saved = readOption(response);
   if (saved === null) {
     return null;
@@ -1093,7 +1243,9 @@ export async function createProofWidgetsExprWithCtxAtPos(rpcSession, position, p
 }
 
 export async function statAsset(rpcSession, path) {
-  const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", { path });
+  const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", {
+    path,
+  });
   return assetInfo(response, path);
 }
 
@@ -1105,7 +1257,9 @@ function assetDataBase64(response, path) {
 function assetInfo(response, path) {
   const responsePath = requiredString(response?.path, `asset ${path} path`);
   if (responsePath !== path) {
-    throw new Error(`VIR asset response path mismatch: expected ${path}, got ${responsePath}`);
+    throw new Error(
+      `VIR asset response path mismatch: expected ${path}, got ${responsePath}`,
+    );
   }
   return {
     path: responsePath,
@@ -1129,21 +1283,44 @@ function irPackageInfo(response, roots) {
 function proofWidgetsRpcRefInfo(response, ref) {
   const id = requiredString(response?.id, "proofwidgets rpc ref id");
   if (id !== ref.id) {
-    throw new Error(`VIR ProofWidgets RPC ref id mismatch: expected ${ref.id}, got ${id}`);
+    throw new Error(
+      `VIR ProofWidgets RPC ref id mismatch: expected ${ref.id}, got ${id}`,
+    );
   }
   return {
     id,
     label: optionalString(response?.label, "proofwidgets rpc ref label"),
-    typeName: optionalString(response?.typeName, "proofwidgets rpc ref typeName"),
+    typeName: optionalString(
+      response?.typeName,
+      "proofwidgets rpc ref typeName",
+    ),
     summary: optionalString(response?.summary, "proofwidgets rpc ref summary"),
-    expression: optionalString(response?.expression, "proofwidgets rpc ref expression"),
-    typeText: optionalString(response?.typeText, "proofwidgets rpc ref typeText"),
+    expression: optionalString(
+      response?.expression,
+      "proofwidgets rpc ref expression",
+    ),
+    typeText: optionalString(
+      response?.typeText,
+      "proofwidgets rpc ref typeText",
+    ),
     context: optionalString(response?.context, "proofwidgets rpc ref context"),
     source: requiredString(response?.source, "proofwidgets rpc ref source"),
-    position: requiredString(response?.position, "proofwidgets rpc ref position"),
-    packageRevision: optionalString(response?.packageRevision, "proofwidgets rpc ref packageRevision"),
-    storeKey: optionalString(response?.storeKey, "proofwidgets rpc ref storeKey"),
-    knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant"),
+    position: requiredString(
+      response?.position,
+      "proofwidgets rpc ref position",
+    ),
+    packageRevision: optionalString(
+      response?.packageRevision,
+      "proofwidgets rpc ref packageRevision",
+    ),
+    storeKey: optionalString(
+      response?.storeKey,
+      "proofwidgets rpc ref storeKey",
+    ),
+    knownConstant: requiredBoolean(
+      response?.knownConstant,
+      "proofwidgets rpc ref knownConstant",
+    ),
   };
 }
 
@@ -1172,9 +1349,14 @@ function requiredRpcRefObject(value, label) {
 }
 
 function irPackageStatInfo(response, roots) {
-  const responseRoots = requiredStringArray(response?.roots, "IR package roots");
+  const responseRoots = requiredStringArray(
+    response?.roots,
+    "IR package roots",
+  );
   if (JSON.stringify(responseRoots) !== JSON.stringify(roots)) {
-    throw new Error(`VIR IR package roots mismatch: expected ${roots.join(", ")}, got ${responseRoots.join(", ")}`);
+    throw new Error(
+      `VIR IR package roots mismatch: expected ${roots.join(", ")}, got ${responseRoots.join(", ")}`,
+    );
   }
   return {
     source: requiredString(response?.source, "IR package source"),
@@ -1200,9 +1382,10 @@ export function decodeBase64Bytes(base64) {
 }
 
 function freshMountId(value) {
-  const prefix = typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value)
-    ? value
-    : "vir-infoview-widget";
+  const prefix =
+    typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value)
+      ? value
+      : "vir-infoview-widget";
   nextMountId += 1;
   return `${prefix}-${nextMountId}`;
 }

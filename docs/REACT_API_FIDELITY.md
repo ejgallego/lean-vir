@@ -8,7 +8,7 @@ plan in [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md).
 This is also the first audit template for future JavaScript library bindings.
 The binding should preserve the source library's names, call shapes, and
 semantic contracts wherever the runtime permits it. Lean-specific differences
-should expose real ownership, effect, and value-representation boundaries; they
+should expose unavoidable effect and value-representation boundaries; they
 should not invent a parallel API as the primary surface.
 
 ## Principle
@@ -17,11 +17,15 @@ React fidelity is the north star:
 
 - bind React concepts under React names;
 - keep React call shapes recognizable;
-- expose runtime ownership explicitly with `Js`, `JSL`, `ReactM`, `DomM`, and
-  `RuntimeM`;
+- expose the runtime/effect boundary explicitly with `Js`, `JSL`, `ReactM`,
+  `DomM`, and `RuntimeM` without inventing ownership semantics;
 - treat helper syntax as elaboration over the React-shaped API, not as a
   substitute programming model;
 - avoid implicit conversion or magic coercion at the boundary.
+
+VIR does not enforce a property that TypeScript React does not enforce. Render
+purity, hook order, replay-safe reducers, effect discipline, and complete
+dependency arrays remain programmer responsibilities.
 
 The acceptable type deltas are the ones forced by the runtime. For example,
 `Component props := props -> ReactM (Js Node)` is not the TypeScript type of a
@@ -48,30 +52,30 @@ The audit baseline is the public React 19.2 reference, checked on
 
 ## Current Fidelity Audit
 
-| React concept | React shape | Current Lean shape | Fidelity |
-| --- | --- | --- | --- |
-| Function component | `function Component(props) { ... }` | `Component props := props -> ReactM (Js Node)` | Good. The effect and `Js Node` wrapper are justified runtime deltas. |
-| Root creation | `createRoot(domNode, options?)` | `Root.create : Js Element -> DomM (Js Root)` | Close. Missing root options. Selector helpers are convenience, not core React. |
-| Root render | `root.render(reactNode)` | `Root.renderNode root (Js Node)`; convenience `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Good core match. `renderNode` is the faithful resource boundary; the other two APIs are explicit generated adapters for Lean tree construction and real function components. |
-| Root unmount | `root.unmount()` | `Root.unmount : Js Root -> DomM Unit` | Good. Resource cleanup is an explicit runtime concern. |
-| Element construction | `createElement(type, props, ...children)` | `Node.createElement elementType props children` with `Array Props.Entry` | Close. `elementType : Js ElementType` mirrors React's `type`; Lean keeps an array for child-list ergonomics, and props carry keys, refs, properties, and handlers together. |
-| JSX | JSX elaborates to React elements | no native JSX-like syntax yet | Missing. Any future syntax should elaborate to `createElement`-shaped calls. |
-| Fragment | `<Fragment>` / `<>` | `Node.fragment`, `Node.keyedFragment` | Close. Naming is Lean-style but maps directly to React fragments. |
-| Props | one props argument, including event handlers and special fields such as `key`/`ref` | `Array Props.Entry` with `Props.key`, `Props.ref`, property helpers, and event helpers | Close. Lean uses an array builder for ownership, but the lane carries React's ordinary and special props together. |
-| Event handlers | props such as `onClick={...}` | `Props.onClick ...` entries | Close. Handler names and placement now match React's props model. |
-| Children | variadic children after props | `Array (Js Node)` | Acceptable Lean adaptation, but the user-facing call should still read like React's child list. |
-| Text children | string/number child values | explicit `Node.text` resources | Acceptable low-level representation. Syntax/helpers should make text children feel like React children without implicit conversion. |
-| `useState` | returns `[state, setState]` | `Hooks.useState : Js a -> ReactM (State (Js a))` | Good semantic match. Explicit `JsValue` conversion is a necessary boundary. Scalar convenience wrappers should not become the core API. |
-| state setter | `setState(next)` or updater function | `State.set`, `State.modify` | Close. The names differ because Lean lacks JS tuple/destructuring ergonomics, but both setter forms are present. |
-| `useReducer` | `useReducer(reducer, initialArg, init?)` | reducer over `Js state -> Js action -> RuntimeM (Js state)` plus initial `Js state` | Good core direction. Missing initializer form. `JSL` adapters are explicit ownership helpers, not a different reducer API. |
-| dispatch | `dispatch(action)` | `ReducerDispatch.dispatch dispatch action` | Close. Action is explicitly `Js action`, which matches the JS-land reducer surface. |
-| `useRef` | returns ref object with `.current` | `Hooks.useRef`, `Ref.get`, `Ref.set` | Good. The explicit get/set API reflects the Wasm/Lean boundary. |
-| `useEffect` | `useEffect(setup, dependencies?)`; cleanup optional | `Hooks.useEffect setup cleanup`; `useEffectWithDeps deps setup cleanup` | Partial. Runtime cleanup discipline is useful, but the public shape is split and requires cleanup/resource forms. |
-| effect dependencies | any reactive JS values compared with `Object.is` | `Js DependencyList` built from `Js α` values | Close. Dependency values now stay JavaScript-owned; string deps are a convenience wrapper. |
-| `useMemo` | `useMemo(calculateValue, dependencies)` | `Hooks.useMemo calculate deps` | Good. Calculate runs in `ReactM`, dependencies are a `Js DependencyList`, and the result is a `Js` value. |
-| `useCallback` | `useCallback(fn, dependencies)` | not exposed | Missing. |
-| `useContext` | `useContext(SomeContext)` | not exposed | Missing. |
-| External JS components | component value passed as element type | `Js ElementType` first argument to `Node.createElement` | Foundation present. The smoke fixture binds an external component value this way; real library wrappers remain future binding work. |
+| React concept          | React shape                                                                         | Current Lean shape                                                                                          | Fidelity                                                                                                                                                                                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Function component     | `function Component(props) { ... }`                                                 | `Component props := props -> ReactM (Js Node)`                                                              | Good. The effect and phantom `Js Node` handle are justified runtime deltas; the underlying value remains the real React node.                                                                                                                 |
+| Root creation          | `createRoot(domNode, options?)`                                                     | `Root.create : Js Element -> DomM (Js Root)`                                                                | Close. Missing root options. Selector helpers are convenience, not core React.                                                                                                                                                                |
+| Root render            | `root.render(reactNode)`                                                            | `Root.renderNode root (Js Node)`; convenience `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Good core match. `renderNode` is the faithful resource boundary; the other two APIs are explicit generated adapters for Lean tree construction and real function components.                                                                  |
+| Root unmount           | `root.unmount()`                                                                    | `Root.unmount : Js Root -> DomM Unit`                                                                       | Good. Resource cleanup is an explicit runtime concern.                                                                                                                                                                                        |
+| Element construction   | `createElement(type, props, ...children)`                                           | `Node.createElement elementType props children` with `Array Props.Entry`                                    | Close. `elementType : Js ElementType` mirrors React's `type`; Lean keeps an array for child-list ergonomics, and props carry keys, refs, properties, and handlers together.                                                                   |
+| JSX                    | JSX elaborates to React elements                                                    | no native JSX-like syntax yet                                                                               | Missing. Any future syntax should elaborate to `createElement`-shaped calls.                                                                                                                                                                  |
+| Fragment               | `<Fragment>` / `<>`                                                                 | `Node.fragment`, `Node.keyedFragment`                                                                       | Close. Naming is Lean-style but maps directly to React fragments.                                                                                                                                                                             |
+| Props                  | one props argument, including event handlers and special fields such as `key`/`ref` | `Array Props.Entry` with `Props.key`, `Props.ref`, property helpers, and event helpers                      | Close. Lean uses an array builder for ergonomics, then constructs an actual props object carrying React's ordinary and special props together.                                                                                                |
+| Event handlers         | props such as `onClick={...}`                                                       | `Props.onClick ...` entries                                                                                 | Close. Handler names and placement now match React's props model.                                                                                                                                                                             |
+| Children               | variadic children after props                                                       | `Array (Js Node)`                                                                                           | Acceptable Lean adaptation, but the user-facing call should still read like React's child list.                                                                                                                                               |
+| Text children          | string/number child values                                                          | explicit `Node.text` resources                                                                              | Acceptable low-level representation. Syntax/helpers should make text children feel like React children without implicit conversion.                                                                                                           |
+| `useState`             | returns `[state, setState]`                                                         | `Hooks.useState : Js a -> ReactM (State (Js a))`                                                            | Good semantic match. Explicit `JsValue` conversion is a necessary boundary. Scalar convenience wrappers should not become the core API.                                                                                                       |
+| state setter           | `setState(next)` or updater function                                                | `State.set`, `State.modify`                                                                                 | Close. The names differ because Lean lacks JS tuple/destructuring ergonomics, but both setter forms are present.                                                                                                                              |
+| `useReducer`           | `useReducer(reducer, initialArg, init?)`                                            | reducer over `Js state -> Js action -> RuntimeM (Js state)` plus initial `Js state`                         | Good core direction. Missing initializer form. React invokes the reducer directly, so Lean programmers must obey React's reducer-purity/replay rules. `JSL` is an explicit representation for Lean-owned values, not a different reducer API. |
+| dispatch               | `dispatch(action)`                                                                  | `ReducerDispatch.dispatch dispatch action`                                                                  | Close. Action is explicitly `Js action`, which matches the JS-land reducer surface.                                                                                                                                                           |
+| `useRef`               | returns ref object with `.current`                                                  | `Hooks.useRef`, `Ref.get`, `Ref.set`                                                                        | Good. The explicit get/set API reflects the Wasm/Lean boundary.                                                                                                                                                                               |
+| `useEffect`            | `useEffect(setup, dependencies?)`; cleanup optional                                 | `Hooks.useEffect setup cleanup`; `useEffectWithDeps deps setup cleanup`                                     | Partial. Runtime cleanup discipline is useful, but the public shape is split and requires cleanup/resource forms.                                                                                                                             |
+| effect dependencies    | any reactive JS values compared with `Object.is`                                    | `Js DependencyList` built from `Js α` values                                                                | Close. Dependency values now stay JavaScript-owned; string deps are a convenience wrapper.                                                                                                                                                    |
+| `useMemo`              | `useMemo(calculateValue, dependencies)`                                             | `Hooks.useMemo calculate deps`                                                                              | Good. Calculate runs when React chooses, dependencies are the actual JavaScript array, and the result is the exact `Js` value. Purity remains the programmer's responsibility.                                                                |
+| `useCallback`          | `useCallback(fn, dependencies)`                                                     | not exposed                                                                                                 | Missing.                                                                                                                                                                                                                                      |
+| `useContext`           | `useContext(SomeContext)`                                                           | not exposed                                                                                                 | Missing.                                                                                                                                                                                                                                      |
+| External JS components | component value passed as element type                                              | `Js ElementType` first argument to `Node.createElement`                                                     | Foundation present. The smoke fixture binds an external component value this way; real library wrappers remain future binding work.                                                                                                           |
 
 ## Main Mismatches
 
@@ -85,7 +89,7 @@ Node.createElement tag key? props handlers children
 React's public shape is:
 
 ```javascript
-createElement(type, props, ...children)
+createElement(type, props, ...children);
 ```
 
 The public surface now uses:
@@ -105,8 +109,8 @@ coverage and real external library component bindings.
 
 The next mismatch is the hook surface. `useState`, `useReducer`, and `useRef`
 are close enough to be trusted as the base. `useMemo` is now exposed under its
-React name. `useEffect` is semantically resource-safe but not shaped like
-React's optional cleanup/dependency API. `useCallback` and `useContext` are
+React name. `useEffect` uses an explicit split setup/cleanup adapter rather
+than React's optional cleanup/dependency call shape. `useCallback` and `useContext` are
 absent and should be added under their React names.
 
 External component interop now has the right low-level lane: future JS library
@@ -160,7 +164,7 @@ createElement component props children
 This React audit should become the template:
 
 1. Write down the source library's real public API shape.
-2. Classify each type delta as ownership, effect, or representation.
+2. Classify each type delta as an unavoidable effect or representation boundary.
 3. Bind the 1:1 names and calls first.
 4. Add Lean syntax/helpers only as thin lowering layers.
 5. Keep explicit conversion functions visible at the boundaries.

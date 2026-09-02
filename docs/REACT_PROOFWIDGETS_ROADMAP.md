@@ -69,14 +69,15 @@ The current API coverage inventory is maintained as a machine-readable block in
 
 The merged closure bridge gives us the hard part for interactive React views:
 
-- Lean closures can cross to JavaScript as `VirCallback` values.
-- JavaScript can retain those callbacks and release them on removal,
-  cancellation, package reload, or `VirRuntime.dispose()`.
+- Lean closures cross to JavaScript as ordinary callable functions with
+  private, self-owning Lean roots.
+- JavaScript retains those functions through ordinary reachability; package
+  reload and `VirRuntime.dispose()` provide deterministic root cleanup.
 - Function types are now manifest types, so callback fields can be nested
   inside host-import data structures as long as the surrounding Lean data is
   otherwise representable.
-- Opaque host resources already cover DOM elements and can be extended to React
-  roots or rendered node handles.
+- Exact JavaScript values already cover DOM elements, React roots, and rendered
+  nodes without a parallel wrapper model.
 
 The main remaining mismatch for richer ProofWidgets-style data is structural:
 direct recursive structures and simple non-indexed recursive inductives with
@@ -84,8 +85,8 @@ nullary or runtime-payload constructors can now cross the boundary, but mutual
 recursion, non-uniform recursion, and inherited recursive structures remain
 outside the general manifest surface. The current standalone renderer now uses
 a native `ReactNode` resource rather than a recursive `Html` tree; broader
-ProofWidgets compatibility must still keep callback ownership and
-renderer-specific cleanup inside a narrow audited ABI.
+ProofWidgets compatibility must still keep Lean-root obligations and active
+renderer cleanup inside a narrow audited ABI.
 
 This roadmap assumes the current `main` branch repository setup and the small
 repository harness documented in `AGENTS.md`, `CONTRIBUTING.md`, and
@@ -97,12 +98,12 @@ state is uncertain.
 
 The current standalone renderer is implemented and documented in
 `docs/REACT_NODE.md`. In short, Lean can construct `ReactNode` resources
-through DOM-like combinators, render them into a browser React root, retain
-Lean callbacks in event handlers, and release them on rerender, unmount,
-package reload, or runtime disposal.
+through DOM-like combinators and render them into a browser React root. Props,
+children, elements, and callbacks are their actual JavaScript values and use
+the same reachability rules as a TypeScript React application.
 
 That renderer deliberately avoids full infoview compatibility. It validates the
-host-resource and callback-lifetime model first. Resource values now cross the
+exact-value and active-resource model first. JavaScript values cross the
 C++/Wasm ABI through an `externref` side channel, while ProofWidgets RPC
 compatibility remains a later layer.
 
@@ -126,8 +127,8 @@ Current RF status:
   values use explicit `Lean.Vir.JSL` handles, distinct from JavaScript-shaped
   `Js` values.
 - `useEffectWithDeps` exposes React's dependency-array shape through
-  JavaScript-owned dependency values, with callback release handled by the host
-  layer when dependencies are unchanged.
+  an actual JavaScript dependency array. React decides when dependencies are
+  unchanged; VIR keeps no parallel dependency ownership state.
 - `useRef` exposes React-owned ref objects, and `Node.fragment` maps to
   `React.Fragment`.
 

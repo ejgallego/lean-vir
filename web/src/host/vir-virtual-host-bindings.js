@@ -4,40 +4,32 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  createVirtualReactNodeElementResource,
-  createVirtualReactNodeFragmentResource,
-  createVirtualReactNodeTextResource,
-  createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
-} from "../react/vir-react-node.js";
-import {
-  createReactJsValueHostBindings,
-  createReactStateHostBindings,
-  createVirtualReactHookRuntime,
-} from "../react/vir-react-hooks.js";
-import { VIR_HOST_DISPOSE, hostResourceValue, isHostResource } from "../host-resource.js";
+import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
   callLeanEventCallback,
-  createAnimationResourceHostBindings,
-  createElementResourceHostBindings,
-  createHostResourceState,
-  createHtmlInputElementResourceHostBindings,
-  createReactHostHooks,
-  createReactRootResourceHostBindings,
-  createTimerResourceHostBindings,
+  createAnimationHostBindings,
+  createElementHostBindings,
+  createHostLifecycle,
+  createHtmlInputElementHostBindings,
+  createTimerHostBindings,
   performanceNow,
   preventDefaultOnEvent,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
-import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
+import {
+  createNullableValue,
+  nullablePayload,
+} from "./vir-js-value-bindings.js";
 import { createStaticNodeList } from "./vir-js-collection-bindings.js";
-import { takeCallbackLease } from "../runtime/callbacks.js";
-import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "../runtime/cleanup.js";
 
 export function createVirtualDocumentState({
   title = "",
   elements = new Map(),
-  resources = createHostResourceState(),
+  resources = createHostLifecycle(),
   clipboardText = "",
   clipboardWrites = [],
   revealedPosition = null,
@@ -68,7 +60,15 @@ export function createVirtualElementState({
   value = "",
   listeners = new Map(),
 } = {}) {
-  return { innerHTML, textContent, attributes, queries, checked, value, listeners };
+  return {
+    innerHTML,
+    textContent,
+    attributes,
+    queries,
+    checked,
+    value,
+    listeners,
+  };
 }
 
 export function ensureVirtualElementState(state, selector, element = null) {
@@ -95,7 +95,9 @@ export function ensureVirtualElementStates(state, selector, elements) {
   if (!Array.isArray(elements)) {
     throw new Error("virtual document selector elements must be an Array");
   }
-  const values = elements.map((element) => normalizeVirtualElementState(element ?? createVirtualElementState()));
+  const values = elements.map((element) =>
+    normalizeVirtualElementState(element ?? createVirtualElementState()),
+  );
   state.elements.set(selector, values);
   return values;
 }
@@ -129,69 +131,51 @@ export function createVirtualEventState({
 
 export function createVirtualEventHostBindings(
   state = createVirtualDocumentState(),
-  resources = state.resources ?? createHostResourceState(),
 ) {
-  state.resources = resources;
   return {
     "browser.event.target": (event) =>
-      resources.adoptResourceForValue(createNullableValue(virtualEventElementValue(state, resources, event, "target"))),
+      createNullableValue(virtualEventElementValue(state, event, "target")),
     "browser.event.currentTarget": (event) =>
-      resources.adoptResourceForValue(createNullableValue(virtualEventElementValue(state, resources, event, "currentTarget"))),
+      createNullableValue(
+        virtualEventElementValue(state, event, "currentTarget"),
+      ),
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(resources.resolveResource(event, "Event"));
+      preventDefaultOnEvent(event);
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(resources.resolveResource(event, "Event"));
+      stopPropagationOnEvent(event);
       return undefined;
     },
     "browser.event.key": (event) => {
-      const key = resources.resolveResource(event, "Event")?.key;
-      return resources.resourceForValue(typeof key === "string" ? key : "");
+      const key = event?.key;
+      return typeof key === "string" ? key : "";
     },
     "browser.event.formValue": (event) =>
-      resources.adoptResourceForValue(createNullableValue(formControlEventValue(resources.resolveResource(event, "Event")))),
+      createNullableValue(formControlEventValue(event)),
   };
 }
 
 export function createVirtualDocumentHostBindings(
   state = createVirtualDocumentState(),
-  resources = state.resources ?? createHostResourceState(),
+  resources = state.resources ?? createHostLifecycle(),
 ) {
   if (!(state?.elements instanceof Map)) {
     throw new Error("virtual document state must have an elements Map");
   }
   state.resources = resources;
-  const reactHookRuntime = createVirtualReactHookRuntime(resources);
-  const reactHooks = {
-    ...createReactHostHooks({
-      resources,
-      reportError: (error) => resources.recordGcFinalizerError(error),
-    }),
-    hookRuntime: reactHookRuntime,
-  };
   return {
-    "browser.document.getTitle": () => resources.resourceForValue(state.title),
+    "browser.document.getTitle": () => state.title,
     "browser.document.setTitle": (title) => {
-      state.title = resources.resolveResource(title, "JsString");
+      state.title = title;
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      resources.adoptResourceForValue(createNullableValue(
-        queryVirtualElementState(
-          state,
-          resources.resolveResource(selector, "JsString"),
-        ),
-      )),
+      createNullableValue(queryVirtualElementState(state, selector)),
     "browser.document.querySelectorAll": (selector) =>
-      resources.resourceForValue(createStaticNodeList(
-        queryVirtualElementStates(
-          state,
-          resources.resolveResource(selector, "JsString"),
-        ),
-      )),
-    ...createVirtualEventHostBindings(state, resources),
-    ...createElementResourceHostBindings(resources, {
+      createStaticNodeList(queryVirtualElementStates(state, selector)),
+    ...createVirtualEventHostBindings(state),
+    ...createElementHostBindings(resources, {
       querySelector: (target, selector) =>
         queryVirtualDescendantStates(target, selector)[0] ?? null,
       querySelectorAll: (target, selector) =>
@@ -208,134 +192,176 @@ export function createVirtualDocumentHostBindings(
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),
       createEventListener: (target, eventName, callback) =>
-        createVirtualEventListenerResource(resources, target, eventName, callback),
+        createVirtualEventListenerSubscription(
+          resources,
+          target,
+          eventName,
+          callback,
+        ),
     }),
-    ...createHtmlInputElementResourceHostBindings(resources, {
+    ...createHtmlInputElementHostBindings({
       fromElement: (element) => element,
     }),
-    ...createTimerResourceHostBindings(resources),
-    ...createAnimationResourceHostBindings(resources, {
-      requestFrame: (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
+    ...createTimerHostBindings(resources),
+    ...createAnimationHostBindings(resources, {
+      requestFrame: (run) =>
+        globalThis.setTimeout(() => run(performanceNow()), 16),
       cancelFrame: globalThis.clearTimeout.bind(globalThis),
     }),
-    ...createReactRootResourceHostBindings(resources, (target) =>
-      createVirtualReactRootResource(resources, target, reactHooks), {
-        querySelector: (selector) => queryVirtualElementState(state, selector),
-        createNodeTextResource: (value) => createVirtualReactNodeTextResource(resources, value),
-        createNodeElementResource: (elementType, props, children) =>
-          createVirtualReactNodeElementResource(resources, reactHooks, elementType, props, children),
-        createNodeFragmentResource: (props, children) =>
-          createVirtualReactNodeFragmentResource(resources, props, children),
-      }),
-    ...createReactJsValueHostBindings(resources),
-    ...createReactStateHostBindings(resources, reactHookRuntime),
-    "infoview.documentPosition": (uri, fileName, line, character, label) =>
-      resources.resourceForValue({
-        uri: resources.resolveResource(uri, "JsString"),
-        fileName: resources.resolveResource(fileName, "JsString"),
-        line: resources.resolveResource(line, "JsNat"),
-        character: resources.resolveResource(character, "JsNat"),
-        label: resources.resolveResource(label, "JsString"),
-      }),
+    ...createUnsupportedReactHostBindings(),
+    "infoview.documentPosition": (uri, fileName, line, character, label) => ({
+      uri,
+      fileName,
+      line,
+      character,
+      label,
+    }),
     "infoview.clipboard.writeText": (text) => {
-      const value = resources.resolveResource(text, "JsString");
-      state.clipboardText = value;
+      state.clipboardText = text;
       state.clipboardWrites ??= [];
-      state.clipboardWrites.push(value);
-      return resources.resourceForValue(true);
+      state.clipboardWrites.push(text);
+      return true;
     },
     "infoview.command.revealPosition": (position) => {
-      const normalized = normalizeInfoviewDocumentPosition(
-        resources.resolveResource(position, "DocumentPosition"),
-      );
+      const normalized = normalizeInfoviewDocumentPosition(position);
       if (normalized === null) {
-        return resources.resourceForValue(false);
+        return false;
       }
       state.revealedPosition = normalized;
       state.infoviewCommands ??= [];
-      state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
-      return resources.resourceForValue(true);
+      state.infoviewCommands.push({
+        kind: "revealPosition",
+        position: normalized,
+      });
+      return true;
     },
     "infoview.command.insertText": (position, text) => {
-      const normalized = normalizeInfoviewDocumentPosition(
-        resources.resolveResource(position, "DocumentPosition"),
-      );
-      const newText = resources.resolveResource(text, "JsString");
+      const normalized = normalizeInfoviewDocumentPosition(position);
+      const newText = text;
       if (normalized === null) {
-        return resources.resourceForValue(false);
+        return false;
       }
       const edit = { position: normalized, newText };
       state.appliedEdits ??= [];
       state.appliedEdits.push(edit);
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "insertText", ...edit });
-      return resources.resourceForValue(true);
+      return true;
     },
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>
-      resources.resourceForValue({
-        id: resources.resolveResource(id, "JsString"),
-        label: resources.resolveResource(label, "JsString"),
-        typeName: resources.resolveResource(typeName, "JsString"),
-        summary: resources.resolveResource(summary, "JsString"),
-        expression: resources.resolveResource(expression, "JsString"),
-        typeText: "",
-        context: "",
-      }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) =>
-      resources.resourceForValue({
-        ...resources.resolveResource(ref, "RpcRef"),
-        typeText: resources.resolveResource(typeText, "JsString"),
-        context: resources.resolveResource(context, "JsString"),
-        ...nullableField(resources, serverRef, "serverRef"),
-      }),
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
+      id,
+      label,
+      typeName,
+      summary,
+      expression,
+      typeText: "",
+      context: "",
+    }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => ({
+      ...ref,
+      typeText,
+      context,
+      ...nullableField(serverRef, "serverRef"),
+    }),
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+      normalizeProofWidgetsResolvedRef(ref),
     "proofwidgets.rpc.inspectRef": (ref) => {
-      const normalized = normalizeProofWidgetsRpcRef(resources.resolveResource(ref, "RpcRef"));
+      const normalized = normalizeProofWidgetsRpcRef(ref);
       if (normalized === null) {
-        return resources.resourceForValue(false);
+        return false;
       }
       state.infoviewCommands ??= [];
-      state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
-      return resources.resourceForValue(true);
+      state.infoviewCommands.push({
+        kind: "proofwidgetsRpcInspectRef",
+        ref: normalized,
+      });
+      return true;
     },
     "proofwidgets.rpc.resolveRef": (ref, callback) => {
-      const normalized = normalizeProofWidgetsRpcRef(resources.resolveResource(ref, "RpcRef"));
+      const normalized = normalizeProofWidgetsRpcRef(ref);
       if (normalized === null || typeof callback !== "function") {
-        releaseCallback(callback);
-        return resources.resourceForValue(false);
+        return false;
       }
       const result = virtualProofWidgetsRpcRefInfo(normalized);
       state.infoviewCommands ??= [];
-      state.infoviewCommands.push({ kind: "proofwidgetsRpcResolveRef", ref: normalized, result });
-      callAndReleaseCallback(callback, resources.resourceForValue(result));
-      return resources.resourceForValue(true);
+      state.infoviewCommands.push({
+        kind: "proofwidgetsRpcResolveRef",
+        ref: normalized,
+        result,
+      });
+      callHostCallback(callback, result);
+      return true;
     },
     [VIR_HOST_DISPOSE]: () => resources.dispose(),
   };
 }
 
-export function findVirtualReactElementById(rootOrNode, id) {
-  const node = rootOrNode?.current ?? rootOrNode;
-  return findVirtualReactElementNodeById(node, id);
+const unsupportedReactHostTargets = Object.freeze([
+  "js.value.react.property",
+  "js.value.react.eventHandler",
+  "react.props.empty",
+  "react.props.setKey",
+  "react.props.setProperty",
+  "react.props.setEventHandler",
+  "react.props.setRef",
+  "react.state.set",
+  "react.state.modify",
+  "react.reducer.dispatch",
+  "react.useReducer",
+  "react.reducerState.value",
+  "react.reducerState.dispatch",
+  "react.useState",
+  "react.state.value",
+  "react.state.setter",
+  "react.useRef",
+  "react.useEffect",
+  "react.deps.empty",
+  "react.deps.push",
+  "react.useMemo",
+  "react.useEffectWithDeps",
+  "react.ref.get",
+  "react.ref.set",
+  "react.elementType.tag",
+  "react.node.text",
+  "react.node.createElement",
+  "react.node.fragment",
+  "react.node.children.empty",
+  "react.node.children.push",
+  "react.root.render",
+  "react.root.renderComponent",
+  "react.root.renderIntoSelector",
+  "react.root.renderComponentIntoSelector",
+  "react.root.unmountSelector",
+  "react.root.renderNode",
+  "react.root.unmount",
+  "react.root.create",
+]);
+
+function createUnsupportedReactHostBindings() {
+  return Object.fromEntries(
+    unsupportedReactHostTargets.map((target) => [
+      target,
+      () => {
+        throw new Error(`${target} requires the browser React host`);
+      },
+    ]),
+  );
 }
 
-export function virtualReactElementById(rootOrNode, id) {
-  const node = findVirtualReactElementById(rootOrNode, id);
-  if (node === null) {
-    throw new Error(`expected virtual React element #${id}`);
-  }
-  return node;
-}
-
-function createVirtualEventListenerResource(resources, target, eventName, callback) {
-  const listener = virtualCallbackEventListenerState(target, eventName, callback, resources);
+function createVirtualEventListenerSubscription(
+  resources,
+  target,
+  eventName,
+  callback,
+) {
+  const listener = virtualCallbackEventListenerState(
+    target,
+    eventName,
+    callback,
+    resources,
+  );
   target.listeners.get(eventName).push(listener);
   return listener;
-}
-
-function createVirtualReactRootResource(resources, target, hooks) {
-  return createVirtualReactRootResourceFromNode(resources, target, hooks);
 }
 
 function queryVirtualElementState(state, selector) {
@@ -349,8 +375,8 @@ function queryVirtualElementStates(state, selector) {
   return elements.map(normalizeVirtualElementState);
 }
 
-function nullableField(resources, value, name) {
-  const payload = nullablePayload(resources, value);
+function nullableField(value, name) {
+  const payload = nullablePayload(value);
   return payload === null ? {} : { [name]: payload };
 }
 
@@ -372,24 +398,11 @@ function queryVirtualDescendantStates(element, selector) {
   return elements.map(normalizeVirtualElementState);
 }
 
-function findVirtualReactElementNodeById(node, id) {
-  if (node?.kind !== "element" && node?.kind !== "fragment") return null;
-  if (node.kind === "element" && node.props?.id === id) return node;
-  for (const child of node.children ?? []) {
-    const found = findVirtualReactElementNodeById(child, id);
-    if (found !== null) return found;
-  }
-  return null;
-}
-
-function virtualEventElementValue(state, resources, event, field) {
-  const value = resources.resolveResource(event, "Event")?.[field];
+function virtualEventElementValue(state, event, field) {
+  const value = event?.[field];
   if (value === null || value === undefined) return null;
   if (typeof value === "string") {
     return queryVirtualElementState(state, value);
-  }
-  if (isHostResource(value)) {
-    return resources.resolveResource(value, "Element");
   }
   if (typeof value === "object") {
     return value;
@@ -476,18 +489,16 @@ function proofWidgetsServerRpcRef(ref) {
   if (isRpcRefObject(ref.serverRef)) {
     return ref.serverRef;
   }
-  if (isHostResource(ref.serverRef)) {
-    const value = hostResourceValue(ref.serverRef);
-    return isRpcRefObject(value) ? value : null;
-  }
   return null;
 }
 
 function isRpcRefObject(value) {
-  return value !== null &&
+  return (
+    value !== null &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    (typeof value.__rpcref === "number" || typeof value.p === "number");
+    (typeof value.__rpcref === "number" || typeof value.p === "number")
+  );
 }
 
 function virtualProofWidgetsRpcRefInfo(ref) {
@@ -501,25 +512,19 @@ function virtualProofWidgetsRpcRefInfo(ref) {
   };
 }
 
-function callAndReleaseCallback(callback, value) {
+function callHostCallback(callback, value) {
   try {
     callback(value);
   } catch (error) {
     console.error(error);
-  } finally {
-    releaseCallback(callback);
-  }
-}
-
-function releaseCallback(callback) {
-  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
-    callback.release();
   }
 }
 
 function nonNegativeInteger(value) {
   if (typeof value === "bigint") {
-    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(value)
+      : null;
   }
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -531,8 +536,14 @@ function nonNegativeInteger(value) {
   return null;
 }
 
-function virtualCallbackEventListenerState(target, eventName, callback, resources) {
-  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
+function virtualCallbackEventListenerState(
+  target,
+  eventName,
+  callback,
+  resources,
+) {
+  if (typeof callback !== "function")
+    throw new Error("browser event listener callback must be a function");
   if (!target.listeners.has(eventName)) {
     target.listeners.set(eventName, []);
   }
@@ -540,21 +551,22 @@ function virtualCallbackEventListenerState(target, eventName, callback, resource
     removed: false,
     dispatch(event = {}) {
       if (!listener.removed) {
-        const dispatchEvent = event !== null && typeof event === "object" ? event : {};
+        const dispatchEvent =
+          event !== null && typeof event === "object" ? event : {};
         dispatchEvent.target ??= target;
         dispatchEvent.currentTarget ??= target;
-        callLeanEventCallback(resources, dispatchEvent, ownedCallback);
+        callLeanEventCallback(dispatchEvent, callback);
       }
     },
     remove() {
       if (listener.removed) return;
       listener.removed = true;
       const listeners = target.listeners.get(eventName) ?? [];
-      target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
+      target.listeners.set(
+        eventName,
+        listeners.filter((candidate) => candidate !== listener),
+      );
       resources.removeDisposable(listener);
-      const errors = [];
-      collectCleanupError(errors, () => ownedCallback.release());
-      throwCollectedErrors(errors, "virtual event listener removal failed");
     },
   };
   return listener;

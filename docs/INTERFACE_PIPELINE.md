@@ -147,34 +147,34 @@ a missing marker to `false`. Version 6 intentionally rejected the old
 `wireTag` field and `wire` host-import boundary label instead of accepting
 aliases.
 
-| Tag | JavaScript name | Lean interface type | Descriptor payload |
-| --- | --- | --- | --- |
-| 0 | `INTERFACE_TAG.NAT` | `Nat` | Primitive. |
-| 1 | `INTERFACE_TAG.INT` | `Int` | Primitive. |
-| 2 | `INTERFACE_TAG.BOOL` | `Bool` | Primitive. |
-| 3 | `INTERFACE_TAG.STRING` | `String` | Primitive. |
-| 4 | `INTERFACE_TAG.UINT8` | `UInt8` | Primitive. |
-| 5 | `INTERFACE_TAG.UINT16` | `UInt16` | Primitive. |
-| 6 | `INTERFACE_TAG.UINT32` | `UInt32` | Primitive. |
-| 7 | `INTERFACE_TAG.UINT64` | `UInt64` | Primitive. |
-| 8 | `INTERFACE_TAG.USIZE` | `USize` | Primitive. |
-| 9 | `INTERFACE_TAG.BYTE_ARRAY` | `ByteArray` | Primitive byte data. |
-| 10 | `INTERFACE_TAG.FLOAT` | `Float` | Primitive. |
-| 11 | `INTERFACE_TAG.FLOAT32` | `Float32` | Primitive. |
-| 14 | `INTERFACE_TAG.SIMPLE_ENUM` | Nullary inductive enum | Constructor names and tags. |
-| 15 | `INTERFACE_TAG.EXPR` | `Lean.Expr` | Structural expression object. |
-| 16 | `INTERFACE_TAG.ARRAY` | `Array α` | Element descriptor. |
-| 17 | `INTERFACE_TAG.LIST` | `List α` | Element descriptor. |
-| 18 | `INTERFACE_TAG.OPTION` | `Option α` | Element descriptor. |
-| 19 | `INTERFACE_TAG.PROD` | `α × β` | `fst` and `snd` descriptors. |
-| 20 | `INTERFACE_TAG.STRUCTURE` | Structure | Name, runtime layout counts, fields, optional trivial field. |
-| 21 | `INTERFACE_TAG.TAGGED_UNION` | `Sum` / `Except` | Constructor descriptors with payload layout. |
-| 22 | `INTERFACE_TAG.UNIT` | `Unit` | Primitive. |
-| 23 | `INTERFACE_TAG.RESOURCE` | `@[vir_js]` resource marker | Resource name. |
-| 24 | `INTERFACE_TAG.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
-| 25 | `INTERFACE_TAG.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
-| 26 | `INTERFACE_TAG.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
-| 27 | `INTERFACE_TAG.LEAN_OBJECT` | Opaque retained Lean object | Object-handle boundary descriptor. |
+| Tag | JavaScript name                  | Lean interface type          | Descriptor payload                                           |
+| --- | -------------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| 0   | `INTERFACE_TAG.NAT`              | `Nat`                        | Primitive.                                                   |
+| 1   | `INTERFACE_TAG.INT`              | `Int`                        | Primitive.                                                   |
+| 2   | `INTERFACE_TAG.BOOL`             | `Bool`                       | Primitive.                                                   |
+| 3   | `INTERFACE_TAG.STRING`           | `String`                     | Primitive.                                                   |
+| 4   | `INTERFACE_TAG.UINT8`            | `UInt8`                      | Primitive.                                                   |
+| 5   | `INTERFACE_TAG.UINT16`           | `UInt16`                     | Primitive.                                                   |
+| 6   | `INTERFACE_TAG.UINT32`           | `UInt32`                     | Primitive.                                                   |
+| 7   | `INTERFACE_TAG.UINT64`           | `UInt64`                     | Primitive.                                                   |
+| 8   | `INTERFACE_TAG.USIZE`            | `USize`                      | Primitive.                                                   |
+| 9   | `INTERFACE_TAG.BYTE_ARRAY`       | `ByteArray`                  | Primitive byte data.                                         |
+| 10  | `INTERFACE_TAG.FLOAT`            | `Float`                      | Primitive.                                                   |
+| 11  | `INTERFACE_TAG.FLOAT32`          | `Float32`                    | Primitive.                                                   |
+| 14  | `INTERFACE_TAG.SIMPLE_ENUM`      | Nullary inductive enum       | Constructor names and tags.                                  |
+| 15  | `INTERFACE_TAG.EXPR`             | `Lean.Expr`                  | Structural expression object.                                |
+| 16  | `INTERFACE_TAG.ARRAY`            | `Array α`                    | Element descriptor.                                          |
+| 17  | `INTERFACE_TAG.LIST`             | `List α`                     | Element descriptor.                                          |
+| 18  | `INTERFACE_TAG.OPTION`           | `Option α`                   | Element descriptor.                                          |
+| 19  | `INTERFACE_TAG.PROD`             | `α × β`                      | `fst` and `snd` descriptors.                                 |
+| 20  | `INTERFACE_TAG.STRUCTURE`        | Structure                    | Name, runtime layout counts, fields, optional trivial field. |
+| 21  | `INTERFACE_TAG.TAGGED_UNION`     | `Sum` / `Except`             | Constructor descriptors with payload layout.                 |
+| 22  | `INTERFACE_TAG.UNIT`             | `Unit`                       | Primitive.                                                   |
+| 23  | `INTERFACE_TAG.RESOURCE`         | `@[vir_js]` resource marker  | Resource name.                                               |
+| 24  | `INTERFACE_TAG.FUNCTION`         | Callback function type       | Argument descriptors, result descriptor, effect label.       |
+| 25  | `INTERFACE_TAG.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts.                   |
+| 26  | `INTERFACE_TAG.RECURSIVE_SELF`   | Recursive reference          | Referenced owner name.                                       |
+| 27  | `INTERFACE_TAG.LEAN_OBJECT`      | Opaque retained Lean object  | Object-handle boundary descriptor.                           |
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -203,22 +203,21 @@ written into the same constructor scalar slots as compiled Lean code.
 Function-valued interface types are used for Lean callbacks passed to
 JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns a synchronous effect
-(`RuntimeM`, `IO`, `DomM`, or `ReactM`). JavaScript receives these values as
-`VirCallback` objects. The `INTERFACE_TAG.FUNCTION` value payload carries no
-serialized numeric token; the runtime receives the internal closure root id
-through a side channel and releases the rooted Lean closure when the host-owned
-registration is done with it. Functions are accepted only as host-import
-arguments; callback arguments and results must be `Unit` or resource
-descriptors, so nested callbacks are rejected.
+(`RuntimeM`, `IO`, `DomM`, or `ReactM`). JavaScript receives an ordinary
+function. The `INTERFACE_TAG.FUNCTION` value payload carries no serialized
+numeric token; the runtime receives the internal closure root id through a side
+channel and associates it with the function in private WeakMap state. Functions
+are accepted only as host-import arguments; callback arguments and results must
+be `Unit` or resource descriptors, so nested callbacks are rejected.
 
-`Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
-structure of the rendered tree lives in the host resource graph created by
-`react.node.text` and `react.node.createElement`. Text inputs are explicit
+`Lean.Vir.React.Node` is a phantom marker for an exact JavaScript React value. The recursive
+structure of the rendered tree is the ordinary React/JavaScript object graph
+created by `react.node.text` and `react.node.createElement`. Text inputs are explicit
 `Lean.Vir.Js String` resources. Element construction receives an explicit
-`Lean.Vir.Js ElementType` resource; DOM tag strings are wrapped by
-`react.elementType.tag`, and future component bindings can provide component
-element types directly. Props, children, and dependency lists are explicit
-React-owned resources built by `react.props.*`, `react.node.children.*`, and
+`Lean.Vir.Js ElementType` value; `react.elementType.tag` preserves DOM tag
+strings unchanged, and future component bindings can provide component element
+types directly. Props, children, and dependency lists are ordinary JavaScript
+objects and arrays built by `react.props.*`, `react.node.children.*`, and
 `react.deps.*`. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
 cross only through explicit
 `js.value.react.property` and `js.value.react.eventHandler` conversion targets.
@@ -232,8 +231,7 @@ arguments/results are `Unit` or resources, or explicit conversion targets such a
 host imports are rejected, except for declarations marked with
 `@[vir_js_explicit_conversion]` that convert between exactly one
 `Lean.Vir.Js ...` resource and one ordinary Lean value, or for the
-`js.leanRef` object-handle boundary (`js.leanRef`, `.value`, `.retain`, and
-`.release`). JavaScript
+`js.leanRef` object-handle boundary (`js.leanRef` and `js.leanRef.value`). JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
 `Lean.Vir.Browser.DomM α`; React component construction uses
 `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and
@@ -276,15 +274,14 @@ committed component-model boundary.
 Lean-to-JavaScript host imports use package-owned arity/effect metadata: the
 shim and `VirHostState` exchange borrowed/owned Lean object
 arguments and results for package-declared host imports through
-`env.vir_js_call_objects`. The `leanObject` descriptor is used by
-generic `Lean.Vir.LeanRef.toJSL` / `fromJSL` / `retainJSL` / `releaseJSL`
-object handles. On
+`env.vir_js_call_objects`. The `leanObject` descriptor is used by the generic
+`Lean.Vir.LeanRef.toJSL` / `fromJSL` object handles. On
 the Lean side those handles are surfaced as `Lean.Vir.JSL α`, an alias that
-remains distinct from JavaScript-shaped `Js α` resources.
+remains distinct from JavaScript-shaped `Js α` values.
 Function-valued imports are rooted with only their arity and effect bit in the
-shim. JavaScript keeps the full function descriptor on the `VirCallback` wrapper,
-so calls back into Lean lower arguments to owned objects and lift the owned object
-result using JavaScript-side manifest metadata.
+shim. JavaScript keeps the full function descriptor in the callback's private
+state, so calls back into Lean lower arguments to owned objects and lift the
+owned object result using JavaScript-side manifest metadata.
 
 Package loading validates every exported argument/result type before exposing
 the manifest to the UI or JS caller. The validator rejects unsupported

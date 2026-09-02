@@ -12,51 +12,50 @@ import {
   createReactStateHostBindings,
 } from "./react/vir-react-hooks.js";
 import {
-  createBrowserReactNodeElementResource,
-  createBrowserReactNodeFragmentResource,
-  createBrowserReactNodeTextResource,
-  createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
+  createBrowserReactComponentNode,
+  createBrowserReactNodeElement,
+  createBrowserReactNodeFragment,
+  createBrowserReactNodeText,
+  createBrowserReactRoot,
 } from "./react/vir-react-node.js";
 import {
-  hasHostResourceFinalizationSupport,
-} from "./host-resource.js";
-import {
-  createHostResourceState,
-  createReactHostHooks,
-  createReactRootResourceHostBindings,
+  createHostLifecycle,
+  createReactRootHostBindings,
 } from "./host/vir-host-resources.js";
 
-export function createBrowserReactHostBindings(state = createHostResourceState(), {
-  querySelector = queryBrowserElement,
-} = {}) {
-  if (!hasHostResourceFinalizationSupport()) {
-    throw new Error("browser React host bindings require FinalizationRegistry and WeakRef support");
-  }
-  const hookRuntime = createBrowserReactHookRuntime(state, React);
-  const hooks = {
-    ...createReactHostHooks({
-      resources: state,
-      reportError: (error) => state.recordGcFinalizerError(error),
-    }),
-    hookRuntime,
-  };
+export function createBrowserReactHostBindings(
+  state = createHostLifecycle(),
+  { querySelector = queryBrowserElement } = {},
+) {
+  const hookRuntime = createBrowserReactHookRuntime(React);
   return {
-    ...createReactRootResourceHostBindings(state, (target) =>
-      createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
+    ...createReactRootHostBindings(
+      state,
+      (target) => createBrowserReactRoot(ReactDOMClient.createRoot(target)),
+      {
         querySelector,
-        createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
-        createNodeElementResource: (elementType, props, children) =>
-          createBrowserReactNodeElementResource(state, React.createElement, hooks, elementType, props, children),
-        createNodeFragmentResource: (props, children) =>
-          createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children),
-      }),
-    ...createReactJsValueHostBindings(state),
-    ...createReactStateHostBindings(state, hookRuntime),
+        createComponentNode: (component) =>
+          createBrowserReactComponentNode(React.createElement, component),
+        createNodeText: createBrowserReactNodeText,
+        createNodeElement: (elementType, props, children) =>
+          createBrowserReactNodeElement(
+            React.createElement,
+            elementType,
+            props,
+            children,
+          ),
+        createNodeFragment: (props, children) =>
+          createBrowserReactNodeFragment(
+            React.createElement,
+            React.Fragment,
+            props,
+            children,
+          ),
+      },
+    ),
+    ...createReactJsValueHostBindings(),
+    ...createReactStateHostBindings(hookRuntime),
   };
-}
-
-function createBrowserReactRootResource(state, root, React, hooks) {
-  return createBrowserReactRootResourceFromNode(state, root, React, hooks);
 }
 
 function queryBrowserElement(selector) {

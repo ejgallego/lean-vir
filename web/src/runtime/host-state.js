@@ -5,18 +5,19 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  abandonHostResource,
-  commitHostResource,
-  ExternrefResourceRoots,
-  isHostResource,
-  releaseHostResource,
-  retainHostResource,
+  abortHostCallTransaction,
+  beginHostCallTransaction,
+  commitHostCallTransaction,
+  ExternrefRoots,
   VIR_HOST_DISPOSE,
-  VIR_HOST_RESOLVE_BINDING,
-} from "../host-resource.js";
+} from "../host-boundary.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { releaseCallbackRoots } from "./callbacks.js";
-import { collectCleanupError, throwCollectedErrors, throwWithCleanup } from "./cleanup.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+  throwWithCleanup,
+} from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
@@ -27,8 +28,6 @@ const MAX_FINALIZER_ERROR_MESSAGE_LENGTH = 2048;
 export const RUNTIME_INTRINSIC_HOST_TARGETS = Object.freeze({
   leanRef: "js.leanRef",
   leanRefValue: "js.leanRef.value",
-  leanRefRetain: "js.leanRef.retain",
-  leanRefRelease: "js.leanRef.release",
 });
 
 export class VirHostState {
@@ -46,7 +45,7 @@ export class VirHostState {
     this.releaseHostBindings = releaseHostBindings;
     this.releaseDefaultHostBindings = releaseDefaultHostBindings;
     this.runtime = null;
-    this.resourceRoots = new ExternrefResourceRoots();
+    this.resourceRoots = new ExternrefRoots();
     this.leanObjectHandleCells = new Set();
     this.callError = null;
     this.callTimings = [];
@@ -85,7 +84,8 @@ export class VirHostState {
 
   recordCallError(error) {
     if (this.callError === null) {
-      this.callError = error instanceof Error ? error : new Error(String(error));
+      this.callError =
+        error instanceof Error ? error : new Error(String(error));
     }
   }
 
@@ -95,16 +95,12 @@ export class VirHostState {
     return error;
   }
 
-  rootResource(value, owned = 0) {
-    return this.resourceRoots.root(value, { owned: owned !== 0 });
+  rootResource(value) {
+    return this.resourceRoots.root(value);
   }
 
-  getRootedResource(rootId, take = 0) {
-    return this.resourceRoots.get(rootId, { take: take !== 0 });
-  }
-
-  rootedResourceIsOwned(rootId) {
-    return this.resourceRoots.isOwned(rootId) ? 1 : 0;
+  getRootedResource(rootId) {
+    return this.resourceRoots.get(rootId);
   }
 
   releaseRootedResource(rootId) {
@@ -127,7 +123,9 @@ export class VirHostState {
     }
     const name = error instanceof Error && error.name ? error.name : "Error";
     const message = error instanceof Error ? error.message : String(error);
-    this.finalizerErrorMessages.push(`${name}: ${message}`.slice(0, MAX_FINALIZER_ERROR_MESSAGE_LENGTH));
+    this.finalizerErrorMessages.push(
+      `${name}: ${message}`.slice(0, MAX_FINALIZER_ERROR_MESSAGE_LENGTH),
+    );
   }
 
   takeFinalizerErrors() {
@@ -135,7 +133,9 @@ export class VirHostState {
     const dropped = this.droppedFinalizerErrors;
     this.droppedFinalizerErrors = 0;
     if (dropped !== 0) {
-      messages.push(`${dropped} additional finalizer error${dropped === 1 ? " was" : "s were"} discarded`);
+      messages.push(
+        `${dropped} additional finalizer error${dropped === 1 ? " was" : "s were"} discarded`,
+      );
     }
     return messages.map((message) => new Error(message));
   }
@@ -160,7 +160,9 @@ export class VirHostState {
       throw new Error("Vir host state has been disposed");
     }
     if (this.exports === null) {
-      throw new Error("Vir host import called before WASM exports were attached");
+      throw new Error(
+        "Vir host import called before WASM exports were attached",
+      );
     }
     if (this.runtime === null) {
       throw new Error("Vir host import called before runtime was attached");
@@ -172,54 +174,72 @@ export class VirHostState {
     if (entry.boundary === HOST_IMPORT_BOUNDARY.OBJECT_HANDLE) {
       return this.callObjectHandle(entry, argvPtr, argc);
     }
-    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
+    const binding = lookupHostBinding(
+      entry.target,
+      this.userBindings,
+      this.defaultBindings,
+    );
     if (typeof binding !== "function") {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
 
     const args = [];
     const liftedCallbacks = new Set();
-    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
+    const explicitConversionTarget =
+      entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
-        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+        throw new Error(
+          `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+        );
       }
       entry.args.forEach((arg, index) => {
         const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
         try {
           const value = explicitConversionTarget
-            ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
-            : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+            ? this.runtime.liftExplicitConversionObjectValue(
+                arg.type,
+                argObjects[index],
+                `${entry.target} argument ${arg.name}`,
+              )
+            : this.runtime.liftJsObjectValue(
+                arg.type,
+                argObjects[index],
+                `${entry.target} argument ${arg.name}`,
+              );
           args.push(value);
         } finally {
-          captureCallbacksCreatedSince(this.runtime.liveCallbacks, callbacksBeforeArgument, liftedCallbacks);
+          captureCallbacksCreatedSince(
+            this.runtime.liveCallbacks,
+            callbacksBeforeArgument,
+            liftedCallbacks,
+          );
         }
       });
-      const value = binding(...args);
-      if (isPromiseLike(value)) {
-        throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
-      }
-      const resultLabel = `${entry.target} result`;
-      const retainedIdentityResult = isHostResource(value) && args.includes(value)
-        ? retainHostResource(value, resultLabel)
-        : null;
-      const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
+      const transaction = beginHostCallTransaction();
       try {
-        const resultValue = retainedIdentityResult ?? value;
-        const resultObject = explicitConversionTarget
-          ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel)
-          : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
-        if (ownedResultResource !== null) {
-          commitHostResource(ownedResultResource);
+        const value = binding(...args);
+        if (isPromiseLike(value)) {
+          throw new Error(
+            `Vir host import ${entry.target} returned a Promise; host imports must be synchronous`,
+          );
         }
+        const resultLabel = `${entry.target} result`;
+        const resultObject = explicitConversionTarget
+          ? this.runtime.makeExplicitConversionObjectValue(
+              entry.result,
+              value,
+              resultLabel,
+            )
+          : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
+        commitHostCallTransaction(transaction);
         return resultObject;
       } catch (error) {
-        if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => abandonHostResource(ownedResultResource),
-          `Vir host import ${entry.target} failed during result ownership cleanup`,
+          () => abortHostCallTransaction(transaction),
+          `Vir host import ${entry.target} failed during transactional rollback`,
         );
       }
     } catch (error) {
@@ -234,68 +254,79 @@ export class VirHostState {
   callObjectHandle(entry, argvPtr, argc) {
     const argObjects = this.readObjectArgv(argvPtr, argc);
     if (argObjects.length !== entry.args.length) {
-      throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+      throw new Error(
+        `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+      );
     }
-    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRef && entry.args.length === 1 &&
-        isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
-      const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
-      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} result`);
-      cell.onRelease = () => {
-        this.leanObjectHandleCells.delete(cell);
-      };
-      this.leanObjectHandleCells.add(cell);
+    if (
+      entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRef &&
+      entry.args.length === 1 &&
+      isLeanObjectDescriptor(entry.args[0]?.type) &&
+      isGenericJsResourceDescriptor(entry.result)
+    ) {
+      const resource = this.runtime.makeLeanObjectHandleResource(
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`,
+      );
+      const cell = this.runtime.leanObjectHandleCell(
+        resource,
+        `${entry.target} result`,
+      );
       try {
-        return this.runtime.makeHostResourceObjectValue(entry.result, resource, `${entry.target} result`);
+        return this.runtime.makeJsObjectValue(
+          entry.result,
+          resource,
+          `${entry.target} result`,
+        );
       } catch (error) {
         throwWithCleanup(
           error,
-          () => releaseHostResource(resource),
+          () => {
+            const errors = [];
+            collectCleanupError(errors, () =>
+              this.runtime.releaseLeanObjectHandleCell(cell),
+            );
+            throwCollectedErrors(
+              errors,
+              `${entry.target} failed during object-handle rollback`,
+            );
+          },
           `${entry.target} failed during result cleanup`,
         );
       }
     }
-    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefValue && entry.args.length === 1 &&
-        isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostResourceObjectValue(
+    if (
+      entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefValue &&
+      entry.args.length === 1 &&
+      isGenericJsResourceDescriptor(entry.args[0]?.type) &&
+      isLeanObjectDescriptor(entry.result)
+    ) {
+      const resource = this.runtime.liftJsObjectValue(
         entry.args[0].type,
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`,
       );
-      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
-    }
-    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefRetain && entry.args.length === 1 &&
-        isGenericJsResourceDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostResourceObjectValue(
-        entry.args[0].type,
-        argObjects[0],
-        `${entry.target} argument ${entry.args[0].name}`,
-      );
-      const alias = this.runtime.retainLeanObjectHandleResource(
+      return this.runtime.retainLeanObjectHandleValue(
         resource,
         `${entry.target} argument ${entry.args[0].name}`,
       );
-      try {
-        return this.runtime.makeHostResourceObjectValue(entry.result, alias, `${entry.target} result`);
-      } catch (error) {
-        throwWithCleanup(
-          error,
-          () => releaseHostResource(alias),
-          `${entry.target} failed during result cleanup`,
-        );
-      }
     }
-    if (entry.target === RUNTIME_INTRINSIC_HOST_TARGETS.leanRefRelease && entry.args.length === 1 &&
-        isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostResourceObjectValue(
-        entry.args[0].type,
-        argObjects[0],
-        `${entry.target} argument ${entry.args[0].name}`,
+    throw new Error(
+      `Vir host import ${entry.target} has unsupported objectHandle signature`,
+    );
+  }
+
+  trackLeanObjectHandleCell(cell) {
+    if (this.disposed || this.disposing || this.runtime === null) {
+      throw new Error(
+        "cannot track a Lean object handle in an inactive host state",
       );
-      this.runtime.releaseLeanObjectHandleResource(resource, `${entry.target} argument ${entry.args[0].name}`);
-      releaseHostResource(resource);
-      return this.runtime.makeHostResourceObjectValue(entry.result, undefined, `${entry.target} result`);
     }
-    throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
+    cell.onRelease = () => {
+      this.leanObjectHandleCells.delete(cell);
+    };
+    this.leanObjectHandleCells.add(cell);
+    return cell;
   }
 
   readObjectArgv(argvPtr, argc) {
@@ -303,7 +334,9 @@ export class VirHostState {
       throw new Error("Vir host import object argv pointer is null");
     }
     const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
-    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
+    return Array.from({ length: argc }, (_value, index) =>
+      view.getUint32(index * 4, true),
+    );
   }
 
   dispose({ disposeBindings = true } = {}) {
@@ -313,13 +346,23 @@ export class VirHostState {
     try {
       this.clearCallError();
 
-      const userRelease = collectCleanupError(errors, () => this.releaseHostBindings?.() ?? true);
+      const userRelease = collectCleanupError(
+        errors,
+        () => this.releaseHostBindings?.() ?? true,
+      );
       if (disposeBindings && userRelease.ok && userRelease.value) {
-        collectCleanupError(errors, () => disposeHostBindings(this.userBindings));
+        collectCleanupError(errors, () =>
+          disposeHostBindings(this.userBindings),
+        );
       }
-      const defaultRelease = collectCleanupError(errors, () => this.releaseDefaultHostBindings?.() ?? true);
+      const defaultRelease = collectCleanupError(
+        errors,
+        () => this.releaseDefaultHostBindings?.() ?? true,
+      );
       if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
-        collectCleanupError(errors, () => disposeHostBindings(this.defaultBindings));
+        collectCleanupError(errors, () =>
+          disposeHostBindings(this.defaultBindings),
+        );
       }
 
       collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
@@ -337,7 +380,9 @@ export class VirHostState {
   releaseLeanObjectHandleCells() {
     const errors = [];
     for (const cell of Array.from(this.leanObjectHandleCells)) {
-      collectCleanupError(errors, () => this.runtime.releaseLeanObjectHandleCell(cell));
+      collectCleanupError(errors, () =>
+        this.runtime.releaseLeanObjectHandleCell(cell),
+      );
     }
     this.leanObjectHandleCells.clear();
     throwCollectedErrors(errors, "Lean object handle release failed");
@@ -345,20 +390,23 @@ export class VirHostState {
 }
 
 function isLeanObjectDescriptor(type) {
-  return type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
-}
-
-function isUnitDescriptor(type) {
-  return type?.interfaceTag === INTERFACE_TAG.UNIT;
+  return (
+    type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT &&
+    type?.kind === "leanObject"
+  );
 }
 
 function isGenericJsResourceDescriptor(type) {
-  return type?.interfaceTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
+  return (
+    type?.interfaceTag === INTERFACE_TAG.RESOURCE &&
+    type?.kind === "resource" &&
+    type?.name === "Lean.Vir.Js"
+  );
 }
 
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === undefined) return;
-  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
+  const disposer = bindings[VIR_HOST_DISPOSE];
   if (typeof disposer === "function") {
     disposer.call(bindings);
   }
@@ -382,18 +430,22 @@ function lookupHostBindingIn(target, bindings) {
   if (typeof bindings === "object" && Object.hasOwn(bindings, target)) {
     return bindings[target];
   }
-  const resolver = bindings[VIR_HOST_RESOLVE_BINDING];
-  if (typeof resolver === "function") {
-    return resolver.call(bindings, target);
-  }
   return undefined;
 }
 
 function isPromiseLike(value) {
-  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof value.then === "function"
+  );
 }
 
-function captureCallbacksCreatedSince(liveCallbacks, callbacksBeforeArgument, liftedCallbacks) {
+function captureCallbacksCreatedSince(
+  liveCallbacks,
+  callbacksBeforeArgument,
+  liftedCallbacks,
+) {
   for (const callback of liveCallbacks) {
     if (!callbacksBeforeArgument.has(callback)) {
       liftedCallbacks.add(callback);

@@ -254,7 +254,9 @@ descriptor smoke tests, and `docs/IRPKG_FORMAT.md` together.
 Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
 the embedded package/manifest schema, such as a WASM host ABI or JavaScript
 runtime contract change. That value is currently recorded in the SDK artifact
-metadata, not in generated `.irpkg` manifests.
+metadata, not in generated `.irpkg` manifests. The same artifact metadata
+records the exact build-time React and ReactDOM versions required by the
+optional browser React host; these versions come from `package-lock.json`.
 
 After any version bump, run at least:
 

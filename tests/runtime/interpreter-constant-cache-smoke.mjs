@@ -8,8 +8,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { hostResourceValue, releaseHostResource } from "../../web/src/host-resource.js";
-import { publicArtifactPath, wasmPublicFile } from "../../scripts/packages/browser-package-config.mjs";
+import {
+  publicArtifactPath,
+  wasmPublicFile,
+} from "../../scripts/packages/browser-package-config.mjs";
 import {
   assert,
   ensureVirJsBuilt,
@@ -28,22 +30,21 @@ const packagePath = join(freshDir, "interpreter-constant-cache.irpkg");
 const reportPath = join(freshDir, "interpreter-constant-cache.report.md");
 let runtime = null;
 
-function liveObjectPayload(resource, label) {
-  const payload = hostResourceValue(resource);
-  assert.ok(payload !== null, `${label} must be a live LeanRef resource`);
-  assert.equal(payload.cell?.live, true, `${label} Lean object cell must be live`);
-  assert.equal(payload.lease?.released, false, `${label} Lean object lease must be live`);
+function liveObjectCell(resource, label) {
+  assert.ok(resource !== null, `${label} must be a live JSL value`);
+  const cell = runtime.leanObjectHandleCell(resource, label);
+  assert.equal(cell.live, true, `${label} Lean object cell must be live`);
   assert.ok(
-    Number.isInteger(payload.object) && payload.object > 0,
+    Number.isInteger(cell.object) && cell.object > 0,
     `${label} must retain a Lean object`,
   );
-  return payload;
+  return cell;
 }
 
 function assertWarmCache(first, second, label) {
   assert.equal(
-    liveObjectPayload(second.value, `${label} second handle`).object,
-    liveObjectPayload(first.value, `${label} first handle`).object,
+    liveObjectCell(second.value, `${label} second handle`).object,
+    liveObjectCell(first.value, `${label} first handle`).object,
     `${label} calls must retain the same cached nullary object`,
   );
   assert.ok(
@@ -64,25 +65,42 @@ try {
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   const packageBytes = await readFile(packagePath);
-  runtime = await createVirRuntimeFactory({ wasmBytes })
-    .createRuntime({ irPackageSetBytes: [packageBytes] });
+  runtime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
+    irPackageSetBytes: [packageBytes],
+  });
 
-  const first = runtime.callTimed("Vir.Fixtures.InterpreterConstantCache.denseTableHandle");
-  const second = runtime.callTimed("Vir.Fixtures.InterpreterConstantCache.denseTableHandle");
+  const first = runtime.callTimed(
+    "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
+  );
+  const second = runtime.callTimed(
+    "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
+  );
   assertWarmCache(first, second, "initial package");
-  const firstPayload = liveObjectPayload(first.value, "initial package first handle");
-  const secondPayload = liveObjectPayload(second.value, "initial package second handle");
+  const firstCell = liveObjectCell(first.value, "initial package first handle");
+  const secondCell = liveObjectCell(
+    second.value,
+    "initial package second handle",
+  );
   assert.equal(
-    runtime.call("Vir.Fixtures.InterpreterConstantCache.denseLookupValue", 32770),
+    runtime.call(
+      "Vir.Fixtures.InterpreterConstantCache.denseLookupValue",
+      32770,
+    ),
     "1",
     "the packaged implementation must use the dense-table implemented_by body",
   );
 
   runtime.loadIrPackageSetBytes([packageBytes]);
-  assert.equal(firstPayload.cell.live, false, "replacement must release the old first cell");
-  assert.equal(firstPayload.lease.released, true, "replacement must release the old first lease");
-  assert.equal(secondPayload.cell.live, false, "replacement must release the old second cell");
-  assert.equal(secondPayload.lease.released, true, "replacement must release the old second lease");
+  assert.equal(
+    firstCell.live,
+    false,
+    "replacement must release the old first cell",
+  );
+  assert.equal(
+    secondCell.live,
+    false,
+    "replacement must release the old second cell",
+  );
 
   const replacementFirst = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
@@ -91,8 +109,6 @@ try {
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
   assertWarmCache(replacementFirst, replacementSecond, "replacement package");
-  releaseHostResource(replacementFirst.value);
-  releaseHostResource(replacementSecond.value);
 
   console.log(
     "interpreter constant cache smoke ok: " +

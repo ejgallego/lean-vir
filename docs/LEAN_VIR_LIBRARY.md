@@ -78,7 +78,7 @@ piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
 `Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
 bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
-React bindings for tests. The JavaScript-side binding composition reference
+document bindings and explicit unsupported React shims. The JavaScript-side binding composition reference
 lives in [JS_API.md](JS_API.md). This section documents the repository-local
 package generator; downstream Lake packages should prefer the facet workflow
 above.
@@ -152,19 +152,17 @@ import {
   createVirRuntime,
   ensureVirtualElementState,
   ensureVirtualElementStates,
-  findVirtualReactElementById,
-  virtualReactElementById,
 } from "lean-vir/vir-runtime-node";
 ```
 
 That wrapper uses the same runtime and installs virtual browser bindings for
 `Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`,
 `Lean.Vir.Browser.Event`, `Lean.Vir.Browser.HTMLInputElement`, timers,
-animation frames, and React roots. It also exports
+and animation frames. It also exports
 `createVirtualElementState`, `createVirtualEventState`,
-`ensureVirtualElementState`, `ensureVirtualElementStates`,
-`findVirtualReactElementById`, and
-`virtualReactElementById` for direct virtual callback tests. Virtual
+`ensureVirtualElementState`, and `ensureVirtualElementStates` for direct
+callback tests. React operations are explicit unsupported shims; React
+semantics are tested with official React in Chromium. Virtual
 `Document.querySelector` returns a nullable JavaScript resource for missing
 selectors; the explicit `Document.querySelectorString` convenience wrapper
 converts that result to `none`. Call
@@ -201,13 +199,11 @@ npm run generate:irpkg -- MyCustom.lean web/public/custom.irpkg bumpViaJs
 Then provide the matching JavaScript binding when creating the runtime:
 
 ```js
-const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageSetBytes: [await fetchBytes("custom.irpkg")],
-  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
+    "demo.bumpNat": (n) => n + 1n,
   },
 });
 
@@ -236,21 +232,21 @@ opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 ```
 
 `Vir.Runtime` provides `Lean.Vir.RuntimeM`, the effect for
-JavaScript-runtime operations that may
-allocate or inspect `Lean.Vir.Js ...` resources or update runtime bookkeeping,
+JavaScript-runtime operations that may allocate or inspect exact values carried
+by `Lean.Vir.Js ...` or update runtime bookkeeping,
 but do not themselves mutate the browser DOM or enter React root APIs. It is
 narrower than raw `IO` and lifts into `DomM` and `ReactM`.
 
 It also provides `Lean.Vir.RuntimeRef α`, a Lean-owned mutable cell for state
-shared by retained callbacks. `RuntimeRef.new`, `get`, `set`, `modify`, and
-`modifyGet` run in `RuntimeM`. Values replaced in a runtime ref follow normal
-Lean reference counting, including the owned/borrowed host-resource policy for
-stored `Js` handles; callers do not manually release DOM element handles.
+shared by callbacks. `RuntimeRef.new`, `get`, `set`, `modify`, and `modifyGet`
+run in `RuntimeM`. Values replaced in a runtime ref follow normal Lean reference
+counting. Stored `Js` values retain their exact JavaScript values through the
+normal Lean external-object root; callers do not manually release DOM elements.
 
-`Vir.Js` provides `Lean.Vir.Js α`, an opaque resource handle for
-JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: while
-the value remains inside `Js`, the runtime transports it as one host resource
-and does not decode the underlying `α`. This is the intended lane for
+`Vir.Js` provides `Lean.Vir.Js α`, an opaque Lean handle for an exact
+JavaScript value. The `α` parameter is a Lean-side phantom marker: while the
+value remains inside `Js`, the runtime transports it through `externref` and
+does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
 their Lean representation.
 
@@ -267,27 +263,24 @@ their Lean representation.
   independent lifetime, so it remains usable after the source collection is
   no longer reachable.
 
-`Lean.Vir.LeanRef.toJSL`, `Lean.Vir.LeanRef.fromJSL`,
-`Lean.Vir.LeanRef.retainJSL`, and `Lean.Vir.LeanRef.releaseJSL` are the generic
-handle lane for Lean-owned values that JavaScript should store or route without
-decoding. They are backed by the intrinsic `js.leanRef`, `js.leanRef.value`,
-`js.leanRef.retain`, and `js.leanRef.release` object-handle imports. The
-JavaScript host retains the Lean object pointer behind a `Lean.Vir.JSL α`
-resource and returns a fresh owned Lean pointer when the value is unwrapped.
-`retainJSL` creates a distinct alias; each alias is released independently,
-and the final release drops the retained object. Ordinary Lean copies of one
-`JSL` value share a handle lease and become invalid together; use `retainJSL`
-for an independently releasable owner. Runtime teardown force-revokes all
-remaining aliases.
+`Lean.Vir.LeanRef.toJSL` and `Lean.Vir.LeanRef.fromJSL` are the generic handle
+lane for Lean-owned values that JavaScript should store or route without
+decoding. They are backed by the intrinsic `js.leanRef` and `js.leanRef.value`
+object-handle imports. The JavaScript host retains the Lean object pointer in
+out-of-band state associated with the ordinary `Lean.Vir.JSL α` object and
+returns a fresh owned Lean pointer when the value is recovered.
+The payload is an ordinary self-owning JavaScript object. Lean and JavaScript
+references follow their native reachability rules; there is no VIR-specific
+retain/release protocol for JSL carriers. JavaScript collection releases the
+retained Lean pointer when finalization is available; package/runtime teardown
+always does so synchronously and invalidates the object.
 `JSL α` is an alias for `Js (LeanRef.Handle α)`, so `JSL String` is distinct
 from a true JavaScript `Js String`. This avoids named structured `js.value.*`
 conversion targets for state/action values that are only coordinated through
 JavaScript.
 
-React state, reducer, ref, and memo bindings retain their own JSL aliases while
-React stores a value, then release those aliases on replacement, reducer-action
-consumption, or component disposal. This ownership is independent of any JSL
-handle that Lean keeps and later releases explicitly.
+Hosts and frameworks store JSL values as ordinary JavaScript object references;
+no VIR-specific per-container lease is required.
 
 `Vir.Js` also provides explicit scalar conversion helpers for JavaScript
 state/resource values:
@@ -434,14 +427,14 @@ resources, and then call the low-level `react.node.*` host targets.
 React's `type` parameter; `Node.createElementTag` and DOM helpers explicitly
 wrap ordinary tag strings with `ElementType.ofTag`. Browser hosts construct
 native React nodes with `React.createElement` at that point. Rendering retains
-any Lean event callbacks embedded in the resource graph until the root is
-rerendered, unmounted, the package is reloaded, or the runtime is disposed.
+the same object graph React would retain in JavaScript; VIR adds no parallel
+node or callback ownership graph.
 
 `Root.renderNode` is the faithful host boundary for borrowing a JavaScript-owned
 React node. `Root.render` is the generated convenience adapter for rendering a
 `ReactM` tree into an existing root: the JavaScript host invokes the received
-render action once, forwards the concrete `Js Node`, and releases that callback
-after the render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
+render action once and forwards the concrete `Js Node`.
+`Root.renderComponent` wraps a Lean `Component props` plus
 concrete props in a real JavaScript React function component. The public hook
 surface is
 resource-typed: `useState`, `State.set`, and `State.modify` accept
@@ -464,13 +457,10 @@ Lean.Vir.React.State.modify count fun previous => do
   Lean.Vir.JsValue.ofNat (value + 1)
 ```
 
-State value, synthetic updater/reducer input, and scalar `JsValue` resource
-ownership is documented in
-[HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
-Synthetic callback inputs must not escape their callback. This remains a
-dynamic contract because `Lean.Vir.Js` has no scope parameter; an escaped
-wrapper is invalidated and fails on later use. Static enforcement is deferred
-to a scoped/generative borrow API.
+State, updater, reducer, action, and scalar `JsValue` behavior is documented in
+[HOST_BINDINGS.md](HOST_BINDINGS.md). These are the actual JavaScript values,
+and the same purity, replay, and reachability responsibilities apply as in a
+TypeScript React program.
 
 The intended v0 authoring surface is a DOM-like helper set over that `Js Node`
 resource ABI: named property helpers, named event-handler helpers, and keyed
@@ -607,13 +597,11 @@ the embedded manifest `hostImports` array.
 The JavaScript runtime binds targets through `hostBindings`:
 
 ```js
-const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageSetBytes: [await fetchBytes("custom.irpkg")],
-  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
+    "demo.bumpNat": (n) => n + 1n,
   },
 });
 ```
@@ -627,25 +615,22 @@ is a built-in conversion primitive such as `js.nat.value` or
 `js.value.react.property`. `Unit` results should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
-JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
-passes a callable `VirCallback` object to the host binding, and releases the
-internal root with `vir_closure_release` after the last JavaScript callback
-lease calls `release()`, or force-revokes the root when the runtime is disposed.
-`callback.retain()` creates a distinct lease for an independent JavaScript
-owner; built-in registrations manage these leases without Lean-side lifetime
-work.
+JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim
+and passes an ordinary callable function to the host binding. Private WeakMap
+state associates the function with its closure root. Normal JavaScript
+reachability keeps it alive; collection is a best-effort release backstop and
+runtime disposal is the deterministic release boundary.
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
 `Element.addEventListener`, `Timer.setTimeout`,
 `Animation.requestAnimationFrame`, and raw React Node rendering use the callback ABI.
-Event resources are valid only during the callback. Listener, timeout, frame,
-and React root resources own their retained callbacks until removal,
-cancellation, firing, rerender, unmount, package reload, or runtime disposal.
-See the current
-[resource ownership policy](HOST_BINDINGS.md#resource-ownership-policy) for the
-contract and the [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for
-callback-specific follow-up work.
+The underlying browser and React APIs determine event and callback validity;
+VIR adds no callback scope. Listener, timeout, frame, and React-root
+registrations are explicitly terminated on removal, cancellation, firing,
+unmount, package reload, or runtime disposal. See
+[HOST_BINDINGS.md](HOST_BINDINGS.md) for the contract and the
+[event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for follow-up work.
 
 ## Current Surface
 

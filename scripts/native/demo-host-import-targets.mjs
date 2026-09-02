@@ -47,7 +47,6 @@ export const demoHostImportTargets = [
   "js.float",
   "js.float.value",
   "js.leanRef",
-  "js.leanRef.release",
   "js.leanRef.value",
   "js.nat",
   "js.nat.value",

@@ -104,7 +104,6 @@ const byTarget = new Map(report.bindings.map((entry) => [entry.target, entry]));
 assert.equal(byTarget.get("browser.document.getTitle")?.declarations[0]?.boundary, "hostResource");
 assert.match(byTarget.get("browser.document.getTitle")?.declarations[0]?.type ?? "", /Lean\.Vir\.Js String/u);
 assert.equal(byTarget.get("js.string")?.declarations[0]?.boundary, "explicitConversion");
-assert.deepEqual(byTarget.get("js.leanRef.retain")?.providers, ["runtime-intrinsic"]);
 assert.equal(byTarget.get("infoview.command.insertText")?.status, "provided");
 assert.equal(
   byTarget.get("infoview.command.insertText")?.declarations[0]?.boundary,

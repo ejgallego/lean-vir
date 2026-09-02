@@ -10,17 +10,18 @@ import { relative, resolve } from "node:path";
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
-import { VIR_HOST_DISPOSE } from "../../web/src/host-resource.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   createBrowserHostBindings,
-  createHostResourceState,
+  createHostLifecycle,
   createNodeHostBindings,
   createVirtualDocumentState,
 } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import { RUNTIME_INTRINSIC_HOST_TARGETS } from "../../web/src/runtime/host-state.js";
 
-const usageLine = "usage: node scripts/bindings/generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [options]";
+const usageLine =
+  "usage: node scripts/bindings/generate-shipped-bindings-report.mjs --lean FILE --out FILE --html FILE [options]";
 
 function usage() {
   console.log(`${usageLine}
@@ -43,74 +44,120 @@ function parseArgs(argv) {
     if (option === "-h" || option === "--help") {
       usage();
       return null;
-    } else if (option === "--lean") options.lean = requiredValue(argv, ++index, option);
-    else if (option === "--out") options.out = requiredValue(argv, ++index, option);
-    else if (option === "--html") options.html = requiredValue(argv, ++index, option);
+    } else if (option === "--lean")
+      options.lean = requiredValue(argv, ++index, option);
+    else if (option === "--out")
+      options.out = requiredValue(argv, ++index, option);
+    else if (option === "--html")
+      options.html = requiredValue(argv, ++index, option);
     else if (option === "--check") options.check = true;
     else throw new Error(`unknown option ${option}`);
   }
   if (options.lean === null || options.out === null || options.html === null) {
     throw new Error(usageLine);
   }
-  return Object.fromEntries(Object.entries(options).map(([key, value]) =>
-    [key, typeof value === "string" ? resolve(root, value) : value]));
+  return Object.fromEntries(
+    Object.entries(options).map(([key, value]) => [
+      key,
+      typeof value === "string" ? resolve(root, value) : value,
+    ]),
+  );
 }
 
 async function readInventory(path) {
   const value = JSON.parse(await readFile(path, "utf8"));
-  if (value?.format !== "lean-vir-js-inventory" || value.version !== 1 ||
-      !Array.isArray(value.bindings) || value.summary?.declarations !== value.bindings.length ||
-      !Array.isArray(value.publicEntries) ||
-      value.summary?.publicEntries !== value.publicEntries.length) {
-    throw new Error(`${relative(root, path)} is not a compiler-derived VIR JavaScript inventory`);
+  if (
+    value?.format !== "lean-vir-js-inventory" ||
+    value.version !== 1 ||
+    !Array.isArray(value.bindings) ||
+    value.summary?.declarations !== value.bindings.length ||
+    !Array.isArray(value.publicEntries) ||
+    value.summary?.publicEntries !== value.publicEntries.length
+  ) {
+    throw new Error(
+      `${relative(root, path)} is not a compiler-derived VIR JavaScript inventory`,
+    );
   }
-  const validBoundaries = new Set(["hostResource", "explicitConversion", "objectHandle"]);
+  const validBoundaries = new Set([
+    "hostResource",
+    "explicitConversion",
+    "objectHandle",
+  ]);
   const declarations = new Set();
   for (const binding of value.bindings) {
-    if (typeof binding.declaration !== "string" || typeof binding.target !== "string" ||
-        typeof binding.type !== "string" || !validBoundaries.has(binding.boundary)) {
-      throw new Error(`${relative(root, path)} contains an invalid binding entry`);
+    if (
+      typeof binding.declaration !== "string" ||
+      typeof binding.target !== "string" ||
+      typeof binding.type !== "string" ||
+      !validBoundaries.has(binding.boundary)
+    ) {
+      throw new Error(
+        `${relative(root, path)} contains an invalid binding entry`,
+      );
     }
     if (declarations.has(binding.declaration)) {
       throw new Error(`duplicate compiler declaration ${binding.declaration}`);
     }
     declarations.add(binding.declaration);
-    const expectedBoundary = binding.marker === "vir_js_explicit_conversion"
-      ? "explicitConversion"
-      : binding.marker === "vir_js" ? null : "invalid";
-    if (expectedBoundary === "invalid" ||
-        (expectedBoundary === "explicitConversion" && binding.boundary !== expectedBoundary) ||
-        (expectedBoundary === null && binding.boundary === "explicitConversion")) {
-      throw new Error(`${binding.declaration} has inconsistent marker and boundary metadata`);
+    const expectedBoundary =
+      binding.marker === "vir_js_explicit_conversion"
+        ? "explicitConversion"
+        : binding.marker === "vir_js"
+          ? null
+          : "invalid";
+    if (
+      expectedBoundary === "invalid" ||
+      (expectedBoundary === "explicitConversion" &&
+        binding.boundary !== expectedBoundary) ||
+      (expectedBoundary === null && binding.boundary === "explicitConversion")
+    ) {
+      throw new Error(
+        `${binding.declaration} has inconsistent marker and boundary metadata`,
+      );
     }
   }
   let publicTargetEdges = 0;
   const publicTargets = new Set();
   for (const entry of value.publicEntries) {
-    if (typeof entry.declaration !== "string" || typeof entry.module !== "string" ||
-        typeof entry.type !== "string" || !Array.isArray(entry.targets) ||
-        entry.targets.length === 0) {
-      throw new Error(`${relative(root, path)} contains an invalid public entry`);
+    if (
+      typeof entry.declaration !== "string" ||
+      typeof entry.module !== "string" ||
+      typeof entry.type !== "string" ||
+      !Array.isArray(entry.targets) ||
+      entry.targets.length === 0
+    ) {
+      throw new Error(
+        `${relative(root, path)} contains an invalid public entry`,
+      );
     }
     for (const reached of entry.targets) {
-      if (typeof reached.target !== "string" || !Array.isArray(reached.path) ||
-          reached.path[0] !== entry.declaration ||
-          reached.path.some((declaration) => typeof declaration !== "string")) {
-        throw new Error(`${entry.declaration} contains invalid compiler reachability evidence`);
+      if (
+        typeof reached.target !== "string" ||
+        !Array.isArray(reached.path) ||
+        reached.path[0] !== entry.declaration ||
+        reached.path.some((declaration) => typeof declaration !== "string")
+      ) {
+        throw new Error(
+          `${entry.declaration} contains invalid compiler reachability evidence`,
+        );
       }
       publicTargetEdges += 1;
       publicTargets.add(reached.target);
     }
   }
-  if (value.summary.publicTargetEdges !== publicTargetEdges ||
-      value.summary.publicTargets !== publicTargets.size) {
-    throw new Error(`${relative(root, path)} has inconsistent public reachability counts`);
+  if (
+    value.summary.publicTargetEdges !== publicTargetEdges ||
+    value.summary.publicTargets !== publicTargets.size
+  ) {
+    throw new Error(
+      `${relative(root, path)} has inconsistent public reachability counts`,
+    );
   }
   return value;
 }
 
 function collectProviders() {
-  const browserResources = createHostResourceState();
+  const browserResources = createHostLifecycle();
   const browser = createBrowserHostBindings({
     resources: browserResources,
     reactHostBindings: createBrowserReactHostBindings,
@@ -121,8 +168,11 @@ function collectProviders() {
     return [
       provider("browser", "Browser + React host map", Object.keys(browser)),
       provider("node", "Virtual Node host map", Object.keys(node)),
-      provider("runtime-intrinsic", "VIR object-handle dispatcher",
-        Object.values(RUNTIME_INTRINSIC_HOST_TARGETS)),
+      provider(
+        "runtime-intrinsic",
+        "VIR object-handle dispatcher",
+        Object.values(RUNTIME_INTRINSIC_HOST_TARGETS),
+      ),
     ];
   } finally {
     browser[VIR_HOST_DISPOSE]?.();
@@ -136,7 +186,11 @@ function provider(id, title, targets) {
 
 export function buildShippedBindingsReport(inventory, providers) {
   const declarationsByTarget = new Map();
-  const boundaryCounts = { hostResource: 0, objectHandle: 0, explicitConversion: 0 };
+  const boundaryCounts = {
+    hostResource: 0,
+    objectHandle: 0,
+    explicitConversion: 0,
+  };
   for (const binding of inventory.bindings) {
     boundaryCounts[binding.boundary] += 1;
     const entries = declarationsByTarget.get(binding.target) ?? [];
@@ -152,34 +206,47 @@ export function buildShippedBindingsReport(inventory, providers) {
     }
   }
 
-  const targets = [...new Set([...declarationsByTarget.keys(), ...providersByTarget.keys()])].sort();
+  const targets = [
+    ...new Set([...declarationsByTarget.keys(), ...providersByTarget.keys()]),
+  ].sort();
   const bindings = targets.map((target) => {
-    const declarations = (declarationsByTarget.get(target) ?? []).sort((lhs, rhs) =>
-      lhs.declaration.localeCompare(rhs.declaration));
+    const declarations = (declarationsByTarget.get(target) ?? []).sort(
+      (lhs, rhs) => lhs.declaration.localeCompare(rhs.declaration),
+    );
     const targetProviders = (providersByTarget.get(target) ?? []).sort();
-    const status = declarations.length === 0
-      ? "runtime-only"
-      : targetProviders.length === 0 ? "missing-provider" : "provided";
+    const status =
+      declarations.length === 0
+        ? "runtime-only"
+        : targetProviders.length === 0
+          ? "missing-provider"
+          : "provided";
     return {
       target,
       prefix: target.split(".")[0],
       status,
       providers: targetProviders,
-      boundaries: [...new Set(declarations.map((entry) => entry.boundary))].sort(),
-      visibility: declarations.some((entry) => !entry.private) ? "public" : "private",
+      boundaries: [
+        ...new Set(declarations.map((entry) => entry.boundary)),
+      ].sort(),
+      visibility: declarations.some((entry) => !entry.private)
+        ? "public"
+        : "private",
       declarations,
     };
   });
 
-  const count = (status) => bindings.filter((entry) => entry.status === status).length;
+  const count = (status) =>
+    bindings.filter((entry) => entry.status === status).length;
   return {
     format: "lean-vir-shipped-bindings-coverage",
     version: 1,
     generatedBy: "scripts/bindings/generate-shipped-bindings-report.mjs",
     analysis: {
       representationPolicy: "compiler-validated-coarse-boundary",
-      ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
-      conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
+      ordinaryBoundary:
+        "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
+      conversionBoundary:
+        "explicit vir_js_explicit_conversion declarations only",
       providerCoverage: "target-name-presence-only",
       providerBehavior: "not-mechanically-verified",
       semanticParity: "library-specific type anchors",
@@ -190,7 +257,11 @@ export function buildShippedBindingsReport(inventory, providers) {
       toolchain: inventory.lean.toolchain,
       githash: inventory.lean.githash,
     },
-    providers: providers.map(({ id, title, targets }) => ({ id, title, targets: targets.length })),
+    providers: providers.map(({ id, title, targets }) => ({
+      id,
+      title,
+      targets: targets.length,
+    })),
     summary: {
       declarations: inventory.summary.declarations,
       virJs: inventory.summary.virJs,
@@ -202,8 +273,10 @@ export function buildShippedBindingsReport(inventory, providers) {
       provided: count("provided"),
       missingProvider: count("missing-provider"),
       runtimeOnly: count("runtime-only"),
-      publicTargets: bindings.filter((entry) => entry.visibility === "public").length,
-      privateTargets: bindings.filter((entry) => entry.visibility === "private").length,
+      publicTargets: bindings.filter((entry) => entry.visibility === "public")
+        .length,
+      privateTargets: bindings.filter((entry) => entry.visibility === "private")
+        .length,
       publicEntries: inventory.summary.publicEntries,
       publicTargetEdges: inventory.summary.publicTargetEdges,
       targetsReachedByPublicEntries: inventory.summary.publicTargets,
@@ -318,11 +391,22 @@ export async function runShippedBindingsReportCli(argv) {
     staleHint: "rerun the corresponding shipped-bindings generation step",
   };
   await Promise.all([
-    emitGeneratedFile(options.out, `${JSON.stringify(report, null, 2)}\n`, outputOptions),
-    emitGeneratedFile(options.html, renderShippedBindingsHtml(report), outputOptions),
+    emitGeneratedFile(
+      options.out,
+      `${JSON.stringify(report, null, 2)}\n`,
+      outputOptions,
+    ),
+    emitGeneratedFile(
+      options.html,
+      renderShippedBindingsHtml(report),
+      outputOptions,
+    ),
   ]);
 
-  if (report.summary.missingProvider !== 0 || report.summary.runtimeOnly !== 0) {
+  if (
+    report.summary.missingProvider !== 0 ||
+    report.summary.runtimeOnly !== 0
+  ) {
     throw new Error(
       `shipped binding reconciliation found ${report.summary.missingProvider} missing provider keys and ` +
         `${report.summary.runtimeOnly} runtime-only targets`,
@@ -336,9 +420,17 @@ export async function runShippedBindingsReportCli(argv) {
   console.log(`  provider keys present: ${report.summary.provided}`);
   console.log(`  missing provider keys: ${report.summary.missingProvider}`);
   console.log(`  runtime-only targets: ${report.summary.runtimeOnly}`);
-  console.log(`  public entries reaching targets: ${report.summary.publicEntries}`);
-  console.log(`  public entry/target edges: ${report.summary.publicTargetEdges}`);
-  console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(root, options.out)}`);
-  console.log(`             ${options.check ? "validated" : "wrote"} ${relative(root, options.html)}`);
+  console.log(
+    `  public entries reaching targets: ${report.summary.publicEntries}`,
+  );
+  console.log(
+    `  public entry/target edges: ${report.summary.publicTargetEdges}`,
+  );
+  console.log(
+    `  artifacts: ${options.check ? "validated" : "wrote"} ${relative(root, options.out)}`,
+  );
+  console.log(
+    `             ${options.check ? "validated" : "wrote"} ${relative(root, options.html)}`,
+  );
   return 0;
 }
