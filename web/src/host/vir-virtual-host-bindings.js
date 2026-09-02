@@ -8,6 +8,7 @@ import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
+  createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
   createHtmlInputElementHostBindings,
@@ -189,6 +190,10 @@ export function createVirtualDocumentHostBindings(
       setTextContent: (target, text) => {
         target.textContent = text ?? "";
       },
+      getClassList: (target) => virtualDOMTokenList(target),
+      setClassList: (target, classList) => {
+        target.attributes.set("class", classList);
+      },
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),
       createEventListener: (target, eventName, callback) =>
@@ -199,6 +204,7 @@ export function createVirtualDocumentHostBindings(
           callback,
         ),
     }),
+    ...createDOMTokenListHostBindings(),
     ...createHtmlInputElementHostBindings({
       fromElement: (element) => element,
     }),
@@ -392,6 +398,42 @@ function normalizeVirtualElementState(element) {
   element.value ??= "";
   element.listeners ??= new Map();
   return element;
+}
+
+function virtualDOMTokenList(element) {
+  element.classList ??= {
+    add: (token) =>
+      updateVirtualClassTokens(element, (tokens) => tokens.add(token)),
+    remove: (token) =>
+      updateVirtualClassTokens(element, (tokens) => tokens.delete(token)),
+    toggle: (token) => {
+      const tokens = virtualClassTokens(element);
+      const present = tokens.has(token);
+      if (present) tokens.delete(token);
+      else tokens.add(token);
+      writeVirtualClassTokens(element, tokens);
+      return !present;
+    },
+  };
+  return element.classList;
+}
+
+function virtualClassTokens(element) {
+  return new Set(
+    String(element.attributes.get("class") ?? "")
+      .split(/\s+/u)
+      .filter((token) => token.length > 0),
+  );
+}
+
+function updateVirtualClassTokens(element, update) {
+  const tokens = virtualClassTokens(element);
+  update(tokens);
+  writeVirtualClassTokens(element, tokens);
+}
+
+function writeVirtualClassTokens(element, tokens) {
+  element.attributes.set("class", [...tokens].join(" "));
 }
 
 function queryVirtualDescendantStates(element, selector) {

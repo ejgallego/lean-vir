@@ -111,6 +111,12 @@ export function createElementHostBindings(resources, operations) {
       operations.setTextContent(element, nullablePayload(text));
       return undefined;
     },
+    "browser.element.getClassList": (element) =>
+      operations.getClassList(element),
+    "browser.element.setClassList": (element, classList) => {
+      operations.setClassList(element, classList);
+      return undefined;
+    },
     "browser.element.getAttribute": (element, name) =>
       createNullableValue(operations.getAttribute(element, name)),
     "browser.element.setAttribute": (element, name, value) => {
@@ -137,6 +143,21 @@ export function createElementHostBindings(resources, operations) {
       );
       return undefined;
     },
+  };
+}
+
+export function createDOMTokenListHostBindings() {
+  return {
+    "browser.domTokenList.add": (tokenList, className) => {
+      tokenList.add(className);
+      return undefined;
+    },
+    "browser.domTokenList.remove": (tokenList, className) => {
+      tokenList.remove(className);
+      return undefined;
+    },
+    "browser.domTokenList.toggle": (tokenList, className) =>
+      tokenList.toggle(className),
   };
 }
 

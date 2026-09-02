@@ -59,6 +59,9 @@ Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Elem
 -/
 opaque Element : Type
 
+/-- Exact browser `DOMTokenList` value returned by `Element.classList`. -/
+opaque DOMTokenList : Type
+
 /-- Browser event object class. Event values are callback-scoped resources. -/
 opaque Event : Type
 

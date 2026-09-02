@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
+  createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
   createHtmlInputElementHostBindings,
@@ -39,7 +40,10 @@ export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./host-boundary.js";
-export { createHostLifecycle } from "./host/vir-host-resources.js";
+export {
+  createDOMTokenListHostBindings,
+  createHostLifecycle,
+} from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
@@ -123,6 +127,10 @@ export function createBrowserElementHostBindings(
       setTextContent: (target, text) => {
         target.textContent = text;
       },
+      getClassList: (target) => target.classList,
+      setClassList: (target, classList) => {
+        target.classList = classList;
+      },
       getAttribute: (target, name) => target.getAttribute(name) ?? null,
       setAttribute: (target, name, value) => target.setAttribute(name, value),
       createEventListener: (target, eventName, callback) =>
@@ -141,16 +149,6 @@ export function createBrowserElementHostBindings(
       element.remove();
       return undefined;
     },
-    "browser.element.classList.add": (element, className) => {
-      element.classList.add(className);
-      return undefined;
-    },
-    "browser.element.classList.remove": (element, className) => {
-      element.classList.remove(className);
-      return undefined;
-    },
-    "browser.element.classList.toggle": (element, className) =>
-      element.classList.toggle(className),
     "browser.element.style.setProperty": (element, name, value) => {
       element.style.setProperty(name, nullablePayload(value));
       return undefined;
@@ -304,6 +302,7 @@ export function createBrowserHostBindings({
     ...createBrowserDocumentHostBindings(),
     ...createBrowserEventHostBindings(),
     ...createBrowserElementHostBindings(state),
+    ...createDOMTokenListHostBindings(),
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserCanvasHostBindings(),
     ...createBrowserTimerHostBindings(state),

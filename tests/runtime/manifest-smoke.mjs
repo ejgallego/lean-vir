@@ -664,6 +664,26 @@ assert.equal(
   virtualQueryHost["browser.element.getTextContent"](virtualPresentElement),
   "",
 );
+const virtualTokenList = virtualQueryHost["browser.element.getClassList"](
+  virtualPresentElement,
+);
+assert.equal(
+  virtualQueryHost["browser.element.getClassList"](virtualPresentElement),
+  virtualTokenList,
+);
+virtualQueryHost["browser.domTokenList.add"](virtualTokenList, "active");
+virtualQueryHost["browser.domTokenList.add"](virtualTokenList, "selected");
+virtualQueryHost["browser.domTokenList.remove"](virtualTokenList, "active");
+assert.equal(
+  virtualQueryHost["browser.domTokenList.toggle"](virtualTokenList, "ready"),
+  true,
+);
+assert.equal(virtualPresentElement.attributes.get("class"), "selected ready");
+virtualQueryHost["browser.element.setClassList"](
+  virtualPresentElement,
+  "reset",
+);
+assert.equal(virtualPresentElement.attributes.get("class"), "reset");
 let virtualMissingEventTarget = "not-dispatched";
 let virtualMissingEventCurrentTarget = "not-dispatched";
 const virtualMissingEventCallback = (event) => {

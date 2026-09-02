@@ -346,16 +346,25 @@ assert.deepEqual(elementRoot?.comparison.summary, {
 assert.deepEqual(elementRoot?.coverage.summary, {
   exact: 0,
   compatible: 2,
-  derived: 12,
+  derived: 13,
   "protocol-linked": 0,
   "contract-linked": 0,
   weak: 0,
   unreviewed: 0,
   suggested: 0,
   ambiguous: 0,
-  missing: 728,
-  mappedTargets: 16,
+  missing: 727,
+  mappedTargets: 18,
 });
+const elementClassList = elementRoot?.coverage.members.find(
+  (member) => member.id === "Element.classList",
+);
+assert.equal(elementClassList?.generation.disposition, "generated");
+assert.equal(elementClassList?.generation.semanticCoverage.status, "faithful");
+assert.deepEqual(elementClassList?.generation.targets, [
+  "browser.element.getClassList",
+  "browser.element.setClassList",
+]);
 const elementInnerHTML = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.innerHTML",
 );
@@ -651,11 +660,18 @@ const semanticCoverageByMember = new Map(roots.flatMap((root) =>
   ])));
 for (const member of [
   "browser/document:Document.title",
-  "browser/element:DOMTokenList.add",
   "browser/element:CSSStyleDeclaration.setProperty",
   "browser/event:KeyboardEvent.key",
 ]) {
   assert.equal(semanticCoverageByMember.get(member), "adapter-only");
+}
+for (const member of [
+  "browser/element:Element.classList",
+  "browser/element:DOMTokenList.add",
+  "browser/element:DOMTokenList.remove",
+  "browser/element:DOMTokenList.toggle",
+]) {
+  assert.equal(semanticCoverageByMember.get(member), "faithful");
 }
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);

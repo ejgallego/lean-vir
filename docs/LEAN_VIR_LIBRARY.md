@@ -352,7 +352,12 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
   applications choose explicitly between a string resource and JavaScript
   `null`.
 - `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
-- `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
+- `Lean.Vir.Browser.Element.getClassList` returns the element's exact JavaScript
+  `DOMTokenList`; `setClassList` exposes the upstream string setter. The
+  generated `Lean.Vir.Browser.DOMTokenList.add`, `remove`, and `toggle`
+  operations act on that value directly. `Element.ClassList` keeps compact
+  convenience wrappers for callers that do not need to retain the token list.
+- `Lean.Vir.Browser.Element.Style.setProperty` updates inline style properties.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
 - `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`

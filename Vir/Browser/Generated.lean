@@ -592,6 +592,73 @@ opaque setTitle
 
 end Document
 
+namespace DOMTokenList
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.add`.
+
+The **`add()`** method of the DOMTokenList interface adds the given tokens to the list, omitting any that are already present.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/add)
+
+Call policy: The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.add"]
+opaque add
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.remove`.
+
+The **`remove()`** method of the DOMTokenList interface removes the specified tokens from the list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/remove)
+
+Call policy: The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.remove"]
+opaque remove
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.toggle`.
+
+The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/toggle)
+
+Call policy: Omitting force selects DOMTokenList.toggle's standard toggle behavior without changing the receiver, token, or result.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.toggle"]
+opaque toggle
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (token : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js Bool)
+
+end DOMTokenList
+
 namespace Element
 
 /--
@@ -632,6 +699,43 @@ opaque appendChild
     (element : @& Lean.Vir.Js Element)
     (node : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js Element)
+
+/--
+Faithful generated getter binding for TypeScript `Element.classList`.
+
+The read-only **`classList`** property of the Element interface contains a live DOMTokenList collection representing the class attribute of the element. This can then be used to manipulate the class list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/classList)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
+
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.getClassList"]
+opaque getClassList
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js DOMTokenList)
+
+/--
+Faithful generated setter binding for TypeScript `Element.classList`.
+
+The read-only **`classList`** property of the Element interface contains a live DOMTokenList collection representing the class attribute of the element. This can then be used to manipulate the class list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/classList)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
+
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; classList js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.setClassList"]
+opaque setClassList
+    (element : @& Lean.Vir.Js Element)
+    (classList : @& Lean.Vir.Js String) :
+    DomM Unit
 
 /--
 Faithful generated method binding for TypeScript `Element.getAttribute`.
@@ -819,73 +923,6 @@ opaque setTextContent
     DomM Unit
 
 end Element
-
-namespace Element.ClassList
-
-/--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.add`.
-
-The **`add()`** method of the DOMTokenList interface adds the given tokens to the list, omitting any that are already present.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/add)
-
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.element.classList.add"]
-opaque addJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.remove`.
-
-The **`remove()`** method of the DOMTokenList interface removes the specified tokens from the list.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/remove)
-
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.element.classList.remove"]
-opaque removeJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.toggle`.
-
-The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/toggle)
-
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.element.classList.toggle"]
-opaque toggleJs
-    (element : @& Lean.Vir.Js Element)
-    (token : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js Bool)
-
-end Element.ClassList
 
 namespace Element.Style
 

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   createBrowserCanvasHostBindings,
   createBrowserElementHostBindings,
+  createDOMTokenListHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
 
@@ -22,13 +23,19 @@ const child = { id: "child" };
 const element = {
   textContent: "",
   attributes: new Map(),
-  classList: {
+  _classList: {
     add: (name) => elementCalls.push(["class.add", name]),
     remove: (name) => elementCalls.push(["class.remove", name]),
     toggle: (name) => {
       elementCalls.push(["class.toggle", name]);
       return true;
     },
+  },
+  get classList() {
+    return this._classList;
+  },
+  set classList(value) {
+    elementCalls.push(["class.set", value]);
   },
   style: {
     setProperty: (name, value) => elementCalls.push(["style", name, value]),
@@ -45,16 +52,20 @@ const element = {
   removeEventListener() {},
 };
 const elementBindings = createBrowserElementHostBindings(state);
+const tokenBindings = createDOMTokenListHostBindings();
 assert.equal(
   elementBindings["browser.element.appendChild"](element, child),
   child,
 );
-elementBindings["browser.element.classList.add"](element, "active");
-elementBindings["browser.element.classList.remove"](element, "hidden");
+const tokenList = elementBindings["browser.element.getClassList"](element);
+assert.equal(tokenList, element.classList);
+tokenBindings["browser.domTokenList.add"](tokenList, "active");
+tokenBindings["browser.domTokenList.remove"](tokenList, "hidden");
 assert.equal(
-  elementBindings["browser.element.classList.toggle"](element, "ready"),
+  tokenBindings["browser.domTokenList.toggle"](tokenList, "ready"),
   true,
 );
+elementBindings["browser.element.setClassList"](element, "ready selected");
 elementBindings["browser.element.style.setProperty"](
   element,
   "color",
@@ -66,6 +77,7 @@ assert.deepEqual(elementCalls, [
   ["class.add", "active"],
   ["class.remove", "hidden"],
   ["class.toggle", "ready"],
+  ["class.set", "ready selected"],
   ["style", "color", "red"],
   ["remove"],
 ]);

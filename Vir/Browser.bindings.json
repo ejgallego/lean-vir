@@ -41,11 +41,7 @@
     },
     "resources": {
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
-      "DOMTokenList": {
-        "lean": "Element",
-        "semantics": "changing",
-        "reason": "The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value."
-      },
+      "DOMTokenList": "DOMTokenList",
       "Element": "Element",
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
@@ -57,7 +53,7 @@
       },
       "TextMetrics": "TextMetrics"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
+    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": {
@@ -94,9 +90,24 @@
       "Document.createElement": { "signature": 2, "omittedOptionalParameters": ["options"] },
       "Document.querySelector": { "signature": 4 },
       "Document.querySelectorAll": { "signature": 4 },
-      "DOMTokenList.add": { "signature": "only", "fixedRestParameters": { "tokens": ["className"] } },
-      "DOMTokenList.remove": { "signature": "only", "fixedRestParameters": { "tokens": ["className"] } },
-      "DOMTokenList.toggle": { "signature": "only", "omittedOptionalParameters": ["force"] },
+      "DOMTokenList.add": {
+        "signature": "only",
+        "fixedRestParameters": { "tokens": ["className"] },
+        "semantics": "preserving",
+        "reason": "The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap."
+      },
+      "DOMTokenList.remove": {
+        "signature": "only",
+        "fixedRestParameters": { "tokens": ["className"] },
+        "semantics": "preserving",
+        "reason": "The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap."
+      },
+      "DOMTokenList.toggle": {
+        "signature": "only",
+        "omittedOptionalParameters": ["force"],
+        "semantics": "preserving",
+        "reason": "Omitting force selects DOMTokenList.toggle's standard toggle behavior without changing the receiver, token, or result."
+      },
       "Element.addEventListener": {
         "signature": 1,
         "omittedOptionalParameters": ["options"],
@@ -295,42 +306,6 @@
             "lean": "Lean.Vir.Js EventListener",
             "representation": "js-resource",
             "resourceInner": "EventListener"
-          }
-        }
-      },
-      "browser.element.classList.add": {
-        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
-        "semantics": "changing",
-        "receiver": {
-          "name": "element",
-          "type": {
-            "lean": "Lean.Vir.Js Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
-          }
-        }
-      },
-      "browser.element.classList.remove": {
-        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
-        "semantics": "changing",
-        "receiver": {
-          "name": "element",
-          "type": {
-            "lean": "Lean.Vir.Js Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
-          }
-        }
-      },
-      "browser.element.classList.toggle": {
-        "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument.",
-        "semantics": "changing",
-        "receiver": {
-          "name": "element",
-          "type": {
-            "lean": "Lean.Vir.Js Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
           }
         }
       },
@@ -726,7 +701,7 @@
     {
       "id": "element",
       "title": "Element",
-      "targets": ["browser.element.*"],
+      "targets": ["browser.element.*", "browser.domTokenList.*"],
       "lean": { "public": ["Lean.Vir.Browser.Element"] },
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
       "comparison": { "report": "build/type-descriptors/element-v1.report.json" },
@@ -751,9 +726,16 @@
         { "typescript": "Element.setAttribute", "targets": ["browser.element.setAttribute"], "lean": ["Lean.Vir.Browser.Element.setAttribute"] },
         { "typescript": "Element.appendChild", "targets": ["browser.element.appendChild"], "lean": ["Lean.Vir.Browser.Element.appendChild"] },
         { "typescript": "Element.remove", "targets": ["browser.element.remove"], "lean": ["Lean.Vir.Browser.Element.remove"] },
-        { "typescript": "DOMTokenList.add", "targets": ["browser.element.classList.add"], "lean": ["Lean.Vir.Browser.Element.ClassList.addJs"] },
-        { "typescript": "DOMTokenList.remove", "targets": ["browser.element.classList.remove"], "lean": ["Lean.Vir.Browser.Element.ClassList.removeJs"] },
-        { "typescript": "DOMTokenList.toggle", "targets": ["browser.element.classList.toggle"], "lean": ["Lean.Vir.Browser.Element.ClassList.toggleJs"] },
+        {
+          "typescript": "Element.classList",
+          "accessors": {
+            "get": { "target": "browser.element.getClassList", "lean": "Lean.Vir.Browser.Element.getClassList" },
+            "set": { "target": "browser.element.setClassList", "lean": "Lean.Vir.Browser.Element.setClassList" }
+          }
+        },
+        { "typescript": "DOMTokenList.add", "targets": ["browser.domTokenList.add"], "lean": ["Lean.Vir.Browser.DOMTokenList.add"], "receiverName": "tokenList" },
+        { "typescript": "DOMTokenList.remove", "targets": ["browser.domTokenList.remove"], "lean": ["Lean.Vir.Browser.DOMTokenList.remove"], "receiverName": "tokenList" },
+        { "typescript": "DOMTokenList.toggle", "targets": ["browser.domTokenList.toggle"], "lean": ["Lean.Vir.Browser.DOMTokenList.toggle"], "receiverName": "tokenList" },
         { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.element.style.setProperty"], "lean": ["Lean.Vir.Browser.Element.Style.setPropertyJs"] },
         { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
         { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }

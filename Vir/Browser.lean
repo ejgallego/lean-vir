@@ -142,17 +142,21 @@ def setAttributeString
 
 namespace ClassList
 
-/-- Adds a CSS class to an element. -/
+/-- Adds a CSS class through the element's exact `DOMTokenList` value. -/
 def add (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
-  addJs element (← Lean.Vir.JsValue.ofString className)
+  let tokenList ← getClassList element
+  DOMTokenList.add tokenList (← Lean.Vir.JsValue.ofString className)
 
-/-- Removes a CSS class from an element. -/
+/-- Removes a CSS class through the element's exact `DOMTokenList` value. -/
 def remove (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
-  removeJs element (← Lean.Vir.JsValue.ofString className)
+  let tokenList ← getClassList element
+  DOMTokenList.remove tokenList (← Lean.Vir.JsValue.ofString className)
 
-/-- Toggles a CSS class and returns whether it is present afterward. -/
+/-- Toggles a CSS class through the exact list and reports its resulting presence. -/
 def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Bool := do
-  Lean.Vir.JsValue.toBool (← toggleJs element (← Lean.Vir.JsValue.ofString className))
+  let tokenList ← getClassList element
+  Lean.Vir.JsValue.toBool
+    (← DOMTokenList.toggle tokenList (← Lean.Vir.JsValue.ofString className))
 
 end ClassList
 
