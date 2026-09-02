@@ -42,6 +42,12 @@ function validateUpstreamSemantics(value, context) {
   }
 }
 
+function validateActiveEffect(value, context) {
+  if (!["register", "use", "release"].includes(value)) {
+    throw new Error(`${context} activeEffect must be register, use, or release`);
+  }
+}
+
 function validateKeys(value, allowed, context) {
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) throw new Error(`${context} has unsupported field ${key}`);
@@ -92,11 +98,14 @@ function validateException(exception, context) {
   }
   validateKeys(
     exception,
-    ["reason", "semantics", "receiver", "arguments", "result", "effect"],
+    ["reason", "semantics", "activeEffect", "receiver", "arguments", "result", "effect"],
     context,
   );
   if (exception.semantics !== undefined) {
     validateUpstreamSemantics(exception.semantics, context);
+  }
+  if (exception.activeEffect !== undefined) {
+    validateActiveEffect(exception.activeEffect, context);
   }
   if (!["receiver", "arguments", "result", "effect"].some((key) => exception[key] !== undefined)) {
     throw new Error(`${context} must define an override`);
@@ -141,6 +150,7 @@ export function validateGenerationProfile(generation, context = "generation") {
       !object(profile.types) || !object(profile.resource) ||
       !nonemptyString(profile.resource.constructor) ||
       !nonemptyString(profile.resource.nullableConstructor) ||
+      profile.resource.valueTransport !== "direct" ||
       !object(profile.resource.argument) || !object(profile.resource.result) ||
       !object(profile.receiver) || !object(profile.receiver.default) ||
       !Array.isArray(profile.receiver.globalTypes) ||
@@ -376,6 +386,27 @@ function protocolSemantics(protocol) {
     relation: "unreviewed",
     evidence: relation.kind === "upstream-adapter" ? "upstream-adapter" : "unclassified",
     detail: protocol.reason,
+  };
+}
+
+function hostPolicy(operation, profile) {
+  const positions = [
+    ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
+    ...operation.arguments,
+    operation.result,
+  ];
+  const transportsJavaScriptValue = positions.some((position) =>
+    position.modalities.representation === "js-resource");
+  const relation = operation.protocol?.upstreamRelation;
+  const semanticAdapter = relation?.kind === "upstream-adapter"
+    ? "named"
+    : operation.semantics.relation === "changing" ? "declared" : "none";
+  return {
+    valueTransport: transportsJavaScriptValue
+      ? profile.resource.valueTransport
+      : "not-applicable",
+    semanticAdapter,
+    activeEffect: operation.activeEffect ?? "none",
   };
 }
 
@@ -673,6 +704,7 @@ function propertyOperation(
     arguments: arguments_,
     result,
     semantics: derivedSemantics(exception),
+    ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -888,6 +920,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     arguments: arguments_,
     result,
     semantics: derivedSemantics(exception),
+    ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -1005,6 +1038,9 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     if (operationIds.has(protocol.id)) throw new Error(`generated operation id ${protocol.id} is repeated`);
     if (targets.has(protocol.target)) throw new Error(`generated host target ${protocol.target} is repeated`);
+    if (protocol.activeEffect !== undefined) {
+      validateActiveEffect(protocol.activeEffect, `generated protocol ${protocol.id}`);
+    }
     const root = rootsById.get(protocol.group);
     const relation = protocol.upstreamRelation;
     if (root.upstream.kind === "internal" && relation.kind !== "vir-owned") {
@@ -1127,11 +1163,15 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       arguments: args,
       result,
       semantics: protocolSemantics(protocol),
+      ...(protocol.activeEffect === undefined ? {} : { activeEffect: protocol.activeEffect }),
     });
     operationIds.add(protocol.id);
     targets.add(protocol.target);
   }
-  return operations;
+  return operations.map((operation) => ({
+    ...operation,
+    hostPolicy: hostPolicy(operation, profile),
+  }));
 }
 
 function projectedPortIntent(anchor, operation) {
@@ -1170,6 +1210,7 @@ function modalityContract(operation, profile) {
     arguments: operation.arguments,
     result: operation.result,
     semantics: operation.semantics,
+    hostPolicy: operation.hostPolicy,
     ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
     ...(operation.exception === undefined ? {} : { exception: operation.exception }),
   };

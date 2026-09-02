@@ -1155,6 +1155,19 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     generatedOperations.filter((operation) =>
       operation.semantics?.relation === relation).length,
   ]));
+  const hostPolicies = {
+    exactValueTransport: generatedOperations.filter((operation) =>
+      operation.hostPolicy.valueTransport === "direct").length,
+    namedSemanticAdapters: generatedOperations.filter((operation) =>
+      operation.hostPolicy.semanticAdapter === "named").length,
+    declaredSemanticAdapters: generatedOperations.filter((operation) =>
+      operation.hostPolicy.semanticAdapter === "declared").length,
+    activeEffects: Object.fromEntries(["register", "use", "release"].map((role) => [
+      role,
+      generatedOperations.filter((operation) =>
+        operation.hostPolicy.activeEffect === role).length,
+    ])),
+  };
   const generatedSources = new Set(configs.flatMap((config) =>
     config.generation === undefined ? [] : [config.generation.output]));
   const handwrittenDeclarations = coverage.bindings.flatMap((binding) => binding.declarations)
@@ -1169,6 +1182,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     },
     protocolRelations,
     semanticRelations,
+    hostPolicies,
     disposition: Object.fromEntries(generationDispositions.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
@@ -1299,6 +1313,7 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
+  console.log(`  host policy: ${report.summary.generation.hostPolicies.exactValueTransport} exact-value transports, ${report.summary.generation.hostPolicies.namedSemanticAdapters} named semantic adapters, ${Object.values(report.summary.generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} private active-effect operations`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);
   const unresolvedSemanticMissing = Math.max(

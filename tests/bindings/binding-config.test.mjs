@@ -145,6 +145,27 @@ test("semantic review classifications are fail-closed enums", async () => {
   );
 });
 
+test("ABI profiles require direct JavaScript value transport", async () => {
+  const invalid = structuredClone(browser);
+  invalid.generation.abiProfile.resource.valueTransport = "wrapper";
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /valueTransport.*must be equal to constant/u,
+  );
+});
+
+test("private active-effect roles are fail-closed", async () => {
+  const invalid = structuredClone(browser);
+  invalid.generation.exceptions["browser.animation.requestAnimationFrame"]
+    .activeEffect = "maybe-clean-up";
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /activeEffect.*must be equal to one of the allowed values/u,
+  );
+});
+
 test("the Browser audit classifies every exception and upstream adapter", () => {
   const exceptions = Object.entries(browser.generation.exceptions);
   assert.equal(exceptions.filter(([, exception]) =>
@@ -153,8 +174,6 @@ test("the Browser audit classifies every exception and upstream adapter", () => 
     exceptions.filter(([, exception]) => exception.semantics === "changing")
       .map(([id]) => id).sort(),
     [
-      "browser.animation.cancelAnimationFrame",
-      "browser.animation.requestAnimationFrame",
       "browser.element.addEventListener",
       "browser.element.removeEventListener",
       "browser.event.currentTarget",
@@ -166,15 +185,24 @@ test("the Browser audit classifies every exception and upstream adapter", () => 
     operation.upstreamRelation.kind === "upstream-adapter");
   assert.equal(adapters.filter((operation) =>
     operation.upstreamRelation.semantics === undefined).length, 0);
+  assert.equal(adapters.filter((operation) =>
+    operation.upstreamRelation.semantics === "changing").length, 0);
   assert.deepEqual(
-    adapters.filter((operation) =>
-      operation.upstreamRelation.semantics === "changing")
-      .map((operation) => operation.id).sort(),
     [
-      "browser.timer.clearInterval",
-      "browser.timer.clearTimeout",
-      "browser.timer.setInterval",
-      "browser.timer.setTimeout",
+      ...Object.entries(browser.generation.exceptions),
+      ...browser.generation.protocolOperations.map((operation) =>
+        [operation.id, operation]),
+    ].filter(([, operation]) => operation.activeEffect !== undefined)
+      .map(([id, operation]) => `${id}:${operation.activeEffect}`).sort(),
+    [
+      "browser.animation.cancelAnimationFrame:release",
+      "browser.animation.requestAnimationFrame:register",
+      "browser.element.addEventListener:register",
+      "browser.element.removeEventListener:release",
+      "browser.timer.clearInterval:release",
+      "browser.timer.clearTimeout:release",
+      "browser.timer.setInterval:register",
+      "browser.timer.setTimeout:register",
     ],
   );
 });
@@ -194,7 +222,7 @@ test("the JavaScript collection audit distinguishes direct operations from owner
     adapters.filter((operation) =>
       operation.upstreamRelation.semantics === "changing")
       .map((operation) => operation.id),
-    ["javascript.array.push", "javascript.array.item"],
+    ["javascript.array.item"],
   );
 });
 
@@ -211,10 +239,8 @@ test("the React audit treats direct native values as the preserving exemplar", (
       operation.upstreamRelation.semantics === "changing")
       .map((operation) => operation.id).sort(),
     [
+      "react.hooks.use-effect",
       "react.hooks.use-effect-with-deps",
-      "react.hooks.use-memo",
-      "react.hooks.use-reducer",
-      "react.hooks.use-state",
       "react.props.set-key",
       "react.root.render-tree",
     ],

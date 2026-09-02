@@ -101,6 +101,8 @@ does not make the second use unrepresentable.
 Each generated library has a named `generation.abiProfile` in its
 `Vir/*.bindings.json` configuration. The browser profile currently says:
 
+- every `Js` resource transports the exact JavaScript value; public host
+  wrappers and payload envelopes are not an allowed profile;
 - TypeScript `string` is represented faithfully as `Lean.Vir.Js String`;
 - TypeScript `void` is represented as immediate `Unit`;
 - nullable resources use `Lean.Vir.Js.Nullable`;
@@ -135,6 +137,11 @@ Generation rejects `T | undefined`, `T | null | undefined`, and optional
 properties until their distinct JavaScript semantics have an explicit ABI
 representation.
 
+The required `valueTransport: "direct"` profile field makes this boundary
+machine-readable. It covers ordinary objects, functions, native timer/frame
+tokens, and `null` payloads. Resource liveness and cleanup state stay
+out-of-band; they must not replace the public JavaScript value.
+
 ## Canonical Operation IR
 
 `npm run generate:lean-bindings` creates a canonical operation record for every
@@ -155,6 +162,8 @@ Each operation records:
 - global or argument receiver policy;
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
+- the declared host policy: exact-value transport, named or declared semantic
+  adaptation, and any private active-effect role;
 - provenance for every derived choice;
 - the reason for any explicit exception;
 - a protocol's machine-readable upstream relation.
@@ -264,6 +273,22 @@ An `upstream-adapter` relation also records whether its behavior is
 different question from correspondence: naming an upstream member says what an
 operation relates to, while semantic classification says whether the VIR
 contract preserves or intentionally changes that member's observable behavior.
+
+Operations that need repository-private teardown may additionally declare an
+`activeEffect` role:
+
+- `register` creates a private listener, pending timer/frame, or React-root
+  teardown record;
+- `use` operates through an existing private record without replacing the
+  public JavaScript value;
+- `release` removes the record and performs the corresponding upstream
+  cancellation or unmount.
+
+These roles describe policy that provider tests must exercise. They do not
+change value transport and do not claim that provider behavior is mechanically
+verified. Passive JavaScript values and React hook/node values have no
+active-effect role; JavaScript reachability and official React own their normal
+lifetime.
 
 ## Documentation Flow
 

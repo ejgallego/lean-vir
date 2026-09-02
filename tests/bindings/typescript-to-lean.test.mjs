@@ -33,6 +33,7 @@ const generation = {
     resource: {
       constructor: "Lean.Vir.Js",
       nullableConstructor: "Lean.Vir.Js.Nullable",
+      valueTransport: "direct",
       argument: { passing: "borrowed", retention: "call" },
       result: { ownership: "owned" },
     },
@@ -185,6 +186,11 @@ test("operation IR records derived modalities and their provenance", () => {
     evidence: "typescript-derived",
     detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
+  assert.deepEqual(getter.hostPolicy, {
+    valueTransport: "direct",
+    semanticAdapter: "none",
+    activeEffect: "none",
+  });
 });
 
 test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
@@ -275,6 +281,11 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     relation: "unreviewed",
     evidence: "upstream-adapter",
     detail: protocolGeneration.protocolOperations[0].reason,
+  });
+  assert.deepEqual(operation.hostPolicy, {
+    valueTransport: "direct",
+    semanticAdapter: "named",
+    activeEffect: "none",
   });
 
   const reviewedProtocol = structuredClone(protocolGeneration);

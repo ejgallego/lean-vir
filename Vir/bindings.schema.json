@@ -84,6 +84,7 @@
         "marker": { "enum": ["vir_js", "vir_js_explicit_conversion"] },
         "reason": { "type": "string", "minLength": 1 },
         "upstreamRelation": { "$ref": "#/$defs/protocolUpstreamRelation" },
+        "activeEffect": { "enum": ["register", "use", "release"] },
         "documentation": { "type": "string", "minLength": 1 },
         "typeParameters": {
           "type": "array",
@@ -248,10 +249,11 @@
         "resource": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["constructor", "nullableConstructor", "argument", "result"],
+          "required": ["constructor", "nullableConstructor", "valueTransport", "argument", "result"],
           "properties": {
             "constructor": { "type": "string", "minLength": 1 },
             "nullableConstructor": { "type": "string", "minLength": 1 },
+            "valueTransport": { "const": "direct" },
             "argument": { "$ref": "#/$defs/passingRetention" },
             "result": {
               "type": "object",
@@ -330,6 +332,7 @@
       ],
       "properties": {
         "reason": { "type": "string", "minLength": 1 },
+        "activeEffect": { "enum": ["register", "use", "release"] },
         "semantics": { "$ref": "#/$defs/upstreamSemantics" },
         "receiver": { "$ref": "#/$defs/receiverOverride" },
         "arguments": {

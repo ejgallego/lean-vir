@@ -147,6 +147,19 @@ assert.deepEqual(report.summary.generation, {
     "vir-owned",
     "local-contract",
   ].map((relation) => [relation, semanticRelationCounts[relation] ?? 0])),
+  hostPolicies: {
+    exactValueTransport: generatedOperations.filter((operation) =>
+      operation.hostPolicy.valueTransport === "direct").length,
+    namedSemanticAdapters: generatedOperations.filter((operation) =>
+      operation.hostPolicy.semanticAdapter === "named").length,
+    declaredSemanticAdapters: generatedOperations.filter((operation) =>
+      operation.hostPolicy.semanticAdapter === "declared").length,
+    activeEffects: Object.fromEntries(["register", "use", "release"].map((role) => [
+      role,
+      generatedOperations.filter((operation) =>
+        operation.hostPolicy.activeEffect === role).length,
+    ])),
+  },
   disposition: {
     generated: dispositionCounts.generated ?? 0,
     adapted: dispositionCounts.adapted ?? 0,
@@ -173,6 +186,10 @@ assert.equal(
 );
 assert.equal(report.summary.generation.semanticRelations.unreviewed, 0);
 assert.ok(report.summary.generation.semanticRelations.changing > 0);
+assert.ok(report.summary.generation.hostPolicies.exactValueTransport > 0);
+assert.ok(report.summary.generation.hostPolicies.namedSemanticAdapters > 0);
+assert.ok(Object.values(report.summary.generation.hostPolicies.activeEffects)
+  .every((count) => count > 0));
 assert.equal(
   generatedOperations.find((operation) =>
     operation.id === "infoview.clipboard.write-text")?.semantics.relation,
@@ -363,6 +380,11 @@ assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
 assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
 assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
 assert.equal(generatedAddEventListener?.semantics.relation, "changing");
+assert.deepEqual(generatedAddEventListener?.hostPolicy, {
+  valueTransport: "direct",
+  semanticAdapter: "declared",
+  activeEffect: "register",
+});
 assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
 assert.deepEqual(
   generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
@@ -370,6 +392,7 @@ assert.deepEqual(
 );
 assert.equal(generatedRemoveEventListener?.arguments[0].modalities.passing, "consumed");
 assert.equal(generatedRemoveEventListener?.semantics.relation, "changing");
+assert.equal(generatedRemoveEventListener?.hostPolicy.activeEffect, "release");
 assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);
