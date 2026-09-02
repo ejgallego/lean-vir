@@ -58,10 +58,6 @@ function parseArgs(argv) {
   return { configs, configDirs, check };
 }
 
-function nonemptyString(value) {
-  return typeof value === "string" && value.length !== 0;
-}
-
 function validateGenerationConfig(config, configPath) {
   const label = relative(repositoryRoot, configPath);
   const generation = config?.generation;
@@ -71,9 +67,6 @@ function validateGenerationConfig(config, configPath) {
   validateGenerationProfile(generation, `${label} generation`);
   if (new Set(generation.members).size !== generation.members.length) {
     throw new Error(`${label} repeats a generated TypeScript member`);
-  }
-  if (!Object.values(generation.resources).every(nonemptyString)) {
-    throw new Error(`${label} generation resources must map to Lean names`);
   }
   for (const name of generation.namespace.split(".")) {
     validateLeanIdentifier(name, `${label} generation namespace`);
@@ -122,6 +115,39 @@ function leanDocText(value) {
   return String(value ?? "").replaceAll("-/", "- /").trim();
 }
 
+function semanticSubject(operation) {
+  const upstream = operation.protocol?.upstreamRelation.member;
+  if (upstream !== undefined) return `TypeScript \`${upstream}\``;
+  if (operation.typescript.kind !== "protocol") {
+    return `TypeScript \`${operation.typescript.member}\``;
+  }
+  return `unclassified VIR protocol \`${operation.typescript.member}\``;
+}
+
+function semanticDocumentation(operation, operationLabel) {
+  const relation = operation.semantics.relation;
+  const subject = semanticSubject(operation);
+  if (relation === "changing") {
+    return {
+      headline: `Generated explicit ${operationLabel} semantic adapter for ${subject}.`,
+      note: `Adapter policy: ${leanDocText(operation.semantics.detail)}`,
+    };
+  }
+  if (relation === "unreviewed") {
+    return {
+      headline: `Generated ${operationLabel} boundary for ${subject}, awaiting semantic review.`,
+      note: `Semantic review required: ${leanDocText(operation.semantics.detail)}`,
+    };
+  }
+  if (operation.semantics.evidence === "reviewed-method-policy") {
+    return { note: `Call policy: ${leanDocText(operation.semantics.detail)}` };
+  }
+  if (operation.exception !== undefined) {
+    return { note: `Specialization policy: ${leanDocText(operation.semantics.detail)}` };
+  }
+  return null;
+}
+
 function renderOperation(operation, profile) {
   const args = [
     ...(operation.receiver.kind === "argument" ? [operation.receiver.argument] : []),
@@ -136,28 +162,31 @@ function renderOperation(operation, profile) {
       : operation.typescript.kind === "protocol"
         ? "protocol operation"
       : operation.typescript.accessor === "get" ? "getter" : "setter";
+  const semanticDoc = semanticDocumentation(operation, operationLabel);
   const upstreamDocumentation = leanDocText(operation.typescript.documentation);
+  const distinctUpstreamDocumentation = upstreamDocumentation ===
+      leanDocText(operation.semantics.detail) && semanticDoc?.note !== undefined
+    ? ""
+    : upstreamDocumentation;
   const publicDocumentation = leanDocText([
-    operation.typescript.kind === "protocol"
+    semanticDoc?.headline ?? (operation.typescript.kind === "protocol"
       ? `Generated binding for reviewed VIR protocol \`${operation.typescript.member}\`.`
+      : operation.semantics.evidence === "reviewed-method-policy"
+        ? `Generated reviewed ${operationLabel} call policy for TypeScript \`${operation.typescript.member}\`.`
       : specialized
         ? `Generated reviewed ${operationLabel} specialization of TypeScript \`${operation.typescript.member}\`.`
-        : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`,
-    upstreamDocumentation,
+        : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`),
+    distinctUpstreamDocumentation,
+    semanticDoc?.note,
     operation.typescript.kind === "protocol"
       ? "Binding contract: `generation.protocolOperations`."
       : `Upstream declaration: ${source}`,
   ].filter(Boolean).join("\n\n"));
   const marker = operation.host.marker ?? "vir_js";
   const typeParameters = operation.typeParameters ?? [];
-  const boundarySummary = operation.typescript.kind === "protocol"
-    ? "Generated reviewed VIR protocol boundary."
-    : specialized
-      ? `Generated reviewed JavaScript boundary specialization for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`
-      : `Generated faithful JavaScript boundary for the TypeScript \`${operation.typescript.member}\` ${operationLabel}.`;
   return {
     namespace: operation.lean.namespace,
-    text: `/--\n${publicDocumentation}\n\n${boundarySummary}\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, "opaque ")}`,
+    text: `/--\n${publicDocumentation}\n\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, "opaque ")}`,
   };
 }
 

@@ -10,6 +10,7 @@ import { join, relative, resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { repositoryRoot } from "../repository-paths.mjs";
+import { validateGenerationProfile } from "./binding-modalities.mjs";
 
 const schemaPath = resolve(repositoryRoot, "Vir/bindings.schema.json");
 let validatorPromise = null;
@@ -40,6 +41,7 @@ function validationMessage(label, errors) {
 }
 
 function validateLibrarySemantics(config, label) {
+  validateGenerationProfile(config.generation, `${label} generation`);
   const rootIds = new Set();
   const generated = new Set(config.generation?.members ?? []);
   for (const member of Object.keys(config.generation?.methodPolicies ?? {})) {

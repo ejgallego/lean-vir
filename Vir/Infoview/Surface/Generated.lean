@@ -20,7 +20,6 @@ Constructs the fixed host-side document-position record used by editor commands.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-infoview-protocol-v1`: receiver none; uri js-resource/borrowed/call; fileName js-resource/borrowed/call; line js-resource/borrowed/call; character js-resource/borrowed/call; label js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -39,13 +38,12 @@ end Infoview
 namespace Infoview.Clipboard
 
 /--
-Generated binding for reviewed VIR protocol `infoview.clipboard.write-text`.
+Generated explicit protocol operation semantic adapter for TypeScript `Clipboard.writeText`.
 
-Adapts Clipboard.writeText to the infoview capability protocol, returning false when unavailable or rejected.
+Adapter policy: Adapts Clipboard.writeText to the infoview capability protocol. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-infoview-protocol-v1`: receiver none; text js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -66,7 +64,6 @@ Dispatches the local editor reveal-position capability and reports whether a dis
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -83,7 +80,6 @@ Dispatches the local editor insert-text capability and reports whether it was ap
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.

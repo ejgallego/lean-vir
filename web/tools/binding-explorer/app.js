@@ -8,16 +8,16 @@ const report = JSON.parse(document.querySelector("#report-data").textContent);
 const generation = report.summary.generation;
 
 document.querySelector("#catalog-metric").textContent = String(
-  Object.values(generation.availability).reduce((sum, count) => sum + count, 0),
+  Object.values(generation.semanticCoverage).reduce((sum, count) => sum + count, 0),
 );
-document.querySelector("#available-metric").textContent = String(
-  generation.availability.available,
+document.querySelector("#faithful-metric").textContent = String(
+  generation.semanticCoverage.faithful,
+);
+document.querySelector("#adapter-metric").textContent = String(
+  generation.semanticCoverage["adapter-only"],
 );
 document.querySelector("#generated-metric").textContent = String(
   generation.boundaries.targets,
-);
-document.querySelector("#direct-metric").textContent = String(
-  generation.boundaries.typescriptDerived,
 );
 document.querySelector("#work-metric").textContent = String(generation.workItems);
 document.querySelector("#work-card").classList.add(
@@ -39,6 +39,12 @@ document.querySelector("#scope").replaceChildren(
     `${generation.protocolRelations.virOwned} VIR-owned operations, ` +
     `${generation.protocolRelations.localContracts} local-contract operations, ` +
     `${generation.protocolRelations.unclassified} unclassified). ` +
+    `${generation.semanticRelations.preserving} contracts claim semantics preservation, ` +
+    `${generation.semanticRelations.changing} are explicit semantic adapters, and ` +
+    `${generation.semanticRelations.unreviewed} require semantic review. ` +
+    "All JavaScript resources use the required direct-value transport, and " +
+    `${Object.values(generation.activeEffects).reduce((sum, count) => sum + count, 0)} ` +
+    "operations register, use, or release private active-effect teardown records. " +
     "Provider behavior is not mechanically verified by this name reconciliation. " +
     "Unselected upstream entries are documentation coverage, not binding defects.",
   ),
@@ -126,11 +132,45 @@ const dispositionLabel = (value) => ({
   unsupported: "unsupported",
   "not-selected": "not selected",
 })[value] ?? value;
-const availabilityLabel = (value) => ({
-  available: "VIR binding available",
-  candidate: "correspondence not confirmed",
-  "not-provided": "not provided",
-})[value] ?? value;
+const semanticCoverageDefinitions = new Map([
+  ["faithful", {
+    filter: "Has faithful boundary",
+    badge: "faithful boundary available",
+    summary: "with faithful boundary",
+  }],
+  ["adapter-only", {
+    filter: "Adapter only",
+    badge: "explicit adapter only",
+    summary: "adapter only",
+  }],
+  ["unreviewed", {
+    filter: "Semantic review required",
+    badge: "semantic review required",
+    summary: "unreviewed",
+  }],
+  ["local-contract", {
+    filter: "Local contracts",
+    badge: "local contract",
+    summary: "local contract",
+  }],
+  ["candidate", {
+    filter: "Unconfirmed candidates",
+    badge: "correspondence not confirmed",
+    summary: "candidate",
+  }],
+  ["not-provided", {
+    filter: "Not provided",
+    badge: "not provided",
+    summary: "not provided",
+  }],
+]);
+const semanticCoverageLabel = (value) =>
+  semanticCoverageDefinitions.get(value)?.badge ?? value;
+const semanticCoverageSummary = (coverage) => Object.entries(coverage)
+  .filter(([, count]) => count !== 0)
+  .map(([status, count]) =>
+    `${count} ${semanticCoverageDefinitions.get(status)?.summary ?? status}`)
+  .join(" · ");
 const evidenceLabel = (value) => ({
   exact: "exact comparator match",
   compatible: "comparator-compatible",
@@ -155,6 +195,37 @@ const boundaryEvidenceLabel = (value) => ({
   "local-contract": "local contract protocol",
   unclassified: "unclassified protocol",
 })[value] ?? value;
+const semanticRelation = (operation) => operation?.semantics?.relation ?? "unreviewed";
+const semanticRelationDefinitions = new Map([
+  ["preserving", {
+    filter: "Semantics-preserving",
+    badge: "semantics-preserving contract",
+  }],
+  ["changing", {
+    filter: "Explicit semantic adapters",
+    badge: "explicit semantic adapter",
+  }],
+  ["unreviewed", {
+    filter: "Semantic review required",
+    badge: "semantic review required",
+  }],
+  ["vir-owned", {
+    filter: "VIR-owned semantics",
+    badge: "VIR-owned semantics",
+  }],
+  ["local-contract", {
+    filter: "Local contract semantics",
+    badge: "local contract semantics",
+  }],
+]);
+const semanticRelationLabel = (value) =>
+  semanticRelationDefinitions.get(value)?.badge ?? value;
+
+function operationsForSymbol(group, symbol) {
+  return (group.generatedOperations ?? []).filter((operation) =>
+    operation.typescript.member === symbol.id ||
+    operation.protocol?.upstreamRelation.member === symbol.id);
+}
 
 const librarySelect = document.querySelector("#library");
 for (const library of report.libraries) {
@@ -188,8 +259,9 @@ const workById = new Map(workItems.map((item) => [item.id, item]));
 const elements = Object.fromEntries([
   "search",
   "library",
-  "availability",
+  "coverage",
   "boundary",
+  "semantics",
   "disposition",
   "count",
   "results",
@@ -199,6 +271,14 @@ const elements = Object.fromEntries([
   "inventory-view",
   "workbench-view",
 ].map((id) => [id, document.querySelector("#" + id)]));
+for (const status of Object.keys(generation.semanticCoverage)) {
+  const label = semanticCoverageDefinitions.get(status)?.filter ?? status;
+  elements.coverage.add(new Option(label, status));
+}
+for (const relation of Object.keys(generation.semanticRelations)) {
+  const label = semanticRelationDefinitions.get(relation)?.filter ?? relation;
+  elements.semantics.add(new Option(label, relation));
+}
 
 const typeBrowserOptionValues = {
   boundaryNotes: new Set(["show", "hide"]),
@@ -261,8 +341,9 @@ function groupId(group) {
 
 function primarySymbols(group) {
   const roots = new Set(group.upstream.roots ?? []);
+  const covered = new Set((group.coverage?.members ?? []).map((member) => member.id));
   return (group.typescript?.symbols ?? []).filter((symbol) =>
-    roots.has(symbol.id) || symbol.surfaceRoot !== undefined);
+    roots.has(symbol.id) || symbol.surfaceRoot !== undefined || covered.has(symbol.id));
 }
 
 function coverageMember(group, id) {
@@ -285,12 +366,12 @@ function groupSearchText(group) {
 
 function referenceGroupMatches(group) {
   const query = elements.search.value.trim().toLowerCase();
-  const availability = elements.availability.value;
+  const coverage = elements.coverage.value;
   const library = elements.library.value;
   const members = group.coverage?.members ?? [];
   return (library === "all" || group.library.id === library) &&
-    (availability === "all" || members.some((member) =>
-      member.generation.availability === availability)) &&
+    (coverage === "all" || members.some((member) =>
+      member.generation.semanticCoverage.status === coverage)) &&
     (!query || groupSearchText(group).includes(query));
 }
 
@@ -298,8 +379,10 @@ function inventoryTargetMatches(target) {
   const query = elements.search.value.trim().toLowerCase();
   const library = elements.library.value;
   const evidence = boundaryEvidence(target.operation);
+  const relation = semanticRelation(target.operation);
   return (library === "all" || target.group.library.id === library) &&
     (elements.boundary.value === "all" || evidence === elements.boundary.value) &&
+    (elements.semantics.value === "all" || relation === elements.semantics.value) &&
     (!query || searchText([
       target.target,
       target.group.library.title,
@@ -334,8 +417,9 @@ function render() {
   elements["reference-view"].classList.toggle("active", view === "reference");
   elements["inventory-view"].classList.toggle("active", view === "inventory");
   elements["workbench-view"].classList.toggle("active", view === "workbench");
-  elements.availability.hidden = view !== "reference";
+  elements.coverage.hidden = view !== "reference";
   elements.boundary.hidden = view !== "inventory";
+  elements.semantics.hidden = view !== "inventory";
   elements.disposition.hidden = view !== "workbench";
   if (view === "reference") renderReference();
   else if (view === "inventory") renderInventory();
@@ -352,14 +436,12 @@ function renderReference() {
     ? '<div class="empty">No upstream API groups match these filters.</div>'
     : visible.map((group) => {
       const id = groupId(group);
-      const availability = group.coverage?.generation.availability ?? {};
+      const coverage = group.coverage?.generation.semanticCoverage ?? {};
       return '<button type="button" class="row ' + (id === selected ? "active" : "") +
         '" data-group="' + escapeHtml(id) + '"><span><span class="name">' +
         escapeHtml(group.library.title + " · " + group.title) +
-        '</span><span class="sub">' + (availability.available ?? 0) + " confirmed · " +
-        (availability.candidate ?? 0) + " unconfirmed · " +
-        (availability["not-provided"] ?? 0) +
-        ' not provided</span></span><span class="pill available">upstream API</span></button>';
+        '</span><span class="sub">' + escapeHtml(semanticCoverageSummary(coverage)) +
+        '</span></span><span class="pill faithful">upstream API</span></button>';
     }).join("");
   elements.results.querySelectorAll("[data-group]").forEach((button) =>
     button.addEventListener("click", () => selectGroup(button.dataset.group)));
@@ -377,12 +459,15 @@ function renderInventory() {
     ? '<div class="empty">No shipped boundaries match these filters.</div>'
     : visible.map((target) => {
       const evidence = boundaryEvidence(target.operation);
+      const relation = semanticRelation(target.operation);
       return '<button type="button" class="row ' + (target.target === selected ? "active" : "") +
         '" data-target="' + escapeHtml(target.target) + '"><span><span class="name">' +
         escapeHtml(target.target) + '</span><span class="sub">' +
         escapeHtml(target.group.library.title + " · " + target.group.title) +
-        '</span></span><span class="pill ' + escapeHtml(evidence) + '">' +
-        escapeHtml(boundaryEvidenceLabel(evidence)) + "</span></button>";
+        '</span></span><span class="row-badges"><span class="pill ' + escapeHtml(evidence) + '">' +
+        escapeHtml(boundaryEvidenceLabel(evidence)) + '</span><span class="pill ' +
+        escapeHtml(relation) + '">' + escapeHtml(semanticRelationLabel(relation)) +
+        "</span></span></button>";
     }).join("");
   elements.results.querySelectorAll("[data-target]").forEach((button) =>
     button.addEventListener("click", () => selectTarget(button.dataset.target)));
@@ -517,12 +602,12 @@ function renderSemanticLeanType(value, provenance = []) {
 }
 
 const modalityDescriptions = {
-  "js-resource": "A JavaScript value represented by an opaque Lean resource handle.",
+  "js-resource": "The exact JavaScript value, rooted behind Lean's opaque Js marker.",
   immediate: "An immediate Lean value; no JavaScript resource handle is involved.",
   callback: "A Lean callback crossing the JavaScript boundary.",
   borrowed: "Borrowed by the host for this boundary call.",
-  owned: "Ownership transfers across this boundary.",
-  consumed: "The runtime takes this handle and dynamically revokes its aliases after the call; Lean does not enforce affine use.",
+  owned: "Passed as an owned Lean argument; ordinary JavaScript aliases remain unchanged.",
+  consumed: "A terminal operation takes this Lean argument and may clear private effect state; JavaScript aliases are not revoked and Lean does not enforce affine use.",
   call: "The host may retain this value only for the duration of the call.",
   "until-release": "The host retains this value until the matching release operation.",
   retained: "The host retains this value after the call.",
@@ -818,7 +903,7 @@ function renderLeanCards(targetIds, {
 
 function symbolMatchesReferenceFilters(group, symbol) {
   const member = coverageMember(group, symbol.id);
-  const availability = elements.availability.value;
+  const coverage = elements.coverage.value;
   const query = elements.search.value.trim().toLowerCase();
   const groupHeaderMatches = query && searchText([
     group.library.title,
@@ -826,7 +911,7 @@ function symbolMatchesReferenceFilters(group, symbol) {
     group.description,
     group.upstream.roots,
   ]).includes(query);
-  return (availability === "all" || member?.generation.availability === availability) &&
+  return (coverage === "all" || member?.generation.semanticCoverage.status === coverage) &&
     (!query || groupHeaderMatches || searchText([symbol.id, symbol.display, symbol.hover]).includes(query));
 }
 
@@ -847,7 +932,10 @@ function renderOperationPolicy(operation) {
   const signature = operation.typescript.signaturePolicy;
   return '<article><div class="card-head"><span class="card-title">' +
     escapeHtml(operation.host.target) + '</span><span class="badge">' +
-    escapeHtml(operation.effect.id) + '</span></div><div class="policy-flow"><span>' +
+    escapeHtml(operation.effect.id) + '</span><span class="pill ' +
+    escapeHtml(semanticRelation(operation)) + '">' +
+    escapeHtml(semanticRelationLabel(semanticRelation(operation))) +
+    '</span></div><div class="policy-flow"><span>' +
     escapeHtml(operation.protocol?.upstreamRelation.member ?? operation.typescript.member) +
     '</span><span aria-hidden="true">→</span><span>' +
     escapeHtml(operation.lean.declaration) + '</span></div><ul><li>' +
@@ -868,12 +956,23 @@ function renderOperationPolicy(operation) {
 }
 
 function renderGenerationPolicy(group, symbol) {
-  const operations = (group.generatedOperations ?? []).filter((operation) =>
-    operation.typescript.member === symbol.id ||
-    operation.protocol?.upstreamRelation.member === symbol.id);
+  const operations = operationsForSymbol(group, symbol);
   if (operations.length === 0) return "";
   return '<details class="generation-policy"><summary>Generated conversion policy</summary>' +
     operations.map(renderOperationPolicy).join("") + "</details>";
+}
+
+function leanPaneTitle(semanticCoverage) {
+  if (semanticCoverage?.status === "faithful" &&
+      semanticCoverage.relations?.includes("changing")) {
+    return "Lean boundaries and explicit adapters";
+  }
+  return ({
+    faithful: "Faithful Lean boundary",
+    "adapter-only": "Explicit Lean semantic adapter",
+    unreviewed: "Lean boundary — semantic review required",
+    "local-contract": "Repository-local Lean contract",
+  })[semanticCoverage?.status] ?? "Lean boundary";
 }
 
 function renderUpstreamSymbol(group, symbol) {
@@ -882,23 +981,25 @@ function renderUpstreamSymbol(group, symbol) {
   const inherited = symbol.inheritedFrom
     ? '<span class="badge">inherited from ' + escapeHtml(symbol.inheritedFrom) + "</span>"
     : "";
-  const availability = state
-    ? '<span class="pill ' + escapeHtml(state.availability) + '">' +
-      escapeHtml(availabilityLabel(state.availability)) + "</span>"
+  const coverage = state?.semanticCoverage
+    ? '<span class="pill ' + escapeHtml(state.semanticCoverage.status) + '">' +
+      escapeHtml(semanticCoverageLabel(state.semanticCoverage.status)) + "</span>"
     : "";
   const evidence = member
     ? '<span class="pill ' + escapeHtml(member.status) + '">' +
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
-  const lean = state?.availability === "available"
+  const relation = state?.semanticCoverage.status;
+  const lean = state !== undefined && !["candidate", "not-provided"].includes(relation)
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
-      renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">Faithful Lean binding</div>' +
+      renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
+      escapeHtml(leanPaneTitle(state.semanticCoverage)) + '</div>' +
       renderLeanCards(state.targets) + "</div></div>"
     : renderCode(symbol.display, "typescript") +
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
-    availability + " " + evidence + '</summary><div class="card-head">' +
+    coverage + " " + evidence + '</summary><div class="card-head">' +
     renderDocumentation(symbol.hover) +
     symbolSource(symbol) + "</div>" + lean + renderGenerationPolicy(group, symbol) + "</details>";
 }
@@ -915,7 +1016,7 @@ function renderGroupDetail(group) {
     : "";
   const symbols = primarySymbols(group).filter((symbol) =>
     symbolMatchesReferenceFilters(group, symbol));
-  elements.detail.innerHTML = '<div class="badges"><span class="pill available">upstream API</span>' +
+  elements.detail.innerHTML = '<div class="badges"><span class="pill faithful">upstream API</span>' +
     upstream.map((value) => '<span class="badge">' + escapeHtml(value) + "</span>").join("") +
     "</div><h2>" + escapeHtml(group.title) + '</h2><p class="note">' +
     escapeHtml(group.description || group.library.description) + "</p>" + docs +
@@ -1025,6 +1126,8 @@ function renderGenerationDecisions(operation) {
       '<p class="note">No canonical generated operation was recorded.</p></section>';
   }
   const decisions = [
+    "Semantic relation: " + semanticRelationLabel(semanticRelation(operation)) +
+      " (" + operation.semantics.evidence + ")",
     signaturePolicySummary(operation.typescript.signaturePolicy),
     operation.protocol === undefined
       ? undefined
@@ -1033,6 +1136,9 @@ function renderGenerationDecisions(operation) {
     operation.exception === undefined
       ? undefined
       : "Reviewed specialization: " + operation.exception.reason,
+    operation.activeEffect === undefined
+      ? undefined
+      : "Private active-effect teardown: " + operation.activeEffect,
   ].filter(Boolean);
   return '<section class="evidence-unit"><h4>Generation decisions</h4>' +
     (decisions.length
@@ -1079,6 +1185,7 @@ function renderInventoryDetail(target) {
   }
   const operation = target.operation;
   const evidence = boundaryEvidence(operation);
+  const relation = semanticRelation(operation);
   const upstreamMember = operation?.protocol?.upstreamRelation.member ??
     (operation?.typescript.kind === "protocol" ? undefined : operation?.typescript.member);
   const symbol = upstreamMember === undefined
@@ -1086,7 +1193,8 @@ function renderInventoryDetail(target) {
     : target.group.typescript?.symbols.find((entry) => entry.id === upstreamMember);
   elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
     escapeHtml(evidence) + '">' + escapeHtml(boundaryEvidenceLabel(evidence)) +
-    "</span>" + (target.status === "provided"
+    '</span><span class="pill ' + escapeHtml(relation) + '">' +
+    escapeHtml(semanticRelationLabel(relation)) + "</span>" + (target.status === "provided"
       ? ""
       : '<span class="pill ' + escapeHtml(target.status) + '">' +
         escapeHtml(target.status) + "</span>") + "</div><h2>" + escapeHtml(target.target) +
@@ -1154,7 +1262,7 @@ function renderWorkItem(item) {
     selectGroup(item.library + "/" + item.group));
 }
 
-[elements.search, elements.library, elements.availability, elements.boundary, elements.disposition].forEach((element) =>
+[elements.search, elements.library, elements.coverage, elements.boundary, elements.semantics, elements.disposition].forEach((element) =>
   element.addEventListener(element === elements.search ? "input" : "change", render));
 elements["reference-view"].addEventListener("click", () =>
   selectGroup(groupById.has(selected) ? selected : groupId(referenceGroups[0])));

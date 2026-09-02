@@ -1,6 +1,6 @@
 {
   "$schema": "../bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "proofwidgets",
   "title": "ProofWidgets RPC",
   "description": "ProofWidgets reference transport and inspection calls implemented by the VIR host.",
@@ -19,7 +19,7 @@
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
-      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
     "members": [],

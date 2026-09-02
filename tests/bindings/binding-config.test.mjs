@@ -20,6 +20,7 @@ const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
+  assert.equal(loaded.version, 2);
   assert.equal(loaded.id, "browser");
   assert.equal(loaded.path, "Vir/Browser.bindings.json");
 });
@@ -120,6 +121,77 @@ test("reviewed protocols require a machine-readable upstream relation", async ()
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
     /must have required property 'upstreamRelation'/u,
+  );
+});
+
+test("semantic review classifications are fail-closed enums", async () => {
+  const invalidProtocol = structuredClone(browser);
+  invalidProtocol.generation.protocolOperations.find((operation) =>
+    operation.upstreamRelation.kind === "upstream-adapter")
+    .upstreamRelation.semantics = "probably close enough";
+  await assert.rejects(
+    validateBindingConfig(invalidProtocol, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+
+  const invalidException = structuredClone(browser);
+  Object.values(invalidException.generation.exceptions)[0].semantics = "unknown";
+  await assert.rejects(
+    validateBindingConfig(invalidException, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+
+  const invalidMethodPolicy = structuredClone(browser);
+  invalidMethodPolicy.generation.methodPolicies["CanvasRenderingContext2D.arc"].semantics = "close";
+  await assert.rejects(
+    validateBindingConfig(invalidMethodPolicy, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+
+  const missingMethodReason = structuredClone(browser);
+  delete missingMethodReason.generation.methodPolicies["CanvasRenderingContext2D.arc"].reason;
+  await assert.rejects(
+    validateBindingConfig(missingMethodReason, browserPath),
+    /must have property reason when property semantics is present/u,
+  );
+
+  const missingGlobalReason = structuredClone(browser);
+  delete missingGlobalReason.generation.abiProfile.receiver.globalTypes.Document.reason;
+  await assert.rejects(
+    validateBindingConfig(missingGlobalReason, browserPath),
+    /must have required property 'reason'/u,
+  );
+
+  const implicitResourceAlias = structuredClone(browser);
+  implicitResourceAlias.generation.resources.KeyboardEvent = "Event";
+  await assert.rejects(
+    validateBindingConfig(implicitResourceAlias, browserPath),
+    /changes the TypeScript marker and requires lean, semantics, and reason/u,
+  );
+
+  const sameLeafResourceAlias = structuredClone(browser);
+  sameLeafResourceAlias.generation.resources.Element = "Unrelated.Namespace.Element";
+  await assert.rejects(
+    validateBindingConfig(sameLeafResourceAlias, browserPath),
+    /changes the TypeScript marker and requires lean, semantics, and reason/u,
+  );
+
+  const previousFormat = structuredClone(browser);
+  previousFormat.version = 1;
+  await assert.rejects(
+    validateBindingConfig(previousFormat, browserPath),
+    /version.*must be equal to constant/u,
+  );
+});
+
+test("private active-effect roles are fail-closed", async () => {
+  const invalid = structuredClone(browser);
+  invalid.generation.exceptions["browser.animation.requestAnimationFrame"]
+    .activeEffect = "maybe-clean-up";
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /activeEffect.*must be equal to one of the allowed values/u,
   );
 });
 

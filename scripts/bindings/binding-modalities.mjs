@@ -36,6 +36,49 @@ function validateRetention(value, context) {
   }
 }
 
+function validateUpstreamSemantics(value, context) {
+  if (!["preserving", "changing"].includes(value)) {
+    throw new Error(`${context} semantics must be preserving or changing`);
+  }
+}
+
+function validateActiveEffect(value, context) {
+  if (!["register", "use", "release"].includes(value)) {
+    throw new Error(`${context} activeEffect must be register, use, or release`);
+  }
+}
+
+function validateSemanticPolicy(value, context, additionalFields = []) {
+  if (!object(value) || !nonemptyString(value.reason)) {
+    throw new Error(`${context} must define semantics and reason`);
+  }
+  validateKeys(value, ["semantics", "reason", ...additionalFields], context);
+  validateUpstreamSemantics(value.semantics, context);
+}
+
+function resourceMapping(generation, id, context = `generation resource ${id}`) {
+  const mapping = generation.resources?.[id];
+  if (typeof mapping === "string") {
+    if (!nonemptyString(mapping) || mapping !== id) {
+      throw new Error(
+        `${context} changes the TypeScript marker and requires lean, semantics, and reason`,
+      );
+    }
+    return {
+      lean: mapping,
+      semantics: "preserving",
+      reason: `${mapping} preserves the TypeScript ${id} phantom marker.`,
+      explicit: false,
+    };
+  }
+  if (mapping === undefined) return null;
+  if (!object(mapping) || !nonemptyString(mapping.lean)) {
+    throw new Error(`${context} must define a Lean marker`);
+  }
+  validateSemanticPolicy(mapping, context, ["lean"]);
+  return { ...mapping, explicit: true };
+}
+
 function validateKeys(value, allowed, context) {
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) throw new Error(`${context} has unsupported field ${key}`);
@@ -84,7 +127,17 @@ function validateException(exception, context) {
   if (!object(exception) || !nonemptyString(exception.reason)) {
     throw new Error(`${context} requires a reason`);
   }
-  validateKeys(exception, ["reason", "receiver", "arguments", "result", "effect"], context);
+  validateKeys(
+    exception,
+    ["reason", "semantics", "activeEffect", "receiver", "arguments", "result", "effect"],
+    context,
+  );
+  if (exception.semantics !== undefined) {
+    validateUpstreamSemantics(exception.semantics, context);
+  }
+  if (exception.activeEffect !== undefined) {
+    validateActiveEffect(exception.activeEffect, context);
+  }
   if (!["receiver", "arguments", "result", "effect"].some((key) => exception[key] !== undefined)) {
     throw new Error(`${context} must define an override`);
   }
@@ -130,12 +183,16 @@ export function validateGenerationProfile(generation, context = "generation") {
       !nonemptyString(profile.resource.nullableConstructor) ||
       !object(profile.resource.argument) || !object(profile.resource.result) ||
       !object(profile.receiver) || !object(profile.receiver.default) ||
-      !Array.isArray(profile.receiver.globalTypes) ||
-      !profile.receiver.globalTypes.every(nonemptyString)) {
+      !object(profile.receiver.globalTypes) || !object(generation.resources)) {
     throw new Error(`${context} does not define a valid ABI profile`);
   }
-  if (new Set(profile.receiver.globalTypes).size !== profile.receiver.globalTypes.length) {
-    throw new Error(`${context} ABI profile repeats a global receiver type`);
+  for (const [name, policy] of Object.entries(profile.receiver.globalTypes)) {
+    if (!nonemptyString(name)) throw new Error(`${context} global receiver type is empty`);
+    validateSemanticPolicy(policy, `${context} global receiver ${name}`);
+  }
+  for (const id of Object.keys(generation.resources)) {
+    if (!nonemptyString(id)) throw new Error(`${context} resource type is empty`);
+    resourceMapping(generation, id, `${context} resource ${id}`);
   }
   for (const [name, type] of Object.entries(profile.types)) {
     if (!object(type) || !nonemptyString(type.lean) ||
@@ -168,6 +225,8 @@ export function validateGenerationProfile(generation, context = "generation") {
         "fixedRestParameters",
         "fixedArguments",
         "parameterRenames",
+        "semantics",
+        "reason",
       ],
       `${context} method policy ${member}`,
     );
@@ -208,6 +267,16 @@ export function validateGenerationProfile(generation, context = "generation") {
         !Object.values(parameterRenames).every(nonemptyString) ||
         new Set(Object.values(parameterRenames)).size !== Object.keys(parameterRenames).length) {
       throw new Error(`${context} method policy ${member} has invalid parameter renames`);
+    }
+    if ((policy.semantics === undefined) !== (policy.reason === undefined)) {
+      throw new Error(`${context} method policy ${member} must define semantics and reason together`);
+    }
+    if (policy.semantics !== undefined &&
+        !["preserving", "changing"].includes(policy.semantics)) {
+      throw new Error(`${context} method policy ${member} has invalid semantics`);
+    }
+    if (policy.reason !== undefined && !nonemptyString(policy.reason)) {
+      throw new Error(`${context} method policy ${member} has invalid reason`);
     }
   }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
@@ -296,8 +365,12 @@ function translateType(shape, generation, profile, context) {
     }
   }
   if (shape?.kind === "option") return nullableResource(shape, generation, profile, context);
-  if (shape?.kind === "ref" && nonemptyString(generation.resources?.[shape.id])) {
-    const marker = generation.resources[shape.id];
+  if (shape?.kind === "ref") {
+    const mapping = resourceMapping(generation, shape.id, `${context} resource ${shape.id}`);
+    if (mapping === null) {
+      throw new Error(`${context} has unsupported faithful translation ${JSON.stringify(shape)}`);
+    }
+    const marker = mapping.lean;
     return translatedType(
       `${profile.resource.constructor} ${marker}`,
       "js-resource",
@@ -320,6 +393,126 @@ export function leanType(shape, generation, context = "TypeScript shape") {
 
 function exceptionFor(generation, operationId) {
   return generation.exceptions?.[operationId] ?? null;
+}
+
+function methodPolicyChangesCall(policy) {
+  return policy.signature !== "only" ||
+    (policy.omittedOptionalParameters?.length ?? 0) !== 0 ||
+    (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
+    (policy.omittedRestParameters?.length ?? 0) !== 0 ||
+    Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
+    Object.keys(policy.fixedArguments ?? {}).length !== 0;
+}
+
+function combineSemantics(primary, policyFacts) {
+  if (primary.relation === "unreviewed") return primary;
+  const changing = policyFacts.filter((fact) => fact.relation === "changing");
+  if (changing.length === 0) return primary;
+  const details = [...new Set([
+    ...(primary.relation === "changing" ? [primary.detail] : []),
+    ...changing.map((fact) => fact.detail),
+  ])];
+  return {
+    relation: "changing",
+    evidence: primary.relation === "changing" ? primary.evidence : "abi-policy",
+    detail: details.join(" "),
+  };
+}
+
+function typePolicyFacts(shape, generation, context) {
+  if (shape?.kind === "option") {
+    return typePolicyFacts(shape.element, generation, context);
+  }
+  if (shape?.kind === "ref") {
+    const mapping = resourceMapping(generation, shape.id, `${context} resource ${shape.id}`);
+    return mapping?.explicit === true
+      ? [{
+        relation: mapping.semantics,
+        evidence: "resource-mapping",
+        detail: mapping.reason,
+      }]
+      : [];
+  }
+  return [];
+}
+
+function receiverPolicyFacts(member, generation, profile, { free = false } = {}) {
+  if (free) return [];
+  const owner = member.slice(0, member.lastIndexOf("."));
+  const globalPolicy = profile.receiver.globalTypes[owner];
+  if (globalPolicy !== undefined) {
+    return [{
+      relation: globalPolicy.semantics,
+      evidence: "global-receiver-policy",
+      detail: globalPolicy.reason,
+    }];
+  }
+  const mapping = resourceMapping(generation, owner, `${member} receiver resource ${owner}`);
+  return mapping?.explicit === true
+    ? [{
+      relation: mapping.semantics,
+      evidence: "resource-mapping",
+      detail: mapping.reason,
+    }]
+    : [];
+}
+
+function derivedSemantics(exception, methodPolicy = null, policyFacts = []) {
+  let primary;
+  if (exception === null && methodPolicy?.semantics !== undefined) {
+    primary = {
+      relation: methodPolicy.semantics,
+      evidence: "reviewed-method-policy",
+      detail: methodPolicy.reason,
+    };
+  } else if (exception === null && methodPolicy !== null && methodPolicyChangesCall(methodPolicy)) {
+    primary = {
+      relation: "unreviewed",
+      evidence: "method-policy",
+      detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+    };
+  } else if (exception === null) {
+    primary = {
+      relation: "preserving",
+      evidence: "typescript-derived",
+      detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+    };
+  } else if (exception.semantics === undefined) {
+    primary = {
+      relation: "unreviewed",
+      evidence: "operation-exception",
+      detail: exception.reason,
+    };
+  } else {
+    primary = {
+      relation: exception.semantics,
+      evidence: "reviewed-exception",
+      detail: exception.reason,
+    };
+  }
+  return combineSemantics(primary, policyFacts);
+}
+
+function protocolSemantics(protocol) {
+  const relation = protocol.upstreamRelation;
+  if (relation.kind === "vir-owned") {
+    return { relation: "vir-owned", evidence: "protocol-relation", detail: protocol.reason };
+  }
+  if (relation.kind === "local-contract") {
+    return { relation: "local-contract", evidence: "protocol-relation", detail: protocol.reason };
+  }
+  if (relation.kind === "upstream-adapter" && relation.semantics !== undefined) {
+    return {
+      relation: relation.semantics,
+      evidence: "reviewed-protocol",
+      detail: protocol.reason,
+    };
+  }
+  return {
+    relation: "unreviewed",
+    evidence: relation.kind === "upstream-adapter" ? "upstream-adapter" : "unclassified",
+    detail: protocol.reason,
+  };
 }
 
 function modalityArgument(
@@ -367,7 +560,7 @@ function modalityArgument(
 
 function receiverFor(member, identity, generation, profile, exception, defaultName = undefined) {
   const owner = member.slice(0, member.lastIndexOf("."));
-  const configuredGlobal = profile.receiver.globalTypes.includes(owner);
+  const configuredGlobal = profile.receiver.globalTypes[owner] !== undefined;
   const kind = exception?.receiver?.kind ?? (configuredGlobal ? "global" : "argument");
   if (!["global", "argument", "none"].includes(kind)) {
     throw new Error(`${identity.id} receiver exception kind must be global, argument, or none`);
@@ -407,7 +600,7 @@ function receiverFor(member, identity, generation, profile, exception, defaultNa
     exception?.receiver?.name ?? defaultName ?? ownerName[0].toLowerCase() + ownerName.slice(1),
     `${identity.id} receiver name`,
   );
-  const marker = generation.resources?.[owner];
+  const marker = resourceMapping(generation, owner, `${identity.id} receiver resource ${owner}`)?.lean;
   const type = exception?.receiver?.type === undefined
     ? (() => {
       if (!nonemptyString(marker)) {
@@ -586,6 +779,10 @@ function propertyOperation(
       throw new Error(`${anchor.id} exception references missing argument ${name}`);
     }
   }
+  const semanticFacts = [
+    ...receiverPolicyFacts(member, generation, profile),
+    ...typePolicyFacts(shape, generation, `${member} ${accessor}`),
+  ];
   return {
     id: anchor.id,
     library: config.id,
@@ -615,6 +812,8 @@ function propertyOperation(
     receiver,
     arguments: arguments_,
     result,
+    semantics: derivedSemantics(exception, null, semanticFacts),
+    ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -656,6 +855,11 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const fixedArguments = policy.fixedArguments ?? {};
   const parameterRenames = policy.parameterRenames ?? {};
   const exception = exceptionFor(generation, operationId);
+  if (policy.semantics !== undefined && exception !== null) {
+    throw new Error(
+      `${member} cannot classify semantics in both its method policy and operation exception`,
+    );
+  }
   for (const name of omitted) {
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
@@ -791,6 +995,12 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     profile,
     exception,
   );
+  const semanticFacts = [
+    ...receiverPolicyFacts(member, generation, profile, { free }),
+    ...shape.args.flatMap((argument) =>
+      typePolicyFacts(argument.type, generation, `${member} argument ${argument.name}`)),
+    ...typePolicyFacts(shape.result, generation, `${member} result`),
+  ];
   return {
     id: operationId,
     library: config.id,
@@ -829,6 +1039,8 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     receiver,
     arguments: arguments_,
     result,
+    semantics: derivedSemantics(exception, policy, semanticFacts),
+    ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };
 }
@@ -946,6 +1158,9 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     if (operationIds.has(protocol.id)) throw new Error(`generated operation id ${protocol.id} is repeated`);
     if (targets.has(protocol.target)) throw new Error(`generated host target ${protocol.target} is repeated`);
+    if (protocol.activeEffect !== undefined) {
+      validateActiveEffect(protocol.activeEffect, `generated protocol ${protocol.id}`);
+    }
     const root = rootsById.get(protocol.group);
     const relation = protocol.upstreamRelation;
     if (root.upstream.kind === "internal" && relation.kind !== "vir-owned") {
@@ -966,6 +1181,12 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       }
     }
     if (relation.kind === "upstream-adapter") {
+      if (relation.semantics !== undefined) {
+        validateUpstreamSemantics(
+          relation.semantics,
+          `generated protocol ${protocol.id}`,
+        );
+      }
       if (root.upstream.kind !== "typescript") {
         throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);
       }
@@ -1061,6 +1282,8 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       },
       arguments: args,
       result,
+      semantics: protocolSemantics(protocol),
+      ...(protocol.activeEffect === undefined ? {} : { activeEffect: protocol.activeEffect }),
     });
     operationIds.add(protocol.id);
     targets.add(protocol.target);
@@ -1103,6 +1326,8 @@ function modalityContract(operation, profile) {
     receiver: operation.receiver,
     arguments: operation.arguments,
     result: operation.result,
+    semantics: operation.semantics,
+    ...(operation.activeEffect === undefined ? {} : { activeEffect: operation.activeEffect }),
     ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
     ...(operation.exception === undefined ? {} : { exception: operation.exception }),
   };
@@ -1143,7 +1368,7 @@ export function materializeGeneratedAnchors(config, root, descriptor, anchorData
 export function generatedOperationDocument(config, generation, operations) {
   return {
     format: "lean-vir-binding-operation-ir",
-    version: 1,
+    version: 2,
     library: config.id,
     profile: generation.abiProfile,
     operations,

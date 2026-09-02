@@ -9,6 +9,7 @@ import test from "node:test";
 
 import {
   buildGeneratedOperations,
+  generatedOperationDocument,
   materializeGeneratedAnchors,
 } from "../../scripts/bindings/binding-modalities.mjs";
 import {
@@ -38,7 +39,7 @@ const generation = {
     },
     receiver: {
       default: { passing: "borrowed", retention: "call" },
-      globalTypes: [],
+      globalTypes: {},
     },
   },
   resources: { Widget: "Widget" },
@@ -180,6 +181,27 @@ test("operation IR records derived modalities and their provenance", () => {
     representation: "immediate",
     ownership: "value",
   });
+  assert.deepEqual(getter.semantics, {
+    relation: "preserving",
+    evidence: "typescript-derived",
+    detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+  });
+  assert.equal(generatedOperationDocument(config, generation, operations).version, 2);
+
+  const widened = structuredClone(generation);
+  widened.resources.Widget = {
+    lean: "Event",
+    semantics: "changing",
+    reason: "The demo deliberately accepts a wider event marker.",
+  };
+  const widenedGetter = buildGeneratedOperations(config, widened, descriptors).find(
+    (operation) => operation.id === "widget.label.get",
+  );
+  assert.deepEqual(widenedGetter.semantics, {
+    relation: "changing",
+    evidence: "abi-policy",
+    detail: widened.resources.Widget.reason,
+  });
 });
 
 test("reviewed protocols generate polymorphic declarations with explicit callback retention", () => {
@@ -266,6 +288,33 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     kind: "upstream-adapter",
     member: "Widget.getAttribute",
   });
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "upstream-adapter",
+    detail: protocolGeneration.protocolOperations[0].reason,
+  });
+
+  const reviewedProtocol = structuredClone(protocolGeneration);
+  reviewedProtocol.protocolOperations[0].upstreamRelation.semantics = "preserving";
+  const [reviewedOperation] = buildGeneratedOperations(
+    config,
+    reviewedProtocol,
+    descriptors,
+  );
+  assert.deepEqual(reviewedOperation.semantics, {
+    relation: "preserving",
+    evidence: "reviewed-protocol",
+    detail: reviewedProtocol.protocolOperations[0].reason,
+  });
+
+  const unclassifiedProtocol = structuredClone(protocolGeneration);
+  unclassifiedProtocol.protocolOperations[0].upstreamRelation = { kind: "unclassified" };
+  const unclassifiedOutput = renderLeanBindings(config, unclassifiedProtocol, descriptors);
+  assert.match(
+    unclassifiedOutput,
+    /boundary for unclassified VIR protocol `demo\.widget\.subscribe`, awaiting semantic review/u,
+  );
+  assert.doesNotMatch(unclassifiedOutput, /TypeScript `undefined`/u);
 
   const missingMember = structuredClone(protocolGeneration);
   missingMember.protocolOperations[0].upstreamRelation.member = "Widget.missing";
@@ -299,9 +348,21 @@ test("an explicit single-signature policy generates faithful methods and documen
     descriptors,
   );
   assert.match(namedReceiver, /opaque getAttribute\n    \(self : @& Lean\.Vir\.Js Widget\)/u);
+
+  const renamedGeneration = structuredClone(generation);
+  renamedGeneration.methodPolicies["Widget.getAttribute"].parameterRenames = {
+    name: "attribute",
+  };
+  const renamedOperation = buildGeneratedOperations(
+    config,
+    renamedGeneration,
+    descriptors,
+  ).find((operation) => operation.id === "demo.widget.getAttribute");
+  assert.equal(renamedOperation.arguments[0].name, "attribute");
+  assert.equal(renamedOperation.semantics.relation, "preserving");
 });
 
-test("generated exceptions are documented as reviewed specializations", () => {
+test("generated exceptions distinguish unreviewed boundaries and semantic adapters", () => {
   const specialized = structuredClone(generation);
   specialized.exceptions["demo.widget.getAttribute"] = {
     reason: "The demo specializes the result representation.",
@@ -314,14 +375,68 @@ test("generated exceptions are documented as reviewed specializations", () => {
     },
   };
   const output = renderLeanBindings(config, specialized, descriptors);
+  const operation = buildGeneratedOperations(config, specialized, descriptors).find(
+    (candidate) => candidate.id === "demo.widget.getAttribute",
+  );
 
   assert.match(
     output,
-    /Generated reviewed method specialization of TypeScript `Widget\.getAttribute`\./u,
+    /Generated method boundary for TypeScript `Widget\.getAttribute`, awaiting semantic review\./u,
   );
   assert.doesNotMatch(
     output,
     /Faithful generated method binding for TypeScript `Widget\.getAttribute`\./u,
+  );
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "operation-exception",
+    detail: specialized.exceptions["demo.widget.getAttribute"].reason,
+  });
+
+  specialized.exceptions["demo.widget.getAttribute"].semantics = "changing";
+  const changedOutput = renderLeanBindings(config, specialized, descriptors);
+  const reviewed = buildGeneratedOperations(config, specialized, descriptors).find(
+    (candidate) => candidate.id === "demo.widget.getAttribute",
+  );
+  assert.match(
+    changedOutput,
+    /Generated explicit method semantic adapter for TypeScript `Widget\.getAttribute`\./u,
+  );
+  assert.match(
+    changedOutput,
+    /Adapter policy: The demo specializes the result representation\./u,
+  );
+  assert.doesNotMatch(
+    changedOutput,
+    /Generated reviewed method specialization of TypeScript `Widget\.getAttribute`/u,
+  );
+  assert.deepEqual(reviewed.semantics, {
+    relation: "changing",
+    evidence: "reviewed-exception",
+    detail: specialized.exceptions["demo.widget.getAttribute"].reason,
+  });
+});
+
+test("method semantics have exactly one policy authority", () => {
+  const conflicting = structuredClone(generation);
+  conflicting.methodPolicies["Widget.getAttribute"].semantics = "preserving";
+  conflicting.methodPolicies["Widget.getAttribute"].reason =
+    "The selected TypeScript signature is preserved.";
+  conflicting.exceptions["demo.widget.getAttribute"] = {
+    reason: "The result has a specialized host representation.",
+    semantics: "changing",
+    result: {
+      type: {
+        lean: "Lean.Vir.Js String",
+        representation: "js-resource",
+        resourceInner: "String",
+      },
+    },
+  };
+
+  assert.throws(
+    () => buildGeneratedOperations(config, conflicting, descriptors),
+    /cannot classify semantics in both its method policy and operation exception/u,
   );
 });
 
@@ -367,6 +482,25 @@ test("optional method parameters require an explicit trailing omission", () => {
     .find((candidate) => candidate.id === "demo.widget.getAttribute");
   assert.deepEqual(operation.typescript.signaturePolicy.omittedOptionalParameters, ["mode"]);
   assert.deepEqual(operation.arguments.map((argument) => argument.name), ["name"]);
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "method-policy",
+    detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+  });
+
+  optionalGeneration.methodPolicies["Widget.getAttribute"].semantics = "preserving";
+  optionalGeneration.methodPolicies["Widget.getAttribute"].reason =
+    "Omitting mode preserves the declaration's default behavior.";
+  const reviewed = buildGeneratedOperations(config, optionalGeneration, optionalDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  const reviewedOutput = renderLeanBindings(config, optionalGeneration, optionalDescriptors);
+  assert.deepEqual(reviewed.semantics, {
+    relation: "preserving",
+    evidence: "reviewed-method-policy",
+    detail: "Omitting mode preserves the declaration's default behavior.",
+  });
+  assert.match(reviewedOutput, /Generated reviewed method call policy/u);
+  assert.match(reviewedOutput, /Call policy: Omitting mode preserves/u);
 
   method.shape.args.push({ name: "requiredAfter", type: stringShape });
   assert.throws(

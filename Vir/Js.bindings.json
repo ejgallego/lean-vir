@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "javascript",
   "title": "JavaScript values",
   "description": "Core JavaScript resources, nullable values, collections, primitive conversions, and retained Lean references.",
@@ -22,7 +22,7 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": []
+        "globalTypes": {}
       }
     },
     "resources": {},
@@ -139,7 +139,7 @@
         "id": "javascript.array.length", "group": "array", "target": "js.array.length",
         "lean": "Lean.Vir.Js.Array.lengthJs", "marker": "vir_js",
         "reason": "Reads Array.length while keeping the array contents in JavaScript land.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }],
         "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
@@ -147,8 +147,8 @@
       {
         "id": "javascript.array.item", "group": "array", "target": "js.array.item",
         "lean": "Lean.Vir.Js.Array.itemNullable", "marker": "vir_js",
-        "reason": "Reads an Array entry as a nullable resource without decoding it into Lean.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array" },
+        "reason": "Reads an Array entry as a nullable resource and normalizes JavaScript undefined to null, so this is an explicit safe-lookup adapter rather than raw bracket access.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "changing" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
@@ -160,7 +160,7 @@
         "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",
         "lean": "Lean.Vir.Js.NodeList.lengthJs", "marker": "vir_js",
         "reason": "Reads NodeList.length while keeping the collection in JavaScript land.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.length", "accessor": "get" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.length", "accessor": "get", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value α" } }],
         "result": { "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
@@ -169,7 +169,7 @@
         "id": "javascript.node-list.item", "group": "node-list", "target": "js.nodeList.item",
         "lean": "Lean.Vir.Js.NodeList.itemNullable", "marker": "vir_js",
         "reason": "Calls NodeList.item and represents a missing entry as JavaScript null.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.item" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.item", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value (Lean.Vir.Js α)" } },

@@ -1,6 +1,6 @@
 {
   "$schema": "../bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "infoview",
   "title": "Infoview client surface",
   "description": "Browser capabilities supplied to the Lean infoview and its editor-facing command bridge.",
@@ -19,7 +19,7 @@
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
-      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
     "members": [],
@@ -42,8 +42,8 @@
       {
         "id": "infoview.clipboard.write-text", "group": "clipboard", "target": "infoview.clipboard.writeText",
         "lean": "Lean.Vir.Infoview.Clipboard.writeTextJs", "marker": "vir_js",
-        "reason": "Adapts Clipboard.writeText to the infoview capability protocol, returning false when unavailable or rejected.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Clipboard.writeText" },
+        "reason": "Adapts Clipboard.writeText to the infoview capability protocol. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Clipboard.writeText", "semantics": "changing" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [{ "name": "text", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }

@@ -20,7 +20,6 @@ Constructs the base host-side ProofWidgets reference descriptor from explicit Ja
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-proofwidgets-protocol-v1`: receiver none; id js-resource/borrowed/call; label js-resource/borrowed/call; typeName js-resource/borrowed/call; summary js-resource/borrowed/call; expression js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -41,7 +40,6 @@ Completes a host-side ProofWidgets reference with optional server state and cont
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-proofwidgets-protocol-v1`: receiver none; ref js-resource/borrowed/call; typeText js-resource/borrowed/call; context js-resource/borrowed/call; serverRef js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -65,7 +63,6 @@ Explicitly decodes the fixed ResolvedRef record returned by the ProofWidgets hos
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-proofwidgets-protocol-v1`: receiver none; ref js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
@@ -82,7 +79,6 @@ Asks the host whether a ProofWidgets reference can be inspected.
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-proofwidgets-protocol-v1`: receiver none; ref js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
@@ -99,7 +95,6 @@ Starts a one-shot host resolution and retains the callback until resolution or r
 
 Binding contract: `generation.protocolOperations`.
 
-Generated reviewed VIR protocol boundary.
 ABI profile `vir-proofwidgets-protocol-v1`: receiver none; ref js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.

@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "common",
   "title": "Common host helpers",
   "description": "Small VIR-owned host calls used to exercise explicit JavaScript conversion boundaries.",
@@ -19,7 +19,7 @@
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
-      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": [] }
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
     "members": [],

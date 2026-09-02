@@ -1,6 +1,6 @@
 {
   "$schema": "./bindings.schema.json",
-  "version": 1,
+  "version": 2,
   "id": "browser",
   "title": "Browser APIs",
   "description": "DOM, events, canvas, animation, timers, and browser-owned values exposed by Vir.Browser.",
@@ -27,27 +27,54 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": ["Console", "Document"]
+        "globalTypes": {
+          "Console": {
+            "semantics": "changing",
+            "reason": "The shipped console boundary uses the host-global console instead of accepting an arbitrary Console receiver."
+          },
+          "Document": {
+            "semantics": "changing",
+            "reason": "The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver."
+          }
+        }
       }
     },
     "resources": {
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
-      "DOMTokenList": "Element",
+      "DOMTokenList": {
+        "lean": "Element",
+        "semantics": "changing",
+        "reason": "The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value."
+      },
       "Element": "Element",
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
-      "KeyboardEvent": "Event",
+      "KeyboardEvent": {
+        "lean": "Event",
+        "semantics": "changing",
+        "reason": "The shipped key getter accepts the wider Event marker and normalizes a missing key to the empty string."
+      },
       "TextMetrics": "TextMetrics"
     },
     "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
-      "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
+      "CanvasRenderingContext2D.arc": {
+        "signature": "only",
+        "omittedOptionalParameters": ["counterclockwise"],
+        "semantics": "preserving",
+        "reason": "Omitting counterclockwise preserves the TypeScript default value false."
+      },
       "CanvasRenderingContext2D.beginPath": { "signature": "only" },
       "CanvasRenderingContext2D.clearRect": { "signature": "only" },
       "CanvasRenderingContext2D.closePath": { "signature": "only" },
-      "CanvasRenderingContext2D.fill": { "signature": 0, "omittedOptionalParameters": ["fillRule"] },
+      "CanvasRenderingContext2D.fill": {
+        "signature": 0,
+        "omittedOptionalParameters": ["fillRule"],
+        "semantics": "preserving",
+        "reason": "The selected overload is fill(fillRule?), and omitting fillRule preserves its nonzero default."
+      },
       "CanvasRenderingContext2D.fillRect": { "signature": "only" },
       "CanvasRenderingContext2D.lineTo": { "signature": "only" },
       "CanvasRenderingContext2D.measureText": { "signature": "only" },
@@ -55,7 +82,11 @@
       "CanvasRenderingContext2D.restore": { "signature": "only" },
       "CanvasRenderingContext2D.rotate": { "signature": "only" },
       "CanvasRenderingContext2D.save": { "signature": "only" },
-      "CanvasRenderingContext2D.stroke": { "signature": 0 },
+      "CanvasRenderingContext2D.stroke": {
+        "signature": 0,
+        "semantics": "preserving",
+        "reason": "The selected zero-argument overload is the complete current-path stroke operation."
+      },
       "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
       "CanvasRenderingContext2D.translate": { "signature": "only" },
       "Console.log": { "signature": "only", "fixedRestParameters": { "data": ["message"] } },
@@ -94,6 +125,8 @@
     "exceptions": {
       "browser.animation.cancelAnimationFrame": {
         "reason": "Lean gives the exact browser animation-frame token a phantom Js AnimationFrame type; the host passes that token unchanged to cancelAnimationFrame.",
+        "semantics": "preserving",
+        "activeEffect": "release",
         "arguments": {
           "handle": {
             "passing": "consumed",
@@ -107,6 +140,8 @@
       },
       "browser.animation.requestAnimationFrame": {
         "reason": "VIR adapts the Lean callback and privately records pending cancellation for teardown, while returning the exact token produced by requestAnimationFrame.",
+        "semantics": "preserving",
+        "activeEffect": "register",
         "arguments": {
           "callback": {
             "passing": "owned",
@@ -127,6 +162,7 @@
       },
       "browser.canvas2d.getFillStyle": {
         "reason": "The JavaScript-owned CanvasStyle marker faithfully preserves the full string, CanvasGradient, and CanvasPattern union.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js CanvasStyle",
@@ -137,6 +173,7 @@
       },
       "browser.canvas2d.setFillStyleValue": {
         "reason": "The JavaScript-owned CanvasStyle marker faithfully preserves the full string, CanvasGradient, and CanvasPattern union.",
+        "semantics": "preserving",
         "arguments": {
           "style": {
             "type": {
@@ -149,6 +186,7 @@
       },
       "browser.canvas2d.getStrokeStyle": {
         "reason": "The JavaScript-owned CanvasStyle marker faithfully preserves the full string, CanvasGradient, and CanvasPattern union.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js CanvasStyle",
@@ -159,6 +197,7 @@
       },
       "browser.canvas2d.setStrokeStyleValue": {
         "reason": "The JavaScript-owned CanvasStyle marker faithfully preserves the full string, CanvasGradient, and CanvasPattern union.",
+        "semantics": "preserving",
         "arguments": {
           "style": {
             "type": {
@@ -171,6 +210,7 @@
       },
       "browser.console.log": {
         "reason": "VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary.",
+        "semantics": "changing",
         "arguments": {
           "message": {
             "type": {
@@ -184,6 +224,7 @@
       },
       "browser.document.createElement": {
         "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type.",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js Element",
@@ -194,6 +235,7 @@
       },
       "browser.document.querySelector": {
         "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -204,6 +246,7 @@
       },
       "browser.document.querySelectorAll": {
         "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -214,6 +257,7 @@
       },
       "browser.element.appendChild": {
         "reason": "VIR currently specializes Node's generic appendChild operation to exact values carrying the Element phantom type.",
+        "semantics": "preserving",
         "arguments": {
           "node": {
             "type": {
@@ -232,7 +276,9 @@
         }
       },
       "browser.element.addEventListener": {
-        "reason": "VIR specializes DOM listener registration to a Lean callback retained until an explicit revocable listener handle is consumed.",
+        "reason": "VIR specializes DOM listener registration to a Lean callback retained until the returned listener value is passed to terminal removal.",
+        "semantics": "changing",
+        "activeEffect": "register",
         "arguments": {
           "callback": {
             "role": "callback",
@@ -254,6 +300,7 @@
       },
       "browser.element.classList.add": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -265,6 +312,7 @@
       },
       "browser.element.classList.remove": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token.",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -276,6 +324,7 @@
       },
       "browser.element.classList.toggle": {
         "reason": "The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument.",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -287,6 +336,7 @@
       },
       "browser.element.style.setProperty": {
         "reason": "The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.",
+        "semantics": "changing",
         "receiver": {
           "name": "element",
           "type": {
@@ -298,6 +348,7 @@
       },
       "browser.element.querySelector": {
         "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -308,6 +359,7 @@
       },
       "browser.element.querySelectorAll": {
         "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -317,7 +369,9 @@
         }
       },
       "browser.element.removeEventListener": {
-        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the revocable listener handle returned by registration; consuming it removes the listener and releases the callback.",
+        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the listener value returned by registration; terminal removal removes the listener, releases the callback, and does not revoke JavaScript aliases.",
+        "semantics": "changing",
+        "activeEffect": "release",
         "receiver": { "kind": "none" },
         "arguments": {
           "listener": {
@@ -332,10 +386,12 @@
       },
       "browser.htmlCanvasElement.getContext2D": {
         "reason": "VIR specializes HTMLCanvasElement.getContext to the fixed 2d context id and default options.",
+        "semantics": "preserving",
         "receiver": { "name": "canvas" }
       },
       "browser.event.currentTarget": {
         "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -346,6 +402,7 @@
       },
       "browser.event.target": {
         "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
+        "semantics": "changing",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -388,7 +445,7 @@
         "id": "browser.canvas2d.set-fill-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setFillStyle",
         "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleJs", "marker": "vir_js",
         "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.fillStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.fillStyle", "accessor": "set" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.fillStyle", "accessor": "set", "semantics": "changing" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
@@ -400,7 +457,7 @@
         "id": "browser.canvas2d.set-stroke-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setStrokeStyle",
         "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleJs", "marker": "vir_js",
         "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.strokeStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.strokeStyle", "accessor": "set" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.strokeStyle", "accessor": "set", "semantics": "changing" },
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
@@ -457,7 +514,8 @@
         "lean": "Lean.Vir.Browser.Timer.setTimeoutJs",
         "marker": "vir_js",
         "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout", "semantics": "preserving" },
+        "activeEffect": "register",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
@@ -471,8 +529,9 @@
         "target": "browser.timer.clearTimeout",
         "lean": "Lean.Vir.Browser.Timer.clearTimeout",
         "marker": "vir_js",
-        "reason": "The exact timeout token is passed unchanged to clearTimeout; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout" },
+        "reason": "The exact timeout token is passed unchanged to clearTimeout; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout", "semantics": "preserving" },
+        "activeEffect": "release",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "timeout", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
@@ -486,7 +545,8 @@
         "lean": "Lean.Vir.Browser.Timer.setIntervalJs",
         "marker": "vir_js",
         "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval" },
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval", "semantics": "preserving" },
+        "activeEffect": "register",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
@@ -500,8 +560,9 @@
         "target": "browser.timer.clearInterval",
         "lean": "Lean.Vir.Browser.Timer.clearInterval",
         "marker": "vir_js",
-        "reason": "The exact interval token is passed unchanged to clearInterval; consuming its Lean Js value also removes VIR's private pending-cancellation record.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval" },
+        "reason": "The exact interval token is passed unchanged to clearInterval; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval", "semantics": "preserving" },
+        "activeEffect": "release",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
           { "name": "interval", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }

@@ -16,6 +16,66 @@ choices explicit and reusable. An anchor still identifies which TypeScript
 operation, Lean declaration, and host target correspond; it does not repeat the
 modalities derived by generation.
 
+## Semantics Fidelity
+
+Semantics fidelity is the repository-wide rule for every upstream-backed
+binding. The canonical Lean boundary preserves every representable,
+caller-observable property of the upstream operation: operation identity and
+naming, types and absence, overload selection, mutation and object identity,
+synchronous or asynchronous behavior, success and failure behavior, argument
+lifetime and reuse, callback retention, terminal behavior, and result
+ownership.
+
+Runtime ownership machinery may retain independent internal leases needed to
+implement that contract. It must not consume, clone, revoke, normalize,
+convert, or otherwise change a caller-owned value unless the upstream
+operation does so. Memory-management convenience is not evidence for changing
+the public modality. For example, a reusable JavaScript argument remains
+borrowed even when the result must independently retain values reachable from
+it.
+
+Conversions and ergonomic policies belong in explicitly named Lean adapters
+above the canonical boundary. Such an adapter may be useful and generated, but
+it does not occupy the upstream operation's faithful documentation lane or
+count as semantics-preserving coverage. Unsupported or ambiguous semantics
+fail closed until they have an explicit representation or reviewed policy.
+
+Canonical operation IR records this separately from type-comparator evidence:
+
+- `preserving` claims that the generated contract preserves upstream-observable
+  behavior;
+- `changing` identifies an explicit semantic adapter;
+- `unreviewed` is binding-author work and must never be presented as faithful;
+- `vir-owned` and `local-contract` identify operations whose semantics do not
+  come from an external upstream operation.
+
+A TypeScript-derived operation without an operation exception and with an
+unmodified single-signature call policy starts with a `preserving` contract
+claim. The generator then folds in the ABI profile's receiver and resource
+mapping facts; any changing fact makes the complete operation an adapter. A
+method policy that selects an overload or changes the exposed parameter list
+must set `semantics` and `reason`, unless an operation exception already
+supplies that review. Exceptions and
+`upstream-adapter` protocols likewise set `semantics` to `preserving` or
+`changing`; until then the operation remains `unreviewed` in the author
+workbench. This is a contract classification, not provider-behavior
+verification. Provider dispatch, retention, rollback, and cleanup remain
+separately trusted and tested.
+
+### Direct Value Rule
+
+Generated bindings preserve the upstream value itself whenever it can cross as
+a JavaScript resource. `Js`, borrowing, ownership, and an effect carrier are
+boundary semantics, not intermediate representations. A VIR-specific props,
+node, collection, or scalar algebra cannot replace a representable upstream
+value in the canonical operation. Explicitly named builders and conversions may
+sit above that operation, but the audit reports them as adapters rather than API
+fidelity.
+
+Any protocol operation that introduces a distinct data model must explain why
+the upstream value cannot cross directly. Convenience or easier decoding is not
+such a reason.
+
 ## Separate Questions
 
 Every operation answers separate representation, passing, and lifetime
@@ -36,16 +96,18 @@ ABI policy.
 
 These modes are runtime/ABI policy, not an affine Lean type system. `@&` marks
 borrowed arguments for Lean's calling convention; it does not prevent a caller
-from retaining a Lean alias. Likewise, `consumed` means the runtime takes the
-handle and dynamically revokes its aliases after the call. A later operation
-through an alias fails resource-liveness validation, but ordinary Lean typing
-does not make the second use unrepresentable.
+from retaining a Lean alias. `consumed` marks a terminal operation that takes
+the Lean argument and may terminate associated private effect state. It does
+not revoke ordinary JavaScript aliases or make a second use unrepresentable in
+Lean.
 
 ## ABI Profile
 
 Each generated library has a named `generation.abiProfile` in its
 `Vir/*.bindings.json` configuration. The browser profile currently says:
 
+- every `Js` resource transports the exact JavaScript value; public host
+  wrappers and payload envelopes are not an allowed profile;
 - TypeScript `string` is represented faithfully as `Lean.Vir.Js String`;
 - TypeScript `void` is represented as immediate `Unit`;
 - nullable resources use `Lean.Vir.Js.Nullable`;
@@ -55,6 +117,15 @@ Each generated library has a named `generation.abiProfile` in its
 - operations run in `DomM`;
 - `Document` is a host-global receiver, while `Element` is an explicit
   borrowed receiver.
+
+Binding-library configuration format version 2 makes semantic policy explicit.
+Only exactly identical resource marker names may use the short string form.
+Qualified or renamed Lean markers, and every host-global receiver choice, must
+instead carry `semantics` plus `reason`. These are
+operation-policy facts: a changing fact makes the generated operation an
+adapter, while only identity mappings and explicitly preserving facts can
+contribute to faithful coverage. This keeps widened phantom types and omitted
+receivers from being promoted silently.
 
 The profile is library policy, not user convenience policy. In particular, it
 does not turn JavaScript strings into Lean-owned `String` values. Applications
@@ -80,12 +151,18 @@ Generation rejects `T | undefined`, `T | null | undefined`, and optional
 properties until their distinct JavaScript semantics have an explicit ABI
 representation.
 
+Direct-value transport is a generator invariant rather than a configurable
+policy. It covers ordinary objects, functions, native timer/frame tokens, and
+`null` payloads. Resource liveness and cleanup state stay out-of-band; they
+must not replace the public JavaScript value.
+
 ## Canonical Operation IR
 
 `npm run generate:lean-bindings` creates a canonical operation record for every
 selected TypeScript operation and every reviewed protocol operation.
 It then renders all downstream views from those records. Ignored debugging
-artifacts are written per library under:
+artifacts use `lean-vir-binding-operation-ir` version 2 and are written per
+library under:
 
 ```text
 build/bindings/*.generated-operations.json
@@ -100,6 +177,8 @@ Each operation records:
 - global or argument receiver policy;
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
+- any operation-specific private active-effect role;
+- correspondence and semantic fidelity as separate operation facts;
 - provenance for every derived choice;
 - the reason for any explicit exception;
 - a protocol's machine-readable upstream relation.
@@ -137,9 +216,11 @@ selection:
 ```json
 "methodPolicies": {
   "Element.getAttribute": { "signature": "only" },
-  "Document.createElement": {
-    "signature": 2,
-    "omittedOptionalParameters": ["options"]
+  "CanvasRenderingContext2D.arc": {
+    "signature": "only",
+    "omittedOptionalParameters": ["counterclockwise"],
+    "semantics": "preserving",
+    "reason": "Omitting counterclockwise preserves the TypeScript default value false."
   },
   "Element.removeEventListener": {
     "signature": 1,
@@ -153,7 +234,10 @@ selection:
 signature. An integer selects that zero-based overload explicitly. A required
 parameter can be omitted only by naming it in `omittedRequiredParameters` and
 providing a justified operation exception; this deliberately marks a reviewed
-signature projection rather than a faithful translation. Every optional
+signature projection rather than a faithful translation. Overload selection,
+optional or rest-parameter omission, fixed arguments, and parameter projection
+must carry `semantics` plus `reason` when no operation exception classifies the
+change. Every optional
 parameter must either be represented by a supported translation rule or named
 in `omittedOptionalParameters`; the current generator implements the latter
 path. A rest parameter must be omitted explicitly or projected to one or more
@@ -178,8 +262,10 @@ The browser slice includes global functions, DOM methods, and properties.
 Selected overloads, parameter projections and renames, fixed-arity rest
 specializations, callbacks, primitive resources, and receiver/result overrides
 are all recorded in the same IR. In particular, the event-listener pair records
-registration as returning a revocable handle and removal as a receiver-free
-disposer that dynamically revokes that handle and its aliases.
+registration as returning a removable listener value and removal as a
+receiver-free terminal operation. Removal clears VIR's private teardown record;
+ordinary JavaScript aliases still refer to the same already-removed listener
+value.
 
 ## Reviewed Protocol Operations
 
@@ -203,6 +289,28 @@ descriptor and rejects relation kinds inconsistent with internal or local API
 groups. The explorer reports each class separately, confirms upstream members
 served by reviewed adapters, and reserves correspondence actions for genuinely
 unclassified operations.
+
+An `upstream-adapter` relation also records whether its behavior is
+`semantics: "preserving"` or `semantics: "changing"`. These values answer a
+different question from correspondence: naming an upstream member says what an
+operation relates to, while semantic classification says whether the VIR
+contract preserves or intentionally changes that member's observable behavior.
+
+Operations that need repository-private teardown may additionally declare an
+`activeEffect` role:
+
+- `register` creates a private listener, pending timer/frame, or React-root
+  teardown record;
+- `use` operates through an existing private record without replacing the
+  public JavaScript value;
+- `release` removes the record and performs the corresponding upstream
+  cancellation or unmount.
+
+These roles describe policy that provider tests must exercise. They do not
+change value transport and do not claim that provider behavior is mechanically
+verified. Passive JavaScript values and React hook/node values have no
+active-effect role; JavaScript reachability and official React own their normal
+lifetime.
 
 ## Documentation Flow
 
@@ -235,6 +343,10 @@ Exceptions are intended for semantics that TypeScript declarations do not
 express, such as a host retaining a callback until explicit release. They are
 not a place to restate ordinary profile defaults. The operation IR marks every
 override and its reason, so review can distinguish inference from policy.
+An exception's optional `semantics` field records whether the reviewed override
+preserves upstream behavior or creates an explicit semantic adapter. Omitting
+that field leaves the operation visibly unreviewed rather than inferring
+faithfulness from its type comparison.
 
 ## Authored And Generated Ownership
 
@@ -243,6 +355,8 @@ Authored configuration owns:
 - the pinned declaration inputs and selected member set;
 - correspondence among TypeScript operations, Lean names, and host targets;
 - resource marker names and the named ABI profile;
+- reviewed semantic policy for non-identity resource mappings and host-global
+  receivers;
 - documented semantic exceptions.
 
 Generation owns:
