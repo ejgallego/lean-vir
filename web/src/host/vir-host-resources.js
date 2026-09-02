@@ -161,6 +161,14 @@ export function createDOMTokenListHostBindings() {
   };
 }
 
+export function createKeyboardEventHostBindings({ fromEvent }) {
+  return {
+    "browser.keyboardEvent.fromEvent": (event) =>
+      createNullableValue(fromEvent(event)),
+    "browser.keyboardEvent.getKey": (event) => event.key,
+  };
+}
+
 function terminateRevocableResource(resources, value, cleanup, label) {
   const errors = [];
   collectCleanupError(errors, () => resources.removeDisposable(value));

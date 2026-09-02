@@ -46,11 +46,7 @@
       "Event": "Event",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
-      "KeyboardEvent": {
-        "lean": "Event",
-        "semantics": "changing",
-        "reason": "The shipped key getter accepts the wider Event marker and normalizes a missing key to the empty string."
-      },
+      "KeyboardEvent": "KeyboardEvent",
       "TextMetrics": "TextMetrics"
     },
     "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
@@ -469,6 +465,20 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Nullable HTMLCanvasElement", "representation": "js-resource", "resourceInner": "HTMLCanvasElement" } }
       },
       {
+        "id": "browser.keyboard-event.from-event",
+        "group": "event",
+        "target": "browser.keyboardEvent.fromEvent",
+        "lean": "Lean.Vir.Browser.KeyboardEvent.fromEventNullable",
+        "marker": "vir_js",
+        "reason": "This checked narrowing preserves the exact JavaScript event value and has no corresponding JavaScript method.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [
+          { "name": "event", "type": { "lean": "Lean.Vir.Js Event", "representation": "js-resource", "resourceInner": "Event" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable KeyboardEvent", "representation": "js-resource", "resourceInner": "KeyboardEvent" } }
+      },
+      {
         "id": "browser.event.formValue",
         "group": "event",
         "target": "browser.event.formValue",
@@ -782,8 +792,8 @@
     {
       "id": "event",
       "title": "Events",
-      "targets": ["browser.event.*"],
-      "lean": { "public": ["Lean.Vir.Browser.Event"] },
+      "targets": ["browser.event.*", "browser.keyboardEvent.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Event", "Lean.Vir.Browser.KeyboardEvent"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Event", "KeyboardEvent"] },
       "mappings": [
         {
@@ -818,8 +828,8 @@
           "typescript": "KeyboardEvent.key",
           "accessors": {
             "get": {
-              "target": "browser.event.key",
-              "lean": "Lean.Vir.Browser.Event.getKey"
+              "target": "browser.keyboardEvent.getKey",
+              "lean": "Lean.Vir.Browser.KeyboardEvent.getKey"
             }
           }
         }

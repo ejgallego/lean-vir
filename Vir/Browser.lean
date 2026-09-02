@@ -10,6 +10,20 @@ import Vir.Browser.Generated
 
 namespace Lean.Vir.Browser
 
+namespace KeyboardEvent
+
+/-- Checks whether an event is a keyboard event without changing its JavaScript identity. -/
+def fromEvent
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Option (Lean.Vir.Js KeyboardEvent)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromEventNullable event)
+
+/-- Returns the exact JavaScript `key` string carried by a keyboard event. -/
+def keyString (event : @& Lean.Vir.Js KeyboardEvent) : DomM String := do
+  Lean.Vir.JsValue.toString (← getKey event)
+
+end KeyboardEvent
+
 namespace Event
 
 /--
@@ -37,12 +51,14 @@ def currentTargetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.
 
 /--
 Returns the keyboard key represented by an event, or the empty string for
-events without a string-valued {lit}`key` property.
+events that do not narrow to a keyboard event.
 
 Reference: [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
 -/
 def keyString (event : @& Lean.Vir.Js Event) : DomM String := do
-  Lean.Vir.JsValue.toString (← getKey event)
+  match ← KeyboardEvent.fromEvent event with
+  | none => pure ""
+  | some keyboardEvent => KeyboardEvent.keyString keyboardEvent
 
 end Event
 

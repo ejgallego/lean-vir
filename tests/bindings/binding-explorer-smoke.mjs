@@ -661,7 +661,6 @@ const semanticCoverageByMember = new Map(roots.flatMap((root) =>
 for (const member of [
   "browser/document:Document.title",
   "browser/element:CSSStyleDeclaration.setProperty",
-  "browser/event:KeyboardEvent.key",
 ]) {
   assert.equal(semanticCoverageByMember.get(member), "adapter-only");
 }
@@ -670,6 +669,7 @@ for (const member of [
   "browser/element:DOMTokenList.add",
   "browser/element:DOMTokenList.remove",
   "browser/element:DOMTokenList.toggle",
+  "browser/event:KeyboardEvent.key",
 ]) {
   assert.equal(semanticCoverageByMember.get(member), "faithful");
 }

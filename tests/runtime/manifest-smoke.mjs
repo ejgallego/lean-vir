@@ -411,6 +411,16 @@ const querySelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.querySelector",
 );
 assert.equal(querySelectorImport?.args[0]?.type?.type, "Js");
+const keyboardEventNarrowingImport = hostImportTarget(
+  "browser.keyboardEvent.fromEvent",
+);
+assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.type, "Event");
+assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
+const keyboardEventKeyImport = hostImportTarget(
+  "browser.keyboardEvent.getKey",
+);
+assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
+assert.equal(keyboardEventKeyImport?.result?.type, "Js");
 const getCheckedImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.htmlInputElement.getChecked",
 );
@@ -664,6 +674,20 @@ assert.equal(
   virtualQueryHost["browser.element.getTextContent"](virtualPresentElement),
   "",
 );
+const virtualPlainEvent = createVirtualEventState();
+assert.equal(
+  virtualQueryHost["browser.keyboardEvent.fromEvent"](virtualPlainEvent),
+  null,
+);
+const virtualKeyboardEvent = createVirtualEventState({ key: "Enter" });
+assert.equal(
+  virtualQueryHost["browser.keyboardEvent.fromEvent"](virtualKeyboardEvent),
+  virtualKeyboardEvent,
+);
+assert.equal(
+  virtualQueryHost["browser.keyboardEvent.getKey"](virtualKeyboardEvent),
+  "Enter",
+);
 const virtualTokenList = virtualQueryHost["browser.element.getClassList"](
   virtualPresentElement,
 );
@@ -813,6 +837,10 @@ keyTarget.listeners
   .get("keydown")[0]
   .dispatch(createVirtualEventState({ key: "Enter" }));
 assert.equal(virtualDocumentState.title, "Enter");
+keyTarget.listeners
+  .get("keydown")[0]
+  .dispatch(createVirtualEventState());
+assert.equal(virtualDocumentState.title, "");
 assert.equal(
   hostRuntime.hostState.resourceRoots.debugCounts().active,
   queryRootBaseline,

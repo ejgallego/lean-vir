@@ -102,6 +102,35 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     status: "Ready",
   });
 
+  await runDemoHostEntry(cdp, origin, "HostInterop.mountKeyTitle", {
+    runInputs: ["#keyboard-event-target"],
+    expectedResult: "1",
+    target: {
+      id: "keyboard-event-target",
+      tag: "input",
+    },
+  });
+  await evaluate(cdp, `document.querySelector("#keyboard-event-target")
+    .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }))`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "Enter",
+      "KeyboardEvent.key did not reach the exact Lean binding",
+    ),
+    "Enter",
+  );
+  await evaluate(cdp, `document.querySelector("#keyboard-event-target")
+    .dispatchEvent(new Event("keydown"))`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "",
+      "ordinary Event did not fail KeyboardEvent narrowing",
+    ),
+    "",
+  );
+
   await runDemoHostEntry(cdp, origin, "ReactCounter.mount", {
     runInputs: ["#react-smoke-root"],
     target: { id: "react-smoke-root" },

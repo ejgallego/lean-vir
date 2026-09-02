@@ -12,6 +12,7 @@ import {
   createElementHostBindings,
   createHostLifecycle,
   createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
   createTimerHostBindings,
   performanceNow,
   preventDefaultOnEvent,
@@ -106,7 +107,7 @@ export function ensureVirtualElementStates(state, selector, elements) {
 export function createVirtualEventState({
   target = null,
   currentTarget = null,
-  key = "",
+  key = null,
   defaultPrevented = false,
   propagationStopped = false,
   onPreventDefault = null,
@@ -115,7 +116,7 @@ export function createVirtualEventState({
   const event = {
     target,
     currentTarget,
-    key,
+    ...(typeof key === "string" ? { key } : {}),
     defaultPrevented,
     propagationStopped,
     preventDefault: () => {
@@ -134,6 +135,10 @@ export function createVirtualEventHostBindings(
   state = createVirtualDocumentState(),
 ) {
   return {
+    ...createKeyboardEventHostBindings({
+      fromEvent: (event) =>
+        typeof event?.key === "string" ? event : null,
+    }),
     "browser.event.target": (event) =>
       createNullableValue(virtualEventElementValue(state, event, "target")),
     "browser.event.currentTarget": (event) =>
@@ -147,10 +152,6 @@ export function createVirtualEventHostBindings(
     "browser.event.stopPropagation": (event) => {
       stopPropagationOnEvent(event);
       return undefined;
-    },
-    "browser.event.key": (event) => {
-      const key = event?.key;
-      return typeof key === "string" ? key : "";
     },
     "browser.event.formValue": (event) =>
       createNullableValue(formControlEventValue(event)),

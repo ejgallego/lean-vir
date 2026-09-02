@@ -1029,26 +1029,6 @@ opaque getTarget
     DomM (Lean.Vir.Js.Nullable Element)
 
 /--
-Generated explicit getter semantic adapter for TypeScript `KeyboardEvent.key`.
-
-The KeyboardEvent interface's **`key`** read-only property returns the value of the key pressed by the user, taking into consideration the state of modifier keys such as Shift as well as the keyboard locale and layout.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/KeyboardEvent/key)
-
-Adapter policy: The shipped key getter accepts the wider Event marker and normalizes a missing key to the empty string.
-
-Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
-
-ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.event.key"]
-opaque getKey
-    (keyboardEvent : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js String)
-
-/--
 Generated binding for reviewed VIR protocol `browser.event.formValue`.
 
 This local protocol extracts the common value property from supported form-control event targets.
@@ -1309,6 +1289,44 @@ opaque ownedFloat
     Lean.Vir.RuntimeM (Lean.Vir.Js Float)
 
 end Internal
+
+namespace KeyboardEvent
+
+/--
+Faithful generated getter binding for TypeScript `KeyboardEvent.key`.
+
+The KeyboardEvent interface's **`key`** read-only property returns the value of the key pressed by the user, taking into consideration the state of modifier keys such as Shift as well as the keyboard locale and layout.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/KeyboardEvent/key)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.keyboardEvent.getKey"]
+opaque getKey
+    (keyboardEvent : @& Lean.Vir.Js KeyboardEvent) :
+    DomM (Lean.Vir.Js String)
+
+/--
+Generated binding for reviewed VIR protocol `browser.keyboard-event.from-event`.
+
+This checked narrowing preserves the exact JavaScript event value and has no corresponding JavaScript method.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.keyboardEvent.fromEvent"]
+opaque fromEventNullable
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable KeyboardEvent)
+
+end KeyboardEvent
 
 namespace TextMetrics
 

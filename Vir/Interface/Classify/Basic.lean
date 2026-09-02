@@ -102,7 +102,9 @@ def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   let name ← constName? e
   match name with
   | `Lean.Vir.Browser.Element => some (name, "Element")
+  | `Lean.Vir.Browser.DOMTokenList => some (name, "DOMTokenList")
   | `Lean.Vir.Browser.Event => some (name, "Event")
+  | `Lean.Vir.Browser.KeyboardEvent => some (name, "KeyboardEvent")
   | `Lean.Vir.Browser.EventListener => some (name, "EventListener")
   | `Lean.Vir.Browser.HTMLInputElement => some (name, "HTMLInputElement")
   | `Lean.Vir.Browser.Timeout => some (name, "Timeout")

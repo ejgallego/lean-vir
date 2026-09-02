@@ -316,9 +316,9 @@ effect and is recognized by the package generator as a synchronous host effect.
 Use `DomM.run` only at an explicit exported `IO` boundary.
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
-- object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
-  `HTMLCanvasElement`, `CanvasRenderingContext2D`, `Timeout`, and
-  `AnimationFrame`
+- object markers: `Element`, `DOMTokenList`, `Event`, `KeyboardEvent`,
+  `EventListener`, `HTMLInputElement`, `HTMLCanvasElement`,
+  `CanvasRenderingContext2D`, `Timeout`, and `AnimationFrame`
 - `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
 - `Lean.Vir.Browser.Document.setTitle : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)`
@@ -332,7 +332,9 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Event.key : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM String`
+- `Lean.Vir.Browser.KeyboardEvent.getKey : @& Lean.Vir.Js Lean.Vir.Browser.KeyboardEvent -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)` faithfully exposes the upstream property.
+- `Lean.Vir.Browser.KeyboardEvent.fromEvent` checks an `Event` without changing its JavaScript identity; `KeyboardEvent.keyString` performs the explicit string conversion.
+- `Lean.Vir.Browser.Event.keyString` remains a convenience that returns the empty string when the event does not narrow to `KeyboardEvent`.
 - `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
 - `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`

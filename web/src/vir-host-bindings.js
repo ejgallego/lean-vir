@@ -11,6 +11,7 @@ import {
   createElementHostBindings,
   createHostLifecycle,
   createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
   createTimerHostBindings,
   once,
   performanceNow,
@@ -92,6 +93,9 @@ export function createBrowserDocumentHostBindings() {
 
 export function createBrowserEventHostBindings() {
   return {
+    ...createKeyboardEventHostBindings({
+      fromEvent: (event) => (isKeyboardEvent(event) ? event : null),
+    }),
     "browser.event.target": (event) => nullableElementTarget(event.target),
     "browser.event.currentTarget": (event) =>
       nullableElementTarget(event.currentTarget),
@@ -102,10 +106,6 @@ export function createBrowserEventHostBindings() {
     "browser.event.stopPropagation": (event) => {
       stopPropagationOnEvent(event);
       return undefined;
-    },
-    "browser.event.key": (event) => {
-      const key = event?.key;
-      return typeof key === "string" ? key : "";
     },
     "browser.event.formValue": (event) =>
       createNullableValue(formControlEventValue(event)),
@@ -625,6 +625,13 @@ function isInputElement(value) {
   return (
     typeof globalThis.HTMLInputElement === "function" &&
     value instanceof globalThis.HTMLInputElement
+  );
+}
+
+function isKeyboardEvent(value) {
+  return (
+    typeof globalThis.KeyboardEvent === "function" &&
+    value instanceof globalThis.KeyboardEvent
   );
 }
 

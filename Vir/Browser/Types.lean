@@ -65,6 +65,9 @@ opaque DOMTokenList : Type
 /-- Browser event object class. Event values are callback-scoped resources. -/
 opaque Event : Type
 
+/-- Exact browser `KeyboardEvent` value. Keyboard events remain callback-scoped. -/
+opaque KeyboardEvent : Type
+
 /-- Handle for a browser event-listener registration. -/
 opaque EventListener : Type
 
