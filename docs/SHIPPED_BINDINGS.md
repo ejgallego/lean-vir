@@ -87,9 +87,14 @@ and shipped runtime targets; the UI does not call them roots.
 
 Each upstream member has a generation record with three independent facts:
 
-- **availability** is `available`, `candidate`, or `not-provided`. Only an
-  authored mapping or comparison target is available; a name candidate is not
-  presented as a Lean binding.
+- **semantic coverage** is `faithful`, `adapter-only`, `unreviewed`,
+  `local-contract`, `candidate`, or `not-provided`. It is computed once from
+  the canonical operations associated with the member. A changing adapter no
+  longer appears as faithful coverage merely because its provider key exists.
+  `unreviewed` dominates mixed coverage; otherwise one preserving operation is
+  enough for `faithful`, while a member with only changing operations is
+  `adapter-only`. Thus a faithful primitive can coexist with named convenience
+  adapters without hiding either fact.
 - **provenance** records whether upstream-correspondence evidence comes from
   direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
   annotation, or no implementation. This is distinct from declaration
@@ -312,7 +317,7 @@ python3 -m http.server 4178 --bind 127.0.0.1
 
 Then open `http://127.0.0.1:4178/build/bindings/index.html`.
 
-The document supports library, availability, boundary-evidence, and
+The document supports library, semantic-coverage, boundary-evidence, and
 author-disposition filters;
 deep links; upstream TypeScript documentation; inherited-member provenance;
 Lean and TypeScript source context; compiled boundary evidence; and light/dark

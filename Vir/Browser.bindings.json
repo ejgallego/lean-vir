@@ -44,11 +44,21 @@
     "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
       "cancelAnimationFrame": { "signature": "only" },
-      "CanvasRenderingContext2D.arc": { "signature": "only", "omittedOptionalParameters": ["counterclockwise"] },
+      "CanvasRenderingContext2D.arc": {
+        "signature": "only",
+        "omittedOptionalParameters": ["counterclockwise"],
+        "semantics": "preserving",
+        "reason": "Omitting counterclockwise preserves the TypeScript default value false."
+      },
       "CanvasRenderingContext2D.beginPath": { "signature": "only" },
       "CanvasRenderingContext2D.clearRect": { "signature": "only" },
       "CanvasRenderingContext2D.closePath": { "signature": "only" },
-      "CanvasRenderingContext2D.fill": { "signature": 0, "omittedOptionalParameters": ["fillRule"] },
+      "CanvasRenderingContext2D.fill": {
+        "signature": 0,
+        "omittedOptionalParameters": ["fillRule"],
+        "semantics": "preserving",
+        "reason": "The selected overload is fill(fillRule?), and omitting fillRule preserves its nonzero default."
+      },
       "CanvasRenderingContext2D.fillRect": { "signature": "only" },
       "CanvasRenderingContext2D.lineTo": { "signature": "only" },
       "CanvasRenderingContext2D.measureText": { "signature": "only" },
@@ -56,7 +66,11 @@
       "CanvasRenderingContext2D.restore": { "signature": "only" },
       "CanvasRenderingContext2D.rotate": { "signature": "only" },
       "CanvasRenderingContext2D.save": { "signature": "only" },
-      "CanvasRenderingContext2D.stroke": { "signature": 0 },
+      "CanvasRenderingContext2D.stroke": {
+        "signature": 0,
+        "semantics": "preserving",
+        "reason": "The selected zero-argument overload is the complete current-path stroke operation."
+      },
       "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
       "CanvasRenderingContext2D.translate": { "signature": "only" },
       "Console.log": { "signature": "only", "fixedRestParameters": { "data": ["message"] } },

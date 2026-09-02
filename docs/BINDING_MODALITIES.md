@@ -49,11 +49,14 @@ Canonical operation IR records this separately from type-comparator evidence:
 - `vir-owned` and `local-contract` identify operations whose semantics do not
   come from an external upstream operation.
 
-A TypeScript-derived operation without an operation exception receives a
-`preserving` contract claim from its declaration plus ABI profile. Exceptions
-and `upstream-adapter` protocols must explicitly set `semantics` to
-`preserving` or `changing`; until then the operation remains `unreviewed` in
-the author workbench. This is a contract classification, not provider-behavior
+A TypeScript-derived operation without an operation exception and with an
+unmodified single-signature call policy receives a `preserving` contract claim
+from its declaration plus ABI profile. A method policy that selects an overload
+or changes the exposed parameter list must set `semantics` and `reason`, unless
+an operation exception already supplies that review. Exceptions and
+`upstream-adapter` protocols likewise set `semantics` to `preserving` or
+`changing`; until then the operation remains `unreviewed` in the author
+workbench. This is a contract classification, not provider-behavior
 verification. Provider dispatch, retention, rollback, and cleanup remain
 separately trusted and tested.
 
@@ -162,8 +165,9 @@ Each operation records:
 - global or argument receiver policy;
 - every argument's Lean type, representation, passing, and retention;
 - the result's Lean type, representation, and ownership;
-- the declared host policy: exact-value transport, named or declared semantic
-  adaptation, and any private active-effect role;
+- the declared host policy: exact-value transport and any private active-effect
+  role;
+- correspondence and semantic fidelity as separate operation facts;
 - provenance for every derived choice;
 - the reason for any explicit exception;
 - a protocol's machine-readable upstream relation.
@@ -201,9 +205,11 @@ selection:
 ```json
 "methodPolicies": {
   "Element.getAttribute": { "signature": "only" },
-  "Document.createElement": {
-    "signature": 2,
-    "omittedOptionalParameters": ["options"]
+  "CanvasRenderingContext2D.arc": {
+    "signature": "only",
+    "omittedOptionalParameters": ["counterclockwise"],
+    "semantics": "preserving",
+    "reason": "Omitting counterclockwise preserves the TypeScript default value false."
   },
   "Element.removeEventListener": {
     "signature": 1,
@@ -217,7 +223,10 @@ selection:
 signature. An integer selects that zero-based overload explicitly. A required
 parameter can be omitted only by naming it in `omittedRequiredParameters` and
 providing a justified operation exception; this deliberately marks a reviewed
-signature projection rather than a faithful translation. Every optional
+signature projection rather than a faithful translation. Overload selection,
+optional or rest-parameter omission, fixed arguments, and parameter projection
+must carry `semantics` plus `reason` when no operation exception classifies the
+change. Every optional
 parameter must either be represented by a supported translation rule or named
 in `omittedOptionalParameters`; the current generator implements the latter
 path. A rest parameter must be omitted explicitly or projected to one or more

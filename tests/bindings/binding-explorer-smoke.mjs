@@ -49,13 +49,14 @@ const issueCounts = countBy(report.issues.map((issue) => issue.severity));
 const generationMembers = roots.flatMap((root) => root.coverage?.members ?? []);
 const dispositionCounts = countBy(generationMembers.map((member) =>
   member.generation.disposition));
-const availabilityCounts = countBy(generationMembers.map((member) =>
-  member.generation.availability));
+const semanticCoverageCounts = countBy(generationMembers.map((member) =>
+  member.generation.semanticCoverage.status));
 const generatedOperations = roots.flatMap((root) => root.generatedOperations ?? []);
 const semanticRelationCounts = countBy(generatedOperations.map((operation) =>
   operation.semantics.relation));
 
 assert.equal(report.format, "lean-vir-binding-explorer");
+assert.equal(report.version, 2);
 assert.deepEqual(report.boundaryAnalysis, {
   representationPolicy: "compiler-validated-coarse-boundary",
   ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
@@ -150,10 +151,6 @@ assert.deepEqual(report.summary.generation, {
   hostPolicies: {
     exactValueTransport: generatedOperations.filter((operation) =>
       operation.hostPolicy.valueTransport === "direct").length,
-    namedSemanticAdapters: generatedOperations.filter((operation) =>
-      operation.hostPolicy.semanticAdapter === "named").length,
-    declaredSemanticAdapters: generatedOperations.filter((operation) =>
-      operation.hostPolicy.semanticAdapter === "declared").length,
     activeEffects: Object.fromEntries(["register", "use", "release"].map((role) => [
       role,
       generatedOperations.filter((operation) =>
@@ -167,11 +164,14 @@ assert.deepEqual(report.summary.generation, {
     unsupported: dispositionCounts.unsupported ?? 0,
     "not-selected": dispositionCounts["not-selected"] ?? 0,
   },
-  availability: {
-    available: availabilityCounts.available ?? 0,
-    candidate: availabilityCounts.candidate ?? 0,
-    "not-provided": availabilityCounts["not-provided"] ?? 0,
-  },
+  semanticCoverage: Object.fromEntries([
+    "faithful",
+    "adapter-only",
+    "unreviewed",
+    "local-contract",
+    "candidate",
+    "not-provided",
+  ].map((status) => [status, semanticCoverageCounts[status] ?? 0])),
   workItems: report.workItems.length,
 });
 assert.equal(
@@ -187,7 +187,6 @@ assert.equal(
 assert.equal(report.summary.generation.semanticRelations.unreviewed, 0);
 assert.ok(report.summary.generation.semanticRelations.changing > 0);
 assert.ok(report.summary.generation.hostPolicies.exactValueTransport > 0);
-assert.ok(report.summary.generation.hostPolicies.namedSemanticAdapters > 0);
 assert.ok(Object.values(report.summary.generation.hostPolicies.activeEffects)
   .every((count) => count > 0));
 assert.equal(
@@ -284,8 +283,11 @@ assert.equal(documentTitle?.status, "compatible");
 assert.deepEqual(documentTitle?.generation, {
   disposition: "generated",
   provenance: "generator",
-  availability: "available",
   targets: ["browser.document.getTitle", "browser.document.setTitle"],
+  semanticCoverage: {
+    status: "faithful",
+    relations: ["preserving"],
+  },
   diagnostics: [],
 });
 const documentTitleGetter = documentRoot?.comparison.results.find(
@@ -332,7 +334,7 @@ assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
-assert.equal(documentQuerySelector?.generation.availability, "available");
+assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -365,7 +367,7 @@ const elementGetAttribute = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.getAttribute",
 );
 assert.equal(elementGetAttribute?.generation.disposition, "generated");
-assert.equal(elementGetAttribute?.generation.availability, "available");
+assert.equal(elementGetAttribute?.generation.semanticCoverage.status, "faithful");
 const generatedGetAttribute = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.getAttribute");
 assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "only");
@@ -383,7 +385,6 @@ assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener"
 assert.equal(generatedAddEventListener?.semantics.relation, "changing");
 assert.deepEqual(generatedAddEventListener?.hostPolicy, {
   valueTransport: "direct",
-  semanticAdapter: "declared",
   activeEffect: "register",
 });
 assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
@@ -622,8 +623,12 @@ assert.deepEqual(
 );
 const reactRootRender = reactDomRoot?.comparison.results.find((result) =>
   result.id === "react_dom.root.render");
+const reactRootRenderCoverage = reactDomRoot?.coverage.members.find((member) =>
+  member.id === "Root.render")?.generation.semanticCoverage;
 assert.equal(reactRootRender?.status, "compatible");
 assert.equal(reactRootRender?.target, "react.root.renderNode");
+assert.equal(reactRootRenderCoverage?.status, "faithful");
+assert.deepEqual(reactRootRenderCoverage?.relations, ["changing", "preserving"]);
 assert.ok(!(reactRootRender?.diagnostics ?? []).some((diagnostic) =>
   diagnostic.code === "typescript_dependency_abstract"));
 assert.ok(reactDomRoot?.generatedOperations.some((operation) =>
@@ -643,9 +648,25 @@ assert.ok(reactDomRoot?.coverage.members.filter((member) =>
   member.generation.disposition === "unsupported").every((member) =>
     member.generation.diagnostics.length === 0));
 
+assert.deepEqual(
+  roots.flatMap((root) => (root.coverage?.members ?? []).filter((member) =>
+    member.generation.semanticCoverage.status === "adapter-only").map((member) =>
+    `${root.library}/${root.id}:${member.id}`)).sort(),
+  [
+    "browser/element:Element.addEventListener",
+    "browser/element:Element.removeEventListener",
+    "browser/event:Event.currentTarget",
+    "browser/event:Event.target",
+    "infoview/clipboard:Clipboard.writeText",
+    "react/hooks:React.useEffect",
+    "react/props:React.Attributes.key",
+  ],
+);
+
 assert.match(html, /<h1>Binding reference<\/h1>/u);
-assert.match(html, /id="available-metric"/u);
-assert.match(html, /id="direct-metric"/u);
+assert.match(html, /id="faithful-metric"/u);
+assert.match(html, /id="adapter-metric"/u);
+assert.match(html, /id="coverage" aria-label="Filter upstream semantic coverage"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /id="semantics" aria-label="Filter semantic relation"/u);
 assert.match(html, /VIR binding reference/u);

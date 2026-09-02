@@ -188,7 +188,6 @@ test("operation IR records derived modalities and their provenance", () => {
   });
   assert.deepEqual(getter.hostPolicy, {
     valueTransport: "direct",
-    semanticAdapter: "none",
     activeEffect: "none",
   });
 });
@@ -284,7 +283,6 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   });
   assert.deepEqual(operation.hostPolicy, {
     valueTransport: "direct",
-    semanticAdapter: "named",
     activeEffect: "none",
   });
 
@@ -300,6 +298,15 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     evidence: "reviewed-protocol",
     detail: reviewedProtocol.protocolOperations[0].reason,
   });
+
+  const unclassifiedProtocol = structuredClone(protocolGeneration);
+  unclassifiedProtocol.protocolOperations[0].upstreamRelation = { kind: "unclassified" };
+  const unclassifiedOutput = renderLeanBindings(config, unclassifiedProtocol, descriptors);
+  assert.match(
+    unclassifiedOutput,
+    /boundary for unclassified VIR protocol `demo\.widget\.subscribe`, awaiting semantic review/u,
+  );
+  assert.doesNotMatch(unclassifiedOutput, /TypeScript `undefined`/u);
 
   const missingMember = structuredClone(protocolGeneration);
   missingMember.protocolOperations[0].upstreamRelation.member = "Widget.missing";
@@ -432,6 +439,25 @@ test("optional method parameters require an explicit trailing omission", () => {
     .find((candidate) => candidate.id === "demo.widget.getAttribute");
   assert.deepEqual(operation.typescript.signaturePolicy.omittedOptionalParameters, ["mode"]);
   assert.deepEqual(operation.arguments.map((argument) => argument.name), ["name"]);
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "method-policy",
+    detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+  });
+
+  optionalGeneration.methodPolicies["Widget.getAttribute"].semantics = "preserving";
+  optionalGeneration.methodPolicies["Widget.getAttribute"].reason =
+    "Omitting mode preserves the declaration's default behavior.";
+  const reviewed = buildGeneratedOperations(config, optionalGeneration, optionalDescriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  const reviewedOutput = renderLeanBindings(config, optionalGeneration, optionalDescriptors);
+  assert.deepEqual(reviewed.semantics, {
+    relation: "preserving",
+    evidence: "reviewed-method-policy",
+    detail: "Omitting mode preserves the declaration's default behavior.",
+  });
+  assert.match(reviewedOutput, /Generated reviewed method call policy/u);
+  assert.match(reviewedOutput, /Call policy: Omitting mode preserves/u);
 
   method.shape.args.push({ name: "requiredAfter", type: stringShape });
   assert.throws(

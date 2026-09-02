@@ -191,6 +191,8 @@ export function validateGenerationProfile(generation, context = "generation") {
         "fixedRestParameters",
         "fixedArguments",
         "parameterRenames",
+        "semantics",
+        "reason",
       ],
       `${context} method policy ${member}`,
     );
@@ -231,6 +233,16 @@ export function validateGenerationProfile(generation, context = "generation") {
         !Object.values(parameterRenames).every(nonemptyString) ||
         new Set(Object.values(parameterRenames)).size !== Object.keys(parameterRenames).length) {
       throw new Error(`${context} method policy ${member} has invalid parameter renames`);
+    }
+    if ((policy.semantics === undefined) !== (policy.reason === undefined)) {
+      throw new Error(`${context} method policy ${member} must define semantics and reason together`);
+    }
+    if (policy.semantics !== undefined &&
+        !["preserving", "changing"].includes(policy.semantics)) {
+      throw new Error(`${context} method policy ${member} has invalid semantics`);
+    }
+    if (policy.reason !== undefined && !nonemptyString(policy.reason)) {
+      throw new Error(`${context} method policy ${member} has invalid reason`);
     }
   }
   for (const [id, exception] of Object.entries(generation.exceptions ?? {})) {
@@ -345,7 +357,31 @@ function exceptionFor(generation, operationId) {
   return generation.exceptions?.[operationId] ?? null;
 }
 
-function derivedSemantics(exception) {
+function methodPolicyChangesCall(policy) {
+  return policy.signature !== "only" ||
+    (policy.omittedOptionalParameters?.length ?? 0) !== 0 ||
+    (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
+    (policy.omittedRestParameters?.length ?? 0) !== 0 ||
+    Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
+    Object.keys(policy.fixedArguments ?? {}).length !== 0 ||
+    Object.keys(policy.parameterRenames ?? {}).length !== 0;
+}
+
+function derivedSemantics(exception, methodPolicy = null) {
+  if (exception === null && methodPolicy?.semantics !== undefined) {
+    return {
+      relation: methodPolicy.semantics,
+      evidence: "reviewed-method-policy",
+      detail: methodPolicy.reason,
+    };
+  }
+  if (exception === null && methodPolicy !== null && methodPolicyChangesCall(methodPolicy)) {
+    return {
+      relation: "unreviewed",
+      evidence: "method-policy",
+      detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+    };
+  }
   if (exception === null) {
     return {
       relation: "preserving",
@@ -397,15 +433,10 @@ function hostPolicy(operation, profile) {
   ];
   const transportsJavaScriptValue = positions.some((position) =>
     position.modalities.representation === "js-resource");
-  const relation = operation.protocol?.upstreamRelation;
-  const semanticAdapter = relation?.kind === "upstream-adapter"
-    ? "named"
-    : operation.semantics.relation === "changing" ? "declared" : "none";
   return {
     valueTransport: transportsJavaScriptValue
       ? profile.resource.valueTransport
       : "not-applicable",
-    semanticAdapter,
     activeEffect: operation.activeEffect ?? "none",
   };
 }
@@ -919,7 +950,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     receiver,
     arguments: arguments_,
     result,
-    semantics: derivedSemantics(exception),
+    semantics: derivedSemantics(exception, policy),
     ...(exception?.activeEffect === undefined ? {} : { activeEffect: exception.activeEffect }),
     ...(exception === null ? {} : { exception: { reason: exception.reason } }),
   };

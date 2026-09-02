@@ -8,16 +8,16 @@ const report = JSON.parse(document.querySelector("#report-data").textContent);
 const generation = report.summary.generation;
 
 document.querySelector("#catalog-metric").textContent = String(
-  Object.values(generation.availability).reduce((sum, count) => sum + count, 0),
+  Object.values(generation.semanticCoverage).reduce((sum, count) => sum + count, 0),
 );
-document.querySelector("#available-metric").textContent = String(
-  generation.availability.available,
+document.querySelector("#faithful-metric").textContent = String(
+  generation.semanticCoverage.faithful,
+);
+document.querySelector("#adapter-metric").textContent = String(
+  generation.semanticCoverage["adapter-only"],
 );
 document.querySelector("#generated-metric").textContent = String(
   generation.boundaries.targets,
-);
-document.querySelector("#direct-metric").textContent = String(
-  generation.boundaries.typescriptDerived,
 );
 document.querySelector("#work-metric").textContent = String(generation.workItems);
 document.querySelector("#work-card").classList.add(
@@ -42,8 +42,7 @@ document.querySelector("#scope").replaceChildren(
     `${generation.semanticRelations.preserving} contracts claim semantics preservation, ` +
     `${generation.semanticRelations.changing} are explicit semantic adapters, and ` +
     `${generation.semanticRelations.unreviewed} require semantic review. ` +
-    `${generation.hostPolicies.exactValueTransport} operations transport exact JavaScript values, ` +
-    `${generation.hostPolicies.namedSemanticAdapters} are named semantic adapters, and ` +
+    `${generation.hostPolicies.exactValueTransport} operations transport exact JavaScript values, and ` +
     `${Object.values(generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} ` +
     "operations register, use, or release private active-effect teardown records. " +
     "Provider behavior is not mechanically verified by this name reconciliation. " +
@@ -133,11 +132,23 @@ const dispositionLabel = (value) => ({
   unsupported: "unsupported",
   "not-selected": "not selected",
 })[value] ?? value;
-const availabilityLabel = (value) => ({
-  available: "VIR binding available",
+const semanticCoverageLabel = (value) => ({
+  faithful: "faithful VIR binding",
+  "adapter-only": "explicit adapter only",
+  unreviewed: "semantic review required",
+  "local-contract": "local contract",
   candidate: "correspondence not confirmed",
   "not-provided": "not provided",
 })[value] ?? value;
+const semanticCoverageSummary = (coverage) => [
+  ["faithful", "faithful"],
+  ["adapter-only", "adapter only"],
+  ["unreviewed", "unreviewed"],
+  ["local-contract", "local contract"],
+  ["candidate", "candidate"],
+  ["not-provided", "not provided"],
+].filter(([status]) => (coverage[status] ?? 0) !== 0)
+  .map(([status, label]) => `${coverage[status]} ${label}`).join(" · ");
 const evidenceLabel = (value) => ({
   exact: "exact comparator match",
   compatible: "comparator-compatible",
@@ -177,14 +188,6 @@ function operationsForSymbol(group, symbol) {
     operation.protocol?.upstreamRelation.member === symbol.id);
 }
 
-function combinedSemanticRelation(operations) {
-  const relations = new Set(operations.map(semanticRelation));
-  if (relations.has("unreviewed")) return "unreviewed";
-  if (relations.has("changing")) return "changing";
-  if (relations.size === 1) return [...relations][0];
-  return operations.length === 0 ? "unreviewed" : "changing";
-}
-
 const librarySelect = document.querySelector("#library");
 for (const library of report.libraries) {
   librarySelect.add(new Option(library.title, library.id));
@@ -217,7 +220,7 @@ const workById = new Map(workItems.map((item) => [item.id, item]));
 const elements = Object.fromEntries([
   "search",
   "library",
-  "availability",
+  "coverage",
   "boundary",
   "semantics",
   "disposition",
@@ -291,8 +294,9 @@ function groupId(group) {
 
 function primarySymbols(group) {
   const roots = new Set(group.upstream.roots ?? []);
+  const covered = new Set((group.coverage?.members ?? []).map((member) => member.id));
   return (group.typescript?.symbols ?? []).filter((symbol) =>
-    roots.has(symbol.id) || symbol.surfaceRoot !== undefined);
+    roots.has(symbol.id) || symbol.surfaceRoot !== undefined || covered.has(symbol.id));
 }
 
 function coverageMember(group, id) {
@@ -315,12 +319,12 @@ function groupSearchText(group) {
 
 function referenceGroupMatches(group) {
   const query = elements.search.value.trim().toLowerCase();
-  const availability = elements.availability.value;
+  const coverage = elements.coverage.value;
   const library = elements.library.value;
   const members = group.coverage?.members ?? [];
   return (library === "all" || group.library.id === library) &&
-    (availability === "all" || members.some((member) =>
-      member.generation.availability === availability)) &&
+    (coverage === "all" || members.some((member) =>
+      member.generation.semanticCoverage.status === coverage)) &&
     (!query || groupSearchText(group).includes(query));
 }
 
@@ -366,7 +370,7 @@ function render() {
   elements["reference-view"].classList.toggle("active", view === "reference");
   elements["inventory-view"].classList.toggle("active", view === "inventory");
   elements["workbench-view"].classList.toggle("active", view === "workbench");
-  elements.availability.hidden = view !== "reference";
+  elements.coverage.hidden = view !== "reference";
   elements.boundary.hidden = view !== "inventory";
   elements.semantics.hidden = view !== "inventory";
   elements.disposition.hidden = view !== "workbench";
@@ -385,14 +389,12 @@ function renderReference() {
     ? '<div class="empty">No upstream API groups match these filters.</div>'
     : visible.map((group) => {
       const id = groupId(group);
-      const availability = group.coverage?.generation.availability ?? {};
+      const coverage = group.coverage?.generation.semanticCoverage ?? {};
       return '<button type="button" class="row ' + (id === selected ? "active" : "") +
         '" data-group="' + escapeHtml(id) + '"><span><span class="name">' +
         escapeHtml(group.library.title + " · " + group.title) +
-        '</span><span class="sub">' + (availability.available ?? 0) + " confirmed · " +
-        (availability.candidate ?? 0) + " unconfirmed · " +
-        (availability["not-provided"] ?? 0) +
-        ' not provided</span></span><span class="pill available">upstream API</span></button>';
+        '</span><span class="sub">' + escapeHtml(semanticCoverageSummary(coverage)) +
+        '</span></span><span class="pill faithful">upstream API</span></button>';
     }).join("");
   elements.results.querySelectorAll("[data-group]").forEach((button) =>
     button.addEventListener("click", () => selectGroup(button.dataset.group)));
@@ -854,7 +856,7 @@ function renderLeanCards(targetIds, {
 
 function symbolMatchesReferenceFilters(group, symbol) {
   const member = coverageMember(group, symbol.id);
-  const availability = elements.availability.value;
+  const coverage = elements.coverage.value;
   const query = elements.search.value.trim().toLowerCase();
   const groupHeaderMatches = query && searchText([
     group.library.title,
@@ -862,7 +864,7 @@ function symbolMatchesReferenceFilters(group, symbol) {
     group.description,
     group.upstream.roots,
   ]).includes(query);
-  return (availability === "all" || member?.generation.availability === availability) &&
+  return (coverage === "all" || member?.generation.semanticCoverage.status === coverage) &&
     (!query || groupHeaderMatches || searchText([symbol.id, symbol.display, symbol.hover]).includes(query));
 }
 
@@ -919,21 +921,22 @@ function renderUpstreamSymbol(group, symbol) {
   const inherited = symbol.inheritedFrom
     ? '<span class="badge">inherited from ' + escapeHtml(symbol.inheritedFrom) + "</span>"
     : "";
-  const availability = state
-    ? '<span class="pill ' + escapeHtml(state.availability) + '">' +
-      escapeHtml(availabilityLabel(state.availability)) + "</span>"
+  const coverage = state?.semanticCoverage
+    ? '<span class="pill ' + escapeHtml(state.semanticCoverage.status) + '">' +
+      escapeHtml(semanticCoverageLabel(state.semanticCoverage.status)) + "</span>"
     : "";
   const evidence = member
     ? '<span class="pill ' + escapeHtml(member.status) + '">' +
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
-  const relation = combinedSemanticRelation(operationsForSymbol(group, symbol));
+  const relation = state?.semanticCoverage.status;
   const leanPaneTitle = ({
-    preserving: "Semantics-preserving Lean boundary",
-    changing: "Explicit Lean semantic adapter",
+    faithful: "Faithful Lean boundary",
+    "adapter-only": "Explicit Lean semantic adapter",
     unreviewed: "Lean boundary — semantic review required",
+    "local-contract": "Repository-local Lean contract",
   })[relation] ?? "Lean boundary";
-  const lean = state?.availability === "available"
+  const lean = state !== undefined && !["candidate", "not-provided"].includes(relation)
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
       renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
       escapeHtml(leanPaneTitle) + '</div>' +
@@ -942,7 +945,7 @@ function renderUpstreamSymbol(group, symbol) {
       (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
-    availability + " " + evidence + '</summary><div class="card-head">' +
+    coverage + " " + evidence + '</summary><div class="card-head">' +
     renderDocumentation(symbol.hover) +
     symbolSource(symbol) + "</div>" + lean + renderGenerationPolicy(group, symbol) + "</details>";
 }
@@ -959,7 +962,7 @@ function renderGroupDetail(group) {
     : "";
   const symbols = primarySymbols(group).filter((symbol) =>
     symbolMatchesReferenceFilters(group, symbol));
-  elements.detail.innerHTML = '<div class="badges"><span class="pill available">upstream API</span>' +
+  elements.detail.innerHTML = '<div class="badges"><span class="pill faithful">upstream API</span>' +
     upstream.map((value) => '<span class="badge">' + escapeHtml(value) + "</span>").join("") +
     "</div><h2>" + escapeHtml(group.title) + '</h2><p class="note">' +
     escapeHtml(group.description || group.library.description) + "</p>" + docs +
@@ -1082,11 +1085,6 @@ function renderGenerationDecisions(operation) {
     operation.hostPolicy.valueTransport === "direct"
       ? "Value transport: exact JavaScript value (no public host wrapper)"
       : undefined,
-    operation.hostPolicy.semanticAdapter === "named"
-      ? "Adapter: named upstream semantic adapter"
-      : operation.hostPolicy.semanticAdapter === "declared"
-        ? "Adapter: declared TypeScript-operation specialization"
-        : undefined,
     operation.hostPolicy.activeEffect === "none"
       ? undefined
       : "Private active-effect teardown: " + operation.hostPolicy.activeEffect,
@@ -1213,7 +1211,7 @@ function renderWorkItem(item) {
     selectGroup(item.library + "/" + item.group));
 }
 
-[elements.search, elements.library, elements.availability, elements.boundary, elements.semantics, elements.disposition].forEach((element) =>
+[elements.search, elements.library, elements.coverage, elements.boundary, elements.semantics, elements.disposition].forEach((element) =>
   element.addEventListener(element === elements.search ? "input" : "change", render));
 elements["reference-view"].addEventListener("click", () =>
   selectGroup(groupById.has(selected) ? selected : groupId(referenceGroups[0])));

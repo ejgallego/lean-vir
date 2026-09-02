@@ -35,6 +35,14 @@ const generationDispositions = [
   "unsupported",
   "not-selected",
 ];
+const semanticCoverageStatuses = [
+  "faithful",
+  "adapter-only",
+  "unreviewed",
+  "local-contract",
+  "candidate",
+  "not-provided",
+];
 const usageLine = "usage: node scripts/bindings/generate-binding-explorer.mjs --coverage FILE --out FILE --html FILE [options]";
 
 function usage() {
@@ -282,7 +290,36 @@ function comparisonResultsForSymbol(symbol, comparison) {
       result.ts === symbol.surfaceRoot));
 }
 
-function generationRecord(generatedMembers, symbol, member, targetMappings, comparison) {
+function operationUpstreamMember(operation) {
+  if (operation.typescript.kind !== "protocol") return operation.typescript.member;
+  const relation = operation.protocol?.upstreamRelation;
+  return ["upstream-adapter", "local-contract"].includes(relation?.kind)
+    ? relation.member
+    : null;
+}
+
+function semanticCoverageRecord(operations, confirmedTargets, candidateTargets) {
+  const relations = [...new Set(operations.map((operation) =>
+    operation.semantics.relation))].sort();
+  let status;
+  if (relations.includes("unreviewed")) status = "unreviewed";
+  else if (relations.includes("preserving")) status = "faithful";
+  else if (relations.includes("changing")) status = "adapter-only";
+  else if (relations.includes("local-contract")) status = "local-contract";
+  else if (confirmedTargets.length !== 0) status = "unreviewed";
+  else if (candidateTargets.length !== 0) status = "candidate";
+  else status = "not-provided";
+  return { status, relations };
+}
+
+function generationRecord(
+  generatedMembers,
+  symbol,
+  member,
+  targetMappings,
+  comparison,
+  generatedOperations,
+) {
   const comparisonResults = comparisonResultsForSymbol(symbol, comparison);
   const auditedTargets = comparisonResults.filter((result) =>
     result.relation === "audit" && result.target !== undefined).map((result) => result.target);
@@ -369,19 +406,36 @@ function generationRecord(generatedMembers, symbol, member, targetMappings, comp
   return {
     disposition,
     provenance,
-    availability: confirmedTargets.length !== 0 || adaptedTargets.length !== 0
-      ? "available"
-      : candidateTargets.length !== 0 ? "candidate" : "not-provided",
     targets: [...new Set([...confirmedTargets, ...adaptedTargets])].sort(),
+    semanticCoverage: semanticCoverageRecord(
+      generatedOperations,
+      [...new Set([...confirmedTargets, ...adaptedTargets])],
+      candidateTargets,
+    ),
     ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
     diagnostics,
   };
 }
 
-function decorateGenerationCoverage(config, bindingRoot, typeScript, surfaceCoverage, comparison) {
+function decorateGenerationCoverage(
+  config,
+  bindingRoot,
+  typeScript,
+  surfaceCoverage,
+  comparison,
+  generatedOperations,
+) {
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const generatedMembers = new Set(config.generation?.members ?? []);
   const targetMappingsBySymbol = new Map();
+  const operationsBySymbol = new Map();
+  for (const operation of generatedOperations) {
+    const member = operationUpstreamMember(operation);
+    if (member === null) continue;
+    const operations = operationsBySymbol.get(member) ?? [];
+    operations.push(operation);
+    operationsBySymbol.set(member, operations);
+  }
   for (const mapping of surfaceCoverage.targetMappings) {
     const ids = [mapping.typescript, ...(mapping.candidates ?? []).map((candidate) =>
       candidate.typescript)].filter(Boolean);
@@ -404,21 +458,22 @@ function decorateGenerationCoverage(config, bindingRoot, typeScript, surfaceCove
         member,
         targetMappingsBySymbol.get(member.id) ?? [],
         comparison,
+        operationsBySymbol.get(member.id) ?? [],
       ),
     };
   });
   const disposition = Object.fromEntries(generationDispositions.map((status) => [status, 0]));
-  const availability = { available: 0, candidate: 0, "not-provided": 0 };
+  const semanticCoverage = Object.fromEntries(semanticCoverageStatuses.map((status) => [status, 0]));
   for (const member of members) {
     disposition[member.generation.disposition] += 1;
-    availability[member.generation.availability] += 1;
+    semanticCoverage[member.generation.semanticCoverage.status] += 1;
   }
   return {
     ...surfaceCoverage,
     members,
     generation: {
       disposition,
-      availability,
+      semanticCoverage,
       actions: members.reduce((sum, member) => sum + member.generation.diagnostics.length, 0),
     },
   };
@@ -435,7 +490,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
       member: member.id,
       disposition: member.generation.disposition,
       provenance: member.generation.provenance,
-      availability: member.generation.availability,
+      semanticCoverage: member.generation.semanticCoverage.status,
       targets: member.generation.targets,
       ...(member.generation.candidateTargets === undefined
         ? {} : { candidateTargets: member.generation.candidateTargets }),
@@ -657,7 +712,8 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
     const missing = bindings.filter((binding) => !classifiedTargets.has(binding.target)).map((binding) => binding.target);
     throw new Error(`${config.id}/${bindingRoot.id} mappings do not classify targets: ${missing.join(", ")}`);
   }
-  const members = typeScript.symbols.filter((symbol) => symbol.surfaceRoot !== undefined).map((symbol) => {
+  const members = typeScript.symbols.filter((symbol) =>
+    symbol.surfaceRoot !== undefined || mappings.has(symbol.id)).map((symbol) => {
     const mapping = mappings.get(symbol.id);
     return {
       id: symbol.id,
@@ -1042,6 +1098,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           typescript,
           rawSurfaceCoverage,
           comparison,
+          generatedByGroup.get(bindingRoot.id) ?? [],
         );
       const issues = [];
       for (const binding of bindings) {
@@ -1158,10 +1215,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   const hostPolicies = {
     exactValueTransport: generatedOperations.filter((operation) =>
       operation.hostPolicy.valueTransport === "direct").length,
-    namedSemanticAdapters: generatedOperations.filter((operation) =>
-      operation.hostPolicy.semanticAdapter === "named").length,
-    declaredSemanticAdapters: generatedOperations.filter((operation) =>
-      operation.hostPolicy.semanticAdapter === "declared").length,
     activeEffects: Object.fromEntries(["register", "use", "release"].map((role) => [
       role,
       generatedOperations.filter((operation) =>
@@ -1188,10 +1241,10 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
       generationGroups.reduce((sum, entry) =>
         sum + entry.coverage.generation.disposition[status], 0),
     ])),
-    availability: Object.fromEntries(["available", "candidate", "not-provided"].map((status) => [
+    semanticCoverage: Object.fromEntries(semanticCoverageStatuses.map((status) => [
       status,
       generationGroups.reduce((sum, entry) =>
-        sum + entry.coverage.generation.availability[status], 0),
+        sum + entry.coverage.generation.semanticCoverage[status], 0),
     ])),
     workItems: workItems.length,
   };
@@ -1210,7 +1263,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
     format: "lean-vir-binding-explorer",
-    version: 1,
+    version: 2,
     generatedBy: "scripts/bindings/generate-binding-explorer.mjs",
     inputs: {
       coverage: relative(repositoryRoot, coveragePath),
@@ -1313,7 +1366,8 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
-  console.log(`  host policy: ${report.summary.generation.hostPolicies.exactValueTransport} exact-value transports, ${report.summary.generation.hostPolicies.namedSemanticAdapters} named semantic adapters, ${Object.values(report.summary.generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} private active-effect operations`);
+  console.log(`  upstream semantic coverage: ${report.summary.generation.semanticCoverage.faithful} faithful, ${report.summary.generation.semanticCoverage["adapter-only"]} adapter-only, ${report.summary.generation.semanticCoverage.unreviewed} unreviewed, ${report.summary.generation.semanticCoverage["local-contract"]} local-contract, ${report.summary.generation.semanticCoverage.candidate} candidate, ${report.summary.generation.semanticCoverage["not-provided"]} not provided`);
+  console.log(`  host policy: ${report.summary.generation.hostPolicies.exactValueTransport} exact-value transports, ${Object.values(report.summary.generation.hostPolicies.activeEffects).reduce((sum, count) => sum + count, 0)} private active-effect operations`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);
   const unresolvedSemanticMissing = Math.max(

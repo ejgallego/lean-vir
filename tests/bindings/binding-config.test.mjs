@@ -22,6 +22,15 @@ const javascript = JSON.parse(await readFile(javascriptPath, "utf8"));
 const reactPath = new URL("../../Vir/React.bindings.json", import.meta.url).pathname;
 const react = JSON.parse(await readFile(reactPath, "utf8"));
 
+const generationExceptions = (config) => Object.entries(config.generation.exceptions ?? {});
+const upstreamAdapters = (config) => config.generation.protocolOperations.filter((operation) =>
+  operation.upstreamRelation.kind === "upstream-adapter");
+const activeEffectAssignments = (config) => [
+  ...generationExceptions(config),
+  ...config.generation.protocolOperations.map((operation) => [operation.id, operation]),
+].filter(([, operation]) => operation.activeEffect !== undefined)
+  .map(([id, operation]) => `${id}:${operation.activeEffect}`).sort();
+
 test("the shared loader validates a complete binding library", async () => {
   const loaded = await loadBindingConfig(browserPath);
   assert.equal(loaded.id, "browser");
@@ -143,6 +152,20 @@ test("semantic review classifications are fail-closed enums", async () => {
     validateBindingConfig(invalidException, browserPath),
     /semantics.*must be equal to one of the allowed values/u,
   );
+
+  const invalidMethodPolicy = structuredClone(browser);
+  invalidMethodPolicy.generation.methodPolicies["CanvasRenderingContext2D.arc"].semantics = "close";
+  await assert.rejects(
+    validateBindingConfig(invalidMethodPolicy, browserPath),
+    /semantics.*must be equal to one of the allowed values/u,
+  );
+
+  const missingMethodReason = structuredClone(browser);
+  delete missingMethodReason.generation.methodPolicies["CanvasRenderingContext2D.arc"].reason;
+  await assert.rejects(
+    validateBindingConfig(missingMethodReason, browserPath),
+    /must have property reason when property semantics is present/u,
+  );
 });
 
 test("ABI profiles require direct JavaScript value transport", async () => {
@@ -167,7 +190,7 @@ test("private active-effect roles are fail-closed", async () => {
 });
 
 test("the Browser audit classifies every exception and upstream adapter", () => {
-  const exceptions = Object.entries(browser.generation.exceptions);
+  const exceptions = generationExceptions(browser);
   assert.equal(exceptions.filter(([, exception]) =>
     exception.semantics === undefined).length, 0);
   assert.deepEqual(
@@ -181,19 +204,13 @@ test("the Browser audit classifies every exception and upstream adapter", () => 
     ],
   );
 
-  const adapters = browser.generation.protocolOperations.filter((operation) =>
-    operation.upstreamRelation.kind === "upstream-adapter");
+  const adapters = upstreamAdapters(browser);
   assert.equal(adapters.filter((operation) =>
     operation.upstreamRelation.semantics === undefined).length, 0);
   assert.equal(adapters.filter((operation) =>
     operation.upstreamRelation.semantics === "changing").length, 0);
   assert.deepEqual(
-    [
-      ...Object.entries(browser.generation.exceptions),
-      ...browser.generation.protocolOperations.map((operation) =>
-        [operation.id, operation]),
-    ].filter(([, operation]) => operation.activeEffect !== undefined)
-      .map(([id, operation]) => `${id}:${operation.activeEffect}`).sort(),
+    activeEffectAssignments(browser),
     [
       "browser.animation.cancelAnimationFrame:release",
       "browser.animation.requestAnimationFrame:register",
@@ -214,8 +231,7 @@ test("the infoview clipboard capability is an explicit semantic adapter", () => 
 });
 
 test("the JavaScript collection audit distinguishes direct operations from ownership and null adapters", () => {
-  const adapters = javascript.generation.protocolOperations.filter((operation) =>
-    operation.upstreamRelation.kind === "upstream-adapter");
+  const adapters = upstreamAdapters(javascript);
   assert.equal(adapters.filter((operation) =>
     operation.upstreamRelation.semantics === undefined).length, 0);
   assert.deepEqual(
@@ -227,7 +243,7 @@ test("the JavaScript collection audit distinguishes direct operations from owner
 });
 
 test("the React audit treats direct native values as the preserving exemplar", () => {
-  const exceptions = Object.entries(react.generation.exceptions);
+  const exceptions = generationExceptions(react);
   assert.equal(exceptions.filter(([, exception]) =>
     exception.semantics === undefined).length, 0);
   assert.deepEqual(
@@ -236,8 +252,7 @@ test("the React audit treats direct native values as the preserving exemplar", (
     [],
   );
 
-  const adapters = react.generation.protocolOperations.filter((operation) =>
-    operation.upstreamRelation.kind === "upstream-adapter");
+  const adapters = upstreamAdapters(react);
   assert.equal(adapters.filter((operation) =>
     operation.upstreamRelation.semantics === undefined).length, 0);
   assert.deepEqual(
@@ -256,6 +271,16 @@ test("the React audit treats direct native values as the preserving exemplar", (
       ?.upstreamRelation.semantics,
     "preserving",
   );
+  assert.deepEqual(activeEffectAssignments(react), [
+    "react.root.create:register",
+    "react.root.render-component-selector:register",
+    "react.root.render-component:use",
+    "react.root.render-selector:register",
+    "react.root.render-tree:use",
+    "react.root.renderNode:use",
+    "react.root.unmount-selector:release",
+    "react.root.unmount:release",
+  ]);
 });
 
 test("local protocol relations identify their declaration member", async () => {

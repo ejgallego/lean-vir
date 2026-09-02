@@ -122,27 +122,32 @@ function leanDocText(value) {
   return String(value ?? "").replaceAll("-/", "- /").trim();
 }
 
-function upstreamOperationName(operation) {
-  return operation.protocol?.upstreamRelation.member ?? operation.typescript.member;
+function semanticSubject(operation) {
+  const upstream = operation.protocol?.upstreamRelation.member;
+  if (upstream !== undefined) return `TypeScript \`${upstream}\``;
+  if (operation.typescript.kind !== "protocol") {
+    return `TypeScript \`${operation.typescript.member}\``;
+  }
+  return `unclassified VIR protocol \`${operation.typescript.member}\``;
 }
 
 function semanticDocumentation(operation, operationLabel) {
   const relation = operation.semantics.relation;
-  const member = upstreamOperationName(operation);
+  const subject = semanticSubject(operation);
   if (relation === "changing") {
     return {
-      headline: `Generated explicit ${operationLabel} semantic adapter for TypeScript \`${member}\`.`,
+      headline: `Generated explicit ${operationLabel} semantic adapter for ${subject}.`,
       note: operation.exception === undefined
         ? "Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior."
         : `Semantic relation: explicit adapter; this boundary intentionally changes upstream-observable behavior.\n\nAdapter policy: ${leanDocText(operation.semantics.detail)}`,
-      boundary: `Generated explicit JavaScript semantic adapter for the TypeScript \`${member}\` ${operationLabel}.`,
+      boundary: `Generated explicit JavaScript semantic adapter for the ${subject} ${operationLabel}.`,
     };
   }
   if (relation === "unreviewed") {
     return {
-      headline: `Generated ${operationLabel} boundary for TypeScript \`${member}\`, awaiting semantic review.`,
+      headline: `Generated ${operationLabel} boundary for ${subject}, awaiting semantic review.`,
       note: `Semantic review required: ${leanDocText(operation.semantics.detail)}`,
-      boundary: `Generated JavaScript boundary awaiting semantic review for the TypeScript \`${member}\` ${operationLabel}.`,
+      boundary: `Generated JavaScript boundary awaiting semantic review for the ${subject} ${operationLabel}.`,
     };
   }
   return null;
@@ -155,6 +160,7 @@ function renderOperation(operation, profile) {
   ];
   const source = sourceReference(operation.typescript.source);
   const specialized = operation.exception !== undefined;
+  const reviewedMethodPolicy = operation.semantics.evidence === "reviewed-method-policy";
   const operationLabel = operation.typescript.kind === "method"
     ? "method"
     : operation.typescript.kind === "function"
@@ -167,11 +173,14 @@ function renderOperation(operation, profile) {
   const publicDocumentation = leanDocText([
     semanticDoc?.headline ?? (operation.typescript.kind === "protocol"
       ? `Generated binding for reviewed VIR protocol \`${operation.typescript.member}\`.`
+      : reviewedMethodPolicy
+        ? `Generated reviewed ${operationLabel} call policy for TypeScript \`${operation.typescript.member}\`.`
       : specialized
         ? `Generated reviewed ${operationLabel} specialization of TypeScript \`${operation.typescript.member}\`.`
         : `Faithful generated ${operationLabel} binding for TypeScript \`${operation.typescript.member}\`.`),
     upstreamDocumentation,
     semanticDoc?.note,
+    reviewedMethodPolicy ? `Call policy: ${leanDocText(operation.semantics.detail)}` : undefined,
     operation.typescript.kind === "protocol"
       ? "Binding contract: `generation.protocolOperations`."
       : `Upstream declaration: ${source}`,

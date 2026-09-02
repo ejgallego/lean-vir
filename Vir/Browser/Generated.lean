@@ -51,9 +51,11 @@ end Animation
 namespace CanvasRenderingContext2D
 
 /--
-Faithful generated method binding for TypeScript `CanvasRenderingContext2D.arc`.
+Generated reviewed method call policy for TypeScript `CanvasRenderingContext2D.arc`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/arc)
+
+Call policy: Omitting counterclockwise preserves the TypeScript default value false.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -128,9 +130,11 @@ opaque closePath
     DomM Unit
 
 /--
-Faithful generated method binding for TypeScript `CanvasRenderingContext2D.fill`.
+Generated reviewed method call policy for TypeScript `CanvasRenderingContext2D.fill`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/fill)
+
+Call policy: The selected overload is fill(fillRule?), and omitting fillRule preserves its nonzero default.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -344,9 +348,11 @@ opaque save
     DomM Unit
 
 /--
-Faithful generated method binding for TypeScript `CanvasRenderingContext2D.stroke`.
+Generated reviewed method call policy for TypeScript `CanvasRenderingContext2D.stroke`.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/stroke)
+
+Call policy: The selected zero-argument overload is the complete current-path stroke operation.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
