@@ -66,7 +66,7 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);
   assert.deepEqual(config.example, { id: "prettyM", variant: "default" });
-  assert.equal(config.setId, "prettyM-bounded-set-0002");
+  assert.equal(config.setId, "prettyM-bounded-set-0003");
   assert.equal(
     config.components.vir.runtime.repository,
     "https://github.com/ejgallego/lean-vir",

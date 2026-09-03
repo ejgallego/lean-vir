@@ -130,7 +130,8 @@ try {
       assert.equal(
         byId.get(backendId)?.status,
         "ready",
-        `${exampleId}/${variant.id}/${test.id} requires ready backend ${backendId}`,
+        `${exampleId}/${variant.id}/${test.id} requires ready backend ${backendId}` +
+          (byId.get(backendId)?.error ? `: ${byId.get(backendId).error}` : ""),
       );
     }
     const report = await page.evaluate(

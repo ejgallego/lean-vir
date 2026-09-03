@@ -60,7 +60,7 @@
     "vir-prettyM": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65"
+      "revision": "b519d5adf48c6f208939819b556671007271ec11"
     }
   },
   "builds": {
@@ -70,7 +70,7 @@
         "variant": "default"
       },
       "artifactSet": {
-        "setId": "prettyM-bounded-set-0002",
+        "setId": "prettyM-bounded-set-0003",
         "benchmarkContract": {
           "id": "prettyM/artifacts/v1",
           "input": "prettyM-compact-format/v1",
