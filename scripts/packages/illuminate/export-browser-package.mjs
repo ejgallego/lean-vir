@@ -154,11 +154,12 @@ async function main() {
     const packagePaths = descriptor.packages.map(
       ({ path }) => `module-set/${path}`,
     );
-    const expectedPackagePaths = [
-      "module-set/Vir.parts/0.irpkg",
-      packageFile,
-    ];
-    if (JSON.stringify(packagePaths) !== JSON.stringify(expectedPackagePaths)) {
+    const pathsAreCanonical = packagePaths.every((path, index) =>
+      index + 1 === packagePaths.length
+        ? path === packageFile
+        : path === `module-set/Vir.parts/${index}.irpkg`,
+    );
+    if (packagePaths.length === 0 || !pathsAreCanonical) {
       throw new Error(
         `unexpected Illuminate VIR package members: ${packagePaths.join(", ")}`,
       );
