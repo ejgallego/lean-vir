@@ -107,11 +107,11 @@ private def fallbackAdapter?
 
 private def importedLoadedDecl?
     (index : DeclIndex) (name : Name) (accept : Decl → Bool) : Option LoadedDecl :=
-  index.envs.findSome? fun (source, env) => do
+  index.envs.findSome? fun (sourceKey, env) => do
     let decl ← findEnvDecl env name
     guard <| accept decl
     return {
-      source := s!"imported by {source}"
+      source := s!"imported by {index.displaySourceForKey sourceKey}"
       module? := environmentModuleForDecl? env name
       decl
     }
@@ -141,7 +141,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       if !Vir.ExportValidation.isExternFallbackClone env decl.name then
         names := names.push decl.name
       let loaded := {
-        source := sourceKey
+        source := source.toString
         module? := environmentModuleForDecl? env decl.name
         decl
       }

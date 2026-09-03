@@ -93,6 +93,11 @@ def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
   index.sourceKeys.findSome? (fun (source, key) =>
     if source == target.source.toString then some key else none) |>.getD target.source.normalize.toString
 
+/-- Preserve the first caller-supplied spelling for diagnostics and manifests. -/
+def DeclIndex.displaySourceForKey (index : DeclIndex) (sourceKey : String) : String :=
+  index.sourceKeys.findSome? (fun (source, key) =>
+    if key == sourceKey then some source else none) |>.getD sourceKey
+
 structure InitGlobal where
   name : Name
   initName : Name
