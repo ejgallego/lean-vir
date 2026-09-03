@@ -190,7 +190,8 @@ def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
 
 def withElement
     (selector : String) (f : Lean.Vir.Js Lean.Vir.Browser.Element → DomM Unit) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ()
   | some element => f element
 
@@ -200,7 +201,8 @@ def setText (selector text : String) : DomM Unit := do
     Lean.Vir.Browser.Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
 
 def getAttribute (selector name : String) : DomM (Option String) := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure none
   | some element => Lean.Vir.Browser.Element.getAttributeString element name
 
@@ -209,7 +211,8 @@ def setAttribute (selector name value : String) : DomM Unit :=
     Lean.Vir.Browser.Element.setAttributeString element name value
 
 def getChecked (selector : String) : DomM Bool := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure false
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
@@ -217,7 +220,8 @@ def getChecked (selector : String) : DomM Bool := do
       | some input => Lean.Vir.Browser.HTMLInputElement.getCheckedBool input
 
 def setChecked (selector : String) (checked : Bool) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ()
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
@@ -225,7 +229,8 @@ def setChecked (selector : String) (checked : Bool) : DomM Unit := do
       | some input => Lean.Vir.Browser.HTMLInputElement.setCheckedBool input checked
 
 def getValue (selector : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ""
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
@@ -233,7 +238,8 @@ def getValue (selector : String) : DomM String := do
       | some input => Lean.Vir.Browser.HTMLInputElement.getValueString input
 
 def setValue (selector value : String) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ()
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
@@ -332,7 +338,8 @@ def uiRenameFromDom : DomM PetState := do
 def mountCallback
     (selector event : String)
     (callback : Lean.Vir.Js Lean.Vir.Browser.Event → DomM Unit) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure 0
   | some element =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener element event callback

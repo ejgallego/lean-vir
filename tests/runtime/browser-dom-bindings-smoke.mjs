@@ -7,8 +7,10 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import {
+  createBrowserDocumentHostBindings,
   createBrowserElementHostBindings,
   createBrowserEventHostBindings,
+  createConsoleHostBindings,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
   createVirtualElementState,
@@ -18,6 +20,60 @@ import {
 import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-bindings.js";
 
 const calls = [];
+const consoleCalls = [];
+const consoleBindings = createConsoleHostBindings();
+const consoleValue = { log: (message) => consoleCalls.push(message) };
+consoleBindings["browser.console.log"](consoleValue, "exact receiver");
+assert.deepEqual(consoleCalls, ["exact receiver"]);
+assert.equal(
+  consoleBindings["browser.console.current"](),
+  globalThis.console,
+);
+
+const documentCalls = [];
+const documentValue = {
+  title: "initial",
+  querySelector: (selector) => {
+    documentCalls.push(["querySelector", selector]);
+    return null;
+  },
+  querySelectorAll: (selector) => {
+    documentCalls.push(["querySelectorAll", selector]);
+    return [];
+  },
+  createElement: (tagName) => {
+    documentCalls.push(["createElement", tagName]);
+    return { tagName };
+  },
+};
+const documentBindings = createBrowserDocumentHostBindings();
+assert.equal(
+  documentBindings["browser.document.getTitle"](documentValue),
+  "initial",
+);
+documentBindings["browser.document.setTitle"](documentValue, "updated");
+assert.equal(documentValue.title, "updated");
+assert.equal(
+  documentBindings["browser.document.querySelector"](documentValue, "#x"),
+  null,
+);
+assert.deepEqual(
+  documentBindings["browser.document.querySelectorAll"](
+    documentValue,
+    ".row",
+  ),
+  [],
+);
+assert.deepEqual(
+  documentBindings["browser.document.createElement"](documentValue, "p"),
+  { tagName: "p" },
+);
+assert.deepEqual(documentCalls, [
+  ["querySelector", "#x"],
+  ["querySelectorAll", ".row"],
+  ["createElement", "p"],
+]);
+
 const child = { id: "child" };
 const element = {
   textContent: "",
@@ -129,6 +185,13 @@ assert.deepEqual(calls, [
 
 const virtualState = createVirtualDocumentState();
 const virtualBindings = createVirtualDocumentHostBindings(virtualState);
+const virtualDocument = virtualBindings["browser.document.current"]();
+assert.equal(virtualDocument, virtualState);
+assert.equal(
+  virtualBindings["browser.document.createElement"](virtualDocument, "p")
+    .textContent,
+  "",
+);
 const virtualElement = ensureVirtualElementState(virtualState, "#present");
 const virtualPlainEvent = createVirtualEventState();
 assert.equal(

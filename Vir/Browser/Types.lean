@@ -47,6 +47,12 @@ instance : Nonempty (DomM α) :=
 
 end DomM
 
+/-- Exact JavaScript `Console` receiver. -/
+opaque Console : Type
+
+/-- Exact browser `Document` receiver. -/
+opaque Document : Type
+
 /--
 Browser DOM element object class.
 

@@ -66,39 +66,31 @@ end Event
 
 namespace Console
 
-/--
-Logs a message through the JavaScript host's console binding.
-
-The default browser/runtime binding calls `console.log`. The host call is
-synchronous and returns `Unit`.
+/-- Converts a Lean string before calling the exact `Console.log` binding.
 
 Reference: [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static).
 -/
-def log (message : @& String) : IO Unit :=
+def log (console : @& Lean.Vir.Js Console) (message : @& String) : IO Unit :=
   Lean.Vir.RuntimeM.run do
     let jsMessage ← Lean.Vir.JsValue.ofString message
-    logJs jsMessage
+    logJs console jsMessage
 
 end Console
 
 namespace Document
 
 /--
-Returns the first element matching a CSS selector.
-
-In a browser this calls `document.querySelector(selector)`. In Node tests, use
-the `lean-vir/vir-runtime-node` wrapper for virtual document state. The virtual
-binding follows DOM lookup behavior: a missing selector returns `none`. Tests
-that need an element fixture should pre-seed it from JavaScript with
-`ensureVirtualElementState`.
+Converts a Lean selector before calling the exact `Document.querySelector`
+binding. A missing selector returns `none`.
 
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
 def querySelectorString
+    (document : @& Lean.Vir.Js Document)
     (selector : @& String) :
     DomM (Option (Lean.Vir.Js Element)) := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
-  Lean.Vir.Js.Nullable.toOption (← querySelector jsSelector)
+  Lean.Vir.Js.Nullable.toOption (← querySelector document jsSelector)
 
 /--
 Returns the static list of elements matching a CSS selector.
@@ -110,13 +102,17 @@ handles remain valid independently of the list.
 Reference: [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll).
 -/
 def querySelectorAllString
+    (document : @& Lean.Vir.Js Document)
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
-  querySelectorAll (← Lean.Vir.JsValue.ofString selector)
+  querySelectorAll document (← Lean.Vir.JsValue.ofString selector)
 
-/-- Converts a Lean tag name before calling `document.createElement`. -/
-def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
-  createElement (← Lean.Vir.JsValue.ofString tagName)
+/-- Converts a Lean tag name before calling the exact `Document.createElement` binding. -/
+def createElementString
+    (document : @& Lean.Vir.Js Document)
+    (tagName : @& String) :
+    DomM (Lean.Vir.Js Element) := do
+  createElement document (← Lean.Vir.JsValue.ofString tagName)
 
 end Document
 

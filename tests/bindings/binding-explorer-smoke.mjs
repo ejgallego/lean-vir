@@ -272,7 +272,7 @@ assert.deepEqual(documentRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 267,
-  mappedTargets: 5,
+  mappedTargets: 6,
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
 assert.equal(documentTitle?.status, "compatible");
@@ -281,8 +281,8 @@ assert.deepEqual(documentTitle?.generation, {
   provenance: "generator",
   targets: ["browser.document.getTitle", "browser.document.setTitle"],
   semanticCoverage: {
-    status: "adapter-only",
-    relations: ["changing"],
+    status: "faithful",
+    relations: ["preserving"],
   },
   diagnostics: [],
 });
@@ -290,7 +290,11 @@ const documentTitleGetter = documentRoot?.comparison.results.find(
   (result) => result.id === "document.title.get",
 );
 assert.equal(documentTitleGetter?.modalityContract.profile, "browser-dom-faithful-v1");
-assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "global");
+assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "argument");
+assert.equal(
+  documentTitleGetter?.modalityContract.receiver.argument.type,
+  "Lean.Vir.Js Document",
+);
 assert.deepEqual(documentTitleGetter?.modalityContract.result.modalities, {
   representation: "js-resource",
   ownership: "owned",
@@ -330,7 +334,7 @@ assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
-assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "adapter-only");
+assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -660,9 +664,13 @@ const semanticCoverageByMember = new Map(roots.flatMap((root) =>
     member.generation.semanticCoverage.status,
   ])));
 for (const member of [
+  "browser/console:Console.log",
+  "browser/document:Document.createElement",
+  "browser/document:Document.querySelector",
+  "browser/document:Document.querySelectorAll",
   "browser/document:Document.title",
 ]) {
-  assert.equal(semanticCoverageByMember.get(member), "adapter-only");
+  assert.equal(semanticCoverageByMember.get(member), "faithful");
 }
 for (const member of [
   "browser/element:Element.classList",

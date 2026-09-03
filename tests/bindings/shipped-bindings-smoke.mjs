@@ -79,9 +79,23 @@ assert.equal(publicEntries.has("Lean.Vir.Browser.Document.setTitleString"), fals
 assert.deepEqual(publicEntries.get("Lean.Vir.Browser.Document.getTitle")?.interface, {
   kind: "function",
   effect: "dom",
-  args: [],
+  args: [
+    {
+      name: "document",
+      type: {
+        type: "Js",
+        interfaceTag: 23,
+        kind: "resource",
+        name: "Lean.Vir.Js",
+      },
+    },
+  ],
   result: { type: "Js", interfaceTag: 23, kind: "resource", name: "Lean.Vir.Js" },
 });
+assert.equal(
+  publicEntries.get("Lean.Vir.Browser.Document.current")?.targets[0]?.target,
+  "browser.document.current",
+);
 assert.deepEqual(
   publicEntries.get("Lean.Vir.Browser.Element.setTextContent")?.interface?.args.map((arg) => arg.name),
   ["element", "textContent"],

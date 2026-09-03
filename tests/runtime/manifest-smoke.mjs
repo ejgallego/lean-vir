@@ -172,8 +172,13 @@ assert.throws(
     const documentBindings =
       createExportedBrowserDocumentHostBindings(resources);
     const elementBindings = createExportedBrowserElementHostBindings(resources);
+    const documentValue = documentBindings["browser.document.current"]();
+    assert.equal(documentValue, globalThis.document);
     const sharedElementNullable =
-      documentBindings["browser.document.querySelector"]("#shared");
+      documentBindings["browser.document.querySelector"](
+        documentValue,
+        "#shared",
+      );
     assert.equal(
       commonBindings["js.nullable.isNull"](sharedElementNullable),
       false,
@@ -402,15 +407,21 @@ const documentSetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.setTitle",
 );
 assert.equal(documentSetTitleImport?.boundary, "hostResource");
+assert.equal(documentSetTitleImport?.args[0]?.name, "document");
 assert.equal(documentSetTitleImport?.args[0]?.type?.type, "Js");
+assert.equal(documentSetTitleImport?.args[1]?.type?.type, "Js");
 const documentGetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.getTitle",
 );
 assert.equal(documentGetTitleImport?.result?.type, "Js");
+assert.equal(documentGetTitleImport?.args[0]?.name, "document");
+assert.equal(documentGetTitleImport?.args[0]?.type?.type, "Js");
 const querySelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.querySelector",
 );
 assert.equal(querySelectorImport?.args[0]?.type?.type, "Js");
+assert.equal(querySelectorImport?.args[0]?.name, "document");
+assert.equal(querySelectorImport?.args[1]?.type?.type, "Js");
 const keyboardEventNarrowingImport = hostImportTarget(
   "browser.keyboardEvent.fromEvent",
 );
@@ -678,18 +689,26 @@ assert.deepEqual(
 );
 const virtualQueryState = createVirtualDocumentState();
 const virtualQueryHost = createVirtualDocumentHostBindings(virtualQueryState);
+const virtualDocument = virtualQueryHost["browser.document.current"]();
+assert.equal(virtualDocument, virtualQueryState);
 const virtualNullableHost = createExportedCommonHostBindings(
   virtualQueryState.resources,
 );
 assert.equal(
   virtualNullableHost["js.nullable.isNull"](
-    virtualQueryHost["browser.document.querySelector"]("#missing"),
+    virtualQueryHost["browser.document.querySelector"](
+      virtualDocument,
+      "#missing",
+    ),
   ),
   true,
 );
 ensureVirtualElementState(virtualQueryState, "#present");
 const virtualPresentElement = virtualNullableHost["js.nullable.value"](
-  virtualQueryHost["browser.document.querySelector"]("#present"),
+  virtualQueryHost["browser.document.querySelector"](
+    virtualDocument,
+    "#present",
+  ),
 );
 assert.notEqual(virtualPresentElement, null);
 assert.equal(

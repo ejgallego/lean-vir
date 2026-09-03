@@ -59,8 +59,9 @@ export function createCommonHostBindings() {
 
 export function createConsoleHostBindings() {
   return {
-    "browser.console.log": (message) => {
-      console.log(message);
+    "browser.console.current": () => browserConsole(),
+    "browser.console.log": (consoleValue, message) => {
+      consoleValue.log(message);
       return undefined;
     },
   };
@@ -68,17 +69,18 @@ export function createConsoleHostBindings() {
 
 export function createBrowserDocumentHostBindings() {
   return {
-    "browser.document.getTitle": () => browserDocument().title,
-    "browser.document.setTitle": (title) => {
-      browserDocument().title = title;
+    "browser.document.current": () => browserDocument(),
+    "browser.document.getTitle": (documentValue) => documentValue.title,
+    "browser.document.setTitle": (documentValue, title) => {
+      documentValue.title = title;
       return undefined;
     },
-    "browser.document.querySelector": (selector) =>
-      queryDocumentElement(selector),
-    "browser.document.querySelectorAll": (selector) =>
-      queryDocumentElements(selector),
-    "browser.document.createElement": (tagName) =>
-      browserDocument().createElement(tagName),
+    "browser.document.querySelector": (documentValue, selector) =>
+      documentValue.querySelector(selector),
+    "browser.document.querySelectorAll": (documentValue, selector) =>
+      documentValue.querySelectorAll(selector),
+    "browser.document.createElement": (documentValue, tagName) =>
+      documentValue.createElement(tagName),
   };
 }
 
@@ -345,12 +347,18 @@ function browserDocument() {
   return globalThis.document;
 }
 
-function queryDocumentElement(selector) {
-  return browserDocument().querySelector(selector);
+function browserConsole() {
+  const consoleValue = globalThis.console;
+  if (!consoleValue || typeof consoleValue.log !== "function") {
+    throw new Error(
+      "browser.console host binding requires globalThis.console or explicit hostBindings",
+    );
+  }
+  return consoleValue;
 }
 
-function queryDocumentElements(selector) {
-  return browserDocument().querySelectorAll(selector);
+function queryDocumentElement(selector) {
+  return browserDocument().querySelector(selector);
 }
 
 function isCanvasElement(value) {

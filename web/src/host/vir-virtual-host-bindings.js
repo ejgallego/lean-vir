@@ -187,15 +187,18 @@ export function createVirtualDocumentHostBindings(
   }
   state.resources = resources;
   return {
-    "browser.document.getTitle": () => state.title,
-    "browser.document.setTitle": (title) => {
-      state.title = title;
+    "browser.document.current": () => state,
+    "browser.document.getTitle": (documentValue) => documentValue.title,
+    "browser.document.setTitle": (documentValue, title) => {
+      documentValue.title = title;
       return undefined;
     },
-    "browser.document.querySelector": (selector) =>
-      queryVirtualElementState(state, selector),
-    "browser.document.querySelectorAll": (selector) =>
-      createStaticNodeList(queryVirtualElementStates(state, selector)),
+    "browser.document.querySelector": (documentValue, selector) =>
+      queryVirtualElementState(documentValue, selector),
+    "browser.document.querySelectorAll": (documentValue, selector) =>
+      createStaticNodeList(queryVirtualElementStates(documentValue, selector)),
+    "browser.document.createElement": (_documentValue, _tagName) =>
+      createVirtualElementState(),
     ...createVirtualEventHostBindings(state),
     ...createElementHostBindings({
       querySelector: (target, selector) =>

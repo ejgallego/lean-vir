@@ -469,24 +469,39 @@ end CanvasRenderingContext2D
 namespace Console
 
 /--
-Generated explicit method semantic adapter for TypeScript `Console.log`.
+Generated reviewed method specialization of TypeScript `Console.log`.
 
 The **`console.log()`** static method outputs a message to the console.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/console/log_static)
 
-Adapter policy: VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary. The shipped console boundary uses the host-global console instead of accepting an arbitrary Console receiver.
+Specialization policy: The selected one-message call passes the exact Console receiver and JavaScript string unchanged; additional variadic values remain an explicit coverage gap.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Console); message js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: console js-resource/borrowed/call; message js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.console.log"]
 opaque logJs
+    (console : @& Lean.Vir.Js Console)
     (message : @& Lean.Vir.Js String) :
     Lean.Vir.RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.console.current`.
+
+Returns the host-global Console as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.console.current"]
+opaque current : Lean.Vir.RuntimeM (Lean.Vir.Js Console)
 
 end Console
 
@@ -519,102 +534,118 @@ end CSSStyleDeclaration
 namespace Document
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.createElement`.
+Generated reviewed method specialization of TypeScript `Document.createElement`.
 
 In an HTML document, the **`document.createElement()`** method creates the HTML element specified by localName, or an HTMLUnknownElement if localName isn't recognized.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/createElement)
 
-Adapter policy: The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic string overload passes the exact Document receiver and tag name unchanged and returns the exact element under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12929
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); tagName js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; tagName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.createElement"]
 opaque createElement
+    (document : @& Lean.Vir.Js Document)
     (tagName : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js Element)
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.querySelector`.
+Generated reviewed method specialization of TypeScript `Document.querySelector`.
 
 Returns the first element that is a descendant of node that matches selectors.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelector)
 
-Adapter policy: The non-generic selector overload returns the exact element under VIR's common Element phantom type. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact nullable value under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.querySelector"]
 opaque querySelector
+    (document : @& Lean.Vir.Js Document)
     (selectors : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js.Nullable Element)
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.querySelectorAll`.
+Generated reviewed method specialization of TypeScript `Document.querySelectorAll`.
 
 Returns all element descendants of node that match selectors.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelectorAll)
 
-Adapter policy: The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact NodeList under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.querySelectorAll"]
 opaque querySelectorAll
+    (document : @& Lean.Vir.Js Document)
     (selectors : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Document.title`.
+Faithful generated getter binding for TypeScript `Document.title`.
 
 The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
-Adapter policy: The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
-
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.getTitle"]
-opaque getTitle : DomM (Lean.Vir.Js String)
+opaque getTitle
+    (document : @& Lean.Vir.Js Document) :
+    DomM (Lean.Vir.Js String)
 
 /--
-Generated explicit setter semantic adapter for TypeScript `Document.title`.
+Faithful generated setter binding for TypeScript `Document.title`.
 
 The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
-Adapter policy: The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
-
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); title js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; title js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.setTitle"]
 opaque setTitle
+    (document : @& Lean.Vir.Js Document)
     (title : @& Lean.Vir.Js String) :
     DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.document.current`.
+
+Returns the host-global Document as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.document.current"]
+opaque current : DomM (Lean.Vir.Js Document)
 
 end Document
 

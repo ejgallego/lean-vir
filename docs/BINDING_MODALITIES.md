@@ -115,8 +115,9 @@ Each generated library has a named `generation.abiProfile` in its
   call;
 - resource results are owned;
 - operations run in `DomM`;
-- `Document` is a host-global receiver, while `Element` is an explicit
-  borrowed receiver.
+- `Document`, `Console`, and `Element` are explicit borrowed receivers;
+  separate VIR-owned `current` operations expose the host globals where
+  needed.
 
 Binding-library configuration format version 2 makes semantic policy explicit.
 Only exactly identical resource marker names may use the short string form.

@@ -8,6 +8,7 @@ export const demoHostImportTargets = [
   "browser.animation.cancelAnimationFrame",
   "browser.animation.requestAnimationFrame",
   "browser.cssStyleDeclaration.setProperty",
+  "browser.document.current",
   "browser.document.getTitle",
   "browser.document.querySelector",
   "browser.document.querySelectorAll",

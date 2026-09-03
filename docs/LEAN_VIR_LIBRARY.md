@@ -94,8 +94,9 @@ above.
    ```lean
    def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
-     Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+     let document ← Lean.Vir.Browser.Document.current
+     Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
    ```
 
 3. Generate a package with that declaration as a root.
@@ -135,7 +136,8 @@ the same identity with `Element.removeEventListener`.
 import Vir.Browser
 
 def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString "#run" with
+  let document ← Lean.Vir.Browser.Document.current
+  match ← Lean.Vir.Browser.Document.querySelectorString document "#run" with
   | none => pure ()
   | some button =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener
@@ -164,9 +166,10 @@ and animation frames. It also exports
 `ensureVirtualElementState`, and `ensureVirtualElementStates` for direct
 callback tests. React operations are explicit unsupported shims; React
 semantics are tested with official React in Chromium. Virtual
-`Document.querySelector` returns a nullable JavaScript resource for missing
-selectors; the explicit `Document.querySelectorString` convenience wrapper
-converts that result to `none`. Call
+`Document.current` returns the virtual document value used as the explicit
+receiver. `Document.querySelector` returns a nullable JavaScript resource for
+missing selectors; the explicit `Document.querySelectorString` convenience
+wrapper converts that result to `none`. Call
 `ensureVirtualElementState(state, selector)` in JS tests when the fixture
 should exist. Use `ensureVirtualElementStates` to seed all results returned by
 virtual `Document.querySelectorAll`.
@@ -323,9 +326,10 @@ and open `build/bindings/index.html` to inspect the current checkout. This
 overview records the intended shape without duplicating that generated
 inventory:
 
-- `Document` exposes the host-global document's title, selector, and element
-  creation operations. Helpers ending in `String` perform explicit conversion
-  from Lean-owned text.
+- `Document` operations take an exact JavaScript receiver. `Document.current`
+  separately retrieves the host-global document, and helpers ending in
+  `String` perform explicit conversion from Lean-owned text without hiding
+  receiver selection.
 - `Element` exposes tree, query, content, attribute, listener, and exact
   `DOMTokenList` operations. `Element.ClassList` is a Lean convenience over the
   generated `Element.classList` and `DOMTokenList` boundaries.
@@ -342,8 +346,9 @@ inventory:
 - Timers, intervals, animation frames, and event listeners use private host
   teardown records for active effects. Their JavaScript tokens and values cross
   the public boundary directly.
-- `Console.log` is the deliberately specialized single-JavaScript-string
-  console boundary.
+- `Console.logJs` is the deliberately specialized single-JavaScript-string
+  boundary with an exact `Js Console` receiver; `Console.current` separately
+  retrieves the host-global console.
 
 `Vir.React` provides the first React-specific imports and a native `ReactNode`
 resource surface. React root lifetime operations and event callbacks use
@@ -558,8 +563,9 @@ namespace HostInterop
 
 def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+  let document ← Lean.Vir.Browser.Document.current
+  Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
 
 end HostInterop
 ```

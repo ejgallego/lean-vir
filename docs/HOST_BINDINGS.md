@@ -145,7 +145,9 @@ failures as an `AggregateError`.
 
 The built-in groups closely follow their browser APIs:
 
-- `browser.document.*` exposes title, selectors, and element creation;
+- `browser.document.*` exposes the exact `Document` receiver, title,
+  selectors, and element creation. The separate `browser.document.current`
+  operation retrieves the host-global document;
 - `browser.element.*` exposes queries, content, attributes, tree operations,
   classes, styles, and event listeners;
 - `browser.event.*` exposes targets, keyboard keys, cancellation, and form
@@ -158,9 +160,10 @@ The built-in groups closely follow their browser APIs:
 - `infoview.*` and `proofwidgets.rpc.*` connect the widget host.
 
 Convenience conversions have separate Lean names. For example,
-`Document.querySelector` uses `Js String`, while `querySelectorString`
-explicitly converts a Lean `String` first. This keeps conversion out of the
-faithful low-level binding.
+`Document.querySelector` accepts exact `Js Document` and `Js String` values,
+while `querySelectorString` keeps the same explicit receiver and converts only
+the Lean `String`. This keeps both conversion and ambient-global selection out
+of the faithful low-level binding.
 
 Event-listener registration passes the exact JavaScript listener function to
 the native `addEventListener` method and returns `Unit`, just like the selected

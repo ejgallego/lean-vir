@@ -154,7 +154,8 @@ def View : RuntimeM (Component Unit) := do
         <button id="proofwidgets-jsx-action" className="pw-jsx-action"
             onClick={do
               let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
-              Lean.Vir.Browser.Document.setTitle title}>
+              Lean.Vir.Browser.Document.setTitle
+                (← Lean.Vir.Browser.Document.current) title}>
           {Html.text "mark"}
         </button>
         <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">

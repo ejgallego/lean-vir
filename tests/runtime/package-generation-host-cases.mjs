@@ -36,7 +36,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostRuntime = await hostFactory.createRuntime({
     irPackageSetBytes: [await readFile(hostPackage)],
   });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 17);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
     hostRuntime.interfaceManifest.exports.find(
       (entry) => entry.entry === "freshEchoBang",

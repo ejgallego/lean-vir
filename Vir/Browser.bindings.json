@@ -27,21 +27,14 @@
       },
       "receiver": {
         "default": { "passing": "borrowed", "retention": "call" },
-        "globalTypes": {
-          "Console": {
-            "semantics": "changing",
-            "reason": "The shipped console boundary uses the host-global console instead of accepting an arbitrary Console receiver."
-          },
-          "Document": {
-            "semantics": "changing",
-            "reason": "The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver."
-          }
-        }
+        "globalTypes": {}
       }
     },
     "resources": {
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
+      "Console": "Console",
       "CSSStyleDeclaration": "CSSStyleDeclaration",
+      "Document": "Document",
       "DOMTokenList": "DOMTokenList",
       "Element": "Element",
       "ElementCSSInlineStyle": "ElementCSSInlineStyle",
@@ -83,14 +76,20 @@
       },
       "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
       "CanvasRenderingContext2D.translate": { "signature": "only" },
-      "Console.log": { "signature": "only", "fixedRestParameters": { "data": ["message"] } },
+      "Console.log": {
+        "signature": "only",
+        "fixedRestParameters": { "data": ["message"] }
+      },
       "CSSStyleDeclaration.setProperty": {
         "signature": "only",
         "omittedOptionalParameters": ["priority"],
         "semantics": "preserving",
         "reason": "Omitting priority preserves CSSStyleDeclaration.setProperty's default empty priority while passing the exact declaration, property, value, and result unchanged."
       },
-      "Document.createElement": { "signature": 2, "omittedOptionalParameters": ["options"] },
+      "Document.createElement": {
+        "signature": 2,
+        "omittedOptionalParameters": ["options"]
+      },
       "Document.querySelector": { "signature": 4 },
       "Document.querySelectorAll": { "signature": 4 },
       "DOMTokenList.add": {
@@ -223,8 +222,8 @@
         }
       },
       "browser.console.log": {
-        "reason": "VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary.",
-        "semantics": "changing",
+        "reason": "The selected one-message call passes the exact Console receiver and JavaScript string unchanged; additional variadic values remain an explicit coverage gap.",
+        "semantics": "preserving",
         "arguments": {
           "message": {
             "type": {
@@ -237,8 +236,8 @@
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" }
       },
       "browser.document.createElement": {
-        "reason": "The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type.",
-        "semantics": "changing",
+        "reason": "The selected non-generic string overload passes the exact Document receiver and tag name unchanged and returns the exact element under VIR's common Element phantom type.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js Element",
@@ -248,8 +247,8 @@
         }
       },
       "browser.document.querySelector": {
-        "reason": "The non-generic selector overload returns the exact element under VIR's common Element phantom type.",
-        "semantics": "changing",
+        "reason": "The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact nullable value under VIR's common Element phantom type.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.Nullable Element",
@@ -259,8 +258,8 @@
         }
       },
       "browser.document.querySelectorAll": {
-        "reason": "The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries.",
-        "semantics": "changing",
+        "reason": "The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact NodeList under VIR's common Element phantom type.",
+        "semantics": "preserving",
         "result": {
           "type": {
             "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js Element)",
@@ -366,6 +365,24 @@
       }
     },
     "protocolOperations": [
+      {
+        "id": "browser.console.current", "group": "console", "target": "browser.console.current",
+        "lean": "Lean.Vir.Browser.Console.current", "marker": "vir_js",
+        "reason": "Returns the host-global Console as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js Console", "representation": "js-resource", "resourceInner": "Console" } }
+      },
+      {
+        "id": "browser.document.current", "group": "document", "target": "browser.document.current",
+        "lean": "Lean.Vir.Browser.Document.current", "marker": "vir_js",
+        "reason": "Returns the host-global Document as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js Document", "representation": "js-resource", "resourceInner": "Document" } }
+      },
       {
         "id": "browser.event-listener.of-lean", "group": "element", "target": "js.value.browser.eventListener",
         "lean": "Lean.Vir.Browser.EventListener.ofLean", "marker": "vir_js_explicit_conversion",

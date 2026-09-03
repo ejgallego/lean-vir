@@ -473,14 +473,16 @@ Import one of the provided modules:
 import Vir.Browser
 
 def titleRoundtrip (title : String) : Lean.Vir.Browser.DomM String := do
-  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+  let document ← Lean.Vir.Browser.Document.current
+  Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
 ```
 
 `Document.title` is exposed as the faithful `getTitle`/`setTitle` property
-pair. Applications choose where to place conversions or other policy; the
-binding layer does not add a second upstream operation for a convenience
-wrapper.
+pair with an explicit `Js Document` receiver. `Document.current` separately
+retrieves the host-global document as an exact JavaScript value. Applications
+choose where to place conversions or other policy; the binding layer does not
+hide global receiver selection inside the upstream operation.
 
 The full Lean-side declaration list is maintained in
 `docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
@@ -503,8 +505,8 @@ Browser React root, native Node construction, component, and hook targets are
 provided by `lean-vir/react-host-bindings`.
 Use the `defaultHostBindings` composition shown above when a browser package
 calls `Lean.Vir.React.Root.*`, `Lean.Vir.React.Node.*`, or
-`Lean.Vir.React.Hooks.*`. The browser runtime requires `globalThis.document`
-for `browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or
+`Lean.Vir.React.Hooks.*`. `Document.current` requires `globalThis.document` in
+the browser host. In Node, use `lean-vir/vir-runtime-node` or
 pass explicit `hostBindings`; the Node wrapper provides virtual document and
 event values, while React operations explicitly require the browser host.
 

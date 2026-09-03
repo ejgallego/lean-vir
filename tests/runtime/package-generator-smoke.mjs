@@ -460,6 +460,7 @@ try {
   const slidesManifest = JSON.parse(inspectedSlides.stdout).manifest;
   assert.equal(manifestEntry(slidesManifest, "SlidesCanvas.mount").startup, true);
   for (const target of [
+    "browser.document.current",
     "browser.document.createElement",
     "browser.canvas2d.fillRect",
     "browser.animation.requestAnimationFrame",

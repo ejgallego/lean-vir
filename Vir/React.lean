@@ -1014,7 +1014,8 @@ def render
 Creates a React root for the first element matching a CSS selector.
 -/
 def createFromSelector (selector : String) : Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure none
   | some container => some <$> create container
 
