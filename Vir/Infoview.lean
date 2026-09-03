@@ -12,6 +12,8 @@ public import Vir.Infoview.Package
 public meta import Vir.Infoview.Package
 public import Vir.Infoview.ProofWidgetsRpc
 public meta import Vir.Infoview.ProofWidgetsRpc
+public import Vir.Infoview.RpcWidget
+public meta import Vir.Infoview.RpcWidget
 public import Vir.Infoview.Surface
 public import Vir.Infoview.Widget
 public meta import Vir.Infoview.Widget

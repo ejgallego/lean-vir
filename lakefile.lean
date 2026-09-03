@@ -7,26 +7,27 @@ package lean_vir where
 def npmCmd : String :=
   if System.Platform.isWindows then "npm.cmd" else "npm"
 
-def runNpmScript (scriptName : String) : LogIO Unit :=
+def runNpmScript (packageDir : System.FilePath) (scriptName : String) : LogIO Unit :=
   proc {
     cmd := npmCmd
     args := #["run", "--silent", scriptName]
+    cwd := some packageDir
   }
 
 input_dir infoviewBundleSources where
-  path := "web/src"
+  path := "web"
   filter := .extension <| .mem #["js"]
   text := true
 
-target infoviewBundle : System.FilePath := do
+target infoviewBundle pkg : System.FilePath := do
   let sources ← infoviewBundleSources.fetch
-  let output := (← getRootPackage).dir / "build/generated/infoview/vir-infoview-widget.js"
+  let output := pkg.dir / "build/generated/infoview/vir-infoview-widget.js"
   buildFileAfterDep (text := true) output sources (extraDepTrace := do
-    let scriptTrace ← computeTrace (System.FilePath.mk "scripts/build-infoview-widget.mjs")
-    let packageTrace ← computeTrace (System.FilePath.mk "package.json")
-    let lockTrace ← computeTrace (System.FilePath.mk "package-lock.json")
+    let scriptTrace ← computeTrace (pkg.dir / "scripts/build-infoview-widget.mjs")
+    let packageTrace ← computeTrace (pkg.dir / "package.json")
+    let lockTrace ← computeTrace (pkg.dir / "package-lock.json")
     return mixTrace scriptTrace (mixTrace packageTrace lockTrace)) fun _ =>
-    runNpmScript "build:infoview"
+    runNpmScript pkg.dir "build:infoview"
 
 @[default_target]
 lean_lib Vir where
@@ -50,7 +51,7 @@ lean_lib VirModuleFixtures where
 /-- Infoview-only regression fixtures kept outside the public library. -/
 lean_lib VirInfoviewFixtures where
   srcDir := "fixtures/infoview"
-  roots := #[`InfoviewFixtures.ImportedHelper]
+  roots := #[`InfoviewFixtures.ImportedHelper, `InfoviewFixtures.TypedRpcWidget]
 
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage

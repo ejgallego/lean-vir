@@ -129,8 +129,8 @@ the broad scalar completion list: its seven members were priced as one strict
 Wasm link and dynamically checked before becoming runtime policy.
 -/
 private def floatCoreExternSpecs : Array NativeExternSpec :=
-  boxedExternSpecs `Float #["add", "beq", "decLt", "toModel"] ++
-  boxedExternSpecs `Float32 #["decLe", "ofBits", "toModel"]
+  boxedExternSpecs `Float #["add", "beq", "decLt", "toBits", "toModel"] ++
+  boxedExternSpecs `Float32 #["decLe", "ofBits", "toBits", "toModel"]
 
 /--
 The separately measured Float formatting frontier. Keeping it distinct from
@@ -1128,7 +1128,10 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
-  nativeExternSpecs.mapM (·.resolve env)
+  nativeExternSpecs.filterMapM fun spec => do
+    if (findEnvDecl env spec.name).isSome then
+      return some (← spec.resolve env)
+    return none
 
 def resolveNativeExternsWithExtras
     (env : Environment) (extraNames : Array Name) : Except String (Array NativeExtern) := do

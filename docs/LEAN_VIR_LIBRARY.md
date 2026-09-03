@@ -493,12 +493,15 @@ provides the first infoview-facing shell:
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`
 - `Lean.Vir.Infoview.ProofWidgetsRpc`
+- `Lean.Vir.Infoview.RpcWidget`
 - `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
 - `Lean.Vir.Infoview.IRPackage`
 - `Lean.Vir.Infoview.WidgetProps`
 - `Lean.Vir.Infoview.ReactWidget`
+- `Lean.Vir.Infoview.ReactRpcWidget`
 - `vir_proof_widget`
+- `vir_rpc_widget`
 - `Lean.Vir.Infoview.widget`
 
 `Lean.Vir.Infoview.Clipboard.writeText` remains a public `String -> DomM Bool`
@@ -533,6 +536,11 @@ the command declares the standard `createComponent`, `mount`, `irPackage`, and
 `widgetProps` entries in the current
 namespace. `ReactWidget` is the lower-level expansion target when a caller
 needs to assemble those pieces manually.
+For application-specific state, `vir_rpc_widget` accepts a component factory
+whose props have a `Lean.FromJson` instance. The infoview shell calls the
+configured cursor-position RPC, maps its JSON result to the recursive
+`RpcJson` object ABI, and passes it to the generated component-factory and
+mount entries. `ReactRpcWidget` exposes the same contract without the macro.
 `examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and
 `examples/ReactProofWidget.lean` is the next rung: a focused editor tool that
 uses the goal surface and editor edit command without duplicating the infoview.

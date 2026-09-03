@@ -33,6 +33,8 @@ structure WidgetProps where
   mountId : String := "vir-infoview-widget"
   autoReloadMs : Nat := 0
   setupHint : String := ""
+  /-- Optional cursor-position RPC supplying a `RpcJson` entry value. -/
+  rpcMethod : String := ""
   deriving Server.RpcEncodable
 
 namespace ReactWidget

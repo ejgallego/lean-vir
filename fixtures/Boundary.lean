@@ -8,7 +8,7 @@ import Init.Data.Nat.Bitwise.Basic
 import Init.Data.Nat.Log2
 import Init.Data.Array.Set
 import Init.Data.ByteArray.Basic
-import Init.Data.Float.Float32
+import Init.Data.Float32
 import Init.Data.SInt.Basic
 import Init.Data.String.Basic
 import Init.Data.String.Modify
@@ -392,10 +392,10 @@ private def floatCorePrimitiveScore (a b : Float) (float32Bits : UInt32) : Nat :
   let sum := Float.add a b
   let sumOk := Float.beq sum 3.75
   let orderOk := decide (a < b)
-  let sumModelOk := (Float.toModel sum).toBits == 0x400e000000000000
+  let sumModelOk := Float.toBits sum == 0x400e000000000000
   let value32 := Float32.ofBits float32Bits
   let order32Ok := decide (value32 ≤ value32)
-  let model32Ok := (Float32.toModel value32).toBits == float32Bits
+  let model32Ok := Float32.toBits value32 == float32Bits
   (if sumOk then 1 else 0) +
     (if orderOk then 2 else 0) +
     (if sumModelOk then 4 else 0) +
@@ -446,7 +446,7 @@ def floatBasicCompletionFrontierScore : Nat :=
   floatBasicCompletionPrimitiveScore 0x3fc00000 0x40000000 0x7ff0000000000000
 
 private def floatBits (value : Float) : UInt64 :=
-  (Float.toModel value).toBits
+  Float.toBits value
 
 private def floatBitsIsNaN (value : Float) : Bool :=
   let bits := floatBits value
