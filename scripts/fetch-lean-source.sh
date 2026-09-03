@@ -20,10 +20,9 @@ esac
 
 if [ -d third_party/lean4-src/.git ]; then
   git -C third_party/lean4-src fetch --depth 1 origin "${LEAN_VERSION}"
+  git -C third_party/lean4-src checkout --detach FETCH_HEAD
 else
   git clone --depth 1 --branch "${LEAN_VERSION}" https://github.com/leanprover/lean4.git third_party/lean4-src
 fi
-
-git -C third_party/lean4-src checkout d8b18978322de05a8f3dba51ef03cf5461676c17
 
 echo "Lean source ready at third_party/lean4-src"

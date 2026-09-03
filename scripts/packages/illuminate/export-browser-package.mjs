@@ -74,12 +74,12 @@ async function main() {
   const toolchain = await requireToolchain(
     producer,
     "VIR",
-    "leanprover/lean4:v4.33.0",
+    "leanprover/lean4:v4.34.0-rc2",
   );
   await requireToolchain(
     client,
     "Illuminate",
-    "leanprover/lean4:v4.33.0",
+    "leanprover/lean4:v4.34.0-rc2",
   );
 
   let workspace = null;

@@ -69,7 +69,7 @@ async function main() {
     [producer, "VIR"],
     [client, "lean-zip"],
   ]) {
-    await requireToolchain(root, label, "leanprover/lean4:v4.33.0");
+    await requireToolchain(root, label, "leanprover/lean4:v4.34.0-rc2");
   }
   const workspace = await mkdtemp(join(tmpdir(), "vir-lean-zip-export-"));
   try {
