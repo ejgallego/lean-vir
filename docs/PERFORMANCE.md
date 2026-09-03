@@ -167,9 +167,9 @@ Use a different comparison point depending on the question:
 - For new rows that do not exist on `main`, keep the current absolute per-call
   number as the first baseline and compare future PRs against it.
 
-Avoid comparing unrelated rows directly. For example, a React render row includes
-host resource work and React object creation, while a scalar base row is mostly a
-small boundary call. They answer different questions.
+Avoid comparing unrelated rows directly. For example, a recursive `Std.Format`
+row includes thousands of object conversions, while a scalar base row is mostly
+a small boundary call. They answer different questions.
 
 The comparison checks common benchmark rows for sample names, iteration counts,
 and checksums before printing per-call deltas. Rows present in only one report
@@ -181,11 +181,17 @@ object-lowering rows, base boundary rows for `Unit`, `Bool`, `Nat`, `Int`,
 `ByteArray`, and shallow array inputs, plus end-to-end top-level value
 conversion rows for WIT-like scalar records, nested records/lists/options, and
 recursive custom inductives. It also includes host/resource rows for scalar host
-imports, callback root round trips, DOM listener resource churn, React root
-lifecycle work, and focused React `Node` render conversion.
+imports, callback root round trips, and DOM listener resource churn.
 The `format-tag-transitions` representative row and `format-empty-nodes`
 focused row use the generated `pretty-printer.irpkg` to exercise recursive
 `Std.Format` custom-inductive lowering through the same public runtime path.
+
+React is intentionally absent from this Node benchmark. The Node runtime's
+virtual document host rejects React operations instead of approximating React's
+renderer, reconciliation, or ownership behavior. Validate React against the real
+Chromium/React host with `npm run test:pages:browser`; any React performance
+campaign should likewise be a browser-catalog example rather than a virtual-host
+timing row.
 
 The `base-*` JSON rows are intended as the first regression surface for direct
 base-type conversion work. Each row has a `lower` sample for JavaScript object
@@ -206,9 +212,9 @@ nullary/unary/binary pretty-printer calls.
 JavaScript lowers inputs with the matching `vir_obj_*` constructor,
 `vir_obj_array`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the matching
-inspection helpers. The scalar host/resource and React rows repeat one exported
-operation from JavaScript where possible, so they stress boundary conversion
-without primarily measuring a deep recursive Lean `DomM` loop.
+inspection helpers. The scalar host/resource rows repeat one exported operation
+from JavaScript where possible, so they stress boundary conversion without
+primarily measuring a deep recursive Lean `DomM` loop.
 
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same
@@ -256,8 +262,8 @@ excluded from the median, while warm-up checksums still participate in each
 candidate's stability check. Any per-candidate checksum instability or
 cross-candidate disagreement fails the benchmark. This row is the focused check
 for package-owned ABI and call-slot dispatch changes. Object host-import framing
-is more visible in the host/resource and React rows because those paths cross
-from Lean back into JavaScript. The broader `fib` and `sort` rows spend more time
+is more visible in the host/resource rows because those paths cross from Lean
+back into JavaScript. The broader `fib` and `sort` rows spend more time
 in Lean execution and should show smaller movement from boundary-only work.
 `npm run bench:engines` remains a WASI command-module comparison across
 available engines for the broader `fib` and `sort` rows.
