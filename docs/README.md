@@ -96,8 +96,8 @@ ownership diagrams.
   fixture.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
-- [TYPE_ANCHORS.md](TYPE_ANCHORS.md): generated TypeScript descriptors,
-  compiler-backed Lean VIR comparison, and the React DOM root review seed.
+- [TYPE_ANCHORS.md](TYPE_ANCHORS.md): standalone fixture/debug comparison of
+  TypeScript and compiler-produced Lean interface descriptors.
 - [BINDING_MODALITIES.md](BINDING_MODALITIES.md): deterministic binding
   modalities, operation IR provenance, and justified exceptions.
 - [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): the consolidated binding library

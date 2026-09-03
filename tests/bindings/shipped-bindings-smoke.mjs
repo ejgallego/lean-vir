@@ -36,7 +36,7 @@ assert.deepEqual(report.analysis, {
   conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
   providerCoverage: "target-name-presence-only",
   providerBehavior: "not-mechanically-verified",
-  semanticParity: "library-specific type anchors",
+  semanticParity: "not-analyzed-by-provider-reconciliation",
 });
 assert.equal(report.summary.declarations, declarations.length);
 assert.equal(

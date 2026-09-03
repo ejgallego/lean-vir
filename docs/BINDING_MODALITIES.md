@@ -8,13 +8,13 @@ pinned TypeScript declaration
   + library ABI profile
   + named, justified exceptions
   = canonical operation IR
-  = Lean source + comparator intent + explorer explanation
+  = Lean source + explorer explanation
 ```
 
 This keeps TypeScript as the authority for API shape while making the host ABI
-choices explicit and reusable. An anchor still identifies which TypeScript
-operation, Lean declaration, and host target correspond; it does not repeat the
-modalities derived by generation.
+choices explicit and reusable. The reviewed mapping identifies the TypeScript
+operation, Lean declaration, and host target once; generated operation IR
+carries the derived modalities.
 
 ## Semantics Fidelity
 
@@ -40,7 +40,8 @@ it does not occupy the upstream operation's faithful documentation lane or
 count as semantics-preserving coverage. Unsupported or ambiguous semantics
 fail closed until they have an explicit representation or reviewed policy.
 
-Canonical operation IR records this separately from type-comparator evidence:
+Canonical operation IR records this separately from provider and reachability
+evidence:
 
 - `preserving` claims that the generated contract preserves upstream-observable
   behavior;
@@ -185,11 +186,9 @@ Each operation records:
 - a protocol's machine-readable upstream relation.
 
 The checked-in `Vir/**/Generated.lean` declarations are rendered from this IR.
-The descriptor generator also projects comparator-compatible `portIntent`
-fields from it. Comparison results retain the complete `modalityContract`, and
-the binding explorer shows generated operations in an expandable conversion
-policy panel. This avoids three independently authored versions of the same
-policy.
+The binding explorer shows generated operations in an expandable conversion
+policy panel. There is no second shipped anchor or comparator policy to keep in
+sync.
 
 ## Property Selection
 
@@ -211,15 +210,13 @@ faithful generated property setter after that conversion.
 
 ## Method Selection
 
-A selected TypeScript method must have a `generation.methodPolicies` entry.
-The policy separates API identity (the reviewed mapping) from signature
-selection:
+A uniquely signed TypeScript method needs no method policy. A
+`generation.methodPolicies` entry records only a choice or specialization that
+cannot be inferred from that declaration:
 
 ```json
 "methodPolicies": {
-  "Element.getAttribute": { "signature": "only" },
   "CanvasRenderingContext2D.arc": {
-    "signature": "only",
     "omittedOptionalParameters": ["counterclockwise"],
     "semantics": "preserving",
     "reason": "Omitting counterclockwise preserves the TypeScript default value false."
@@ -232,8 +229,8 @@ selection:
 }
 ```
 
-`"signature": "only"` asserts that the declaration has exactly one function
-signature. An integer selects that zero-based overload explicitly. A required
+The generator selects a unique function signature automatically. An integer
+selects a zero-based overload explicitly. A required
 parameter can be omitted only by naming it in `omittedRequiredParameters` and
 providing a justified operation exception; this deliberately marks a reviewed
 signature projection rather than a faithful translation. Overload selection,
@@ -254,7 +251,7 @@ binder such as `ctx`. Like accessor `receiverName` and setter `parameterName`,
 this changes source spelling only; representation or modality differences still
 require a justified exception.
 
-Missing policies, changed overload layouts, unclassified rest parameters,
+Missing overload policies, changed overload layouts, unclassified rest parameters,
 unknown parameter names, unjustified required-parameter omissions, and
 unsupported parameter or result types fail generation.
 TypeScript parameter names that collide with Lean keywords are rendered as
@@ -323,16 +320,14 @@ with language-aware token classes, and the exact conversion policy that
 produced each generated declaration. No separate handwritten method
 documentation database is involved.
 
-`portIntent` is reserved for transformations that the comparator actually
-checks. A reviewed observation about lifecycle, retention, or host ownership
-that is not yet enforced belongs in the anchor's `advisorySemantics` list. Both
-the focused report and consolidated explorer display such observations under
-an explicit “not mechanically verified” heading; they do not contribute to a
-type-fidelity verdict.
+The explorer documents the operation IR's derived policy and provenance.
+Provider behavior remains a separately tested runtime claim; it is never
+promoted from provider-key presence.
 
 ## Exceptions
 
-`generation.exceptions` is keyed by operation/anchor id. An exception must have
+`generation.exceptions` is keyed by operation id (the host target for direct
+operations). An exception must have
 a non-empty `reason` and may override only the receiver, named argument role,
 type or modalities, result ownership, or effect. A receiver may be projected
 away only through an explicit `kind: "none"` exception. Unknown operation ids,
@@ -346,13 +341,14 @@ override and its reason, so review can distinguish inference from policy.
 An exception's optional `semantics` field records whether the reviewed override
 preserves upstream behavior or creates an explicit semantic adapter. Omitting
 that field leaves the operation visibly unreviewed rather than inferring
-faithfulness from its type comparison.
+faithfulness from its generated shape or provider presence.
 
 ## Authored And Generated Ownership
 
 Authored configuration owns:
 
-- the pinned declaration inputs and selected member set;
+- the pinned declaration inputs and reviewed mappings (from which the selected
+  member set is derived);
 - correspondence among TypeScript operations, Lean names, and host targets;
 - resource marker names and the named ABI profile;
 - reviewed semantic policy for non-identity resource mappings and host-global
@@ -365,11 +361,7 @@ Generation owns:
 - `@&` placement;
 - receiver, argument, result, and effect modalities;
 - generated Lean declarations;
-- comparator modality intent and explorer explanations.
-
-For generated operations, authored anchors are rejected if they include
-`effect`, `receiver`, `resourceArguments`, or `resultRepresentation`, because
-those are projections of the operation IR.
+- explorer explanations.
 
 ## Current Boundary And Next Extension
 

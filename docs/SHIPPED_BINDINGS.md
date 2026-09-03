@@ -72,9 +72,9 @@ provider argument handling, retention, callback leases, result adoption, or
 terminal cleanup, so it is not a mechanical provider-modality audit. The
 compiler/runtime check also does not claim that all upstream APIs have been
 ported, or that every phantom resource name has been proven equivalent to an
-upstream TypeScript type. Configured API groups, type-anchor comparisons, and
-focused lifecycle tests provide separate evidence. The explorer keeps these
-layers visibly distinct while presenting their findings together.
+upstream TypeScript type. Configured API groups and canonical operation IR
+provide declaration evidence; focused lifecycle tests provide separate runtime
+evidence. The explorer keeps these layers visibly distinct.
 The consolidated machine report records this guarantee boundary explicitly in
 its `boundaryAnalysis` object rather than leaving it implicit in prose.
 
@@ -105,8 +105,7 @@ Each upstream member has a generation record with three independent facts:
   or `not-selected`. `adapted` means a reviewed protocol is linked to an
   upstream or local declaration member. Convenience wrappers are downstream
   Lean APIs rather than upstream members, so they are not a member disposition.
-- **evidence status** keeps semantic comparison separate from correspondence:
-  `exact` and `compatible` come only from the comparator, `derived` means one
+- **evidence status** records correspondence provenance: `derived` means one
   canonical TypeScript operation produced the Lean declaration,
   `protocol-linked` means reviewed policy names an upstream member, and
   `contract-linked` means a repository-local declaration member is linked.
@@ -120,11 +119,9 @@ next required action. Reviewed protocols may still use `needs-annotation`
 until their upstream identity and direct TypeScript lowering are fully
 expressed.
 
-A generated operation whose reviewed mapping has no comparator anchor is
-`derived`: the TypeScript shape, ABI policy, and emitted Lean type are one
-canonical operation record. An upstream adapter is `protocol-linked`, and a
-local declaration operation is `contract-linked`; neither is silently promoted
-to semantic `compatible` without comparator evidence.
+A directly generated operation is `derived`: the TypeScript shape, ABI policy,
+and emitted Lean type are one canonical operation record. An upstream adapter
+is `protocol-linked`, and a local declaration operation is `contract-linked`.
 
 A **public Lean API** row is a public executable declaration in the measured
 `Vir` environment that reaches at least one JavaScript host target. It does not
@@ -169,9 +166,8 @@ stronger consumption or conversion policy as though it were upstream
 semantics. Ownership-changing conveniences and ergonomic conversions remain
 explicit adapters.
 
-The explorer reports a semantic relation independently of type evidence. An
-exact or compatible comparator result says only that the represented types
-compare successfully. It cannot promote a semantics-changing or unreviewed
+The explorer reports a semantic relation independently of provider presence.
+A matching provider key cannot promote a semantics-changing or unreviewed
 operation to faithful. Every operation exception and upstream-linked protocol
 therefore remains binding-author work until it is classified as preserving or
 changing.
@@ -249,27 +245,27 @@ local declaration alone.
 
 The descriptor generator, Lean generator, and consolidated explorer all load
 these files through the same schema validator. Unknown fields and malformed
-nested anchors, mappings, ABI profiles, and dependency-policy entries therefore
-fail consistently at every configured entry point.
+nested mappings, ABI profiles, unsupported entries, and dependency-policy
+entries therefore fail consistently at every configured entry point.
 
 A configuration identifies its compiled Lean modules and divides their targets
 into API groups. External groups name their declaration files and upstream
 entry points; internal groups explicitly state that they have no external
-parity contract. Reviewed anchors and dependency policy live with the group
-rather than in parallel symbol, policy, and anchor files. A method mapping
-names its target list. A property mapping instead names `get` and `set`
-operations, or only `get` for a readonly property, with an exact host target,
-public Lean declaration, and comparison anchor for each shipped operation.
+parity contract. Reviewed mappings and dependency policy live with the group
+rather than in parallel symbol and policy files. The selected member
+set is derived from those mappings. A method mapping names its target and Lean
+declaration. A property mapping instead names `get` and `set` operations, or
+only `get` for a readonly property, with an exact host target and public Lean
+declaration for each shipped operation.
 An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
 entry, so partial property coverage cannot be mistaken for a faithful pair.
-Anchor `portIntent` contains only policy that the comparator mechanically
-checks. Lifecycle, retention, or ownership claims that are not yet derived from
-the operation IR use `advisorySemantics`; reports label those notes as not
-mechanically verified.
+Explicitly unsupported upstream entries carry only their TypeScript identity
+and a reason. Derived type, modality, and semantic policy lives exclusively in
+operation IR.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
-groups, a stale selector, a property operation that disagrees with its reviewed
-anchor, or an unclassified public accessor alias. The library configurations
+groups, a stale selector, a mapping that disagrees with its generated
+operation, or an unclassified public accessor alias. The library configurations
 assign every shipped target exactly once.
 
 ## Data Flow
@@ -311,8 +307,8 @@ Validate all layers and the explorer contract with:
 npm run check:bindings
 ```
 
-The Lean compiler inventory and type comparisons are generated under
-`build/type-descriptors/`. The consolidated machine report is
+The Lean compiler inventory is generated under `build/type-descriptors/`.
+The consolidated machine report is
 `build/bindings/report.json`; the primary human report is
 `build/bindings/index.html`. These reproducible reports are ignored build
 artifacts, not commit material.
@@ -357,8 +353,7 @@ shown as upstream operations.
 
 Unselected upstream entries contribute to coverage totals but are not issues.
 Explicitly unsupported selected entries appear under `report.json`'s roadmap;
-only compiler, provider, reachability, and semantic comparison failures are
-issues.
+only compiler, provider, reachability, and canonical-policy failures are issues.
 
 `build/bindings/shipped-v1.coverage.json` and
 `build/bindings/shipped-v1.dashboard.html` are lower-level reconciliation

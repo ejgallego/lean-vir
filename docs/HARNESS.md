@@ -452,7 +452,8 @@ logic into entry-point scripts or pages:
   `scripts/native/`; pure registry contracts: `npm run test:native:unit`
 - Surface, frontier-size, Wasm attribution, and report-rendering tooling:
   `scripts/analysis/`; focused coverage: `tests/surface/`
-- Binding inventory, descriptor, comparison, and explorer tooling:
+- Binding inventory, descriptor, generation, and explorer tooling (plus the
+  standalone type-anchor comparison fixture):
   `scripts/bindings/`; focused coverage: `tests/bindings/`
 - Infoview widget smoke coverage: `tests/infoview/`
 - Browser page helpers: `web/app/pages/page-utils.js` and

@@ -40,6 +40,16 @@ function validationMessage(label, errors) {
   return `${label} does not match Vir/bindings.schema.json: ${details}`;
 }
 
+function deriveGeneratedMembers(config) {
+  if (config.generation === undefined) return config;
+  const members = [...new Set(config.roots.flatMap((root) =>
+    (root.mappings ?? []).map((mapping) => mapping.typescript)))].sort();
+  return {
+    ...config,
+    generation: { ...config.generation, members },
+  };
+}
+
 function validateLibrarySemantics(config, label) {
   validateGenerationProfile(config.generation, `${label} generation`);
   const rootIds = new Set();
@@ -52,6 +62,18 @@ function validateLibrarySemantics(config, label) {
   for (const root of config.roots) {
     if (rootIds.has(root.id)) throw new Error(`${label} repeats root id ${root.id}`);
     rootIds.add(root.id);
+    const unsupported = root.unsupported ?? [];
+    const unsupportedIds = new Set(unsupported.map((entry) => entry.typescript));
+    if (unsupportedIds.size !== unsupported.length) {
+      throw new Error(`${label} repeats an unsupported TypeScript entry in root ${root.id}`);
+    }
+    const mapped = new Set((root.mappings ?? []).map((entry) => entry.typescript));
+    const contradictory = unsupported.find((entry) => mapped.has(entry.typescript));
+    if (contradictory !== undefined) {
+      throw new Error(
+        `${label} marks mapped TypeScript entry ${contradictory.typescript} unsupported in root ${root.id}`,
+      );
+    }
   }
 }
 
@@ -59,8 +81,9 @@ export async function validateBindingConfig(config, path = schemaPath) {
   const label = labelFor(path);
   const validate = await bindingConfigValidator();
   if (!validate(config)) throw new Error(validationMessage(label, validate.errors ?? []));
-  validateLibrarySemantics(config, label);
-  return { ...config, path: label };
+  const normalized = deriveGeneratedMembers(config);
+  validateLibrarySemantics(normalized, label);
+  return { ...normalized, path: label };
 }
 
 export async function loadBindingConfig(path) {

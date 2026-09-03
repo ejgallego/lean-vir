@@ -26,7 +26,6 @@
       }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "javascript.string.of", "group": "primitive-conversions", "target": "js.string",

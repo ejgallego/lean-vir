@@ -23,16 +23,61 @@ test("the shared loader validates a complete binding library", async () => {
   assert.equal(loaded.version, 2);
   assert.equal(loaded.id, "browser");
   assert.equal(loaded.path, "Vir/Browser.bindings.json");
+  assert.equal(loaded.generation.members.length, 52);
+  assert.deepEqual(
+    loaded.generation.members,
+    [...loaded.generation.members].sort(),
+    "selected members are derived deterministically from reviewed mappings",
+  );
 });
 
-test("binding configuration rejects unknown nested intent fields", async () => {
+test("binding configuration rejects a duplicated authored member list", async () => {
   const invalid = structuredClone(browser);
-  invalid.roots.find((root) => root.id === "document")
-    .anchors[0].portIntent.retention = "until somebody reviews it";
+  invalid.generation.members = ["Document.title"];
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
-    /portIntent\/retention.*additional properties/u,
+    /generation\/members.*must NOT have additional properties/u,
+  );
+});
+
+test("binding configuration rejects unknown unsupported-entry fields", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document").unsupported = [{
+    typescript: "Document.cookie",
+    note: "Not selected.",
+    retention: "until somebody reviews it",
+  }];
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /unsupported\/0\/retention.*additional properties/u,
+  );
+});
+
+test("binding configuration rejects duplicate unsupported entries", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document").unsupported = [
+    { typescript: "Document.cookie", note: "Not selected." },
+    { typescript: "Document.cookie", note: "Still not selected." },
+  ];
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /repeats an unsupported TypeScript entry in root document/u,
+  );
+});
+
+test("binding configuration rejects mapped entries marked unsupported", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document").unsupported = [{
+    typescript: "Document.title",
+    note: "Contradicts its mapping.",
+  }];
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /marks mapped TypeScript entry Document\.title unsupported in root document/u,
   );
 });
 
@@ -98,19 +143,19 @@ test("binding configuration rejects manual declaration exceptions", async () => 
   );
 });
 
-test("method policies are explicit, selected, and schema checked", async () => {
+test("method policies are selected and schema checked", async () => {
   const unselected = structuredClone(browser);
-  unselected.generation.methodPolicies["Element.closest"] = { signature: "only" };
+  unselected.generation.methodPolicies["Element.closest"] = { signature: 0 };
   await assert.rejects(
     validateBindingConfig(unselected, browserPath),
     /defines a method policy for unselected member Element\.closest/u,
   );
 
   const vague = structuredClone(browser);
-  vague.generation.methodPolicies["Element.getAttribute"].signature = "best";
+  vague.generation.methodPolicies["CanvasRenderingContext2D.arc"].signature = "best";
   await assert.rejects(
     validateBindingConfig(vague, browserPath),
-    /methodPolicies\/Element\.getAttribute\/signature.*must/u,
+    /methodPolicies\/CanvasRenderingContext2D\.arc\/signature.*must/u,
   );
 });
 

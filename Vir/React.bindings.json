@@ -33,11 +33,8 @@
         "reason": "Lean.Vir.React.Root is the qualified phantom marker for the exact JavaScript ReactDOM Root value."
       }
     },
-    "members": ["Root.render", "Root.unmount", "createRoot"],
     "methodPolicies": {
-      "Root.render": { "signature": "only" },
-      "Root.unmount": { "signature": "only" },
-      "createRoot": { "signature": "only", "omittedOptionalParameters": ["options"] }
+      "createRoot": { "omittedOptionalParameters": ["options"] }
     },
     "exceptions": {
       "react.root.create": {
@@ -396,86 +393,10 @@
           "lean": ["Lean.Vir.React.Root.unmount"]
         }
       ],
-      "comparison": { "report": "build/type-descriptors/react-dom-root-v1.report.json" },
-      "anchors": [
-        {
-          "id": "react_dom.root.resource",
-          "category": "React DOM root",
-          "lean": "Lean.Vir.React.Root",
-          "ts": "Root",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "representation": "hostResource" },
-          "advisorySemantics": [
-            { "topic": "ownership", "note": "The host is expected to own the root resource." },
-            { "topic": "lifetime", "note": "The root is expected to remain live until unmount or runtime disposal." }
-          ],
-          "note": "The TypeScript object interface is intentionally represented by a JavaScript-owned VIR resource."
-        },
-        {
-          "id": "react_dom.root.render",
-          "category": "React DOM root",
-          "lean": "Lean.Vir.React.Root.renderNode",
-          "ts": "Root.render",
-          "target": "react.root.renderNode",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind" },
-          "advisorySemantics": [
-            { "topic": "reachability", "note": "React receives the exact JavaScript ReactNode and controls how long its object graph remains reachable." }
-          ]
-        },
-        {
-          "id": "react_dom.root.unmount",
-          "category": "React DOM root",
-          "lean": "Lean.Vir.React.Root.unmount",
-          "ts": "Root.unmount",
-          "target": "react.root.unmount",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind" },
-          "advisorySemantics": [
-            { "topic": "lifecycle", "note": "Unmount is expected to release retained render state." }
-          ]
-        },
-        {
-          "id": "react_dom.root.create",
-          "category": "React DOM root",
-          "lean": "Lean.Vir.React.Root.create",
-          "ts": "createRoot",
-          "target": "react.root.create",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "omittedOptionalParameters": ["options"] },
-          "advisorySemantics": [
-            { "topic": "container", "note": "The container is expected to be borrowed; VIR currently accepts only the Element subset of the TypeScript Container union." },
-            { "topic": "result-ownership", "note": "The host is expected to own the returned root resource." }
-          ],
-          "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument."
-        },
-        {
-          "id": "react_dom.root.options",
-          "category": "React DOM options",
-          "lean": "Lean.Vir.React.RootOptions",
-          "ts": "RootOptions",
-          "relation": "coverageGap",
-          "portIntent": { "disposition": "unsupported" },
-          "note": "Root creation options are an explicit coverage gap."
-        },
-        {
-          "id": "react_dom.hydration.entrypoint",
-          "category": "React DOM hydration",
-          "lean": "Lean.Vir.React.Root.hydrateRoot",
-          "ts": "hydrateRoot",
-          "relation": "coverageGap",
-          "portIntent": { "disposition": "unsupported" },
-          "note": "Hydration is not exposed by the current VIR React surface."
-        },
-        {
-          "id": "react_dom.hydration.options",
-          "category": "React DOM hydration",
-          "lean": "Lean.Vir.React.HydrationOptions",
-          "ts": "HydrationOptions",
-          "relation": "coverageGap",
-          "portIntent": { "disposition": "unsupported" },
-          "note": "Hydration options are paired with the unsupported hydration entry point."
-        }
+      "unsupported": [
+        { "typescript": "RootOptions", "note": "Root creation options are not exposed by the current VIR React surface." },
+        { "typescript": "hydrateRoot", "note": "Hydration is not exposed by the current VIR React surface." },
+        { "typescript": "HydrationOptions", "note": "Hydration options are paired with the unsupported hydration entry point." }
       ]
     },
     {

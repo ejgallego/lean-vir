@@ -172,13 +172,10 @@ const semanticCoverageSummary = (coverage) => Object.entries(coverage)
     `${count} ${semanticCoverageDefinitions.get(status)?.summary ?? status}`)
   .join(" · ");
 const evidenceLabel = (value) => ({
-  exact: "exact comparator match",
-  compatible: "comparator-compatible",
   derived: "TypeScript-derived",
   "protocol-linked": "reviewed protocol link",
   "contract-linked": "local contract link",
-  weak: "limited comparison",
-  unreviewed: "not compared",
+  unreviewed: "awaiting classification",
   suggested: "suggested correspondence",
   ambiguous: "ambiguous correspondence",
   missing: "no confirmed binding",
@@ -250,7 +247,6 @@ const targets = groups.flatMap((group) => group.bindings.map((binding) => ({
   operation: group.generatedOperations?.find((operation) =>
     operation.host.target === binding.target) ?? null,
   mapping: group.coverage?.targetMappings?.find((entry) => entry.target === binding.target) ?? null,
-  comparison: group.comparison?.results?.find((entry) => entry.target === binding.target) ?? null,
   publicEntries: publicByTarget.get(binding.target) ?? [],
 })));
 const targetById = new Map(targets.map((target) => [target.target, target]));
@@ -540,7 +536,6 @@ function selectorMatches(declaration, selector) {
 function preferredPublicEntries(target) {
   const reviewedNames = [
     ...(target.mapping?.source === "reviewed" ? target.mapping.lean ?? [] : []),
-    target.comparison?.lean,
   ].filter(Boolean);
   const reviewed = target.publicEntries.filter((item) =>
     reviewedNames.includes(item.entry.declaration));
@@ -1206,13 +1201,6 @@ function renderInventoryDetail(target) {
   bindTypeBrowserOptions();
 }
 
-function comparisonResults(group, member) {
-  const symbol = group.typescript?.symbols.find((entry) => entry.id === member);
-  return (group.comparison?.results ?? []).filter((result) =>
-    result.ts === member ||
-    (result.portIntent?.disposition === "unsupported" && result.ts === symbol?.surfaceRoot));
-}
-
 function renderWorkItem(item) {
   if (item === undefined) {
     elements.detail.innerHTML = '<div class="empty">Select a binding-author action.</div>';
@@ -1227,7 +1215,6 @@ function renderWorkItem(item) {
     ...(item.candidateTargets ?? []),
     ...(item.target ? [item.target] : []),
   ])];
-  const comparisons = item.member ? comparisonResults(group, item.member) : [];
   const evidence = symbol
     ? '<section class="section"><h3>Expected versus current</h3><div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div><article class="anchor"><div class="card-head"><span class="card-title">' +
       escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div>" +
@@ -1238,14 +1225,6 @@ function renderWorkItem(item) {
       ? '<section class="section"><h3>Current public Lean evidence</h3>' +
         renderLeanCards(targetIds, { showRuntime: true }) + "</section>"
       : "";
-  const comparison = comparisons.length
-    ? '<section class="section"><h3>Existing comparison evidence</h3>' + comparisons.map((result) =>
-      '<article class="anchor"><div class="card-head"><span class="card-title">' +
-      escapeHtml(result.id) + '</span><span class="pill ' + escapeHtml(result.status) + '">' +
-      escapeHtml(result.status) + "</span></div>" +
-      (result.note ? '<p class="note">' + escapeHtml(result.note) + "</p>" : "") +
-      "</article>").join("") + "</section>"
-    : "";
   elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
     escapeHtml(item.disposition) + '">' + escapeHtml(dispositionLabel(item.disposition)) +
     '</span><span class="pill ' + escapeHtml(item.severity) + '">' +
@@ -1256,7 +1235,7 @@ function renderWorkItem(item) {
     '"><div class="card-head"><span class="card-title">' + escapeHtml(item.code) +
     '</span></div><p>' + escapeHtml(item.message) +
     '</p><div class="pane-title">Required action</div><p>' + escapeHtml(item.action) +
-    "</p></article>" + evidence + comparison +
+    "</p></article>" + evidence +
     '<section class="section"><button type="button" class="inline-button" id="open-reference">Open upstream API group</button></section>';
   elements.detail.querySelector("#open-reference")?.addEventListener("click", () =>
     selectGroup(item.library + "/" + item.group));

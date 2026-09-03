@@ -244,8 +244,7 @@ export async function generateLeanBindings(configPath) {
     descriptorsByRoot.set(root.id, await generateDescriptorFile({
       files: upstream.declarations.map((file) => resolve(repositoryRoot, file)),
       anchors: null,
-      anchorsData: { version: 1, anchors: root.anchors ?? [] },
-      bindingContext: null,
+      anchorsData: { version: 1, anchors: [] },
       symbols: new Set(upstream.roots),
       symbolFiles: [],
       sourceUrl: upstream.sourceUrl ?? null,

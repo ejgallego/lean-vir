@@ -78,6 +78,28 @@ test("reviewed method mappings require their named public declaration to reach t
     description: "Demo bindings.",
     path: "Vir/Demo.bindings.json",
     lean: { modules: ["Vir.Demo"] },
+    generation: {
+      output: "Vir/Demo/Generated.lean",
+      irOutput: "build/bindings/demo.generated-operations.json",
+      imports: ["Vir.Demo.Types"],
+      namespace: "Lean.Vir.Demo",
+      abiProfile: {
+        id: "demo-v1",
+        effect: { id: "runtime", lean: "RuntimeM" },
+        types: { void: { lean: "Unit", representation: "immediate" } },
+        resource: {
+          constructor: "Lean.Vir.Js",
+          nullableConstructor: "Lean.Vir.Js.Nullable",
+          argument: { passing: "borrowed", retention: "call" },
+          result: { ownership: "owned" },
+        },
+        receiver: { default: { passing: "borrowed", retention: "call" }, globalTypes: {} },
+      },
+      resources: { Widget: "Widget" },
+      members: ["Widget.render"],
+      methodPolicies: {},
+      exceptions: {},
+    },
     roots: [{
       id: "widget",
       title: "Widget",
@@ -97,6 +119,8 @@ test("reviewed method mappings require their named public declaration to reach t
       kind: "method",
       surfaceRoot: "Widget",
       display: "render(): void;",
+      source: { path: "demo.d.ts", startLine: 1 },
+      shape: { kind: "function", args: [], result: { kind: "primitive", name: "void" } },
     }],
   };
 

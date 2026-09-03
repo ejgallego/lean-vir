@@ -15,14 +15,10 @@ import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 const explorerAssetsDir = resolve(repositoryRoot, "web/tools/binding-explorer");
-const semanticStatuses = ["exact", "compatible", "weak", "missing"];
 const coverageStatuses = [
-  "exact",
-  "compatible",
   "derived",
   "protocol-linked",
   "contract-linked",
-  "weak",
   "unreviewed",
   "suggested",
   "ambiguous",
@@ -123,11 +119,10 @@ async function generateTypeScriptSurfaces(configs) {
   const surfaces = new Map();
   for (const { upstream, requests } of groups.values()) {
     const requestedSymbols = new Set(requests.flatMap(({ bindingRoot }) => bindingRoot.upstream.roots));
-    const anchors = requests.flatMap(({ bindingRoot }) => bindingRoot.anchors ?? []);
     const descriptor = await generateDescriptorFile({
       files: upstream.declarations.map((file) => resolve(repositoryRoot, file)),
       anchors: null,
-      anchorsData: { version: 1, anchors },
+      anchorsData: { version: 1, anchors: [] },
       symbols: requestedSymbols,
       symbolFiles: [],
       sourceUrl: upstream.sourceUrl ?? null,
@@ -165,76 +160,35 @@ function explorerTypeScriptSymbol(symbol) {
   return { ...presentation, display: `${header} { … }` };
 }
 
-async function loadComparison(bindingRoot) {
-  if (bindingRoot.comparison === undefined) return null;
-  const path = resolve(repositoryRoot, bindingRoot.comparison.report);
-  const report = await readJson(path);
-  if (report?.version !== 1 || report.generatedBy !== "scripts/bindings/check-type-anchors.mjs" ||
-      !Array.isArray(report.results) || !semanticStatuses.every((status) =>
-        Number.isInteger(report.summary?.[status]))) {
-    throw new Error(`${relative(repositoryRoot, path)} is not a type-anchor comparison report`);
-  }
-  return { path: relative(repositoryRoot, path), ...report };
-}
-
 function issue(kind, severity, message, extra = {}) {
   return { kind, severity, message, ...extra };
 }
 
-function semanticIssues(comparison) {
-  if (comparison === null) return [];
-  const issues = [];
-  for (const result of comparison.results) {
-    if (result.status === "weak") {
-      issues.push(issue("type-fidelity", "warning", `${result.lean} weakly matches ${result.ts}`, {
-        anchor: result.id,
-        ...(result.target ? { target: result.target } : {}),
-      }));
-    } else if (result.status === "missing" && result.relation !== "coverageGap") {
-      issues.push(issue(
-        "missing-descriptor",
-        "error",
-        result.note ?? `${result.lean} or ${result.ts} is missing`,
-        { anchor: result.id, ...(result.target ? { target: result.target } : {}) },
-      ));
+function unsupportedRoadmap(config, bindingRoot, typeScript) {
+  const symbols = typeScript?.symbols ?? [];
+  return (bindingRoot.unsupported ?? []).map((entry) => {
+    if (!symbols.some((symbol) =>
+      symbol.id === entry.typescript || symbol.surfaceRoot === entry.typescript)) {
+      throw new Error(
+        `${config.id}/${bindingRoot.id} unsupported entry references missing TypeScript symbol ${entry.typescript}`,
+      );
     }
-    for (const diagnostic of result.diagnostics ?? []) {
-      if (diagnostic.severity === "error") {
-        issues.push(issue("comparison-error", "error", diagnostic.message, {
-          anchor: result.id,
-          code: diagnostic.code,
-          ...(result.target ? { target: result.target } : {}),
-        }));
-      }
-    }
-  }
-  return issues;
+    return {
+      kind: "unsupported-upstream-entry",
+      message: entry.note,
+      typescript: entry.typescript,
+    };
+  });
 }
 
-function semanticRoadmap(comparison) {
-  if (comparison === null) return [];
-  return comparison.results.filter((result) =>
-    result.status === "missing" && result.relation === "coverageGap").map((result) => ({
-    kind: "unsupported-upstream-entry",
-    message: result.note ?? `${result.ts} is not provided by VIR`,
-    anchor: result.id,
-    typescript: result.ts,
-    ...(result.target ? { target: result.target } : {}),
-  }));
-}
-
-function analysisState(bindingRoot, coverage, comparison) {
+function analysisState(bindingRoot, coverage) {
   if (bindingRoot.upstream.kind === "internal") {
     return { status: "not-applicable", scope: "no-upstream-contract" };
   }
   if (coverage?.mode === "reviewed") {
-    return (bindingRoot.upstream.kind === "local" || comparison !== null) &&
-        coverage.summary.unreviewed === 0
+    return coverage.summary.unreviewed === 0
       ? { status: "complete", scope: "complete-upstream-surface" }
       : { status: "in-progress", scope: "complete-upstream-surface" };
-  }
-  if (comparison !== null) {
-    return { status: "curated", scope: "selected-symbol-comparison" };
   }
   if (coverage?.mode === "automatic") {
     return { status: "automatic", scope: "complete-upstream-surface" };
@@ -265,7 +219,6 @@ function reviewedMappingOperations(mapping) {
             accessor,
             target: operation.target,
             lean: [operation.lean],
-            anchor: operation.anchor,
           });
   }
   return mapping.targets.map((target) => ({
@@ -274,20 +227,9 @@ function reviewedMappingOperations(mapping) {
   }));
 }
 
-function worstSemanticStatus(results) {
-  if (results.length === 0) return "unreviewed";
-  return results.reduce((candidate, result) =>
-    semanticStatuses.indexOf(result.status) > semanticStatuses.indexOf(candidate)
-      ? result.status
-      : candidate, "exact");
-}
-
-function comparisonResultsForSymbol(symbol, comparison) {
-  if (comparison === null) return [];
-  return comparison.results.filter((result) =>
-    result.ts === symbol.id ||
-    (result.portIntent?.disposition === "unsupported" &&
-      result.ts === symbol.surfaceRoot));
+function unsupportedForSymbol(entries, symbol) {
+  return entries.find((entry) =>
+    entry.typescript === symbol.id || entry.typescript === symbol.surfaceRoot);
 }
 
 function operationUpstreamMember(operation) {
@@ -317,22 +259,18 @@ function generationRecord(
   symbol,
   member,
   targetMappings,
-  comparison,
+  unsupportedEntries,
   generatedOperations,
 ) {
-  const comparisonResults = comparisonResultsForSymbol(symbol, comparison);
-  const auditedTargets = comparisonResults.filter((result) =>
-    result.relation === "audit" && result.target !== undefined).map((result) => result.target);
   const mappedTargets = member.mapping?.targets ?? [];
-  const confirmedTargets = [...new Set([...mappedTargets, ...auditedTargets])].sort();
+  const confirmedTargets = [...new Set(mappedTargets)].sort();
   const candidateTargets = [...new Set(targetMappings.filter((mapping) =>
     mapping.source === "automatic").map((mapping) => mapping.target))].sort();
   const adaptedTargets = [...new Set(targetMappings.filter((mapping) =>
     mapping.source === "protocol-relation" &&
     ["upstream-adapter", "local-contract"].includes(mapping.relation.kind) &&
     mapping.typescript === symbol.id).map((mapping) => mapping.target))].sort();
-  const unsupported = comparisonResults.find((result) =>
-    result.portIntent?.disposition === "unsupported");
+  const unsupported = unsupportedForSymbol(unsupportedEntries, symbol);
   const diagnostics = [];
   let disposition;
   let provenance;
@@ -392,17 +330,6 @@ function generationRecord(
     });
   }
 
-  for (const result of comparisonResults) {
-    if (result.relation !== "audit" || !["weak", "missing"].includes(result.status)) continue;
-    diagnostics.push({
-      code: result.status === "weak" ? "type-translation-limited" : "type-translation-missing",
-      severity: result.status === "weak" ? "warning" : "error",
-      message: result.note ?? `${result.lean} does not faithfully represent ${result.ts}.`,
-      action: "Repair the translation policy or record the unsupported TypeScript construct.",
-      anchor: result.id,
-    });
-  }
-
   const targets = [...new Set([...confirmedTargets, ...adaptedTargets])].sort();
   return {
     disposition,
@@ -423,7 +350,6 @@ function decorateGenerationCoverage(
   bindingRoot,
   typeScript,
   surfaceCoverage,
-  comparison,
   generatedOperations,
 ) {
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
@@ -458,7 +384,7 @@ function decorateGenerationCoverage(
         symbol,
         member,
         targetMappingsBySymbol.get(member.id) ?? [],
-        comparison,
+        bindingRoot.unsupported ?? [],
         operationsBySymbol.get(member.id) ?? [],
       ),
     };
@@ -566,38 +492,11 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
       action: "Provide a declaration contract before generating or auditing its bindings.",
     });
   }
-  const representedAnchors = new Set(items.flatMap((item) =>
-    item.anchor === undefined ? [] : [item.anchor]));
-  issues.filter((entry) =>
-    ["type-fidelity", "missing-descriptor"].includes(entry.kind) &&
-    entry.anchor !== undefined && !representedAnchors.has(entry.anchor))
-    .forEach((entry) => {
-      items.push({
-        id: `${config.id}/${bindingRoot.id}/comparison/${entry.anchor}/${entry.kind}`,
-        library: config.id,
-        group: bindingRoot.id,
-        subject: "comparison-anchor",
-        anchor: entry.anchor,
-        disposition: "needs-annotation",
-        provenance: "comparison",
-        severity: entry.severity,
-        code: entry.kind === "type-fidelity"
-          ? "type-translation-limited"
-          : "type-translation-missing",
-        message: entry.message,
-        action: entry.kind === "type-fidelity"
-          ? "Review the generated specialization and improve the type translation policy."
-          : "Provide the missing TypeScript or Lean descriptor before generation.",
-        ...(entry.target === undefined ? {} : { target: entry.target }),
-      });
-      representedAnchors.add(entry.anchor);
-    });
   const structuralIssueKinds = new Set([
     "missing-provider",
     "runtime-only",
     "mapped-public-api-unreachable",
     "extra-public-accessor-api",
-    "comparison-error",
   ]);
   issues.filter((entry) => structuralIssueKinds.has(entry.kind)).forEach((entry, index) =>
     items.push({
@@ -616,7 +515,7 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
   return items;
 }
 
-function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison, generatedOperations = []) {
+function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, generatedOperations = []) {
   if (bindingRoot.upstream.kind === "local") {
     return buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, generatedOperations);
   }
@@ -625,18 +524,9 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   }
   const symbolsById = new Map(typeScript.symbols.map((symbol) => [symbol.id, symbol]));
   const bindingsByTarget = new Map(bindings.map((binding) => [binding.target, binding]));
-  const generatedMembers = new Set(config.generation?.members ?? []);
-  const resultsByTypeScript = new Map();
-  const resultsById = new Map();
-  for (const result of comparison?.results ?? []) {
-    if (resultsById.has(result.id)) {
-      throw new Error(`${config.id}/${bindingRoot.id} comparison repeats anchor ${result.id}`);
-    }
-    resultsById.set(result.id, result);
-    const results = resultsByTypeScript.get(result.ts) ?? [];
-    results.push(result);
-    resultsByTypeScript.set(result.ts, results);
-  }
+  const generatedByTarget = new Map(generatedOperations
+    .filter((operation) => operation.typescript.kind !== "protocol")
+    .map((operation) => [operation.host.target, operation]));
   const mappings = new Map();
   const mappedTargets = new Set();
   const protocolTargets = new Set(generatedOperations
@@ -678,34 +568,23 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
         throw new Error(`${config.id}/${bindingRoot.id} maps target twice: ${operation.target}`);
       }
       mappedTargets.add(operation.target);
-      if (operation.accessor !== undefined) {
-        if (operation.anchor === undefined && generatedMembers.has(mapping.typescript)) continue;
-        const result = resultsById.get(operation.anchor);
-        if (result === undefined || result.ts !== mapping.typescript ||
-            result.target !== operation.target ||
-            result.portIntent?.accessor !== operation.accessor) {
-          throw new Error(`${config.id}/${bindingRoot.id} ${mapping.typescript} ${operation.accessor} accessor does not match reviewed anchor ${operation.anchor}`);
-        }
+      const generated = generatedByTarget.get(operation.target);
+      if (generated?.typescript.member !== mapping.typescript ||
+          generated.typescript.accessor !== operation.accessor ||
+          generated.lean.declaration !== operation.lean[0]) {
+        throw new Error(
+          `${config.id}/${bindingRoot.id} ${mapping.typescript} does not match generated operation ${operation.target}`,
+        );
       }
     }
     const mappedOperations = operations.filter((operation) => operation.missing !== true);
-    const results = mapping.accessors === undefined
-      ? resultsByTypeScript.get(mapping.typescript) ?? []
-      : mappedOperations.flatMap((operation) => {
-          const result = operation.anchor === undefined ? undefined : resultsById.get(operation.anchor);
-          return result === undefined ? [] : [result];
-        });
-    const generatedCompatibility = generatedMembers.has(mapping.typescript) &&
-      results.length === 0 && mappedOperations.length !== 0;
     mappings.set(mapping.typescript, {
       ...mapping,
       operations,
       targets: mappedOperations.map((operation) => operation.target),
       lean: mappedOperations.flatMap((operation) => operation.lean),
       status: operations.some((operation) => operation.missing === true)
-        ? "missing"
-        : generatedCompatibility ? "derived" : worstSemanticStatus(results),
-      anchors: results.map((result) => result.id),
+        ? "missing" : "derived",
     });
   }
   const classifiedTargets = new Set([...mappedTargets, ...protocolTargets]);
@@ -728,19 +607,12 @@ function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, compari
   for (const member of members) summary[member.status] += 1;
   const targetMappings = [...mappings.values()].flatMap((mapping) =>
     mapping.operations.filter((operation) => operation.missing !== true).map((operation) => {
-      const operationResults = operation.anchor === undefined
-        ? (resultsByTypeScript.get(mapping.typescript) ?? []).filter((result) =>
-            result.target === operation.target)
-        : [resultsById.get(operation.anchor)];
       return {
         target: operation.target,
-        status: generatedMembers.has(mapping.typescript) && operationResults.length === 0
-          ? "derived"
-          : worstSemanticStatus(operationResults),
+        status: "derived",
         source: "reviewed",
         typescript: mapping.typescript,
         lean: operation.lean,
-        anchors: operationResults.map((result) => result.id),
         ...(operation.accessor === undefined ? {} : { accessor: operation.accessor }),
       };
     }));
@@ -804,7 +676,6 @@ function buildLocalContractCoverage(config, bindingRoot, typeScript, bindings, g
       targets: operations.map((operation) => operation.host.target),
       lean: operations.map((operation) => operation.lean.declaration),
       status: "contract-linked",
-      anchors: [],
     };
     return {
       id: member.id,
@@ -1057,7 +928,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   const allIssues = [];
   const allRoadmap = [];
   const libraries = [];
-  const semanticSummary = Object.fromEntries(semanticStatuses.map((status) => [status, 0]));
   for (const config of configs) {
     const generatedByGroup = new Map();
     if (config.generation !== undefined) {
@@ -1079,7 +949,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     const roots = [];
     for (const bindingRoot of config.roots) {
       const bindings = assigned.get(config.id).get(bindingRoot.id).sort((left, right) => left.target.localeCompare(right.target));
-      const comparison = await loadComparison(bindingRoot);
       const typescript = typeScriptSurfaces.get(`${config.id}/${bindingRoot.id}`) ?? null;
       const rawSurfaceCoverage = typescript === null
         ? null
@@ -1088,7 +957,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           bindingRoot,
           typescript,
           bindings,
-          comparison,
           generatedByGroup.get(bindingRoot.id) ?? [],
         );
       const surfaceCoverage = rawSurfaceCoverage === null
@@ -1098,7 +966,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           bindingRoot,
           typescript,
           rawSurfaceCoverage,
-          comparison,
           generatedByGroup.get(bindingRoot.id) ?? [],
         );
       const issues = [];
@@ -1115,20 +982,11 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         publicByTarget,
         generatedByGroup.get(bindingRoot.id) ?? [],
       ));
-      issues.push(...semanticIssues(comparison));
-      const roadmap = semanticRoadmap(comparison).map((entry) => ({
+      const roadmap = unsupportedRoadmap(config, bindingRoot, typescript).map((entry) => ({
         library: config.id,
         group: bindingRoot.id,
         ...entry,
       }));
-      if (comparison !== null) {
-        for (const status of semanticStatuses) semanticSummary[status] += comparison.summary[status];
-        for (const result of comparison.results) {
-          if (result.target !== undefined && !bindings.some((binding) => binding.target === result.target)) {
-            throw new Error(`${config.id}/${bindingRoot.id} anchor ${result.id} references target outside its root: ${result.target}`);
-          }
-        }
-      }
       const decoratedIssues = issues.map((entry) => ({ library: config.id, group: bindingRoot.id, ...entry }));
       const workItems = groupWorkItems(
         config,
@@ -1148,7 +1006,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         upstream: bindingRoot.upstream,
         ...(typescript === null ? {} : { typescript }),
         ...(surfaceCoverage === null ? {} : { coverage: surfaceCoverage }),
-        analysis: analysisState(bindingRoot, surfaceCoverage, comparison),
+        analysis: analysisState(bindingRoot, surfaceCoverage),
         findingStatus: findingStatus(bindings, issues),
         summary: {
           bindings: bindings.length,
@@ -1157,7 +1015,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
           roadmap: roadmap.length,
         },
         bindings,
-        ...(comparison === null ? {} : { comparison }),
         ...(generatedByGroup.has(bindingRoot.id)
           ? { generatedOperations: generatedByGroup.get(bindingRoot.id) }
           : {}),
@@ -1250,7 +1107,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     complete: apiGroups.filter((entry) => entry.analysis.status === "complete").length,
     inProgress: apiGroups.filter((entry) => entry.analysis.status === "in-progress").length,
     automatic: apiGroups.filter((entry) => entry.analysis.status === "automatic").length,
-    curated: apiGroups.filter((entry) => entry.analysis.status === "curated").length,
     needsInput: apiGroups.filter((entry) => entry.analysis.status === "needs-input").length,
     notRun: apiGroups.filter((entry) => entry.analysis.status === "not-run").length,
     notApplicable: apiGroups.filter((entry) => entry.analysis.status === "not-applicable").length,
@@ -1259,7 +1115,7 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
     format: "lean-vir-binding-explorer",
-    version: 2,
+    version: 3,
     generatedBy: "scripts/bindings/generate-binding-explorer.mjs",
     inputs: {
       coverage: relative(repositoryRoot, coveragePath),
@@ -1267,7 +1123,10 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     },
     lean: coverage.lean,
     providers: coverage.providers,
-    boundaryAnalysis: coverage.analysis,
+    boundaryAnalysis: {
+      ...coverage.analysis,
+      semanticParity: "canonical-generated-operation-ir",
+    },
     summary: {
       libraries: libraries.length,
       apiGroups: apiGroups.length,
@@ -1284,7 +1143,6 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
         externalGroups: apiGroups.length - analysisCounts.notApplicable,
         ...analysisCounts,
       },
-      semantic: semanticSummary,
       upstreamSymbols: apiGroups.reduce((sum, entry) => sum + (entry.typescript?.symbols.length ?? 0), 0),
       coverage: {
         groups: coveredGroups.length,
@@ -1357,20 +1215,15 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  libraries: ${report.summary.libraries}`);
   console.log(`  API groups: ${report.summary.apiGroups}`);
   console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} with provider keys present`);
-  console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.curated} curated, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
+  console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.inProgress} in progress, ${report.summary.analysis.automatic} automatic, ${report.summary.analysis.needsInput} need input, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
-  console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence.exact + report.summary.coverage.evidence.compatible} comparator-checked, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.weak} weak, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
+  console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
   console.log(`  upstream semantic coverage: ${report.summary.generation.semanticCoverage.faithful} with faithful boundary, ${report.summary.generation.semanticCoverage["adapter-only"]} adapter-only, ${report.summary.generation.semanticCoverage.unreviewed} unreviewed, ${report.summary.generation.semanticCoverage["local-contract"]} local-contract, ${report.summary.generation.semanticCoverage.candidate} candidate, ${report.summary.generation.semanticCoverage["not-provided"]} not provided`);
   console.log(`  private active effects: ${report.summary.generation.activeEffects.register} register, ${report.summary.generation.activeEffects.use} use, ${report.summary.generation.activeEffects.release} release`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);
-  const unresolvedSemanticMissing = Math.max(
-    0,
-    report.summary.semantic.missing - report.summary.roadmap.unsupportedEntries,
-  );
-  console.log(`  semantic comparison: ${report.summary.semantic.weak} weak, ${unresolvedSemanticMissing} unresolved missing, ${report.summary.roadmap.unsupportedEntries} reviewed unsupported`);
   console.log(`  issues: ${report.summary.issues.error} errors, ${report.summary.issues.warning} warnings`);
   console.log(`  roadmap: ${report.summary.roadmap.unsupportedEntries} explicitly unsupported upstream entries; unselected entries remain coverage only`);
   console.log(`  artifacts: ${options.check ? "validated" : "wrote"} ${relative(repositoryRoot, options.out)}`);

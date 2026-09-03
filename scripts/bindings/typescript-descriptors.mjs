@@ -10,7 +10,6 @@ import { relative, resolve } from "node:path";
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { loadBindingConfig } from "./binding-config.mjs";
-import { materializeGeneratedAnchors } from "./binding-modalities.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
@@ -20,7 +19,7 @@ Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
 Options:
   --api-group FILE#ID
-                  Load entry points, policy, and anchors from a configured API group.
+                  Load declarations and entry points from a configured API group.
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
   --symbols FILE  Keep TypeScript symbol ids listed in FILE.
@@ -97,7 +96,7 @@ function parseArgs(argv) {
   if (bindingRoot !== null &&
       (files.length !== 0 || anchors !== null || symbols.size !== 0 || symbolFiles.length !== 0 ||
        sourceUrl !== null || dependencyDepth !== 0 || dependencyPolicy !== null)) {
-    throw new Error("--api-group supplies declarations, entry points, policy, and anchors; do not pass those options separately");
+    throw new Error("--api-group supplies declarations and entry points; do not pass those options separately");
   }
   if (check && out === null) throw new Error("--check requires --out");
   if (sourceUrl !== null && files.length !== 1) {
@@ -116,7 +115,6 @@ function parseArgs(argv) {
     dependencyDepth,
     dependencyPolicy,
     dependencyPolicyData: null,
-    bindingContext: null,
   };
 }
 
@@ -150,7 +148,6 @@ export async function generateDescriptorFile({
   dependencyDepth,
   dependencyPolicy,
   dependencyPolicyData,
-  bindingContext = null,
 }) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
@@ -199,14 +196,7 @@ export async function generateDescriptorFile({
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
   const rawAnchorData = anchorsData ??
     (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
-  const anchorData = bindingContext === null
-    ? rawAnchorData
-    : materializeGeneratedAnchors(
-      bindingContext.config,
-      bindingContext.root,
-      { symbols: selectedSymbols },
-      rawAnchorData,
-    );
+  const anchorData = rawAnchorData;
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -250,12 +240,11 @@ async function resolveBindingRoot(options) {
   return {
     ...options,
     files: upstream.declarations.map((file) => resolve(root, file)),
-    anchorsData: { version: 1, anchors: binding.anchors ?? [] },
+    anchorsData: { version: 1, anchors: [] },
     symbols: new Set(upstream.roots),
     sourceUrl: upstream.sourceUrl ?? null,
     dependencyDepth: upstream.dependencyDepth ?? 0,
     dependencyPolicyData: upstream.dependencyPolicy ?? null,
-    bindingContext: { config, root: binding },
   };
 }
 

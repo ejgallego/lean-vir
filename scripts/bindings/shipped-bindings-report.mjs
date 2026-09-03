@@ -250,7 +250,7 @@ export function buildShippedBindingsReport(inventory, providers) {
         "explicit vir_js_explicit_conversion declarations only",
       providerCoverage: "target-name-presence-only",
       providerBehavior: "not-mechanically-verified",
-      semanticParity: "library-specific type anchors",
+      semanticParity: "not-analyzed-by-provider-reconciliation",
     },
     lean: {
       modules: inventory.modules,

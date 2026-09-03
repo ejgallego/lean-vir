@@ -1,9 +1,10 @@
 # Binding tooling
 
 This directory owns the shipped-JavaScript-binding inventory, TypeScript
-descriptor generation, faithful Lean declaration generation, Lean type-anchor
-comparison, and the consolidated upstream reference/shipped inventory/author
-actions document. Use the stable
+descriptor generation, faithful Lean declaration generation, and the
+consolidated upstream reference/shipped inventory/author actions document. It
+also retains a standalone type-anchor comparator for fixture and debugging
+work. Use the stable
 `npm run generate:*`, `npm run check:*`, and `npm run test:*` commands from the
 repository root rather than invoking these entry points directly during
 routine work.
@@ -26,15 +27,15 @@ Schema cannot express directly.
 `binding-modalities.mjs` is the shared TypeScript-to-Lean policy boundary. It
 combines descriptor shapes with a library ABI profile, explicit method
 signature policies, and justified exceptions to produce canonical operation
-IR. Lean source generation, comparator intent, generated documentation, and
-report evidence consume that same IR. Structured protocols additionally state
+IR. Lean source generation, generated documentation, and report evidence
+consume that same IR. Structured protocols additionally state
 whether they adapt a named TypeScript member, are VIR-owned, follow a local
 contract, or still need classification. The interactive document presents an
 upstream-shaped reference, a complete shipped-boundary inventory, and
 actionable author findings with semantic TypeScript/Lean highlighting;
 convenience APIs do not count as upstream bindings.
 
-Operation IR also carries a semantic relation independent of type comparison.
+Operation IR also carries a semantic relation independent of provider presence.
 Unmodified TypeScript-derived operations start as preserving by construction;
 the generator then folds in reviewed receiver and resource-mapping facts.
 Non-identity resource mappings and omitted host-global receivers therefore
