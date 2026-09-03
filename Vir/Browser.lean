@@ -394,15 +394,15 @@ def arc
   withFloat startAngle fun startAngle => withFloat endAngle fun endAngle =>
   arcJs ctx x y radius startAngle endAngle
 
-/-- Sets the context's CSS fill style. -/
+/-- Converts a Lean string to the string arm of `CanvasStyle`, then uses the exact setter. -/
 def setFillStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setFillStyleJs ctx (← Internal.ownedString style)
+  setFillStyleValue ctx (← CanvasStyle.ofString style)
 
-/-- Sets the context's CSS stroke style. -/
+/-- Converts a Lean string to the string arm of `CanvasStyle`, then uses the exact setter. -/
 def setStrokeStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setStrokeStyleJs ctx (← Internal.ownedString style)
+  setStrokeStyleValue ctx (← CanvasStyle.ofString style)
 
 /-- Sets the context's stroke width. -/
 def setLineWidth

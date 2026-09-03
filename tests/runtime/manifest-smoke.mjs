@@ -436,7 +436,8 @@ assert.equal(eventTargetImport?.result?.type, "Js");
 const eventTargetNarrowingImport = hostImportTarget(
   "browser.eventTarget.asElement",
 );
-assert.equal(eventTargetNarrowingImport?.args[0]?.type?.type, "EventTarget");
+assert.equal(eventTargetNarrowingImport?.args[0]?.name, "target");
+assert.equal(eventTargetNarrowingImport?.args[0]?.type?.type, "Js");
 assert.equal(eventTargetNarrowingImport?.result?.type, "Js");
 const inlineStyleNarrowingImport = hostImportTarget(
   "browser.elementCSSInlineStyle.fromElement",
@@ -735,15 +736,7 @@ virtualQueryHost["browser.element.addEventListener"](
   "click",
   virtualMissingEventCallback,
 );
-virtualQueryState.elements
-  .get("#present")
-  .listeners.get("click")[0]
-  .dispatch(
-    createVirtualEventState({
-      target: null,
-      currentTarget: null,
-    }),
-  );
+virtualMissingEventCallback(createVirtualEventState());
 assert.equal(
   virtualNullableHost["js.nullable.isNull"](virtualMissingEventTarget),
   true,

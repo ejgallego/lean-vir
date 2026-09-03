@@ -430,41 +430,27 @@ opaque translateJs
     (y : @& Lean.Vir.Js Float) :
     DomM Unit
 
-/--
-Generated explicit protocol operation semantic adapter for TypeScript `CanvasRenderingContext2D.fillStyle`.
-
-Adapter policy: Convenience adapter for the string arm of CanvasRenderingContext2D.fillStyle.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setFillStyle"]
-opaque setFillStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated explicit protocol operation semantic adapter for TypeScript `CanvasRenderingContext2D.strokeStyle`.
-
-Adapter policy: Convenience adapter for the string arm of CanvasRenderingContext2D.strokeStyle.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setStrokeStyle"]
-opaque setStrokeStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
 end CanvasRenderingContext2D
+
+namespace CanvasStyle
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas-style.of-string`.
+
+Explicitly injects a Lean-owned string into the string arm of the exact JavaScript CanvasStyle union without changing its value.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; style lean-owned/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.browser.canvasStyle.string"]
+opaque ofString
+    (style : @& String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js CanvasStyle)
+
+end CanvasStyle
 
 namespace Console
 

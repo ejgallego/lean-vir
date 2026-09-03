@@ -42,8 +42,8 @@
       {
         "id": "infoview.clipboard.write-text", "group": "clipboard", "target": "infoview.clipboard.writeText",
         "lean": "Lean.Vir.Infoview.Clipboard.writeTextJs", "marker": "vir_js",
-        "reason": "Adapts Clipboard.writeText to the infoview capability protocol. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "Clipboard.writeText", "semantics": "changing" },
+        "reason": "Implements the local synchronous infoview clipboard capability. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.",
+        "upstreamRelation": { "kind": "local-contract", "member": "InfoviewClipboardHost.writeText" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
         "arguments": [{ "name": "text", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
@@ -77,7 +77,7 @@
       "title": "Clipboard",
       "targets": ["infoview.clipboard.*"],
       "lean": { "public": ["Lean.Vir.Infoview.Clipboard"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Clipboard.writeText"] }
+      "upstream": { "kind": "local", "declarations": ["Vir/Infoview/Surface.contract.d.ts"], "roots": ["InfoviewClipboardHost"] }
     },
     {
       "id": "commands",

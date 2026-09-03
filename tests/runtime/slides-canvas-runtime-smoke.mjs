@@ -148,7 +148,10 @@ try {
     defaultHostBindings: createBrowserHostBindings({ resources }),
   });
   try {
-    for (const target of ["js.float.owned", "js.string.owned"]) {
+    for (const target of [
+      "js.float.owned",
+      "js.value.browser.canvasStyle.string",
+    ]) {
       const hostImport = runtime.interfaceManifest.hostImports.find(
         (entry) => entry.target === target,
       );

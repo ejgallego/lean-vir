@@ -463,7 +463,9 @@ try {
     "browser.document.current",
     "browser.document.createElement",
     "browser.canvas2d.fillRect",
+    "browser.canvas2d.setFillStyleValue",
     "browser.animation.requestAnimationFrame",
+    "js.value.browser.canvasStyle.string",
   ]) {
     assert.ok(
       slidesManifest.hostImports.some((entry) => entry.target === target),

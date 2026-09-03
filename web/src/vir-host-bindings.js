@@ -147,6 +147,7 @@ export function createBrowserElementHostBindings() {
 
 export function createBrowserCanvasHostBindings() {
   return {
+    "js.value.browser.canvasStyle.string": (style) => style,
     "browser.htmlCanvasElement.fromElement": (element) => {
       return isCanvasElement(element) ? element : null;
     },
@@ -182,16 +183,8 @@ export function createBrowserCanvasHostBindings() {
       ctx.fillStyle = style;
       return undefined;
     },
-    "browser.canvas2d.setFillStyle": (ctx, style) => {
-      ctx.fillStyle = style;
-      return undefined;
-    },
     "browser.canvas2d.getStrokeStyle": (ctx) => ctx.strokeStyle,
     "browser.canvas2d.setStrokeStyleValue": (ctx, style) => {
-      ctx.strokeStyle = style;
-      return undefined;
-    },
-    "browser.canvas2d.setStrokeStyle": (ctx, style) => {
       ctx.strokeStyle = style;
       return undefined;
     },

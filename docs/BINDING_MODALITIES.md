@@ -205,8 +205,9 @@ existing Lean binder names without treating spelling as a semantic exception.
 Type or modality differences still require a justified
 `generation.exceptions` entry. Canvas `fillStyle` and `strokeStyle`, for
 example, use the opaque JavaScript-owned `CanvasStyle` marker for their faithful
-raw getter/setter pairs. Their existing string-valued setters are separately
-classified generated convenience adapters.
+raw getter/setter pairs. `CanvasStyle.ofString` is a separate explicit
+conversion into the string arm of that union; the convenience setters call the
+faithful generated property setter after that conversion.
 
 ## Method Selection
 

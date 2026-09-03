@@ -182,13 +182,13 @@ assert.equal(
   report.summary.generation.boundaries.operations,
 );
 assert.equal(report.summary.generation.semanticRelations.unreviewed, 0);
-assert.ok(report.summary.generation.semanticRelations.changing > 0);
+assert.equal(report.summary.generation.semanticRelations.changing, 0);
 assert.ok(Object.values(report.summary.generation.activeEffects)
   .every((count) => count > 0));
 assert.equal(
   generatedOperations.find((operation) =>
     operation.id === "infoview.clipboard.write-text")?.semantics.relation,
-  "changing",
+  "local-contract",
 );
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
@@ -432,14 +432,13 @@ assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGra
 assert.equal(generatedFillStyleGetter?.semantics.relation, "preserving");
 assert.deepEqual(canvasFillStyle?.generation.semanticCoverage, {
   status: "faithful",
-  relations: ["changing", "preserving"],
+  relations: ["preserving"],
 });
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
 assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
 assert.ok(canvasRoot?.generatedOperations.some((operation) =>
-  operation.host.target === "browser.canvas2d.setFillStyle" &&
-  operation.protocol?.upstreamRelation.member === "CanvasRenderingContext2D.fillStyle" &&
-  operation.protocol?.upstreamRelation.accessor === "set"));
+  operation.host.target === "js.value.browser.canvasStyle.string" &&
+  operation.protocol?.upstreamRelation.kind === "vir-owned"));
 
 const canvasLineWidth = canvasRoot?.coverage.members.find((member) =>
   member.id === "CanvasRenderingContext2D.lineWidth");

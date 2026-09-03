@@ -413,28 +413,15 @@
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
       {
-        "id": "browser.canvas2d.set-fill-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setFillStyle",
-        "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleJs", "marker": "vir_js",
-        "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.fillStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.fillStyle", "accessor": "set", "semantics": "changing" },
-        "effect": { "id": "dom", "lean": "DomM" },
+        "id": "browser.canvas-style.of-string", "group": "canvas-2d", "target": "js.value.browser.canvasStyle.string",
+        "lean": "Lean.Vir.Browser.CanvasStyle.ofString", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly injects a Lean-owned string into the string arm of the exact JavaScript CanvasStyle union without changing its value.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [
-          { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
-          { "name": "style", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+          { "name": "style", "type": { "lean": "String", "representation": "lean-owned" } }
         ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "browser.canvas2d.set-stroke-style-string", "group": "canvas-2d", "target": "browser.canvas2d.setStrokeStyle",
-        "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleJs", "marker": "vir_js",
-        "reason": "Convenience adapter for the string arm of CanvasRenderingContext2D.strokeStyle.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "CanvasRenderingContext2D.strokeStyle", "accessor": "set", "semantics": "changing" },
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "ctx", "role": "receiver", "type": { "lean": "Lean.Vir.Js CanvasRenderingContext2D", "representation": "js-resource", "resourceInner": "CanvasRenderingContext2D" } },
-          { "name": "style", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+        "result": { "type": { "lean": "Lean.Vir.Js CanvasStyle", "representation": "js-resource", "resourceInner": "CanvasStyle" } }
       },
       {
         "id": "browser.element-css-inline-style.from-element",
@@ -593,8 +580,8 @@
     {
       "id": "canvas-2d",
       "title": "Canvas 2D",
-      "targets": ["browser.canvas2d.*"],
-      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D", "Lean.Vir.Browser.TextMetrics"] },
+      "targets": ["browser.canvas2d.*", "js.value.browser.canvasStyle.*"],
+      "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D", "Lean.Vir.Browser.CanvasStyle", "Lean.Vir.Browser.TextMetrics"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D", "TextMetrics"] },
       "mappings": [
         { "typescript": "CanvasRenderingContext2D.arc", "targets": ["browser.canvas2d.arc"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.arcJs"] },

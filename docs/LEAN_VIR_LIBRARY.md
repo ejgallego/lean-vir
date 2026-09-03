@@ -517,7 +517,9 @@ provides the first infoview-facing shell:
 `Lean.Vir.Infoview.Clipboard.writeText` remains a public `String -> DomM Bool`
 helper, but its low-level host target receives an explicit
 `Lean.Vir.Js String` resource via `JsValue.ofString` and returns an explicit
-`Lean.Vir.Js Bool` resource. The infoview command and proof-widget RPC command
+`Lean.Vir.Js Bool` resource. This is the local synchronous
+`InfoviewClipboardHost` capability, not a binding that claims the asynchronous
+browser `Clipboard.writeText` contract. The infoview command and proof-widget RPC command
 helpers follow the same `Js Bool` result convention at the low-level host
 boundary. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
 `DocumentPosition -> DomM Bool` shape, but first builds a `Js DocumentPosition`

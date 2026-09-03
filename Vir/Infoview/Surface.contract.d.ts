@@ -7,6 +7,11 @@ export interface DocumentPosition {
   label: string;
 }
 
+/** Local synchronous clipboard capability supplied to the VIR infoview. */
+export interface InfoviewClipboardHost {
+  writeText(text: string): boolean;
+}
+
 /** Local editor capabilities supplied to the VIR infoview. */
 export interface InfoviewCommandHost {
   documentPosition(

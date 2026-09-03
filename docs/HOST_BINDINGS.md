@@ -166,6 +166,11 @@ while `querySelectorString` keeps the same explicit receiver and converts only
 the Lean `String`. This keeps both conversion and ambient-global selection out
 of the faithful low-level binding.
 
+Canvas fill and stroke properties use the exact `Js CanvasStyle` union value.
+`CanvasStyle.ofString` is the explicit conversion from Lean-owned text into
+the union's string arm; both convenience setters then call the same faithful
+generated property setter used for gradients and patterns.
+
 Event-listener registration passes the exact JavaScript listener function to
 the native `addEventListener` method and returns `Unit`, just like the selected
 upstream overload. Removal requires the same receiver, event name, and function
