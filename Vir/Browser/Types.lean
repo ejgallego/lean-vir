@@ -74,7 +74,7 @@ opaque Event : Type
 /-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
 opaque KeyboardEvent : Type
 
-/-- Handle for a browser event-listener registration. -/
+/-- Exact JavaScript function value accepted by the DOM event-listener APIs. -/
 opaque EventListener : Type
 
 /-- Browser `HTMLInputElement` object class. -/

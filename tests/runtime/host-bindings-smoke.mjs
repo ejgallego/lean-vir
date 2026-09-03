@@ -145,10 +145,12 @@ lifecycleDocumentState.elements
 assert.deepEqual(lifecycleRecords.splice(0), [101]);
 lifecycleRuntime.dispose();
 assert.equal(lifecycleRuntime.liveCallbacks.size, 0);
-lifecycleDocumentState.elements
-  .get("#callback")
-  .listeners.get("click")?.[0]
-  ?.dispatch({});
+assert.equal(
+  lifecycleDocumentState.elements.get("#callback").listeners.get("click")
+    ?.length,
+  1,
+  "runtime disposal must not invent DOM listener removal",
+);
 assert.deepEqual(lifecycleRecords.splice(0), []);
 
 const lifecycleDocumentState2 = createVirtualDocumentState();
@@ -173,6 +175,11 @@ lifecycleDocumentState2.elements
   .listeners.get("click")?.[0]
   ?.dispatch({});
 assert.deepEqual(lifecycleRecords2.splice(0), []);
+assert.deepEqual(
+  lifecycleDocumentState2.elements.get("#callback").listeners.get("click"),
+  [],
+  "removeEventListener must match the original receiver, event, and function",
+);
 assert.equal(lifecycleRuntime2.call("HostInterop.timeoutRecord", 40), "1");
 await wait(10);
 assert.deepEqual(lifecycleRecords2.splice(0), [41]);
@@ -219,10 +226,11 @@ assert.equal(pendingRuntime.call("HostInterop.animationRecord", 80), "1");
 assert.equal(pendingRuntime.liveCallbacks.size, 3);
 pendingRuntime.dispose();
 assert.equal(pendingRuntime.liveCallbacks.size, 0);
-pendingDocumentState.elements
-  .get("#pending")
-  .listeners.get("click")?.[0]
-  ?.dispatch({});
+assert.equal(
+  pendingDocumentState.elements.get("#pending").listeners.get("click")?.length,
+  1,
+  "runtime disposal must leave the DOM-owned listener registered",
+);
 await wait(40);
 assert.deepEqual(pendingRecords.splice(0), []);
 
@@ -273,10 +281,11 @@ assert.throws(
   /interface entry not found/,
 );
 assert.equal(reloadRuntime.call("fib", 12), "144");
-reloadDocumentState.elements
-  .get("#reload")
-  .listeners.get("click")?.[0]
-  ?.dispatch({});
+assert.equal(
+  reloadDocumentState.elements.get("#reload").listeners.get("click")?.length,
+  1,
+  "package replacement must leave the DOM-owned listener registered",
+);
 await wait(40);
 assert.deepEqual(reloadRecords.splice(0), []);
 reloadRuntime.dispose();

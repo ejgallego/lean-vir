@@ -89,7 +89,7 @@ export function createHostLifecycle() {
   return new HostLifecycle();
 }
 
-export function createElementHostBindings(resources, operations) {
+export function createElementHostBindings(operations) {
   return {
     "browser.element.querySelector": (element, selector) =>
       operations.querySelector(element, selector),
@@ -119,34 +119,15 @@ export function createElementHostBindings(resources, operations) {
       operations.setAttribute(element, name, value);
       return undefined;
     },
-    "browser.element.addEventListener": (element, eventName, callback) => {
-      const listener = operations.createEventListener(
-        element,
-        eventName,
-        callback,
-      );
-      resources.addDisposable(listener, () => listener.remove());
-      return resources.stageResult(listener, {
-        onAbort: () => listener.remove(),
-      });
+    "browser.element.addEventListener": (element, eventName, listener) => {
+      operations.addEventListener(element, eventName, listener);
+      return undefined;
     },
-    "browser.element.removeEventListener": (listener) => {
-      terminateRevocableResource(
-        resources,
-        listener,
-        () => listener.remove(),
-        "browser event listener removal failed",
-      );
+    "browser.element.removeEventListener": (element, eventName, listener) => {
+      operations.removeEventListener(element, eventName, listener);
       return undefined;
     },
   };
-}
-
-function terminateRevocableResource(resources, value, cleanup, label) {
-  const errors = [];
-  collectCleanupError(errors, () => resources.removeDisposable(value));
-  collectCleanupError(errors, cleanup);
-  throwCollectedErrors(errors, label);
 }
 
 export function createReactRootHostBindings(
@@ -621,14 +602,6 @@ export function stopPropagationOnEvent(event) {
     event.stopPropagation();
   } else {
     event.propagationStopped = true;
-  }
-}
-
-export function callLeanEventCallback(event, callback) {
-  try {
-    callback(event ?? {});
-  } catch (error) {
-    reportEventHandlerError(error);
   }
 }
 

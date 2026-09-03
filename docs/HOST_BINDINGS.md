@@ -119,7 +119,6 @@ runtime is disposed fails instead of entering freed Lean state.
 Explicit lifecycle bookkeeping is reserved for activities with a real
 termination operation:
 
-- DOM event listeners;
 - timeouts and intervals;
 - animation frames;
 - React roots.
@@ -163,12 +162,12 @@ Convenience conversions have separate Lean names. For example,
 explicitly converts a Lean `String` first. This keeps conversion out of the
 faithful low-level binding.
 
-Event-listener registration is the principal browser adapter in this slice.
-Unlike `EventTarget.addEventListener`, it returns an explicit removable
-subscription so Lean can unregister without reconstructing the original
-receiver/type/callback triple. The binding audit records this semantic change;
-ordinary DOM objects and scheduling tokens are never replaced with VIR handle
-objects.
+Event-listener registration passes the exact JavaScript listener function to
+the native `addEventListener` method and returns `Unit`, just like the selected
+upstream overload. Removal requires the same receiver, event name, and function
+identity. `EventListener.ofLean` is separate conversion sugar that turns a Lean
+closure into an ordinary self-owning JavaScript function; the DOM, not a VIR
+registration handle, retains that function.
 
 ## React Bindings
 

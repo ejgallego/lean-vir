@@ -354,7 +354,7 @@ assert.deepEqual(elementRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 728,
-  mappedTargets: 21,
+  mappedTargets: 22,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
@@ -384,19 +384,20 @@ const generatedAddEventListener = elementRoot?.generatedOperations.find((operati
   operation.typescript.member === "Element.addEventListener");
 const generatedRemoveEventListener = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.removeEventListener");
-assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
-assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
-assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
-assert.equal(generatedAddEventListener?.semantics.relation, "changing");
-assert.equal(generatedAddEventListener?.activeEffect, "register");
-assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
+assert.equal(generatedAddEventListener?.arguments[1].role, "argument");
+assert.equal(generatedAddEventListener?.arguments[1].modalities.representation, "js-resource");
+assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "call");
+assert.equal(generatedAddEventListener?.result.lean, "Unit");
+assert.equal(generatedAddEventListener?.semantics.relation, "preserving");
+assert.equal(generatedAddEventListener?.activeEffect, undefined);
+assert.equal(generatedRemoveEventListener?.receiver.kind, "argument");
 assert.deepEqual(
   generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
-  ["type"],
+  [],
 );
-assert.equal(generatedRemoveEventListener?.arguments[0].modalities.passing, "consumed");
-assert.equal(generatedRemoveEventListener?.semantics.relation, "changing");
-assert.equal(generatedRemoveEventListener?.activeEffect, "release");
+assert.equal(generatedRemoveEventListener?.arguments[1].modalities.passing, "borrowed");
+assert.equal(generatedRemoveEventListener?.semantics.relation, "preserving");
+assert.equal(generatedRemoveEventListener?.activeEffect, undefined);
 assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);

@@ -5,12 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  callLeanEventCallback,
   createAnimationHostBindings,
   createElementHostBindings,
   createHostLifecycle,
   createTimerHostBindings,
-  once,
   performanceNow,
   preventDefaultOnEvent,
   reportEventHandlerError,
@@ -19,6 +17,7 @@ import {
 import {
   createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
+  createEventListenerValueHostBindings,
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
 } from "./host/vir-dom-host-bindings.js";
@@ -31,10 +30,6 @@ import {
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
-import {
-  collectCleanupError,
-  throwCollectedErrors,
-} from "./runtime/cleanup.js";
 
 export {
   hasExternrefTableSupport,
@@ -89,6 +84,7 @@ export function createBrowserDocumentHostBindings() {
 
 export function createBrowserEventHostBindings() {
   return {
+    ...createEventListenerValueHostBindings(),
     ...createKeyboardEventHostBindings({
       fromEvent: (event) => (isKeyboardEvent(event) ? event : null),
     }),
@@ -107,15 +103,13 @@ export function createBrowserEventHostBindings() {
   };
 }
 
-export function createBrowserElementHostBindings(
-  state = createHostLifecycle(),
-) {
+export function createBrowserElementHostBindings() {
   return {
     ...createCSSStyleDeclarationHostBindings({
       fromElement: (element) =>
         isElementCSSInlineStyle(element) ? element : null,
     }),
-    ...createElementHostBindings(state, {
+    ...createElementHostBindings({
       querySelector: (target, selector) => target.querySelector(selector),
       querySelectorAll: (target, selector) => target.querySelectorAll(selector),
       getInnerHTML: (target) => target.innerHTML,
@@ -132,13 +126,10 @@ export function createBrowserElementHostBindings(
       },
       getAttribute: (target, name) => target.getAttribute(name),
       setAttribute: (target, name, value) => target.setAttribute(name, value),
-      createEventListener: (target, eventName, callback) =>
-        createBrowserEventListenerSubscription(
-          state,
-          target,
-          eventName,
-          callback,
-        ),
+      addEventListener: (target, eventName, listener) =>
+        target.addEventListener(eventName, listener),
+      removeEventListener: (target, eventName, listener) =>
+        target.removeEventListener(eventName, listener),
     }),
     "browser.element.appendChild": (parent, child) => {
       parent.appendChild(child);
@@ -296,9 +287,9 @@ export function createBrowserHostBindings({
     ...createConsoleHostBindings(),
     ...createBrowserDocumentHostBindings(),
     ...createBrowserEventHostBindings(),
-    ...createBrowserElementHostBindings(state),
+    ...createBrowserElementHostBindings(),
     ...createDOMTokenListHostBindings(),
-    ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserHtmlInputElementHostBindings(),
     ...createBrowserCanvasHostBindings(),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
@@ -590,29 +581,6 @@ function copyTextWithExecCommand(text) {
   } finally {
     textarea.remove();
   }
-}
-
-function createBrowserEventListenerSubscription(
-  resources,
-  target,
-  eventName,
-  callback,
-) {
-  if (typeof callback !== "function")
-    throw new Error("browser event listener callback must be a function");
-  const handler = (event) => callLeanEventCallback(event, callback);
-  target.addEventListener(eventName, handler);
-  const listener = {
-    remove: once(() => {
-      const errors = [];
-      resources.removeDisposable(listener);
-      collectCleanupError(errors, () =>
-        target.removeEventListener(eventName, handler),
-      );
-      throwCollectedErrors(errors, "browser event listener removal failed");
-    }),
-  };
-  return listener;
 }
 
 function isInputElement(value) {

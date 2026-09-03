@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
-  callLeanEventCallback,
   createAnimationHostBindings,
   createElementHostBindings,
   createHostLifecycle,
@@ -18,6 +17,7 @@ import {
 import {
   createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
+  createEventListenerValueHostBindings,
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
 } from "./vir-dom-host-bindings.js";
@@ -158,6 +158,7 @@ export function createVirtualEventHostBindings(
   state = createVirtualDocumentState(),
 ) {
   return {
+    ...createEventListenerValueHostBindings(),
     ...createKeyboardEventHostBindings({
       fromEvent: (event) => (typeof event?.key === "string" ? event : null),
     }),
@@ -196,7 +197,7 @@ export function createVirtualDocumentHostBindings(
     "browser.document.querySelectorAll": (selector) =>
       createStaticNodeList(queryVirtualElementStates(state, selector)),
     ...createVirtualEventHostBindings(state),
-    ...createElementHostBindings(resources, {
+    ...createElementHostBindings({
       querySelector: (target, selector) =>
         queryVirtualDescendantStates(target, selector)[0] ?? null,
       querySelectorAll: (target, selector) =>
@@ -216,13 +217,10 @@ export function createVirtualDocumentHostBindings(
       },
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),
-      createEventListener: (target, eventName, callback) =>
-        createVirtualEventListenerSubscription(
-          resources,
-          target,
-          eventName,
-          callback,
-        ),
+      addEventListener: (target, eventName, listener) =>
+        addVirtualEventListener(target, eventName, listener),
+      removeEventListener: (target, eventName, listener) =>
+        removeVirtualEventListener(target, eventName, listener),
     }),
     ...createDOMTokenListHostBindings(),
     ...createCSSStyleDeclarationHostBindings({
@@ -379,22 +377,6 @@ function createUnsupportedReactHostBindings() {
       },
     ]),
   );
-}
-
-function createVirtualEventListenerSubscription(
-  resources,
-  target,
-  eventName,
-  callback,
-) {
-  const listener = virtualCallbackEventListenerState(
-    target,
-    eventName,
-    callback,
-    resources,
-  );
-  target.listeners.get(eventName).push(listener);
-  return listener;
 }
 
 function queryVirtualElementState(state, selector) {
@@ -604,38 +586,37 @@ function nonNegativeInteger(value) {
   return null;
 }
 
-function virtualCallbackEventListenerState(
-  target,
-  eventName,
-  callback,
-  resources,
-) {
-  if (typeof callback !== "function")
+function addVirtualEventListener(target, eventName, listener) {
+  if (typeof listener !== "function")
     throw new Error("browser event listener callback must be a function");
   if (!target.listeners.has(eventName)) {
     target.listeners.set(eventName, []);
   }
-  const listener = {
+  const listeners = target.listeners.get(eventName);
+  if (listeners.some((entry) => entry.callback === listener)) return;
+  const entry = {
+    callback: listener,
     removed: false,
     dispatch(event = {}) {
-      if (!listener.removed) {
+      if (!entry.removed) {
         const dispatchEvent =
           event !== null && typeof event === "object" ? event : {};
         dispatchEvent.target ??= target;
         dispatchEvent.currentTarget ??= target;
-        callLeanEventCallback(dispatchEvent, callback);
+        callHostCallback(listener, dispatchEvent);
       }
     },
-    remove() {
-      if (listener.removed) return;
-      listener.removed = true;
-      const listeners = target.listeners.get(eventName) ?? [];
-      target.listeners.set(
-        eventName,
-        listeners.filter((candidate) => candidate !== listener),
-      );
-      resources.removeDisposable(listener);
-    },
   };
-  return listener;
+  listeners.push(entry);
+}
+
+function removeVirtualEventListener(target, eventName, listener) {
+  const listeners = target.listeners.get(eventName) ?? [];
+  for (const entry of listeners) {
+    if (entry.callback === listener) entry.removed = true;
+  }
+  target.listeners.set(
+    eventName,
+    listeners.filter((entry) => entry.callback !== listener),
+  );
 }

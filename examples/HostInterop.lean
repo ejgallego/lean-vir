@@ -173,7 +173,7 @@ def mountAndRemoveCallbackEvent (selector : String) : DomM Nat := do
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         recordNat 102
-      Lean.Vir.Browser.Element.removeEventListener listener
+      Lean.Vir.Browser.Element.removeEventListener element "click" listener
       pure 1
   | none => pure 0
 
@@ -200,7 +200,7 @@ def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         setElementText element "callback:removed-fired"
-      Lean.Vir.Browser.Element.removeEventListener listener
+      Lean.Vir.Browser.Element.removeEventListener element "click" listener
       pure 1
   | none => pure 0
 

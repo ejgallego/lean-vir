@@ -23,16 +23,16 @@ value or success result.
 
 ## Active Callback APIs
 
-`Element.addEventListener`, timer registration, and animation-frame
-registration are active resources. VIR tracks the registration—not a second
-lease over the callback—until it is removed, cancelled, completed, replaced,
-or disposed. The platform registration's ordinary reference to the function
-keeps the callback alive.
+`Element.addEventListener` receives an exact JavaScript function and returns
+`Unit`. The DOM's ordinary reference keeps that function alive. Removal uses
+the native receiver/event/function triple; VIR does not create or track a
+second listener-registration object.
 
-Creation is transactional. If a registration succeeds but its return value
-cannot be published to Lean, the host-call transaction removes or cancels the
-new registration. A callback lifted for a failed host call is likewise
-invalidated before the error returns to JavaScript.
+Timer and animation-frame registration remain VIR-owned active resources so
+runtime teardown can cancel scheduled work. Their creation is transactional:
+if the returned scheduling token cannot be published to Lean, the host-call
+transaction cancels the new registration. A callback lifted for any failed
+host call is invalidated before the error returns to JavaScript.
 
 DOM and React event objects are ordinary JavaScript values. Their practical
 validity follows the browser or framework API; VIR does not add a dynamic
@@ -46,8 +46,10 @@ attempts every sibling cleanup, and reports multiple failures as an
 `AggregateError`.
 
 Package replacement constructs and validates the new runtime before disposing
-the previous runtime's listeners, schedules, roots, and Lean-backed callback
-roots. Rejected replacement leaves the active runtime intact.
+the previous runtime's schedules, roots, and Lean-backed callback roots.
+Ordinary DOM listeners are not a VIR-owned registry; applications remove them
+with the native identity triple. Rejected replacement leaves the active runtime
+intact.
 
 ## Tests
 
@@ -58,7 +60,6 @@ The runtime suite covers:
 - finalization as an optional GC backstop;
 - listener dispatch/removal and timer/frame completion/cancellation;
 - package replacement and runtime teardown;
-- failure after listener creation but before host-result publication;
 - cleanup that throws while sibling cleanup still runs;
 - real browser events and official React behavior.
 

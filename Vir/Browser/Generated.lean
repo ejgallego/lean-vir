@@ -688,13 +688,13 @@ end DOMTokenList
 namespace Element
 
 /--
-Generated explicit method semantic adapter for TypeScript `Element.addEventListener`.
+Generated reviewed method specialization of TypeScript `Element.addEventListener`.
 
-Adapter policy: VIR specializes DOM listener registration to a Lean callback retained until the returned listener value is passed to terminal removal.
+Specialization policy: VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact listener to Element.addEventListener; options remain an explicit coverage gap.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13915
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -702,8 +702,8 @@ This declaration is generated; edit the TypeScript source or binding configurati
 opaque addEventListenerJs
     (element : @& Lean.Vir.Js Element)
     (event : @& Lean.Vir.Js String)
-    (callback : Lean.Vir.Js Event → DomM Unit) :
-    DomM (Lean.Vir.Js EventListener)
+    (listener : @& Lean.Vir.Js EventListener) :
+    DomM Unit
 
 /--
 Generated reviewed method specialization of TypeScript `Element.appendChild`.
@@ -880,19 +880,21 @@ opaque remove
     DomM Unit
 
 /--
-Generated explicit method semantic adapter for TypeScript `Element.removeEventListener`.
+Generated reviewed method specialization of TypeScript `Element.removeEventListener`.
 
-Adapter policy: VIR replaces the DOM receiver, event name, and callback triple with the listener value returned by registration; terminal removal removes the listener, releases the callback, and does not revoke JavaScript aliases.
+Specialization policy: VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact receiver, event name, and listener to Element.removeEventListener; options remain an explicit coverage gap.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13917
 
-ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.element.removeEventListener"]
-opaque removeEventListener
-    (listener : Lean.Vir.Js EventListener) :
+opaque removeEventListenerJs
+    (element : @& Lean.Vir.Js Element)
+    (event : @& Lean.Vir.Js String)
+    (listener : @& Lean.Vir.Js EventListener) :
     DomM Unit
 
 /--
@@ -1098,6 +1100,26 @@ opaque formValueNullable
     DomM (Lean.Vir.Js.Nullable String)
 
 end Event
+
+namespace EventListener
+
+/--
+Generated binding for reviewed VIR protocol `browser.event-listener.of-lean`.
+
+Explicitly converts a transferred Lean event callback into an ordinary JavaScript function that can be passed unchanged to addEventListener and removeEventListener.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.browser.eventListener"]
+opaque ofLean
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js EventListener)
+
+end EventListener
 
 namespace HTMLCanvasElement
 

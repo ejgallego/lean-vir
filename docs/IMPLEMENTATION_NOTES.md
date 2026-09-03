@@ -69,14 +69,16 @@ through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
 object ABI on the package-call path.
 
 The host-import path supports Lean function values as ordinary JavaScript
-functions. `Element.addEventListener`, `Timer.setTimeout`, and
+functions. `EventListener.ofLean`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` root Lean closures in the WASM shim and
 associate the root with the function through private WeakMap state. Normal
 JavaScript reachability keeps the function alive. Callback finalization is a
 best-effort backstop; runtime teardown remains the deterministic upper bound.
-Loading a new package into an existing runtime terminates the old runtime's
-active registrations before installing the new manifest. Event values follow
-the underlying browser semantics. The current contract is in
+`Element.addEventListener` and `Element.removeEventListener` receive that exact
+function and follow native identity rules. Loading a new package into an
+existing runtime terminates VIR-owned schedules and roots before installing the
+new manifest; it does not invent DOM-listener teardown that JavaScript does not
+provide. Event values follow the underlying browser semantics. The current contract is in
 [HOST_BINDINGS.md](HOST_BINDINGS.md), while
 callback-specific follow-up work remains in the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md).

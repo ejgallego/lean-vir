@@ -114,7 +114,7 @@
       "Element.addEventListener": {
         "signature": 1,
         "omittedOptionalParameters": ["options"],
-        "parameterRenames": { "type": "event", "listener": "callback" }
+        "parameterRenames": { "type": "event" }
       },
       "Element.appendChild": { "signature": "only" },
       "Element.getAttribute": { "signature": "only" },
@@ -124,7 +124,7 @@
       "Element.removeEventListener": {
         "signature": 1,
         "omittedOptionalParameters": ["options"],
-        "omittedRequiredParameters": ["type"]
+        "parameterRenames": { "type": "event" }
       },
       "Element.setAttribute": { "signature": "only" },
       "Event.preventDefault": { "signature": "only" },
@@ -290,25 +290,15 @@
         }
       },
       "browser.element.addEventListener": {
-        "reason": "VIR specializes DOM listener registration to a Lean callback retained until the returned listener value is passed to terminal removal.",
-        "semantics": "changing",
-        "activeEffect": "register",
+        "reason": "VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact listener to Element.addEventListener; options remain an explicit coverage gap.",
+        "semantics": "preserving",
         "arguments": {
-          "callback": {
-            "role": "callback",
-            "passing": "owned",
-            "retention": "until-release",
+          "listener": {
             "type": {
-              "lean": "Lean.Vir.Js Event → DomM Unit",
-              "representation": "callback"
+              "lean": "Lean.Vir.Js EventListener",
+              "representation": "js-resource",
+              "resourceInner": "EventListener"
             }
-          }
-        },
-        "result": {
-          "type": {
-            "lean": "Lean.Vir.Js EventListener",
-            "representation": "js-resource",
-            "resourceInner": "EventListener"
           }
         }
       },
@@ -335,13 +325,10 @@
         }
       },
       "browser.element.removeEventListener": {
-        "reason": "VIR replaces the DOM receiver, event name, and callback triple with the listener value returned by registration; terminal removal removes the listener, releases the callback, and does not revoke JavaScript aliases.",
-        "semantics": "changing",
-        "activeEffect": "release",
-        "receiver": { "kind": "none" },
+        "reason": "VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact receiver, event name, and listener to Element.removeEventListener; options remain an explicit coverage gap.",
+        "semantics": "preserving",
         "arguments": {
           "listener": {
-            "passing": "consumed",
             "type": {
               "lean": "Lean.Vir.Js EventListener",
               "representation": "js-resource",
@@ -379,6 +366,17 @@
       }
     },
     "protocolOperations": [
+      {
+        "id": "browser.event-listener.of-lean", "group": "element", "target": "js.value.browser.eventListener",
+        "lean": "Lean.Vir.Browser.EventListener.ofLean", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean event callback into an ordinary JavaScript function that can be passed unchanged to addEventListener and removeEventListener.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js Event → DomM Unit", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js EventListener", "representation": "js-resource", "resourceInner": "EventListener" } }
+      },
       {
         "id": "browser.internal.ownedString",
         "group": "owned-primitives",
@@ -720,7 +718,7 @@
     {
       "id": "element",
       "title": "Element",
-      "targets": ["browser.element.*", "browser.domTokenList.*", "browser.elementCSSInlineStyle.*", "browser.cssStyleDeclaration.*"],
+      "targets": ["browser.element.*", "browser.domTokenList.*", "browser.elementCSSInlineStyle.*", "browser.cssStyleDeclaration.*", "js.value.browser.eventListener"],
       "lean": { "public": ["Lean.Vir.Browser.Element", "Lean.Vir.Browser.ElementCSSInlineStyle", "Lean.Vir.Browser.CSSStyleDeclaration"] },
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "ElementCSSInlineStyle", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
       "comparison": { "report": "build/type-descriptors/element-v1.report.json" },
@@ -764,7 +762,7 @@
         },
         { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.cssStyleDeclaration.setProperty"], "lean": ["Lean.Vir.Browser.CSSStyleDeclaration.setProperty"], "receiverName": "declaration" },
         { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
-        { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }
+        { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListenerJs"] }
       ],
       "anchors": [
         {

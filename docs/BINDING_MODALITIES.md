@@ -261,11 +261,10 @@ escaped Lean identifiers.
 The browser slice includes global functions, DOM methods, and properties.
 Selected overloads, parameter projections and renames, fixed-arity rest
 specializations, callbacks, primitive resources, and receiver/result overrides
-are all recorded in the same IR. In particular, the event-listener pair records
-registration as returning a removable listener value and removal as a
-receiver-free terminal operation. Removal clears VIR's private teardown record;
-ordinary JavaScript aliases still refer to the same already-removed listener
-value.
+are all recorded in the same IR. The event-listener pair preserves the native
+receiver/event/listener triple and returns `Unit`; the separately declared
+`EventListener.ofLean` conversion creates the exact JavaScript function used by
+both native calls.
 
 ## Reviewed Protocol Operations
 

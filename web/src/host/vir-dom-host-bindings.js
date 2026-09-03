@@ -19,6 +19,17 @@ export function createDOMTokenListHostBindings() {
   };
 }
 
+export function createEventListenerValueHostBindings() {
+  return {
+    "js.value.browser.eventListener": (callback) => {
+      if (typeof callback !== "function") {
+        throw new Error("browser event listener must be a JavaScript function");
+      }
+      return callback;
+    },
+  };
+}
+
 export function createCSSStyleDeclarationHostBindings({ fromElement }) {
   return {
     "browser.elementCSSInlineStyle.fromElement": (element) =>

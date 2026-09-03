@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   createBrowserElementHostBindings,
+  createBrowserEventHostBindings,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
   createVirtualElementState,
@@ -15,11 +16,6 @@ import {
   ensureVirtualElementState,
 } from "../../web/src/vir-host-bindings.js";
 import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-bindings.js";
-
-const lifecycle = {
-  addDisposable() {},
-  removeDisposable() {},
-};
 
 const calls = [];
 const child = { id: "child" };
@@ -57,11 +53,26 @@ const element = {
   setAttribute(name, value) {
     this.attributes.set(name, value);
   },
-  addEventListener() {},
-  removeEventListener() {},
+  addEventListener: (name, listener) =>
+    calls.push(["listener.add", name, listener]),
+  removeEventListener: (name, listener) =>
+    calls.push(["listener.remove", name, listener]),
 };
-const elementBindings = createBrowserElementHostBindings(lifecycle);
+const elementBindings = createBrowserElementHostBindings();
+const eventBindings = createBrowserEventHostBindings();
 const tokenBindings = createDOMTokenListHostBindings();
+const listener = () => undefined;
+
+assert.equal(
+  eventBindings["js.value.browser.eventListener"](listener),
+  listener,
+);
+elementBindings["browser.element.addEventListener"](element, "click", listener);
+elementBindings["browser.element.removeEventListener"](
+  element,
+  "click",
+  listener,
+);
 
 assert.equal(
   elementBindings["browser.element.appendChild"](element, child),
@@ -103,6 +114,8 @@ elementBindings["browser.elementCSSInlineStyle.setStyle"](
 );
 elementBindings["browser.element.remove"](element);
 assert.deepEqual(calls, [
+  ["listener.add", "click", listener],
+  ["listener.remove", "click", listener],
   ["append", child],
   ["class.add", "active"],
   ["class.remove", "hidden"],

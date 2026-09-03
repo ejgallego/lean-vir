@@ -216,11 +216,8 @@ def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Boo
 end ClassList
 
 /--
-Registers a browser event listener backed by a Lean callback closure.
-
-The host retains the callback until `Element.removeEventListener` is called or
-the owning runtime is disposed. The callback receives an opaque event resource
-that is valid only during that event dispatch.
+Registers an exact JavaScript event-listener function and returns that same
+function so it can be passed to `Element.removeEventListener`.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
@@ -230,7 +227,17 @@ def addEventListener
     (callback : Lean.Vir.Js Event → DomM Unit) :
     DomM (Lean.Vir.Js EventListener) := do
   let jsEvent ← Lean.Vir.JsValue.ofString event
-  addEventListenerJs element jsEvent callback
+  let listener ← EventListener.ofLean callback
+  addEventListenerJs element jsEvent listener
+  pure listener
+
+/-- Removes the exact listener previously registered for this element and event name. -/
+def removeEventListener
+    (element : @& Lean.Vir.Js Element)
+    (event : @& String)
+    (listener : @& Lean.Vir.Js EventListener) : DomM Unit := do
+  let jsEvent ← Lean.Vir.JsValue.ofString event
+  removeEventListenerJs element jsEvent listener
 
 end Element
 

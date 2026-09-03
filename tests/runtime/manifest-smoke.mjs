@@ -416,9 +416,7 @@ const keyboardEventNarrowingImport = hostImportTarget(
 );
 assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.type, "Event");
 assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
-const keyboardEventKeyImport = hostImportTarget(
-  "browser.keyboardEvent.getKey",
-);
+const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
 const inlineStyleNarrowingImport = hostImportTarget(
@@ -705,9 +703,11 @@ const virtualMissingEventCallback = (event) => {
   virtualMissingEventCurrentTarget =
     virtualQueryHost["browser.event.currentTarget"](event);
 };
-const virtualMissingEventListener = virtualQueryHost[
-  "browser.element.addEventListener"
-](virtualPresentElement, "click", virtualMissingEventCallback);
+virtualQueryHost["browser.element.addEventListener"](
+  virtualPresentElement,
+  "click",
+  virtualMissingEventCallback,
+);
 virtualQueryState.elements
   .get("#present")
   .listeners.get("click")[0]
@@ -726,7 +726,13 @@ assert.equal(
   true,
 );
 virtualQueryHost["browser.element.removeEventListener"](
-  virtualMissingEventListener,
+  virtualPresentElement,
+  "click",
+  virtualMissingEventCallback,
+);
+assert.deepEqual(
+  virtualQueryState.elements.get("#present").listeners.get("click"),
+  [],
 );
 const browserRuntime = await createBrowserVirRuntime({
   wasmBytes,
@@ -837,9 +843,7 @@ keyTarget.listeners
   .get("keydown")[0]
   .dispatch(createVirtualEventState({ key: "Enter" }));
 assert.equal(virtualDocumentState.title, "Enter");
-keyTarget.listeners
-  .get("keydown")[0]
-  .dispatch(createVirtualEventState());
+keyTarget.listeners.get("keydown")[0].dispatch(createVirtualEventState());
 assert.equal(virtualDocumentState.title, "");
 assert.equal(
   hostRuntime.hostState.resourceRoots.debugCounts().active,

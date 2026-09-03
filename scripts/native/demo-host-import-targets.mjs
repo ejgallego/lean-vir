@@ -66,6 +66,7 @@ export const demoHostImportTargets = [
   "js.nullable.value",
   "js.string",
   "js.string.value",
+  "js.value.browser.eventListener",
   "js.value.proofwidgets.resolvedRef.value",
   "js.value.react.component",
   "js.value.react.effectCallback",

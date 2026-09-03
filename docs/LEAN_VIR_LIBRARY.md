@@ -126,9 +126,10 @@ const vir = await createVirRuntime({
 vir.call("titleHandshake", "browser handshake");
 ```
 
-Browser event listeners use the same default bindings. Lean passes a closure
-directly with `Element.addEventListener`; the host retains that closure
-until the listener is removed or the runtime is disposed.
+Browser event listeners use the same default bindings. The convenience call
+creates an ordinary JavaScript function with `EventListener.ofLean`, passes it
+unchanged to `Element.addEventListener`, and returns it so callers can later use
+the same identity with `Element.removeEventListener`.
 
 ```lean
 import Vir.Browser
@@ -605,12 +606,13 @@ runtime disposal is the deterministic release boundary.
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
-`Element.addEventListener`, `Timer.setTimeout`,
+`EventListener.ofLean`, `Timer.setTimeout`,
 `Animation.requestAnimationFrame`, and raw React Node rendering use the callback ABI.
 The underlying browser and React APIs determine event and callback validity;
-VIR adds no callback scope. Listener, timeout, frame, and React-root
-registrations are explicitly terminated on removal, cancellation, firing,
-unmount, package reload, or runtime disposal. See
+VIR adds no callback scope. DOM listeners use native function-identity removal;
+VIR-owned timeout, frame, and React-root registrations are explicitly
+terminated on cancellation, firing, unmount, package reload, or runtime
+disposal. See
 [HOST_BINDINGS.md](HOST_BINDINGS.md) for the contract and the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for follow-up work.
 
