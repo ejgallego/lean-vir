@@ -55,7 +55,7 @@
     "vir-illuminate": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "c416498225e7be53a090c79eac6f0befa8f55fd3"
+      "revision": "b1d223fed3383cd222cb71a426c72eaf4b8d7ab9"
     },
     "vir-prettyM": {
       "kind": "git",
@@ -371,7 +371,7 @@
         "variant": "default"
       },
       "artifactSet": {
-        "setId": "illuminate-player-set-0001",
+        "setId": "illuminate-player-set-0002",
         "benchmarkContract": {
           "id": "illuminate/player-trace/v1",
           "input": "player-animation-and-event-trace/v1",
@@ -448,6 +448,7 @@
               "lean-vir/wasm/vir-upstream.wasm": "illuminate/vir/sdk/wasm/vir-upstream.wasm",
               "module-set/Vir.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg",
               "module-set/Vir.irpkg-set.json": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
+              "module-set/Vir.parts/0.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/0.irpkg",
               "smoke.examples.json": "illuminate/vir/smoke.examples.json",
               "smoke.mjs": "illuminate/vir/smoke.mjs",
               "smoke.vir-player-trace.mjs": "illuminate/vir/smoke.vir-player-trace.mjs"

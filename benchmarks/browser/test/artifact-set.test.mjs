@@ -138,7 +138,7 @@ test("Illuminate assembles workload, VIR, and FIR selection packages", async () 
 
   const config = artifactSetConfig(database, "illuminate");
   assert.deepEqual(config.example, { id: "illuminate", variant: "default" });
-  assert.equal(config.setId, "illuminate-player-set-0001");
+  assert.equal(config.setId, "illuminate-player-set-0002");
   assert.equal(
     config.benchmarkContract.id,
     "illuminate/player-trace/v1",
