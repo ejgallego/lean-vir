@@ -156,7 +156,7 @@ import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "/vir-upstream.wasm" });
 const bytes = await fetchBytes("/local-quickstart.irpkg");
-const runtime = await factory.createRuntime({ irPackageSetBytes: [bytes] });
+const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
 
 const result = runtime.call("Quickstart.double", 21);
 ```

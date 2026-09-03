@@ -1,8 +1,9 @@
 # IR Package Format
 
 `.irpkg` files are the local binary packages loaded by the WASM shim. The
-format is internal to this repository and is versioned by
-`packageFormatVersion` in the embedded manifest metadata.
+format is internal to this repository. The binary header is authoritative for
+its package format version; the embedded manifest's `packageFormatVersion`
+must match it.
 
 A composable module build does not introduce another binary format. Its
 `lean-vir-ir-package-set` version-2 JSON descriptor lists dependency `.irpkg`
@@ -22,7 +23,7 @@ The version-2 descriptor has this shape:
     {
       "module": "MySlides.Support",
       "role": "dependency",
-      "path": "Runtime.parts/MySlides.Support.irpkg",
+      "path": "Runtime.parts/0.irpkg",
       "byteLength": 12345,
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
@@ -46,6 +47,14 @@ and percent escapes are rejected. The loader validates the complete structure
 before fetching members, then verifies every length and digest before loading
 the set.
 
+Dependency shard filenames are ordinal identities (`0.irpkg`, `1.irpkg`, ...),
+while the descriptor carries the Lean module identity. This keeps filesystem
+escaping out of module names and makes bytes reproducible across checkout
+locations. Each member manifest also records `metadata.packageSetMember` with
+its module and `dependency` or `root` role. Dependency members have no public
+targets; the root has the stable module target `{ "module": ..., "mode":
+"markedModule" }` rather than the generated driver's local path.
+
 See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
 module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)
 for loading one.
@@ -55,12 +64,12 @@ multi-byte integers are unsigned little-endian 32-bit values.
 
 ## Header
 
-| Field | Encoding | Meaning |
-| --- | --- | --- |
-| magic | string | Must be `lean-vir-ir-package`. |
-| package format | u32 | Currently `10`. |
-| declaration count | u32 | Number of declaration entries in the declarations section. |
-| section count | u32 | Number of section directory entries. |
+| Field             | Encoding | Meaning                                                    |
+| ----------------- | -------- | ---------------------------------------------------------- |
+| magic             | string   | Must be `lean-vir-ir-package`.                             |
+| package format    | u32      | Currently `10`.                                            |
+| declaration count | u32      | Number of declaration entries in the declarations section. |
+| section count     | u32      | Number of section directory entries.                       |
 
 Strings are encoded as `u32 byteLength` followed by UTF-8 bytes. They are
 length-delimited rather than NUL-terminated, so embedded zero bytes are
@@ -70,21 +79,21 @@ preserved.
 
 Each section directory entry is:
 
-| Field | Encoding | Meaning |
-| --- | --- | --- |
-| kind | u32 | Stable section kind. |
-| offset | u32 | Absolute byte offset from the start of the package. |
-| byte length | u32 | Payload byte length. |
+| Field       | Encoding | Meaning                                             |
+| ----------- | -------- | --------------------------------------------------- |
+| kind        | u32      | Stable section kind.                                |
+| offset      | u32      | Absolute byte offset from the start of the package. |
+| byte length | u32      | Payload byte length.                                |
 
 The loader requires exactly one of each current section kind:
 
-| Kind | Name | Payload |
-| ---: | --- | --- |
-| 1 | `declarations` | Encoded Lean IR declaration entries. The count lives in the header. |
-| 2 | `initGlobals` | Encoded array of initializer global mappings. |
-| 3 | `hostImports` | Encoded array of package-owned host import metadata. |
-| 4 | `exportSummaries` | Encoded array of direct export call summaries. |
-| 5 | `interfaceManifest` | Embedded JSON interface manifest as an encoded string. |
+| Kind | Name                | Payload                                                             |
+| ---: | ------------------- | ------------------------------------------------------------------- |
+|    1 | `declarations`      | Encoded Lean IR declaration entries. The count lives in the header. |
+|    2 | `initGlobals`       | Encoded array of initializer global mappings.                       |
+|    3 | `hostImports`       | Encoded array of package-owned host import metadata.                |
+|    4 | `exportSummaries`   | Encoded array of direct export call summaries.                      |
+|    5 | `interfaceManifest` | Embedded JSON interface manifest as an encoded string.              |
 
 The section payload encodings are the same payloads that the pre-v10 linear
 stream used. Format 10 makes the envelope self-describing; it does not add

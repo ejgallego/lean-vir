@@ -30,6 +30,7 @@ export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";
 
 export const IR_PACKAGE_SET_FORMAT = "lean-vir-ir-package-set";
 export const IR_PACKAGE_SET_VERSION = 2;
+const fetchedPackageSetBrand = Symbol("VIR fetched package set");
 
 function rejectUnknownOptions(options, label) {
   const names = Object.keys(options);
@@ -117,18 +118,9 @@ export function createVirRuntimeFactory(options = {}) {
 }
 
 export async function createVirRuntime(options = {}) {
-  const {
-    irPackageSet,
-    irPackageSetBytes,
-    irPackageSetUrl,
-    ...factoryOptions
-  } = options;
+  const { irPackageSet = null, ...factoryOptions } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
-  return factory.createRuntime({
-    irPackageSet,
-    irPackageSetBytes,
-    irPackageSetUrl,
-  });
+  return factory.createRuntime({ irPackageSet });
 }
 
 export class VirRuntimeFactory {
@@ -228,32 +220,16 @@ export class VirRuntimeFactory {
   }
 
   async createRuntime(options = {}) {
-    const {
-      irPackageSet = null,
-      irPackageSetBytes = null,
-      irPackageSetUrl = null,
-      ...unknownOptions
-    } = options;
+    const { irPackageSet = null, ...unknownOptions } = options;
     rejectUnknownOptions(unknownOptions, "VirRuntimeFactory.createRuntime");
+    const packageSet =
+      irPackageSet === null
+        ? null
+        : await resolvePackageSetInput(this, irPackageSet);
     const runtime = await this.instantiate();
     try {
-      const inputCount = [
-        irPackageSet,
-        irPackageSetBytes,
-        irPackageSetUrl,
-      ].filter((input) => input !== null).length;
-      if (inputCount > 1) {
-        throw new Error("provide at most one IR package-set input");
-      }
-      if (irPackageSet !== null) {
-        runtime.loadIrPackageSetBytes(
-          await packageSetMemberBytes(irPackageSet),
-        );
-      } else if (irPackageSetBytes !== null) {
-        runtime.loadIrPackageSetBytes(irPackageSetBytes);
-      } else if (irPackageSetUrl !== null) {
-        const packageSet = await this.fetchIrPackageSet(irPackageSetUrl);
-        runtime.loadIrPackageSetBytes(await packageSetMemberBytes(packageSet));
+      if (packageSet !== null) {
+        runtime.loadIrPackageSetBytes(packageSet.bytes, packageSet.info);
       }
       return runtime;
     } catch (error) {
@@ -269,9 +245,11 @@ export class VirRuntimeFactory {
     const members = await Promise.all(
       descriptor.packages.map(async (entry) => {
         const url = resolvePackageSetUrl(entry.path, descriptorUrl);
-        const bytes = asBytes(
-          await this.fetchBytes(url),
-          `IR package-set member ${entry.module}`,
+        const bytes = Uint8Array.from(
+          asBytes(
+            await this.fetchBytes(url),
+            `IR package-set member ${entry.module}`,
+          ),
         );
         if (bytes.byteLength !== entry.byteLength) {
           throw new Error(
@@ -290,12 +268,40 @@ export class VirRuntimeFactory {
       }),
     );
     return Object.freeze({
+      [fetchedPackageSetBrand]: true,
       format: descriptor.format,
       version: descriptor.version,
       descriptorUrl,
       members: Object.freeze(members),
     });
   }
+}
+
+async function resolvePackageSetInput(factory, input) {
+  if (Array.isArray(input)) {
+    if (input.length === 0) {
+      throw new TypeError(
+        "irPackageSet byte input must be a non-empty array ordered dependencies first, root last",
+      );
+    }
+    return {
+      bytes: input.map((bytes, index) =>
+        asBytes(bytes, `irPackageSet member ${index + 1}`),
+      ),
+      info: null,
+    };
+  }
+  if (typeof input === "string" || input instanceof URL) {
+    const fetched = await factory.fetchIrPackageSet(input);
+    return {
+      bytes: await packageSetMemberBytes(fetched, { verify: false }),
+      info: runtimePackageSetInfo(fetched),
+    };
+  }
+  return {
+    bytes: await packageSetMemberBytes(input),
+    info: runtimePackageSetInfo(input),
+  };
 }
 
 const packageSetTextDecoder = new TextDecoder();
@@ -338,15 +344,7 @@ function parseIrPackageSetDescriptor(bytes) {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`${label} must be an object`);
     }
-    if (typeof entry.module !== "string" || entry.module.trim() === "") {
-      throw new Error(`${label} has no module`);
-    }
-    if (
-      entry.module !== entry.module.trim() ||
-      /[\u0000-\u001f\u007f]/u.test(entry.module)
-    ) {
-      throw new Error(`${label}.module must be a normalized module name`);
-    }
+    requireNormalizedModuleName(entry.module, label);
     if (modules.has(entry.module)) {
       throw new Error(
         `${label} duplicates module ${JSON.stringify(entry.module)}`,
@@ -406,10 +404,52 @@ function requireNormalizedPackageSetPath(path, label) {
   }
 }
 
-async function packageSetMemberBytes(packageSet) {
+function requireNormalizedModuleName(moduleName, label) {
+  if (typeof moduleName !== "string" || moduleName.trim() === "") {
+    throw new Error(`${label} has no module`);
+  }
+  if (
+    moduleName !== moduleName.trim() ||
+    /[\u0000-\u001f\u007f/\\:#?%]/u.test(moduleName)
+  ) {
+    throw new Error(`${label}.module must be a normalized Lean module name`);
+  }
+  let offset = 0;
+  while (offset < moduleName.length) {
+    if (moduleName[offset] === "«") {
+      const end = moduleName.indexOf("»", offset + 1);
+      if (end === offset + 1 || end < 0) {
+        throw new Error(
+          `${label}.module must be a normalized Lean module name`,
+        );
+      }
+      offset = end + 1;
+    } else {
+      const end = moduleName.indexOf(".", offset);
+      const component = moduleName.slice(
+        offset,
+        end < 0 ? moduleName.length : end,
+      );
+      if (component === "" || /[\s«»]/u.test(component)) {
+        throw new Error(
+          `${label}.module must be a normalized Lean module name`,
+        );
+      }
+      offset += component.length;
+    }
+    if (offset === moduleName.length) return;
+    if (moduleName[offset] !== "." || offset + 1 === moduleName.length) {
+      throw new Error(`${label}.module must be a normalized Lean module name`);
+    }
+    offset += 1;
+  }
+}
+
+async function packageSetMemberBytes(packageSet, { verify = true } = {}) {
   if (
     packageSet === null ||
     typeof packageSet !== "object" ||
+    packageSet[fetchedPackageSetBrand] !== true ||
     packageSet.format !== IR_PACKAGE_SET_FORMAT ||
     packageSet.version !== IR_PACKAGE_SET_VERSION ||
     !Array.isArray(packageSet.members) ||
@@ -427,10 +467,12 @@ async function packageSetMemberBytes(packageSet) {
         throw new TypeError(`irPackageSet member ${index + 1} has no bytes`);
       }
       const bytes = asBytes(member.bytes, `irPackageSet member ${index + 1}`);
-      if (
-        bytes.byteLength !== member.byteLength ||
-        (await sha256Hex(bytes)) !== member.sha256
-      ) {
+      if (bytes.byteLength !== member.byteLength) {
+        throw new Error(
+          `irPackageSet member ${index + 1} no longer matches its integrity metadata`,
+        );
+      }
+      if (verify && (await sha256Hex(bytes)) !== member.sha256) {
         throw new Error(
           `irPackageSet member ${index + 1} no longer matches its integrity metadata`,
         );
@@ -438,6 +480,19 @@ async function packageSetMemberBytes(packageSet) {
       return bytes;
     }),
   );
+}
+
+function runtimePackageSetInfo(packageSet) {
+  return Object.freeze({
+    format: packageSet.format,
+    version: packageSet.version,
+    descriptorUrl: String(packageSet.descriptorUrl),
+    members: Object.freeze(
+      packageSet.members.map(({ bytes: _bytes, url, ...member }) =>
+        Object.freeze({ ...member, url: String(url) }),
+      ),
+    ),
+  });
 }
 
 async function sha256Hex(bytes) {

@@ -178,14 +178,17 @@ async function instantiateRuntimes() {
     readPublicArtifact(hostPackageFile),
     readPublicArtifact(prettyPackageFile),
   ]);
-  const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
+  const runtime = await createBrowserVirRuntime({
+    wasmBytes: wasm,
+    irPackageSet: [irPackage],
+  });
   const prettyRuntime = await createBrowserVirRuntime({
     wasmBytes: wasm,
-    irPackageSetBytes: [prettyPackage],
+    irPackageSet: [prettyPackage],
   });
   const hostRuntime = await createNodeVirRuntime({
     wasmBytes: wasm,
-    irPackageSetBytes: [hostPackage],
+    irPackageSet: [hostPackage],
     hostBindings: createBenchmarkHostBindings(),
   });
   return {

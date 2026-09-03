@@ -12,11 +12,11 @@ const { wasmBytes, defaultPackageBytes, leanPackageBytes } =
   await readRuntimeArtifacts();
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [defaultPackageBytes],
+  irPackageSet: [defaultPackageBytes],
 });
 const leanRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [leanPackageBytes],
+  irPackageSet: [leanPackageBytes],
 });
 
 assert.equal(

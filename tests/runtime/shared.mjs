@@ -165,10 +165,10 @@ export function assertValidManifestShape() {
   );
 }
 
-export function assertInvalidManifest(mutator, pattern) {
+export function assertInvalidManifest(mutator, pattern, options = {}) {
   const manifest = structuredClone(validManifestShape);
   mutator(manifest);
-  assert.throws(() => validateInterfaceManifest(manifest), pattern);
+  assert.throws(() => validateInterfaceManifest(manifest, options), pattern);
 }
 
 export function wait(ms) {

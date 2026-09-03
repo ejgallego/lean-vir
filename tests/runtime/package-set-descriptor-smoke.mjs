@@ -32,11 +32,7 @@ const validDescriptor = {
   format: IR_PACKAGE_SET_FORMAT,
   version: IR_PACKAGE_SET_VERSION,
   packages: [
-    packageEntry(
-      "Example.Dependency",
-      "dependency",
-      "Root.parts/Example.Dependency.irpkg",
-    ),
+    packageEntry("Example.Dependency", "dependency", "Root.parts/0.irpkg"),
     packageEntry("Example.Root", "root", "Root.irpkg"),
   ],
 };
@@ -54,7 +50,7 @@ const factory = createVirRuntimeFactory({
 const packageSet = await factory.fetchIrPackageSet(descriptorUrl);
 assert.deepEqual(fetchedUrls, [
   descriptorUrl.href,
-  "https://example.test/packages/Root.parts/Example.Dependency.irpkg",
+  "https://example.test/packages/Root.parts/0.irpkg",
   "https://example.test/packages/Root.irpkg",
 ]);
 assert.deepEqual(
@@ -123,8 +119,26 @@ for (const path of [
 }
 await assertInvalidEntry(
   { ...validDescriptor.packages[1], module: " ModuleSetFixture.Root" },
-  /module must be a normalized module name/,
+  /module must be a normalized Lean module name/,
 );
+for (const module of ["..", "A B", "A/B", "A:", "«»", "A."]) {
+  await assertInvalidEntry(
+    { ...validDescriptor.packages[1], module },
+    /module must be a normalized Lean module name/,
+  );
+}
+const escapedModuleSet = await createVirRuntimeFactory({
+  fetchBytes: async (url) =>
+    String(url) === descriptorUrl.href
+      ? encodeDescriptor({
+          ...validDescriptor,
+          packages: [
+            packageEntry("«Example Dependency»", "root", "Root.irpkg"),
+          ],
+        })
+      : encoder.encode(String(url)),
+}).fetchIrPackageSet(descriptorUrl);
+assert.equal(escapedModuleSet.members[0].module, "«Example Dependency»");
 await assertInvalidDescriptor(
   {
     ...validDescriptor,
@@ -149,7 +163,7 @@ await assertInvalidDescriptor(
       },
     ],
   },
-  /entry 2 duplicates path "Root.parts\/Example.Dependency.irpkg"/,
+  /entry 2 duplicates path "Root.parts\/0.irpkg"/,
 );
 await assertInvalidDescriptor(
   {
@@ -178,6 +192,22 @@ await assertMemberFailure(
     byteLength: validDescriptor.packages[1].byteLength + 1,
   },
   /has .* bytes; expected/,
+);
+
+await assert.rejects(
+  () => createVirRuntimeFactory().createRuntime({ irPackageSet: [] }),
+  /byte input must be a non-empty array/,
+);
+await assert.rejects(
+  () => createVirRuntimeFactory().createRuntime({ irPackageSet: {} }),
+  /must be a fetched package-set object/,
+);
+await assert.rejects(
+  () =>
+    createVirRuntimeFactory().createRuntime({
+      irPackageSetBytes: [new Uint8Array()],
+    }),
+  /unknown option: irPackageSetBytes/,
 );
 await assertMemberFailure(
   { ...validDescriptor.packages[1], sha256: "0".repeat(64) },

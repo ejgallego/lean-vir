@@ -60,6 +60,32 @@ const packageInfoByModule = new Map(
     readIrPackageInfo(packageBytes[index]),
   ]),
 );
+for (const [index, descriptorMember] of descriptor.packages.entries()) {
+  const manifest = packageInfoByModule.get(descriptorMember.module).manifest;
+  assert.deepEqual(manifest.metadata.packageSetMember, {
+    module: descriptorMember.module,
+    role: descriptorMember.role,
+  });
+  if (descriptorMember.role === "dependency") {
+    assert.deepEqual(manifest.metadata.targets, []);
+    assert.deepEqual(manifest.exports, []);
+  } else {
+    assert.deepEqual(manifest.metadata.targets, [
+      {
+        module: "ModuleSetFixture.Root",
+        mode: "markedModule",
+        roots: [],
+        resolvedRoots: ["ModuleSetFixture.Root.answer"],
+      },
+    ]);
+    assert.equal(manifest.exports[0].source, "module ModuleSetFixture.Root");
+  }
+  assert.doesNotMatch(JSON.stringify(manifest), /\.lake|\/drivers\//);
+  assert.equal(
+    descriptorMember.path,
+    index < 5 ? `Root.parts/${index}.irpkg` : "Root.irpkg",
+  );
+}
 for (const moduleName of [
   "ModuleSetFixture.Shared",
   "ModuleSetFixture.Right",
@@ -76,7 +102,7 @@ const expectedAnswer = "62";
 
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: packageBytes,
+  irPackageSet: packageBytes,
 });
 assert.equal(runtime.packageInfo.packageCount, 6);
 assert.equal(
@@ -86,7 +112,8 @@ assert.equal(
     0,
   ),
 );
-assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
+assert.equal(runtime.packageMetadata.targets[0].mode, "markedModule");
+assert.equal(runtime.packageInfo.packageSet, null);
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 assert.throws(
   () =>
@@ -104,10 +131,22 @@ runtime.dispose();
 
 const urlRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetUrl: pathToFileURL(descriptorPath),
+  irPackageSet: pathToFileURL(descriptorPath),
   fetchBytes: (path) => readFile(path),
 });
 assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
+assert.deepEqual(
+  urlRuntime.packageInfo.packageSet.members.map(({ module, role, path }) => ({
+    module,
+    role,
+    path,
+  })),
+  descriptor.packages.map(({ module, role, path }) => ({ module, role, path })),
+);
+assert.equal(
+  Object.hasOwn(urlRuntime.packageInfo.packageSet.members[0], "bytes"),
+  false,
+);
 urlRuntime.dispose();
 
 const structuredFactory = createVirRuntimeFactory({
@@ -135,6 +174,10 @@ const structuredRuntime = await structuredFactory.createRuntime({
 assert.equal(
   structuredRuntime.call("ModuleSetFixture.Root.answer"),
   expectedAnswer,
+);
+assert.equal(
+  structuredRuntime.packageInfo.packageSet.descriptorUrl,
+  pathToFileURL(descriptorPath).href,
 );
 structuredRuntime.dispose();
 

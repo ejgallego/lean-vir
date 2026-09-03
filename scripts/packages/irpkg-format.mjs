@@ -6,7 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { INTERFACE_MANIFEST_ARTIFACT, validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
+import {
+  INTERFACE_MANIFEST_ARTIFACT,
+  validateInterfaceManifest,
+} from "../../web/src/runtime/interface-manifest.js";
 import { PACKAGE_FORMAT_VERSION } from "./package-versions.mjs";
 
 const textDecoder = new TextDecoder();
@@ -61,14 +64,22 @@ function readIrPackageInfoInternal(input, { path = null } = {}) {
   for (const kind of Object.values(IR_PACKAGE_SECTION)) {
     requireSection(sections, kind);
   }
-  const manifestSection = requireSection(sections, IR_PACKAGE_SECTION.INTERFACE_MANIFEST);
+  const manifestSection = requireSection(
+    sections,
+    IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
+  );
   const manifestString = readString(bytes, manifestSection.offset);
-  if (manifestString.nextOffset !== manifestSection.offset + manifestSection.byteLength) {
+  if (
+    manifestString.nextOffset !==
+    manifestSection.offset + manifestSection.byteLength
+  ) {
     throw new Error("interface manifest section has trailing bytes");
   }
   const manifest = JSON.parse(manifestString.value);
   if (manifest?.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
-    throw new Error("IR package interface manifest has an invalid artifact marker");
+    throw new Error(
+      "IR package interface manifest has an invalid artifact marker",
+    );
   }
   return {
     path,
@@ -79,16 +90,25 @@ function readIrPackageInfoInternal(input, { path = null } = {}) {
       declarationCount: header.declarationCount,
       sections,
     },
-    manifest: validateInterfaceManifest(manifest),
+    manifest: validateInterfaceManifest(manifest, {
+      packageFormatVersion: header.version,
+    }),
   };
 }
 
 export function replaceIrPackageManifest(input, manifest) {
   const bytes = asBytes(input);
   const info = readIrPackageInfoInternal(bytes);
-  const manifestText = JSON.stringify(validateInterfaceManifest(manifest));
+  const manifestText = JSON.stringify(
+    validateInterfaceManifest(manifest, {
+      packageFormatVersion: info.package.version,
+    }),
+  );
   const manifestBytes = textEncoder.encode(manifestText);
-  const manifestSection = requireSection(info.package.sections, IR_PACKAGE_SECTION.INTERFACE_MANIFEST);
+  const manifestSection = requireSection(
+    info.package.sections,
+    IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
+  );
   const newManifestSectionByteLength = 4 + manifestBytes.byteLength;
   const oldManifestEnd = manifestSection.offset + manifestSection.byteLength;
   const newManifestEnd = manifestSection.offset + newManifestSectionByteLength;
@@ -99,7 +119,10 @@ export function replaceIrPackageManifest(input, manifest) {
   output.set(manifestBytes, manifestSection.offset + 4);
   output.set(bytes.subarray(oldManifestEnd), newManifestEnd);
   for (const section of info.package.sections) {
-    const offset = section.offset > manifestSection.offset ? section.offset + delta : section.offset;
+    const offset =
+      section.offset > manifestSection.offset
+        ? section.offset + delta
+        : section.offset;
     writeU32(output, section.directoryEntryOffset + 4, offset);
     writeU32(
       output,
@@ -145,7 +168,10 @@ function readSectionDirectory(bytes, offset) {
     offset += 4;
     const byteLength = readU32(bytes, offset);
     offset += 4;
-    if (sectionOffset > bytes.byteLength || byteLength > bytes.byteLength - sectionOffset) {
+    if (
+      sectionOffset > bytes.byteLength ||
+      byteLength > bytes.byteLength - sectionOffset
+    ) {
       throw new Error(`IR package section ${kind} exceeds package byte length`);
     }
     sections.push({
@@ -188,7 +214,9 @@ function readString(bytes, offset) {
   const start = offset + 4;
   const end = start + byteLength;
   if (end > bytes.byteLength) {
-    throw new Error(`string length ${byteLength} exceeds remaining package bytes`);
+    throw new Error(
+      `string length ${byteLength} exceeds remaining package bytes`,
+    );
   }
   return {
     value: textDecoder.decode(bytes.subarray(start, end)),
@@ -210,11 +238,12 @@ function readU32OrNull(bytes, offset) {
     return null;
   }
   return (
-    bytes[offset] |
-    (bytes[offset + 1] << 8) |
-    (bytes[offset + 2] << 16) |
-    (bytes[offset + 3] << 24)
-  ) >>> 0;
+    (bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24)) >>>
+    0
+  );
 }
 
 function writeU32(bytes, offset, value) {

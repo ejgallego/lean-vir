@@ -697,7 +697,7 @@ async function boot() {
   try {
     const runtime = await runtimeModule.createVirRuntime({
       wasmUrl: new URL("vir/sdk/wasm/vir-upstream.wasm", artifactBase),
-      irPackageSetUrl: new URL(
+      irPackageSet: new URL(
         "vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
         artifactBase,
       ),

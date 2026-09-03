@@ -65,7 +65,8 @@ private def originalExternDecl? (index : DeclIndex) (name : Name) : Option Decl 
       | _ => findImported
   | none => findImported
 where
-  findImported := index.envs.findSome? fun (_, env) => do
+  findImported := index.sources.findSome? fun source => do
+      let env := source.env
       let decl ← findEnvDecl env name
       match decl with
       | .extern .. => return decl
@@ -107,11 +108,12 @@ private def fallbackAdapter?
 
 private def importedLoadedDecl?
     (index : DeclIndex) (name : Name) (accept : Decl → Bool) : Option LoadedDecl :=
-  index.envs.findSome? fun (sourceKey, env) => do
+  index.sources.findSome? fun source => do
+    let env := source.env
     let decl ← findEnvDecl env name
     guard <| accept decl
     return {
-      source := s!"imported by {index.displaySourceForKey sourceKey}"
+      source := s!"imported by {source.display}"
       module? := environmentModuleForDecl? env name
       decl
     }
@@ -123,7 +125,6 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   for target in targets do
     let sourceKey ← target.canonicalSourceKey
     keyedTargets := keyedTargets.push (target, sourceKey)
-    index := { index with sourceKeys := index.sourceKeys.push (target.source.toString, sourceKey) }
   let sources := keyedTargets.foldl (init := #[]) fun sources (target, sourceKey) =>
     if sources.any (fun (_, key) => key == sourceKey) then
       sources
@@ -132,17 +133,27 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   for (source, sourceKey) in sources do
     let sourceTargets := keyedTargets.foldl (init := #[]) fun selected (target, key) =>
       if key == sourceKey then selected.push target else selected
+    let aliases := sourceTargets.map (fun target => target.source.toString)
+    let display := sourceTargets.findSome? (fun target =>
+      match target.mode.markedModule? with
+      | some _ => some target.publicSource
+      | none => none) |>.getD source.toString
     let env <- frontendEnv source
     let mut names : Array Name := #[]
-    index := { index with envs := index.envs.push (sourceKey, env) }
     for decl in getDecls env do
       if !sourceTargets.any (fun target => targetOwnsDecl target env decl.name) then
         continue
       if !Vir.ExportValidation.isExternFallbackClone env decl.name then
         names := names.push decl.name
+      let module? := environmentModuleForDecl? env decl.name
+      let loadedSource :=
+        if sourceTargets.any (fun target => target.mode.markedModule?.isSome) then
+          module?.map (fun moduleName => s!"module {moduleName}") |>.getD display
+        else
+          display
       let loaded := {
-        source := source.toString
-        module? := environmentModuleForDecl? env decl.name
+        source := loadedSource
+        module?
         decl
       }
       match index.localDecls.find? decl.name with
@@ -166,14 +177,24 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
         | some moduleName => modules.insert moduleName
         | none => modules
     }
-    index := { index with sourceDecls := index.sourceDecls.push (sourceKey, names) }
+    index := { index with sources := index.sources.push {
+      key := sourceKey
+      display
+      aliases
+      env
+      decls := names
+    } }
   return index
 
 def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex := Id.run do
   let mut names : Array Name := #[]
   let mut index : DeclIndex := {
-    envs := #[(source, env)]
-    sourceKeys := #[(source, source)]
+    sources := #[{
+      key := source
+      display := source
+      aliases := #[source]
+      env
+    }]
   }
   for decl in getDecls env do
     if !Vir.ExportValidation.isExternFallbackClone env decl.name then
@@ -186,10 +207,17 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
         decl
       }
     }
-  return { index with sourceDecls := #[(source, names)] }
+  return { index with sources := #[{
+    key := source
+    display := source
+    aliases := #[source]
+    env
+    decls := names
+  }] }
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
-  match index.envs.findSome? fun (_, env) => Vir.ExportValidation.externFallbackClone? env name with
+  match index.sources.findSome? fun source =>
+      Vir.ExportValidation.externFallbackClone? source.env name with
   | some clone =>
     match index.localDecls.find? clone <|> importedLoadedDecl? index clone (fun _ => true) with
     | some fallback => fallbackAdapter? index name fallback
@@ -207,7 +235,8 @@ private def DeclIndex.loadedModuleGraph
     (index : DeclIndex) : Array Name × NameMap (Array Name) := Id.run do
   let mut modules := #[]
   let mut importsByModule : NameMap (Array Name) := {}
-  for (_, env) in index.envs do
+  for source in index.sources do
+    let env := source.env
     for h : moduleIdx in [:env.header.moduleNames.size] do
       let moduleName := env.header.moduleNames[moduleIdx]
       if !modules.contains moduleName then
@@ -236,7 +265,7 @@ for a direct `import all` driver.
 -/
 def DeclIndex.moduleInitializationOrderForTarget?
     (index : DeclIndex) (target : Target) : Option (Array Name) := Id.run do
-  unless index.envs.any (fun (source, _) => source == index.sourceKeyFor target) do
+  unless index.sources.any (fun source => source.key == index.sourceKeyFor target) do
     return none
   let (modules, importsByModule) := index.loadedModuleGraph
   let moduleSet := modules.foldl (init := ({} : NameSet)) fun names moduleName =>
@@ -266,7 +295,12 @@ unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) 
   let source := s!"module {moduleName}"
   let mut index := {
     index with
-    envs := index.envs.push (source, env)
+    sources := index.sources.push {
+      key := source
+      display := source
+      aliases := #[source]
+      env
+    }
     loadedModules := index.loadedModules.insert moduleName
   }
   for decl in getDecls env do
@@ -286,11 +320,11 @@ unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) 
   return index
 
 def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
-  index.envs.findSome? fun (_, env) => getInitFnNameFor? env name
+  index.sources.findSome? fun source => getInitFnNameFor? source.env name
 
 def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
-  match index.envs.findSome? (fun (source, env) =>
-      if source == index.sourceKeyFor target then some env else none) with
+  match index.sources.findSome? (fun source =>
+      if source.key == index.sourceKeyFor target then some source.env else none) with
   | none => #[]
   | some env =>
       match target.mode.markedModule? with
@@ -301,8 +335,7 @@ def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
                 if env.header.moduleNames[moduleIdx]? == some moduleName then names.push name else names
             | none => names
       | none =>
-          index.sourceDecls.findSome? (fun (source, names) =>
-            if source == index.sourceKeyFor target then some names else none) |>.getD #[]
+          index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
           |>.filter fun name =>
             index.virExports.contains name || index.virStartups.contains name
 

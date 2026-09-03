@@ -25,7 +25,7 @@ assert.ok(examples.length > 0);
 
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [packageBytes],
+  irPackageSet: [packageBytes],
 });
 try {
   assert.notEqual(runtime.findManifestEntry(build.entry), null);

@@ -56,7 +56,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     },
   });
   const hostRuntime = await hostFactory.createRuntime({
-    irPackageSetBytes: [await readFile(hostPackage)],
+    irPackageSet: [await readFile(hostPackage)],
   });
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
@@ -170,7 +170,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.js.id": (value) => value,
       "test.js.length": (value) => BigInt(value.length),
     },
-  }).createRuntime({ irPackageSetBytes: [await readFile(jsObjectPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(jsObjectPackage)] });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.js.id",
   );
@@ -202,7 +202,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   generateIrPackage(leanRefSource, leanRefPackage);
   const leanRefRuntime = await createVirRuntimeFactory({
     wasmBytes,
-  }).createRuntime({ irPackageSetBytes: [await readFile(leanRefPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(leanRefPackage)] });
   const leanRefToJsImport = leanRefRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.leanRef",
   );
@@ -252,7 +252,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.payload": (payload) => ({ ...payload, name: `${payload.name}!` }),
     },
   }).createRuntime({
-    irPackageSetBytes: [await readFile(customJsValuePackage)],
+    irPackageSet: [await readFile(customJsValuePackage)],
   });
   const customPayloadImport =
     customJsValueRuntime.interfaceManifest.hostImports.find(
@@ -280,7 +280,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.react.externalBadge": () => externalBadge,
     },
   }).createRuntime({
-    irPackageSetBytes: [await readFile(reactExternalPackage)],
+    irPackageSet: [await readFile(reactExternalPackage)],
   });
   const externalBadgeImport =
     reactExternalRuntime.interfaceManifest.hostImports.find(

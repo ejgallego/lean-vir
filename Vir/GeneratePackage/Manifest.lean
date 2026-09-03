@@ -19,7 +19,7 @@ open Lean.IR
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
   {
-    source := target.source.toString
+    origin := target.publicOrigin
     mode := target.mode.metadataName
     roots := target.mode.roots
     resolvedRoots := resolvedRootsForTarget index target
@@ -67,7 +67,7 @@ def collectInterfaceManifest
     diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toPackageDiagnostic)
   }
   for target in targets do
-    let source := target.source.toString
+    let source := target.publicSource
     match index.envForSource? (index.sourceKeyFor target) with
     | none =>
         manifest := { manifest with diagnostics := manifest.diagnostics.push {

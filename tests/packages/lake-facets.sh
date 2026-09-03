@@ -41,11 +41,11 @@ assert_module_fixture_descriptor() {
     }
     const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
     const expected = [
-      ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
-      ["ModuleSetFixture.Left", "dependency", "Root.parts/ModuleSetFixture.Left.irpkg"],
-      ["ModuleSetFixture.Right", "dependency", "Root.parts/ModuleSetFixture.Right.irpkg"],
-      ["ModuleSetFixture.InternalBase", "dependency", "Root.parts/ModuleSetFixture.InternalBase.irpkg"],
-      ["ModuleSetFixture.Facade", "dependency", "Root.parts/ModuleSetFixture.Facade.irpkg"],
+      ["ModuleSetFixture.Shared", "dependency", "Root.parts/0.irpkg"],
+      ["ModuleSetFixture.Left", "dependency", "Root.parts/1.irpkg"],
+      ["ModuleSetFixture.Right", "dependency", "Root.parts/2.irpkg"],
+      ["ModuleSetFixture.InternalBase", "dependency", "Root.parts/3.irpkg"],
+      ["ModuleSetFixture.Facade", "dependency", "Root.parts/4.irpkg"],
       ["ModuleSetFixture.Root", "root", "Root.irpkg"],
     ];
     if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
@@ -62,7 +62,7 @@ test -f "$canvas_report"
 
 module_set="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg-set.json"
 module_set_root="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg"
-module_set_shared="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/ModuleSetFixture.Shared.irpkg"
+module_set_shared="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/0.irpkg"
 test -f "$module_set"
 test -f "$module_set_root"
 test -f "$module_set_shared"
@@ -70,6 +70,19 @@ test -f "$module_set_shared"
 assert_module_fixture_descriptor "$module_set"
 module_set_root_hash="$(sha256sum "$module_set_root" | cut -d' ' -f1)"
 module_set_shared_hash="$(sha256sum "$module_set_shared" | cut -d' ' -f1)"
+
+for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
+  mkdir -p "$repro_dir/Root.parts"
+  printf '%s\n' 'module' 'import all ModuleSetFixture.Root' > "$repro_dir/Driver.lean"
+  lake env .lake/build/bin/vir_irpkg \
+    "$repro_dir/Root.irpkg" "$repro_dir/Root.report.md" \
+    --module-set-output "$repro_dir/Root.irpkg-set.json" "$repro_dir/Root.parts" \
+    ModuleSetFixture.Root Root.irpkg Root.parts \
+    --target-marked-module "$repro_dir/Driver.lean" ModuleSetFixture.Root
+done
+cmp "$tmp/repro-a/Root.irpkg-set.json" "$tmp/repro-b/Root.irpkg-set.json"
+cmp "$tmp/repro-a/Root.irpkg" "$tmp/repro-b/Root.irpkg"
+diff -rq "$tmp/repro-a/Root.parts" "$tmp/repro-b/Root.parts"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
 printf '%s\n' 'obsolete' > "$obsolete_shard"
@@ -377,7 +390,7 @@ test -f "$report"
 
 module_package="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg"
 module_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
-module_dependency="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.parts/Smoke.Dependency.irpkg"
+module_dependency="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.parts/0.irpkg"
 module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
 test -f "$module_descriptor"
@@ -398,7 +411,7 @@ node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
   const entries = Object.fromEntries(manifest.exports.map((entry) => [entry.entry, entry]));
-  if (manifest.metadata.targets[0]?.mode !== "markedModules") process.exit(1);
+  if (manifest.metadata.targets[0]?.mode !== "markedModule") process.exit(1);
   if (manifest.exports.length !== 2) process.exit(1);
   if (entries["Smoke.NewRuntime.value"]?.startup !== false) process.exit(1);
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);

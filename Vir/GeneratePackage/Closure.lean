@@ -26,7 +26,7 @@ def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
       initGlobals := state.initGlobals.push { name, initName } }
 
 def DeclIndex.resolveNativeExtern? (index : DeclIndex) (spec : NativeExternSpec) : Option NativeExtern :=
-  index.envs.findSome? fun (_, env) => spec.resolve env |>.toOption
+  index.sources.findSome? fun source => spec.resolve source.env |>.toOption
 
 private def DeclIndex.selectedNativeExternSpec?
     (index : DeclIndex) (name : Name) : Option NativeExternSpec :=
@@ -79,8 +79,7 @@ partial def collectName
 def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .all =>
-      index.sourceDecls.findSome? (fun (source, names) =>
-        if source == index.sourceKeyFor target then some names else none) |>.getD #[]
+      index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
   | .marked | .markedModule _ => markedDeclNamesFor index target
   | .explicit roots | .packageOnly roots => roots
 
@@ -110,7 +109,8 @@ def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
 
 private def DeclIndex.opaqueImportedModuleForDecl?
     (index : DeclIndex) (name : Name) : Option Name :=
-  index.envs.findSome? fun (_, env) => do
+  index.sources.findSome? fun source => do
+    let env := source.env
     let decl ← findEnvDecl env name
     if isOpaqueExternDecl decl then
       environmentModuleForDecl? env name

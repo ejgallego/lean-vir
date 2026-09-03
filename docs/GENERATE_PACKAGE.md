@@ -33,7 +33,7 @@ Targets have one of five modes:
   the Lake `:vir` facet.
 
 The corresponding manifest `mode` values are `explicit`, `packageOnly`,
-`all`, `marked`, and `markedModules`. `Target` represents these alternatives
+`all`, `marked`, and `markedModule`. `Target` represents these alternatives
 with `TargetMode`, so callers cannot construct contradictory combinations of
 selection booleans.
 
@@ -184,7 +184,7 @@ for the full matrix.
   changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
   `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
-  /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
+/tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
   change.
 - Lean library packaging or import layout: `bash scripts/build-lean-lib.sh`.
 

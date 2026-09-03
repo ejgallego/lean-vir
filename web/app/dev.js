@@ -269,16 +269,24 @@ function updateLocationForSelectedEntry() {
   window.history.replaceState(null, "", entryUrl(entry));
 }
 
-function renderPackageMetadata(metadata) {
+function renderPackageMetadata(metadata, packageInfo) {
   const targets = Array.isArray(metadata?.targets) ? metadata.targets : [];
   const compactTargets = targets.map((target) =>
     formatPackageTarget(target, { compact: true }),
   );
   const fullTargets = targets.map((target) => formatPackageTarget(target));
+  const members = packageInfo?.packageSet?.members ?? [];
+  const memberSummary =
+    members.length === 0
+      ? ""
+      : ` · ${members.length} module${members.length === 1 ? "" : "s"}`;
+  const memberDetails = members.map(
+    (member) => `${member.role}: ${member.module} (${member.path})`,
+  );
 
   exportCount.textContent = String(runtime.packageInfo.interfaceExports);
-  sourceTargets.textContent = compactTargets.join(" / ") || "unknown";
-  sourceTargets.title = fullTargets.join("\n");
+  sourceTargets.textContent = `${compactTargets.join(" / ") || "unknown"}${memberSummary}`;
+  sourceTargets.title = [...fullTargets, ...memberDetails].join("\n");
   toolchain.textContent =
     metadata?.leanToolchain ?? metadata?.leanVersion ?? "unknown";
 }
@@ -339,18 +347,16 @@ function renderResult(value) {
   resultOutput.dataset.multiline = String(text.includes("\n"));
 }
 
-async function loadPackageSet(label, packageMembers, packageQuery = null) {
+async function loadPackageSet(label, irPackageSet, packageQuery = null) {
   currentPackageQuery = packageQuery;
-  runtime = await runtimeFactory.createRuntime({
-    irPackageSetBytes: packageMembers,
-  });
+  runtime = await runtimeFactory.createRuntime({ irPackageSet });
   syncPackagePreset();
   packageName.textContent = label;
   packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);
   declCount.textContent = String(runtime.packageInfo.count);
   ptrWidth.textContent = `${runtime.targetPointerBytes()} bytes`;
   renderManifestEntries(runtime.interfaceManifest);
-  renderPackageMetadata(runtime.packageMetadata);
+  renderPackageMetadata(runtime.packageMetadata, runtime.packageInfo);
   runEntryButton.disabled = interfaceEntries.length === 0;
   setReadyState(statusEl, "Ready", true);
   updateLocationForSelectedEntry();
@@ -367,8 +373,11 @@ async function loadPackageUrl() {
   resetPackageState();
   setReadyState(statusEl, "Loading", false);
   const label = packageUrl.value.trim() || defaultPackageFile;
-  const bytes = await fetchBytes(assetPathFor(label, import.meta.env.BASE_URL));
-  await loadPackageSet(label, [bytes], label);
+  const url = assetPathFor(label, import.meta.env.BASE_URL);
+  const packageInput = /\.irpkg-set\.json(?:[?#]|$)/u.test(label)
+    ? url
+    : [await fetchBytes(url)];
+  await loadPackageSet(label, packageInput, label);
 }
 
 async function loadPackageFile(file) {

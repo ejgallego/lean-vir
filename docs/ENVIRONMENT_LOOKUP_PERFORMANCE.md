@@ -16,8 +16,9 @@ The reported lookup cost had two independent causes:
    declarations for every fresh interpreter cache miss.
 
 The accepted implementation computes the same name hashes as Lean and builds
-two `lean::name_hash_map<uint32_t>` indices when a package set is finished. One
-map indexes full declaration names and the other indexes boxed base names.
+two `lean::name_hash_map<uint32_t>` indices when a package set is prepared. One
+map indexes full declaration names and the other indexes boxed base names;
+manifest validation and initializer execution happen afterward.
 Values remain stable slots in the package-owned declaration vector.
 
 No `.irpkg` format change is needed. A format-11 precomputed-index experiment
@@ -64,12 +65,12 @@ All decisions below use six order-balanced AB/BA passes on 2026-08-05, Node
 24.18.0, an AMD Ryzen AI 9 HX 370, the pinned Lean 4.33.0-rc2 toolchain, and
 the same format-10 package bytes within each comparison.
 
-| Comparison | Execution paired median | Package-load paired median | Decision |
-| --- | ---: | ---: | --- |
-| constant hashes + linear scan → correct hashes + linear scan | -56.7% | -23.8% | accept hash fix |
-| correct hashes + linear scan → correct hashes + sorted binary index | -57.9% | -3.4% | useful, but not final |
-| correct hashes + sorted binary index → correct hashes + `name_hash_map` | -15.3% | -1.6% | accept hash map |
-| original → accepted combined implementation | -84.8% | -26.2% | final focused result |
+| Comparison                                                              | Execution paired median | Package-load paired median | Decision              |
+| ----------------------------------------------------------------------- | ----------------------: | -------------------------: | --------------------- |
+| constant hashes + linear scan → correct hashes + linear scan            |                  -56.7% |                     -23.8% | accept hash fix       |
+| correct hashes + linear scan → correct hashes + sorted binary index     |                  -57.9% |                      -3.4% | useful, but not final |
+| correct hashes + sorted binary index → correct hashes + `name_hash_map` |                  -15.3% |                      -1.6% | accept hash map       |
+| original → accepted combined implementation                             |                  -84.8% |                     -26.2% | final focused result  |
 
 For the final original-to-candidate comparison, aggregate medians moved from
 403.4 to 58.9 microseconds per fresh entry, a 6.85x speedup. All six paired
@@ -97,13 +98,13 @@ The follow-up representative test used the same animation, package bytes,
 modular runtime, and sustained 60 Hz callback rate for control and candidate.
 Across eight order-balanced A/B runs it reported:
 
-| Workload | Control | Candidate | Improvement |
-| --- | ---: | ---: | ---: |
-| VIR fresh-entry benchmark | 371.4 µs | 56.2 µs | 6.6x |
-| Package loading | 12.35 ms | 9.21 ms | 25.4% |
-| Illuminate sustained 60 Hz mean | 1.10 ms | 0.545 ms | 2.0x |
-| Illuminate sustained p95 | 1.60 ms | 0.75 ms | 53% |
-| Illuminate callback CPU | 6.6% | 3.3% | 50% |
+| Workload                        |  Control | Candidate | Improvement |
+| ------------------------------- | -------: | --------: | ----------: |
+| VIR fresh-entry benchmark       | 371.4 µs |   56.2 µs |        6.6x |
+| Package loading                 | 12.35 ms |   9.21 ms |       25.4% |
+| Illuminate sustained 60 Hz mean |  1.10 ms |  0.545 ms |        2.0x |
+| Illuminate sustained p95        |  1.60 ms |   0.75 ms |         53% |
+| Illuminate callback CPU         |     6.6% |      3.3% |         50% |
 
 There were zero DOM mismatches and zero browser errors. The post-change sampled
 profile also moved in the predicted direction:

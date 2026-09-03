@@ -20,8 +20,8 @@ open Lean.IR
 open Vir.Interface
 
 def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
-  index.envs.findSome? fun (candidate, env) =>
-    if candidate == source then some env else none
+  index.sources.findSome? fun candidate =>
+    if candidate.key == source then some candidate.env else none
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
@@ -52,8 +52,7 @@ def isGeneratedAuxName (n : Name) : Bool :=
         text.endsWith ".noConfusionType"
 
 def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
-  index.sourceDecls.findSome? (fun (source, names) =>
-    if source == index.sourceKeyFor target then some names else none) |>.getD #[]
+  index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
 
 def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
   match index.envForSource? (index.sourceKeyFor target) with
@@ -159,9 +158,9 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           | .error diagnostic => return .error diagnostic
 
 def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
-  index.envs.findSome? fun (source, env) =>
-    match env.find? name with
-    | some info => some (source, env, info)
+  index.sources.findSome? fun source =>
+    match source.env.find? name with
+    | some info => some (source.display, source.env, info)
     | none => none
 
 def hostImportSymbol (slot arity : Nat) : String :=

@@ -11,7 +11,9 @@ const requiredFunctionExports = [
   "vir_alloc_bytes",
   "vir_begin_ir_package_set",
   "vir_append_ir_package",
+  "vir_prepare_ir_package_set",
   "vir_finish_ir_package_set",
+  "vir_abort_ir_package_set",
   "vir_last_package_error",
   "vir_last_package_error_size",
   "vir_resolve_call_export",
@@ -25,6 +27,7 @@ const requiredFunctionExports = [
   "vir_package_interface_manifest",
   "vir_package_interface_manifest_size",
   "vir_package_decl_count",
+  "vir_package_format_version",
   "vir_upstream_target_pointer_bytes",
   "vir_obj_string",
   "vir_obj_string_data",
@@ -132,6 +135,9 @@ export function loadIrPackageSet(exports, packageMembers) {
       exports.vir_free_bytes?.(packagePtr);
     }
   }
+  if (exports.vir_prepare_ir_package_set() === 0) {
+    throw new Error("IR package-set validation failed");
+  }
   const loadedDecls = exports.vir_finish_ir_package_set();
   if (loadedDecls === 0) throw new Error("IR package-set finalization failed");
   if (exports.vir_package_decl_count() !== loadedDecls) {
@@ -190,6 +196,10 @@ function assertInvalidPackageDiagnostic(exports) {
       throw new Error(
         `invalid package diagnostic did not mention magic: ${error}`,
       );
+    }
+    exports.vir_abort_ir_package_set();
+    if (exports.vir_package_decl_count() !== 0) {
+      throw new Error("aborted IR package set retained declarations");
     }
   } finally {
     exports.vir_free_bytes?.(badPackagePtr);

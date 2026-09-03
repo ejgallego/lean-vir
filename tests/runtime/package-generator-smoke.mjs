@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import {
@@ -115,7 +115,7 @@ try {
   manifestEntry(evalSourceManifest, "evalSourceValue");
 
   const markedSource = join(freshDir, "MarkedExports.lean");
-  const markedSourceAlias = `${freshDir}/./MarkedExports.lean`;
+  const markedSourceAlias = join(freshDir, "MarkedExportsAlias.lean");
   const markedPackage = join(freshDir, "marked-exports.irpkg");
   const markedReport = join(freshDir, "marked-exports.report.md");
   const sourceElaborationSentinel = "VIR_SOURCE_ELABORATED_ONCE";
@@ -168,6 +168,7 @@ try {
       "",
     ].join("\n"),
   );
+  await symlink(markedSource, markedSourceAlias);
   const generatedMarked = runVirIrpkg([
     markedPackage,
     markedReport,
@@ -284,7 +285,7 @@ try {
     "markedValue.",
   ]);
   assert.equal(malformedRoot.status, 2);
-  assert.match(malformedRoot.stderr, /must not contain empty components/);
+  assert.match(malformedRoot.stderr, /is not a valid Lean name/);
 
   const unknownTargetOption = runVirIrpkg([
     join(freshDir, "unknown-target-option.irpkg"),

@@ -50,7 +50,7 @@ def metadataName : TargetMode → String
   | .packageOnly _ => "packageOnly"
   | .all => "all"
   | .marked => "marked"
-  | .markedModule _ => "markedModules"
+  | .markedModule _ => "markedModule"
 
 end TargetMode
 
@@ -63,6 +63,26 @@ unrelated loading flag.
 structure Target where
   source : System.FilePath
   mode : TargetMode
+
+inductive PackageTargetOrigin where
+  | source (path : String)
+  | module (name : Name)
+
+namespace PackageTargetOrigin
+
+def display : PackageTargetOrigin → String
+  | .source path => path
+  | .module name => s!"module {name}"
+
+end PackageTargetOrigin
+
+def Target.publicOrigin (target : Target) : PackageTargetOrigin :=
+  match target.mode.markedModule? with
+  | some moduleName => .module moduleName
+  | none => .source target.source.toString
+
+def Target.publicSource (target : Target) : String :=
+  target.publicOrigin.display
 
 /-- Resolve a package input to the file identity used by frontend caches. -/
 def Target.canonicalSourceKey (target : Target) : IO String := do
@@ -78,11 +98,21 @@ structure DeclIndexDiagnostic where
   source : String
   reason : String
 
+/--
+One elaborated source environment together with every caller spelling that
+resolved to it. Keeping these values together prevents canonical cache keys,
+display provenance, environments, and declaration lists from drifting apart.
+-/
+structure DeclSource where
+  key : String
+  display : String
+  aliases : Array String
+  env : Environment
+  decls : Array Name := #[]
+
 structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
-  envs : Array (String × Environment) := #[]
-  sourceDecls : Array (String × Array Name) := #[]
-  sourceKeys : Array (String × String) := #[]
+  sources : Array DeclSource := #[]
   clientNativeExternSpecs : Array NativeExternSpec := #[]
   virExports : NameSet := {}
   virStartups : NameSet := {}
@@ -90,13 +120,17 @@ structure DeclIndex where
   diagnostics : Array DeclIndexDiagnostic := #[]
 
 def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
-  index.sourceKeys.findSome? (fun (source, key) =>
-    if source == target.source.toString then some key else none) |>.getD target.source.normalize.toString
+  index.sources.findSome? (fun source =>
+    if source.aliases.contains target.source.toString then some source.key else none)
+    |>.getD target.source.normalize.toString
 
 /-- Preserve the first caller-supplied spelling for diagnostics and manifests. -/
 def DeclIndex.displaySourceForKey (index : DeclIndex) (sourceKey : String) : String :=
-  index.sourceKeys.findSome? (fun (source, key) =>
-    if key == sourceKey then some source else none) |>.getD sourceKey
+  index.sources.findSome? (fun source =>
+    if source.key == sourceKey then some source.display else none) |>.getD sourceKey
+
+def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
+  index.sources.find? (fun source => source.aliases.contains target.source.toString)
 
 structure InitGlobal where
   name : Name
@@ -148,10 +182,26 @@ def DeclIndexDiagnostic.toPackageDiagnostic (diagnostic : DeclIndexDiagnostic) :
   }
 
 structure PackageTargetMetadata where
-  source : String
+  origin : PackageTargetOrigin
   mode : String
   roots : Array Name
   resolvedRoots : Array Name
+
+inductive PackageSetMemberRole where
+  | dependency
+  | root
+
+namespace PackageSetMemberRole
+
+def label : PackageSetMemberRole → String
+  | .dependency => "dependency"
+  | .root => "root"
+
+end PackageSetMemberRole
+
+structure PackageSetMemberMetadata where
+  moduleName : Name
+  role : PackageSetMemberRole
 
 structure PackageMetadata where
   generator : String
@@ -161,6 +211,7 @@ structure PackageMetadata where
   leanToolchain : String
   leanGithash : String
   targets : Array PackageTargetMetadata
+  packageSetMember? : Option PackageSetMemberMetadata := none
 
 structure InterfaceManifest where
   metadata : PackageMetadata

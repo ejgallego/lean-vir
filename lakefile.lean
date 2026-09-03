@@ -91,17 +91,21 @@ private def virJsonNatField? (json : Lean.Json) (field : String) : Option Nat :=
   | .ok value => some value
   | .error _ => none
 
-private def virSha256File? (path : System.FilePath) : IO (Option String) := do
+private def virSha256Files? (paths : Array System.FilePath) : IO (Option (Array String)) := do
+  if paths.isEmpty then
+    return some #[]
   try
     let out ← IO.Process.output {
       cmd := "sha256sum"
-      args := #[path.toString]
+      args := #["--zero"] ++ paths.map (fun path => path.toString)
     }
     if out.exitCode != 0 then
       return none
-    let hash := (out.stdout.splitOn " ").head?.getD ""
-    if hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·) then
-      return some hash
+    let records := out.stdout.split (· == '\u0000') |>.filter (fun record => !record.isEmpty)
+    let hashes := records.toArray.map (fun record => (record.take 64).toString)
+    if hashes.size == paths.size && hashes.all (fun hash =>
+        hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·)) then
+      return some hashes
     return none
   catch _ =>
     return none
@@ -132,11 +136,15 @@ private def virPackageSetComplete
   let baseDir := descriptorPath.parent.getD "."
   let mut modules : Array String := #[]
   let mut paths : Array String := #[]
+  let mut memberPaths : Array System.FilePath := #[]
+  let mut expectedHashes : Array String := #[]
   let mut index := 0
   for packageJson in packages do
     let some moduleName := virJsonStringField? packageJson "module"
       | return false
-    if moduleName.trimAscii.toString.isEmpty || modules.contains moduleName then
+    if moduleName.trimAscii.toString.isEmpty || moduleName.toName.isAnonymous ||
+        moduleName.toName.toString != moduleName ||
+        modules.contains moduleName then
       return false
     modules := modules.push moduleName
     let some role := virJsonStringField? packageJson "role"
@@ -152,7 +160,7 @@ private def virPackageSetComplete
       if role == "root" then
         expectedRootPath
       else
-        (System.FilePath.mk expectedShardDir / s!"{moduleName}.irpkg").toString
+        (System.FilePath.mk expectedShardDir / s!"{index}.irpkg").toString
     if path != expectedPath then
       return false
     paths := paths.push path
@@ -166,13 +174,13 @@ private def virPackageSetComplete
     let memberPath := baseDir / path
     if !(← memberPath.pathExists) || (← memberPath.isDir) then
       return false
-    let bytes ← IO.FS.readBinFile memberPath
-    if bytes.size != expectedByteLength then
+    let metadata ← memberPath.metadata
+    if metadata.byteSize.toNat != expectedByteLength then
       return false
-    if (← virSha256File? memberPath) != some expectedSha256 then
-      return false
+    memberPaths := memberPaths.push memberPath
+    expectedHashes := expectedHashes.push expectedSha256
     index := index + 1
-  return true
+  return (← virSha256Files? memberPaths) == some expectedHashes
 
 private def buildVirPackageSetFacet
     (mod : Module) : FetchM (Job System.FilePath) := do

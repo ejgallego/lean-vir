@@ -61,7 +61,7 @@ artifact by setting `debugWasm: true`:
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   debugWasm: true,
-  irPackageSetBytes: [await fetchBytes("fixtures-basic.irpkg")],
+  irPackageSet: [await fetchBytes("fixtures-basic.irpkg")],
 });
 ```
 
@@ -143,7 +143,7 @@ import { createVirRuntime, fetchBytes } from "./src/vir-runtime.js";
 const createForMember = async (path) =>
   createVirRuntime({
     wasmUrl: "vir-upstream.wasm",
-    irPackageSetBytes: [await fetchBytes(path)],
+    irPackageSet: [await fetchBytes(path)],
   });
 
 const vir = await createForMember("fixtures-basic.irpkg");
@@ -183,15 +183,16 @@ ordered dependencies first and public root last. Load it directly by URL:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetUrl: "ModuleSetFixture/Root.irpkg-set.json",
+  irPackageSet: "ModuleSetFixture/Root.irpkg-set.json",
 });
 
 console.log(vir.packageInfo.packageCount);
 console.log(vir.call("ModuleSetFixture.Root.answer"));
 ```
 
-Hosts that already have the bytes can pass `irPackageSetBytes`, a non-empty
-array in descriptor order. On an existing factory-managed runtime,
+`irPackageSet` accepts a descriptor URL, the structured value returned by
+`fetchIrPackageSet`, or a non-empty array of member bytes in descriptor order.
+On an existing factory-managed runtime,
 `vir.loadIrPackageSetBytes(members)` validates the complete set in a fresh WASM
 instance before handover. `packageInfo.count` is the aggregate declaration count;
 `packageInfo.byteLength` is the sum of all members.
@@ -211,10 +212,15 @@ member paths, fetches them in parallel, and verifies every declared byte length
 and SHA-256. It returns `{ format, version, descriptorUrl, members }`; each
 member preserves its `module`, `role`, resolved `url`, integrity metadata, and
 `bytes`. Passing that structured value as `irPackageSet` keeps transport
-identity available through runtime creation. `irPackageSetBytes` remains the
-low-level input for hosts that intentionally manage descriptor validation and
-transport themselves. A custom `fetchBytes` factory option can provide
-filesystem, cache, or authenticated transport semantics.
+identity in `vir.packageInfo.packageSet`; runtime metadata omits the member
+bytes. Passing a byte array is the low-level form for hosts that intentionally
+manage descriptor validation and transport themselves, and therefore leaves
+`packageInfo.packageSet` as `null`. A custom `fetchBytes` factory option can
+provide filesystem, cache, or authenticated transport semantics.
+
+The runtime validates or fetches `irPackageSet` before instantiating Wasm. An
+invalid descriptor object, empty byte array, or failed member integrity check
+therefore cannot allocate a throwaway interpreter instance.
 
 The browser and Node runtime entry points also export
 `IR_PACKAGE_SET_FORMAT`, `IR_PACKAGE_SET_VERSION`, `PACKAGE_TARGET_MODE`, and
@@ -234,10 +240,10 @@ const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
 const packageMemberBytes = await fetchBytes("fixtures-basic.irpkg");
 
 const first = await factory.createRuntime({
-  irPackageSetBytes: [packageMemberBytes],
+  irPackageSet: [packageMemberBytes],
 });
 const second = await factory.createRuntime({
-  irPackageSetBytes: [packageMemberBytes],
+  irPackageSet: [packageMemberBytes],
 });
 ```
 
@@ -250,15 +256,15 @@ compiled. Calling it on a loaded, factory-managed runtime preserves the public
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
 const vir = await factory.createRuntime({
-  irPackageSetBytes: firstPackageMembers,
+  irPackageSet: firstPackageMembers,
 });
 
 vir.loadIrPackageSetBytes(secondPackageMembers);
 console.log(vir.call("SecondPackage.entry"));
 ```
 
-The second package set is loaded, initialized, and manifest-validated in a fresh
-candidate instance before handover. If that work fails, the candidate is
+The second package set is loaded and prepared, then manifest-validated before
+its initializers run in a fresh candidate instance. If that work fails, the candidate is
 disposed and the first package remains usable. After a successful handover,
 old object pointers, Lean-backed callback/JSL roots, externref roots, active
 registrations, and resolved call slots are invalid. The runtime releases the old set's resources once,
@@ -495,7 +501,7 @@ The built-in `common.*` and `browser.*` targets do not require a
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("demo-host.irpkg")],
+  irPackageSet: [await fetchBytes("demo-host.irpkg")],
 });
 
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
@@ -542,7 +548,7 @@ default `common.*`, `browser.*`, and `react.*` bindings:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
+  irPackageSet: [await fetchBytes("custom.irpkg")],
   hostBindings: {
     "demo.bumpNat": (n) => n + 1n,
   },
@@ -666,7 +672,7 @@ the two assets:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "/vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("/my-package.irpkg")],
+  irPackageSet: [await fetchBytes("/my-package.irpkg")],
 });
 ```
 

@@ -9,7 +9,7 @@ export const PACKAGE_TARGET_MODE = Object.freeze({
   PACKAGE_ONLY: "packageOnly",
   ALL: "all",
   MARKED: "marked",
-  MARKED_MODULE: "markedModules",
+  MARKED_MODULE: "markedModule",
 });
 
 const PACKAGE_TARGET_MODE_LABEL = Object.freeze({
@@ -24,7 +24,11 @@ export function packageTargetModeLabel(mode) {
   return PACKAGE_TARGET_MODE_LABEL[mode] ?? null;
 }
 
-export function validatePackageTargets(targets, label) {
+export function validatePackageTargets(
+  targets,
+  label,
+  { manifestVersion = null } = {},
+) {
   if (targets === undefined) return;
   if (!Array.isArray(targets)) {
     throw new Error(`${label} must be an array`);
@@ -38,19 +42,55 @@ export function validatePackageTargets(targets, label) {
     ) {
       throw new Error(`${targetLabel} must be an object`);
     }
-    requireNonEmptyString(target.source, `${targetLabel}.source`);
-    if (packageTargetModeLabel(target.mode) === null) {
+    const legacyMarkedModule =
+      manifestVersion !== null &&
+      manifestVersion < 8 &&
+      target.mode === "markedModules";
+    if (packageTargetModeLabel(target.mode) === null && !legacyMarkedModule) {
       throw new Error(
         `${targetLabel}.mode must be one of ${Object.values(PACKAGE_TARGET_MODE).join(", ")}`,
       );
     }
-    requireNameArray(target.roots, `${targetLabel}.roots`);
+    const hasSource = target.source !== undefined;
+    const hasModule = target.module !== undefined;
+    if (hasSource === hasModule) {
+      throw new Error(
+        `${targetLabel} must have exactly one of source or module`,
+      );
+    }
+    if (hasSource)
+      requireNormalizedString(target.source, `${targetLabel}.source`);
+    if (hasModule)
+      requireNormalizedString(target.module, `${targetLabel}.module`);
+    if (target.mode === PACKAGE_TARGET_MODE.MARKED_MODULE && !hasModule) {
+      throw new Error(`${targetLabel}.mode markedModule requires a module`);
+    }
+    if (target.mode !== PACKAGE_TARGET_MODE.MARKED_MODULE && hasModule) {
+      throw new Error(`${targetLabel}.module requires mode markedModule`);
+    }
+    const roots = requireNameArray(target.roots, `${targetLabel}.roots`);
     requireNameArray(target.resolvedRoots, `${targetLabel}.resolvedRoots`);
+    const explicitRoots =
+      target.mode === PACKAGE_TARGET_MODE.EXPLICIT ||
+      target.mode === PACKAGE_TARGET_MODE.PACKAGE_ONLY;
+    if (explicitRoots && roots.length === 0) {
+      throw new Error(
+        `${targetLabel}.roots must be non-empty for ${target.mode}`,
+      );
+    }
+    if (!explicitRoots && roots.length !== 0) {
+      throw new Error(`${targetLabel}.roots must be empty for ${target.mode}`);
+    }
   });
 }
 
 export function formatPackageTarget(target, { compact = false } = {}) {
-  const source = typeof target?.source === "string" ? target.source : "unknown";
+  const source =
+    typeof target?.module === "string"
+      ? `module ${target.module}`
+      : typeof target?.source === "string"
+        ? target.source
+        : "unknown";
   const mode = packageTargetModeLabel(target?.mode) ?? "unknown selection";
   const roots = Array.isArray(target?.resolvedRoots)
     ? target.resolvedRoots
@@ -67,11 +107,24 @@ function requireNonEmptyString(value, label) {
   }
 }
 
+function requireNormalizedString(value, label) {
+  requireNonEmptyString(value, label);
+  if (value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) {
+    throw new Error(`${label} must be normalized`);
+  }
+}
+
 function requireNameArray(value, label) {
   if (!Array.isArray(value)) {
     throw new Error(`${label} must be an array`);
   }
-  value.forEach((name, index) =>
-    requireNonEmptyString(name, `${label}[${index}]`),
-  );
+  const names = new Set();
+  value.forEach((name, index) => {
+    requireNormalizedString(name, `${label}[${index}]`);
+    if (names.has(name)) {
+      throw new Error(`${label}[${index}] duplicates ${JSON.stringify(name)}`);
+    }
+    names.add(name);
+  });
+  return value;
 }

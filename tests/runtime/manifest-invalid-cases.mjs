@@ -9,6 +9,16 @@ import {
   MIN_INTERFACE_MANIFEST_VERSION,
 } from "../../web/src/runtime/interface-manifest.js";
 
+function packageTarget(overrides = {}) {
+  return {
+    source: "Example.lean",
+    mode: "all",
+    roots: [],
+    resolvedRoots: [],
+    ...overrides,
+  };
+}
+
 export const invalidManifestCases = [
   {
     name: "missing manifest version",
@@ -60,6 +70,14 @@ export const invalidManifestCases = [
     pattern: /metadata\.manifestVersion must match manifest\.version/,
   },
   {
+    name: "package header metadata version mismatch",
+    mutate: (manifest) => {
+      manifest.metadata.packageFormatVersion = 9;
+    },
+    options: { packageFormatVersion: 10 },
+    pattern: /packageFormatVersion must match package header version 10/,
+  },
+  {
     name: "non-array package targets",
     mutate: (manifest) => {
       manifest.metadata.targets = {};
@@ -100,6 +118,116 @@ export const invalidManifestCases = [
       ];
     },
     pattern: /metadata\.targets\[0\]\.resolvedRoots must be an array/,
+  },
+  {
+    name: "package target with both origins",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [packageTarget({ module: "Example" })];
+    },
+    pattern: /must have exactly one of source or module/,
+  },
+  {
+    name: "module target without module origin",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [packageTarget({ mode: "markedModule" })];
+    },
+    pattern: /mode markedModule requires a module/,
+  },
+  {
+    name: "module origin with source mode",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({ source: undefined, module: "Example", mode: "all" }),
+      ];
+    },
+    pattern: /module requires mode markedModule/,
+  },
+  {
+    name: "explicit target without roots",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [packageTarget({ mode: "explicit" })];
+    },
+    pattern: /roots must be non-empty for explicit/,
+  },
+  {
+    name: "marked target with explicit roots",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({ mode: "marked", roots: ["Example.value"] }),
+      ];
+    },
+    pattern: /roots must be empty for marked/,
+  },
+  {
+    name: "duplicate resolved package roots",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({
+          mode: "all",
+          resolvedRoots: ["Example.value", "Example.value"],
+        }),
+      ];
+    },
+    pattern: /resolvedRoots\[1\] duplicates "Example\.value"/,
+  },
+  {
+    name: "invalid package-set member role",
+    mutate: (manifest) => {
+      manifest.metadata.packageSetMember = {
+        module: "Example",
+        role: "leaf",
+      };
+    },
+    pattern: /packageSetMember\.role must be dependency or root/,
+  },
+  {
+    name: "unnormalized package-set member module",
+    mutate: (manifest) => {
+      manifest.metadata.packageSetMember = {
+        module: " Example.Dependency",
+        role: "dependency",
+      };
+    },
+    pattern: /packageSetMember\.module must be normalized/,
+  },
+  {
+    name: "dependency package-set member with target",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [packageTarget()];
+      manifest.metadata.packageSetMember = {
+        module: "Example.Dependency",
+        role: "dependency",
+      };
+    },
+    pattern: /dependency members must not have public targets/,
+  },
+  {
+    name: "dependency package-set member with export",
+    mutate: (manifest) => {
+      manifest.metadata.packageSetMember = {
+        module: "Example.Dependency",
+        role: "dependency",
+      };
+    },
+    pattern:
+      /dependency package-set members must not expose exports or host imports/,
+  },
+  {
+    name: "root package-set member without matching module target",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({
+          source: undefined,
+          module: "Example.Other",
+          mode: "markedModule",
+        }),
+      ];
+      manifest.metadata.packageSetMember = {
+        module: "Example.Root",
+        role: "root",
+      };
+    },
+    pattern: /root member must match its markedModule target/,
   },
   {
     name: "non-boolean startup marker",

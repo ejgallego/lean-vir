@@ -14,13 +14,13 @@ let hostVir = null;
 try {
   vir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
-    irPackageSetBytes: [
+    irPackageSet: [
       await fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`),
     ],
   });
   hostVir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
-    irPackageSetBytes: [
+    irPackageSet: [
       await fetchBytes(`${import.meta.env.BASE_URL}${hostPackageFile}`),
     ],
   });

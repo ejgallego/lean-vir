@@ -45,7 +45,22 @@ def dottedNameParserFailures : Array String :=
   let emptyComponent := match Vir.parseDottedName "Lean..Expr" with
     | .error _ => #[]
     | .ok _ => #["dotted-name parser accepted an empty component"]
-  valid ++ empty ++ emptyComponent
+  let escapedDot := match Vir.parseDottedName "«Lean.Expr».eqv" with
+    | .ok name =>
+        if name == .str (.str .anonymous "Lean.Expr") "eqv" then #[]
+        else #["dotted-name parser changed an escaped dot component"]
+    | .error error => #[s!"dotted-name parser rejected an escaped dot component: {error}"]
+  let escapedSpace := match Vir.parseDottedName "Lean.«Expr value»" with
+    | .ok name =>
+        if name == .str (.str .anonymous "Lean") "Expr value" then #[]
+        else #["dotted-name parser changed an escaped space component"]
+    | .error error => #[s!"dotted-name parser rejected an escaped space component: {error}"]
+  let numeric := match Vir.parseDottedName "Lean.1" with
+    | .ok name =>
+        if name == .num (.str .anonymous "Lean") 1 then #[]
+        else #["dotted-name parser changed a numeric component"]
+    | .error error => #[s!"dotted-name parser rejected a numeric component: {error}"]
+  valid ++ empty ++ emptyComponent ++ escapedDot ++ escapedSpace ++ numeric
 
 def runNativeExternCheck : CoreM Unit := do
   let failures := dottedNameParserFailures ++ duplicateNativeExternNames ++

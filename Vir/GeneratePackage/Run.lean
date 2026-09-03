@@ -159,29 +159,35 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"JavaScript host imports: {manifest.hostImports.size}"
       IO.println s!"interface exports: {manifest.exports.size}"
       for target in manifest.metadata.targets do
-        IO.println s!"target: {target.source} [{target.mode}] roots: {namesSummary target.resolvedRoots}"
+        IO.println s!"target: {target.origin.display} [{target.mode}] roots: {namesSummary target.resolvedRoots}"
       return 0
   | .error err =>
       IO.eprintln err
       return 1
 
-private def sha256File (path : System.FilePath) : IO String := do
+private def sha256Files (paths : Array System.FilePath) : IO (Array String) := do
+  if paths.isEmpty then
+    return #[]
   let out ← IO.Process.output {
     cmd := "sha256sum"
-    args := #[path.toString]
+    args := #["--zero"] ++ paths.map (fun path => path.toString)
   }
   if out.exitCode != 0 then
-    throw <| IO.userError s!"sha256sum failed for `{path}`: {out.stderr.trimAscii.toString}"
-  let hash := (out.stdout.splitOn " ").head?.getD ""
-  unless hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·) do
-    throw <| IO.userError s!"sha256sum returned an invalid digest for `{path}`"
-  return hash
+    throw <| IO.userError s!"sha256sum failed: {out.stderr.trimAscii.toString}"
+  let records := out.stdout.split (· == '\u0000') |>.filter (fun record => !record.isEmpty)
+  let hashes := records.toArray.map (fun record => (record.take 64).toString)
+  unless hashes.size == paths.size &&
+      hashes.all (fun hash => hash.length == 64 &&
+        hash.toList.all ("0123456789abcdef".contains ·)) do
+    throw <| IO.userError "sha256sum returned invalid batch output"
+  return hashes
 
 def packageSetMemberJson
-    (moduleName role path : String) (byteLength : Nat) (sha256 : String) : String :=
+    (moduleName path : String) (role : PackageSetMemberRole)
+    (byteLength : Nat) (sha256 : String) : String :=
   jsonObject #[
     ("module", jsonString moduleName),
-    ("role", jsonString role),
+    ("role", jsonString role.label),
     ("path", jsonString path),
     ("byteLength", jsonNat byteLength),
     ("sha256", jsonString sha256)
@@ -193,6 +199,13 @@ def packageSetDescriptorJson (members : Array String) : String :=
     ("version", jsonNat currentPackageSetVersion),
     ("packages", jsonArray members)
   ] ++ "\n"
+
+structure PendingPackageSetMember where
+  moduleName : Name
+  role : PackageSetMemberRole
+  relativePath : String
+  outputPath : System.FilePath
+  byteLength : Nat
 
 unsafe def runModuleSet
     (targets : Array Target)
@@ -230,44 +243,66 @@ unsafe def runModuleSet
         pure none
   let some moduleOrder := moduleOrder? | return 1
 
-  let dependencyManifest : InterfaceManifest := {
-    metadata := manifest.metadata
-  }
   let dependencyModules := moduleOrder.filter (· != rootModule)
-  let mut members : Array String := #[]
+  let mut pendingMembers : Array PendingPackageSetMember := #[]
   for moduleName in dependencyModules do
     let moduleClosure := closure.forModule moduleName rootModule
     if moduleClosure.decls.isEmpty && moduleClosure.initGlobals.isEmpty then
       continue
-    let fileName := moduleName.toString ++ ".irpkg"
+    let fileName := s!"{pendingMembers.size}.irpkg"
     let outputPath := shardDir / fileName
+    let dependencyManifest : InterfaceManifest := {
+      metadata := {
+        manifest.metadata with
+        targets := #[]
+        packageSetMember? := some { moduleName, role := .dependency }
+      }
+    }
     match emitPackage moduleClosure dependencyManifest with
     | .error err =>
         IO.eprintln s!"while emitting module shard `{moduleName}`: {err}"
         return 1
     | .ok bytes =>
         writeBinFile outputPath bytes
-        let sha256 ← sha256File outputPath
-        members := members.push <| packageSetMemberJson
-          moduleName.toString "dependency" (System.FilePath.mk shardRelativeDir / fileName).toString
-          bytes.size sha256
+        pendingMembers := pendingMembers.push {
+          moduleName
+          role := .dependency
+          relativePath := (System.FilePath.mk shardRelativeDir / fileName).toString
+          outputPath
+          byteLength := bytes.size
+        }
 
   let rootClosure := closure.forModule rootModule rootModule
-  match emitPackage rootClosure manifest with
+  let rootManifest := {
+    manifest with
+    metadata := {
+      manifest.metadata with
+      packageSetMember? := some { moduleName := rootModule, role := .root }
+    }
+  }
+  match emitPackage rootClosure rootManifest with
   | .error err =>
       IO.eprintln s!"while emitting root module `{rootModule}`: {err}"
       return 1
   | .ok bytes =>
       writeBinFile packagePath bytes
-      let sha256 ← sha256File packagePath
-      members := members.push <| packageSetMemberJson
-        rootModule.toString "root" rootRelativePath bytes.size sha256
+      pendingMembers := pendingMembers.push {
+        moduleName := rootModule
+        role := .root
+        relativePath := rootRelativePath
+        outputPath := packagePath
+        byteLength := bytes.size
+      }
+      let hashes ← sha256Files (pendingMembers.map (fun member => member.outputPath))
+      let members := pendingMembers.zip hashes |>.map fun (member, sha256) =>
+        packageSetMemberJson member.moduleName.toString member.relativePath member.role
+          member.byteLength sha256
       writeTextFile descriptorPath (packageSetDescriptorJson members)
       IO.println s!"wrote {descriptorPath}"
       IO.println s!"wrote {packagePath}"
       IO.println s!"wrote {reportPath}"
       IO.println s!"package set members: {members.size}"
-      IO.println s!"package format: {manifest.metadata.packageFormatVersion}"
+      IO.println s!"package format: {rootManifest.metadata.packageFormatVersion}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
       IO.println s!"interface exports: {manifest.exports.size}"
       return 0

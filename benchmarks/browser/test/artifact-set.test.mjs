@@ -555,7 +555,7 @@ test("stages a verified example namespace without replacing siblings", async () 
     "illuminate/vir/sdk/js/vir-runtime.js",
     "illuminate/vir/sdk/wasm/vir-upstream.wasm",
     "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
-    "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/Player.irpkg",
+    "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/0.irpkg",
     "illuminate/native/BUILD.json",
     "illuminate/native/illuminate-player-browser-adapter.mjs",
     "illuminate/native/illuminate-player.wasm",

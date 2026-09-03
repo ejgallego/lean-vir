@@ -33,7 +33,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.match(generated.stdout, /local package ready/);
 
   const freshRuntime = await factory.createRuntime({
-    irPackageSetBytes: [await readFile(freshPackage)],
+    irPackageSet: [await readFile(freshPackage)],
   });
   const freshManifest = freshRuntime.interfaceManifest;
   assert.equal(
@@ -169,7 +169,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     escapedGenerated.stderr || escapedGenerated.stdout,
   );
   const escapedRuntime = await factory.createRuntime({
-    irPackageSetBytes: [await readFile(escapedPackage)],
+    irPackageSet: [await readFile(escapedPackage)],
   });
   const dottedEntry = manifestEntry(
     escapedRuntime.interfaceManifest,

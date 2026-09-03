@@ -43,16 +43,7 @@ export function createVirRuntimeFactory(options = {}) {
 }
 
 export async function createVirRuntime(options = {}) {
-  const {
-    irPackageSet,
-    irPackageSetBytes,
-    irPackageSetUrl,
-    ...factoryOptions
-  } = options;
+  const { irPackageSet = null, ...factoryOptions } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
-  return factory.createRuntime({
-    irPackageSet,
-    irPackageSetBytes,
-    irPackageSetUrl,
-  });
+  return factory.createRuntime({ irPackageSet });
 }

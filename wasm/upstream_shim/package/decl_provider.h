@@ -37,11 +37,13 @@ bool package_ready();
 void clear_loaded_package();
 bool begin_package_set();
 bool append_package(uint8_t const * data, size_t size);
+bool prepare_package_set();
 bool finish_package_set();
 char const * last_package_error();
 uint32_t last_package_error_size();
 char const * package_interface_manifest();
 uint32_t package_interface_manifest_size();
+uint32_t package_format_version();
 
 }
 
@@ -49,11 +51,14 @@ extern "C" void * vir_alloc_bytes(uint32_t size);
 extern "C" void vir_free_bytes(void * ptr);
 extern "C" uint32_t vir_begin_ir_package_set(void);
 extern "C" uint32_t vir_append_ir_package(uint8_t const * data, uint32_t size);
+extern "C" uint32_t vir_prepare_ir_package_set(void);
 extern "C" uint32_t vir_finish_ir_package_set(void);
+extern "C" void vir_abort_ir_package_set(void);
 extern "C" char const * vir_last_package_error(void);
 extern "C" uint32_t vir_last_package_error_size(void);
 extern "C" char const * vir_package_interface_manifest(void);
 extern "C" uint32_t vir_package_interface_manifest_size(void);
 extern "C" uint32_t vir_package_decl_count(void);
+extern "C" uint32_t vir_package_format_version(void);
 extern "C" void vir_set_io_initializing(uint8_t value);
 extern "C" uint8_t vir_get_io_initializing(void);

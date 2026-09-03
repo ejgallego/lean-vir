@@ -63,7 +63,7 @@ try {
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(Object.hasOwn(runtime, "VirCallback"), false);
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
-  assert.equal(runtime.PACKAGE_TARGET_MODE.MARKED_MODULE, "markedModules");
+  assert.equal(runtime.PACKAGE_TARGET_MODE.MARKED_MODULE, "markedModule");
   assert.equal(
     runtime.packageTargetModeLabel("packageOnly"),
     "package-only roots",

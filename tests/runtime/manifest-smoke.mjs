@@ -58,13 +58,13 @@ assert.throws(
 
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [defaultPackageBytes],
+  irPackageSet: [defaultPackageBytes],
 });
 const callbackRecords = [];
 const testDocument = { title: "" };
 const hostRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "browser.document.current": () => testDocument,
     "browser.document.getTitle": (documentValue) => documentValue.title,
@@ -81,11 +81,11 @@ const hostRuntime = await createVirRuntime({
 });
 const prettyRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [prettyPackageBytes],
+  irPackageSet: [prettyPackageBytes],
 });
 const leanRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [leanPackageBytes],
+  irPackageSet: [leanPackageBytes],
 });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
@@ -246,9 +246,9 @@ assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(prettyRuntime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assertValidManifestShape();
-for (const { name, mutate, pattern } of invalidManifestCases) {
+for (const { name, mutate, pattern, options } of invalidManifestCases) {
   try {
-    assertInvalidManifest(mutate, pattern);
+    assertInvalidManifest(mutate, pattern, options);
   } catch (error) {
     if (error instanceof Error) {
       error.message = `${name}: ${error.message}`;
@@ -595,7 +595,7 @@ assert.equal(reactFragmentImport?.args[0]?.type?.type, "Js");
 assert.equal(reactFragmentImport?.args[1]?.type?.type, "Js");
 const browserRuntime = await createBrowserVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
 });
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),

@@ -132,7 +132,7 @@ async function boot() {
   const width = setWidth(query.get("width") ?? "18");
   setActiveCase(activeCase);
   runtime = await runtimeFactory.createRuntime({
-    irPackageSetBytes: [
+    irPackageSet: [
       await fetchBytes(`${import.meta.env.BASE_URL}${prettyPackageFile}`),
     ],
   });

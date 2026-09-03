@@ -46,7 +46,10 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 
-export function validateInterfaceManifest(manifest) {
+export function validateInterfaceManifest(
+  manifest,
+  { packageFormatVersion = null } = {},
+) {
   if (
     !isRecord(manifest) ||
     !Number.isInteger(manifest.version) ||
@@ -77,13 +80,27 @@ export function validateInterfaceManifest(manifest) {
   ) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
-  validateManifestMetadata(manifest.metadata, manifest.version);
-  validateManifestExports(manifest.exports, manifest.version);
-  validateManifestHostImports(manifest.hostImports ?? []);
-  return manifest;
+  validateManifestMetadata(
+    manifest.metadata,
+    manifest.version,
+    packageFormatVersion,
+  );
+  const exports = validateManifestExports(manifest.exports, manifest.version);
+  const hostImports = manifest.hostImports ?? [];
+  validateManifestHostImports(hostImports);
+  validatePackageSetSurface(
+    manifest.metadata.packageSetMember,
+    exports,
+    hostImports,
+  );
+  return { ...manifest, exports };
 }
 
-function validateManifestMetadata(metadata, manifestVersion) {
+function validateManifestMetadata(
+  metadata,
+  manifestVersion,
+  packageFormatVersion,
+) {
   const label = "embedded interface manifest metadata";
   for (const field of [
     "generator",
@@ -105,14 +122,25 @@ function validateManifestMetadata(metadata, manifestVersion) {
   ) {
     throw new Error(`${label}.manifestVersion must match manifest.version`);
   }
-  validatePackageTargets(metadata.targets, `${label}.targets`);
+  if (
+    packageFormatVersion !== null &&
+    metadata.packageFormatVersion !== packageFormatVersion
+  ) {
+    throw new Error(
+      `${label}.packageFormatVersion must match package header version ${packageFormatVersion}`,
+    );
+  }
+  validatePackageTargets(metadata.targets, `${label}.targets`, {
+    manifestVersion,
+  });
+  validatePackageSetMember(metadata.packageSetMember, metadata.targets, label);
 }
 
 function validateManifestExports(exports, manifestVersion) {
   const entries = new Set();
   const ids = new Set();
   const jsNames = new Set();
-  exports.forEach((entry, index) => {
+  return exports.map((entry, index) => {
     const label = `embedded interface manifest exports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
@@ -129,7 +157,6 @@ function validateManifestExports(exports, manifestVersion) {
       if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
         throw new Error(`${label}.startup must be a boolean`);
       }
-      entry.startup ??= false;
     }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
@@ -147,7 +174,57 @@ function validateManifestExports(exports, manifestVersion) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
+    return manifestVersion < 7 && entry.startup === undefined
+      ? { ...entry, startup: false }
+      : entry;
   });
+}
+
+function validatePackageSetMember(member, targets, metadataLabel) {
+  if (member === undefined) return;
+  const label = `${metadataLabel}.packageSetMember`;
+  if (!isRecord(member)) {
+    throw new Error(`${label} must be an object`);
+  }
+  requireString(member.module, `${label}.module`);
+  if (
+    member.module !== member.module.trim() ||
+    /[\u0000-\u001f\u007f]/u.test(member.module)
+  ) {
+    throw new Error(`${label}.module must be normalized`);
+  }
+  if (member.role !== "dependency" && member.role !== "root") {
+    throw new Error(`${label}.role must be dependency or root`);
+  }
+  const packageTargets = targets ?? [];
+  if (member.role === "dependency" && packageTargets.length !== 0) {
+    throw new Error(`${label} dependency members must not have public targets`);
+  }
+  if (member.role === "root") {
+    if (packageTargets.length === 0) {
+      throw new Error(`${label} root member must have a public package target`);
+    }
+    const moduleTargets = packageTargets.filter(
+      (target) => target.mode === "markedModule",
+    );
+    if (
+      moduleTargets.length !== 0 &&
+      !moduleTargets.some((target) => target.module === member.module)
+    ) {
+      throw new Error(
+        `${label} root member must match its markedModule target`,
+      );
+    }
+  }
+}
+
+function validatePackageSetSurface(member, exports, hostImports) {
+  if (member?.role !== "dependency") return;
+  if (exports.length !== 0 || hostImports.length !== 0) {
+    throw new Error(
+      "embedded interface manifest dependency package-set members must not expose exports or host imports",
+    );
+  }
 }
 
 function validateManifestHostImports(hostImports) {

@@ -17,13 +17,14 @@ const factory = createVirRuntimeFactory({ wasmBytes });
 const unloaded = await factory.createRuntime();
 assert.equal(unloaded.packageInfo, null);
 assert.equal(unloaded.packageDeclCount(), 0);
-assert.throws(
-  () => unloaded.call("fib", 8),
-  /interface entry not found: fib/,
-);
+assert.throws(() => unloaded.call("fib", 8), /interface entry not found: fib/);
 
-const first = await factory.createRuntime({ irPackageSetBytes: [defaultPackageBytes] });
-const second = await factory.createRuntime({ irPackageSetBytes: [defaultPackageBytes] });
+const first = await factory.createRuntime({
+  irPackageSet: [defaultPackageBytes],
+});
+const second = await factory.createRuntime({
+  irPackageSet: [defaultPackageBytes],
+});
 assert.equal(first.call("SortDemo.demo"), "192");
 assert.equal(second.call("fib", 8), "21");
 
@@ -47,36 +48,70 @@ assertFailedCleanly(
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.INIT_GLOBALS),
+  oversizeSectionEntryCount(
+    defaultPackageBytes,
+    IR_PACKAGE_SECTION.INIT_GLOBALS,
+  ),
   /initializer entry count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.HOST_IMPORTS),
+  oversizeSectionEntryCount(
+    defaultPackageBytes,
+    IR_PACKAGE_SECTION.HOST_IMPORTS,
+  ),
   /host import entry count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.EXPORT_SUMMARIES),
+  oversizeSectionEntryCount(
+    defaultPackageBytes,
+    IR_PACKAGE_SECTION.EXPORT_SUMMARIES,
+  ),
   /export summary entry count 4294967295 exceeds remaining section bytes/,
+);
+assertFailedCleanly(
+  badPackageRuntime,
+  replacePackageText(
+    defaultPackageBytes,
+    '"packageFormatVersion":10',
+    '"packageFormatVersion":11',
+  ),
+  /packageFormatVersion must match package header version 10/,
 );
 
 const partialDecodeRuntime = await factory.createRuntime();
-const partialDeclarationPackage = truncateDeclarationSection(defaultPackageBytes);
+const partialDeclarationPackage =
+  truncateDeclarationSection(defaultPackageBytes);
 const partialDecodePages = [];
 for (let iteration = 0; iteration < 30; iteration += 1) {
   assert.throws(
-    () => partialDecodeRuntime.loadIrPackageSetBytes([partialDeclarationPackage]),
+    () =>
+      partialDecodeRuntime.loadIrPackageSetBytes([partialDeclarationPackage]),
     /invalid IR package section `declarations`:/,
   );
-  partialDecodePages.push(partialDecodeRuntime.exports.memory.buffer.byteLength / 65536);
+  partialDecodePages.push(
+    partialDecodeRuntime.exports.memory.buffer.byteLength / 65536,
+  );
 }
 const warmedPartialDecodePages = partialDecodePages.slice(5);
 assert.ok(
-  Math.max(...warmedPartialDecodePages) - Math.min(...warmedPartialDecodePages) <= 1,
+  Math.max(...warmedPartialDecodePages) -
+    Math.min(...warmedPartialDecodePages) <=
+    1,
   `partial package decoding should reuse memory after warm-up; pages: ${partialDecodePages.join(", ")}`,
 );
 partialDecodeRuntime.dispose();
+
+const partialSetRuntime = await factory.createRuntime();
+assertFailedSetCleanly(
+  partialSetRuntime,
+  [defaultPackageBytes, badPackage],
+  /IR package-set member 2 load failed.*invalid IR package magic/,
+);
+partialSetRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
+assert.equal(partialSetRuntime.call("fib", 8), "21");
+partialSetRuntime.dispose();
 
 assert.throws(
   () => first.loadIrPackageSetBytes([badPackage]),
@@ -95,7 +130,14 @@ unloaded.dispose();
 console.log("vir package decoder smoke ok");
 
 function assertFailedCleanly(runtime, packageBytes, expectedError) {
-  assert.throws(() => runtime.loadIrPackageSetBytes([packageBytes]), expectedError);
+  assertFailedSetCleanly(runtime, [packageBytes], expectedError);
+}
+
+function assertFailedSetCleanly(runtime, packageMembers, expectedError) {
+  assert.throws(
+    () => runtime.loadIrPackageSetBytes(packageMembers),
+    expectedError,
+  );
   assert.equal(runtime.packageInfo, null);
   assert.equal(runtime.interfaceManifest, null);
   assert.equal(runtime.packageMetadata, null);
@@ -105,16 +147,25 @@ function assertFailedCleanly(runtime, packageBytes, expectedError) {
 function truncateDeclarationSection(packageBytes) {
   const bytes = Uint8Array.from(packageBytes);
   const view = dataView(bytes);
-  const declarations = findPackageSection(view, IR_PACKAGE_SECTION.DECLARATIONS);
+  const declarations = findPackageSection(
+    view,
+    IR_PACKAGE_SECTION.DECLARATIONS,
+  );
   const declarationBytes = view.getUint32(declarations.byteLengthOffset, true);
-  assert.ok(declarationBytes > 32, "IR package declarations section is too small to truncate");
+  assert.ok(
+    declarationBytes > 32,
+    "IR package declarations section is too small to truncate",
+  );
   view.setUint32(declarations.byteLengthOffset, declarationBytes - 32, true);
   return bytes;
 }
 
 function invalidateFirstDeclarationNameTag(packageBytes) {
   const bytes = Uint8Array.from(packageBytes);
-  const declarations = findPackageSection(dataView(bytes), IR_PACKAGE_SECTION.DECLARATIONS);
+  const declarations = findPackageSection(
+    dataView(bytes),
+    IR_PACKAGE_SECTION.DECLARATIONS,
+  );
   bytes[declarations.offset] = 255;
   return bytes;
 }
@@ -138,6 +189,25 @@ function oversizeSectionEntryCount(packageBytes, kind) {
   const view = dataView(bytes);
   const section = findPackageSection(view, kind);
   view.setUint32(section.offset, 0xffffffff, true);
+  return bytes;
+}
+
+function replacePackageText(packageBytes, sourceText, replacementText) {
+  assert.equal(sourceText.length, replacementText.length);
+  const bytes = Uint8Array.from(packageBytes);
+  const source = new TextEncoder().encode(sourceText);
+  const replacement = new TextEncoder().encode(replacementText);
+  let offset = -1;
+  for (let index = 0; index <= bytes.length - source.length; index += 1) {
+    if (
+      source.every((byte, sourceIndex) => bytes[index + sourceIndex] === byte)
+    ) {
+      offset = index;
+      break;
+    }
+  }
+  assert.notEqual(offset, -1, `package did not contain ${sourceText}`);
+  bytes.set(replacement, offset);
   return bytes;
 }
 

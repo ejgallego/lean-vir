@@ -542,12 +542,15 @@ exports=(
   -Wl,--export=vir_free_bytes
   -Wl,--export=vir_begin_ir_package_set
   -Wl,--export=vir_append_ir_package
+  -Wl,--export=vir_prepare_ir_package_set
   -Wl,--export=vir_finish_ir_package_set
+  -Wl,--export=vir_abort_ir_package_set
   -Wl,--export=vir_last_package_error
   -Wl,--export=vir_last_package_error_size
   -Wl,--export=vir_package_interface_manifest
   -Wl,--export=vir_package_interface_manifest_size
   -Wl,--export=vir_package_decl_count
+  -Wl,--export=vir_package_format_version
 )
 
 object_abi_export_flags="$obj_dir/object-abi-export-flags.txt"

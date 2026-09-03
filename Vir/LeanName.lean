@@ -14,13 +14,16 @@ open Lean
 
 namespace Vir
 
-/-- Parse a nonempty dotted Lean name without accepting empty components. -/
+/--
+Parse the escaped syntax emitted by `Name.toString`. `String.toName` understands
+quoted components such as `«A.B»`; splitting on dots does not.
+-/
 def parseDottedName (text : String) : Except String Name := do
   if text.isEmpty then
-    throw "dotted Lean name must be non-empty"
-  let parts := text.splitOn "."
-  if parts.any (·.isEmpty) then
-    throw s!"dotted Lean name `{text}` must not contain empty components"
-  return parts.foldl (fun name part => .str name part) .anonymous
+    throw "Lean name must be non-empty"
+  let name := text.toName
+  if name.isAnonymous then
+    throw s!"`{text}` is not a valid Lean name"
+  return name
 
 end Vir
