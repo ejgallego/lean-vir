@@ -81,9 +81,9 @@ Focused reports include a stable comparison identity; saved and paired
 comparisons require the same workload/result, run policy, diagnostic mode,
 Node/V8 version, Lean toolchain, platform/architecture, CPU model, Wasm
 artifact/build configuration, package content and format, timing harness, and
-fixture before reporting a delta. Package content identity ignores only the
-manifest's volatile `generatedAt` field; the report also retains the exact
-package SHA-256. Timing-harness identity covers the benchmark helpers and the
+fixture before reporting a delta. Package manifests do not embed wall-clock
+generation time, so package content identity covers every manifest field and
+the report also retains the exact package SHA-256. Timing-harness identity covers the benchmark helpers and the
 complete local JavaScript module closure loaded by the focused runtime.
 
 Capture sampled attribution in a separate diagnostic run:

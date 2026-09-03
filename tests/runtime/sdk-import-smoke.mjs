@@ -56,12 +56,18 @@ try {
   const codec = modules["runtime/vir-codec.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
+  const packageTargets = modules["runtime/package-targets.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(Object.hasOwn(runtime, "VirCallback"), false);
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
+  assert.equal(runtime.PACKAGE_TARGET_MODE.MARKED_MODULE, "markedModules");
+  assert.equal(
+    runtime.packageTargetModeLabel("packageOnly"),
+    "package-only roots",
+  );
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
   assert.equal(
@@ -99,6 +105,14 @@ try {
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
+  assert.equal(
+    packageTargets.formatPackageTarget({
+      source: "Example.lean",
+      mode: "explicit",
+      resolvedRoots: ["Example.value"],
+    }),
+    "Example.lean [explicit roots] roots: Example.value",
+  );
   assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(

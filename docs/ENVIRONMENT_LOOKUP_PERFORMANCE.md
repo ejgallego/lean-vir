@@ -54,9 +54,9 @@ artifacts have been built, keep profiling separate from timing evidence, and
 use an even AB/BA schedule for acceptance. Focused comparisons require the same
 workload, package content, harness sources, fixtures, run policies, diagnostic
 mode, Wasm artifact/build configuration, Node/V8 versions, Lean toolchain,
-platform/architecture, and CPU model. Package identity ignores only the
-manifest's volatile `generatedAt` field; reports retain the exact package
-SHA-256 for stricter manual acceptance.
+platform/architecture, and CPU model. Package identity covers the complete
+manifest; reports retain the exact package SHA-256 for stricter manual
+acceptance.
 
 ## Measurements
 

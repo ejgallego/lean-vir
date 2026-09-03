@@ -4,11 +4,15 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface-effects.js";
+import {
+  formatInterfaceEffectPrefix,
+  requireInterfaceEffect,
+} from "./interface-effects.js";
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
+import { validatePackageTargets } from "./package-targets.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 7;
+export const INTERFACE_MANIFEST_VERSION = 8;
 export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
@@ -43,26 +47,65 @@ function requireNonNegativeInteger(value, label) {
 }
 
 export function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) ||
-      !Number.isInteger(manifest.version) ||
-      (manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
-        manifest.version > INTERFACE_MANIFEST_VERSION) ||
-      !isRecord(manifest.metadata) ||
-      !Array.isArray(manifest.exports)) {
+  if (
+    !isRecord(manifest) ||
+    !Number.isInteger(manifest.version) ||
+    manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
+    manifest.version > INTERFACE_MANIFEST_VERSION ||
+    !isRecord(manifest.metadata) ||
+    !Array.isArray(manifest.exports)
+  ) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
-  if (manifest.artifact !== undefined && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
-    throw new Error(`embedded interface manifest artifact must be ${INTERFACE_MANIFEST_ARTIFACT}`);
+  if (
+    manifest.artifact !== undefined &&
+    manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT
+  ) {
+    throw new Error(
+      `embedded interface manifest artifact must be ${INTERFACE_MANIFEST_ARTIFACT}`,
+    );
   }
-  if (manifest.diagnostics !== undefined && !Array.isArray(manifest.diagnostics)) {
+  if (
+    manifest.diagnostics !== undefined &&
+    !Array.isArray(manifest.diagnostics)
+  ) {
     throw new Error("embedded interface manifest diagnostics must be an array");
   }
-  if (manifest.hostImports !== undefined && !Array.isArray(manifest.hostImports)) {
+  if (
+    manifest.hostImports !== undefined &&
+    !Array.isArray(manifest.hostImports)
+  ) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
+  validateManifestMetadata(manifest.metadata, manifest.version);
   validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
+}
+
+function validateManifestMetadata(metadata, manifestVersion) {
+  const label = "embedded interface manifest metadata";
+  for (const field of [
+    "generator",
+    "leanVersion",
+    "leanToolchain",
+    "leanGithash",
+  ]) {
+    if (metadata[field] !== undefined)
+      requireString(metadata[field], `${label}.${field}`);
+  }
+  for (const field of ["packageFormatVersion", "manifestVersion"]) {
+    if (metadata[field] !== undefined) {
+      requireNonNegativeInteger(metadata[field], `${label}.${field}`);
+    }
+  }
+  if (
+    metadata.manifestVersion !== undefined &&
+    metadata.manifestVersion !== manifestVersion
+  ) {
+    throw new Error(`${label}.manifestVersion must match manifest.version`);
+  }
+  validatePackageTargets(metadata.targets, `${label}.targets`);
 }
 
 function validateManifestExports(exports, manifestVersion) {
@@ -90,7 +133,8 @@ function validateManifestExports(exports, manifestVersion) {
     }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
-    if (entry.jsName !== undefined) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
+    if (entry.jsName !== undefined)
+      requireUnique(jsNames, entry.jsName, `${label}.jsName`);
     if (!Array.isArray(entry.args)) {
       throw new Error(`${label}.args must be an array`);
     }
@@ -119,7 +163,9 @@ function validateManifestHostImports(hostImports) {
 
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
+    throw new Error(
+      `${label} must be hostResource, explicitConversion, or objectHandle`,
+    );
   }
 }
 
@@ -135,7 +181,10 @@ export function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label} must be an object`);
   }
   requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+  if (
+    !Number.isInteger(type.interfaceTag) ||
+    !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)
+  ) {
     throw new Error(`${label}.interfaceTag is not supported`);
   }
   switch (type.interfaceTag) {
@@ -207,9 +256,11 @@ function validateStructureType(type, label) {
     throw new Error(`${label}.fields must be a non-empty array`);
   }
   if (type.trivialFieldIndex !== undefined) {
-    if (!Number.isInteger(type.trivialFieldIndex) ||
-        type.trivialFieldIndex < 0 ||
-        type.trivialFieldIndex >= type.fields.length) {
+    if (
+      !Number.isInteger(type.trivialFieldIndex) ||
+      type.trivialFieldIndex < 0 ||
+      type.trivialFieldIndex >= type.fields.length
+    ) {
       throw new Error(`${label}.trivialFieldIndex is out of range`);
     }
   }
@@ -222,7 +273,9 @@ function validateStructureType(type, label) {
     }
     if (field.subobject === true) {
       if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
-        throw new Error(`${fieldLabel}.subobject field type must be a structure`);
+        throw new Error(
+          `${fieldLabel}.subobject field type must be a structure`,
+        );
       }
       if (field.layout?.kind !== "object") {
         throw new Error(`${fieldLabel}.subobject field layout must be object`);
@@ -245,15 +298,21 @@ function validateStructureFieldLayout(layout, structureType, label) {
       break;
     case "usize":
       requireNonNegativeInteger(layout.index, `${label}.index`);
-      if (layout.index < structureType.objectFieldCount ||
-          layout.index >= structureType.objectFieldCount + structureType.usizeFieldCount) {
+      if (
+        layout.index < structureType.objectFieldCount ||
+        layout.index >=
+          structureType.objectFieldCount + structureType.usizeFieldCount
+      ) {
         throw new Error(`${label}.index is outside usize slot range`);
       }
       break;
     case "scalar":
       requireNonNegativeInteger(layout.size, `${label}.size`);
       requireNonNegativeInteger(layout.offset, `${label}.offset`);
-      if (layout.size === 0 || layout.offset + layout.size > structureType.scalarByteSize) {
+      if (
+        layout.size === 0 ||
+        layout.offset + layout.size > structureType.scalarByteSize
+      ) {
         throw new Error(`${label} is outside scalarByteSize`);
       }
       break;
@@ -273,7 +332,13 @@ function validateTaggedUnionType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    const ctorLabel = validateConstructorHeader(
+      ctor,
+      index,
+      label,
+      names,
+      jsNames,
+    );
     validateRuntimeCounts(ctor, ctorLabel);
     validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
     validateInterfaceType(ctor.type, `${ctorLabel}.type`);
@@ -291,14 +356,26 @@ function validateCustomInductiveType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    const ctorLabel = validateConstructorHeader(
+      ctor,
+      index,
+      label,
+      names,
+      jsNames,
+    );
     validateRuntimeCounts(ctor, ctorLabel);
     if (!Array.isArray(ctor.fields)) {
       throw new Error(`${ctorLabel}.fields must be an array`);
     }
-    if (ctor.fields.length === 0 &&
-        (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
-      throw new Error(`${ctorLabel} with no fields must have zero runtime field counts`);
+    if (
+      ctor.fields.length === 0 &&
+      (ctor.objectFieldCount !== 0 ||
+        ctor.usizeFieldCount !== 0 ||
+        ctor.scalarByteSize !== 0)
+    ) {
+      throw new Error(
+        `${ctorLabel} with no fields must have zero runtime field counts`,
+      );
     }
     const fieldNames = new Set();
     ctor.fields.forEach((field, fieldIndex) => {
@@ -329,15 +406,29 @@ function validateRuntimeCounts(type, label) {
   requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
 }
 
-function validateInterfaceField(field, fieldLabel, names, layoutOwner, recursiveOwnerName) {
+function validateInterfaceField(
+  field,
+  fieldLabel,
+  names,
+  layoutOwner,
+  recursiveOwnerName,
+) {
   if (!isRecord(field)) {
     throw new Error(`${fieldLabel} must be an object`);
   }
   requireString(field.name, `${fieldLabel}.name`);
   requireUnique(names, field.name, `${fieldLabel}.name`, "field");
-  validateStructureFieldLayout(field.layout, layoutOwner, `${fieldLabel}.layout`);
+  validateStructureFieldLayout(
+    field.layout,
+    layoutOwner,
+    `${fieldLabel}.layout`,
+  );
   validateInterfaceType(field.type, `${fieldLabel}.type`);
-  validateRecursiveSelfOwner(field.type, recursiveOwnerName, `${fieldLabel}.type`);
+  validateRecursiveSelfOwner(
+    field.type,
+    recursiveOwnerName,
+    `${fieldLabel}.type`,
+  );
 }
 
 function validateRecursiveSelfType(type, label) {
@@ -369,7 +460,11 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
       break;
     case INTERFACE_TAG.TAGGED_UNION:
       for (const ctor of type.constructors ?? []) {
-        validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
+        validateRecursiveSelfOwner(
+          ctor.type,
+          ownerName,
+          `${label}.${ctor.jsName}`,
+        );
       }
       break;
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
@@ -390,7 +485,9 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
 function validateNoDanglingRecursiveSelf(type, label) {
   switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
-      throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
+      throw new Error(
+        `${label} cannot be recursiveSelf outside a recursive descriptor`,
+      );
     case INTERFACE_TAG.ARRAY:
     case INTERFACE_TAG.LIST:
     case INTERFACE_TAG.OPTION:
@@ -454,7 +551,11 @@ function validateFlattenedStructureFields(type, label) {
     const fieldLabel = `${label}.fields[${index}]`;
     if (field.subobject === true) {
       for (const name of flattenedStructureFieldNames(field.type)) {
-        requireUniqueStructureField(names, name, `${fieldLabel}.subobject.${name}`);
+        requireUniqueStructureField(
+          names,
+          name,
+          `${fieldLabel}.subobject.${name}`,
+        );
       }
     } else {
       requireUniqueStructureField(names, field.name, `${fieldLabel}.name`);

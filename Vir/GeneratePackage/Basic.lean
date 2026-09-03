@@ -64,6 +64,10 @@ structure Target where
   source : System.FilePath
   mode : TargetMode
 
+/-- Resolve a package input to the file identity used by frontend caches. -/
+def Target.canonicalSourceKey (target : Target) : IO String := do
+  return (← IO.FS.realPath target.source).normalize.toString
+
 structure LoadedDecl where
   source : String
   module? : Option Name := none
@@ -78,11 +82,16 @@ structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
   envs : Array (String × Environment) := #[]
   sourceDecls : Array (String × Array Name) := #[]
+  sourceKeys : Array (String × String) := #[]
   clientNativeExternSpecs : Array NativeExternSpec := #[]
   virExports : NameSet := {}
   virStartups : NameSet := {}
   loadedModules : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
+
+def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
+  index.sourceKeys.findSome? (fun (source, key) =>
+    if source == target.source.toString then some key else none) |>.getD target.source.normalize.toString
 
 structure InitGlobal where
   name : Name
@@ -146,7 +155,6 @@ structure PackageMetadata where
   leanVersion : String
   leanToolchain : String
   leanGithash : String
-  generatedAt : String
   targets : Array PackageTargetMetadata
 
 structure InterfaceManifest where

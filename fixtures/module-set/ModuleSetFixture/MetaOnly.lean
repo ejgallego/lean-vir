@@ -8,6 +8,6 @@ module
 
 namespace ModuleSetFixture.MetaOnly
 
-public def value : Nat := 97
+public initialize value : Nat ← pure 97
 
 end ModuleSetFixture.MetaOnly

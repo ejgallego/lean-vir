@@ -48,10 +48,6 @@ Author: Emilio J. Gallego Arias
               <span>Toolchain</span>
               <strong id="dev-toolchain">...</strong>
             </div>
-            <div>
-              <span>Generated</span>
-              <strong id="dev-generated-at">...</strong>
-            </div>
           </div>
         </header>
 
@@ -69,12 +65,20 @@ Author: Emilio J. Gallego Arias
             </label>
             <label class="dev-field">
               <span>Served package URL</span>
-              <input id="dev-package-url" type="text" value="fixtures-basic.irpkg" />
+              <input
+                id="dev-package-url"
+                type="text"
+                value="fixtures-basic.irpkg"
+              />
             </label>
             <button id="dev-load-url" type="button">Load</button>
             <label class="dev-field">
               <span>Upload .irpkg</span>
-              <input id="dev-package-file" type="file" accept=".irpkg,application/octet-stream" />
+              <input
+                id="dev-package-file"
+                type="file"
+                accept=".irpkg,application/octet-stream"
+              />
             </label>
           </div>
         </section>
@@ -97,7 +101,10 @@ Author: Emilio J. Gallego Arias
           </div>
         </section>
 
-        <section class="dev-runner dev-help" aria-labelledby="dev-command-title">
+        <section
+          class="dev-runner dev-help"
+          aria-labelledby="dev-command-title"
+        >
           <details>
             <summary>
               <span class="eyebrow">Package your own file</span>

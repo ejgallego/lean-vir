@@ -55,10 +55,11 @@ safe stop at an opaque imported declaration, while package generation loads the
 owning module and reports the remaining unsupported dependency path. The
 module-set fixture also checks dependency-first initialization through a
 private import and verifies that a reached imported declaration is packaged
-without becoming a public interface export. It excludes meta-only and
-otherwise-unreached initializer modules, and the Lake facet smoke mutates only
-an imported implementation to verify that the artifact dependency invalidates
-and rewrites its package shard even when the root public interface is stable.
+without becoming a public interface export. Root initializer coverage verifies
+that the public member initializes last. The fixture excludes actual meta-only
+and otherwise-unreached initializer modules. The Lake facet smoke mutates an
+imported implementation, a descriptor member, and a client-native manifest to
+verify source, member-integrity, and environment-profile invalidation.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather

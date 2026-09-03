@@ -26,9 +26,9 @@ described under [Install The Browser SDK](#install-the-browser-sdk).
 
 ## Mark The Browser Surface
 
-Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
-Use `@[vir_startup]` for startup hooks that the browser host should run after
-loading the package.
+Import `Vir.Browser` for the browser types and import `Vir.Attributes` at meta
+time for `@[vir_export]` and `@[vir_startup]`. The umbrella `Vir` module remains
+available when a source intentionally needs the whole public surface.
 
 ```lean
 module
@@ -128,11 +128,12 @@ The command accepts only `@[extern] def`s with transparent kernel bodies. It
 rejects bodyless or opaque declarations, duplicate requests, non-externs, and
 directly recursive fallbacks. Lean's
 ordinary native compiler continues to use the extern; the command compiles a
-private reference-body clone only for VIR closure resolution. Package
-generation emits an adapter at the original name and preserves the extern's
-IR parameter ownership while calling the clone. Any dependencies newly exposed
-by the reference body must still have ordinary IR or a registered native
-provider.
+reserved-name reference-body clone only for VIR closure resolution. In a Lean
+module the clone is exported as an internal compiler artifact so the generated
+`import all` driver can load it; it is not a user-facing declaration. Package
+generation emits an adapter at the original name and preserves the extern's IR
+parameter ownership while calling the clone. Any dependencies newly exposed by
+the reference body must still have ordinary IR or a registered native provider.
 
 Use this only as an explicit package portability decision. It does not add the
 extern symbol to the shared runtime, enable general dynamic lookup, or affect
@@ -179,8 +180,11 @@ Lean module initializer.
 The descriptor is the facet's returned artifact. The facet depends on Lake's
 transitive import artifacts, so changing an imported
 implementation regenerates the affected set even when the root module's public
-interface and `.olean` remain unchanged. A missing root package, report, or
-descriptor-listed shard also invalidates the cached descriptor target.
+interface and `.olean` remain unchanged. The selected
+`VIR_NATIVE_EXTERN_MANIFEST` path and contents are also build inputs, so native
+selection cannot reuse a package from another profile. A missing root package,
+report, descriptor-listed shard, or member whose byte length or SHA-256 no
+longer matches the descriptor invalidates the cached descriptor target.
 
 The descriptor is currently one Lake target: when it is invalidated, the facet
 regenerates the root and every reached dependency member as a complete set. It
@@ -188,6 +192,10 @@ does not yet cache unchanged members independently. Before rebuilding, the
 facet removes the previous descriptor, root, and root-specific shard directory,
 so a failed generation cannot leave an old descriptor advertising stale or
 partially replaced members.
+
+Package manifests omit wall-clock generation time, so clean builds with the
+same source/toolchain/profile inputs can produce the same package bytes. The
+separate Markdown report retains its generation timestamp for local diagnosis.
 
 An executable or renderer that consumes the package should declare the facet as
 a build dependency:

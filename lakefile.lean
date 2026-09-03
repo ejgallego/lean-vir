@@ -79,12 +79,32 @@ private def virSdkVersion : String := "0.1.0"
 
 private def virPackageSetFormat : String := "lean-vir-ir-package-set"
 
-private def virPackageSetVersion : Nat := 1
+private def virPackageSetVersion : Nat := 2
 
 private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
   match json.getObjVal? field with
   | .ok (.str value) => some value
   | _ => none
+
+private def virJsonNatField? (json : Lean.Json) (field : String) : Option Nat :=
+  match json.getObjVal? field >>= Lean.Json.getNat? with
+  | .ok value => some value
+  | .error _ => none
+
+private def virSha256File? (path : System.FilePath) : IO (Option String) := do
+  try
+    let out ← IO.Process.output {
+      cmd := "sha256sum"
+      args := #[path.toString]
+    }
+    if out.exitCode != 0 then
+      return none
+    let hash := (out.stdout.splitOn " ").head?.getD ""
+    if hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·) then
+      return some hash
+    return none
+  catch _ =>
+    return none
 
 private def virPackageSetComplete
     (descriptorPath : System.FilePath)
@@ -136,8 +156,20 @@ private def virPackageSetComplete
     if path != expectedPath then
       return false
     paths := paths.push path
+    let some expectedByteLength := virJsonNatField? packageJson "byteLength"
+      | return false
+    let some expectedSha256 := virJsonStringField? packageJson "sha256"
+      | return false
+    if expectedSha256.length != 64 ||
+        !expectedSha256.toList.all ("0123456789abcdef".contains ·) then
+      return false
     let memberPath := baseDir / path
     if !(← memberPath.pathExists) || (← memberPath.isDir) then
+      return false
+    let bytes ← IO.FS.readBinFile memberPath
+    if bytes.size != expectedByteLength then
+      return false
+    if (← virSha256File? memberPath) != some expectedSha256 then
       return false
     index := index + 1
   return true
@@ -158,12 +190,17 @@ private def buildVirPackageSetFacet
   let moduleName := mod.name.toString
   let rootRelativePath := mod.fileName "irpkg"
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
+  let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
   generatorJob.bindM fun generator =>
     moduleJob.bindM fun artifacts =>
       importArtsJob.mapM fun _ => do
         addLeanTrace
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
+        addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
+        if let some manifest := clientNativeManifest? then
+          unless manifest.isEmpty do
+            addTrace (← computeTrace (System.FilePath.mk manifest))
         let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
           rootRelativePath shardRelativeDir
         if (← descriptorPath.pathExists) &&

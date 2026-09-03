@@ -111,12 +111,12 @@ def analyzePackage
     (index : DeclIndex) : IO AnalyzedPackage := do
   let closure := collectClosure targets index
   let (hostImports, hostDiagnostics) ← collectHostImports index closure
-  let metadata := collectPackageMetadata generatedAt targets index
+  let metadata := collectPackageMetadata targets index
   let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
   return {
     closure
     manifest
-    report := reportFor targets closure manifest
+    report := reportFor generatedAt targets closure manifest
   }
 
 def buildPackageFromIndex
@@ -155,7 +155,6 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"wrote {reportPath}"
       IO.println s!"package format: {manifest.metadata.packageFormatVersion}"
       IO.println s!"toolchain: {manifest.metadata.leanToolchain}"
-      IO.println s!"generated at: {manifest.metadata.generatedAt}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
       IO.println s!"JavaScript host imports: {manifest.hostImports.size}"
       IO.println s!"interface exports: {manifest.exports.size}"
@@ -166,11 +165,26 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.eprintln err
       return 1
 
-def packageSetMemberJson (moduleName role path : String) : String :=
+private def sha256File (path : System.FilePath) : IO String := do
+  let out ← IO.Process.output {
+    cmd := "sha256sum"
+    args := #[path.toString]
+  }
+  if out.exitCode != 0 then
+    throw <| IO.userError s!"sha256sum failed for `{path}`: {out.stderr.trimAscii.toString}"
+  let hash := (out.stdout.splitOn " ").head?.getD ""
+  unless hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·) do
+    throw <| IO.userError s!"sha256sum returned an invalid digest for `{path}`"
+  return hash
+
+def packageSetMemberJson
+    (moduleName role path : String) (byteLength : Nat) (sha256 : String) : String :=
   jsonObject #[
     ("module", jsonString moduleName),
     ("role", jsonString role),
-    ("path", jsonString path)
+    ("path", jsonString path),
+    ("byteLength", jsonNat byteLength),
+    ("sha256", jsonString sha256)
   ]
 
 def packageSetDescriptorJson (members : Array String) : String :=
@@ -233,8 +247,10 @@ unsafe def runModuleSet
         return 1
     | .ok bytes =>
         writeBinFile outputPath bytes
+        let sha256 ← sha256File outputPath
         members := members.push <| packageSetMemberJson
           moduleName.toString "dependency" (System.FilePath.mk shardRelativeDir / fileName).toString
+          bytes.size sha256
 
   let rootClosure := closure.forModule rootModule rootModule
   match emitPackage rootClosure manifest with
@@ -243,8 +259,9 @@ unsafe def runModuleSet
       return 1
   | .ok bytes =>
       writeBinFile packagePath bytes
+      let sha256 ← sha256File packagePath
       members := members.push <| packageSetMemberJson
-        rootModule.toString "root" rootRelativePath
+        rootModule.toString "root" rootRelativePath bytes.size sha256
       writeTextFile descriptorPath (packageSetDescriptorJson members)
       IO.println s!"wrote {descriptorPath}"
       IO.println s!"wrote {packagePath}"

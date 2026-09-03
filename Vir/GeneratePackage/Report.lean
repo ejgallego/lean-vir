@@ -16,7 +16,9 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
-def reportFor (_targets : Array Target) (closure : Closure) (manifest : InterfaceManifest) : String :=
+def reportFor
+    (generatedAt : String) (_targets : Array Target)
+    (closure : Closure) (manifest : InterfaceManifest) : String :=
   let roots :=
     manifest.metadata.targets.foldl (fun acc target => acc ++ target.resolvedRoots) #[]
   let loadedLines :=
@@ -61,7 +63,7 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
   ++ s!"Lean toolchain: {manifest.metadata.leanToolchain}\n\n"
   ++ s!"Lean version: {manifest.metadata.leanVersion}\n\n"
   ++ s!"Lean git hash: {manifest.metadata.leanGithash}\n\n"
-  ++ s!"Generated at: {manifest.metadata.generatedAt}\n\n"
+  ++ s!"Generated at: {generatedAt}\n\n"
   ++ s!"Loaded declarations: {closure.decls.size}\n\n"
   ++ s!"Native extern declarations: {closure.externs.size}\n\n"
   ++ s!"Initializer globals: {closure.initGlobals.size}\n\n"

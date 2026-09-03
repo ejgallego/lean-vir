@@ -53,10 +53,10 @@ def isGeneratedAuxName (n : Name) : Bool :=
 
 def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
   index.sourceDecls.findSome? (fun (source, names) =>
-    if source == target.source.toString then some names else none) |>.getD #[]
+    if source == index.sourceKeyFor target then some names else none) |>.getD #[]
 
 def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
-  match index.envForSource? target.source.toString with
+  match index.envForSource? (index.sourceKeyFor target) with
   | none => #[]
   | some env =>
       sourceDeclNamesFor index target |>.filter fun n =>

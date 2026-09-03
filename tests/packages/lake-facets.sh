@@ -34,7 +34,11 @@ assert_module_fixture_descriptor() {
     import fs from "node:fs";
     const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
     if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
-    if (descriptor.version !== 1) process.exit(1);
+    if (descriptor.version !== 2) process.exit(1);
+    for (const entry of descriptor.packages) {
+      if (!Number.isSafeInteger(entry.byteLength) || entry.byteLength <= 0) process.exit(1);
+      if (!/^[0-9a-f]{64}$/.test(entry.sha256)) process.exit(1);
+    }
     const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
     const expected = [
       ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
@@ -64,6 +68,8 @@ test -f "$module_set_root"
 test -f "$module_set_shared"
 
 assert_module_fixture_descriptor "$module_set"
+module_set_root_hash="$(sha256sum "$module_set_root" | cut -d' ' -f1)"
+module_set_shared_hash="$(sha256sum "$module_set_shared" | cut -d' ' -f1)"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
 printf '%s\n' 'obsolete' > "$obsolete_shard"
@@ -77,6 +83,8 @@ node --input-type=module -e '
 lake build +ModuleSetFixture.Root:vir
 test ! -e "$obsolete_shard"
 assert_module_fixture_descriptor "$module_set"
+test "$(sha256sum "$module_set_root" | cut -d' ' -f1)" = "$module_set_root_hash"
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" = "$module_set_shared_hash"
 
 node --input-type=module -e '
   import fs from "node:fs";
@@ -109,6 +117,12 @@ mv "$module_set_shared" "$tmp/shard-replaced-by-directory.irpkg"
 mkdir "$module_set_shared"
 lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
+
+printf '%s\n' 'corrupt-member-bytes' >> "$module_set_shared"
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" != "$module_set_shared_hash"
+lake build +ModuleSetFixture.Root:vir
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" = "$module_set_shared_hash"
 assert_module_fixture_descriptor "$module_set"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
@@ -232,7 +246,7 @@ printf '%s\n' \
   '#check Vir.GeneratePackage.TargetMode.explicit' \
   '#check Vir.GeneratePackage.TargetMode.packageOnly' \
   '#check Vir.GeneratePackage.TargetMode.markedModule' \
-  '#check Vir.GeneratePackage.parseDottedName' \
+  '#check Vir.parseDottedName' \
   '#check Vir.GeneratePackage.moduleNameFor' \
   '#check Vir.GeneratePackage.collectClosure' \
   '#check Vir.GeneratePackage.virJsMetadataFromDecl?' \
@@ -241,6 +255,42 @@ printf '%s\n' \
   '#check Vir.GeneratePackage.emitPackage' \
   '#check Vir.GeneratePackage.reportFor' \
   '#check Vir.GeneratePackage.analyzePackage' > "$tmp/Smoke/PackagePipeline.lean"
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'meta import Vir.Attributes' \
+  'meta import Vir.ExternFallback' \
+  '' \
+  '@[extern "smoke_client_native_first"]' \
+  'public def Smoke.ClientNative.first (value : UInt32) : UInt32 := value + 1' \
+  '' \
+  '@[extern "smoke_client_native_second"]' \
+  'public def Smoke.ClientNative.second (value : UInt32) : UInt32 := value + 2' \
+  '' \
+  'vir_extern_fallback Smoke.ClientNative.first, Smoke.ClientNative.second' \
+  '' \
+  '@[vir_export]' \
+  'public def Smoke.ClientNative.value (value : UInt32) : UInt32 :=' \
+  '  Smoke.ClientNative.first value + Smoke.ClientNative.second value' > "$tmp/Smoke/ClientNative.lean"
+
+printf '%s\n' \
+  '#include <stdint.h>' \
+  'uint32_t smoke_client_native_first(uint32_t value) { return value + 1; }' \
+  'uint32_t smoke_client_native_second(uint32_t value) { return value + 2; }' \
+  > "$tmp/client-native.c"
+
+write_client_native_manifest() {
+  local externs="$1"
+  printf '%s\n' \
+    '{' \
+    '  "format": "lean-vir-client-native-externs",' \
+    '  "version": 1,' \
+    '  "modules": ["Smoke.ClientNative"],' \
+    "  \"externs\": $externs," \
+    '  "providerSources": ["client-native.c"]' \
+    '}' > "$tmp/client-native.json"
+}
 
 printf '%s\n' \
   'module' \
@@ -387,6 +437,38 @@ if lake -d "$tmp" build +Smoke.NewRuntime:vir \
 fi
 test ! -e "$module_descriptor"
 test ! -e "$module_package"
+
+client_native_package="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.irpkg"
+client_native_report="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.report.md"
+write_client_native_manifest \
+  '["Smoke.ClientNative.first", "Smoke.ClientNative.second"]'
+VIR_NATIVE_EXTERN_MANIFEST="$tmp/client-native.json" \
+  lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_first_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+
+printf '%s\n' 'stale-client-native-report' > "$client_native_report"
+write_client_native_manifest \
+  '["Smoke.ClientNative.second", "Smoke.ClientNative.first"]'
+VIR_NATIVE_EXTERN_MANIFEST="$tmp/client-native.json" \
+  lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_second_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+if grep -q 'stale-client-native-report' "$client_native_report"; then
+  echo "client-native manifest contents did not invalidate the VIR package-set facet" >&2
+  exit 1
+fi
+test "$client_native_first_hash" = "$client_native_second_hash"
+
+printf '%s\n' 'stale-client-native-report' > "$client_native_report"
+lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_fallback_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+if grep -q 'stale-client-native-report' "$client_native_report"; then
+  echo "removing the client-native manifest profile did not invalidate the VIR package-set facet" >&2
+  exit 1
+fi
+if [ "$client_native_second_hash" = "$client_native_fallback_hash" ]; then
+  echo "removing the client-native manifest profile did not change the VIR package set" >&2
+  exit 1
+fi
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"

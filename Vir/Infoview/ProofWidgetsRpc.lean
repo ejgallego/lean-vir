@@ -189,7 +189,7 @@ meta def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExpr
   return { ref, info := stored.toInfo }
 
 meta def rpcRefName? (ref : ProofWidgetsRpcRef) : Option Name :=
-  match Vir.GeneratePackage.parseDottedName ref.id with
+  match Vir.parseDottedName ref.id with
   | .ok name => some name
   | .error _ => none
 
@@ -199,7 +199,7 @@ meta def rpcRefKnownConstant (env : Environment) (ref : ProofWidgetsRpcRef) : Bo
   | some name => env.contains name
 
 meta def rpcRefIdKnownConstant (env : Environment) (id : String) : Bool :=
-  match Vir.GeneratePackage.parseDottedName id with
+  match Vir.parseDottedName id with
   | .ok name => env.contains name
   | .error _ => false
 

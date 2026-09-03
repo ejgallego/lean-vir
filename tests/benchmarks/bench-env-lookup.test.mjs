@@ -17,8 +17,8 @@ import {
 } from "../../benchmarks/harness/bench-env-lookup-contract.mjs";
 import { assertComparableBenchmarkReportIdentities } from "../../benchmarks/harness/bench-utils.mjs";
 
-test("environment lookup identity covers package content but ignores generation time", () => {
-  const packageInfo = (generatedAt) => ({
+test("environment lookup identity covers all package content", () => {
+  const packageInfo = (generator = "test") => ({
     package: {
       version: 10,
       declarationCount: 1,
@@ -28,9 +28,9 @@ test("environment lookup identity covers package content but ignores generation 
       ],
     },
     manifest: {
-      version: 7,
+      version: 8,
       artifact: "lean-vir-ir-package",
-      metadata: { generatedAt, generator: "test" },
+      metadata: { generator },
       exports: [],
       hostImports: [],
       diagnostics: [],
@@ -38,25 +38,16 @@ test("environment lookup identity covers package content but ignores generation 
   });
   const identity = environmentLookupPackageIdentity(
     Buffer.from("declmanifest"),
-    packageInfo("2026-08-05T10:00:00Z"),
+    packageInfo(),
   );
   assert.equal(identity.packageFormatVersion, 10);
   assert.match(identity.contentSha256, /^[0-9a-f]{64}$/);
-  assert.deepEqual(identity.ignoredManifestFields, ["metadata.generatedAt"]);
-  assert.deepEqual(
-    identity,
-    environmentLookupPackageIdentity(
-      Buffer.from("declmanifest"),
-      packageInfo("2026-08-05T11:00:00Z"),
-    ),
-  );
-  const changedMetadata = packageInfo("2026-08-05T10:00:00Z");
-  changedMetadata.manifest.metadata.generator = "different-generator";
+  assert.deepEqual(identity.ignoredManifestFields, []);
   assert.notDeepEqual(
     identity,
     environmentLookupPackageIdentity(
-      Buffer.from("declmanifest"),
-      changedMetadata,
+      Buffer.from("declmanifesz"),
+      packageInfo("different-generator"),
     ),
   );
 

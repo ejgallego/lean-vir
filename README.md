@@ -76,8 +76,9 @@ VIR_SDK_COMMIT=<same-commit> lake build :virSdk
 ```
 
 The module facet writes a package-set descriptor, root member, reached
-dependency members, and report under `.lake/build/vir/module-sets/`; the package
-facet installs the versioned browser SDK. `vir.runStartupEntries()`
+dependency members, and report under `.lake/build/vir/module-sets/`. Descriptor
+v2 records every member's byte length and SHA-256; the package facet installs
+the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely

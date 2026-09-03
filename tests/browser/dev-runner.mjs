@@ -28,13 +28,14 @@ const packageInfoCache = new Map();
 export async function smokeRunner(cdp, origin, url, expected) {
   await navigate(cdp, `${origin}${basePath}${url}`);
   await waitForReady(cdp);
-  const before = await evaluate(cdp, `({
+  const before = await evaluate(
+    cdp,
+    `({
     location: window.location.href,
     packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
     exports: document.querySelector("#dev-export-count")?.textContent?.trim(),
     sourceTargets: document.querySelector("#dev-source-targets")?.textContent?.trim(),
     toolchain: document.querySelector("#dev-toolchain")?.textContent?.trim(),
-    generatedAt: document.querySelector("#dev-generated-at")?.textContent?.trim(),
     entry: document.querySelector("#dev-entry-select")?.value,
     entryCount: document.querySelector("#dev-entry-select")?.options.length,
     input: document.querySelector("[data-input-index='0']")?.value,
@@ -44,13 +45,19 @@ export async function smokeRunner(cdp, origin, url, expected) {
       type: field.type,
       tagName: field.tagName
     }))
-  })`);
-  assert.ok(before.location.endsWith(url), `unexpected runner URL: ${before.location}`);
+  })`,
+  );
+  assert.ok(
+    before.location.endsWith(url),
+    `unexpected runner URL: ${before.location}`,
+  );
   assert.equal(before.packageName, expected.packageName);
-  assert.ok(/^\d+$/.test(before.exports), `expected export count, got ${before.exports}`);
+  assert.ok(
+    /^\d+$/.test(before.exports),
+    `expected export count, got ${before.exports}`,
+  );
   assert.notEqual(before.sourceTargets, "...");
   assert.match(before.toolchain, /leanprover\/lean4/);
-  assert.notEqual(before.generatedAt, "...");
   assert.equal(before.entry, expected.entry);
   if (expected.entryCount !== undefined) {
     assert.equal(before.entryCount, expected.entryCount);
@@ -59,13 +66,25 @@ export async function smokeRunner(cdp, origin, url, expected) {
     assert.equal(before.input, expected.input);
   }
   if (expected.inputs !== undefined) {
-    assert.deepEqual(before.inputs.map((input) => input.value).slice(0, expected.inputs.length), expected.inputs);
+    assert.deepEqual(
+      before.inputs
+        .map((input) => input.value)
+        .slice(0, expected.inputs.length),
+      expected.inputs,
+    );
   }
   if (expected.inputTags !== undefined) {
-    assert.deepEqual(before.inputs.map((input) => input.tagName).slice(0, expected.inputTags.length), expected.inputTags);
+    assert.deepEqual(
+      before.inputs
+        .map((input) => input.tagName)
+        .slice(0, expected.inputTags.length),
+      expected.inputTags,
+    );
   }
 
-  const runInputs = expected.runInputs ?? (expected.runInput === undefined ? null : [expected.runInput]);
+  const runInputs =
+    expected.runInputs ??
+    (expected.runInput === undefined ? null : [expected.runInput]);
   const result = await runSelectedEntry(cdp, runInputs);
   assert.equal(result, expected.result);
   if (expected.documentTitle !== undefined) {
@@ -75,7 +94,9 @@ export async function smokeRunner(cdp, origin, url, expected) {
 }
 
 export async function runSelectedEntry(cdp, runInputs = null) {
-  return evaluate(cdp, `new Promise((resolve, reject) => {
+  return evaluate(
+    cdp,
+    `new Promise((resolve, reject) => {
     const output = document.querySelector("#dev-result");
     const runInputs = ${JSON.stringify(runInputs)};
     if (runInputs !== null) {
@@ -102,20 +123,24 @@ export async function runSelectedEntry(cdp, runInputs = null) {
       }
     };
     poll();
-  })`);
+  })`,
+  );
 }
 
 export async function smokeRunnerFailure(cdp, origin, url, expected) {
   await navigate(cdp, `${origin}${basePath}${url}`);
   await waitForStatus(cdp, "Failed");
-  const state = await evaluate(cdp, `({
+  const state = await evaluate(
+    cdp,
+    `({
     packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
     status: document.querySelector("#status")?.textContent?.trim(),
     result: document.querySelector("#dev-result")?.textContent?.trim(),
     entryCount: document.querySelector("#dev-entry-select")?.options.length,
     runDisabled: document.querySelector("#dev-run-entry")?.disabled,
     exports: document.querySelector("#dev-export-count")?.textContent?.trim()
-  })`);
+  })`,
+  );
   assert.equal(state.status, "Failed");
   assert.match(state.result, expected.result);
   assert.equal(state.runDisabled, true);
@@ -132,9 +157,14 @@ export async function smokeRunnerFailure(cdp, origin, url, expected) {
 
 export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   const info = await packageInfoFor(packageFile);
-  await navigate(cdp, `${origin}${basePath}dev.html?package=${encodeURIComponent(packageFile)}`);
+  await navigate(
+    cdp,
+    `${origin}${basePath}dev.html?package=${encodeURIComponent(packageFile)}`,
+  );
   await waitForReady(cdp);
-  const state = await evaluate(cdp, `(() => {
+  const state = await evaluate(
+    cdp,
+    `(() => {
     const select = document.querySelector("#dev-entry-select");
     return {
       options: Array.from(select.options).map((option) => ({
@@ -143,23 +173,32 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
       })),
       packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
     };
-  })()`);
+  })()`,
+  );
   assert.equal(state.packageName, packageFile);
   assert.deepEqual(
     state.options.map((option) => option.value),
     info.manifest.exports.map((entry) => entry.id),
   );
   for (const [index, entry] of info.manifest.exports.entries()) {
-    assert.ok(state.options[index].text.includes(entry.jsName), `missing ${entry.jsName} in option label`);
+    assert.ok(
+      state.options[index].text.includes(entry.jsName),
+      `missing ${entry.jsName} in option label`,
+    );
   }
 
   const expectedControls = info.manifest.exports.map((entry) => ({
     id: entry.id,
     inputTags: entry.args.map((arg) => interfaceInputTag(arg.type)),
     enumOptionCounts: entry.args.map((arg) =>
-      interfaceInputTag(arg.type) === "SELECT" ? (arg.type.constructors ?? []).length : null),
+      interfaceInputTag(arg.type) === "SELECT"
+        ? (arg.type.constructors ?? []).length
+        : null,
+    ),
   }));
-  const renderedControls = await evaluate(cdp, `(() => {
+  const renderedControls = await evaluate(
+    cdp,
+    `(() => {
     const select = document.querySelector("#dev-entry-select");
     return ${JSON.stringify(expectedControls)}.map((expected) => {
       select.value = expected.id;
@@ -171,19 +210,25 @@ export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
           field.tagName === "SELECT" ? field.options.length : null),
       };
     });
-  })()`);
+  })()`,
+  );
   assert.deepEqual(renderedControls, expectedControls);
 }
 
 export async function prepareNegativePackages() {
-  await writeFile(resolve(distRoot, "bad-magic.irpkg"), encodeInvalidMagicPackage());
+  await writeFile(
+    resolve(distRoot, "bad-magic.irpkg"),
+    encodeInvalidMagicPackage(),
+  );
 
   const fibBytes = await readFile(resolve(distRoot, "local-fib.irpkg"));
   const fibInfo = readIrPackageInfo(fibBytes);
   const manifest = {
     ...fibInfo.manifest,
     diagnostics: [
-      ...(Array.isArray(fibInfo.manifest.diagnostics) ? fibInfo.manifest.diagnostics : []),
+      ...(Array.isArray(fibInfo.manifest.diagnostics)
+        ? fibInfo.manifest.diagnostics
+        : []),
       {
         name: "BrowserSmoke.unsupported",
         source: "tests/browser/runner.mjs",
@@ -199,15 +244,22 @@ export async function prepareNegativePackages() {
 
 export async function packageInfoFor(packageFile) {
   if (!packageInfoCache.has(packageFile)) {
-    packageInfoCache.set(packageFile, readIrPackageInfo(await readFile(resolve(distRoot, packageFile))));
+    packageInfoCache.set(
+      packageFile,
+      readIrPackageInfo(await readFile(resolve(distRoot, packageFile))),
+    );
   }
   return packageInfoCache.get(packageFile);
 }
 
 export async function runnerCaseFromManifest(packageFile, entryName, expected) {
   const info = await packageInfoFor(packageFile);
-  const entry = info.manifest.exports.find((candidate) =>
-    candidate.entry === entryName || candidate.id === entryName || candidate.jsName === entryName);
+  const entry = info.manifest.exports.find(
+    (candidate) =>
+      candidate.entry === entryName ||
+      candidate.id === entryName ||
+      candidate.jsName === entryName,
+  );
   assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
   return {
     url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.id)}`,

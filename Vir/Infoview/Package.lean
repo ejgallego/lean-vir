@@ -59,7 +59,7 @@ private meta def irPackageRootNames (roots : Array String) : Except String (Arra
     throw "at least one root name is required"
   let mut names : Array Name := #[]
   for root in roots do
-    let name ← Vir.GeneratePackage.parseDottedName root
+    let name ← Vir.parseDottedName root
     if !names.contains name then
       names := names.push name
   return names

@@ -233,7 +233,6 @@ assert.equal(
   INTERFACE_MANIFEST_VERSION,
 );
 assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
-assert.ok(runtime.packageMetadata.generatedAt.length > 0);
 assert.ok(
   runtime.packageMetadata.targets.some(
     (target) => target.source === "examples/Fib.lean",

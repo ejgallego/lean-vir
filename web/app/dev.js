@@ -12,13 +12,32 @@ import {
   parseBoolText,
 } from "./pages/interface-inputs.js";
 import { formatInterfaceEffectPrefix } from "../src/runtime/interface-effects.js";
-import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "../src/runtime/interface-manifest.js";
+import {
+  formatInterfaceType,
+  manifestDiagnostics,
+  validateInterfaceManifest,
+} from "../src/runtime/interface-manifest.js";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
-import { defaultPackageFile, packagePresets, wasmPublicFile } from "./pages/browser-packages.js";
-import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "./pages/input-parsers.js";
-import { assetPathFor, errorMessage, formatBytes, setReadyState } from "./pages/page-utils.js";
+import {
+  defaultPackageFile,
+  packagePresets,
+  wasmPublicFile,
+} from "./pages/browser-packages.js";
+import {
+  parseByteArrayInput,
+  parseFloatText,
+  parseIntText,
+  parseNatText,
+} from "./pages/input-parsers.js";
+import {
+  assetPathFor,
+  errorMessage,
+  formatBytes,
+  setReadyState,
+} from "./pages/page-utils.js";
 import { fetchBytes } from "../src/vir-runtime.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
+import { formatPackageTarget } from "../src/runtime/package-targets.js";
 
 const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");
@@ -28,7 +47,6 @@ const exportCount = document.querySelector("#dev-export-count");
 const ptrWidth = document.querySelector("#dev-ptr-width");
 const sourceTargets = document.querySelector("#dev-source-targets");
 const toolchain = document.querySelector("#dev-toolchain");
-const generatedAt = document.querySelector("#dev-generated-at");
 const packagePreset = document.querySelector("#dev-package-preset");
 const packageUrl = document.querySelector("#dev-package-url");
 const packageFile = document.querySelector("#dev-package-file");
@@ -37,7 +55,9 @@ const entrySelect = document.querySelector("#dev-entry-select");
 const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
-const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}` });
+const runtimeFactory = createBrowserReactRuntimeFactory({
+  wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
+});
 const query = new URLSearchParams(window.location.search);
 let requestedEntry = query.get("entry");
 let requestedAutoRun = query.get("run") === "1";
@@ -69,18 +89,23 @@ function resetPackageState() {
   sourceTargets.textContent = "...";
   sourceTargets.removeAttribute("title");
   toolchain.textContent = "...";
-  generatedAt.textContent = "...";
 }
 
 function selectedInterfaceEntry() {
-  return interfaceEntries.find((entry) => entry.id === entrySelect.value) ?? null;
+  return (
+    interfaceEntries.find((entry) => entry.id === entrySelect.value) ?? null
+  );
 }
 
 function selectEntryFromQuery() {
   const entryId = requestedEntry;
   if (!entryId) return;
-  const match = interfaceEntries.find((entry) =>
-    entry.id === entryId || entry.jsName === entryId || entry.entry === entryId);
+  const match = interfaceEntries.find(
+    (entry) =>
+      entry.id === entryId ||
+      entry.jsName === entryId ||
+      entry.entry === entryId,
+  );
   if (match) {
     entrySelect.value = match.id;
   }
@@ -103,7 +128,9 @@ function renderPackagePresets() {
 
 function syncPackagePreset() {
   const value = packageUrl.value.trim();
-  packagePreset.value = packagePresets.some((preset) => preset.file === value) ? value : "";
+  packagePreset.value = packagePresets.some((preset) => preset.file === value)
+    ? value
+    : "";
 }
 
 function inputFieldId(input, index) {
@@ -126,7 +153,9 @@ function renderInputFields(entry) {
     label.className = "dev-field";
     const caption = document.createElement("span");
     caption.textContent = `${input.name ?? `input${index + 1}`} : ${formatInterfaceType(input.type)}`;
-    const field = document.createElement(interfaceInputTag(input.type).toLowerCase());
+    const field = document.createElement(
+      interfaceInputTag(input.type).toLowerCase(),
+    );
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
     if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
@@ -137,14 +166,19 @@ function renderInputFields(entry) {
         field.append(option);
       }
       field.value = inputDefault(input);
-    } else if (input.type?.interfaceTag === INTERFACE_TAG.NAT ||
-        input.type?.interfaceTag === INTERFACE_TAG.UINT8 ||
-        input.type?.interfaceTag === INTERFACE_TAG.UINT16 ||
-        input.type?.interfaceTag === INTERFACE_TAG.UINT32) {
+    } else if (
+      input.type?.interfaceTag === INTERFACE_TAG.NAT ||
+      input.type?.interfaceTag === INTERFACE_TAG.UINT8 ||
+      input.type?.interfaceTag === INTERFACE_TAG.UINT16 ||
+      input.type?.interfaceTag === INTERFACE_TAG.UINT32
+    ) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
-    } else if (input.type?.interfaceTag === INTERFACE_TAG.FLOAT || input.type?.interfaceTag === INTERFACE_TAG.FLOAT32) {
+    } else if (
+      input.type?.interfaceTag === INTERFACE_TAG.FLOAT ||
+      input.type?.interfaceTag === INTERFACE_TAG.FLOAT32
+    ) {
       field.type = "text";
       field.inputMode = "decimal";
     } else if (isJsonInputTag(input.type?.interfaceTag)) {
@@ -152,12 +186,17 @@ function renderInputFields(entry) {
     } else if (input.type?.interfaceTag === INTERFACE_TAG.BOOL) {
       label.classList.add("dev-checkbox-field");
       field.type = "checkbox";
-      field.checked = parseBoolText(inputOverride(entry, input, index) ?? inputDefault(input));
+      field.checked = parseBoolText(
+        inputOverride(entry, input, index) ?? inputDefault(input),
+      );
     } else {
       field.type = "text";
       field.inputMode = "text";
     }
-    if (input.type?.interfaceTag !== INTERFACE_TAG.SIMPLE_ENUM && input.type?.interfaceTag !== INTERFACE_TAG.BOOL) {
+    if (
+      input.type?.interfaceTag !== INTERFACE_TAG.SIMPLE_ENUM &&
+      input.type?.interfaceTag !== INTERFACE_TAG.BOOL
+    ) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
@@ -174,7 +213,10 @@ function inputOverride(entry, input, index) {
   if (queryValue !== null) {
     return queryValue;
   }
-  if (entry?.entry === "Vir.Fixtures.FormatPretty.formatPrettyAtWidth" && index === 0) {
+  if (
+    entry?.entry === "Vir.Fixtures.FormatPretty.formatPrettyAtWidth" &&
+    index === 0
+  ) {
     return "18";
   }
   return null;
@@ -184,9 +226,13 @@ function renderManifestEntries(manifest) {
   validateInterfaceManifest(manifest);
   const diagnostics = manifestDiagnostics(manifest);
   if (diagnostics.length > 0) {
-    const lines = diagnostics.map((diagnostic) =>
-      `${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`);
-    throw new Error(`package contains unsupported interface exports:\n${lines.join("\n")}`);
+    const lines = diagnostics.map(
+      (diagnostic) =>
+        `${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`,
+    );
+    throw new Error(
+      `package contains unsupported interface exports:\n${lines.join("\n")}`,
+    );
   }
   interfaceEntries = manifest.exports;
   entrySelect.replaceChildren();
@@ -201,7 +247,8 @@ function renderManifestEntries(manifest) {
   selectEntryFromQuery();
   renderInputFields(selectedInterfaceEntry());
   if (interfaceEntries.length === 0) {
-    resultOutput.textContent = "No callable interface exports were found in this package.";
+    resultOutput.textContent =
+      "No callable interface exports were found in this package.";
   }
 }
 
@@ -224,22 +271,16 @@ function updateLocationForSelectedEntry() {
 
 function renderPackageMetadata(metadata) {
   const targets = Array.isArray(metadata?.targets) ? metadata.targets : [];
-  const compactTargets = targets.map((target) => {
-    const roots = Array.isArray(target.resolvedRoots) ? target.resolvedRoots.length : 0;
-    return `${target.source ?? "unknown"} [${target.mode ?? "?"}: ${roots} roots]`;
-  });
-  const fullTargets = targets.map((target) => {
-    const roots = Array.isArray(target.resolvedRoots) && target.resolvedRoots.length > 0
-      ? target.resolvedRoots.join(", ")
-      : "(none)";
-    return `${target.source ?? "unknown"} [${target.mode ?? "?"}] roots: ${roots}`;
-  });
+  const compactTargets = targets.map((target) =>
+    formatPackageTarget(target, { compact: true }),
+  );
+  const fullTargets = targets.map((target) => formatPackageTarget(target));
 
   exportCount.textContent = String(runtime.packageInfo.interfaceExports);
   sourceTargets.textContent = compactTargets.join(" / ") || "unknown";
   sourceTargets.title = fullTargets.join("\n");
-  toolchain.textContent = metadata?.leanToolchain ?? metadata?.leanVersion ?? "unknown";
-  generatedAt.textContent = metadata?.generatedAt ?? "unknown";
+  toolchain.textContent =
+    metadata?.leanToolchain ?? metadata?.leanVersion ?? "unknown";
 }
 
 function parseInputValue(input, field) {
@@ -287,7 +328,8 @@ function parseInputValue(input, field) {
 
 function formatResult(value) {
   if (value instanceof Uint8Array) return Array.from(value).join(", ");
-  if (value !== null && typeof value === "object") return JSON.stringify(value, null, 2);
+  if (value !== null && typeof value === "object")
+    return JSON.stringify(value, null, 2);
   return String(value);
 }
 
@@ -299,7 +341,9 @@ function renderResult(value) {
 
 async function loadPackageSet(label, packageMembers, packageQuery = null) {
   currentPackageQuery = packageQuery;
-  runtime = await runtimeFactory.createRuntime({ irPackageSetBytes: packageMembers });
+  runtime = await runtimeFactory.createRuntime({
+    irPackageSetBytes: packageMembers,
+  });
   syncPackagePreset();
   packageName.textContent = label;
   packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);

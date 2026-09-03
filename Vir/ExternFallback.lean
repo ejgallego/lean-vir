@@ -41,12 +41,17 @@ private meta def compileExternFallback (ref : Syntax) (name : Name) : CoreM Name
   if containsConst info.value name then
     throwErrorAt ref
       "extern `{name}` has a recursive reference body; recursive VIR extern fallbacks are not supported"
-  addAndCompile <| .defnDecl {
-    info with
-    name := clone
-    all := [clone]
-  }
-  modifyEnv fun env => ExportValidation.registerExternFallback env clone
+  -- The fallback is an internal implementation detail, but package generation
+  -- happens from a separate `import all` driver. Export the generated compiler
+  -- artifact so that driver can recover the reference body across the module
+  -- boundary when the matching native profile is absent.
+  withExporting (isExporting := true) do
+    addAndCompile <| .defnDecl {
+      info with
+      name := clone
+      all := [clone]
+    }
+    modifyEnv fun env => ExportValidation.registerExternFallback env clone
   return clone
 
 /--

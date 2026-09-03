@@ -36,13 +36,13 @@ def duplicateNativeExternNames : Array String := Id.run do
   return duplicates
 
 def dottedNameParserFailures : Array String :=
-  let valid := match parseDottedName "Lean.Expr.eqv" with
+  let valid := match Vir.parseDottedName "Lean.Expr.eqv" with
     | .ok name => if name == `Lean.Expr.eqv then #[] else #["dotted-name parser changed a valid name"]
     | .error error => #[s!"dotted-name parser rejected a valid name: {error}"]
-  let empty := match parseDottedName "" with
+  let empty := match Vir.parseDottedName "" with
     | .error _ => #[]
     | .ok _ => #["dotted-name parser accepted an empty name"]
-  let emptyComponent := match parseDottedName "Lean..Expr" with
+  let emptyComponent := match Vir.parseDottedName "Lean..Expr" with
     | .error _ => #[]
     | .ok _ => #["dotted-name parser accepted an empty component"]
   valid ++ empty ++ emptyComponent

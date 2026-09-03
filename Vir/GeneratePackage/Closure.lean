@@ -80,7 +80,7 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .all =>
       index.sourceDecls.findSome? (fun (source, names) =>
-        if source == target.source.toString then some names else none) |>.getD #[]
+        if source == index.sourceKeyFor target then some names else none) |>.getD #[]
   | .marked | .markedModule _ => markedDeclNamesFor index target
   | .explicit roots | .packageOnly roots => roots
 

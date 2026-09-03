@@ -48,6 +48,8 @@ unrelated responsibilities.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
   and type formatting helpers.
 - `runtime/interface-tags.js`: shared interface descriptor tag constants.
+- `runtime/package-targets.js`: validated package-target mode constants and
+  shared user-facing formatting.
 - `host-boundary.js`: exact-value externref roots and host-call rollback
   transactions.
 - `host/vir-dom-host-bindings.js`: passive direct-value DOM provider helpers.

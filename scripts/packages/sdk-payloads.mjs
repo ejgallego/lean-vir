@@ -29,6 +29,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
   ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
+  ["js/runtime/package-targets.js", "web/src/runtime/package-targets.js"],
   [
     "js/host/vir-active-host-bindings.js",
     "web/src/host/vir-active-host-bindings.js",

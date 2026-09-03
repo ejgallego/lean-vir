@@ -18,9 +18,12 @@ export {
   fetchBytes,
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
+  PACKAGE_TARGET_MODE,
   VIR_HOST_DISPOSE,
   VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE,
+  formatPackageTarget,
+  packageTargetModeLabel,
 } from "./vir-runtime.js";
 export {
   hasExternrefTableSupport,
@@ -40,9 +43,15 @@ export function createVirRuntimeFactory(options = {}) {
 }
 
 export async function createVirRuntime(options = {}) {
-  const { irPackageSetBytes, irPackageSetUrl, ...factoryOptions } = options;
+  const {
+    irPackageSet,
+    irPackageSetBytes,
+    irPackageSetUrl,
+    ...factoryOptions
+  } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
   return factory.createRuntime({
+    irPackageSet,
     irPackageSetBytes,
     irPackageSetUrl,
   });

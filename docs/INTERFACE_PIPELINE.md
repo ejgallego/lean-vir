@@ -142,8 +142,12 @@ them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
 after editing either side.
 Manifest schema version 7 requires every export to carry an explicit Boolean
 `startup` marker. Package generation sets it for declarations marked with
-`@[vir_startup]`. The runtime still accepts version 6 manifests and normalizes
-a missing marker to `false`. Version 6 intentionally rejected the old
+`@[vir_startup]`. Version 8 removes volatile wall-clock generation time from
+embedded package metadata and defines the five package-target mode values and
+their root arrays as a validated wire contract. Generation reports retain the
+human-facing timestamp without making package bytes nondeterministic. The
+runtime still accepts version 6 manifests and normalizes a missing marker to
+`false`. Version 6 intentionally rejected the old
 `wireTag` field and `wire` host-import boundary label instead of accepting
 aliases.
 

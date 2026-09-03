@@ -46,11 +46,60 @@ export const invalidManifestCases = [
     pattern: /embedded interface manifest must be/,
   },
   {
-    name: "missing v7 startup marker",
+    name: "missing required startup marker",
     mutate: (manifest) => {
       delete manifest.exports[0].startup;
     },
     pattern: /exports\[0\]\.startup must be a boolean/,
+  },
+  {
+    name: "manifest metadata version mismatch",
+    mutate: (manifest) => {
+      manifest.metadata.manifestVersion = manifest.version - 1;
+    },
+    pattern: /metadata\.manifestVersion must match manifest\.version/,
+  },
+  {
+    name: "non-array package targets",
+    mutate: (manifest) => {
+      manifest.metadata.targets = {};
+    },
+    pattern: /metadata\.targets must be an array/,
+  },
+  {
+    name: "non-object package target",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [null];
+    },
+    pattern: /metadata\.targets\[0\] must be an object/,
+  },
+  {
+    name: "unsupported package target mode",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        {
+          source: "Example.lean",
+          mode: "everything",
+          roots: [],
+          resolvedRoots: [],
+        },
+      ];
+    },
+    pattern: /metadata\.targets\[0\]\.mode must be one of/,
+  },
+  {
+    name: "non-array resolved package roots",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        {
+          source: "Example.lean",
+          mode: "all",
+          roots: [],
+          resolvedRoots: "Example.value",
+        },
+      ];
+    },
+    pattern: /metadata\.targets\[0\]\.resolvedRoots must be an array/,
   },
   {
     name: "non-boolean startup marker",
@@ -64,12 +113,16 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].effect = "sideEffect";
     },
-    pattern: /exports\[0\]\.effect must be one of pure, runtime, io, dom, or react/,
+    pattern:
+      /exports\[0\]\.effect must be one of pure, runtime, io, dom, or react/,
   },
   {
     name: "unsupported interface tag",
     mutate: (manifest) => {
-      manifest.exports[0].result = { type: "UnsupportedTag13", interfaceTag: 13 };
+      manifest.exports[0].result = {
+        type: "UnsupportedTag13",
+        interfaceTag: 13,
+      };
     },
     pattern: /result\.interfaceTag is not supported/,
   },
@@ -85,7 +138,10 @@ export const invalidManifestCases = [
   {
     name: "array without element type",
     mutate: (manifest) => {
-      manifest.exports[0].args[0].type = { type: "Array Nat", interfaceTag: 16 };
+      manifest.exports[0].args[0].type = {
+        type: "Array Nat",
+        interfaceTag: 16,
+      };
     },
     pattern: /args\[0\]\.type\.element must be an object/,
   },
@@ -138,7 +194,8 @@ export const invalidManifestCases = [
         ],
       };
     },
-    pattern: /constructors\[0\] with no fields must have zero runtime field counts/,
+    pattern:
+      /constructors\[0\] with no fields must have zero runtime field counts/,
   },
   {
     name: "custom inductive recursiveSelf owner mismatch",
@@ -176,7 +233,8 @@ export const invalidManifestCases = [
         ],
       };
     },
-    pattern: /constructors\[0\]\.fields\[0\]\.type\.element\.name must match Tree/,
+    pattern:
+      /constructors\[0\]\.fields\[0\]\.type\.element\.name must match Tree/,
   },
   {
     name: "root recursiveSelf",
@@ -204,7 +262,8 @@ export const invalidManifestCases = [
         },
       };
     },
-    pattern: /result\.element cannot be recursiveSelf outside a recursive descriptor/,
+    pattern:
+      /result\.element cannot be recursiveSelf outside a recursive descriptor/,
   },
   {
     name: "structure recursiveSelf owner mismatch",
@@ -298,7 +357,8 @@ export const invalidManifestCases = [
         ],
       };
     },
-    pattern: /constructors\[0\]\.fields\[0\]\.layout\.index is outside objectFieldCount/,
+    pattern:
+      /constructors\[0\]\.fields\[0\]\.layout\.index is outside objectFieldCount/,
   },
   {
     name: "invalid structure trivial field index",
@@ -435,7 +495,8 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+    pattern:
+      /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
   },
   {
     name: "host import unsupported boundary",
@@ -449,7 +510,8 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+    pattern:
+      /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
   },
   {
     name: "legacy wire host boundary rejected",
@@ -463,6 +525,7 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+    pattern:
+      /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
   },
 ];

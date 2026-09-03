@@ -207,8 +207,9 @@ single-field structures.
 
 The local source workflow emits one `.irpkg` member. Lake module-system clients
 build `:vir`: the generator uses Lean's declaration-to-module ownership data to
-materialize reached opaque imports and emits a JSON-described set of ordinary
-format-10 `.irpkg` members.
+materialize reached opaque imports and emits a version-2 JSON-described set of
+ordinary format-10 `.irpkg` members. The descriptor binds every member to its
+module, role, byte length, and SHA-256 before the runtime accepts the set.
 The browser still does not load `.olean` or Lean's raw `.ir` format. The WASM
 side decodes every package member into real Lean IR objects and serves their
 aggregate declaration table through `lean_ir_find_env_decl`.

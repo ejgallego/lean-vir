@@ -5,29 +5,33 @@ format is internal to this repository and is versioned by
 `packageFormatVersion` in the embedded manifest metadata.
 
 A composable module build does not introduce another binary format. Its
-`lean-vir-ir-package-set` version-1 JSON descriptor lists dependency `.irpkg`
+`lean-vir-ir-package-set` version-2 JSON descriptor lists dependency `.irpkg`
 members in the dependency-first order reconstructed from Lean's loaded module
 graphs and the public root member last. Every listed member independently owns
 its declarations and initializer metadata and uses the format documented
 below; the root's embedded interface manifest is the public manifest for the
 aggregate runtime.
 
-The version-1 descriptor has this shape:
+The version-2 descriptor has this shape:
 
 ```json
 {
   "format": "lean-vir-ir-package-set",
-  "version": 1,
+  "version": 2,
   "packages": [
     {
       "module": "MySlides.Support",
       "role": "dependency",
-      "path": "Runtime.parts/MySlides.Support.irpkg"
+      "path": "Runtime.parts/MySlides.Support.irpkg",
+      "byteLength": 12345,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     {
       "module": "MySlides.Runtime",
       "role": "root",
-      "path": "Runtime.irpkg"
+      "path": "Runtime.irpkg",
+      "byteLength": 67890,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
     }
   ]
 }
@@ -35,8 +39,12 @@ The version-1 descriptor has this shape:
 
 `packages` must be non-empty. Every entry has a non-empty, unique `module` and
 `path`; every entry except the last has role `dependency`, and the last has
-role `root`. Paths are resolved relative to the descriptor URL. The loader
-validates this structure before starting any member fetch.
+role `root`. Each positive `byteLength` and lowercase `sha256` binds that entry
+to its exact package bytes. Paths are normalized, same-directory-relative
+paths: absolute URLs, parent traversal, query strings, fragments, backslashes,
+and percent escapes are rejected. The loader validates the complete structure
+before fetching members, then verifies every length and digest before loading
+the set.
 
 See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
 module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)

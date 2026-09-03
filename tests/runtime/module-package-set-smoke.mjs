@@ -17,6 +17,7 @@ import {
 import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 import {
   createVirRuntime,
+  createVirRuntimeFactory,
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime-node.js";
@@ -48,12 +49,17 @@ assert.deepEqual(
   ],
 );
 
-const packageBytes = await Promise.all(descriptor.packages.map((entry) =>
-  readFile(resolve(dirname(descriptorPath), entry.path))));
-const packageInfoByModule = new Map(descriptor.packages.map((entry, index) => [
-  entry.module,
-  readIrPackageInfo(packageBytes[index]),
-]));
+const packageBytes = await Promise.all(
+  descriptor.packages.map((entry) =>
+    readFile(resolve(dirname(descriptorPath), entry.path)),
+  ),
+);
+const packageInfoByModule = new Map(
+  descriptor.packages.map((entry, index) => [
+    entry.module,
+    readIrPackageInfo(packageBytes[index]),
+  ]),
+);
 for (const moduleName of [
   "ModuleSetFixture.Shared",
   "ModuleSetFixture.Right",
@@ -62,17 +68,33 @@ for (const moduleName of [
 ]) {
   assert.ok(initSectionSize(packageInfoByModule.get(moduleName)) > 4);
 }
-assert.equal(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")), 4);
+assert.ok(
+  initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")) > 4,
+);
 const wasmBytes = await readFile(wasmPath);
 const expectedAnswer = "62";
 
-const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: packageBytes });
+const runtime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: packageBytes,
+});
 assert.equal(runtime.packageInfo.packageCount, 6);
-assert.equal(runtime.packageInfo.count, 16);
+assert.equal(
+  runtime.packageInfo.count,
+  [...packageInfoByModule.values()].reduce(
+    (count, info) => count + info.package.declarationCount,
+    0,
+  ),
+);
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 assert.throws(
-  () => runtime.loadIrPackageSetBytes([packageBytes[0], packageBytes[0], packageBytes[1]]),
+  () =>
+    runtime.loadIrPackageSetBytes([
+      packageBytes[0],
+      packageBytes[0],
+      packageBytes[1],
+    ]),
   /duplicate IR declaration `ModuleSetFixture\./,
 );
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
@@ -88,9 +110,38 @@ const urlRuntime = await createVirRuntime({
 assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 urlRuntime.dispose();
 
+const structuredFactory = createVirRuntimeFactory({
+  wasmBytes,
+  fetchBytes: (path) => readFile(path),
+});
+const fetchedPackageSet = await structuredFactory.fetchIrPackageSet(
+  pathToFileURL(descriptorPath),
+);
+assert.deepEqual(
+  fetchedPackageSet.members.map(({ module, role }) => [module, role]),
+  descriptor.packages.map(({ module, role }) => [module, role]),
+);
+fetchedPackageSet.members[0].bytes[0] ^= 1;
+await assert.rejects(
+  () => structuredFactory.createRuntime({ irPackageSet: fetchedPackageSet }),
+  /no longer matches its integrity metadata/,
+);
+const verifiedPackageSet = await structuredFactory.fetchIrPackageSet(
+  pathToFileURL(descriptorPath),
+);
+const structuredRuntime = await structuredFactory.createRuntime({
+  irPackageSet: verifiedPackageSet,
+});
+assert.equal(
+  structuredRuntime.call("ModuleSetFixture.Root.answer"),
+  expectedAnswer,
+);
+structuredRuntime.dispose();
+
 console.log("module package-set smoke ok");
 
 function initSectionSize(info) {
-  return info.package.sections.find((section) =>
-    section.kind === IR_PACKAGE_SECTION.INIT_GLOBALS)?.byteLength;
+  return info.package.sections.find(
+    (section) => section.kind === IR_PACKAGE_SECTION.INIT_GLOBALS,
+  )?.byteLength;
 }

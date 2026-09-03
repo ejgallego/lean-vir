@@ -200,21 +200,27 @@ To separate transport from runtime creation, use the factory fetch API:
 
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const members = await factory.fetchIrPackageSet(
+const packageSet = await factory.fetchIrPackageSet(
   "ModuleSetFixture/Root.irpkg-set.json",
 );
-const vir = await factory.createRuntime({ irPackageSetBytes: members });
+const vir = await factory.createRuntime({ irPackageSet: packageSet });
 ```
 
-`fetchIrPackageSet` validates the descriptor, resolves member paths relative to
-the descriptor URL, and fetches them in parallel while preserving descriptor
-order. A custom `fetchBytes` factory option can provide filesystem, cache, or
-authenticated transport semantics.
+`fetchIrPackageSet` validates the descriptor, resolves normalized relative
+member paths, fetches them in parallel, and verifies every declared byte length
+and SHA-256. It returns `{ format, version, descriptorUrl, members }`; each
+member preserves its `module`, `role`, resolved `url`, integrity metadata, and
+`bytes`. Passing that structured value as `irPackageSet` keeps transport
+identity available through runtime creation. `irPackageSetBytes` remains the
+low-level input for hosts that intentionally manage descriptor validation and
+transport themselves. A custom `fetchBytes` factory option can provide
+filesystem, cache, or authenticated transport semantics.
 
 The browser and Node runtime entry points also export
-`IR_PACKAGE_SET_FORMAT` and `IR_PACKAGE_SET_VERSION` for tooling that inspects
-or produces descriptors. Applications that only consume Lake-generated sets do
-not need to use these constants directly.
+`IR_PACKAGE_SET_FORMAT`, `IR_PACKAGE_SET_VERSION`, `PACKAGE_TARGET_MODE`, and
+the package-target label/format helpers for tooling that inspects or presents
+these contracts. Applications that only consume Lake-generated sets do not
+need to use these constants directly.
 
 ## Reusing The Compiled Module
 

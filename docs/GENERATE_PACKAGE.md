@@ -60,6 +60,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures and attribute-time marker
   validation.
+- `Vir.LeanName`: strict dotted-name parsing shared by package tools,
+  client-native manifests, inventories, and infoview entrypoints.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
 - `Vir.HostMetadata`: host-import marker identity and the single encoder/decoder
@@ -193,8 +195,12 @@ package generation run. This is stricter than Lean's module system because the
 current `.irpkg` format stores declarations by Lean name and the closure lookup
 must not depend on source order.
 
-The same source may appear in more than one target mode. This is useful when a
-package needs a public export target plus a package-only support target.
+The same canonical source file may appear in more than one target mode, even
+through different lexical paths or symlinks. The frontend resolves each input
+with `realPath`, elaborates the file exactly once, then applies each target
+selection to the shared environment. This is useful when a package needs a
+public export target plus a package-only support target without repeating
+`#eval`, `run_cmd`, macro, or initializer elaboration effects.
 
 The generator does not rewrite source commands. A target containing `#eval`,
 `run_cmd`, macros, or initializers is responsible for their normal elaboration

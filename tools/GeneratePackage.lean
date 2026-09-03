@@ -9,62 +9,94 @@ import Vir.GeneratePackage
 open Lean
 open Vir.GeneratePackage
 
-partial def takeTargetRoots : List String -> List String -> List String × List String
-  | [], roots => (roots.reverse, [])
-  | "--target" :: rest, roots => (roots.reverse, "--target" :: rest)
-  | "--package-target" :: rest, roots => (roots.reverse, "--package-target" :: rest)
-  | "--target-all" :: rest, roots => (roots.reverse, "--target-all" :: rest)
-  | "--target-marked" :: rest, roots => (roots.reverse, "--target-marked" :: rest)
-  | "--target-marked-module" :: rest, roots => (roots.reverse, "--target-marked-module" :: rest)
-  | root :: rest, roots => takeTargetRoots rest (root :: roots)
+inductive TargetFlag where
+  | explicit
+  | packageOnly
+  | all
+  | marked
+  | markedModule
 
-partial def parseTargets : List String -> Except String (Array Vir.GeneratePackage.Target)
-  | [] => pure #[]
-  | "--target" :: source :: rest => do
-      let (roots, rest) := takeTargetRoots rest []
+namespace TargetFlag
+
+def option : TargetFlag → String
+  | .explicit => "--target"
+  | .packageOnly => "--package-target"
+  | .all => "--target-all"
+  | .marked => "--target-marked"
+  | .markedModule => "--target-marked-module"
+
+def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked, .markedModule]
+
+def parse? (text : String) : Option TargetFlag :=
+  values.find? fun flag => flag.option == text
+
+def alternatives : String :=
+  ", ".intercalate (values.map (fun flag => s!"`{flag.option}`")).toList
+
+end TargetFlag
+
+def takeTargetRoots : List String -> List String -> List String × List String
+  | [], roots => (roots.reverse, [])
+  | arg :: rest, roots =>
+      if arg.startsWith "--" then
+        (roots.reverse, arg :: rest)
+      else
+        takeTargetRoots rest (arg :: roots)
+
+partial def parseTargets.go
+    (args : List String) (targets : Array Vir.GeneratePackage.Target) :
+    Except String (Array Vir.GeneratePackage.Target) := do
+  let flagText :: rest := args | return targets
+  let some flag := TargetFlag.parse? flagText
+    | throw s!"expected {TargetFlag.alternatives}, got `{flagText}`"
+  match flag, rest with
+  | .explicit, source :: rest =>
+      let (roots, remaining) := takeTargetRoots rest []
       if roots.isEmpty then
         throw s!"target `{source}` has no roots"
-      let roots ← roots.toArray.mapM parseDottedName
+      let roots ← roots.toArray.mapM Vir.parseDottedName
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
           mode := .explicit roots
         }
-      return (#[target] ++ (← parseTargets rest))
-  | "--package-target" :: source :: rest => do
-      let (roots, rest) := takeTargetRoots rest []
+      go remaining (targets.push target)
+  | .packageOnly, source :: rest =>
+      let (roots, remaining) := takeTargetRoots rest []
       if roots.isEmpty then
         throw s!"package target `{source}` has no roots"
-      let roots ← roots.toArray.mapM parseDottedName
+      let roots ← roots.toArray.mapM Vir.parseDottedName
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
           mode := .packageOnly roots
         }
-      return (#[target] ++ (← parseTargets rest))
-  | "--target-all" :: source :: rest => do
+      go remaining (targets.push target)
+  | .all, source :: remaining =>
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
           mode := .all
         }
-      return (#[target] ++ (← parseTargets rest))
-  | "--target-marked" :: source :: rest => do
+      go remaining (targets.push target)
+  | .marked, source :: remaining =>
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
           mode := .marked
         }
-      return (#[target] ++ (← parseTargets rest))
-  | "--target-marked-module" :: source :: moduleName :: rest => do
-      let moduleName ← parseDottedName moduleName
+      go remaining (targets.push target)
+  | .markedModule, source :: moduleName :: remaining =>
+      let moduleName ← Vir.parseDottedName moduleName
       let target : Vir.GeneratePackage.Target := {
         source := source
         mode := .markedModule moduleName
       }
-      return (#[target] ++ (← parseTargets rest))
-  | arg :: _ =>
-      throw s!"expected `--target`, `--package-target`, `--target-all`, `--target-marked`, or `--target-marked-module`, got `{arg}`"
+      go remaining (targets.push target)
+  | _, _ => throw s!"{flag.option} is missing its source or module argument"
+
+def parseTargets (args : List String) : Except String (Array Vir.GeneratePackage.Target) :=
+  parseTargets.go args #[]
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
@@ -74,7 +106,7 @@ unsafe def main (args : List String) : IO UInt32 := do
       match targetArgs with
       | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::
           rootRelativePath :: shardRelativeDir :: targetArgs =>
-          match parseDottedName moduleName, parseTargets targetArgs with
+          match Vir.parseDottedName moduleName, parseTargets targetArgs with
           | .ok rootModule, .ok targets =>
               Vir.GeneratePackage.runModuleSet targets rootModule
                 packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath

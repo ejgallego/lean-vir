@@ -82,7 +82,6 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
     ("leanVersion", jsonString metadata.leanVersion),
     ("leanToolchain", jsonString metadata.leanToolchain),
     ("leanGithash", jsonString metadata.leanGithash),
-    ("generatedAt", jsonString metadata.generatedAt),
     ("targets", jsonArray (metadata.targets.map PackageTargetMetadata.toJson))
   ]
 

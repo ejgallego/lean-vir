@@ -25,7 +25,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
     resolvedRoots := resolvedRootsForTarget index target
   }
 
-def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
+def collectPackageMetadata (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
     packageFormatVersion := currentPackageFormatVersion
@@ -33,7 +33,6 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
     leanGithash := Lean.githash
-    generatedAt := generatedAt
     targets := targets.map (targetMetadataFor index)
   }
 
@@ -69,7 +68,7 @@ def collectInterfaceManifest
   }
   for target in targets do
     let source := target.source.toString
-    match index.envForSource? source with
+    match index.envForSource? (index.sourceKeyFor target) with
     | none =>
         manifest := { manifest with diagnostics := manifest.diagnostics.push {
           name := .anonymous,

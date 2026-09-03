@@ -15,9 +15,11 @@ meta import ModuleSetFixture.MetaOnly
 
 namespace ModuleSetFixture.Root
 
+public initialize rootValue : Nat ← pure 1
+
 @[vir_export]
 public def answer : Nat :=
-  ModuleSetFixture.Left.value + ModuleSetFixture.Right.value +
-    ModuleSetFixture.Facade.value
+  rootValue + ModuleSetFixture.Left.value + ModuleSetFixture.Right.value +
+    ModuleSetFixture.Facade.value - 1
 
 end ModuleSetFixture.Root

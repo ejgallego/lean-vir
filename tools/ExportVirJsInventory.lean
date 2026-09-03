@@ -251,7 +251,7 @@ unsafe def main (args : List String) : IO UInt32 := do
     | rest => (false, rest)
   match args with
   | output :: moduleTexts =>
-      match moduleTexts.toArray.mapM Vir.GeneratePackage.parseDottedName with
+      match moduleTexts.toArray.mapM Vir.parseDottedName with
       | .error err =>
           IO.eprintln err
           return 2
