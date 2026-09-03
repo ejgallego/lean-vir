@@ -13,24 +13,15 @@ export function createJsValueHostBindings() {
   bindings["js.string.owned"] = jsStringValue;
   bindings["js.float.owned"] = jsFloatValue;
   bindings["js.nullable.null"] = () => null;
-  bindings["js.nullable.of"] = createNullableValue;
-  bindings["js.nullable.isNull"] = (value) => nullablePayload(value) === null;
+  bindings["js.nullable.of"] = (value) => value;
+  bindings["js.nullable.isNull"] = (value) => value === null;
   bindings["js.nullable.value"] = (value) => {
-    const payload = nullablePayload(value);
-    if (payload === null) {
+    if (value === null) {
       throw new Error("js.nullable.value expects a non-null nullable value");
     }
-    return payload;
+    return value;
   };
   return bindings;
-}
-
-export function createNullableValue(value) {
-  return value ?? null;
-}
-
-export function nullablePayload(value) {
-  return value ?? null;
 }
 
 const jsValueCodecs = {

@@ -4,8 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createNullableValue } from "./vir-js-value-bindings.js";
-
 export function createJsCollectionHostBindings() {
   return {
     "js.array.empty": () => [],
@@ -16,10 +14,8 @@ export function createJsCollectionHostBindings() {
       return values[jsCollectionIndex(index)];
     },
     "js.nodeList.length": (nodeList) => jsNodeListValue(nodeList).length,
-    "js.nodeList.item": (nodeList, index) => {
-      const value = jsNodeListValue(nodeList).item(jsCollectionIndex(index));
-      return createNullableValue(value ?? null);
-    },
+    "js.nodeList.item": (nodeList, index) =>
+      jsNodeListValue(nodeList).item(jsCollectionIndex(index)),
     "js.nodeList.toArray": (nodeList) => Array.from(jsNodeListValue(nodeList)),
   };
 }

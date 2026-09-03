@@ -13,10 +13,6 @@ import {
   setReactPropsRef,
 } from "../react/vir-react-node.js";
 import {
-  createNullableValue,
-  nullablePayload,
-} from "./vir-js-value-bindings.js";
-import {
   collectCleanupError,
   throwCollectedErrors,
 } from "../runtime/cleanup.js";
@@ -96,7 +92,7 @@ export function createHostLifecycle() {
 export function createElementHostBindings(resources, operations) {
   return {
     "browser.element.querySelector": (element, selector) =>
-      createNullableValue(operations.querySelector(element, selector)),
+      operations.querySelector(element, selector),
     "browser.element.querySelectorAll": (element, selector) =>
       operations.querySelectorAll(element, selector),
     "browser.element.getInnerHTML": (element) =>
@@ -108,7 +104,7 @@ export function createElementHostBindings(resources, operations) {
     "browser.element.getTextContent": (element) =>
       operations.getTextContent(element),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(element, nullablePayload(text));
+      operations.setTextContent(element, text);
       return undefined;
     },
     "browser.element.getClassList": (element) =>
@@ -118,7 +114,7 @@ export function createElementHostBindings(resources, operations) {
       return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
-      createNullableValue(operations.getAttribute(element, name)),
+      operations.getAttribute(element, name),
     "browser.element.setAttribute": (element, name, value) => {
       operations.setAttribute(element, name, value);
       return undefined;

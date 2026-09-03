@@ -28,11 +28,7 @@ import {
   normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
-import {
-  createJsValueHostBindings,
-  createNullableValue,
-  nullablePayload,
-} from "./host/vir-js-value-bindings.js";
+import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
 import {
@@ -83,7 +79,7 @@ export function createBrowserDocumentHostBindings() {
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      createNullableValue(queryDocumentElement(selector)),
+      queryDocumentElement(selector),
     "browser.document.querySelectorAll": (selector) =>
       queryDocumentElements(selector),
     "browser.document.createElement": (tagName) =>
@@ -107,8 +103,7 @@ export function createBrowserEventHostBindings() {
       stopPropagationOnEvent(event);
       return undefined;
     },
-    "browser.event.formValue": (event) =>
-      createNullableValue(formControlEventValue(event)),
+    "browser.event.formValue": (event) => formControlEventValue(event),
   };
 }
 
@@ -123,11 +118,11 @@ export function createBrowserElementHostBindings(
     ...createElementHostBindings(state, {
       querySelector: (target, selector) => target.querySelector(selector),
       querySelectorAll: (target, selector) => target.querySelectorAll(selector),
-      getInnerHTML: (target) => target.innerHTML ?? "",
+      getInnerHTML: (target) => target.innerHTML,
       setInnerHTML: (target, html) => {
         target.innerHTML = html;
       },
-      getTextContent: (target) => target.textContent ?? "",
+      getTextContent: (target) => target.textContent,
       setTextContent: (target, text) => {
         target.textContent = text;
       },
@@ -135,7 +130,7 @@ export function createBrowserElementHostBindings(
       setClassList: (target, classList) => {
         target.classList = classList;
       },
-      getAttribute: (target, name) => target.getAttribute(name) ?? null,
+      getAttribute: (target, name) => target.getAttribute(name),
       setAttribute: (target, name, value) => target.setAttribute(name, value),
       createEventListener: (target, eventName, callback) =>
         createBrowserEventListenerSubscription(
@@ -159,20 +154,20 @@ export function createBrowserElementHostBindings(
 export function createBrowserCanvasHostBindings() {
   return {
     "browser.htmlCanvasElement.fromElement": (element) => {
-      return createNullableValue(isCanvasElement(element) ? element : null);
+      return isCanvasElement(element) ? element : null;
     },
-    "browser.htmlCanvasElement.getWidth": (canvas) => Number(canvas.width),
+    "browser.htmlCanvasElement.getWidth": (canvas) => canvas.width,
     "browser.htmlCanvasElement.setWidth": (canvas, width) => {
       canvas.width = width;
       return undefined;
     },
-    "browser.htmlCanvasElement.getHeight": (canvas) => Number(canvas.height),
+    "browser.htmlCanvasElement.getHeight": (canvas) => canvas.height,
     "browser.htmlCanvasElement.setHeight": (canvas, height) => {
       canvas.height = height;
       return undefined;
     },
     "browser.htmlCanvasElement.getContext2D": (canvas) =>
-      createNullableValue(canvas.getContext("2d")),
+      canvas.getContext("2d"),
     "browser.canvas2d.clearRect": (ctx, x, y, width, height) =>
       ctx.clearRect(x, y, width, height),
     "browser.canvas2d.fillRect": (ctx, x, y, width, height) =>
@@ -206,12 +201,12 @@ export function createBrowserCanvasHostBindings() {
       ctx.strokeStyle = style;
       return undefined;
     },
-    "browser.canvas2d.getLineWidth": (ctx) => Number(ctx.lineWidth),
+    "browser.canvas2d.getLineWidth": (ctx) => ctx.lineWidth,
     "browser.canvas2d.setLineWidth": (ctx, width) => {
       ctx.lineWidth = width;
       return undefined;
     },
-    "browser.canvas2d.textMetrics.getWidth": (metrics) => Number(metrics.width),
+    "browser.canvas2d.textMetrics.getWidth": (metrics) => metrics.width,
     "browser.canvas2d.save": (ctx) => ctx.save(),
     "browser.canvas2d.restore": (ctx) => ctx.restore(),
     "browser.canvas2d.translate": (ctx, x, y) => ctx.translate(x, y),
@@ -426,8 +421,7 @@ function insertInfoviewText(commandDispatcher, position, text) {
 }
 
 function nullableField(value, name) {
-  const payload = nullablePayload(value);
-  return payload === null ? {} : { [name]: payload };
+  return value === null ? {} : { [name]: value };
 }
 
 function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
@@ -670,7 +664,7 @@ function isElement(value) {
 }
 
 function nullableElementTarget(value) {
-  return createNullableValue(isElement(value) ? value : null);
+  return isElement(value) ? value : null;
 }
 
 function formControlEventValue(event) {

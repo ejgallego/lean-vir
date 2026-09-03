@@ -21,10 +21,6 @@ import {
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
 } from "./vir-dom-host-bindings.js";
-import {
-  createNullableValue,
-  nullablePayload,
-} from "./vir-js-value-bindings.js";
 import { createStaticNodeList } from "./vir-js-collection-bindings.js";
 import {
   collectCleanupError,
@@ -163,15 +159,12 @@ export function createVirtualEventHostBindings(
 ) {
   return {
     ...createKeyboardEventHostBindings({
-      fromEvent: (event) =>
-        typeof event?.key === "string" ? event : null,
+      fromEvent: (event) => (typeof event?.key === "string" ? event : null),
     }),
     "browser.event.target": (event) =>
-      createNullableValue(virtualEventElementValue(state, event, "target")),
+      virtualEventElementValue(state, event, "target"),
     "browser.event.currentTarget": (event) =>
-      createNullableValue(
-        virtualEventElementValue(state, event, "currentTarget"),
-      ),
+      virtualEventElementValue(state, event, "currentTarget"),
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(event);
       return undefined;
@@ -180,8 +173,7 @@ export function createVirtualEventHostBindings(
       stopPropagationOnEvent(event);
       return undefined;
     },
-    "browser.event.formValue": (event) =>
-      createNullableValue(formControlEventValue(event)),
+    "browser.event.formValue": (event) => formControlEventValue(event),
   };
 }
 
@@ -200,7 +192,7 @@ export function createVirtualDocumentHostBindings(
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      createNullableValue(queryVirtualElementState(state, selector)),
+      queryVirtualElementState(state, selector),
     "browser.document.querySelectorAll": (selector) =>
       createStaticNodeList(queryVirtualElementStates(state, selector)),
     ...createVirtualEventHostBindings(state),
@@ -417,8 +409,7 @@ function queryVirtualElementStates(state, selector) {
 }
 
 function nullableField(value, name) {
-  const payload = nullablePayload(value);
-  return payload === null ? {} : { [name]: payload };
+  return value === null ? {} : { [name]: value };
 }
 
 function normalizeVirtualElementState(element) {

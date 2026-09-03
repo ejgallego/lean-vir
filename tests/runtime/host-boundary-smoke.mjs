@@ -18,11 +18,7 @@ import {
   createHostLifecycle,
   createTimerHostBindings,
 } from "../../web/src/host/vir-host-resources.js";
-import {
-  createJsValueHostBindings,
-  createNullableValue,
-  nullablePayload,
-} from "../../web/src/host/vir-js-value-bindings.js";
+import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 
 {
   const roots = new ExternrefRoots({ initial: 3 });
@@ -113,17 +109,16 @@ import {
 
 {
   const lifecycle = createHostLifecycle();
-  const bindings = createJsValueHostBindings(lifecycle);
+  const bindings = createJsValueHostBindings();
   const object = { exact: true };
-  assert.equal(createNullableValue(object), object);
-  assert.equal(nullablePayload(object), object);
-  assert.equal(createNullableValue(null), null);
-  assert.equal(createNullableValue(undefined), null);
   assert.equal(bindings["js.nullable.of"](object), object);
+  assert.equal(bindings["js.nullable.of"](undefined), undefined);
   assert.equal(bindings["js.nullable.null"](), null);
   assert.equal(bindings["js.nullable.isNull"](null), true);
   assert.equal(bindings["js.nullable.isNull"](object), false);
+  assert.equal(bindings["js.nullable.isNull"](undefined), false);
   assert.equal(bindings["js.nullable.value"](object), object);
+  assert.equal(bindings["js.nullable.value"](undefined), undefined);
   assert.throws(() => bindings["js.nullable.value"](null), /non-null/);
   lifecycle.dispose();
 }
