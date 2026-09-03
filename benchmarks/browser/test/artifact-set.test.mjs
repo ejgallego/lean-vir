@@ -143,6 +143,14 @@ test("Illuminate assembles workload, VIR, and FIR selection packages", async () 
     config.benchmarkContract.id,
     "illuminate/player-trace/v1",
   );
+  assert.deepEqual(
+    Object.keys(config.components.vir.files).filter((path) =>
+      path.startsWith("module-set/Vir.parts/"),
+    ),
+    Array.from({ length: 14 }, (_, index) =>
+      `module-set/Vir.parts/${index}.irpkg`,
+    ),
+  );
 });
 
 test("catalog build identity and artifact paths are example-neutral", async () => {
@@ -555,7 +563,11 @@ test("stages a verified example namespace without replacing siblings", async () 
     "illuminate/vir/sdk/js/vir-runtime.js",
     "illuminate/vir/sdk/wasm/vir-upstream.wasm",
     "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
-    "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/0.irpkg",
+    ...Array.from(
+      { length: 14 },
+      (_, index) =>
+        `illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/${index}.irpkg`,
+    ),
     "illuminate/native/BUILD.json",
     "illuminate/native/illuminate-player-browser-adapter.mjs",
     "illuminate/native/illuminate-player.wasm",
