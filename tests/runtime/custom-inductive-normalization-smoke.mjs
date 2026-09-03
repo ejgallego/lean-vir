@@ -60,7 +60,7 @@ assert.deepEqual(normalizeCustomInductive({ kind: "nil" }, type, "value"), {
 });
 const layoutReadsAfterPlanConstruction = layoutReads;
 assert.equal(layoutReadsAfterPlanConstruction, 3);
-assert.deepEqual(normalizeCustomInductive({ kind: "Example.unary", value: 1 }, type, "value"), {
+assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 1 }, type, "value"), {
   index: 1,
   ctor: unaryCtor,
   fields: { arg1: 1 },
@@ -78,6 +78,10 @@ assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 3 }, type, "re
   fields: { arg1: 3 },
 });
 assert.equal(layoutReads, layoutReadsAfterPlanConstruction);
+assert.throws(
+  () => normalizeCustomInductive({ kind: "Example.unary", value: 1 }, type, "value"),
+  /unknown custom inductive constructor Example\.unary/,
+);
 
 assert.throws(
   () => normalizeCustomInductive(null, type, "value"),

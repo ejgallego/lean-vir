@@ -198,7 +198,7 @@ export class VirHostState {
         const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
         try {
           const value = explicitConversionTarget
-            ? this.runtime.liftExplicitConversionObjectValue(
+            ? this.runtime.liftObjectValue(
                 arg.type,
                 argObjects[index],
                 `${entry.target} argument ${arg.name}`,
@@ -227,7 +227,7 @@ export class VirHostState {
         }
         const resultLabel = `${entry.target} result`;
         const resultObject = explicitConversionTarget
-          ? this.runtime.makeExplicitConversionObjectValue(
+          ? this.runtime.makeObjectValue(
               entry.result,
               value,
               resultLabel,

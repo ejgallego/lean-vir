@@ -30,7 +30,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/host/vir-js-collection-bindings.js",
   "web/src/host/vir-js-value-bindings.js",
   "web/src/host/vir-virtual-host-bindings.js",
-  "web/src/pages/browser-package-config.js",
+  "web/app/pages/browser-package-config.js",
   "web/src/react/vir-react-hooks.js",
   "web/src/react/vir-react-node.js",
   "web/src/react/vir-react-root.js",

@@ -62,20 +62,16 @@ example : Lean.Vir.RuntimeM
     (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
   createComponent
 
-example : String →
+example : Lean.Vir.Js Lean.Vir.React.Root →
     Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
-    Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
+    Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Unit :=
   mount
-
-example : String → Lean.Vir.Browser.DomM Bool :=
-  unmount
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
   expect "authoring package roots" <|
     package.roots == #[
       "SmokeInfoviewLean.createComponent",
-      "SmokeInfoviewLean.mount",
-      "SmokeInfoviewLean.unmount"
+      "SmokeInfoviewLean.mount"
     ]
 
 def smokeVar : Lean.IR.VarId :=
@@ -135,20 +131,17 @@ def expectImportedDecl
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["ReactProofWidget.createComponent", "ReactProofWidget.mount", "ReactProofWidget.unmount"] #[
+  expectRootsOk #["ReactProofWidget.createComponent", "ReactProofWidget.mount"] #[
     `ReactProofWidget.createComponent,
-    `ReactProofWidget.mount,
-    `ReactProofWidget.unmount
+    `ReactProofWidget.mount
   ]
-  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.mount", "ReactProofWidgetHello.unmount"] #[
+  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.mount"] #[
     `ReactProofWidgetHello.createComponent,
-    `ReactProofWidgetHello.mount,
-    `ReactProofWidgetHello.unmount
+    `ReactProofWidgetHello.mount
   ]
-  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.mount", "ReactTamagotchiWidget.unmount"] #[
+  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.mount"] #[
     `ReactTamagotchiWidget.createComponent,
-    `ReactTamagotchiWidget.mount,
-    `ReactTamagotchiWidget.unmount
+    `ReactTamagotchiWidget.mount
   ]
   expectRootsOk #["ReactProofWidget.mount", "ReactProofWidget.mount"] #[
     `ReactProofWidget.mount
@@ -158,7 +151,6 @@ def expectImportedDecl
   expect "authoring widget component entry"
     (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
   expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.mount")
-  expect "authoring widget unmount entry" (widgetProps.unmountEntry == "SmokeInfoviewLean.unmount")
   expect "authoring widget mount id" (widgetProps.mountId == "vir-smoke-widget")
   expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.ReactWidget.defaultWasmPath)

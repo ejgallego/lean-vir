@@ -15,18 +15,15 @@ namespace Lean.Vir.Infoview
 Props for the minimal VIR infoview shell.
 
 The component entry must return the exact JavaScript component function. The
-mount entry receives that function, a fresh DOM selector for the nested mount
-element, and a JavaScript-built surface structure from the real infoview panel
-props.
-If `unmountEntry` is set, it must have signature `String -> DomM Bool` and is
-called before the shell disposes its nested React root and VIR runtime.
+mount entry receives the shell's exact React root, that function, and a
+JavaScript-built surface structure from the real infoview panel props. The
+shell owns and unmounts the root before disposing the VIR runtime.
 -/
 structure WidgetProps where
   wasmPath : String := ""
   irPackage : IRPackage
   componentEntry : String
   entry : String
-  unmountEntry : String := ""
   mountId : String := "vir-infoview-widget"
   autoReloadMs : Nat := 0
   setupHint : String := ""
@@ -49,7 +46,7 @@ Narrow live React widget specification for the VIR infoview shell.
 
 Users provide the real Lean-authored React component plus the exported entry
 names that the generated `.irpkg` should keep. The helper supplies the standard
-selector-owned React mount/unmount entries and widget props. Cursor movement
+React mount entry and widget props. Cursor movement
 updates the `Surface` props and rerenders through React; the runtime service is
 kept stable across cursor updates and replaced when widget configuration or the
 IR package revision changes.
@@ -58,7 +55,6 @@ structure ReactWidget where
   component : Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component Surface))
   componentName : String
   mountName : String
-  unmountName : String := ""
   mountId : String := "vir-infoview-widget"
   wasmPath : String := ReactWidget.defaultWasmPath
   autoReloadMs : Nat := 1000
@@ -68,12 +64,7 @@ namespace ReactWidget
 
 /-- `.irpkg` roots for the standard live React widget entries. -/
 def irPackage (widget : ReactWidget) : IRPackage :=
-  let roots :=
-    if widget.unmountName.isEmpty then
-      #[widget.componentName, widget.mountName]
-    else
-      #[widget.componentName, widget.mountName, widget.unmountName]
-  { roots }
+  { roots := #[widget.componentName, widget.mountName] }
 
 /-- `show_panel_widgets` props for a repo-local live React widget. -/
 def props (widget : ReactWidget) : WidgetProps where
@@ -81,7 +72,6 @@ def props (widget : ReactWidget) : WidgetProps where
   irPackage := irPackage widget
   componentEntry := widget.componentName
   entry := widget.mountName
-  unmountEntry := widget.unmountName
   mountId := widget.mountId
   autoReloadMs := widget.autoReloadMs
   setupHint := widget.setupHint
@@ -97,31 +87,25 @@ private def expandReactWidgetCommand
   let widgetSpecIdent := mkIdent `widgetSpec
   let componentIdent := mkIdent `createComponent
   let mountIdent := mkIdent `mount
-  let unmountIdent := mkIdent `unmount
   let irPackageIdent := mkIdent `irPackage
   let propsIdent := mkIdent `widgetProps
   let componentName : TSyntax `str := ⟨Syntax.mkStrLit ((ns ++ `createComponent).toString)⟩
   let mountName : TSyntax `str := ⟨Syntax.mkStrLit ((ns ++ `mount).toString)⟩
-  let unmountName : TSyntax `str := ⟨Syntax.mkStrLit ((ns ++ `unmount).toString)⟩
   `(
       def $widgetSpecIdent : Lean.Vir.Infoview.ReactWidget where
         component := $component
         componentName := $componentName
         mountName := $mountName
-        unmountName := $unmountName
         mountId := $mountId
 
       def $componentIdent : Lean.Vir.RuntimeM
           (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
         ($widgetSpecIdent).component
 
-      def $mountIdent : String →
+      def $mountIdent : Lean.Vir.Js Lean.Vir.React.Root →
           Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
-          Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
-        Lean.Vir.React.Root.renderComponentIntoSelector
-
-      def $unmountIdent : String → Lean.Vir.Browser.DomM Bool :=
-        Lean.Vir.React.Root.unmountSelector
+          Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Unit :=
+        Lean.Vir.React.Root.renderComponent
 
       def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
         Lean.Vir.Infoview.ReactWidget.irPackage $widgetSpecIdent
@@ -135,7 +119,7 @@ Declare the standard VIR proof-widget entry points for a React component.
 
 The command must be used inside the widget namespace, after defining a
 `RuntimeM (Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface))`. It creates
-the usual `widgetSpec`, `createComponent`, `mount`, `unmount`, `irPackage`, and
+the usual `widgetSpec`, `createComponent`, `mount`, `irPackage`, and
 `widgetProps` declarations in that namespace. The shell creates the JavaScript
 component function once per runtime service and reuses its exact identity while
 cursor movement supplies new `Surface` props.

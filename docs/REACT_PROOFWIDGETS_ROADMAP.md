@@ -206,8 +206,8 @@ A realistic path has three layers:
    `ReactProofWidget.createComponent`, so `ReactProofWidget.mount` rerenders the
    existing React root without changing the component type. Superseded and
    unmounted services are disposed immediately by their owning widget.
-   The shell consumes widget mouse/click events at its outer container and calls
-   `ReactProofWidget.unmount` when a selector is genuinely dropped. Removing the
+   The shell consumes widget mouse/click events at its outer container and owns
+   the nested official React root, which it unmounts before runtime disposal. Removing the
    base64 byte transport remains a separate infoview/webview asset API
    improvement; inside this repository we can avoid external patches, but raw
    binary transfer would need support from the host webview/RPC surface.

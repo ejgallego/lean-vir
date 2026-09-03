@@ -457,29 +457,6 @@
           { "name": "children", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js Lean.Vir.React.Node)" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-      },
-      {
-        "id": "react.root.render-selector", "group": "react-dom-root", "target": "react.root.renderIntoSelector",
-        "lean": "Lean.Vir.React.Root.renderIntoSelectorJs", "marker": "vir_js",
-        "reason": "VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "activeEffect": "register",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [
-          { "name": "selector", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "node", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-        ],
-        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
-      },
-      {
-        "id": "react.root.unmount-selector", "group": "react-dom-root", "target": "react.root.unmountSelector",
-        "lean": "Lean.Vir.React.Root.unmountSelectorJs", "marker": "vir_js",
-        "reason": "VIR-owned convenience protocol that unmounts and releases the root associated with a selector.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "activeEffect": "release",
-        "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
-        "arguments": [{ "name": "selector", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
       }
     ]
   },

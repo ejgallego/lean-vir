@@ -94,7 +94,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
 | `host/vir-virtual-host-bindings.js`  | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
 | `react/vir-react-node.js`            | Browser React node, props, children, and component element construction.                                  |
-| `react/vir-react-root.js`            | React root forwarding plus narrow teardown and selector-root sidecars.                                    |
+| `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
 | `react/vir-react-hooks.js`           | Direct official browser React hook operations.                                                            |
 | `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
 | `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
@@ -389,17 +389,15 @@ use generated Lean `_boxed` declarations automatically.
 JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
-Nullary inductive enums are accepted as constructor names, generated JavaScript
-names, or constructor indexes. Results are returned as the constructor's
-generated JavaScript name.
+Nullary inductive enums use their generated JavaScript constructor name in both
+directions.
 
-Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
-`{ some: value }`, or the bare inner value. Option results are returned as
-`null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`.
-`Sum`/`Except` inputs are accepted as `{ kind, value }`, `{ tag, value }`, or
-single-constructor-key objects such as `{ inl: 4 }` and `{ ok: value }`;
-results are returned as `{ kind, value }`. Non-indexed custom inductives use
+Options use `null` for `none` and the bare inner value for `some`. Products use
+`{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
+`ByteArray` uses `Uint8Array`, floats use JavaScript numbers, and `Sum`/`Except`
+values use `{ kind, value }`.
+Lowering accepts the same canonical shapes that lifting returns; text parsing
+and other UI conveniences belong in application code. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
 and multi-field constructors accept and return `{ kind, fields }`.
@@ -421,8 +419,9 @@ For example, a recursive `Tree Nat` value with constructors
 
 For a custom inductive with a nullary constructor and a recursive single-field
 constructor, use `{ kind: "null" }` and `{ kind: "array", value: [...] }`.
-The `{ tag, value }` and single-constructor-key input aliases are only for
-`Sum`/`Except`, not for custom inductives.
+Tagged unions use their canonical `{ kind, value }` representation in both
+directions; alternate tag fields and single-constructor-key objects are not
+accepted.
 
 Non-indexed structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
@@ -537,8 +536,7 @@ def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.*` bindings, including selector
-helpers such as `react.root.renderIntoSelector`:
+default `common.*`, `browser.*`, and `react.*` bindings:
 
 ```js
 const vir = await createVirRuntime({

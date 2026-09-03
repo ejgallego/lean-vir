@@ -146,9 +146,7 @@ try {
   assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
-  assert.equal(typeof bindings["react.root.renderIntoSelector"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");
-  assert.equal(typeof bindings["react.root.unmountSelector"], "function");
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

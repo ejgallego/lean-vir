@@ -1049,28 +1049,6 @@ def renderComponent
   let node ← ReactM.run (Node.component component props)
   renderNode root node
 
-def renderIntoSelector
-    (selector : @& String)
-    (node : @& Lean.Vir.Js Node) :
-    Lean.Vir.Browser.DomM Bool := do
-  let jsSelector ← Lean.Vir.JsValue.ofString selector
-  let rendered ← renderIntoSelectorJs jsSelector node
-  Lean.Vir.JsValue.toBool rendered
-
-def renderComponentIntoSelector
-    (selector : @& String)
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) :
-    Lean.Vir.Browser.DomM Bool := do
-  let node ← ReactM.run (Node.component component props)
-  renderIntoSelector selector node
-
-/-- Unmounts the React root associated with a selector, when present. -/
-def unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool := do
-  let jsSelector ← Lean.Vir.JsValue.ofString selector
-  let unmounted ← unmountSelectorJs jsSelector
-  Lean.Vir.JsValue.toBool unmounted
-
 end Root
 
 end Lean.Vir.React

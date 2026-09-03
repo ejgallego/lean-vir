@@ -67,12 +67,12 @@ for (const value of [
 
 assert.throws(
   () => runtime.makeJsObjectValue(stringType, "raw", "raw string host result"),
-  /unsupported JavaScript host resource result type/,
+  /unsupported direct JavaScript result type/,
 );
 assert.throws(
   () =>
     runtime.makeJsObjectValue(optionResourceType, null, "option host result"),
-  /unsupported JavaScript host resource result type/,
+  /unsupported direct JavaScript result type/,
 );
 
 let leanObject = makeObjectString(runtime, "lean-ref");

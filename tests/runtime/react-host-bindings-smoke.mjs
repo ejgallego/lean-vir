@@ -313,7 +313,6 @@ assert.throws(
       return root;
     },
     {
-      querySelector: (selector) => (selector === "#app" ? target : null),
       createLeanComponentNode: (component, props, key = null) => ({
         component,
         props,
@@ -341,24 +340,11 @@ assert.throws(
   bindings["react.root.renderNode"](root, componentNode);
   assert.equal(rendered.at(-1).component, component);
   assert.equal(rendered.at(-1).props, leanProps);
-  assert.equal(
-    bindings["react.root.renderIntoSelector"]("#missing", element),
-    false,
-  );
-  assert.equal(
-    bindings["react.root.renderIntoSelector"]("#app", element),
-    true,
-  );
   bindings["react.root.unmount"](root);
   assert.equal(unmounts, 1);
-  assert.equal(lifecycle.debugResourceCounts().active, 1);
-  lifecycle.dispose();
-  assert.equal(unmounts, 2);
   assert.equal(lifecycle.debugResourceCounts().active, 0);
-  assert.equal(
-    bindings["react.root.unmountSelector"]("#app"),
-    false,
-    "lifecycle disposal must forget selector-root side tables",
-  );
+  lifecycle.dispose();
+  assert.equal(unmounts, 1);
+  assert.equal(lifecycle.debugResourceCounts().active, 0);
 }
 console.log("raw React host binding smoke ok");

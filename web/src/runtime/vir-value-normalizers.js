@@ -5,13 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  asBytes,
   customInductiveShape,
-  findTaggedUnionConstructor,
   requireCustomInductiveConstructors,
   requireStructureFields,
   requireTaggedUnionConstructors,
-  taggedUnionConstructorAt,
 } from "./vir-codec.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
@@ -49,24 +46,10 @@ export function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
 }
 
 export function normalizeFloat(value, label) {
-  if (typeof value === "number") {
-    return value;
+  if (typeof value !== "number") {
+    throw new Error(`${label} must be a number`);
   }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      throw new Error(`${label} must be a number`);
-    }
-    if (/^[+-]?nan$/i.test(trimmed)) {
-      return Number.NaN;
-    }
-    const parsed = Number(trimmed);
-    if (Number.isNaN(parsed)) {
-      throw new Error(`${label} must be a number`);
-    }
-    return parsed;
-  }
-  throw new Error(`${label} must be a number`);
+  return value;
 }
 
 export function normalizeInteger(value, label, min, max) {
@@ -77,36 +60,23 @@ export function normalizeInteger(value, label, min, max) {
 }
 
 export function normalizeArray(value, label) {
-  if (value == null || typeof value[Symbol.iterator] !== "function") {
-    throw new Error(`${label} must be iterable`);
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
   }
-  return Array.from(value);
+  return value;
 }
 
-export function normalizeOption(value, label) {
+export function normalizeOption(value, _label) {
   if (value == null) return { some: false, value: null };
-  if (typeof value === "object") {
-    if (value.kind === "none") return { some: false, value: null };
-    if (value.kind === "some") return { some: true, value: value.value };
-    if (hasOwn(value, "some")) return { some: true, value: value.some };
-  }
   return { some: true, value };
 }
 
 export function normalizePair(value, label) {
-  if (Array.isArray(value)) {
-    if (value.length !== 2) throw new Error(`${label} pair array must have exactly two elements`);
-    return { fst: value[0], snd: value[1] };
+  if (value !== null && typeof value === "object" && !Array.isArray(value) &&
+      hasOwn(value, "fst") && hasOwn(value, "snd")) {
+    return { fst: value.fst, snd: value.snd };
   }
-  if (value !== null && typeof value === "object") {
-    if (hasOwn(value, "fst") && hasOwn(value, "snd")) {
-      return { fst: value.fst, snd: value.snd };
-    }
-    if (hasOwn(value, "first") && hasOwn(value, "second")) {
-      return { fst: value.first, snd: value.second };
-    }
-  }
-  throw new Error(`${label} must be a pair { fst, snd } or a two-element array`);
+  throw new Error(`${label} must be a pair { fst, snd }`);
 }
 
 export function normalizeStructure(value, fields, label) {
@@ -156,34 +126,21 @@ export function normalizeTaggedUnion(value, type, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a tagged-union object`);
   }
-  if (hasOwn(value, "tag")) {
-    const ctor = taggedUnionConstructorAt(type, value.tag, label);
-    if (!hasOwn(value, "value")) {
-      throw new Error(`${label}.${ctor.jsName} is missing value`);
-    }
-    return { index: value.tag, ctor, payload: value.value };
+  if (typeof value.kind !== "string") {
+    throw new Error(`${label} must specify tagged-union kind`);
   }
-  const text =
-    typeof value.kind === "string" ? value.kind :
-    typeof value.name === "string" ? value.name :
-    typeof value.jsName === "string" ? value.jsName :
-    hasOwn(value, "constructor") && typeof value.constructor === "string" ? value.constructor :
-    null;
-  if (text !== null) {
-    const match = findTaggedUnionConstructor(type, text);
-    if (match === null) {
-      throw new Error(`${label} has unknown tagged-union constructor ${text}`);
-    }
-    if (!hasOwn(value, "value")) {
-      throw new Error(`${label}.${match.ctor.jsName} is missing value`);
-    }
-    return { ...match, payload: value.value };
+  const constructors = requireTaggedUnionConstructors(type, label);
+  const index = constructors.findIndex(
+    (ctor) => (ctor.jsName ?? ctor.name) === value.kind,
+  );
+  if (index < 0) {
+    throw new Error(`${label} has unknown tagged-union constructor ${value.kind}`);
   }
-  for (const [index, ctor] of requireTaggedUnionConstructors(type, label).entries()) {
-    if (hasOwn(value, ctor.jsName)) return { index, ctor, payload: value[ctor.jsName] };
-    if (hasOwn(value, ctor.name)) return { index, ctor, payload: value[ctor.name] };
+  const match = { index, ctor: constructors[index] };
+  if (!hasOwn(value, "value")) {
+    throw new Error(`${label}.${match.ctor.jsName} is missing value`);
   }
-  throw new Error(`${label} must specify a tagged-union constructor`);
+  return { ...match, payload: value.value };
 }
 
 export function normalizeCustomInductive(value, type, label) {
@@ -251,9 +208,10 @@ function customInductiveNormalizationPlan(type) {
   });
   const constructorsByName = new Map();
   for (const constructorPlan of constructorPlans) {
-    for (const name of [constructorPlan.ctor.name, constructorPlan.ctor.jsName]) {
-      if (!constructorsByName.has(name)) constructorsByName.set(name, constructorPlan);
-    }
+    constructorsByName.set(
+      constructorPlan.ctor.jsName ?? constructorPlan.ctor.name,
+      constructorPlan,
+    );
   }
   const plan = {
     constructors,
@@ -266,19 +224,14 @@ function customInductiveNormalizationPlan(type) {
 
 export function normalizeEnum(value, type, label) {
   const constructors = type?.constructors ?? [];
-  if (typeof value === "number") {
-    if (Number.isInteger(value) && value >= 0 && value < constructors.length) return value;
-    throw new Error(`${label} enum index is out of range`);
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be an enum constructor name`);
   }
-  const text =
-    typeof value === "string" ? value :
-    typeof value === "object" && value !== null ? value.name ?? value.jsName ?? value.constructor : null;
-  if (typeof text !== "string") {
-    throw new Error(`${label} must be an enum constructor name or index`);
-  }
-  const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
+  const index = constructors.findIndex(
+    (ctor) => (ctor.jsName ?? ctor.name) === value,
+  );
   if (index < 0) {
-    throw new Error(`${label} has unknown enum constructor ${text}`);
+    throw new Error(`${label} has unknown enum constructor ${value}`);
   }
   return index;
 }
@@ -291,14 +244,11 @@ export function enumValue(type, index) {
   return ctor.jsName ?? ctor.name ?? String(index);
 }
 
-export function asByteArrayBytes(values) {
-  if (values instanceof Uint8Array || values instanceof ArrayBuffer || ArrayBuffer.isView(values)) {
-    return asBytes(values, "byte array values");
+export function requireByteArrayBytes(values) {
+  if (!(values instanceof Uint8Array)) {
+    throw new Error("byte array values must be a Uint8Array");
   }
-  if (values == null || typeof values[Symbol.iterator] !== "function") {
-    throw new Error("byte array values must be iterable or an ArrayBuffer view");
-  }
-  return Uint8Array.from(values, (value) => normalizeByte(value));
+  return values;
 }
 
 function flattenedSubobjectFieldsPresent(value, type) {
@@ -339,13 +289,6 @@ function normalizeCustomInductiveFields(payload, constructorPlan, label) {
     }
   }
   return fields;
-}
-
-function normalizeByte(value) {
-  if (!Number.isInteger(value) || value < 0 || value > 0xff) {
-    throw new Error("byte array values must be integers in 0..255");
-  }
-  return value;
 }
 
 function hasOwn(value, key) {

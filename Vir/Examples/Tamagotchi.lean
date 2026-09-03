@@ -1062,7 +1062,8 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
 
 def mount (selector : String) : DomM Bool := do
   let component ← View
-  Root.renderComponentIntoSelector selector component ()
+  Root.mountFromSelector selector fun root =>
+    Root.renderComponent root component ()
 
 def mountDefault : DomM Bool :=
   mount "#react-pet-root"

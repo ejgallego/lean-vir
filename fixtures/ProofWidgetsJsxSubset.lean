@@ -169,7 +169,8 @@ def View : RuntimeM (Component Unit) := do
 
 def mount (selector : String) : DomM Bool := do
   let component ← View
-  Lean.Vir.React.Root.renderComponentIntoSelector selector component (componentProps ())
+  Lean.Vir.React.Root.mountFromSelector selector fun root =>
+    Lean.Vir.React.Root.renderComponent root component (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-jsx-subset-root"

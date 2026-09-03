@@ -290,8 +290,6 @@ const unsupportedReactHostTargets = Object.freeze([
   "react.node.component",
   "react.node.keyedComponent",
   "react.node.fragment",
-  "react.root.renderIntoSelector",
-  "react.root.unmountSelector",
   "react.root.renderNode",
   "react.root.unmount",
   "react.root.create",

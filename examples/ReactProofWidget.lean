@@ -369,11 +369,13 @@ vir_proof_widget App with mountId := "vir-react-proof-widget"
 /--
 Standalone dev-runner entry for exercising surface snapshots without passing a
 JavaScript component handle through the runner's text fields. Each call creates
-a fresh component type; the live infoview instead uses `createComponent` once
-and passes that exact value to `mount` on every update.
+a fresh root and component type; the live infoview instead owns one root and
+uses `createComponent` once per runtime service.
 -/
 def renderSnapshotIntoSelector (selector : String) (surface : Surface) : DomM Bool := do
-  Root.renderComponentIntoSelector selector (← App) surface
+  let component ← App
+  Root.mountFromSelector selector fun root =>
+    Root.renderComponent root component surface
 
 end ReactProofWidget
 

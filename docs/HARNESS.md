@@ -455,8 +455,8 @@ logic into entry-point scripts or pages:
 - Binding inventory, descriptor, comparison, and explorer tooling:
   `scripts/bindings/`; focused coverage: `tests/bindings/`
 - Infoview widget smoke coverage: `tests/infoview/`
-- Browser page helpers: `web/src/pages/page-utils.js` and
-  `web/src/pages/input-parsers.js`
+- Browser page helpers: `web/app/pages/page-utils.js` and
+  `web/app/pages/input-parsers.js`
 - Host boundary, active lifecycle, and virtual binding internals:
   `web/src/host-boundary.js`, `web/src/host/vir-active-host-bindings.js`, and
   `web/src/host/vir-virtual-host-bindings.js`

@@ -577,20 +577,6 @@ if (reactRenderNodeImport !== undefined) {
   assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
-const reactRenderIntoSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.renderIntoSelector",
-  );
-if (reactRenderIntoSelectorImport !== undefined) {
-  assert.equal(reactRenderIntoSelectorImport.args[0]?.type?.type, "Js");
-  assert.equal(reactRenderIntoSelectorImport.result?.type, "Js");
-}
-const reactUnmountSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.unmountSelector",
-  );
-assert.equal(reactUnmountSelectorImport?.args[0]?.type?.type, "Js");
-assert.equal(reactUnmountSelectorImport?.result?.type, "Js");
 const reactPropertyImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "js.value.react.property",
 );

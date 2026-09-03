@@ -155,7 +155,7 @@ test("environment lookup harness identity covers the loaded runtime source closu
   for (const required of [
     "benchmarks/harness/bench-utils.mjs",
     "web/src/host-boundary.js",
-    "web/src/pages/browser-package-config.js",
+    "web/app/pages/browser-package-config.js",
     "web/src/runtime/core.js",
     "web/src/runtime/object-values.js",
     "web/src/vir-host-bindings.js",

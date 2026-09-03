@@ -291,8 +291,8 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   shipped JavaScript boundary.
 - `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
   boundary sources.
-- `web/src/` contains runtime and host-binding code; browser page entry points
-  live under `web/src/apps/`, reusable page helpers under `web/src/pages/`, and
+- `web/src/` contains the distributable runtime and host-binding code;
+  repository browser applications and page helpers live under `web/app/`, and
   reusable static tool templates under `web/tools/`.
 - `examples/` contains runnable applications and tutorials; `fixtures/`
   contains regression-only Lean and host inputs, including the authored

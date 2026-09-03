@@ -20,41 +20,12 @@ export function createReactRootHostBindings(
   lifecycle,
   createRoot,
   {
-    querySelector = null,
     createLeanComponentNode = null,
     createNodeText = null,
     createNodeElement = null,
     createNodeFragment = null,
   } = {},
 ) {
-  const rootsByContainer = new WeakMap();
-  const containersByRoot = new WeakMap();
-  const rootsBySelector = new Map();
-
-  function forgetRoot(root) {
-    const container = containersByRoot.get(root);
-    if (rootsByContainer.get(container) === root) {
-      rootsByContainer.delete(container);
-    }
-    containersByRoot.delete(root);
-    for (const [selector, mounted] of rootsBySelector) {
-      if (mounted.root === root) {
-        rootsBySelector.delete(selector);
-      }
-    }
-  }
-
-  function rootForContainer(container) {
-    let root = rootsByContainer.get(container);
-    if (root !== undefined) {
-      return { root, created: false };
-    }
-    root = createTrackedRoot(container);
-    rootsByContainer.set(container, root);
-    containersByRoot.set(root, container);
-    return { root, created: true };
-  }
-
   function createTrackedRoot(container) {
     const root = createRoot(container);
     if (
@@ -77,19 +48,7 @@ export function createReactRootHostBindings(
   }
 
   function cleanupTrackedRoot(root) {
-    const errors = [];
-    collectCleanupError(errors, () => forgetRoot(root));
-    collectCleanupError(errors, () => root.unmount());
-    throwCollectedErrors(errors, "React root cleanup failed");
-  }
-
-  function queryReactRootSelector(selector) {
-    if (typeof querySelector !== "function") {
-      throw new Error(
-        "react.root selector host bindings require a querySelector function",
-      );
-    }
-    return querySelector(selector);
+    root.unmount();
   }
 
   function releaseRoot(root) {
@@ -97,48 +56,6 @@ export function createReactRootHostBindings(
     collectCleanupError(errors, () => lifecycle.removeDisposable(root));
     collectCleanupError(errors, () => cleanupTrackedRoot(root));
     throwCollectedErrors(errors, "React root release failed");
-  }
-
-  function selectorRoot(selector, onMissing) {
-    const target = queryReactRootSelector(selector);
-    if (target === null || target === undefined) {
-      onMissing();
-      return null;
-    }
-    const existing = rootsBySelector.get(selector);
-    if (existing !== undefined && existing.container !== target) {
-      releaseRoot(existing.root);
-    }
-    const { root, created } = rootForContainer(target);
-    rootsBySelector.set(selector, { container: target, root });
-    return { root, created };
-  }
-
-  function selectorPublication(root) {
-    return lifecycle.stageResult(true, {
-      onAbort: () => releaseRoot(root),
-    });
-  }
-
-  function publishSelectorRender(selected, render, failureMessage) {
-    const errors = [];
-    const rendered = collectCleanupError(errors, render);
-    if (!rendered.ok) {
-      if (selected.created) {
-        collectCleanupError(errors, () => releaseRoot(selected.root));
-      }
-      throwCollectedErrors(errors, failureMessage);
-    }
-    const published = collectCleanupError(errors, () =>
-      selectorPublication(selected.root),
-    );
-    if (!published.ok) {
-      // Publication failure rolls the whole side effect back. This also
-      // terminates an existing root whose committed tree was just replaced.
-      collectCleanupError(errors, () => releaseRoot(selected.root));
-    }
-    throwCollectedErrors(errors, failureMessage);
-    return published.value;
   }
 
   return {
@@ -183,35 +100,9 @@ export function createReactRootHostBindings(
       root.render(node);
       return undefined;
     },
-    "react.root.renderIntoSelector": (selector, node) => {
-      const selected = selectorRoot(
-        jsStringValue(selector, "React root selector"),
-        // The node is an ordinary borrowed JavaScript value. A missing mount
-        // point has no effect on it.
-        () => undefined,
-      );
-      if (selected === null) {
-        return false;
-      }
-      return publishSelectorRender(
-        selected,
-        () => selected.root.render(node),
-        "React selector render failed during root rollback",
-      );
-    },
     "react.root.unmount": (root) => {
       releaseRoot(root);
       return undefined;
-    },
-    "react.root.unmountSelector": (selector) => {
-      const mounted = rootsBySelector.get(
-        jsStringValue(selector, "React root selector"),
-      );
-      if (mounted === undefined) {
-        return false;
-      }
-      releaseRoot(mounted.root);
-      return true;
     },
   };
 }

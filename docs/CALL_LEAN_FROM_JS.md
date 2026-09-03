@@ -138,13 +138,6 @@ vir.call("MyApp.useExcept", { kind: "error", value: "bad input" });
 vir.call("MyApp.useExcept", { kind: "ok", value: "good input" });
 ```
 
-Single-constructor-key objects are also accepted:
-
-```js
-vir.call("MyApp.useSum", { inr: 5 });
-vir.call("MyApp.useExcept", { ok: "good input" });
-```
-
 Results come back as `{ kind, value }`:
 
 ```js
@@ -166,8 +159,8 @@ interface support. Custom nullary inductives are supported as enums, and
 non-indexed custom inductives can cross the boundary using `{ kind }` for
 nullary constructors, `{ kind, value }` for single-field constructors, or
 `{ kind, fields }` for multi-field constructors. Those custom-inductive shapes
-are canonical: `Sum`/`Except` conveniences such as `{ tag, value }` and
-single-constructor-key objects do not apply to user-defined custom inductives.
+are canonical. The same shape is used in both directions; the runtime does not
+accept alternate tagged-object dialects.
 
 For example, a recursive tree can use one-field leaves and multi-field branch
 nodes:
@@ -289,14 +282,13 @@ Common Lean values map to JavaScript values like this:
 - `Array alpha` and `List alpha` use JavaScript arrays.
 - `Option alpha` accepts `null` for `none` and a bare value for `some`. Results are
   `null` or the inner value.
-- Products use `{ fst, snd }` or two-element arrays.
+- Products use `{ fst, snd }`.
 - `Sum` and `Except` use `{ kind, value }` tagged objects.
 - Structures use JavaScript objects keyed by Lean field name.
 - Nullary inductive enums use generated constructor names.
 - Custom inductive constructors use `{ kind }`, `{ kind, value }`, or
   `{ kind, fields }` depending on field count.
-- `ByteArray` inputs accept byte arrays or byte-like JavaScript arrays; results
-  are `Uint8Array`.
+- `ByteArray` uses `Uint8Array` in both directions.
 
 See `docs/JS_API.md` for the complete type surface, including `Sum`, `Except`,
 `Lean.Expr`, nested structures, and host imports.

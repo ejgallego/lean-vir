@@ -672,39 +672,6 @@ opaque create
     (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
-/--
-Generated binding for reviewed VIR protocol `react.root.render-selector`.
-
-VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.renderIntoSelector"]
-opaque renderIntoSelectorJs
-    (selector : @& Lean.Vir.Js String)
-    (node : @& Lean.Vir.Js Lean.Vir.React.Node) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `react.root.unmount-selector`.
-
-VIR-owned convenience protocol that unmounts and releases the root associated with a selector.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.unmountSelector"]
-opaque unmountSelectorJs
-    (selector : @& Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
 end React.Root
 
 namespace React.StateSetter

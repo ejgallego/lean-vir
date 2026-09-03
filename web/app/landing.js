@@ -4,9 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirRuntimeFactory, fetchBytes } from "../vir-runtime.js";
-import { defaultPackageFile, wasmPublicFile } from "../pages/browser-packages.js";
-import { parseDelimitedNumberText } from "../pages/input-parsers.js";
+import { createVirRuntimeFactory, fetchBytes } from "../src/vir-runtime.js";
+import { defaultPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
+import { parseDelimitedNumberText } from "./pages/input-parsers.js";
 
 const maxItems = 16;
 const maxValue = 9999;

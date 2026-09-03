@@ -59,7 +59,8 @@ def renderStatic (selector : String) : DomM Bool :=
 
 def renderStaticIntoSelector (selector : String) : DomM Bool := do
   let component ← Component.ofLean fun _ => staticTree
-  Root.renderComponentIntoSelector selector component ()
+  Root.mountFromSelector selector fun root =>
+    Root.renderComponent root component ()
 
 def effectProbe : RuntimeM (Js (Component Unit)) :=
   Component.ofLean fun _ => do

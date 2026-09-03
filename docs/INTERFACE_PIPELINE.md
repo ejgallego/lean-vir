@@ -195,8 +195,8 @@ One-field wrappers whose only runtime field is a direct scalar, for example
 while keeping the JavaScript object shape.
 
 `Sum` and `Except` use manifest-backed tagged-union metadata. JavaScript sends
-objects such as `{ "kind": "inl", "value": 4 }` or `{ "ok": value }`; results
-come back as `{ kind, value }` objects using generated constructor names. The
+and receives canonical `{ kind, value }` objects using generated constructor
+names, such as `{ "kind": "inl", "value": 4 }`. The
 manifest records each constructor payload layout so direct scalar payloads are
 written into the same constructor scalar slots as compiled Lean code.
 

@@ -531,19 +531,19 @@ infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
 entry names. The package roots are built from the active Lean server snapshot.
 The component entry must have signature
 `RuntimeM (Js (React.Component Surface))`; the mount entry must accept
-`String -> Js (React.Component Surface) -> Surface -> DomM Bool`; and the
-optional unmount entry must have signature `String -> DomM Bool`. The shell
-creates the exact JavaScript component function once per loaded runtime
-service, then passes that same value with the selector and current infoview
-`Surface` on every render. It reloads the runtime service only when the widget
-IR package revision changes. That revision token hashes the compiled IR closure
-and local source ranges, so imported helper changes are detected once the
-active Lean snapshot contains them.
+`Js React.Root -> Js (React.Component Surface) -> Surface -> DomM Unit`. The
+shell owns the official React root, creates the exact JavaScript component
+function once per loaded runtime service, and passes those same values with the
+current infoview `Surface` on every render. It unmounts the root before runtime
+disposal and reloads the service only when the widget IR package revision
+changes. That revision token hashes the compiled IR closure and local source
+ranges, so imported helper changes are detected once the active Lean snapshot
+contains them.
 
 `vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
 widgets: users provide a `RuntimeM (Js (React.Component Surface))` factory, and
-the command declares the standard `createComponent`, selector-owned
-`mount`/`unmount`, `irPackage`, and `widgetProps` entries in the current
+the command declares the standard `createComponent`, `mount`, `irPackage`, and
+`widgetProps` entries in the current
 namespace. `ReactWidget` is the lower-level expansion target when a caller
 needs to assemble those pieces manually.
 `examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and

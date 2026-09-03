@@ -18,16 +18,12 @@ import {
 } from "./react/vir-react-node.js";
 import { createReactRootHostBindings } from "./react/vir-react-root.js";
 
-export function createBrowserReactHostBindings(
-  state,
-  { querySelector = queryBrowserElement } = {},
-) {
+export function createBrowserReactHostBindings(state) {
   return {
     ...createReactRootHostBindings(
       state,
       (target) => ReactDOMClient.createRoot(target),
       {
-        querySelector,
         createLeanComponentNode: (component, props, key) =>
           createBrowserLeanComponentNode(
             React.createElement,
@@ -55,11 +51,4 @@ export function createBrowserReactHostBindings(
     ...createReactJsValueHostBindings(),
     ...createBrowserReactHookBindings(React),
   };
-}
-
-function queryBrowserElement(selector) {
-  if (!globalThis.document) {
-    throw new Error("React selector host bindings require globalThis.document");
-  }
-  return globalThis.document.querySelector(selector);
 }
