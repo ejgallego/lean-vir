@@ -75,6 +75,8 @@ test("the prettyM catalog selects the complete source and component graph", asyn
     config.components.vir.runtime.sourceCommit,
     sources.vir.revision,
   );
+  assert.equal(config.components.vir.workload.packageFormat, 10);
+  assert.equal(config.components.vir.workload.manifestVersion, 8);
   assert.deepEqual(config.components.vir.workload.source, {
     repository: "https://github.com/leanprover/verso-slides",
     commit: sources.workload.revision,
