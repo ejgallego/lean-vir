@@ -490,6 +490,32 @@ opaque logJs
 
 end Console
 
+namespace CSSStyleDeclaration
+
+/--
+Generated reviewed method call policy for TypeScript `CSSStyleDeclaration.setProperty`.
+
+The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/CSSStyleDeclaration/setProperty)
+
+Call policy: Omitting priority preserves CSSStyleDeclaration.setProperty's default empty priority while passing the exact declaration, property, value, and result unchanged.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
+
+ABI profile `browser-dom-faithful-v1`: declaration js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.cssStyleDeclaration.setProperty"]
+opaque setProperty
+    (declaration : @& Lean.Vir.Js CSSStyleDeclaration)
+    (property : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js.Nullable String) :
+    DomM Unit
+
+end CSSStyleDeclaration
+
 namespace Document
 
 /--
@@ -592,6 +618,73 @@ opaque setTitle
 
 end Document
 
+namespace DOMTokenList
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.add`.
+
+The **`add()`** method of the DOMTokenList interface adds the given tokens to the list, omitting any that are already present.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/add)
+
+Call policy: The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.add"]
+opaque add
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.remove`.
+
+The **`remove()`** method of the DOMTokenList interface removes the specified tokens from the list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/remove)
+
+Call policy: The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.remove"]
+opaque remove
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (className : @& Lean.Vir.Js String) :
+    DomM Unit
+
+/--
+Generated reviewed method call policy for TypeScript `DOMTokenList.toggle`.
+
+The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/toggle)
+
+Call policy: Omitting force selects DOMTokenList.toggle's standard toggle behavior without changing the receiver, token, or result.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
+
+ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.domTokenList.toggle"]
+opaque toggle
+    (tokenList : @& Lean.Vir.Js DOMTokenList)
+    (token : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js Bool)
+
+end DOMTokenList
+
 namespace Element
 
 /--
@@ -632,6 +725,43 @@ opaque appendChild
     (element : @& Lean.Vir.Js Element)
     (node : @& Lean.Vir.Js Element) :
     DomM (Lean.Vir.Js Element)
+
+/--
+Faithful generated getter binding for TypeScript `Element.classList`.
+
+The read-only **`classList`** property of the Element interface contains a live DOMTokenList collection representing the class attribute of the element. This can then be used to manipulate the class list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/classList)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
+
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.getClassList"]
+opaque getClassList
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js DOMTokenList)
+
+/--
+Faithful generated setter binding for TypeScript `Element.classList`.
+
+The read-only **`classList`** property of the Element interface contains a live DOMTokenList collection representing the class attribute of the element. This can then be used to manipulate the class list.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/classList)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
+
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; classList js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.element.setClassList"]
+opaque setClassList
+    (element : @& Lean.Vir.Js Element)
+    (classList : @& Lean.Vir.Js String) :
+    DomM Unit
 
 /--
 Faithful generated method binding for TypeScript `Element.getAttribute`.
@@ -820,98 +950,58 @@ opaque setTextContent
 
 end Element
 
-namespace Element.ClassList
+namespace ElementCSSInlineStyle
 
 /--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.add`.
+Faithful generated getter binding for TypeScript `ElementCSSInlineStyle.style`.
 
-The **`add()`** method of the DOMTokenList interface adds the given tokens to the list, omitting any that are already present.
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLElement/style)
 
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/add)
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
 
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
-@[vir_js "browser.element.classList.add"]
-opaque addJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
+@[vir_js "browser.elementCSSInlineStyle.getStyle"]
+opaque getStyle
+    (elementCSSInlineStyle : @& Lean.Vir.Js ElementCSSInlineStyle) :
+    DomM (Lean.Vir.Js CSSStyleDeclaration)
+
+/--
+Faithful generated setter binding for TypeScript `ElementCSSInlineStyle.style`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLElement/style)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
+
+ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.elementCSSInlineStyle.setStyle"]
+opaque setStyle
+    (elementCSSInlineStyle : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (style : @& Lean.Vir.Js String) :
     DomM Unit
 
 /--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.remove`.
+Generated binding for reviewed VIR protocol `browser.element-css-inline-style.from-element`.
 
-The **`remove()`** method of the DOMTokenList interface removes the specified tokens from the list.
+This checked structural narrowing preserves the exact JavaScript element value when it implements ElementCSSInlineStyle.
 
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/remove)
+Binding contract: `generation.protocolOperations`.
 
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and specializes the variadic token list to one token. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
+ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
 
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
+This declaration is generated; edit the binding configuration.
 -/
-@[vir_js "browser.element.classList.remove"]
-opaque removeJs
-    (element : @& Lean.Vir.Js Element)
-    (className : @& Lean.Vir.Js String) :
-    DomM Unit
+@[vir_js "browser.elementCSSInlineStyle.fromElement"]
+opaque fromElementNullable
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js.Nullable ElementCSSInlineStyle)
 
-/--
-Generated explicit method semantic adapter for TypeScript `DOMTokenList.toggle`.
-
-The **`toggle()`** method of the DOMTokenList interface removes an existing token from the list and returns false. If the token doesn't exist it's added and the function returns true.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/DOMTokenList/toggle)
-
-Adapter policy: The VIR host target flattens DOMTokenList access onto the exact owning Element value and omits the optional force argument. The shipped class-list operations accept the owning Element rather than the upstream DOMTokenList value.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.element.classList.toggle"]
-opaque toggleJs
-    (element : @& Lean.Vir.Js Element)
-    (token : @& Lean.Vir.Js String) :
-    DomM (Lean.Vir.Js Bool)
-
-end Element.ClassList
-
-namespace Element.Style
-
-/--
-Generated explicit method semantic adapter for TypeScript `CSSStyleDeclaration.setProperty`.
-
-The **`CSSStyleDeclaration.setProperty()`** method interface sets a new value for a property on a CSS style declaration object.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/CSSStyleDeclaration/setProperty)
-
-Adapter policy: The VIR host target flattens CSSStyleDeclaration access onto the exact owning Element value and omits optional priority.
-
-Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
-
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.element.style.setProperty"]
-opaque setPropertyJs
-    (element : @& Lean.Vir.Js Element)
-    (property : @& Lean.Vir.Js String)
-    (value : @& Lean.Vir.Js.Nullable String) :
-    DomM Unit
-
-end Element.Style
+end ElementCSSInlineStyle
 
 namespace Event
 
@@ -990,26 +1080,6 @@ This declaration is generated; edit the TypeScript source or binding configurati
 opaque getTarget
     (event : @& Lean.Vir.Js Event) :
     DomM (Lean.Vir.Js.Nullable Element)
-
-/--
-Generated explicit getter semantic adapter for TypeScript `KeyboardEvent.key`.
-
-The KeyboardEvent interface's **`key`** read-only property returns the value of the key pressed by the user, taking into consideration the state of modifier keys such as Shift as well as the keyboard locale and layout.
-
-[MDN Reference](https://developer.mozilla.org/docs/Web/API/KeyboardEvent/key)
-
-Adapter policy: The shipped key getter accepts the wider Event marker and normalizes a missing key to the empty string.
-
-Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
-
-ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the TypeScript source or binding configuration.
--/
-@[vir_js "browser.event.key"]
-opaque getKey
-    (keyboardEvent : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js String)
 
 /--
 Generated binding for reviewed VIR protocol `browser.event.formValue`.
@@ -1272,6 +1342,44 @@ opaque ownedFloat
     Lean.Vir.RuntimeM (Lean.Vir.Js Float)
 
 end Internal
+
+namespace KeyboardEvent
+
+/--
+Faithful generated getter binding for TypeScript `KeyboardEvent.key`.
+
+The KeyboardEvent interface's **`key`** read-only property returns the value of the key pressed by the user, taking into consideration the state of modifier keys such as Shift as well as the keyboard locale and layout.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/KeyboardEvent/key)
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.keyboardEvent.getKey"]
+opaque getKey
+    (keyboardEvent : @& Lean.Vir.Js KeyboardEvent) :
+    DomM (Lean.Vir.Js String)
+
+/--
+Generated binding for reviewed VIR protocol `browser.keyboard-event.from-event`.
+
+This checked narrowing preserves the exact JavaScript event value and has no corresponding JavaScript method.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.keyboardEvent.fromEvent"]
+opaque fromEventNullable
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable KeyboardEvent)
+
+end KeyboardEvent
 
 namespace TextMetrics
 

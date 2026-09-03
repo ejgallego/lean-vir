@@ -82,6 +82,50 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     })()`,
   });
 
+  await runDemoHostEntry(cdp, origin, "HostInterop.setInlineStyleProperty", {
+    runInputs: ["#inline-style-target", "--vir-accent", "tomato"],
+    expectedResult: "true",
+    beforeRunScript: `(() => {
+      const frame = document.createElement("iframe");
+      document.body.appendChild(frame);
+      const target = frame.contentDocument.createElement("div");
+      target.id = "inline-style-target";
+      document.body.appendChild(target);
+      frame.remove();
+      if (target.style instanceof CSSStyleDeclaration) {
+        throw new Error("inline-style regression target is not cross-realm");
+      }
+      return true;
+    })()`,
+  });
+  assert.equal(
+    await evaluate(
+      cdp,
+      `document.querySelector("#inline-style-target")
+        .style.getPropertyValue("--vir-accent")`,
+    ),
+    "tomato",
+  );
+
+  await runDemoHostEntry(cdp, origin, "HostInterop.setElementClassList", {
+    runInputs: ["#class-list-target", "alpha beta"],
+    expectedResult: "true",
+    target: {
+      id: "class-list-target",
+      tag: "div",
+    },
+  });
+  assert.deepEqual(
+    await evaluate(
+      cdp,
+      `(() => {
+        const target = document.querySelector("#class-list-target");
+        return { className: target.className, tokens: [...target.classList] };
+      })()`,
+    ),
+    { className: "alpha beta", tokens: ["alpha", "beta"] },
+  );
+
   await runDemoHostEntry(cdp, origin, "HostInterop.mountCallbackText", {
     runInputs: ["#callback-smoke-target"],
     expectedResult: "1",
@@ -101,6 +145,55 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     text: "callback:clicked",
     status: "Ready",
   });
+
+  await runDemoHostEntry(cdp, origin, "HostInterop.mountKeyTitle", {
+    runInputs: ["#keyboard-event-target"],
+    expectedResult: "1",
+    target: {
+      id: "keyboard-event-target",
+      tag: "input",
+    },
+  });
+  await evaluate(cdp, `document.querySelector("#keyboard-event-target")
+    .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }))`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "Enter",
+      "KeyboardEvent.key did not reach the exact Lean binding",
+    ),
+    "Enter",
+  );
+  await evaluate(cdp, `(() => {
+    const frame = document.createElement("iframe");
+    document.body.appendChild(frame);
+    try {
+      const event = new frame.contentWindow.KeyboardEvent("keydown", {
+        key: "ForeignEnter",
+      });
+      document.querySelector("#keyboard-event-target").dispatchEvent(event);
+    } finally {
+      frame.remove();
+    }
+  })()`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "ForeignEnter",
+      "cross-realm KeyboardEvent did not pass exact narrowing",
+    ),
+    "ForeignEnter",
+  );
+  await evaluate(cdp, `document.querySelector("#keyboard-event-target")
+    .dispatchEvent(new Event("keydown"))`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "",
+      "ordinary Event did not fail KeyboardEvent narrowing",
+    ),
+    "",
+  );
 
   await runDemoHostEntry(cdp, origin, "ReactCounter.mount", {
     runInputs: ["#react-smoke-root"],

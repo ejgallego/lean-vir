@@ -30,6 +30,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
   ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
   ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
+  ["js/host/vir-dom-host-bindings.js", "web/src/host/vir-dom-host-bindings.js"],
   [
     "js/host/vir-js-collection-bindings.js",
     "web/src/host/vir-js-collection-bindings.js",

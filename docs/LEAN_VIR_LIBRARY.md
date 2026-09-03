@@ -315,60 +315,34 @@ DOM-reading APIs use `Lean.Vir.Browser.DomM`; it is the Lean-facing browser
 effect and is recognized by the package generator as a synchronous host effect.
 Use `DomM.run` only at an explicit exported `IO` boundary.
 
-- `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
-- object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
-  `HTMLCanvasElement`, `CanvasRenderingContext2D`, `Timeout`, and
-  `AnimationFrame`
-- `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
-- `Lean.Vir.Browser.Document.setTitle : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Document.querySelector : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Document.querySelectorAll : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element))`
-- `Lean.Vir.Browser.Document.createElement : @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
-- explicit method-argument conversion helpers: `Document.querySelectorString`,
-  `querySelectorAllString`, and `createElementString`; the `title` property
-  remains the faithful `getTitle`/`setTitle` pair, with conversions composed by
-  applications
-- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
-- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
-- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Event.key : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM String`
-- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
-- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option String)`
-- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`
-- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
-- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js.Nullable String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.Nullable String)`
-- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
-- `Element.getAttributeString` and `setAttributeString` are explicit helpers
-  that convert Lean-owned strings around those faithful generated methods.
-- `Lean.Vir.Browser.Element.querySelector` and `querySelectorAll` search below an existing element resource.
-- `Lean.Vir.Browser.Element.getInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js String)`
-  and `setInnerHTML : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& Lean.Vir.Js String -> Lean.Vir.Browser.DomM Unit`
-  faithfully expose the `innerHTML` property; applications compose conversions
-  explicitly.
-- `Element.getTextContent` and `setTextContent` likewise expose the faithful
-  JavaScript property boundary. The setter accepts `Js.Nullable String`, so
-  applications choose explicitly between a string resource and JavaScript
-  `null`.
-- `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
-- `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
-- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
-- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
-- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM Bool`
-- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Bool -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM String`
-- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> @& String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.HTMLCanvasElement.fromElement`, `getWidth`, `setWidth`, `getHeight`, `setHeight`, and `getContext2D` narrow and configure canvas elements.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.clearRect`, `fillRect`, and `strokeRect` accept ordinary Lean `Float` coordinates.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.beginPath`, `closePath`, `moveTo`, `lineTo`, `arc`, `fill`, and `stroke` provide basic path drawing.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.getFillStyle`, `setFillStyleValue`, `getStrokeStyle`, and `setStrokeStyleValue` preserve the full JavaScript-owned `CanvasStyle` union; `setFillStyle` and `setStrokeStyle` are string conveniences.
-- `Lean.Vir.Browser.CanvasRenderingContext2D.getLineWidth`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure numeric drawing state and transforms.
-- `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
-- `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
-- `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Js Lean.Vir.Browser.AnimationFrame -> Lean.Vir.Browser.DomM Unit`
+The generated [binding reference](SHIPPED_BINDINGS.md) is the exhaustive source
+for browser declarations, exact signatures, upstream TypeScript links,
+provider coverage, and binding-author actions. Run `npm run generate:bindings`
+and open `build/bindings/index.html` to inspect the current checkout. This
+overview records the intended shape without duplicating that generated
+inventory:
+
+- `Document` exposes the host-global document's title, selector, and element
+  creation operations. Helpers ending in `String` perform explicit conversion
+  from Lean-owned text.
+- `Element` exposes tree, query, content, attribute, listener, and exact
+  `DOMTokenList` operations. `Element.ClassList` is a Lean convenience over the
+  generated `Element.classList` and `DOMTokenList` boundaries.
+- `ElementCSSInlineStyle.fromElement` checks the structural inline-style
+  capability without changing identity. Its generated `style` getter returns
+  the exact `CSSStyleDeclaration`; `CSSStyleDeclaration.setProperty` preserves
+  the upstream `string | null` value.
+- `Event` exposes targets and propagation operations. `KeyboardEvent.fromEvent`
+  performs checked identity-preserving narrowing before the generated exact
+  `KeyboardEvent.key` getter; form helpers similarly make their narrowing and
+  string conversion explicit.
+- `HTMLInputElement` and `HTMLCanvasElement` provide checked element narrowing.
+  The canvas surface preserves exact context, text-metric, and style values.
+- Timers, intervals, animation frames, and event listeners use private host
+  teardown records for active effects. Their JavaScript tokens and values cross
+  the public boundary directly.
+- `Console.log` is the deliberately specialized single-JavaScript-string
+  console boundary.
 
 `Vir.React` provides the first React-specific imports and a native `ReactNode`
 resource surface. React root lifetime operations and event callbacks use

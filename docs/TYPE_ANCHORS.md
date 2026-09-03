@@ -310,14 +310,27 @@ npm run check:document-type-anchors
 
 ## DOM Element Audit
 
-The Element API group indexes the complete `Element`, `DOMTokenList`, and
-`CSSStyleDeclaration` surfaces. Its first reviewed properties are `innerHTML`
-and `textContent`, each mapped as separate getter and setter operations with an
-explicit borrowed receiver. `innerHTML` preserves a JavaScript string resource
-in both directions. `textContent` preserves the JavaScript string result and
-the setter's `string | null` contract through `Js.Nullable String`; assigning
-`null` clears the text. The remaining shipped Element targets stay visibly
-mapped but awaiting semantic review.
+The Element API group indexes the complete `Element`, `DOMTokenList`,
+`ElementCSSInlineStyle`, and `CSSStyleDeclaration` surfaces. Its reviewed
+properties include `innerHTML` and `textContent`, each mapped as separate
+getter and setter operations with an explicit borrowed receiver. `innerHTML`
+preserves a JavaScript string resource in both directions. `textContent`
+preserves the JavaScript string result and the setter's `string | null`
+contract through `Js.Nullable String`; assigning `null` clears the text.
+`classList` likewise preserves the exact JavaScript `DOMTokenList` returned by
+its getter and the upstream string accepted by its setter. Generated
+`DOMTokenList.add`, `remove`, and `toggle` operations receive that exact
+token-list value; the separate `Element.ClassList` helpers are Lean
+conveniences rather than additional JavaScript bindings.
+
+Inline style follows the same capability model without pretending every
+`Element` implements the TypeScript mixin. A VIR-owned checked narrowing
+preserves the element identity as `ElementCSSInlineStyle`; the generated
+`style` getter then returns its exact `CSSStyleDeclaration`, and the asymmetric
+string setter is generated separately. `CSSStyleDeclaration.setProperty`
+receives that declaration directly and preserves its `string | null` value.
+The selected Element targets all carry generated or explicitly reviewed
+semantic classifications.
 
 ```bash
 npm run generate:element-type-descriptors

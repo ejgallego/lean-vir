@@ -10,13 +10,28 @@ import Vir.Browser.Generated
 
 namespace Lean.Vir.Browser
 
+namespace KeyboardEvent
+
+/-- Checks whether an event is a keyboard event without changing its JavaScript identity. -/
+def fromEvent
+    (event : @& Lean.Vir.Js Event) :
+    DomM (Option (Lean.Vir.Js KeyboardEvent)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromEventNullable event)
+
+/-- Returns the exact JavaScript `key` string carried by a keyboard event. -/
+def keyString (event : @& Lean.Vir.Js KeyboardEvent) : DomM String := do
+  Lean.Vir.JsValue.toString (← getKey event)
+
+end KeyboardEvent
+
 namespace Event
 
 /--
 Returns the event target as a DOM element when the target is an element.
 
-The returned element resource may be used after the callback, but the event
-resource itself remains callback-scoped.
+The returned element follows ordinary JavaScript reachability. VIR likewise
+does not invalidate the event after callback return; its practical validity
+follows browser semantics.
 
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
@@ -27,8 +42,9 @@ def targetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Elem
 Returns the current event target as a DOM element when the current target is an
 element.
 
-The returned element resource may be used after the callback, but the event
-resource itself remains callback-scoped.
+The returned element follows ordinary JavaScript reachability. The browser
+normally exposes `currentTarget` only while its handler runs; VIR adds no
+stronger event lifetime.
 
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
@@ -37,12 +53,14 @@ def currentTargetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.
 
 /--
 Returns the keyboard key represented by an event, or the empty string for
-events without a string-valued {lit}`key` property.
+events that do not narrow to a keyboard event.
 
 Reference: [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
 -/
 def keyString (event : @& Lean.Vir.Js Event) : DomM String := do
-  Lean.Vir.JsValue.toString (← getKey event)
+  match ← KeyboardEvent.fromEvent event with
+  | none => pure ""
+  | some keyboardEvent => KeyboardEvent.keyString keyboardEvent
 
 end Event
 
@@ -102,6 +120,43 @@ def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
 
 end Document
 
+namespace CSSStyleDeclaration
+
+/-- Converts Lean strings around the exact `CSSStyleDeclaration.setProperty` binding. -/
+def setPropertyString
+    (declaration : @& Lean.Vir.Js CSSStyleDeclaration)
+    (name value : @& String) : DomM Unit := do
+  let jsName ← Lean.Vir.JsValue.ofString name
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  setProperty declaration jsName (← Lean.Vir.Js.Nullable.ofJs jsValue)
+
+end CSSStyleDeclaration
+
+namespace ElementCSSInlineStyle
+
+/--
+Checks whether an element implements `ElementCSSInlineStyle` without changing
+its JavaScript identity.
+-/
+def fromElement
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Option (Lean.Vir.Js ElementCSSInlineStyle)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromElementNullable element)
+
+/-- Converts a Lean string before replacing the element's inline style text. -/
+def setStyleString
+    (element : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (style : @& String) : DomM Unit := do
+  setStyle element (← Lean.Vir.JsValue.ofString style)
+
+/-- Sets a property through the element's exact `CSSStyleDeclaration` value. -/
+def setPropertyString
+    (element : @& Lean.Vir.Js ElementCSSInlineStyle)
+    (name value : @& String) : DomM Unit := do
+  CSSStyleDeclaration.setPropertyString (← getStyle element) name value
+
+end ElementCSSInlineStyle
+
 namespace Element
 
 /-- Converts a Lean selector before calling the faithful `Element.querySelector` binding. -/
@@ -142,31 +197,23 @@ def setAttributeString
 
 namespace ClassList
 
-/-- Adds a CSS class to an element. -/
+/-- Adds a CSS class through the element's exact `DOMTokenList` value. -/
 def add (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
-  addJs element (← Lean.Vir.JsValue.ofString className)
+  let tokenList ← getClassList element
+  DOMTokenList.add tokenList (← Lean.Vir.JsValue.ofString className)
 
-/-- Removes a CSS class from an element. -/
+/-- Removes a CSS class through the element's exact `DOMTokenList` value. -/
 def remove (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
-  removeJs element (← Lean.Vir.JsValue.ofString className)
+  let tokenList ← getClassList element
+  DOMTokenList.remove tokenList (← Lean.Vir.JsValue.ofString className)
 
-/-- Toggles a CSS class and returns whether it is present afterward. -/
+/-- Toggles a CSS class through the exact list and reports its resulting presence. -/
 def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Bool := do
-  Lean.Vir.JsValue.toBool (← toggleJs element (← Lean.Vir.JsValue.ofString className))
+  let tokenList ← getClassList element
+  Lean.Vir.JsValue.toBool
+    (← DOMTokenList.toggle tokenList (← Lean.Vir.JsValue.ofString className))
 
 end ClassList
-
-namespace Style
-
-/-- Sets a CSS custom or ordinary property on an element's inline style. -/
-def setProperty
-    (element : @& Lean.Vir.Js Element)
-    (name value : @& String) : DomM Unit := do
-  let jsName ← Lean.Vir.JsValue.ofString name
-  let jsValue ← Lean.Vir.JsValue.ofString value
-  setPropertyJs element jsName (← Lean.Vir.Js.Nullable.ofJs jsValue)
-
-end Style
 
 /--
 Registers a browser event listener backed by a Lean callback closure.

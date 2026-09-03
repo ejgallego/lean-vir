@@ -411,6 +411,36 @@ const querySelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.querySelector",
 );
 assert.equal(querySelectorImport?.args[0]?.type?.type, "Js");
+const keyboardEventNarrowingImport = hostImportTarget(
+  "browser.keyboardEvent.fromEvent",
+);
+assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.type, "Event");
+assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
+const keyboardEventKeyImport = hostImportTarget(
+  "browser.keyboardEvent.getKey",
+);
+assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
+assert.equal(keyboardEventKeyImport?.result?.type, "Js");
+const inlineStyleNarrowingImport = hostImportTarget(
+  "browser.elementCSSInlineStyle.fromElement",
+);
+assert.equal(inlineStyleNarrowingImport?.args[0]?.type?.type, "Element");
+assert.equal(inlineStyleNarrowingImport?.result?.type, "Js");
+const inlineStyleGetterImport = hostImportTarget(
+  "browser.elementCSSInlineStyle.getStyle",
+);
+assert.equal(
+  inlineStyleGetterImport?.args[0]?.type?.type,
+  "ElementCSSInlineStyle",
+);
+assert.equal(inlineStyleGetterImport?.result?.type, "CSSStyleDeclaration");
+const setStylePropertyImport = hostImportTarget(
+  "browser.cssStyleDeclaration.setProperty",
+);
+assert.equal(
+  setStylePropertyImport?.args[0]?.type?.type,
+  "CSSStyleDeclaration",
+);
 const getCheckedImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.htmlInputElement.getChecked",
 );
@@ -419,6 +449,10 @@ const setTimeoutImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.timer.setTimeout",
 );
 assert.equal(setTimeoutImport?.args[0]?.type?.type, "Js");
+const setIntervalImport = hostImportTarget("browser.timer.setInterval");
+assert.equal(setIntervalImport?.result?.type, "Interval");
+const clearIntervalImport = hostImportTarget("browser.timer.clearInterval");
+assert.equal(clearIntervalImport?.args[0]?.type?.type, "Interval");
 const animationFrameImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.animation.requestAnimationFrame",
 );
@@ -783,6 +817,16 @@ assert.equal(
   ),
   "<svg></svg>",
 );
+assert.equal(
+  hostRuntime.call(
+    "HostInterop.setInlineStyleProperty",
+    "#element-query",
+    "color",
+    "purple",
+  ),
+  true,
+);
+assert.equal(elementQueryRoot.style.properties.get("color"), "purple");
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
 const keyTarget = ensureVirtualElementState(
   virtualDocumentState,
@@ -793,6 +837,10 @@ keyTarget.listeners
   .get("keydown")[0]
   .dispatch(createVirtualEventState({ key: "Enter" }));
 assert.equal(virtualDocumentState.title, "Enter");
+keyTarget.listeners
+  .get("keydown")[0]
+  .dispatch(createVirtualEventState());
+assert.equal(virtualDocumentState.title, "");
 assert.equal(
   hostRuntime.hostState.resourceRoots.debugCounts().active,
   queryRootBaseline,

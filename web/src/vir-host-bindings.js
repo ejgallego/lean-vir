@@ -9,7 +9,6 @@ import {
   createAnimationHostBindings,
   createElementHostBindings,
   createHostLifecycle,
-  createHtmlInputElementHostBindings,
   createTimerHostBindings,
   once,
   performanceNow,
@@ -17,6 +16,12 @@ import {
   reportEventHandlerError,
   stopPropagationOnEvent,
 } from "./host/vir-host-resources.js";
+import {
+  createCSSStyleDeclarationHostBindings,
+  createDOMTokenListHostBindings,
+  createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
+} from "./host/vir-dom-host-bindings.js";
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
@@ -88,6 +93,9 @@ export function createBrowserDocumentHostBindings() {
 
 export function createBrowserEventHostBindings() {
   return {
+    ...createKeyboardEventHostBindings({
+      fromEvent: (event) => (isKeyboardEvent(event) ? event : null),
+    }),
     "browser.event.target": (event) => nullableElementTarget(event.target),
     "browser.event.currentTarget": (event) =>
       nullableElementTarget(event.currentTarget),
@@ -99,10 +107,6 @@ export function createBrowserEventHostBindings() {
       stopPropagationOnEvent(event);
       return undefined;
     },
-    "browser.event.key": (event) => {
-      const key = event?.key;
-      return typeof key === "string" ? key : "";
-    },
     "browser.event.formValue": (event) =>
       createNullableValue(formControlEventValue(event)),
   };
@@ -112,6 +116,10 @@ export function createBrowserElementHostBindings(
   state = createHostLifecycle(),
 ) {
   return {
+    ...createCSSStyleDeclarationHostBindings({
+      fromElement: (element) =>
+        isElementCSSInlineStyle(element) ? element : null,
+    }),
     ...createElementHostBindings(state, {
       querySelector: (target, selector) => target.querySelector(selector),
       querySelectorAll: (target, selector) => target.querySelectorAll(selector),
@@ -122,6 +130,10 @@ export function createBrowserElementHostBindings(
       getTextContent: (target) => target.textContent ?? "",
       setTextContent: (target, text) => {
         target.textContent = text;
+      },
+      getClassList: (target) => target.classList,
+      setClassList: (target, classList) => {
+        target.classList = classList;
       },
       getAttribute: (target, name) => target.getAttribute(name) ?? null,
       setAttribute: (target, name, value) => target.setAttribute(name, value),
@@ -139,20 +151,6 @@ export function createBrowserElementHostBindings(
     },
     "browser.element.remove": (element) => {
       element.remove();
-      return undefined;
-    },
-    "browser.element.classList.add": (element, className) => {
-      element.classList.add(className);
-      return undefined;
-    },
-    "browser.element.classList.remove": (element, className) => {
-      element.classList.remove(className);
-      return undefined;
-    },
-    "browser.element.classList.toggle": (element, className) =>
-      element.classList.toggle(className),
-    "browser.element.style.setProperty": (element, name, value) => {
-      element.style.setProperty(name, nullablePayload(value));
       return undefined;
     },
   };
@@ -304,6 +302,7 @@ export function createBrowserHostBindings({
     ...createBrowserDocumentHostBindings(),
     ...createBrowserEventHostBindings(),
     ...createBrowserElementHostBindings(state),
+    ...createDOMTokenListHostBindings(),
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserCanvasHostBindings(),
     ...createBrowserTimerHostBindings(state),
@@ -627,6 +626,26 @@ function isInputElement(value) {
     typeof globalThis.HTMLInputElement === "function" &&
     value instanceof globalThis.HTMLInputElement
   );
+}
+
+function isElementCSSInlineStyle(value) {
+  return typeof value?.style?.setProperty === "function";
+}
+
+function isKeyboardEvent(value) {
+  const KeyboardEvent = globalThis.KeyboardEvent;
+  if (typeof KeyboardEvent !== "function") return false;
+  const getKey = Object.getOwnPropertyDescriptor(
+    KeyboardEvent.prototype,
+    "key",
+  )?.get;
+  if (typeof getKey !== "function") return false;
+  try {
+    Reflect.apply(getKey, value, []);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isTextAreaElement(value) {

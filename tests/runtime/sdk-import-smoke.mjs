@@ -89,6 +89,14 @@ try {
     false,
   );
   assert.equal(typeof hostBindings.createHostLifecycle, "function");
+  assert.equal(
+    Object.hasOwn(hostBindings, "createDOMTokenListHostBindings"),
+    false,
+  );
+  assert.equal(
+    Object.hasOwn(hostBindings, "createCSSStyleDeclarationHostBindings"),
+    false,
+  );
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(Object.hasOwn(reactNode, "virtualReactTextContent"), false);

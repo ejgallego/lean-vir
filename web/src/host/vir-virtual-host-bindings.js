@@ -10,12 +10,17 @@ import {
   createAnimationHostBindings,
   createElementHostBindings,
   createHostLifecycle,
-  createHtmlInputElementHostBindings,
   createTimerHostBindings,
   performanceNow,
   preventDefaultOnEvent,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
+import {
+  createCSSStyleDeclarationHostBindings,
+  createDOMTokenListHostBindings,
+  createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
+} from "./vir-dom-host-bindings.js";
 import {
   createNullableValue,
   nullablePayload,
@@ -59,8 +64,9 @@ export function createVirtualElementState({
   checked = false,
   value = "",
   listeners = new Map(),
+  inlineStyle = createVirtualCSSStyleDeclarationState(),
 } = {}) {
-  return {
+  const element = {
     innerHTML,
     textContent,
     attributes,
@@ -68,6 +74,29 @@ export function createVirtualElementState({
     checked,
     value,
     listeners,
+  };
+  if (inlineStyle !== null) {
+    Object.defineProperty(element, "style", {
+      enumerable: true,
+      get: () => inlineStyle,
+      set: (cssText) => {
+        inlineStyle.cssText = String(cssText);
+      },
+    });
+  }
+  return element;
+}
+
+function createVirtualCSSStyleDeclarationState() {
+  const properties = new Map();
+  return {
+    cssText: "",
+    properties,
+    setProperty: (property, value) => {
+      const text = value ?? "";
+      if (text === "") properties.delete(property);
+      else properties.set(property, text);
+    },
   };
 }
 
@@ -105,7 +134,7 @@ export function ensureVirtualElementStates(state, selector, elements) {
 export function createVirtualEventState({
   target = null,
   currentTarget = null,
-  key = "",
+  key = null,
   defaultPrevented = false,
   propagationStopped = false,
   onPreventDefault = null,
@@ -114,7 +143,7 @@ export function createVirtualEventState({
   const event = {
     target,
     currentTarget,
-    key,
+    ...(typeof key === "string" ? { key } : {}),
     defaultPrevented,
     propagationStopped,
     preventDefault: () => {
@@ -133,6 +162,10 @@ export function createVirtualEventHostBindings(
   state = createVirtualDocumentState(),
 ) {
   return {
+    ...createKeyboardEventHostBindings({
+      fromEvent: (event) =>
+        typeof event?.key === "string" ? event : null,
+    }),
     "browser.event.target": (event) =>
       createNullableValue(virtualEventElementValue(state, event, "target")),
     "browser.event.currentTarget": (event) =>
@@ -146,10 +179,6 @@ export function createVirtualEventHostBindings(
     "browser.event.stopPropagation": (event) => {
       stopPropagationOnEvent(event);
       return undefined;
-    },
-    "browser.event.key": (event) => {
-      const key = event?.key;
-      return typeof key === "string" ? key : "";
     },
     "browser.event.formValue": (event) =>
       createNullableValue(formControlEventValue(event)),
@@ -189,6 +218,10 @@ export function createVirtualDocumentHostBindings(
       setTextContent: (target, text) => {
         target.textContent = text ?? "";
       },
+      getClassList: (target) => virtualDOMTokenList(target),
+      setClassList: (target, classList) => {
+        target.attributes.set("class", classList);
+      },
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),
       createEventListener: (target, eventName, callback) =>
@@ -198,6 +231,11 @@ export function createVirtualDocumentHostBindings(
           eventName,
           callback,
         ),
+    }),
+    ...createDOMTokenListHostBindings(),
+    ...createCSSStyleDeclarationHostBindings({
+      fromElement: (element) =>
+        typeof element?.style?.setProperty === "function" ? element : null,
     }),
     ...createHtmlInputElementHostBindings({
       fromElement: (element) => element,
@@ -392,6 +430,42 @@ function normalizeVirtualElementState(element) {
   element.value ??= "";
   element.listeners ??= new Map();
   return element;
+}
+
+function virtualDOMTokenList(element) {
+  element.classList ??= {
+    add: (token) =>
+      updateVirtualClassTokens(element, (tokens) => tokens.add(token)),
+    remove: (token) =>
+      updateVirtualClassTokens(element, (tokens) => tokens.delete(token)),
+    toggle: (token) => {
+      const tokens = virtualClassTokens(element);
+      const present = tokens.has(token);
+      if (present) tokens.delete(token);
+      else tokens.add(token);
+      writeVirtualClassTokens(element, tokens);
+      return !present;
+    },
+  };
+  return element.classList;
+}
+
+function virtualClassTokens(element) {
+  return new Set(
+    String(element.attributes.get("class") ?? "")
+      .split(/\s+/u)
+      .filter((token) => token.length > 0),
+  );
+}
+
+function updateVirtualClassTokens(element, update) {
+  const tokens = virtualClassTokens(element);
+  update(tokens);
+  writeVirtualClassTokens(element, tokens);
+}
+
+function writeVirtualClassTokens(element, tokens) {
+  element.attributes.set("class", [...tokens].join(" "));
 }
 
 function queryVirtualDescendantStates(element, selector) {

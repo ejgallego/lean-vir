@@ -123,6 +123,26 @@ def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
     let _ ← Lean.Vir.JsValue.toString jsHtml
     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Element.getInnerHTML element)
 
+def setInlineStyleProperty
+    (selector name value : String) : DomM Bool := do
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  | none => pure false
+  | some element =>
+      match ← Lean.Vir.Browser.ElementCSSInlineStyle.fromElement element with
+      | none => pure false
+      | some styledElement =>
+          Lean.Vir.Browser.ElementCSSInlineStyle.setPropertyString
+            styledElement name value
+          pure true
+
+def setElementClassList (selector classes : String) : DomM Bool := do
+  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  | none => pure false
+  | some element =>
+      Lean.Vir.Browser.Element.setClassList element
+        (← Lean.Vir.JsValue.ofString classes)
+      pure true
+
 def runtimeRefRoundTrip (value : Nat) : Lean.Vir.RuntimeM Nat := do
   let ref ← Lean.Vir.RuntimeRef.new value
   Lean.Vir.RuntimeRef.modify ref (· + 2)

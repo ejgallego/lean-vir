@@ -59,8 +59,20 @@ Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Elem
 -/
 opaque Element : Type
 
-/-- Browser event object class. Event values are callback-scoped resources. -/
+/-- Exact browser `DOMTokenList` value returned by `Element.classList`. -/
+opaque DOMTokenList : Type
+
+/-- Exact element value implementing the browser `ElementCSSInlineStyle` interface. -/
+opaque ElementCSSInlineStyle : Type
+
+/-- Exact browser `CSSStyleDeclaration` value returned by `ElementCSSInlineStyle.style`. -/
+opaque CSSStyleDeclaration : Type
+
+/-- Exact browser `Event` value; its practical validity follows browser semantics. -/
 opaque Event : Type
+
+/-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
+opaque KeyboardEvent : Type
 
 /-- Handle for a browser event-listener registration. -/
 opaque EventListener : Type

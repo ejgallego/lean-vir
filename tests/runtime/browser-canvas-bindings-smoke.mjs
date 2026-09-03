@@ -6,69 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import {
-  createBrowserCanvasHostBindings,
-  createBrowserElementHostBindings,
-} from "../../web/src/vir-host-bindings.js";
-import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
-
-const state = {
-  addDisposable() {},
-  removeDisposable() {},
-};
-
-const elementCalls = [];
-const child = { id: "child" };
-const element = {
-  textContent: "",
-  attributes: new Map(),
-  classList: {
-    add: (name) => elementCalls.push(["class.add", name]),
-    remove: (name) => elementCalls.push(["class.remove", name]),
-    toggle: (name) => {
-      elementCalls.push(["class.toggle", name]);
-      return true;
-    },
-  },
-  style: {
-    setProperty: (name, value) => elementCalls.push(["style", name, value]),
-  },
-  appendChild: (value) => elementCalls.push(["append", value]),
-  remove: () => elementCalls.push(["remove"]),
-  getAttribute(name) {
-    return this.attributes.get(name) ?? null;
-  },
-  setAttribute(name, value) {
-    this.attributes.set(name, value);
-  },
-  addEventListener() {},
-  removeEventListener() {},
-};
-const elementBindings = createBrowserElementHostBindings(state);
-assert.equal(
-  elementBindings["browser.element.appendChild"](element, child),
-  child,
-);
-elementBindings["browser.element.classList.add"](element, "active");
-elementBindings["browser.element.classList.remove"](element, "hidden");
-assert.equal(
-  elementBindings["browser.element.classList.toggle"](element, "ready"),
-  true,
-);
-elementBindings["browser.element.style.setProperty"](
-  element,
-  "color",
-  createNullableValue("red"),
-);
-elementBindings["browser.element.remove"](element);
-assert.deepEqual(elementCalls, [
-  ["append", child],
-  ["class.add", "active"],
-  ["class.remove", "hidden"],
-  ["class.toggle", "ready"],
-  ["style", "color", "red"],
-  ["remove"],
-]);
+import { createBrowserCanvasHostBindings } from "../../web/src/vir-host-bindings.js";
 
 const canvasCalls = [];
 const ctx = {
@@ -99,7 +37,7 @@ const canvas = {
   height: 150,
   getContext: (kind) => (kind === "2d" ? ctx : null),
 };
-const canvasBindings = createBrowserCanvasHostBindings(state);
+const canvasBindings = createBrowserCanvasHostBindings();
 assert.equal(
   canvasBindings["browser.htmlCanvasElement.fromElement"](canvas),
   canvas,

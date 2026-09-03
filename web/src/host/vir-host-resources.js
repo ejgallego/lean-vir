@@ -111,6 +111,12 @@ export function createElementHostBindings(resources, operations) {
       operations.setTextContent(element, nullablePayload(text));
       return undefined;
     },
+    "browser.element.getClassList": (element) =>
+      operations.getClassList(element),
+    "browser.element.setClassList": (element, classList) => {
+      operations.setClassList(element, classList);
+      return undefined;
+    },
     "browser.element.getAttribute": (element, name) =>
       createNullableValue(operations.getAttribute(element, name)),
     "browser.element.setAttribute": (element, name, value) => {
@@ -145,23 +151,6 @@ function terminateRevocableResource(resources, value, cleanup, label) {
   collectCleanupError(errors, () => resources.removeDisposable(value));
   collectCleanupError(errors, cleanup);
   throwCollectedErrors(errors, label);
-}
-
-export function createHtmlInputElementHostBindings({ fromElement }) {
-  return {
-    "browser.htmlInputElement.fromElement": (element) =>
-      createNullableValue(fromElement(element)),
-    "browser.htmlInputElement.getChecked": (input) => input.checked === true,
-    "browser.htmlInputElement.setChecked": (input, checked) => {
-      input.checked = checked;
-      return undefined;
-    },
-    "browser.htmlInputElement.getValue": (input) => input.value ?? "",
-    "browser.htmlInputElement.setValue": (input, value) => {
-      input.value = value;
-      return undefined;
-    },
-  };
 }
 
 export function createReactRootHostBindings(
