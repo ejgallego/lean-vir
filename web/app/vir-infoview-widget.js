@@ -10,6 +10,7 @@ import { createRoot } from "../src/vir-react-dom-client.js";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
+import { rpcJsonFromValue } from "../src/rpc-json.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import {
@@ -56,10 +57,18 @@ export default function VirInfoviewWidget(props) {
   const loadedRef = React.useRef(null);
   const [reloadToken, setReloadToken] = React.useState(0);
   const [runtimeToken, setRuntimeToken] = React.useState(0);
+  const [rpcInput, setRpcInput] = React.useState(null);
   const irPackageRevisionRef = React.useRef("");
   const refreshGenerationRef = React.useRef(0);
   const surface = surfaceFromInfoviewProps(props, rpcSession);
   const surfaceKey = surfaceCacheKey(surface);
+  const rpcMethod = optionalStringValue(props.rpcMethod);
+  const entryInputKey =
+    rpcMethod.length === 0
+      ? surfaceKey
+      : rpcInput === null
+        ? ""
+        : JSON.stringify(rpcInput);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
@@ -99,7 +108,15 @@ export default function VirInfoviewWidget(props) {
         service.runtime,
         config.componentEntry,
       );
-      const entry = validateWidgetEntry(service.runtime, config.entry);
+      const usesRpcInput = config.rpcMethod.length !== 0;
+      const entry = validateWidgetEntry(
+        service.runtime,
+        config.entry,
+        usesRpcInput
+          ? "Lean.Vir.Infoview.RpcJson"
+          : "Lean.Vir.Infoview.Surface",
+        usesRpcInput ? INTERFACE_TAG.CUSTOM_INDUCTIVE : INTERFACE_TAG.STRUCTURE,
+      );
       const component = service.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
@@ -121,8 +138,10 @@ export default function VirInfoviewWidget(props) {
         componentEntry,
         component,
         entry,
+        rpcMethod: config.rpcMethod,
       };
       service = null;
+      setRpcInput(null);
       setReloadToken(0);
       setRuntimeToken((token) => token + 1);
     } catch (error) {
@@ -161,6 +180,7 @@ export default function VirInfoviewWidget(props) {
     irPackageKey,
     props.componentEntry,
     props.entry,
+    props.rpcMethod,
     mountId,
   ]);
 
@@ -181,6 +201,7 @@ export default function VirInfoviewWidget(props) {
     irPackageKey,
     props.componentEntry,
     props.entry,
+    props.rpcMethod,
     mountId,
     reloadToken,
   ]);
@@ -239,8 +260,65 @@ export default function VirInfoviewWidget(props) {
   ]);
 
   React.useEffect(() => {
+    let disposed = false;
+
+    async function refreshRpcInput() {
+      const loaded = loadedRef.current;
+      let config;
+      try {
+        config = widgetRuntimeConfigFromProps(props);
+      } catch {
+        if (!disposed) {
+          setRpcInput(null);
+        }
+        return;
+      }
+      if (config.rpcMethod.length === 0) {
+        if (!disposed) {
+          setRpcInput(null);
+        }
+        return;
+      }
+      const rpc = hostContextRef.current.rpcSession;
+      if (loaded === null || rpc === null || typeof rpc?.call !== "function") {
+        if (!disposed) {
+          setRpcInput(null);
+        }
+        return;
+      }
+      if (!disposed) {
+        setRpcInput(null);
+      }
+      try {
+        const response = await rpc.call(config.rpcMethod, {
+          pos: config.position,
+        });
+        if (!disposed && loadedRef.current === loaded) {
+          setRpcInput(rpcJsonFromValue(response));
+        }
+      } catch (error) {
+        if (!disposed) {
+          setStatus({
+            kind: "error",
+            message: errorMessage(error, setupHintRef.current),
+          });
+        }
+      }
+    }
+
+    refreshRpcInput();
+    return () => {
+      disposed = true;
+    };
+  }, [runtimeToken, surfaceKey, irPackageKey, props.rpcMethod, rpcSession]);
+
+  React.useEffect(() => {
     const loaded = loadedRef.current;
     if (loaded === null) {
+      return;
+    }
+    const entryInput = loaded.rpcMethod.length === 0 ? surface : rpcInput;
+    if (entryInput === null) {
       return;
     }
     try {
@@ -248,7 +326,7 @@ export default function VirInfoviewWidget(props) {
         loaded.entry.entry,
         loaded.root,
         loaded.component,
-        surface,
+        entryInput,
       );
       setStatus({ kind: "ready", message: loaded.entry.entry });
     } catch (error) {
@@ -265,7 +343,7 @@ export default function VirInfoviewWidget(props) {
         ),
       });
     }
-  }, [runtimeToken, surfaceKey, mountId, rpcSession]);
+  }, [runtimeToken, entryInputKey, mountId, rpcSession]);
 
   return e(
     "section",
@@ -298,19 +376,24 @@ function stopInfoviewEvent(event) {
   event.stopPropagation();
 }
 
-export function validateWidgetEntry(runtime, entryName) {
+export function validateWidgetEntry(
+  runtime,
+  entryName,
+  inputTypeName = "Lean.Vir.Infoview.Surface",
+  inputInterfaceTag = INTERFACE_TAG.STRUCTURE,
+) {
   const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 3 ||
     entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
     entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
+    entry.args[2]?.type?.interfaceTag !== inputInterfaceTag ||
+    entry.args[2]?.type?.name !== inputTypeName ||
     entry.result?.interfaceTag !== INTERFACE_TAG.UNIT
   ) {
     throw new Error(
-      `VIR widget entry ${entryName} must be an effectful Root -> Component -> Surface -> Unit entry`,
+      `VIR widget entry ${entryName} must be an effectful Root -> Component -> ${inputTypeName} -> Unit entry`,
     );
   }
   return entry;
@@ -627,6 +710,7 @@ function widgetRuntimeConfigFromProps(props) {
       "autoReloadMs",
     ),
     setupHint: optionalString(props.setupHint, "setupHint"),
+    rpcMethod: optionalString(props.rpcMethod, "rpcMethod"),
   };
 }
 

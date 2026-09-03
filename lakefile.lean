@@ -63,7 +63,7 @@ lean_lib VirModuleFixtures where
 /-- Infoview-only regression fixtures kept outside the public library. -/
 lean_lib VirInfoviewFixtures where
   srcDir := "fixtures/infoview"
-  roots := #[`InfoviewFixtures.ImportedHelper]
+  roots := #[`InfoviewFixtures.ImportedHelper, `InfoviewFixtures.TypedRpcWidget]
 
 /-- Non-default runtime fixtures acquired through complete compiled modules. -/
 lean_lib VirRuntimeFixtures where

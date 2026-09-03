@@ -24,6 +24,6 @@ else
   git clone --depth 1 --branch "${LEAN_VERSION}" https://github.com/leanprover/lean4.git third_party/lean4-src
 fi
 
-git -C third_party/lean4-src checkout d8b18978322de05a8f3dba51ef03cf5461676c17
+git -C third_party/lean4-src checkout f3b06c705e6c85f5314019d5d3baab0fec5b580c
 
 echo "Lean source ready at third_party/lean4-src"

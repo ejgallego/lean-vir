@@ -136,7 +136,7 @@ assert.equal(
 );
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /Root -> Component -> Surface -> Unit/,
+  /Root -> Component -> Lean\.Vir\.Infoview\.Surface -> Unit/,
 );
 assert.throws(
   () =>
@@ -164,7 +164,7 @@ assert.throws(
       },
       "WrongSurface.mount",
     ),
-  /Root -> Component -> Surface -> Unit/,
+  /Root -> Component -> Lean\.Vir\.Infoview\.Surface -> Unit/,
 );
 assert.equal(
   taggedTextToPlain({

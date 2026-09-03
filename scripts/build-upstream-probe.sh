@@ -315,6 +315,7 @@ common_flags=(
   "--target=$target"
   -DNDEBUG
   -DLEAN_BUILD_TYPE=Release
+  -DLEAN_USE_SPLIT_STACK=1
   -DVIR_USE_UPSTREAM_KERNEL_EXPR_DATA=1
   "$wasm_opt_level"
   -DLEAN_DEFAULT_INTERPRETER_PREFER_NATIVE=false
