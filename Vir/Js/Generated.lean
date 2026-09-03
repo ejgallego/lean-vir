@@ -42,8 +42,9 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.array.push"]
 opaque push
     {α : Type}
-    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
-    (value : @& Lean.Vir.Js α) :
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (value : @& Lean.Vir.Js β) :
     RuntimeM (Lean.Vir.Js Float)
 
 /--
@@ -66,7 +67,7 @@ opaque lengthJs
 /--
 Generated binding for reviewed VIR protocol `javascript.array.item`.
 
-Reads the exact JavaScript value at a non-negative safe-integer Array index, including undefined for a hole or missing entry.
+Performs the exact JavaScript bracket-property read on the array, including undefined for a hole or missing entry.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -75,13 +76,37 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.array.item"]
-opaque getJs
+opaque getAs
     {α : Type}
-    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
     (index : @& Lean.Vir.Js Float) :
-    RuntimeM (Lean.Vir.Js α)
+    RuntimeM (Lean.Vir.Js β)
 
 end Js.Array
+
+namespace Js.Function
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call-void`.
+
+Calls the exact JavaScript function with one exact JavaScript argument and discards its void result.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.callVoid"]
+opaque callVoid
+    {fn : Type}
+    {α : Type}
+    (function : @& Lean.Vir.Js fn)
+    (argument : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+end Js.Function
 
 namespace Js.NodeList
 
@@ -209,6 +234,43 @@ opaque get
     RuntimeM (Lean.Vir.Js α)
 
 end Js.Nullable
+
+namespace Js.Object
+
+/--
+Generated binding for reviewed VIR protocol `javascript.object.empty`.
+
+Constructs an ordinary empty JavaScript object without a VIR-specific props representation.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.object.empty"]
+opaque empty : RuntimeM (Lean.Vir.Js.Object)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.object.set`.
+
+Assigns the exact JavaScript value to the exact property name on an ordinary JavaScript object.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.object.set"]
+opaque set
+    {α : Type}
+    (object : @& Lean.Vir.Js.Object)
+    (name : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+end Js.Object
 
 namespace JsValue
 

@@ -57,8 +57,8 @@ def revealCursor (surface : @& Surface) : Lean.Vir.Browser.DomM Bool :=
 Inserts text at a document position through the connected editor.
 
 The bundled infoview host implements this with a zero-width
-`workspace/applyEdit`. Browser-only and virtual hosts may return `false` when
-there is no editable document.
+`workspace/applyEdit`. Browser-only hosts may return `false` when there is no
+editable document.
 -/
 def insertText (position : @& DocumentPosition) (text : @& String) :
     Lean.Vir.Browser.DomM Bool := do

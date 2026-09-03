@@ -63,8 +63,8 @@ returns the setup function passed unchanged to `useEffect`. Hook-order and
 effect correctness remain the programmer's responsibility.
 
 Official React 19, ReactDOM, and Chromium are the sole semantic oracle. The
-Node virtual document supplies cleanup-safe unsupported React shims and does
-not emulate nodes, hooks, reconciliation, roots, or commits.
+Node wrapper supplies no React providers and does not emulate nodes, hooks,
+reconciliation, roots, or commits.
 
 ## Lifecycle Boundary
 
@@ -98,8 +98,8 @@ boundary.
   `createHostLifecycle`.
 - `lean-vir/react-host-bindings` imports React and ReactDOM and exports the
   browser React binding factory.
-- `lean-vir/vir-runtime-node` installs virtual DOM bindings and unsupported
-  React shims for tests and tools.
+- `lean-vir/vir-runtime-node` installs only environment-neutral JavaScript
+  value and console bindings for tests and tools.
 
 ## Local Probes
 

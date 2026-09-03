@@ -6,10 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import { fileURLToPath } from "node:url";
 
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
-  createVirRuntimeFactory,
-  createVirtualDocumentState,
-} from "../../web/src/vir-runtime-node.js";
+  createCommonHostBindings,
+  createHostLifecycle,
+} from "../../web/src/vir-host-bindings.js";
 import {
   assert,
   join,
@@ -61,12 +63,26 @@ export async function runIrPackageLifecycleSmoke({
     generatedSecond.stderr || generatedSecond.stdout,
   );
 
-  const documentState = createVirtualDocumentState();
+  const bindingGenerations = [];
   const hostRuntime = await createVirRuntimeFactory({
     wasmBytes,
-    virtualDocumentState: documentState,
+    defaultHostBindings: () => {
+      const lifecycle = createHostLifecycle();
+      const documentValue = { title: "" };
+      bindingGenerations.push(lifecycle);
+      return {
+        ...createCommonHostBindings(),
+        "browser.document.current": () => documentValue,
+        "browser.document.getTitle": (document) => document.title,
+        "browser.document.setTitle": (document, title) => {
+          document.title = title;
+          return undefined;
+        },
+        [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
+      };
+    },
   }).createRuntime({ irPackageSetBytes: [await readFile(firstPackage)] });
-  const firstGenerationLifecycle = documentState.resources;
+  const firstGenerationLifecycle = bindingGenerations[0];
   const ordinaryValue = { generation: "first" };
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
@@ -81,13 +97,14 @@ export async function runIrPackageLifecycleSmoke({
   );
 
   hostRuntime.loadIrPackageSetBytes([await readFile(secondPackage)]);
+  const secondGenerationLifecycle = bindingGenerations[1];
   assert.notEqual(
-    documentState.resources,
+    secondGenerationLifecycle,
     firstGenerationLifecycle,
     "package replacement should install a fresh active-resource lifecycle",
   );
   assert.equal(firstGenerationLifecycle.phase, "disposed");
-  assert.equal(documentState.resources.phase, "active");
+  assert.equal(secondGenerationLifecycle.phase, "active");
   assert.deepEqual(
     ordinaryValue,
     { generation: "first" },

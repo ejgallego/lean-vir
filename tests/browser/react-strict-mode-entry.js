@@ -8,12 +8,12 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
-import { createBrowserLeanComponentNode } from "../../web/src/react/vir-react-node.js";
 import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
-import { createReactRootHostBindings } from "../../web/src/react/vir-react-root.js";
+import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 
 const resultKey = "__leanVirReactStrictModeSmoke";
+const hookLifecycle = createHostLifecycle();
+const hookBindings = createBrowserReactHostBindings(hookLifecycle);
 
 globalThis[resultKey] = runReactSmoke().then(
   (value) => ({ ok: true, value }),
@@ -24,7 +24,7 @@ globalThis[resultKey] = runReactSmoke().then(
       stack: error instanceof Error ? error.stack : null,
     },
   }),
-);
+).finally(() => hookLifecycle.dispose());
 
 async function runReactSmoke() {
   return {
@@ -39,6 +39,8 @@ async function runReactSmoke() {
 }
 
 async function runNestedComponentIdentityProbe() {
+  const lifecycle = createHostLifecycle();
+  const bindings = createBrowserReactHostBindings(lifecycle);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -58,8 +60,7 @@ async function runNestedComponentIdentityProbe() {
   try {
     flushSync(() =>
       root.render(
-        createBrowserLeanComponentNode(
-          React.createElement,
+        bindings["react.node.keyedComponent"](
           component,
           { label: "first" },
           "stable",
@@ -69,8 +70,7 @@ async function runNestedComponentIdentityProbe() {
     flushSync(() => setter(1));
     flushSync(() =>
       root.render(
-        createBrowserLeanComponentNode(
-          React.createElement,
+        bindings["react.node.keyedComponent"](
           component,
           { label: "second" },
           "stable",
@@ -85,8 +85,7 @@ async function runNestedComponentIdentityProbe() {
     );
     flushSync(() =>
       root.render(
-        createBrowserLeanComponentNode(
-          React.createElement,
+        bindings["react.node.keyedComponent"](
           replacement,
           { label: "replacement" },
           "stable",
@@ -102,6 +101,7 @@ async function runNestedComponentIdentityProbe() {
     return { ...state, text: container.textContent };
   } finally {
     flushSync(() => root.unmount());
+    lifecycle.dispose();
     container.remove();
   }
 }
@@ -110,15 +110,7 @@ async function runRepeatedComponentSubmissionProbe() {
   const lifecycle = createHostLifecycle();
   const container = document.createElement("div");
   document.body.append(container);
-  const bindings = createReactRootHostBindings(lifecycle, createRoot, {
-    createLeanComponentNode: (component, props, key) =>
-      createBrowserLeanComponentNode(
-        React.createElement,
-        component,
-        props,
-        key,
-      ),
-  });
+  const bindings = createBrowserReactHostBindings(lifecycle);
   let root = bindings["react.root.create"](container);
   const state = { mounts: 0, cleanups: 0 };
   let setter = null;
@@ -168,7 +160,7 @@ async function runRepeatedComponentSubmissionProbe() {
 }
 
 async function runStrictModeEffectProbe() {
-  const bindings = createBrowserReactHookBindings(React);
+  const bindings = hookBindings;
   const state = { renders: 0, setups: 0, cleanups: 0 };
   const container = document.createElement("div");
   document.body.append(container);
@@ -212,7 +204,7 @@ async function runStrictModeEffectProbe() {
 }
 
 async function runReducerIdentityProbe() {
-  const bindings = createBrowserReactHookBindings(React);
+  const bindings = hookBindings;
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -262,7 +254,7 @@ async function runReducerIdentityProbe() {
 }
 
 async function runInterleavedStateLaneProbe() {
-  const bindings = createBrowserReactHookBindings(React);
+  const bindings = hookBindings;
   const state = { renders: [] };
   const container = document.createElement("div");
   document.body.append(container);
@@ -310,7 +302,7 @@ async function runInterleavedStateLaneProbe() {
 }
 
 async function runMemoIdentityProbe() {
-  const bindings = createBrowserReactHookBindings(React);
+  const bindings = hookBindings;
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);

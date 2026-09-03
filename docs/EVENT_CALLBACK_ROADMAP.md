@@ -70,8 +70,8 @@ The runtime suite covers:
 - Add event conveniences only as explicitly named Lean adapters; do not change
   the underlying event value.
 - Optimize closure-root allocation only if profiling shows it matters.
-- Continue testing browser APIs against their official implementations rather
-  than extending the Node virtual host into a browser or React emulator.
+- Continue testing browser APIs against their official implementations; the
+  Node wrapper is not a browser or React emulator.
 
 References:
 

@@ -54,7 +54,6 @@ try {
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
   const codec = modules["runtime/vir-codec.js"];
-  const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
 
@@ -99,7 +98,6 @@ try {
   );
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
-  assert.equal(Object.hasOwn(reactNode, "virtualReactTextContent"), false);
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);

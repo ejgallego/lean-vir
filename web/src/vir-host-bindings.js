@@ -17,10 +17,6 @@ import {
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
 } from "./host/vir-dom-host-bindings.js";
-import {
-  createVirtualDocumentHostBindings,
-  createVirtualDocumentState,
-} from "./host/vir-virtual-host-bindings.js";
 import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
@@ -31,15 +27,6 @@ export {
   requireExternrefTableSupport,
 } from "./host-boundary.js";
 export { createHostLifecycle } from "./host/vir-active-host-bindings.js";
-export {
-  createVirtualDocumentHostBindings,
-  createVirtualDocumentState,
-  createVirtualElementState,
-  ensureVirtualElementState,
-  ensureVirtualElementStates,
-  createVirtualEventState,
-  createVirtualEventHostBindings,
-} from "./host/vir-virtual-host-bindings.js";
 export {
   createInfoviewHostBindings,
   normalizeInfoviewDocumentPosition,
@@ -233,7 +220,7 @@ export function createBrowserHostBindings({
       throw new Error("reactHostBindings must be a host binding factory");
     }
     reactBindings = normalizeHostBindingMap(
-      reactHostBindings(state, { querySelector: queryDocumentElement }),
+      reactHostBindings(state),
       "reactHostBindings factory result",
     );
   }
@@ -254,33 +241,6 @@ export function createBrowserHostBindings({
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => state.dispose(),
   };
-}
-
-export function createNodeHostBindings(
-  state = createVirtualDocumentState(),
-  resources = state.resources ?? createHostLifecycle(),
-) {
-  const previousResources = state.resources;
-  state.resources = resources;
-  const bindings = {
-    ...createCommonHostBindings(),
-    ...createConsoleHostBindings(),
-    ...createVirtualDocumentHostBindings(state, resources),
-  };
-  const dispose = bindings[VIR_HOST_DISPOSE];
-  bindings[VIR_HOST_DISPOSE] = () => {
-    try {
-      return dispose?.();
-    } finally {
-      if (
-        state.resources === resources &&
-        previousResources?.phase === "active"
-      ) {
-        state.resources = previousResources;
-      }
-    }
-  };
-  return bindings;
 }
 
 function normalizeHostBindingMap(value, label) {
@@ -307,10 +267,6 @@ function browserConsole() {
     );
   }
   return consoleValue;
-}
-
-function queryDocumentElement(selector) {
-  return browserDocument().querySelector(selector);
 }
 
 function browserAnimationFunction(name) {

@@ -8,7 +8,8 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
+import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
+import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 
@@ -24,7 +25,8 @@ globalThis[resultKey] = runReactRefSmoke().then(
 );
 
 async function runReactRefSmoke() {
-  const bindings = createBrowserReactHookBindings(React);
+  const lifecycle = createHostLifecycle();
+  const bindings = createBrowserReactHostBindings(lifecycle);
   const container = document.createElement("div");
   container.id = "react-ref-smoke-root";
   document.body.append(container);
@@ -69,6 +71,7 @@ async function runReactRefSmoke() {
     return { unattached, attached, cleared: refObject.current };
   } finally {
     flushSync(() => root.unmount());
+    lifecycle.dispose();
     container.remove();
   }
 }

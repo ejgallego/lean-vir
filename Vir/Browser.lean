@@ -257,8 +257,7 @@ namespace HTMLInputElement
 Narrows a generic DOM element to an `HTMLInputElement` when possible.
 
 In a browser this returns `some` exactly when the element is an
-`HTMLInputElement`. In Node tests, use the `lean-vir/vir-runtime-node` wrapper
-for virtual document state.
+`HTMLInputElement`. Non-browser runtimes must supply an explicit DOM host.
 
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
@@ -268,8 +267,8 @@ def fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js H
 /--
 Reads the `checked` property of a checkbox or radio input.
 
-In a browser this reads `input.checked`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this reads `input.checked`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
@@ -280,8 +279,8 @@ def getCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool := do
 /--
 Sets the `checked` property of a checkbox or radio input.
 
-In a browser this writes `input.checked`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this writes `input.checked`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
@@ -292,8 +291,8 @@ def setCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : 
 /--
 Reads the `value` property of an input element.
 
-In a browser this reads `input.value`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this reads `input.value`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
@@ -304,8 +303,8 @@ def getValueString (input : @& Lean.Vir.Js HTMLInputElement) : DomM String := do
 /--
 Sets the `value` property of an input element.
 
-In a browser this writes `input.value`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this writes `input.value`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/

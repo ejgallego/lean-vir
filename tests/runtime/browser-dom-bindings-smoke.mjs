@@ -11,11 +11,6 @@ import {
   createBrowserElementHostBindings,
   createBrowserEventHostBindings,
   createConsoleHostBindings,
-  createVirtualDocumentHostBindings,
-  createVirtualDocumentState,
-  createVirtualElementState,
-  createVirtualEventState,
-  ensureVirtualElementState,
 } from "../../web/src/vir-host-bindings.js";
 import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-bindings.js";
 
@@ -218,85 +213,5 @@ assert.deepEqual(calls, [
   ["style.text", "color: blue"],
   ["remove"],
 ]);
-
-const virtualState = createVirtualDocumentState();
-const virtualBindings = createVirtualDocumentHostBindings(virtualState);
-const virtualDocument = virtualBindings["browser.document.current"]();
-assert.equal(virtualDocument, virtualState);
-assert.equal(
-  virtualBindings["browser.document.createElement"](virtualDocument, "p")
-    .textContent,
-  "",
-);
-const virtualElement = ensureVirtualElementState(virtualState, "#present");
-const virtualEvent = createVirtualEventState({
-  target: virtualElement,
-  currentTarget: virtualElement,
-});
-assert.equal(
-  virtualBindings["browser.event.target"](virtualEvent),
-  virtualElement,
-);
-assert.equal(
-  virtualBindings["browser.event.currentTarget"](virtualEvent),
-  virtualElement,
-);
-assert.equal(
-  virtualBindings["browser.eventTarget.asElement"](virtualElement),
-  virtualElement,
-);
-const virtualPlainEvent = createVirtualEventState();
-assert.equal(
-  virtualBindings["browser.keyboardEvent.fromEvent"](virtualPlainEvent),
-  null,
-);
-const virtualKeyboardEvent = createVirtualEventState({ key: "Enter" });
-assert.equal(
-  virtualBindings["browser.keyboardEvent.fromEvent"](virtualKeyboardEvent),
-  virtualKeyboardEvent,
-);
-assert.equal(
-  virtualBindings["browser.keyboardEvent.getKey"](virtualKeyboardEvent),
-  "Enter",
-);
-const virtualTokenList =
-  virtualBindings["browser.element.getClassList"](virtualElement);
-assert.equal(
-  virtualBindings["browser.element.getClassList"](virtualElement),
-  virtualTokenList,
-);
-virtualBindings["browser.domTokenList.add"](virtualTokenList, "active");
-virtualBindings["browser.domTokenList.add"](virtualTokenList, "selected");
-virtualBindings["browser.domTokenList.remove"](virtualTokenList, "active");
-assert.equal(
-  virtualBindings["browser.domTokenList.toggle"](virtualTokenList, "ready"),
-  true,
-);
-assert.equal(virtualElement.attributes.get("class"), "selected ready");
-virtualBindings["browser.element.setClassList"](virtualElement, "reset");
-assert.equal(virtualElement.attributes.get("class"), "reset");
-assert.equal(
-  virtualBindings["browser.elementCSSInlineStyle.fromElement"](virtualElement),
-  virtualElement,
-);
-const virtualStyle =
-  virtualBindings["browser.elementCSSInlineStyle.getStyle"](virtualElement);
-virtualBindings["browser.cssStyleDeclaration.setProperty"](
-  virtualStyle,
-  "color",
-  "red",
-);
-assert.equal(virtualStyle.properties.get("color"), "red");
-virtualBindings["browser.elementCSSInlineStyle.setStyle"](
-  virtualElement,
-  "color: blue",
-);
-assert.equal(virtualStyle.cssText, "color: blue");
-assert.equal(
-  virtualBindings["browser.elementCSSInlineStyle.fromElement"](
-    createVirtualElementState({ inlineStyle: null }),
-  ),
-  null,
-);
 
 console.log("vir browser DOM bindings smoke ok");

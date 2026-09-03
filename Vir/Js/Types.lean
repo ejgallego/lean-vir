@@ -14,6 +14,30 @@ opaque Js (α : Type) : Type
 
 namespace Js
 
+namespace Object
+
+/-- Phantom shape for an ordinary JavaScript object. -/
+opaque Value : Type
+
+end Object
+
+
+/-- JavaScript-owned ordinary object. -/
+abbrev Object : Type :=
+  Lean.Vir.Js Object.Value
+
+namespace Any
+
+/-- Erased phantom shape for a JavaScript value whose static type is deliberately unknown. -/
+opaque Value : Type
+
+end Any
+
+
+/-- JavaScript-owned value with an explicitly erased static shape. -/
+abbrev Any : Type :=
+  Lean.Vir.Js Any.Value
+
 namespace Nullable
 
 /-- Phantom marker for a JavaScript nullable value. -/

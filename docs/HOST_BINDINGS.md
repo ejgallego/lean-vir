@@ -199,15 +199,14 @@ not as a preconstructed map. The browser host passes its one `HostLifecycle`
 to that factory so React roots cannot be registered in a hidden independent
 lifecycle.
 
-The Node virtual document remains useful for DOM-independent host tests, but
-its React bindings are explicit cleanup-safe unsupported shims. Attempting to
-construct nodes, roots, or use hooks there reports that the browser React host
-is required.
+The Node wrapper installs no DOM or React providers. This avoids treating local
+test doubles as browser or React semantics. Non-browser callers that genuinely
+have a DOM implementation can supply it explicitly through `hostBindings`.
 
 The principal intentional React conveniences are:
 
-- Lean builders for props, property descriptions, event-handler descriptions,
-  and child arrays;
+- optional Lean-side ProofWidgets builders, which lower to exact props objects
+  and child arrays before the React call;
 - `Component.ofLean`, which explicitly creates an ordinary reusable JavaScript
   component function whose identity React observes;
 - `EffectCallback.ofLean`, which explicitly creates React's setup-function
@@ -221,31 +220,13 @@ no callback-render or component-render path. Direct `Root.renderNode` needs no
 VIR acknowledgement for superseded submissions because React retains the exact
 JavaScript node graph.
 
-## Node Virtual Bindings
+## Non-browser Hosts
 
-Use the Node wrapper for virtual document and event tests:
-
-```js
-import {
-  createVirRuntime,
-  createVirtualDocumentState,
-  ensureVirtualElementState,
-} from "lean-vir/vir-runtime-node";
-
-const virtualDocumentState = createVirtualDocumentState();
-ensureVirtualElementState(virtualDocumentState, "#target");
-
-const vir = await createVirRuntime({
-  wasmBytes,
-  irPackageSetBytes: [packageBytes],
-  virtualDocumentState,
-});
-```
-
-Virtual elements and events are plain JavaScript test doubles. Values returned
-from one binding can be passed directly to another. Package replacement
-disposes the previous generation's active lifecycle, but does not invalidate
-ordinary JavaScript values merely because they were observed by that runtime.
+`lean-vir/vir-runtime-node` provides only environment-neutral JavaScript value
+operations and console bindings. It deliberately has no built-in DOM model.
+Tests should inject the smallest binding map they exercise; applications that
+need a DOM outside a browser should use an external DOM implementation and
+adapt its exact objects through `hostBindings`.
 
 ## Custom Targets
 

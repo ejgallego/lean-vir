@@ -216,11 +216,11 @@ created by `react.node.text` and `react.node.createElement`. Text inputs are exp
 `Lean.Vir.Js String` resources. Element construction receives an explicit
 `Lean.Vir.Js ElementType` value; `react.elementType.tag` preserves DOM tag
 strings unchanged, and component bindings can provide component element types
-directly. Props and dependency lists are ordinary JavaScript objects and arrays
-built by `react.props.*` and `react.deps.*`; children use the generic
-`js.array.*` surface. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
-cross only through explicit
-`js.value.react.property` and `js.value.react.eventHandler` conversion targets.
+directly. Props, child collections, and dependency lists are ordinary
+JavaScript objects and arrays built by the generic `js.object.*` and
+`js.array.*` surfaces. React has no private props, dependency, tuple, setter,
+or dispatcher protocol. Optional Lean-side HTML builders lower their values
+before calling this exact boundary.
 
 Entry points and host imports can be pure functions or synchronous effect
 actions. Host imports are deliberately narrower than exports: low-level

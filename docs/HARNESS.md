@@ -457,9 +457,9 @@ logic into entry-point scripts or pages:
 - Infoview widget smoke coverage: `tests/infoview/`
 - Browser page helpers: `web/app/pages/page-utils.js` and
   `web/app/pages/input-parsers.js`
-- Host boundary, active lifecycle, and virtual binding internals:
-  `web/src/host-boundary.js`, `web/src/host/vir-active-host-bindings.js`, and
-  `web/src/host/vir-virtual-host-bindings.js`
+- Host boundary and active lifecycle internals:
+  `web/src/host-boundary.js` and
+  `web/src/host/vir-active-host-bindings.js`
 
 ## Worktree Workflow
 

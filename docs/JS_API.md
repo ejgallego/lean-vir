@@ -14,17 +14,16 @@ The module is also exposed through the package entry point:
 import { createVirRuntime, VIR_HOST_DISPOSE } from "lean-vir";
 ```
 
-Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
-can import the Node wrapper:
+Node tests and command-line tools can import the environment-neutral wrapper:
 
 ```js
 import {
   createVirRuntime,
-  createVirtualElementState,
-  createVirtualEventState,
-  ensureVirtualElementState,
 } from "lean-vir/vir-runtime-node";
 ```
+
+It does not emulate a DOM or React. Packages with browser imports must run in a
+browser or receive an explicit external `hostBindings` implementation.
 
 Custom hosts can import the built-in binding factories directly:
 
@@ -77,7 +76,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | Module                               | Role                                                                                                      |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `vir-runtime.js`                     | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
-| `vir-runtime-node.js`                | Node wrapper that installs virtual browser bindings and unsupported React shims for tests/tools.          |
+| `vir-runtime-node.js`                | Node wrapper with environment-neutral JavaScript value and console bindings.                             |
 | `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
 | `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
 | `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
@@ -92,10 +91,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `host-boundary.js`                   | Exact-value externref roots and host-call rollback transactions.                                          |
 | `host/vir-active-host-bindings.js`   | Shared active lifecycle plus schedule and frame teardown.                                                 |
 | `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
-| `host/vir-virtual-host-bindings.js`  | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
-| `react/vir-react-node.js`            | Browser React node, props, children, and component element construction.                                  |
 | `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
-| `react/vir-react-hooks.js`           | Direct official browser React hook operations.                                                            |
 | `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
 | `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
 | `runtime/interface-tags.js`          | Shared interface descriptor tag constants and JSON-input tag set.                                         |
@@ -113,8 +109,8 @@ names an entry point above.
 ## Host Bindings
 
 The browser runtime installs the built-in `common.*` and `browser.*` host
-bindings by default. The complete target map, factory list, virtual Node
-helpers, custom binding rules, and cleanup behavior are documented in
+bindings by default. The complete target map, factory list, custom binding
+rules, and cleanup behavior are documented in
 `docs/HOST_BINDINGS.md`.
 
 `defaultHostBindings` may be either a binding map or a function returning a
@@ -485,8 +481,7 @@ hide global receiver selection inside the upstream operation.
 
 The full Lean-side declaration list is maintained in
 `docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
-virtual Node helpers, and resource lifetime rules are maintained in
-`docs/HOST_BINDINGS.md`.
+and resource lifetime rules are maintained in `docs/HOST_BINDINGS.md`.
 
 The built-in `common.*` and `browser.*` targets do not require a
 `hostBindings` option:
@@ -505,9 +500,9 @@ provided by `lean-vir/react-host-bindings`.
 Use the `defaultHostBindings` composition shown above when a browser package
 calls `Lean.Vir.React.Root.*`, `Lean.Vir.React.Node.*`, or
 `Lean.Vir.React.Hooks.*`. `Document.current` requires `globalThis.document` in
-the browser host. In Node, use `lean-vir/vir-runtime-node` or
-pass explicit `hostBindings`; the Node wrapper provides virtual document and
-event values, while React operations explicitly require the browser host.
+the browser host. The Node wrapper does not provide document, event, or React
+operations. Supply an external host explicitly when a non-browser environment
+can implement them.
 
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive the exact JavaScript values and return a

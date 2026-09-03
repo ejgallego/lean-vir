@@ -43,13 +43,7 @@ export const SDK_PAYLOADS = [
     "web/src/host/vir-js-collection-bindings.js",
   ],
   ["js/host/vir-js-value-bindings.js", "web/src/host/vir-js-value-bindings.js"],
-  [
-    "js/host/vir-virtual-host-bindings.js",
-    "web/src/host/vir-virtual-host-bindings.js",
-  ],
-  ["js/react/vir-react-node.js", "web/src/react/vir-react-node.js"],
   ["js/react/vir-react-root.js", "web/src/react/vir-react-root.js"],
-  ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 
 const SDK_METADATA_ENTRIES = [

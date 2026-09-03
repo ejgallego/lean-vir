@@ -585,19 +585,55 @@ def onSubmitWith
     Entry :=
   eventHandler <| EventHandler.onSubmitWith callback
 
-def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit := do
-  let property ← Property.toJs (Property.string "key" key)
-  setProperty props property
+private def setJs
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (name : @& String)
+    (value : @& Lean.Vir.Js α) : ReactM Unit := do
+  Lean.Vir.Js.Object.set props (← Lean.Vir.JsValue.ofString name) value
+
+private def setString
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (name value : @& String) : ReactM Unit := do
+  setJs props name (← Lean.Vir.JsValue.ofString value)
+
+private def setPropertyValue
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (name : @& String) : PropValue → ReactM Unit
+  | .string value => setString props name value
+  | .bool value => do setJs props name (← Lean.Vir.JsValue.ofBool value)
+  | .int value => do setJs props name (← Lean.Vir.JsValue.ofFloat (Float.ofInt value))
+  | .float value => do setJs props name (← Lean.Vir.JsValue.ofFloat value)
+  | .style entries => do
+      let style ← Lean.Vir.Js.Object.empty
+      for entry in entries do
+        Lean.Vir.Js.Object.set style
+          (← Lean.Vir.JsValue.ofString entry.name)
+          (← Lean.Vir.JsValue.ofString entry.value)
+      setJs props name style
+  | .classList classes =>
+      setString props name (String.intercalate " " classes.toList)
+
+private def setPropertyValueEntry
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (property : @& Property) : ReactM Unit :=
+  setPropertyValue props property.name property.value
+
+private def setEventHandlerValue
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (handler : @& EventHandler) : ReactM Unit := do
+  setJs props handler.name (← Callback.ofUnary handler.callback)
+
+def empty : ReactM (Lean.Vir.Js Lean.Vir.React.Props) := do
+  Lean.Vir.Js.Object.empty
+
+def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit :=
+  setString props "key" key
 
 def pushEntry (props : @& Lean.Vir.Js Lean.Vir.React.Props) : Entry → ReactM Unit
   | .key value => setKey props value
-  | .ref value => setRef props value
-  | .property value => do
-      let jsValue ← Property.toJs value
-      setProperty props jsValue
-  | .eventHandler value => do
-      let jsValue ← EventHandler.toJs value
-      setEventHandler props jsValue
+  | .ref value => setJs props "ref" value
+  | .property value => setPropertyValueEntry props value
+  | .eventHandler value => setEventHandlerValue props value
 
 def fromEntries (entries : Array Entry) : ReactM (Lean.Vir.Js Lean.Vir.React.Props) := do
   let props ← empty
@@ -609,6 +645,11 @@ end Props
 
 namespace StateSetter
 
+def set
+    (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
+    (value : @& Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit :=
+  Lean.Vir.Js.Function.callVoid setter value
+
 end StateSetter
 
 namespace ReducerDispatch
@@ -616,11 +657,21 @@ namespace ReducerDispatch
 def dispatch {state action : Type}
     (dispatch : Lean.Vir.Js (ReducerDispatch state action))
     (action : Lean.Vir.Js action) : Lean.Vir.RuntimeM Unit :=
-  dispatchJs dispatch action
+  Lean.Vir.Js.Function.callVoid dispatch action
 
 end ReducerDispatch
 
 namespace StateTuple
+
+def value {α : Type}
+    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js α) := do
+  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 0)
+
+def setter {α : Type}
+    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) := do
+  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 1)
 
 /-- Explicitly projects React's native `useState` result array into a Lean structure. -/
 def toState {α : Type}
@@ -633,6 +684,16 @@ def toState {α : Type}
 end StateTuple
 
 namespace ReducerTuple
+
+def value {state action : Type}
+    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js state) := do
+  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 0)
+
+def dispatch {state action : Type}
+    (result : @& Lean.Vir.Js (ReducerTuple state action)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action)) := do
+  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 1)
 
 /-- Explicitly projects React's native `useReducer` result array into a Lean structure. -/
 def toState {state action : Type}
@@ -647,6 +708,15 @@ end ReducerTuple
 namespace Hooks
 
 namespace DependencyList
+
+def empty : ReactM (Lean.Vir.Js DependencyList) := do
+  Lean.Vir.Js.Array.empty
+
+def push
+    (deps : @& Lean.Vir.Js DependencyList)
+    (value : @& Lean.Vir.Js α) : ReactM Unit := do
+  let _ ← Lean.Vir.Js.Array.push deps value
+  pure ()
 
 def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
     ReactM (Lean.Vir.Js DependencyList) := do

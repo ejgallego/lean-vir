@@ -136,6 +136,39 @@
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
+        "id": "javascript.object.empty", "group": "object", "target": "js.object.empty",
+        "lean": "Lean.Vir.Js.Object.empty", "marker": "vir_js",
+        "reason": "Constructs an ordinary empty JavaScript object without a VIR-specific props representation.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js.Object", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Object.Value" } }
+      },
+      {
+        "id": "javascript.object.set", "group": "object", "target": "js.object.set",
+        "lean": "Lean.Vir.Js.Object.set", "marker": "vir_js",
+        "reason": "Assigns the exact JavaScript value to the exact property name on an ordinary JavaScript object.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "object", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Object", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Object.Value" } },
+          { "name": "name", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.function.call-void", "group": "function", "target": "js.function.callVoid",
+        "lean": "Lean.Vir.Js.Function.callVoid", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with one exact JavaScript argument and discards its void result.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["fn", "α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "function", "role": "receiver", "type": { "lean": "Lean.Vir.Js fn", "representation": "js-resource", "resourceInner": "fn" } },
+          { "name": "argument", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
         "id": "javascript.array.empty", "group": "array", "target": "js.array.empty",
         "lean": "Lean.Vir.Js.Array.empty", "marker": "vir_js",
         "reason": "Constructs an empty native JavaScript Array.",
@@ -148,10 +181,10 @@
         "lean": "Lean.Vir.Js.Array.push", "marker": "vir_js",
         "reason": "Calls Array.push with the exact native array and item and returns its JavaScript Number result.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.push", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
-          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
-          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "value", "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
@@ -166,15 +199,15 @@
       },
       {
         "id": "javascript.array.item", "group": "array", "target": "js.array.item",
-        "lean": "Lean.Vir.Js.Array.getJs", "marker": "vir_js",
-        "reason": "Reads the exact JavaScript value at a non-negative safe-integer Array index, including undefined for a hole or missing entry.",
+        "lean": "Lean.Vir.Js.Array.getAs", "marker": "vir_js",
+        "reason": "Performs the exact JavaScript bracket-property read on the array, including undefined for a hole or missing entry.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
-          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } },
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
           { "name": "index", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }
       },
       {
         "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",
@@ -227,6 +260,20 @@
     ]
   },
   "roots": [
+    {
+      "id": "object",
+      "title": "Object",
+      "targets": ["js.object.*"],
+      "lean": { "public": ["Lean.Vir.Js.Object"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Object"] }
+    },
+    {
+      "id": "function",
+      "title": "Function invocation",
+      "targets": ["js.function.*"],
+      "lean": { "public": ["Lean.Vir.Js.Function"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Function"] }
+    },
     {
       "id": "array",
       "title": "Array",

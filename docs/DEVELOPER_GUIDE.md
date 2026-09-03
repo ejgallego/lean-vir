@@ -80,9 +80,9 @@ component purity, hook ordering, effect discipline, valid dependencies, and
 replay-safe reducers. A Lean helper may improve ergonomics, but it must be
 named and documented as an adapter if it changes the upstream operation.
 
-Node virtual bindings intentionally stop at DOM/event test doubles. React
-operations fail with a browser-host-required error. Add React semantic tests to
-the official Chromium suite instead of extending the virtual host.
+The Node wrapper deliberately provides no DOM or React implementation. Add
+browser and React semantic tests to the official Chromium suite; focused Node
+tests may inject only the individual host operations they exercise.
 
 ## Adding A Host Import
 

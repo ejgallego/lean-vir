@@ -148,31 +148,18 @@ def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
       pure ()
 ```
 
-In Node tests or command-line tools, import the Node wrapper instead:
+Node tests and command-line tools may use the environment-neutral wrapper:
 
 ```js
 import {
   createVirRuntime,
-  ensureVirtualElementState,
-  ensureVirtualElementStates,
 } from "lean-vir/vir-runtime-node";
 ```
 
-That wrapper uses the same runtime and installs virtual browser bindings for
-`Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`,
-`Lean.Vir.Browser.Event`, `Lean.Vir.Browser.HTMLInputElement`, timers,
-and animation frames. It also exports
-`createVirtualElementState`, `createVirtualEventState`,
-`ensureVirtualElementState`, and `ensureVirtualElementStates` for direct
-callback tests. React operations are explicit unsupported shims; React
-semantics are tested with official React in Chromium. Virtual
-`Document.current` returns the virtual document value used as the explicit
-receiver. `Document.querySelector` returns a nullable JavaScript resource for
-missing selectors; the explicit `Document.querySelectorString` convenience
-wrapper converts that result to `none`. Call
-`ensureVirtualElementState(state, selector)` in JS tests when the fixture
-should exist. Use `ensureVirtualElementStates` to seed all results returned by
-virtual `Document.querySelectorAll`.
+That wrapper uses the same runtime and installs only environment-neutral
+JavaScript value and console operations. It has no DOM or React model. Run
+browser semantics in Chromium, or pass a focused external `hostBindings` map
+when a non-browser test needs a particular operation.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -552,7 +539,7 @@ uses the goal surface and editor edit command without duplicating the infoview.
 `node tests/infoview/widget.mjs` checks that the shell module loads and
 that the proof-widget entries have the required signatures.
 
-The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
+The JavaScript runtime binding map, external-host behavior, cleanup hooks,
 and external browser/React API references are documented in
 `docs/HOST_BINDINGS.md`.
 
@@ -602,8 +589,8 @@ Host imports use an explicit JavaScript-resource boundary by default. Use
 JavaScript `null`, or callback arguments whose own arguments/results are
 `Unit` or resources. Nested callback arguments are rejected. Raw Lean scalars,
 structures, arrays, lists, options, and products are rejected unless the target
-is a built-in conversion primitive such as `js.nat.value` or
-`js.value.react.property`. `Unit` results should return `undefined` or `null`.
+is a built-in conversion primitive such as `js.nat.value`. `Unit` results
+should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim
