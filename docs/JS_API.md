@@ -135,6 +135,10 @@ const factory = createVirRuntimeFactory({
 });
 ```
 
+The `reactHostBindings` option is deliberately a factory. The browser host
+passes its own lifecycle to that factory so runtime disposal reaches every
+React root; preconstructed binding maps are rejected.
+
 ## Browser Usage
 
 ```js

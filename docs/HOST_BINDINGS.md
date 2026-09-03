@@ -194,6 +194,11 @@ The browser React host uses official React 19 and ReactDOM:
 VIR does not emulate hook state, render replay, reconciliation, lanes, or
 commit semantics. Official React running in Chromium is the semantic oracle.
 
+`createBrowserHostBindings` accepts its optional React bindings as a factory,
+not as a preconstructed map. The browser host passes its one `HostLifecycle`
+to that factory so React roots cannot be registered in a hidden independent
+lifecycle.
+
 The Node virtual document remains useful for DOM-independent host tests, but
 its React bindings are explicit cleanup-safe unsupported shims. Attempting to
 construct nodes, roots, or use hooks there reports that the browser React host
