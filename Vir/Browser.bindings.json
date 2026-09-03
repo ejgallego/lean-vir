@@ -39,6 +39,7 @@
       "Element": "Element",
       "ElementCSSInlineStyle": "ElementCSSInlineStyle",
       "Event": "Event",
+      "EventTarget": "EventTarget",
       "HTMLCanvasElement": "HTMLCanvasElement",
       "HTMLInputElement": "HTMLInputElement",
       "KeyboardEvent": "KeyboardEvent",
@@ -340,28 +341,6 @@
         "reason": "VIR specializes HTMLCanvasElement.getContext to the fixed 2d context id and default options.",
         "semantics": "preserving",
         "receiver": { "name": "canvas" }
-      },
-      "browser.event.currentTarget": {
-        "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
-        "semantics": "changing",
-        "result": {
-          "type": {
-            "lean": "Lean.Vir.Js.Nullable Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
-          }
-        }
-      },
-      "browser.event.target": {
-        "reason": "The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.",
-        "semantics": "changing",
-        "result": {
-          "type": {
-            "lean": "Lean.Vir.Js.Nullable Element",
-            "representation": "js-resource",
-            "resourceInner": "Element"
-          }
-        }
       }
     },
     "protocolOperations": [
@@ -382,6 +361,17 @@
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [],
         "result": { "type": { "lean": "Lean.Vir.Js Document", "representation": "js-resource", "resourceInner": "Document" } }
+      },
+      {
+        "id": "browser.event-target.as-element", "group": "event", "target": "browser.eventTarget.asElement",
+        "lean": "Lean.Vir.Browser.EventTarget.asElementNullable", "marker": "vir_js",
+        "reason": "Checks whether an EventTarget is an Element and preserves the exact JavaScript identity on success; this is explicit narrowing, not an Event property adapter.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [
+          { "name": "target", "type": { "lean": "Lean.Vir.Js EventTarget", "representation": "js-resource", "resourceInner": "EventTarget" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable Element", "representation": "js-resource", "resourceInner": "Element" } }
       },
       {
         "id": "browser.event-listener.of-lean", "group": "element", "target": "js.value.browser.eventListener",
@@ -823,8 +813,8 @@
     {
       "id": "event",
       "title": "Events",
-      "targets": ["browser.event.*", "browser.keyboardEvent.*"],
-      "lean": { "public": ["Lean.Vir.Browser.Event", "Lean.Vir.Browser.KeyboardEvent"] },
+      "targets": ["browser.event.*", "browser.eventTarget.*", "browser.keyboardEvent.*"],
+      "lean": { "public": ["Lean.Vir.Browser.Event", "Lean.Vir.Browser.EventTarget", "Lean.Vir.Browser.KeyboardEvent"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["Event", "KeyboardEvent"] },
       "mappings": [
         {

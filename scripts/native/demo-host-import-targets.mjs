@@ -31,6 +31,7 @@ export const demoHostImportTargets = [
   "browser.event.preventDefault",
   "browser.event.stopPropagation",
   "browser.event.target",
+  "browser.eventTarget.asElement",
   "browser.htmlInputElement.fromElement",
   "browser.htmlInputElement.getChecked",
   "browser.htmlInputElement.getValue",

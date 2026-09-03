@@ -430,6 +430,14 @@ assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
 const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
+const eventTargetImport = hostImportTarget("browser.event.target");
+assert.equal(eventTargetImport?.args[0]?.type?.type, "Event");
+assert.equal(eventTargetImport?.result?.type, "Js");
+const eventTargetNarrowingImport = hostImportTarget(
+  "browser.eventTarget.asElement",
+);
+assert.equal(eventTargetNarrowingImport?.args[0]?.type?.type, "EventTarget");
+assert.equal(eventTargetNarrowingImport?.result?.type, "Js");
 const inlineStyleNarrowingImport = hostImportTarget(
   "browser.elementCSSInlineStyle.fromElement",
 );
@@ -732,8 +740,8 @@ virtualQueryState.elements
   .listeners.get("click")[0]
   .dispatch(
     createVirtualEventState({
-      target: "#missing",
-      currentTarget: "#missing",
+      target: null,
+      currentTarget: null,
     }),
   );
 assert.equal(

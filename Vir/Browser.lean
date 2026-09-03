@@ -24,6 +24,16 @@ def keyString (event : @& Lean.Vir.Js KeyboardEvent) : DomM String := do
 
 end KeyboardEvent
 
+namespace EventTarget
+
+/-- Narrows an exact `EventTarget` to `Element` without changing its JavaScript identity. -/
+def asElement
+    (target : @& Lean.Vir.Js EventTarget) :
+    DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← asElementNullable target)
+
+end EventTarget
+
 namespace Event
 
 /--
@@ -36,7 +46,9 @@ follows browser semantics.
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
 def targetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← getTarget event)
+  match ← Lean.Vir.Js.Nullable.toOption (← getTarget event) with
+  | none => pure none
+  | some target => EventTarget.asElement target
 
 /--
 Returns the current event target as a DOM element when the current target is an
@@ -49,7 +61,9 @@ stronger event lifetime.
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
 def currentTargetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← getCurrentTarget event)
+  match ← Lean.Vir.Js.Nullable.toOption (← getCurrentTarget event) with
+  | none => pure none
+  | some target => EventTarget.asElement target
 
 /--
 Returns the keyboard key represented by an event, or the empty string for

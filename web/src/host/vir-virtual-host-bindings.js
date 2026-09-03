@@ -154,18 +154,16 @@ export function createVirtualEventState({
   return event;
 }
 
-export function createVirtualEventHostBindings(
-  state = createVirtualDocumentState(),
-) {
+export function createVirtualEventHostBindings() {
   return {
     ...createEventListenerValueHostBindings(),
     ...createKeyboardEventHostBindings({
       fromEvent: (event) => (typeof event?.key === "string" ? event : null),
     }),
-    "browser.event.target": (event) =>
-      virtualEventElementValue(state, event, "target"),
-    "browser.event.currentTarget": (event) =>
-      virtualEventElementValue(state, event, "currentTarget"),
+    "browser.event.target": (event) => event?.target ?? null,
+    "browser.event.currentTarget": (event) => event?.currentTarget ?? null,
+    "browser.eventTarget.asElement": (target) =>
+      target !== null && typeof target === "object" ? target : null,
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(event);
       return undefined;
@@ -199,7 +197,7 @@ export function createVirtualDocumentHostBindings(
       createStaticNodeList(queryVirtualElementStates(documentValue, selector)),
     "browser.document.createElement": (_documentValue, _tagName) =>
       createVirtualElementState(),
-    ...createVirtualEventHostBindings(state),
+    ...createVirtualEventHostBindings(),
     ...createElementHostBindings({
       querySelector: (target, selector) =>
         queryVirtualDescendantStates(target, selector)[0] ?? null,
@@ -449,18 +447,6 @@ function queryVirtualDescendantStates(element, selector) {
   if (value === undefined) return [];
   const elements = Array.isArray(value) ? value : [value];
   return elements.map(normalizeVirtualElementState);
-}
-
-function virtualEventElementValue(state, event, field) {
-  const value = event?.[field];
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") {
-    return queryVirtualElementState(state, value);
-  }
-  if (typeof value === "object") {
-    return value;
-  }
-  return null;
 }
 
 function formControlEventValue(event) {

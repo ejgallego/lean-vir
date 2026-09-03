@@ -337,10 +337,10 @@ inventory:
   capability without changing identity. Its generated `style` getter returns
   the exact `CSSStyleDeclaration`; `CSSStyleDeclaration.setProperty` preserves
   the upstream `string | null` value.
-- `Event` exposes targets and propagation operations. `KeyboardEvent.fromEvent`
-  performs checked identity-preserving narrowing before the generated exact
-  `KeyboardEvent.key` getter; form helpers similarly make their narrowing and
-  string conversion explicit.
+- `Event` exposes exact `EventTarget | null` properties and propagation
+  operations. `EventTarget.asElement` and `KeyboardEvent.fromEvent` perform
+  checked identity-preserving narrowing; form helpers likewise make narrowing
+  and string conversion explicit.
 - `HTMLInputElement` and `HTMLCanvasElement` provide checked element narrowing.
   The canvas surface preserves exact context, text-metric, and style values.
 - Timers, intervals, animation frames, and event listeners use private host

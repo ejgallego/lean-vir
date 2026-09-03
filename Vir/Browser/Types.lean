@@ -77,6 +77,9 @@ opaque CSSStyleDeclaration : Type
 /-- Exact browser `Event` value; its practical validity follows browser semantics. -/
 opaque Event : Type
 
+/-- Exact browser `EventTarget` value returned by event properties. -/
+opaque EventTarget : Type
+
 /-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
 opaque KeyboardEvent : Type
 

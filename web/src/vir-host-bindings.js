@@ -90,9 +90,10 @@ export function createBrowserEventHostBindings() {
     ...createKeyboardEventHostBindings({
       fromEvent: (event) => (isKeyboardEvent(event) ? event : null),
     }),
-    "browser.event.target": (event) => nullableElementTarget(event.target),
-    "browser.event.currentTarget": (event) =>
-      nullableElementTarget(event.currentTarget),
+    "browser.event.target": (event) => event.target,
+    "browser.event.currentTarget": (event) => event.currentTarget,
+    "browser.eventTarget.asElement": (target) =>
+      isElement(target) ? target : null,
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(event);
       return undefined;
@@ -637,10 +638,6 @@ function isElement(value) {
     typeof globalThis.Element === "function" &&
     value instanceof globalThis.Element
   );
-}
-
-function nullableElementTarget(value) {
-  return isElement(value) ? value : null;
 }
 
 function formControlEventValue(event) {

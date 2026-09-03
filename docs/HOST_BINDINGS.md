@@ -150,8 +150,9 @@ The built-in groups closely follow their browser APIs:
   operation retrieves the host-global document;
 - `browser.element.*` exposes queries, content, attributes, tree operations,
   classes, styles, and event listeners;
-- `browser.event.*` exposes targets, keyboard keys, cancellation, and form
-  values;
+- `browser.event.*` exposes exact `EventTarget | null` values, keyboard keys,
+  cancellation, and form values; `browser.eventTarget.asElement` is separate
+  checked identity-preserving narrowing;
 - `browser.htmlInputElement.*` and `browser.htmlCanvasElement.*` narrow and
   operate on the actual browser objects;
 - `browser.canvas2d.*` forwards to the actual 2D context;

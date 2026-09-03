@@ -1039,13 +1039,11 @@ end ElementCSSInlineStyle
 namespace Event
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Event.currentTarget`.
+Faithful generated getter binding for TypeScript `Event.currentTarget`.
 
 The **`currentTarget`** read-only property of the Event interface identifies the element to which the event handler has been attached.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/currentTarget)
-
-Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -1056,7 +1054,7 @@ This declaration is generated; edit the TypeScript source or binding configurati
 @[vir_js "browser.event.currentTarget"]
 opaque getCurrentTarget
     (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable Element)
+    DomM (Lean.Vir.Js.Nullable EventTarget)
 
 /--
 Faithful generated method binding for TypeScript `Event.preventDefault`.
@@ -1095,13 +1093,11 @@ opaque stopPropagation
     DomM Unit
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Event.target`.
+Faithful generated getter binding for TypeScript `Event.target`.
 
 The read-only **`target`** property of the Event interface is a reference to the object onto which the event was dispatched. It is different from Event.currentTarget when the event handler is called during the bubbling or capturing phase of the event.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/target)
-
-Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -1112,7 +1108,7 @@ This declaration is generated; edit the TypeScript source or binding configurati
 @[vir_js "browser.event.target"]
 opaque getTarget
     (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable Element)
+    DomM (Lean.Vir.Js.Nullable EventTarget)
 
 /--
 Generated binding for reviewed VIR protocol `browser.event.formValue`.
@@ -1151,6 +1147,26 @@ opaque ofLean
     Lean.Vir.RuntimeM (Lean.Vir.Js EventListener)
 
 end EventListener
+
+namespace EventTarget
+
+/--
+Generated binding for reviewed VIR protocol `browser.event-target.as-element`.
+
+Checks whether an EventTarget is an Element and preserves the exact JavaScript identity on success; this is explicit narrowing, not an Event property adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; target js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.eventTarget.asElement"]
+opaque asElementNullable
+    (target : @& Lean.Vir.Js EventTarget) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+end EventTarget
 
 namespace HTMLCanvasElement
 

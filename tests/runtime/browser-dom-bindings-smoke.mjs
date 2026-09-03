@@ -119,6 +119,42 @@ const eventBindings = createBrowserEventHostBindings();
 const tokenBindings = createDOMTokenListHostBindings();
 const listener = () => undefined;
 
+const previousElement = Object.getOwnPropertyDescriptor(globalThis, "Element");
+class TestElement {}
+Object.defineProperty(globalThis, "Element", {
+  configurable: true,
+  writable: true,
+  value: TestElement,
+});
+try {
+  const elementTarget = new TestElement();
+  const nonElementTarget = {};
+  assert.equal(
+    eventBindings["browser.event.target"]({ target: elementTarget }),
+    elementTarget,
+  );
+  assert.equal(
+    eventBindings["browser.event.currentTarget"]({
+      currentTarget: nonElementTarget,
+    }),
+    nonElementTarget,
+  );
+  assert.equal(
+    eventBindings["browser.eventTarget.asElement"](elementTarget),
+    elementTarget,
+  );
+  assert.equal(
+    eventBindings["browser.eventTarget.asElement"](nonElementTarget),
+    null,
+  );
+} finally {
+  if (previousElement) {
+    Object.defineProperty(globalThis, "Element", previousElement);
+  } else {
+    delete globalThis.Element;
+  }
+}
+
 assert.equal(
   eventBindings["js.value.browser.eventListener"](listener),
   listener,
@@ -193,6 +229,22 @@ assert.equal(
   "",
 );
 const virtualElement = ensureVirtualElementState(virtualState, "#present");
+const virtualEvent = createVirtualEventState({
+  target: virtualElement,
+  currentTarget: virtualElement,
+});
+assert.equal(
+  virtualBindings["browser.event.target"](virtualEvent),
+  virtualElement,
+);
+assert.equal(
+  virtualBindings["browser.event.currentTarget"](virtualEvent),
+  virtualElement,
+);
+assert.equal(
+  virtualBindings["browser.eventTarget.asElement"](virtualElement),
+  virtualElement,
+);
 const virtualPlainEvent = createVirtualEventState();
 assert.equal(
   virtualBindings["browser.keyboardEvent.fromEvent"](virtualPlainEvent),
