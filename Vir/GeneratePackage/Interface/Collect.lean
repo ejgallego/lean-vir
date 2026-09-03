@@ -67,14 +67,12 @@ def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
         | none => false
 
 def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
-  if target.packageOnly then
-    #[]
-  else if target.includeAll then
-    publicSourceDeclsFor index target
-  else if target.includeMarked then
-    markedDeclNamesFor index target
-  else
-    target.roots.foldl (fun acc root =>
+  match target.mode with
+  | .packageOnly _ => #[]
+  | .all => publicSourceDeclsFor index target
+  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .explicit roots =>
+    roots.foldl (fun acc root =>
       let n := (boxedBaseName? root).getD root
       if acc.contains n then acc else acc.push n) #[]
 

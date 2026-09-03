@@ -161,6 +161,7 @@ try {
   );
   assert.equal(inspectedMarked.status, 0, inspectedMarked.stderr || inspectedMarked.stdout);
   const markedManifest = JSON.parse(inspectedMarked.stdout).manifest;
+  assert.equal(markedManifest.metadata.targets[0].mode, "marked");
   assert.deepEqual(
     markedManifest.exports.map((entry) => entry.entry).sort(),
     [
@@ -190,6 +191,56 @@ try {
     assert.equal(entry.effect, effect);
   }
   assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedStartup"), false);
+
+  const selectionModesPackage = join(freshDir, "selection-modes.irpkg");
+  const selectionModesReport = join(freshDir, "selection-modes.report.md");
+  const generatedSelectionModes = runVirIrpkg([
+    selectionModesPackage,
+    selectionModesReport,
+    "--target",
+    markedSource,
+    "markedValue",
+    "--package-target",
+    markedSource,
+    "notMarked",
+  ]);
+  assert.equal(
+    generatedSelectionModes.status,
+    0,
+    generatedSelectionModes.stderr || generatedSelectionModes.stdout,
+  );
+  const inspectedSelectionModes = spawnSync(
+    "node",
+    ["scripts/packages/inspect-irpkg.mjs", "--json", selectionModesPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    inspectedSelectionModes.status,
+    0,
+    inspectedSelectionModes.stderr || inspectedSelectionModes.stdout,
+  );
+  const selectionModesManifest = JSON.parse(inspectedSelectionModes.stdout).manifest;
+  assert.deepEqual(
+    selectionModesManifest.metadata.targets.map(({ mode, roots }) => ({ mode, roots })),
+    [
+      { mode: "explicit", roots: ["markedValue"] },
+      { mode: "packageOnly", roots: ["notMarked"] },
+    ],
+  );
+  assert.deepEqual(
+    selectionModesManifest.exports.map((entry) => entry.entry),
+    ["markedValue"],
+  );
+
+  const malformedRoot = runVirIrpkg([
+    join(freshDir, "malformed-root.irpkg"),
+    join(freshDir, "malformed-root.report.md"),
+    "--target",
+    markedSource,
+    "markedValue.",
+  ]);
+  assert.equal(malformedRoot.status, 2);
+  assert.match(malformedRoot.stderr, /must not contain empty components/);
 
   const externFallbackSource = join(freshDir, "ExternFallback.lean");
   const externFallbackPackage = join(freshDir, "extern-fallback.irpkg");

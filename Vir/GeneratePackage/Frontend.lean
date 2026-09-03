@@ -48,7 +48,7 @@ def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name :=
   env.header.moduleNames[moduleIdx]?
 
 def targetOwnsDecl (target : Target) (env : Environment) (name : Name) : Bool :=
-  match target.markedModule? with
+  match target.mode.markedModule? with
   | some moduleName => environmentModuleForDecl? env name == some moduleName
   | none => true
 
@@ -119,7 +119,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
         names := names.push decl.name
       let loaded := {
         source := target.source.toString
-        module? := target.markedModule? <|> environmentModuleForDecl? env decl.name
+        module? := target.mode.markedModule? <|> environmentModuleForDecl? env decl.name
         decl
       }
       match index.localDecls.find? decl.name with
@@ -138,7 +138,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       index with
       virExports := exports.foldl (fun selected name => selected.insert name) index.virExports
       virStartups := startups.foldl (fun selected name => selected.insert name) index.virStartups
-      loadedModules := match target.markedModule? with
+      loadedModules := match target.mode.markedModule? with
         | some moduleName => index.loadedModules.insert moduleName
         | none => index.loadedModules
     }
@@ -208,6 +208,10 @@ private def DeclIndex.loadedModuleGraph
       let some data := env.header.moduleData[moduleIdx]? | continue
       let mut imports := importsByModule.find? moduleName |>.getD #[]
       for imported in data.imports do
+        -- Meta imports execute while elaborating the module but are not part
+        -- of the packaged program's runtime initialization order.
+        if imported.isMeta then
+          continue
         if !imports.contains imported.module then
           imports := imports.push imported.module
       importsByModule := importsByModule.insert moduleName imports
@@ -234,7 +238,7 @@ def DeclIndex.moduleInitializationOrderForTarget?
   let mut ordered := #[]
   let mut orderedSet : NameSet := {}
   while !remaining.isEmpty do
-    let preferred := match target.markedModule? with
+    let preferred := match target.mode.markedModule? with
       | some rootModule =>
           let withoutRoot := remaining.filter (· != rootModule)
           if withoutRoot.isEmpty then remaining else withoutRoot
@@ -282,7 +286,7 @@ def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
       if source == target.source.toString then some env else none) with
   | none => #[]
   | some env =>
-      match target.markedModule? with
+      match target.mode.markedModule? with
       | some moduleName =>
           (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
             match env.getModuleIdxFor? name with

@@ -24,14 +24,45 @@ def maxHostImportSlots : Nat := 128
 
 def maxHostImportArity : Nat := 6
 
+inductive TargetMode where
+  | explicit (roots : Array Name)
+  | packageOnly (roots : Array Name)
+  | all
+  | marked
+  | markedModule (moduleName : Name)
+
+namespace TargetMode
+
+def roots : TargetMode → Array Name
+  | .explicit roots | .packageOnly roots => roots
+  | .all | .marked | .markedModule _ => #[]
+
+def markedModule? : TargetMode → Option Name
+  | .markedModule moduleName => some moduleName
+  | _ => none
+
+def selectsMarked : TargetMode → Bool
+  | .marked | .markedModule _ => true
+  | _ => false
+
+def metadataName : TargetMode → String
+  | .explicit _ => "explicit"
+  | .packageOnly _ => "packageOnly"
+  | .all => "all"
+  | .marked => "marked"
+  | .markedModule _ => "markedModules"
+
+end TargetMode
+
+/--
+A package input and its single, explicit selection mode. Keeping the mode as a
+sum type prevents contradictory states such as selecting both all declarations
+and marked declarations, or accidentally changing manifest metadata with an
+unrelated loading flag.
+-/
 structure Target where
   source : System.FilePath
-  roots : Array Name
-  includeAll : Bool := false
-  includeMarked : Bool := false
-  markedModule? : Option Name := none
-  resolveImportedModules : Bool := false
-  packageOnly : Bool := false
+  mode : TargetMode
 
 structure LoadedDecl where
   source : String
@@ -127,26 +158,25 @@ structure InterfaceManifest where
 def defaultTargets : Array Target := #[
   {
     source := "examples/Fib.lean",
-    roots := #[`fib]
+    mode := .explicit #[`fib]
   },
   {
     source := "examples/Tamagotchi.lean",
-    roots := #[
+    mode := .explicit #[
       `Tamagotchi.step
     ]
   },
   {
     source := "examples/Tamagotchi.lean",
-    roots := #[
+    mode := .packageOnly #[
       `Tamagotchi.run,
       `Tamagotchi.trace,
       `Tamagotchi.demoScript
-    ],
-    packageOnly := true
+    ]
   },
   {
     source := "examples/MergeSort.lean",
-    roots := #[`SortDemo.demo, `SortDemo.demoFromArray]
+    mode := .explicit #[`SortDemo.demo, `SortDemo.demoFromArray]
   }
 ]
 

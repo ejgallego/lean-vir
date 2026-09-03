@@ -34,7 +34,8 @@ Then mark exports directly in Lean and build the containing module:
 ```lean
 module
 
-public import Vir
+public import Vir.Browser
+meta import Vir.Attributes
 
 public section
 

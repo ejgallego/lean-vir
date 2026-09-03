@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir
+public import Vir.Browser
+meta import Vir.Attributes
 
 public section
 

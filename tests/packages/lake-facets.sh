@@ -149,7 +149,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   '' \
   '@[vir_export]' \
   'public def Lean.SmokeDependency.importedValue : Nat := 41' > "$tmp/Smoke/Dependency.lean"
@@ -157,7 +157,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Smoke.Dependency' \
   '' \
   '@[vir_export]' \
@@ -170,7 +170,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Vir.HostValidation' \
   '' \
   '#check vir_export' \
@@ -228,6 +228,11 @@ printf '%s\n' \
   '' \
   'public import Vir.GeneratePackage' \
   '' \
+  '#check Vir.GeneratePackage.TargetMode' \
+  '#check Vir.GeneratePackage.TargetMode.explicit' \
+  '#check Vir.GeneratePackage.TargetMode.packageOnly' \
+  '#check Vir.GeneratePackage.TargetMode.markedModule' \
+  '#check Vir.GeneratePackage.parseDottedName' \
   '#check Vir.GeneratePackage.moduleNameFor' \
   '#check Vir.GeneratePackage.collectClosure' \
   '#check Vir.GeneratePackage.virJsMetadataFromDecl?' \
@@ -248,7 +253,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Smoke.OpaqueDependency' \
   '' \
   '@[vir_export]' \
@@ -322,9 +327,11 @@ test -f "$report"
 
 module_package="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg"
 module_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
+module_dependency="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.parts/Smoke.Dependency.irpkg"
 module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
 test -f "$module_descriptor"
+test -f "$module_dependency"
 test -f "$module_driver"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
@@ -341,16 +348,32 @@ node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
   const entries = Object.fromEntries(manifest.exports.map((entry) => [entry.entry, entry]));
+  if (manifest.metadata.targets[0]?.mode !== "markedModules") process.exit(1);
   if (manifest.exports.length !== 2) process.exit(1);
   if (entries["Smoke.NewRuntime.value"]?.startup !== false) process.exit(1);
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);
   if (entries["Lean.SmokeDependency.importedValue"] !== undefined) process.exit(1);
 ' "$tmp/module-package.json"
 
+module_dependency_hash_before="$(sha256sum "$module_dependency" | cut -d' ' -f1)"
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
+  '' \
+  '@[vir_export]' \
+  'public def Lean.SmokeDependency.importedValue : Nat := 42' > "$tmp/Smoke/Dependency.lean"
+lake -d "$tmp" build +Smoke.NewRuntime:vir
+module_dependency_hash_after="$(sha256sum "$module_dependency" | cut -d' ' -f1)"
+if [ "$module_dependency_hash_before" = "$module_dependency_hash_after" ]; then
+  echo "imported implementation change did not invalidate the VIR dependency shard" >&2
+  exit 1
+fi
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'meta import Vir.Attributes' \
   'public import Smoke.OpaqueDependency' \
   '' \
   '@[vir_export]' \

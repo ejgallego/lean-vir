@@ -7,10 +7,7 @@ Author: Emilio J. Gallego Arias
 import Vir.GeneratePackage
 
 open Lean
-
-def nameFromDotted (text : String) : Name :=
-  text.splitOn "." |>.foldl (fun name part =>
-    if part.isEmpty then name else .str name part) .anonymous
+open Vir.GeneratePackage
 
 partial def takeTargetRoots : List String -> List String -> List String × List String
   | [], roots => (roots.reverse, [])
@@ -27,50 +24,43 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
       let (roots, rest) := takeTargetRoots rest []
       if roots.isEmpty then
         throw s!"target `{source}` has no roots"
+      let roots ← roots.toArray.mapM parseDottedName
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
-          roots := roots.toArray.map nameFromDotted
-          resolveImportedModules := true
+          mode := .explicit roots
         }
       return (#[target] ++ (← parseTargets rest))
   | "--package-target" :: source :: rest => do
       let (roots, rest) := takeTargetRoots rest []
       if roots.isEmpty then
         throw s!"package target `{source}` has no roots"
+      let roots ← roots.toArray.mapM parseDottedName
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
-          roots := roots.toArray.map nameFromDotted
-          resolveImportedModules := true
-          packageOnly := true
+          mode := .packageOnly roots
         }
       return (#[target] ++ (← parseTargets rest))
   | "--target-all" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
-          roots := #[]
-          includeAll := true
-          resolveImportedModules := true
+          mode := .all
         }
       return (#[target] ++ (← parseTargets rest))
   | "--target-marked" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
         {
           source := source
-          roots := #[]
-          includeMarked := true
-          resolveImportedModules := true
+          mode := .marked
         }
       return (#[target] ++ (← parseTargets rest))
   | "--target-marked-module" :: source :: moduleName :: rest => do
+      let moduleName ← parseDottedName moduleName
       let target : Vir.GeneratePackage.Target := {
         source := source
-        roots := #[]
-        includeMarked := true
-        markedModule? := some (nameFromDotted moduleName)
-        resolveImportedModules := true
+        mode := .markedModule moduleName
       }
       return (#[target] ++ (← parseTargets rest))
   | arg :: _ =>
@@ -84,11 +74,11 @@ unsafe def main (args : List String) : IO UInt32 := do
       match targetArgs with
       | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::
           rootRelativePath :: shardRelativeDir :: targetArgs =>
-          match parseTargets targetArgs with
-          | .ok targets =>
-              Vir.GeneratePackage.runModuleSet targets (nameFromDotted moduleName)
+          match parseDottedName moduleName, parseTargets targetArgs with
+          | .ok rootModule, .ok targets =>
+              Vir.GeneratePackage.runModuleSet targets rootModule
                 packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath
-          | .error err =>
+          | .error err, _ | _, .error err =>
               IO.eprintln err
               return 2
       | _ =>

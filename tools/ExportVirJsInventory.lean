@@ -21,10 +21,6 @@ structure Options where
   modules : Array Name
   check : Bool := false
 
-def nameFromDotted (text : String) : Name :=
-  text.splitOn "." |>.foldl (fun name part =>
-    if part.isEmpty then name else .str name part) .anonymous
-
 def compact (text : String) : String :=
   (" ".toSlice.intercalate <|
     (text.split Char.isWhitespace).filter (!·.isEmpty) |>.toList)
@@ -255,11 +251,15 @@ unsafe def main (args : List String) : IO UInt32 := do
     | rest => (false, rest)
   match args with
   | output :: moduleTexts =>
-      let modules := moduleTexts.toArray.map Vir.ExportVirJsInventory.nameFromDotted
-      if modules.isEmpty || modules.any (·.isAnonymous) then
-        IO.eprintln "at least one non-empty dotted Lean module is required"
-        return 2
-      Vir.ExportVirJsInventory.run { output, modules, check }
+      match moduleTexts.toArray.mapM Vir.GeneratePackage.parseDottedName with
+      | .error err =>
+          IO.eprintln err
+          return 2
+      | .ok modules =>
+          if modules.isEmpty then
+            IO.eprintln "at least one dotted Lean module is required"
+            return 2
+          Vir.ExportVirJsInventory.run { output, modules, check }
   | _ =>
       IO.eprintln "usage: vir_js_inventory [--check] <output.json> <Lean.Module>..."
       return 2

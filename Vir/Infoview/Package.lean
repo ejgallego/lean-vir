@@ -54,20 +54,12 @@ meta structure IRPackageInfo where
   revision : String
   deriving Server.RpcEncodable
 
-meta def nameFromDotted (text : String) : Except String Name := do
-  if text.isEmpty then
-    throw "root name must be non-empty"
-  let parts := text.splitOn "."
-  if parts.any (fun part => part.isEmpty) then
-    throw s!"root name `{text}` must not contain empty components"
-  return parts.foldl (fun name part => .str name part) .anonymous
-
 private meta def irPackageRootNames (roots : Array String) : Except String (Array Name) := do
   if roots.isEmpty then
     throw "at least one root name is required"
   let mut names : Array Name := #[]
   for root in roots do
-    let name ← nameFromDotted root
+    let name ← Vir.GeneratePackage.parseDottedName root
     if !names.contains name then
       names := names.push name
   return names
@@ -311,7 +303,7 @@ meta def packageClosure
     Vir.GeneratePackage.Closure :=
   let target : Vir.GeneratePackage.Target := {
     source := System.FilePath.mk source
-    roots := roots
+    mode := .explicit roots
   }
   let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
   Vir.GeneratePackage.collectClosure #[target] index
@@ -379,7 +371,7 @@ meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPa
     let revision := irPackageRevision doc roots token
     let target : Vir.GeneratePackage.Target := {
       source := System.FilePath.mk source
-      roots := roots
+      mode := .explicit roots
     }
     let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
     match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with

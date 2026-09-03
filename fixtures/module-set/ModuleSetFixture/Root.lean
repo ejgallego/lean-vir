@@ -6,10 +6,12 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public meta import Vir.Attributes
+meta import Vir.Attributes
 public import ModuleSetFixture.Left
 public import ModuleSetFixture.Right
 public import ModuleSetFixture.Facade
+import ModuleSetFixture.Unreached
+meta import ModuleSetFixture.MetaOnly
 
 namespace ModuleSetFixture.Root
 

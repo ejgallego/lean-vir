@@ -192,7 +192,7 @@ unsafe def runModuleSet
   let some target := targets[0]?
     | IO.eprintln "module package-set generation requires one target"
       return 1
-  if let some targetModule := target.markedModule? then
+  if let some targetModule := target.mode.markedModule? then
     if targetModule != rootModule then
       IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
       return 1

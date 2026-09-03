@@ -33,7 +33,8 @@ loading the package.
 ```lean
 module
 
-public import Vir
+public import Vir.Browser
+meta import Vir.Attributes
 
 public section
 
@@ -96,7 +97,7 @@ the full browser-facing `Vir` library:
 ```lean
 module
 
-public meta import Vir.Attributes
+meta import Vir.Attributes
 
 @[vir_export]
 public def MyModule.value : Nat := 42
@@ -161,12 +162,19 @@ on Lake's `.ir` artifact and uses a generated
 Every member is an ordinary format-10 `.irpkg` that owns its module's
 declarations and initializer metadata. The descriptor reconstructs a
 dependency-first order from Lean's loaded module graphs, filters it to the
-reached modules, and puts the root last.
+reached runtime modules, ignores meta-only import edges, and puts the root
+last.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all
 members before running initializer globals in that module order. Duplicate
 declaration, initializer, host-import, or export-summary identities fail the
 candidate load.
+
+Packaging is rooted in `@[vir_export]`, `@[vir_startup]`, or explicitly
+selected declarations. Merely importing a module for initializer side effects
+does not make that module a package member. Model browser lifecycle work as a
+reached `@[vir_startup]` hook instead of relying on an otherwise-unreferenced
+Lean module initializer.
 
 The descriptor is the facet's returned artifact. The facet depends on Lake's
 transitive import artifacts, so changing an imported

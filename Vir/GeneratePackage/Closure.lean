@@ -77,13 +77,12 @@ partial def collectName
                 (fun state dep => collectName index dep (path.push dep) state) state
 
 def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
-  if target.includeAll then
-    index.sourceDecls.findSome? (fun (source, names) =>
-      if source == target.source.toString then some names else none) |>.getD #[]
-  else if target.includeMarked then
-    markedDeclNamesFor index target
-  else
-    target.roots
+  match target.mode with
+  | .all =>
+      index.sourceDecls.findSome? (fun (source, names) =>
+        if source == target.source.toString then some names else none) |>.getD #[]
+  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .explicit roots | .packageOnly roots => roots
 
 def boxedBaseName? : Name -> Option Name
   | .str pre "_boxed" => some pre
@@ -118,11 +117,14 @@ private def DeclIndex.opaqueImportedModuleForDecl?
     else
       none
 
+/--
+Complete a package closure by loading compiled IR from each newly discovered
+opaque declaration owner. This belongs to the IO generation pipeline, not to a
+target-selection mode: every target kind has the same ownership semantics.
+-/
 unsafe def resolveImportedModuleClosure
     (targets : Array Target)
     (index : DeclIndex) : IO DeclIndex := do
-  if !targets.any (·.resolveImportedModules) then
-    return index
   let closure := collectClosure targets index
   let deferred := closure.missingDecls ++ closure.missingExterns
   let modules := deferred.foldl (init := #[]) fun modules dependency =>
@@ -135,9 +137,7 @@ unsafe def resolveImportedModuleClosure
     | none => modules
   if modules.isEmpty then
     return index
-  let mut next := index
-  for moduleName in modules do
-    next ← next.loadImportedModule moduleName
+  let next ← modules.foldlM (fun index moduleName => index.loadImportedModule moduleName) index
   resolveImportedModuleClosure targets next
 
 def Closure.moduleNames (closure : Closure) : Array Name :=

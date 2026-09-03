@@ -18,16 +18,10 @@ namespace Vir.GeneratePackage
 open Lean.IR
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
-  let mode :=
-    if target.packageOnly then "packageOnly"
-    else if target.includeAll then "all"
-    else if target.resolveImportedModules then "markedModules"
-    else if target.includeMarked then "marked"
-    else "explicit"
   {
     source := target.source.toString
-    mode := mode
-    roots := target.roots
+    mode := target.mode.metadataName
+    roots := target.mode.roots
     resolvedRoots := resolvedRootsForTarget index target
   }
 
@@ -84,7 +78,7 @@ def collectInterfaceManifest
         } }
     | some env =>
         let candidates := exportCandidatesFor index target
-        if target.includeMarked && candidates.isEmpty then
+        if target.mode.selectsMarked && candidates.isEmpty then
           manifest := { manifest with diagnostics := manifest.diagnostics.push {
             name := .anonymous,
             source,

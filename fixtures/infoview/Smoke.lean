@@ -93,7 +93,7 @@ def importedHelperTargetSource : System.FilePath :=
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
   let target : Vir.GeneratePackage.Target := {
     source := importedHelperTargetSource
-    roots := #[root]
+    mode := .explicit #[root]
   }
   let index ← Vir.GeneratePackage.loadDeclIndex #[target]
   return Vir.GeneratePackage.collectClosure #[target] index
