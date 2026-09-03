@@ -85,10 +85,18 @@ export async function smokeBrowserCallbacks(cdp, origin) {
   await runDemoHostEntry(cdp, origin, "HostInterop.setInlineStyleProperty", {
     runInputs: ["#inline-style-target", "--vir-accent", "tomato"],
     expectedResult: "true",
-    target: {
-      id: "inline-style-target",
-      tag: "div",
-    },
+    beforeRunScript: `(() => {
+      const frame = document.createElement("iframe");
+      document.body.appendChild(frame);
+      const target = frame.contentDocument.createElement("div");
+      target.id = "inline-style-target";
+      document.body.appendChild(target);
+      frame.remove();
+      if (target.style instanceof CSSStyleDeclaration) {
+        throw new Error("inline-style regression target is not cross-realm");
+      }
+      return true;
+    })()`,
   });
   assert.equal(
     await evaluate(

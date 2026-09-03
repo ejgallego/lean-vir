@@ -68,10 +68,10 @@ opaque ElementCSSInlineStyle : Type
 /-- Exact browser `CSSStyleDeclaration` value returned by `ElementCSSInlineStyle.style`. -/
 opaque CSSStyleDeclaration : Type
 
-/-- Browser event object class. Event values are callback-scoped resources. -/
+/-- Exact browser `Event` value; its practical validity follows browser semantics. -/
 opaque Event : Type
 
-/-- Exact browser `KeyboardEvent` value. Keyboard events remain callback-scoped. -/
+/-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
 opaque KeyboardEvent : Type
 
 /-- Handle for a browser event-listener registration. -/

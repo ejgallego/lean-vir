@@ -29,8 +29,9 @@ namespace Event
 /--
 Returns the event target as a DOM element when the target is an element.
 
-The returned element resource may be used after the callback, but the event
-resource itself remains callback-scoped.
+The returned element follows ordinary JavaScript reachability. VIR likewise
+does not invalidate the event after callback return; its practical validity
+follows browser semantics.
 
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
@@ -41,8 +42,9 @@ def targetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Elem
 Returns the current event target as a DOM element when the current target is an
 element.
 
-The returned element resource may be used after the callback, but the event
-resource itself remains callback-scoped.
+The returned element follows ordinary JavaScript reachability. The browser
+normally exposes `currentTarget` only while its handler runs; VIR adds no
+stronger event lifetime.
 
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
