@@ -300,8 +300,7 @@ contract preserves or intentionally changes that member's observable behavior.
 Operations that need repository-private teardown may additionally declare an
 `activeEffect` role:
 
-- `register` creates a private listener, pending timer/frame, or React-root
-  teardown record;
+- `register` creates a pending timer/frame or React-root teardown record;
 - `use` operates through an existing private record without replacing the
   public JavaScript value;
 - `release` removes the record and performs the corresponding upstream

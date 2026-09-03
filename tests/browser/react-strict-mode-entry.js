@@ -10,10 +10,8 @@ import { createRoot } from "react-dom/client";
 
 import { createBrowserReactHookBindings } from "../../web/src/react/vir-react-hooks.js";
 import { createBrowserLeanComponentNode } from "../../web/src/react/vir-react-node.js";
-import {
-  createHostLifecycle,
-  createReactRootHostBindings,
-} from "../../web/src/host/vir-host-resources.js";
+import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
+import { createReactRootHostBindings } from "../../web/src/react/vir-react-root.js";
 
 const resultKey = "__leanVirReactStrictModeSmoke";
 

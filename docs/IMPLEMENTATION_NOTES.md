@@ -118,9 +118,11 @@ and deterministic teardown.
 Ordinary composite values use their actual JavaScript reference graph. VIR does
 not mirror props, arrays, closures, framework state, or React hook state in a
 second ownership graph. Result lifting still releases callbacks created during
-a failed host call. Active listener, timer, frame, and newly created root
-results remain provisional until result lowering succeeds, so a failed call
-reverses the registration instead of leaving it active.
+a failed host call. Timer, frame, and newly created root results remain
+provisional until result lowering succeeds, so a failed call reverses the
+registration instead of leaving it active. Native event listeners use the
+DOM's exact receiver/type/function removal protocol and are not lifecycle
+records.
 
 Browser React uses React's exact setter, reducer, ref, memo, dependency, and
 render semantics. VIR does not add purity, replay, or hook-order guarantees that

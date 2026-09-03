@@ -16,13 +16,10 @@ import {
   createBrowserReactNodeFragment,
   reactNodeTextValue,
 } from "./react/vir-react-node.js";
-import {
-  createHostLifecycle,
-  createReactRootHostBindings,
-} from "./host/vir-host-resources.js";
+import { createReactRootHostBindings } from "./react/vir-react-root.js";
 
 export function createBrowserReactHostBindings(
-  state = createHostLifecycle(),
+  state,
   { querySelector = queryBrowserElement } = {},
 ) {
   return {

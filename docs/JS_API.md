@@ -74,29 +74,31 @@ Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
 
 The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 
-| Module                              | Role                                                                                                      |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `vir-runtime.js`                    | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
-| `vir-runtime-node.js`               | Node wrapper that installs virtual browser bindings and unsupported React shims for tests/tools.          |
-| `runtime/call-timing.js`            | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
-| `runtime/callbacks.js`              | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
-| `runtime/cleanup.js`                | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
-| `runtime/core.js`                   | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
-| `runtime/object-values.js`          | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
-| `runtime/vir-codec.js`              | Binary reader/writer and interface type descriptor codec.                                                 |
-| `runtime/host-state.js`             | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
-| `runtime/object-abi.js`             | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
-| `runtime/object-abi-exports.js`     | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
-| `runtime/vir-value-normalizers.js`  | Input normalization helpers used by object ABI lowering.                                                  |
-| `vir-host-bindings.js`              | Public common/browser host binding factories and stable re-exports.                                       |
-| `host-boundary.js`                  | Exact-value externref roots and host-call rollback transactions.                                          |
-| `host/vir-host-resources.js`        | Explicit teardown for listeners, schedules, frames, and React roots.                                      |
-| `host/vir-virtual-host-bindings.js` | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
-| `react/vir-react-node.js`           | Browser React node, props, children, and component element construction.                                  |
-| `react/vir-react-hooks.js`          | Direct official browser React hook operations.                                                            |
-| `vir-react-host-bindings.js`        | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
-| `runtime/interface-manifest.js`     | Manifest validation, diagnostics, and type formatting helpers.                                            |
-| `runtime/interface-tags.js`         | Shared interface descriptor tag constants and JSON-input tag set.                                         |
+| Module                               | Role                                                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `vir-runtime.js`                     | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
+| `vir-runtime-node.js`                | Node wrapper that installs virtual browser bindings and unsupported React shims for tests/tools.          |
+| `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
+| `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
+| `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
+| `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
+| `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
+| `runtime/vir-codec.js`               | Binary reader/writer and interface type descriptor codec.                                                 |
+| `runtime/host-state.js`              | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
+| `runtime/object-abi.js`              | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
+| `runtime/object-abi-exports.js`      | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
+| `runtime/vir-value-normalizers.js`   | Input normalization helpers used by object ABI lowering.                                                  |
+| `vir-host-bindings.js`               | Public common/browser host binding factories and stable re-exports.                                       |
+| `host-boundary.js`                   | Exact-value externref roots and host-call rollback transactions.                                          |
+| `host/vir-active-host-bindings.js`   | Shared active lifecycle plus schedule and frame teardown.                                                 |
+| `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
+| `host/vir-virtual-host-bindings.js`  | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
+| `react/vir-react-node.js`            | Browser React node, props, children, and component element construction.                                  |
+| `react/vir-react-root.js`            | React root forwarding plus narrow teardown and selector-root sidecars.                                    |
+| `react/vir-react-hooks.js`           | Direct official browser React hook operations.                                                            |
+| `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
+| `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
+| `runtime/interface-tags.js`          | Shared interface descriptor tag constants and JSON-input tag set.                                         |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
@@ -121,21 +123,15 @@ of React dependencies, compose the React binding group explicitly:
 
 ```js
 import { createVirRuntimeFactory } from "lean-vir";
-import {
-  createBrowserHostBindings,
-  createHostLifecycle,
-} from "lean-vir/host-bindings";
+import { createBrowserHostBindings } from "lean-vir/host-bindings";
 import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 
 const factory = createVirRuntimeFactory({
   wasmUrl: "vir-upstream.wasm",
-  defaultHostBindings: () => {
-    const lifecycle = createHostLifecycle();
-    return createBrowserHostBindings({
-      resources: lifecycle,
+  defaultHostBindings: () =>
+    createBrowserHostBindings({
       reactHostBindings: createBrowserReactHostBindings,
-    });
-  },
+    }),
 });
 ```
 
@@ -560,8 +556,8 @@ keeps their private Lean roots alive, with runtime disposal as the deterministic
 cleanup boundary. If argument conversion, binding execution, synchronous-result
 validation, or result conversion fails, the runtime releases callbacks lifted
 for that failed call. Built-in active-resource creators also roll back a newly
-installed listener, timer, animation frame, or React root when the result cannot
-be published to Lean.
+installed timer, animation frame, or React root when the result cannot be
+published to Lean.
 Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
@@ -585,12 +581,13 @@ payload. `FinalizationRegistry` is a best-effort abandonment backstop; its
 schedule is not deterministic. `vir.dispose()` is the deterministic boundary:
 it releases remaining Lean roots and invalidates subsequent callback calls.
 
-Listeners, timers, frames, and React roots are active resources with explicit
-platform termination. Each built-in `HostLifecycle` entry stores its exact
-cleanup function; it does not infer cleanup from methods on the JavaScript
-value. A private host-call transaction also rolls back a newly created active
-resource if result lowering fails. Passive values are never inserted into this
-lifecycle.
+Timers, frames, and React roots are active resources with explicit platform
+termination. Each built-in `HostLifecycle` entry stores its exact cleanup
+function; it does not infer cleanup from methods on the JavaScript value. A
+private host-call transaction also rolls back a newly created active resource
+if result lowering fails. Passive values and native event listeners are never
+inserted into this lifecycle; the DOM retains a listener until the caller
+removes that exact function or the target becomes unreachable.
 
 Synchronous JavaScript exceptions raised by a host binding are recorded by the
 Wasm import boundary and consumed by the owning call. This applies equally to

@@ -29,8 +29,15 @@ export const SDK_PAYLOADS = [
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
   ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
-  ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
+  [
+    "js/host/vir-active-host-bindings.js",
+    "web/src/host/vir-active-host-bindings.js",
+  ],
   ["js/host/vir-dom-host-bindings.js", "web/src/host/vir-dom-host-bindings.js"],
+  [
+    "js/host/vir-infoview-host-bindings.js",
+    "web/src/host/vir-infoview-host-bindings.js",
+  ],
   [
     "js/host/vir-js-collection-bindings.js",
     "web/src/host/vir-js-collection-bindings.js",
@@ -41,6 +48,7 @@ export const SDK_PAYLOADS = [
     "web/src/host/vir-virtual-host-bindings.js",
   ],
   ["js/react/vir-react-node.js", "web/src/react/vir-react-node.js"],
+  ["js/react/vir-react-root.js", "web/src/react/vir-react-root.js"],
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 

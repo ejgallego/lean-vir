@@ -31,7 +31,7 @@ ownership diagrams.
   [HOST_BINDINGS.md](HOST_BINDINGS.md),
   [REACT_NODE.md](REACT_NODE.md),
   [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md),
-  `web/src/host/vir-host-resources.js`, and `web/src/react/`.
+  `web/src/host/vir-active-host-bindings.js`, and `web/src/react/`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
   [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md),

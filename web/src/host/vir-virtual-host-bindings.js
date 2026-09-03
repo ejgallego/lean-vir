@@ -7,21 +7,19 @@ Author: Emilio J. Gallego Arias
 import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
   createAnimationHostBindings,
-  createElementHostBindings,
   createHostLifecycle,
   createTimerHostBindings,
-  performanceNow,
-  preventDefaultOnEvent,
-  stopPropagationOnEvent,
-} from "./vir-host-resources.js";
+} from "./vir-active-host-bindings.js";
 import {
   createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
+  createElementHostBindings,
   createEventListenerValueHostBindings,
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
 } from "./vir-dom-host-bindings.js";
 import { createStaticNodeList } from "./vir-js-collection-bindings.js";
+import { createInfoviewHostBindings } from "./vir-infoview-host-bindings.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -165,11 +163,11 @@ export function createVirtualEventHostBindings() {
     "browser.eventTarget.asElement": (target) =>
       target !== null && typeof target === "object" ? target : null,
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(event);
+      event.preventDefault();
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(event);
+      event.stopPropagation();
       return undefined;
     },
     "browser.event.formValue": (event) => formControlEventValue(event),
@@ -234,16 +232,12 @@ export function createVirtualDocumentHostBindings(
     ...createTimerHostBindings(resources),
     ...createAnimationHostBindings(resources, {
       requestFrame: (run) =>
-        globalThis.setTimeout(() => run(performanceNow()), 16),
+        globalThis.setTimeout(() => run(virtualPerformanceNow()), 16),
       cancelFrame: globalThis.clearTimeout.bind(globalThis),
     }),
     ...createUnsupportedReactHostBindings(),
-    "infoview.documentPosition": (uri, fileName, line, character, label) => ({
-      uri,
-      fileName,
-      line,
-      character,
-      label,
+    ...createInfoviewHostBindings({
+      commandDispatcher: createVirtualInfoviewCommandDispatcher(state),
     }),
     "infoview.clipboard.writeText": (text) => {
       state.clipboardText = text;
@@ -251,78 +245,12 @@ export function createVirtualDocumentHostBindings(
       state.clipboardWrites.push(text);
       return true;
     },
-    "infoview.command.revealPosition": (position) => {
-      const normalized = normalizeInfoviewDocumentPosition(position);
-      if (normalized === null) {
-        return false;
-      }
-      state.revealedPosition = normalized;
-      state.infoviewCommands ??= [];
-      state.infoviewCommands.push({
-        kind: "revealPosition",
-        position: normalized,
-      });
-      return true;
-    },
-    "infoview.command.insertText": (position, text) => {
-      const normalized = normalizeInfoviewDocumentPosition(position);
-      const newText = text;
-      if (normalized === null) {
-        return false;
-      }
-      const edit = { position: normalized, newText };
-      state.appliedEdits ??= [];
-      state.appliedEdits.push(edit);
-      state.infoviewCommands ??= [];
-      state.infoviewCommands.push({ kind: "insertText", ...edit });
-      return true;
-    },
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
-      id,
-      label,
-      typeName,
-      summary,
-      expression,
-      typeText: "",
-      context: "",
-    }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => ({
-      ...ref,
-      typeText,
-      context,
-      ...nullableField(serverRef, "serverRef"),
-    }),
-    "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(ref),
-    "proofwidgets.rpc.inspectRef": (ref) => {
-      const normalized = normalizeProofWidgetsRpcRef(ref);
-      if (normalized === null) {
-        return false;
-      }
-      state.infoviewCommands ??= [];
-      state.infoviewCommands.push({
-        kind: "proofwidgetsRpcInspectRef",
-        ref: normalized,
-      });
-      return true;
-    },
-    "proofwidgets.rpc.resolveRef": (ref, callback) => {
-      const normalized = normalizeProofWidgetsRpcRef(ref);
-      if (normalized === null || typeof callback !== "function") {
-        return false;
-      }
-      const result = virtualProofWidgetsRpcRefInfo(normalized);
-      state.infoviewCommands ??= [];
-      state.infoviewCommands.push({
-        kind: "proofwidgetsRpcResolveRef",
-        ref: normalized,
-        result,
-      });
-      callHostCallback(callback, result);
-      return true;
-    },
     [VIR_HOST_DISPOSE]: () => resources.dispose(),
   };
+}
+
+function virtualPerformanceNow() {
+  return globalThis.performance?.now?.() ?? Date.now();
 }
 
 const unsupportedReactHostTargets = Object.freeze([
@@ -389,10 +317,6 @@ function queryVirtualElementStates(state, selector) {
   if (value === undefined) return [];
   const elements = Array.isArray(value) ? value : [value];
   return elements.map(normalizeVirtualElementState);
-}
-
-function nullableField(value, name) {
-  return value === null ? {} : { [name]: value };
 }
 
 function normalizeVirtualElementState(element) {
@@ -462,84 +386,6 @@ function formControlValue(value) {
   return String(value.value ?? "");
 }
 
-function normalizeInfoviewDocumentPosition(position) {
-  if (position === null || typeof position !== "object") {
-    return null;
-  }
-  const uri = typeof position.uri === "string" ? position.uri : "";
-  if (uri.length === 0) {
-    return null;
-  }
-  const line = nonNegativeInteger(position.line);
-  const character = nonNegativeInteger(position.character);
-  if (line === null || character === null) {
-    return null;
-  }
-  return { uri, line, character };
-}
-
-export function normalizeProofWidgetsRpcRef(ref) {
-  if (ref === null || typeof ref !== "object") {
-    return null;
-  }
-  const id = stringField(ref.id);
-  if (id.length === 0) {
-    return null;
-  }
-  const normalized = {
-    id,
-    label: stringField(ref.label),
-    typeName: stringField(ref.typeName),
-    summary: stringField(ref.summary),
-    expression: stringField(ref.expression),
-    typeText: stringField(ref.typeText),
-    context: stringField(ref.context),
-  };
-  const serverRef = proofWidgetsServerRpcRef(ref);
-  if (serverRef !== null) {
-    normalized.serverRef = serverRef;
-  }
-  return normalized;
-}
-
-export function normalizeProofWidgetsResolvedRef(ref) {
-  const value = ref !== null && typeof ref === "object" ? ref : {};
-  return {
-    id: stringField(value.id),
-    label: stringField(value.label),
-    typeName: stringField(value.typeName),
-    summary: stringField(value.summary),
-    expression: stringField(value.expression),
-    typeText: stringField(value.typeText),
-    context: stringField(value.context),
-    source: stringField(value.source),
-    position: stringField(value.position),
-    packageRevision: stringField(value.packageRevision),
-    storeKey: stringField(value.storeKey),
-    knownConstant: value.knownConstant === true,
-  };
-}
-
-function stringField(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function proofWidgetsServerRpcRef(ref) {
-  if (isRpcRefObject(ref.serverRef)) {
-    return ref.serverRef;
-  }
-  return null;
-}
-
-function isRpcRefObject(value) {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    (typeof value.__rpcref === "number" || typeof value.p === "number")
-  );
-}
-
 function virtualProofWidgetsRpcRefInfo(ref) {
   return {
     ...ref,
@@ -551,28 +397,46 @@ function virtualProofWidgetsRpcRefInfo(ref) {
   };
 }
 
+function createVirtualInfoviewCommandDispatcher(state) {
+  return {
+    revealPosition(position) {
+      state.revealedPosition = position;
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "revealPosition", position });
+      return true;
+    },
+    insertText(position, text) {
+      const edit = { position, newText: text };
+      state.appliedEdits ??= [];
+      state.appliedEdits.push(edit);
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "insertText", ...edit });
+      return true;
+    },
+    proofwidgetsRpcInspectRef(ref) {
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref });
+      return true;
+    },
+    proofwidgetsRpcResolveRef(ref) {
+      const result = virtualProofWidgetsRpcRefInfo(ref);
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({
+        kind: "proofwidgetsRpcResolveRef",
+        ref,
+        result,
+      });
+      return result;
+    },
+  };
+}
+
 function callHostCallback(callback, value) {
   try {
     callback(value);
   } catch (error) {
     console.error(error);
   }
-}
-
-function nonNegativeInteger(value) {
-  if (typeof value === "bigint") {
-    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
-      ? Number(value)
-      : null;
-  }
-  if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value >= 0 ? value : null;
-  }
-  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : null;
-  }
-  return null;
 }
 
 function addVirtualEventListener(target, eventName, listener) {

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
 import {
+  createBrowserHostBindings as createExportedBrowserHostBindings,
   createCommonHostBindings as createExportedCommonHostBindings,
   createBrowserDocumentHostBindings as createExportedBrowserDocumentHostBindings,
   createBrowserElementHostBindings as createExportedBrowserElementHostBindings,
@@ -90,6 +91,10 @@ const leanRuntime = await createVirRuntime({
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(typeof createExportedHostLifecycle, "function");
+assert.throws(
+  () => createExportedBrowserHostBindings({ reactHostBindings: {} }),
+  /reactHostBindings must be a host binding factory/,
+);
 assert.equal(VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
 assert.equal(VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
 assert.equal(NODE_VIR_WASM_RELEASE_FILE, VIR_WASM_RELEASE_FILE);
@@ -168,17 +173,14 @@ assert.throws(
     const resources = createExportedHostLifecycle();
     const primitiveResource = false;
     assert.equal(primitiveResource, false);
-    const commonBindings = createExportedCommonHostBindings(resources);
-    const documentBindings =
-      createExportedBrowserDocumentHostBindings(resources);
-    const elementBindings = createExportedBrowserElementHostBindings(resources);
+    const commonBindings = createExportedCommonHostBindings();
+    const documentBindings = createExportedBrowserDocumentHostBindings();
+    const elementBindings = createExportedBrowserElementHostBindings();
     const documentValue = documentBindings["browser.document.current"]();
     assert.equal(documentValue, globalThis.document);
-    const sharedElementNullable =
-      documentBindings["browser.document.querySelector"](
-        documentValue,
-        "#shared",
-      );
+    const sharedElementNullable = documentBindings[
+      "browser.document.querySelector"
+    ](documentValue, "#shared");
     assert.equal(
       commonBindings["js.nullable.isNull"](sharedElementNullable),
       false,

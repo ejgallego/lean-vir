@@ -17,8 +17,10 @@ import {
   createAnimationHostBindings,
   createHostLifecycle,
   createTimerHostBindings,
-} from "../../web/src/host/vir-host-resources.js";
+} from "../../web/src/host/vir-active-host-bindings.js";
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
+import { createBrowserAnimationHostBindings } from "../../web/src/vir-host-bindings.js";
+import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host-bindings.js";
 
 {
   const roots = new ExternrefRoots({ initial: 3 });
@@ -108,6 +110,48 @@ import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindi
 }
 
 {
+  const position = {
+    uri: "file:///Main.lean",
+    line: 3n,
+    character: "7",
+    label: "ignored by command protocol",
+  };
+  const calls = [];
+  const functionBindings = createInfoviewHostBindings({
+    commandDispatcher: (name, ...payload) => {
+      calls.push([name, ...payload]);
+    },
+  });
+  assert.equal(
+    functionBindings["infoview.command.insertText"](position, "exact text"),
+    true,
+  );
+  assert.deepEqual(calls, [
+    [
+      "insertText",
+      { uri: "file:///Main.lean", line: 3, character: 7 },
+      "exact text",
+    ],
+  ]);
+
+  const objectCalls = [];
+  const objectBindings = createInfoviewHostBindings({
+    commandDispatcher: {
+      insertText(...payload) {
+        objectCalls.push(payload);
+      },
+    },
+  });
+  assert.equal(
+    objectBindings["infoview.command.insertText"](position, "object text"),
+    true,
+  );
+  assert.deepEqual(objectCalls, [
+    [{ uri: "file:///Main.lean", line: 3, character: 7 }, "object text"],
+  ]);
+}
+
+{
   const lifecycle = createHostLifecycle();
   const bindings = createJsValueHostBindings();
   const object = { exact: true };
@@ -144,8 +188,10 @@ import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindi
     return timeoutTokens[timeoutIndex++];
   };
   globalThis.clearTimeout = (token) => cancellations.push(["timeout", token]);
-  globalThis.setInterval = (_run, delay) => {
+  let intervalRun = null;
+  globalThis.setInterval = (run, delay) => {
     assert.equal(delay, 11);
+    intervalRun = run;
     return intervalToken;
   };
   globalThis.clearInterval = (token) => cancellations.push(["interval", token]);
@@ -164,11 +210,12 @@ import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindi
     assert.equal(timeoutCalls, 1);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
 
-    const interval = bindings["browser.timer.setInterval"](
-      11n,
-      () => undefined,
-    );
+    const interval = bindings["browser.timer.setInterval"](11n, () => {
+      throw new Error("interval callback boom");
+    });
     assert.equal(interval, intervalToken);
+    assert.deepEqual(lifecycle.debugResourceCounts(), { active: 1 });
+    assert.throws(() => intervalRun(), /interval callback boom/);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 1 });
     bindings["browser.timer.clearInterval"](interval);
     assert.deepEqual(cancellations, [["interval", intervalToken]]);
@@ -211,6 +258,14 @@ import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindi
     );
     assert.equal(synchronousCalls, 1);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
+    assert.throws(
+      () =>
+        bindings["browser.timer.setTimeout"](7n, () => {
+          throw new Error("timeout callback boom");
+        }),
+      /timeout callback boom/,
+    );
+    assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
     lifecycle.dispose();
   } finally {
     Object.assign(globalThis, nativeTimers);
@@ -234,4 +289,63 @@ import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindi
   assert.deepEqual(cancelled, [frameToken]);
   assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
   lifecycle.dispose();
+}
+
+{
+  const previousRequest = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "requestAnimationFrame",
+  );
+  const previousCancel = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "cancelAnimationFrame",
+  );
+  Object.defineProperty(globalThis, "requestAnimationFrame", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
+  Object.defineProperty(globalThis, "cancelAnimationFrame", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
+  try {
+    const lifecycle = createHostLifecycle();
+    const bindings = createBrowserAnimationHostBindings(lifecycle);
+    assert.throws(
+      () =>
+        bindings["browser.animation.requestAnimationFrame"](() => undefined),
+      /requires globalThis\.requestAnimationFrame/,
+    );
+    assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
+    let requests = 0;
+    globalThis.requestAnimationFrame = () => {
+      requests++;
+      return 1;
+    };
+    assert.throws(
+      () =>
+        bindings["browser.animation.requestAnimationFrame"](() => undefined),
+      /requires globalThis\.cancelAnimationFrame/,
+    );
+    assert.equal(requests, 0);
+    assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
+    lifecycle.dispose();
+  } finally {
+    if (previousRequest === undefined) {
+      delete globalThis.requestAnimationFrame;
+    } else {
+      Object.defineProperty(
+        globalThis,
+        "requestAnimationFrame",
+        previousRequest,
+      );
+    }
+    if (previousCancel === undefined) {
+      delete globalThis.cancelAnimationFrame;
+    } else {
+      Object.defineProperty(globalThis, "cancelAnimationFrame", previousCancel);
+    }
+  }
 }

@@ -51,16 +51,38 @@ unrelated responsibilities.
 - `runtime/interface-tags.js`: shared interface descriptor tag constants.
 - `host-boundary.js`: exact-value externref roots and host-call rollback
   transactions.
-- `host/vir-dom-host-bindings.js`: passive, direct-value DOM adapters shared by
+- `host/vir-dom-host-bindings.js`: passive, direct-value DOM providers shared by
   the browser and virtual test hosts.
-- `host/vir-host-resources.js`: explicit teardown for active listeners,
-  timers, frames, and React roots.
+- `host/vir-active-host-bindings.js`: explicit teardown for timers and frames.
+  It does not represent passive JavaScript values.
+- `host/vir-infoview-host-bindings.js`: local infoview/ProofWidgets command
+  provider and shared pure validation for its repository-owned protocol.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   unsupported React host bindings for Node tests/tools.
 - `react/vir-react-node.js`: browser React node/props/children operations over
   exact JavaScript component values.
+- `react/vir-react-root.js`: exact root operations plus the narrow lifecycle
+  and selector-root sidecars required for deterministic teardown.
 - `react/vir-react-hooks.js`: direct official browser React hook operations and
   explicit Lean-to-JavaScript function conversions.
+
+## Boundary JavaScript Provenance
+
+Every shipped boundary layer has one of these explicit sources:
+
+| Files                                                                                           | Provenance and justification                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `host-boundary.js`, `runtime/host-state.js`, `runtime/object-values.js`, `runtime/callbacks.js` | VIR-owned Lean/Wasm ABI machinery. It roots exact `externref` values, translates the generated object ABI, and keeps foreign Lean closures alive. JavaScript and browser APIs provide no equivalent. |
+| `vir-host-bindings.js`, `host/vir-dom-host-bindings.js`, `host/vir-js-*.js`                     | Thin handwritten providers for generated targets. Each target's TypeScript, VIR-owned, or local-contract provenance is recorded in `Vir/*.bindings.json` and checked by `npm run check:bindings`.    |
+| `host/vir-active-host-bindings.js`                                                              | VIR-owned lifecycle plus schedule/frame teardown and failed-publication rollback. React roots register with that lifecycle from the React module.                                                    |
+| `host/vir-infoview-host-bindings.js`                                                            | Repository-local infoview and ProofWidgets command contract. Production and virtual hosts share its pure validation rules, while each host owns its effects.                                         |
+| `vir-react-host-bindings.js`, `react/*.js`, `vir-react-dom-client.js`                           | Official React and ReactDOM calls, root teardown sidecars, and explicitly declared VIR-owned conversions for Lean closures and convenience builders. Chromium with official React is the oracle.     |
+| `host/vir-virtual-host-bindings.js`                                                             | Repository-local Node test/tool protocol. It provides DOM test doubles and unsupported React shims; it is not evidence for browser or React semantics.                                               |
+| `vir-infoview-widget.js`, `apps/*.js`, `pages/*.js`                                             | VIR-owned application and demo code rather than binding semantics.                                                                                                                                   |
+
+The generated binding report is the review surface connecting provider keys to
+their declarations and provenance. A provider without a generated key, or a
+generated key without a provider, fails the binding checks.
 
 ## Demo And Page Modules
 

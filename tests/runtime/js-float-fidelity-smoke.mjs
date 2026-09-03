@@ -58,7 +58,7 @@ const floatCases = [
 
 {
   const resources = createHostLifecycle();
-  const bindings = createCommonHostBindings(resources);
+  const bindings = createCommonHostBindings();
   try {
     assert.throws(
       () => bindings["js.float"]("1.5"),

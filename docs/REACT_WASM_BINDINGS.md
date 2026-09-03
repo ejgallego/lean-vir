@@ -44,7 +44,7 @@ function or object.
 
 ## React Fidelity
 
-The browser adapter installs official React and ReactDOM behavior:
+The browser host installs official React and ReactDOM behavior:
 
 - actual props objects and child/dependency arrays;
 - actual React elements returned by `React.createElement`;
@@ -70,8 +70,9 @@ not emulate nodes, hooks, reconciliation, roots, or commits.
 
 Ordinary React and JavaScript values use their native reference graph. VIR
 keeps explicit teardown only for active resources with public termination:
-listeners, timers, animation frames, and React roots. A host-call transaction
-rolls back a newly created active resource if result publication fails.
+timers, animation frames, and React roots. A host-call transaction rolls back a
+newly created active resource if result publication fails. Native DOM listener
+lifetime instead follows the exact target/type/function protocol.
 
 Direct root submission needs no VIR commit protocol: React receives the exact
 JavaScript node graph, and JavaScript reachability owns that graph. VIR tracks

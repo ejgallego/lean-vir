@@ -160,19 +160,15 @@ Browser React root usage:
   import { createVirRuntimeFactory } from "./js/vir-runtime.js";
   import {
     createBrowserHostBindings,
-    createHostLifecycle,
   } from "./js/vir-host-bindings.js";
   import { createBrowserReactHostBindings } from "./js/vir-react-host-bindings.js";
 
   const factory = createVirRuntimeFactory({
     wasmUrl: "./wasm/vir-upstream.wasm",
-    defaultHostBindings: () => {
-      const resources = createHostLifecycle();
-      return createBrowserHostBindings({
-        resources,
-        reactHostBindings: createBrowserReactHostBindings(resources),
-      });
-    },
+    defaultHostBindings: () =>
+      createBrowserHostBindings({
+        reactHostBindings: createBrowserReactHostBindings,
+      }),
   });
 
 Check lean-vir-artifact.json before mixing this SDK with generated packages

@@ -7,8 +7,8 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import * as React from "react";
 
-import { createHostLifecycle } from "../../web/src/host/vir-host-resources.js";
-import { createReactRootHostBindings } from "../../web/src/host/vir-host-resources.js";
+import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
+import { createReactRootHostBindings } from "../../web/src/react/vir-react-root.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import {
   createBrowserLeanComponentNode,
@@ -234,10 +234,14 @@ assert.throws(
     (target) =>
       target.startsWith("react.") || target.startsWith("js.value.react."),
   );
-  const browserTargets = Object.keys(createBrowserReactHostBindings()).filter(
+  const browserLifecycle = createHostLifecycle();
+  const browserTargets = Object.keys(
+    createBrowserReactHostBindings(browserLifecycle),
+  ).filter(
     (target) =>
       target.startsWith("react.") || target.startsWith("js.value.react."),
   );
+  browserLifecycle.dispose();
   assert.deepEqual(targets.toSorted(), browserTargets.toSorted());
   for (const target of targets) {
     assert.throws(
@@ -292,18 +296,20 @@ assert.throws(
   const target = {};
   const rendered = [];
   let unmounts = 0;
-  const root = {
-    render(value) {
-      rendered.push(value);
-    },
-    unmount() {
-      unmounts++;
-    },
-  };
+  const roots = [];
   const bindings = createReactRootHostBindings(
     lifecycle,
     (container) => {
       assert.equal(container, target);
+      const root = {
+        render(value) {
+          rendered.push(value);
+        },
+        unmount() {
+          unmounts++;
+        },
+      };
+      roots.push(root);
       return root;
     },
     {
@@ -325,7 +331,8 @@ assert.throws(
       }),
     },
   );
-  assert.equal(bindings["react.root.create"](target), root);
+  const root = bindings["react.root.create"](target);
+  assert.equal(root, roots[0]);
   bindings["react.root.renderNode"](root, element);
   assert.equal(rendered.at(-1), element);
   const component = () => element;
@@ -344,8 +351,14 @@ assert.throws(
   );
   bindings["react.root.unmount"](root);
   assert.equal(unmounts, 1);
+  assert.equal(lifecycle.debugResourceCounts().active, 1);
+  lifecycle.dispose();
+  assert.equal(unmounts, 2);
   assert.equal(lifecycle.debugResourceCounts().active, 0);
+  assert.equal(
+    bindings["react.root.unmountSelector"]("#app"),
+    false,
+    "lifecycle disposal must forget selector-root side tables",
+  );
 }
-
-lifecycle.dispose();
 console.log("raw React host binding smoke ok");

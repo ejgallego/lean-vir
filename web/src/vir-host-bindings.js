@@ -6,17 +6,13 @@ Author: Emilio J. Gallego Arias
 
 import {
   createAnimationHostBindings,
-  createElementHostBindings,
   createHostLifecycle,
   createTimerHostBindings,
-  performanceNow,
-  preventDefaultOnEvent,
-  reportEventHandlerError,
-  stopPropagationOnEvent,
-} from "./host/vir-host-resources.js";
+} from "./host/vir-active-host-bindings.js";
 import {
   createCSSStyleDeclarationHostBindings,
   createDOMTokenListHostBindings,
+  createElementHostBindings,
   createEventListenerValueHostBindings,
   createHtmlInputElementHostBindings,
   createKeyboardEventHostBindings,
@@ -24,9 +20,8 @@ import {
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
-  normalizeProofWidgetsResolvedRef,
-  normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
+import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
@@ -35,7 +30,7 @@ export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./host-boundary.js";
-export { createHostLifecycle } from "./host/vir-host-resources.js";
+export { createHostLifecycle } from "./host/vir-active-host-bindings.js";
 export {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
@@ -44,9 +39,13 @@ export {
   ensureVirtualElementStates,
   createVirtualEventState,
   createVirtualEventHostBindings,
+} from "./host/vir-virtual-host-bindings.js";
+export {
+  createInfoviewHostBindings,
+  normalizeInfoviewDocumentPosition,
   normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
-} from "./host/vir-virtual-host-bindings.js";
+} from "./host/vir-infoview-host-bindings.js";
 
 export function createCommonHostBindings() {
   return {
@@ -95,11 +94,11 @@ export function createBrowserEventHostBindings() {
     "browser.eventTarget.asElement": (target) =>
       isElement(target) ? target : null,
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(event);
+      event.preventDefault();
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(event);
+      event.stopPropagation();
       return undefined;
     },
     "browser.event.formValue": (event) => formControlEventValue(event),
@@ -207,61 +206,19 @@ export function createBrowserHtmlInputElementHostBindings() {
   });
 }
 
-export function createBrowserTimerHostBindings(state = createHostLifecycle()) {
+export function createBrowserTimerHostBindings(state) {
   return createTimerHostBindings(state);
 }
 
-export function createBrowserAnimationHostBindings(
-  state = createHostLifecycle(),
-) {
-  const requestFrame =
-    typeof globalThis.requestAnimationFrame === "function"
-      ? globalThis.requestAnimationFrame.bind(globalThis)
-      : (callback) =>
-          globalThis.setTimeout(() => callback(performanceNow()), 16);
-  const cancelFrame =
-    typeof globalThis.cancelAnimationFrame === "function"
-      ? globalThis.cancelAnimationFrame.bind(globalThis)
-      : globalThis.clearTimeout.bind(globalThis);
-  return createAnimationHostBindings(state, { requestFrame, cancelFrame });
-}
-
-export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
-  return {
-    "infoview.documentPosition": (uri, fileName, line, character, label) => ({
-      uri,
-      fileName,
-      line,
-      character,
-      label,
-    }),
-    "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
-    "infoview.command.revealPosition": (position) =>
-      revealInfoviewPosition(commandDispatcher, position),
-    "infoview.command.insertText": (position, text) =>
-      insertInfoviewText(commandDispatcher, position, text),
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
-      id,
-      label,
-      typeName,
-      summary,
-      expression,
-      typeText: "",
-      context: "",
-    }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => ({
-      ...ref,
-      typeText,
-      context,
-      ...nullableField(serverRef, "serverRef"),
-    }),
-    "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(ref),
-    "proofwidgets.rpc.inspectRef": (ref) =>
-      inspectProofWidgetsRpcRef(commandDispatcher, ref),
-    "proofwidgets.rpc.resolveRef": (ref, callback) =>
-      resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
+export function createBrowserAnimationHostBindings(state) {
+  const requestFrame = (callback) => {
+    const request = browserAnimationFunction("requestAnimationFrame");
+    browserAnimationFunction("cancelAnimationFrame");
+    return request(callback);
   };
+  const cancelFrame = (frame) =>
+    browserAnimationFunction("cancelAnimationFrame")(frame);
+  return createAnimationHostBindings(state, { requestFrame, cancelFrame });
 }
 
 export function createBrowserHostBindings({
@@ -270,14 +227,16 @@ export function createBrowserHostBindings({
   reactHostBindings = null,
 } = {}) {
   const state = resources;
-  const reactBindingsSource =
-    typeof reactHostBindings === "function"
-      ? reactHostBindings(state, { querySelector: queryDocumentElement })
-      : reactHostBindings;
-  const reactBindings = normalizeOptionalHostBindingMap(
-    reactBindingsSource,
-    "reactHostBindings",
-  );
+  let reactBindings = {};
+  if (reactHostBindings !== null && reactHostBindings !== undefined) {
+    if (typeof reactHostBindings !== "function") {
+      throw new Error("reactHostBindings must be a host binding factory");
+    }
+    reactBindings = normalizeHostBindingMap(
+      reactHostBindings(state, { querySelector: queryDocumentElement }),
+      "reactHostBindings factory result",
+    );
+  }
   return {
     ...createCommonHostBindings(),
     ...createConsoleHostBindings(),
@@ -324,8 +283,7 @@ export function createNodeHostBindings(
   return bindings;
 }
 
-function normalizeOptionalHostBindingMap(value, label) {
-  if (value === null || value === undefined) return {};
+function normalizeHostBindingMap(value, label) {
   if (typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a host binding object`);
   }
@@ -355,234 +313,19 @@ function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
 }
 
+function browserAnimationFunction(name) {
+  const operation = globalThis[name];
+  if (typeof operation !== "function") {
+    throw new Error(
+      `browser.animation host binding requires globalThis.${name}`,
+    );
+  }
+  return operation.bind(globalThis);
+}
+
 function isCanvasElement(value) {
   const Canvas = globalThis.HTMLCanvasElement;
-  return typeof Canvas === "function"
-    ? value instanceof Canvas
-    : value !== null &&
-        typeof value === "object" &&
-        typeof value.getContext === "function";
-}
-
-function writeTextToHostClipboard(text) {
-  const copiedSynchronously = copyTextWithExecCommand(text);
-  if (copiedSynchronously) {
-    return true;
-  }
-  const clipboard = globalThis.navigator?.clipboard;
-  if (
-    clipboard !== null &&
-    typeof clipboard === "object" &&
-    typeof clipboard.writeText === "function"
-  ) {
-    try {
-      clipboard.writeText(text).catch((error) => {
-        reportEventHandlerError(error);
-      });
-      return true;
-    } catch (error) {
-      reportEventHandlerError(error);
-      return false;
-    }
-  }
-  return false;
-}
-
-function revealInfoviewPosition(commandDispatcher, position) {
-  const normalized = normalizeInfoviewDocumentPosition(position);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "revealPosition",
-    normalized,
-  );
-}
-
-function insertInfoviewText(commandDispatcher, position, text) {
-  const normalized = normalizeInfoviewDocumentPosition(position);
-  if (normalized === null || typeof text !== "string") {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "insertText",
-    normalized,
-    text,
-  );
-}
-
-function nullableField(value, name) {
-  return value === null ? {} : { [name]: value };
-}
-
-function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "proofwidgetsRpcInspectRef",
-    normalized,
-  );
-}
-
-function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null || typeof callback !== "function") {
-    return false;
-  }
-  const handler = infoviewCommandHandler(
-    commandDispatcher,
-    "proofwidgetsRpcResolveRef",
-  );
-  if (handler === null) {
-    return false;
-  }
-  let result;
-  try {
-    result = handler(normalized);
-  } catch (error) {
-    reportEventHandlerError(error);
-    return false;
-  }
-  if (result === false) {
-    return false;
-  }
-  if (
-    result !== null &&
-    typeof result === "object" &&
-    typeof result.then === "function"
-  ) {
-    try {
-      result
-        .then((info) => {
-          callHostCallback(callback, normalizeProofWidgetsResolvedRef(info));
-        })
-        .catch((error) => {
-          reportEventHandlerError(error);
-        });
-    } catch (error) {
-      throw error;
-    }
-  } else {
-    callHostCallback(callback, normalizeProofWidgetsResolvedRef(result));
-  }
-  return true;
-}
-
-export function normalizeInfoviewDocumentPosition(position) {
-  if (position === null || typeof position !== "object") {
-    return null;
-  }
-  const uri = typeof position.uri === "string" ? position.uri : "";
-  if (uri.length === 0) {
-    return null;
-  }
-  const line = nonNegativeInteger(position.line);
-  const character = nonNegativeInteger(position.character);
-  if (line === null || character === null) {
-    return null;
-  }
-  return { uri, line, character };
-}
-
-function nonNegativeInteger(value) {
-  if (typeof value === "bigint") {
-    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
-      ? Number(value)
-      : null;
-  }
-  if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value >= 0 ? value : null;
-  }
-  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
-  const handler = infoviewCommandHandler(commandDispatcher, name);
-  if (handler === null) {
-    return false;
-  }
-  try {
-    const result = handler(...payload);
-    if (
-      result !== null &&
-      typeof result === "object" &&
-      typeof result.then === "function"
-    ) {
-      result.catch((error) => {
-        reportEventHandlerError(error);
-      });
-      return true;
-    }
-    return result !== false;
-  } catch (error) {
-    reportEventHandlerError(error);
-    return false;
-  }
-}
-
-function infoviewCommandHandler(commandDispatcher, name) {
-  const dispatcher =
-    commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
-  if (typeof dispatcher === "function") {
-    return (value) => dispatcher(name, value);
-  }
-  if (
-    dispatcher !== null &&
-    typeof dispatcher === "object" &&
-    typeof dispatcher[name] === "function"
-  ) {
-    return (value) => dispatcher[name](value);
-  }
-  return null;
-}
-
-function callHostCallback(callback, value) {
-  try {
-    callback(value);
-  } catch (error) {
-    reportEventHandlerError(error);
-  }
-}
-
-function copyTextWithExecCommand(text) {
-  const document = globalThis.document;
-  if (
-    document === null ||
-    typeof document !== "object" ||
-    typeof document.execCommand !== "function"
-  ) {
-    return false;
-  }
-  const body = document.body;
-  if (body === null || typeof body !== "object") {
-    return false;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-1000px";
-  textarea.style.left = "-1000px";
-  textarea.style.opacity = "0";
-  body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
-  try {
-    return document.execCommand("copy") === true;
-  } catch {
-    return false;
-  } finally {
-    textarea.remove();
-  }
+  return typeof Canvas === "function" && value instanceof Canvas;
 }
 
 function isInputElement(value) {

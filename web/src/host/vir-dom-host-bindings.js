@@ -19,6 +19,47 @@ export function createDOMTokenListHostBindings() {
   };
 }
 
+export function createElementHostBindings(operations) {
+  return {
+    "browser.element.querySelector": (element, selector) =>
+      operations.querySelector(element, selector),
+    "browser.element.querySelectorAll": (element, selector) =>
+      operations.querySelectorAll(element, selector),
+    "browser.element.getInnerHTML": (element) =>
+      operations.getInnerHTML(element),
+    "browser.element.setInnerHTML": (element, html) => {
+      operations.setInnerHTML(element, html);
+      return undefined;
+    },
+    "browser.element.getTextContent": (element) =>
+      operations.getTextContent(element),
+    "browser.element.setTextContent": (element, text) => {
+      operations.setTextContent(element, text);
+      return undefined;
+    },
+    "browser.element.getClassList": (element) =>
+      operations.getClassList(element),
+    "browser.element.setClassList": (element, classList) => {
+      operations.setClassList(element, classList);
+      return undefined;
+    },
+    "browser.element.getAttribute": (element, name) =>
+      operations.getAttribute(element, name),
+    "browser.element.setAttribute": (element, name, value) => {
+      operations.setAttribute(element, name, value);
+      return undefined;
+    },
+    "browser.element.addEventListener": (element, eventName, listener) => {
+      operations.addEventListener(element, eventName, listener);
+      return undefined;
+    },
+    "browser.element.removeEventListener": (element, eventName, listener) => {
+      operations.removeEventListener(element, eventName, listener);
+      return undefined;
+    },
+  };
+}
+
 export function createEventListenerValueHostBindings() {
   return {
     "js.value.browser.eventListener": (callback) => {

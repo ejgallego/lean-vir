@@ -5,21 +5,15 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../vir-runtime.js";
-import {
-  createBrowserHostBindings,
-  createHostLifecycle,
-} from "../vir-host-bindings.js";
+import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../vir-react-host-bindings.js";
 
 export function createBrowserReactRuntimeFactory(options = {}) {
   return createVirRuntimeFactory({
     ...options,
-    defaultHostBindings: () => {
-      const resources = createHostLifecycle();
-      return createBrowserHostBindings({
-        resources,
-        reactHostBindings: createBrowserReactHostBindings(resources),
-      });
-    },
+    defaultHostBindings: () =>
+      createBrowserHostBindings({
+        reactHostBindings: createBrowserReactHostBindings,
+      }),
   });
 }
