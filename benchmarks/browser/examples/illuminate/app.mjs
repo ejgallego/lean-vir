@@ -41,7 +41,7 @@ const clearResults = /** @type {HTMLButtonElement} */ (
   document.querySelector("#clear-results")
 );
 
-/** @type {{ id: string, label: string, status: string, invoke?: (animation: *, events: *[]) => * }[]} */
+/** @type {{ id: string, label: string, status: string, error?: *, invoke?: (animation: *, events: *[]) => * }[]} */
 const backends = [
   { id: "js", label: "JavaScript oracle", status: "ready" },
   { id: "vir", label: "Lean · VIR typed", status: "loading" },
@@ -729,6 +729,7 @@ async function boot() {
     backend("vir").status = "ready";
   } catch (error) {
     backend("vir").status = "failed";
+    backend("vir").error = error;
     console.error(error);
   }
 
@@ -752,6 +753,7 @@ async function boot() {
     backend("native").status = "ready";
   } catch (error) {
     backend("native").status = "failed";
+    backend("native").error = error;
     console.error(error);
   }
 
@@ -828,6 +830,16 @@ const api = {
   runStudy: execute,
   getReport: () => latestReport,
   getBackends: () =>
-    backends.map(({ id, label, status }) => ({ id, label, status })),
+    backends.map(({ id, label, status, error }) => ({
+      id,
+      label,
+      status,
+      error:
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : error == null
+            ? null
+            : String(error),
+    })),
 };
 globalThis.__illuminateBenchApp = api;

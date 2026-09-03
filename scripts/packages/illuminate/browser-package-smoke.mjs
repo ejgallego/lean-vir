@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { createVirRuntime } from "./lean-vir/js/vir-runtime.js";
 import {
@@ -16,16 +16,16 @@ const build = JSON.parse(await readFile(join(root, "BUILD.json"), "utf8"));
 assert.equal(build.schemaVersion, 1);
 assert.equal(build.kind, "vir/illuminate-browser-package");
 
-const [wasmBytes, packageBytes, examples] = await Promise.all([
+const [wasmBytes, examples] = await Promise.all([
   readFile(join(root, build.runtime.wasm)),
-  readFile(join(root, build.package.file)),
   readFile(join(root, build.workload.smokeExamples), "utf8").then(JSON.parse),
 ]);
 assert.ok(examples.length > 0);
 
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSet: [packageBytes],
+  irPackageSet: pathToFileURL(join(root, build.package.setDescriptor)),
+  fetchBytes: (url) => readFile(url),
 });
 try {
   assert.notEqual(runtime.findManifestEntry(build.entry), null);
