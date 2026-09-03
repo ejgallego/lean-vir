@@ -20,6 +20,7 @@ export const demoHostImportTargets = [
   "browser.element.querySelectorAll",
   "browser.element.removeEventListener",
   "browser.element.setAttribute",
+  "browser.element.setClassList",
   "browser.element.setInnerHTML",
   "browser.element.setTextContent",
   "browser.elementCSSInlineStyle.fromElement",

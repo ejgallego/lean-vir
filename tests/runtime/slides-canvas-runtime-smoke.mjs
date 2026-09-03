@@ -154,6 +154,30 @@ try {
       );
       assert.equal(hostImport?.boundary, "explicitConversion");
     }
+    const hostImport = (target) =>
+      runtime.interfaceManifest.hostImports.find(
+        (entry) => entry.target === target,
+      );
+    assert.equal(
+      hostImport("browser.element.getClassList")?.result?.type,
+      "DOMTokenList",
+    );
+    assert.equal(
+      hostImport("browser.domTokenList.add")?.args[0]?.type?.type,
+      "DOMTokenList",
+    );
+    assert.equal(
+      hostImport("browser.htmlCanvasElement.setWidth")?.args[0]?.type?.type,
+      "HTMLCanvasElement",
+    );
+    assert.equal(
+      hostImport("browser.canvas2d.measureText")?.args[0]?.type?.type,
+      "CanvasRenderingContext2D",
+    );
+    assert.equal(
+      hostImport("browser.canvas2d.measureText")?.result?.type,
+      "TextMetrics",
+    );
     assert.equal(runtime.runStartupEntries(), undefined);
     assert.equal(runtime.runStartupEntries(), undefined);
     assert.equal(slideRoot.children.length, 2);

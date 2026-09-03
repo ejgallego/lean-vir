@@ -449,6 +449,10 @@ const setTimeoutImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.timer.setTimeout",
 );
 assert.equal(setTimeoutImport?.args[0]?.type?.type, "Js");
+const setIntervalImport = hostImportTarget("browser.timer.setInterval");
+assert.equal(setIntervalImport?.result?.type, "Interval");
+const clearIntervalImport = hostImportTarget("browser.timer.clearInterval");
+assert.equal(clearIntervalImport?.args[0]?.type?.type, "Interval");
 const animationFrameImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.animation.requestAnimationFrame",
 );
@@ -693,67 +697,6 @@ assert.notEqual(virtualPresentElement, null);
 assert.equal(
   virtualQueryHost["browser.element.getTextContent"](virtualPresentElement),
   "",
-);
-const virtualPlainEvent = createVirtualEventState();
-assert.equal(
-  virtualQueryHost["browser.keyboardEvent.fromEvent"](virtualPlainEvent),
-  null,
-);
-const virtualKeyboardEvent = createVirtualEventState({ key: "Enter" });
-assert.equal(
-  virtualQueryHost["browser.keyboardEvent.fromEvent"](virtualKeyboardEvent),
-  virtualKeyboardEvent,
-);
-assert.equal(
-  virtualQueryHost["browser.keyboardEvent.getKey"](virtualKeyboardEvent),
-  "Enter",
-);
-const virtualTokenList = virtualQueryHost["browser.element.getClassList"](
-  virtualPresentElement,
-);
-assert.equal(
-  virtualQueryHost["browser.element.getClassList"](virtualPresentElement),
-  virtualTokenList,
-);
-virtualQueryHost["browser.domTokenList.add"](virtualTokenList, "active");
-virtualQueryHost["browser.domTokenList.add"](virtualTokenList, "selected");
-virtualQueryHost["browser.domTokenList.remove"](virtualTokenList, "active");
-assert.equal(
-  virtualQueryHost["browser.domTokenList.toggle"](virtualTokenList, "ready"),
-  true,
-);
-assert.equal(virtualPresentElement.attributes.get("class"), "selected ready");
-virtualQueryHost["browser.element.setClassList"](
-  virtualPresentElement,
-  "reset",
-);
-assert.equal(virtualPresentElement.attributes.get("class"), "reset");
-assert.equal(
-  virtualQueryHost["browser.elementCSSInlineStyle.fromElement"](
-    virtualPresentElement,
-  ),
-  virtualPresentElement,
-);
-const virtualStyle =
-  virtualQueryHost["browser.elementCSSInlineStyle.getStyle"](
-    virtualPresentElement,
-  );
-virtualQueryHost["browser.cssStyleDeclaration.setProperty"](
-  virtualStyle,
-  "color",
-  "red",
-);
-assert.equal(virtualStyle.properties.get("color"), "red");
-virtualQueryHost["browser.elementCSSInlineStyle.setStyle"](
-  virtualPresentElement,
-  "color: blue",
-);
-assert.equal(virtualStyle.cssText, "color: blue");
-assert.equal(
-  virtualQueryHost["browser.elementCSSInlineStyle.fromElement"](
-    createVirtualElementState({ inlineStyle: null }),
-  ),
-  null,
 );
 let virtualMissingEventTarget = "not-dispatched";
 let virtualMissingEventCurrentTarget = "not-dispatched";

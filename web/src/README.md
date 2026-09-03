@@ -51,6 +51,8 @@ unrelated responsibilities.
 - `runtime/interface-tags.js`: shared interface descriptor tag constants.
 - `host-boundary.js`: exact-value externref roots and host-call rollback
   transactions.
+- `host/vir-dom-host-bindings.js`: passive, direct-value DOM adapters shared by
+  the browser and virtual test hosts.
 - `host/vir-host-resources.js`: explicit teardown for active listeners,
   timers, frames, and React roots.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and

@@ -35,6 +35,11 @@ export const runtimeTests = Object.freeze(
       file: "browser-canvas-bindings-smoke.mjs",
       group: "pure",
     },
+    {
+      id: "browser-dom-bindings",
+      file: "browser-dom-bindings-smoke.mjs",
+      group: "pure",
+    },
     { id: "startup-hooks", file: "startup-runtime-smoke.mjs", group: "pure" },
     {
       id: "callback-lifecycle",

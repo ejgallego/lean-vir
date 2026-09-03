@@ -8,17 +8,19 @@ import { VIR_HOST_DISPOSE } from "../host-boundary.js";
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
-  createCSSStyleDeclarationHostBindings,
-  createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
-  createHtmlInputElementHostBindings,
-  createKeyboardEventHostBindings,
   createTimerHostBindings,
   performanceNow,
   preventDefaultOnEvent,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
+import {
+  createCSSStyleDeclarationHostBindings,
+  createDOMTokenListHostBindings,
+  createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
+} from "./vir-dom-host-bindings.js";
 import {
   createNullableValue,
   nullablePayload,

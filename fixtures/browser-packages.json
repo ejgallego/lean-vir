@@ -67,6 +67,7 @@
             "HostInterop.elementQuerySelectorText",
             "HostInterop.elementInnerHTMLRoundTrip",
             "HostInterop.setInlineStyleProperty",
+            "HostInterop.setElementClassList",
             "HostInterop.runtimeRefRoundTrip",
             "HostInterop.callbackRoundTripLoop",
             "HostInterop.mountCallbackEvent",

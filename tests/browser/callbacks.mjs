@@ -99,6 +99,25 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     "tomato",
   );
 
+  await runDemoHostEntry(cdp, origin, "HostInterop.setElementClassList", {
+    runInputs: ["#class-list-target", "alpha beta"],
+    expectedResult: "true",
+    target: {
+      id: "class-list-target",
+      tag: "div",
+    },
+  });
+  assert.deepEqual(
+    await evaluate(
+      cdp,
+      `(() => {
+        const target = document.querySelector("#class-list-target");
+        return { className: target.className, tokens: [...target.classList] };
+      })()`,
+    ),
+    { className: "alpha beta", tokens: ["alpha", "beta"] },
+  );
+
   await runDemoHostEntry(cdp, origin, "HostInterop.mountCallbackText", {
     runInputs: ["#callback-smoke-target"],
     expectedResult: "1",
@@ -136,6 +155,26 @@ export async function smokeBrowserCallbacks(cdp, origin) {
       "KeyboardEvent.key did not reach the exact Lean binding",
     ),
     "Enter",
+  );
+  await evaluate(cdp, `(() => {
+    const frame = document.createElement("iframe");
+    document.body.appendChild(frame);
+    try {
+      const event = new frame.contentWindow.KeyboardEvent("keydown", {
+        key: "ForeignEnter",
+      });
+      document.querySelector("#keyboard-event-target").dispatchEvent(event);
+    } finally {
+      frame.remove();
+    }
+  })()`);
+  assert.equal(
+    await waitForDocumentTitle(
+      cdp,
+      "ForeignEnter",
+      "cross-realm KeyboardEvent did not pass exact narrowing",
+    ),
+    "ForeignEnter",
   );
   await evaluate(cdp, `document.querySelector("#keyboard-event-target")
     .dispatchEvent(new Event("keydown"))`);

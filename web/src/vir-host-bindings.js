@@ -7,12 +7,8 @@ Author: Emilio J. Gallego Arias
 import {
   callLeanEventCallback,
   createAnimationHostBindings,
-  createCSSStyleDeclarationHostBindings,
-  createDOMTokenListHostBindings,
   createElementHostBindings,
   createHostLifecycle,
-  createHtmlInputElementHostBindings,
-  createKeyboardEventHostBindings,
   createTimerHostBindings,
   once,
   performanceNow,
@@ -20,6 +16,12 @@ import {
   reportEventHandlerError,
   stopPropagationOnEvent,
 } from "./host/vir-host-resources.js";
+import {
+  createCSSStyleDeclarationHostBindings,
+  createDOMTokenListHostBindings,
+  createHtmlInputElementHostBindings,
+  createKeyboardEventHostBindings,
+} from "./host/vir-dom-host-bindings.js";
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
@@ -42,11 +44,7 @@ export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./host-boundary.js";
-export {
-  createCSSStyleDeclarationHostBindings,
-  createDOMTokenListHostBindings,
-  createHostLifecycle,
-} from "./host/vir-host-resources.js";
+export { createHostLifecycle } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
@@ -631,17 +629,23 @@ function isInputElement(value) {
 }
 
 function isElementCSSInlineStyle(value) {
-  return (
-    typeof globalThis.CSSStyleDeclaration === "function" &&
-    value?.style instanceof globalThis.CSSStyleDeclaration
-  );
+  return typeof value?.style?.setProperty === "function";
 }
 
 function isKeyboardEvent(value) {
-  return (
-    typeof globalThis.KeyboardEvent === "function" &&
-    value instanceof globalThis.KeyboardEvent
-  );
+  const KeyboardEvent = globalThis.KeyboardEvent;
+  if (typeof KeyboardEvent !== "function") return false;
+  const getKey = Object.getOwnPropertyDescriptor(
+    KeyboardEvent.prototype,
+    "key",
+  )?.get;
+  if (typeof getKey !== "function") return false;
+  try {
+    Reflect.apply(getKey, value, []);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isTextAreaElement(value) {

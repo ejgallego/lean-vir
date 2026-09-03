@@ -6,115 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import {
-  createBrowserCanvasHostBindings,
-  createBrowserElementHostBindings,
-  createCSSStyleDeclarationHostBindings,
-  createDOMTokenListHostBindings,
-} from "../../web/src/vir-host-bindings.js";
-import { createNullableValue } from "../../web/src/host/vir-js-value-bindings.js";
-
-const state = {
-  addDisposable() {},
-  removeDisposable() {},
-};
-
-const elementCalls = [];
-const child = { id: "child" };
-const element = {
-  textContent: "",
-  attributes: new Map(),
-  _classList: {
-    add: (name) => elementCalls.push(["class.add", name]),
-    remove: (name) => elementCalls.push(["class.remove", name]),
-    toggle: (name) => {
-      elementCalls.push(["class.toggle", name]);
-      return true;
-    },
-  },
-  get classList() {
-    return this._classList;
-  },
-  set classList(value) {
-    elementCalls.push(["class.set", value]);
-  },
-  _style: {
-    setProperty: (name, value) =>
-      elementCalls.push(["style.property", name, value]),
-  },
-  get style() {
-    return this._style;
-  },
-  set style(value) {
-    elementCalls.push(["style.text", value]);
-  },
-  appendChild: (value) => elementCalls.push(["append", value]),
-  remove: () => elementCalls.push(["remove"]),
-  getAttribute(name) {
-    return this.attributes.get(name) ?? null;
-  },
-  setAttribute(name, value) {
-    this.attributes.set(name, value);
-  },
-  addEventListener() {},
-  removeEventListener() {},
-};
-const elementBindings = createBrowserElementHostBindings(state);
-const tokenBindings = createDOMTokenListHostBindings();
-const styleBindings = createCSSStyleDeclarationHostBindings({
-  fromElement: (value) =>
-    typeof value?.style?.setProperty === "function" ? value : null,
-});
-assert.equal(
-  elementBindings["browser.element.appendChild"](element, child),
-  child,
-);
-const tokenList = elementBindings["browser.element.getClassList"](element);
-assert.equal(tokenList, element.classList);
-tokenBindings["browser.domTokenList.add"](tokenList, "active");
-tokenBindings["browser.domTokenList.remove"](tokenList, "hidden");
-assert.equal(
-  tokenBindings["browser.domTokenList.toggle"](tokenList, "ready"),
-  true,
-);
-elementBindings["browser.element.setClassList"](element, "ready selected");
-assert.equal(
-  styleBindings["browser.elementCSSInlineStyle.fromElement"](element),
-  element,
-);
-assert.equal(
-  styleBindings["browser.elementCSSInlineStyle.fromElement"]({}),
-  null,
-);
-const declaration =
-  styleBindings["browser.elementCSSInlineStyle.getStyle"](element);
-assert.equal(declaration, element.style);
-styleBindings["browser.cssStyleDeclaration.setProperty"](
-  declaration,
-  "color",
-  createNullableValue("red"),
-);
-styleBindings["browser.cssStyleDeclaration.setProperty"](
-  declaration,
-  "display",
-  null,
-);
-styleBindings["browser.elementCSSInlineStyle.setStyle"](
-  element,
-  "color: blue",
-);
-elementBindings["browser.element.remove"](element);
-assert.deepEqual(elementCalls, [
-  ["append", child],
-  ["class.add", "active"],
-  ["class.remove", "hidden"],
-  ["class.toggle", "ready"],
-  ["class.set", "ready selected"],
-  ["style.property", "color", "red"],
-  ["style.property", "display", null],
-  ["style.text", "color: blue"],
-  ["remove"],
-]);
+import { createBrowserCanvasHostBindings } from "../../web/src/vir-host-bindings.js";
 
 const canvasCalls = [];
 const ctx = {
@@ -145,7 +37,7 @@ const canvas = {
   height: 150,
   getContext: (kind) => (kind === "2d" ? ctx : null),
 };
-const canvasBindings = createBrowserCanvasHostBindings(state);
+const canvasBindings = createBrowserCanvasHostBindings();
 assert.equal(
   canvasBindings["browser.htmlCanvasElement.fromElement"](canvas),
   canvas,
