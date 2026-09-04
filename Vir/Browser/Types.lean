@@ -88,7 +88,8 @@ opaque EventTarget : Type
 opaque KeyboardEvent : Type
 
 /-- Exact JavaScript function value accepted by the DOM event-listener APIs. -/
-opaque EventListener : Type
+abbrev EventListener : Type :=
+  Lean.Vir.Js.Function.Unary (Lean.Vir.Js Event) Unit
 
 /-- Browser `HTMLInputElement` object class. -/
 opaque HTMLInputElement : Type

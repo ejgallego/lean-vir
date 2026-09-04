@@ -699,5 +699,6 @@ handover, the wrapper becomes disposed, as described above.
 JavaScript host imports execute synchronously and
 are limited to 128 imported declarations with IR arity at most 6. Native
 Promises may cross as exact `Js` values and be observed with ordinary Promise
-continuations; suspending a Lean call on one still needs a later JSPI-shaped
-boundary.
+continuations. Those operations accept exact `Js.Function1` values; turning a
+Lean closure into one is an explicit `Js.Function.ofLean` conversion.
+Suspending a Lean call on a Promise still needs a later JSPI-shaped boundary.

@@ -8,6 +8,19 @@ opaque Request : Type
 /-- Phantom response shape returned by the test RPC session. -/
 opaque Response : Type
 
+/-- Forget only the phantom type; the JavaScript value and root remain exact. -/
+def eraseExact (value : Lean.Vir.Js Request) : Lean.Vir.Js.Any :=
+  Lean.Vir.Js.erase value
+
+/-- Exercise the generic checked-cast class while preserving successful identity. -/
+def castElementOr
+    (value : Lean.Vir.Js.Any)
+    (fallback : Lean.Vir.Js Lean.Vir.Browser.Element) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element) := do
+  match ← Lean.Vir.Js.cast (target := Lean.Vir.Browser.Element) value with
+  | .ok element => pure element
+  | .error _ => pure fallback
+
 /-- Return the exact native Promise produced by the position-specific session. -/
 def callExact
     (session : Lean.Vir.Js Lean.Vir.Infoview.RpcSession)
@@ -33,9 +46,10 @@ def callMessage
     (request : Lean.Vir.Js Request) :
     Lean.Vir.RuntimeM (Lean.Vir.Js.Promise String) := do
   let pending ← callExact session request
-  Lean.Vir.Js.Promise.then_ pending fun response => do
+  let projectMessage ← Lean.Vir.Js.Function.ofLean fun response => do
     let key ← Lean.Vir.JsValue.ofString "message"
     Lean.Vir.Js.Object.get response key
+  Lean.Vir.Js.Promise.thenValue pending projectMessage
 
 /-- Recover a rejected native Promise with an exact caller-supplied object. -/
 def recover
@@ -44,7 +58,23 @@ def recover
     (fallback : Lean.Vir.Js Response) :
     Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Response) := do
   let pending ← callExact session request
-  Lean.Vir.Js.Promise.catch_ (error := Lean.Vir.Js.Any.Value) pending fun _ =>
-    pure fallback
+  let recoverWithFallback ← Lean.Vir.Js.Function.ofLean
+    (α := Lean.Vir.Js.Any.Value) fun _ => pure fallback
+  Lean.Vir.Js.Promise.catchValue pending recoverWithFallback
+
+/-- Pass an exact native state-setter-shaped function to native `Promise.then`. -/
+def settleIntoState
+    (pending : Lean.Vir.Js.Promise Response)
+    (setter : Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js Response))) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value) :=
+  Lean.Vir.Js.Promise.thenVoid pending setter
+
+/-- Expose native Promise assimilation without a VIR scheduler or wrapper. -/
+def thenPromiseExact
+    (pending : Lean.Vir.Js.Promise Response)
+    (next : Lean.Vir.Js.Function1
+      (Lean.Vir.Js Response) (Lean.Vir.Js.Promise String)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise String) :=
+  Lean.Vir.Js.Promise.thenPromise pending next
 
 end Vir.Fixtures.InfoviewRpcPromise

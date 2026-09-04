@@ -61,13 +61,15 @@ opaque Root : Type
 opaque ElementType : Type
 
 /-- React state setter function returned by `useState`. -/
-opaque StateSetter (α : Type) : Type
+abbrev StateSetter (α : Type) : Type :=
+  Lean.Vir.Js.Function.Unary α Unit
 
 /-- Native JavaScript reducer function accepted by `React.useReducer`. -/
 opaque Reducer (state action : Type) : Type
 
 /-- React reducer dispatch function returned by `useReducer`. -/
-opaque ReducerDispatch (state action : Type) : Type
+abbrev ReducerDispatch (_state action : Type) : Type :=
+  Lean.Vir.Js.Function.Unary (Lean.Vir.Js action) Unit
 
 /-- Exact JavaScript array returned by `React.useState`. -/
 abbrev StateTuple (_α : Type) : Type :=
@@ -89,7 +91,8 @@ structure LeanEffect (value : Type) where
   cleanup : Lean.Vir.Js value → Lean.Vir.Browser.DomM Unit
 
 /-- Native unary JavaScript callback used by React and component props. -/
-opaque Callback (α : Type) : Type
+abbrev Callback (α : Type) : Type :=
+  Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) Unit
 
 /-- Native React context object carrying JavaScript values of type `α`. -/
 opaque Context (α : Type) : Type

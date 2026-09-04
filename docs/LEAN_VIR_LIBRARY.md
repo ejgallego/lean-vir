@@ -253,6 +253,14 @@ their Lean representation.
   element view `Js α` and return `Array (Js α)`. Each resulting handle has an
   independent lifetime, so it remains usable after the source collection is
   no longer reachable.
+- `Js.erase` forgets a phantom shape and preserves the exact value as
+  `Js.Any`. `Js.cast` selects a checked narrowing through a `Js.Cast` instance;
+  failure is `Except Js.TypeConvError (Js target)`. The browser `Element`
+  instance is the first such checked brand cast.
+- `Js.Function1 argument result` describes an exact native unary function.
+  `Js.Function.call` and `callVoid` invoke it directly. `ofLean` and
+  `ofLeanVoid` are explicit conversions for the separate case where a Lean
+  closure must become an ordinary JavaScript function.
 
 `Lean.Vir.LeanRef.toJSL` and `Lean.Vir.LeanRef.fromJSL` are the generic handle
 lane for Lean-owned values that JavaScript should store or route without
@@ -488,10 +496,14 @@ The preferred direct RPC lane is separate from that provisional resolver.
 `RpcSessionAtPos` object returned by the official infoview hook.
 `Vir.Infoview.RpcSession.call` invokes its native `call` method with exact
 JavaScript method and request values and returns `Js.Promise response` without
-awaiting or decoding it. `Js.Promise.then_`, `Js.Promise.catch_`, and the
-generic `Js.Object.get` operation continue on exact native values. This keeps
-server-reference objects inside the response graph under the official RPC
-session's reachability rules.
+awaiting or decoding it. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
+`catchValue` accept exact `Js.Function1` values and expose direct-value,
+Promise-assimilating, and void result shapes separately. `Js.Function.ofLean`
+is the separately named Lean-closure conversion; native functions such as
+React state setters require no conversion. Promise continuations and the
+generic `Js.Object.get` operation therefore continue on exact native values.
+This keeps server-reference objects inside the response graph under the
+official RPC session's reachability rules.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in

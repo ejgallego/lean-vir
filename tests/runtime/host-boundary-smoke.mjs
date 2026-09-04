@@ -105,13 +105,26 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 {
   const bindings = createJsCollectionHostBindings();
   const value = { exact: true };
+  const unary = (item) => item;
+  const unaryVoid = () => undefined;
+  assert.equal(bindings["js.value.function.unary"](unary), unary);
+  assert.equal(bindings["js.value.function.unaryVoid"](unaryVoid), unaryVoid);
+  assert.equal(bindings["js.function.call"](unary, value), value);
   const promise = Promise.resolve(value);
+  assert.equal(await bindings["js.promise.thenValue"](promise, unary), value);
   assert.equal(
-    await bindings["js.promise.then"](promise, (item) => item),
+    await bindings["js.promise.thenPromise"](
+      promise,
+      (item) => Promise.resolve(item),
+    ),
     value,
   );
   assert.equal(
-    await bindings["js.promise.catch"](
+    await bindings["js.promise.thenVoid"](promise, unaryVoid),
+    undefined,
+  );
+  assert.equal(
+    await bindings["js.promise.catchValue"](
       Promise.reject(new Error("recover")),
       (error) => error.message,
     ),

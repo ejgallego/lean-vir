@@ -72,7 +72,7 @@
       {
         "id": "infoview.rpc-session.call", "group": "rpc-session", "target": "infoview.rpcSession.call",
         "lean": "Lean.Vir.Infoview.RpcSession.call", "marker": "vir_js",
-        "reason": "Calls the exact position-specific infoview RPC session with the exact method string and request object and returns its native Promise.",
+        "reason": "Calls the exact position-specific infoview RPC session with the exact method string and request object, omits its optional ClientRequestOptions argument, and returns its native Promise.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "RpcSessionAtPos.call", "semantics": "preserving" },
         "typeParameters": ["params", "result"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
         "arguments": [

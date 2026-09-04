@@ -43,7 +43,7 @@ Those pieces have distinct ownership:
 | React component | JavaScript widget-module export | Exact JavaScript function created from a Lean closure | Keep the exact component value; do not add a component registry. |
 | RPC session | `useRpcSession(): RpcSessionAtPos` | `Surface.rpcSession` carries that exact object into VIR | Keep the position-specific session raw; do not add a session registry. |
 | RPC call | `session.call(method, params, options)` | Direct `RpcSession.call(session, method, params)` binding; options deferred | Add the exact optional options value when the cancellation fixture needs it; do not implement a VIR scheduler. |
-| Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations | Preserve the Promise object; do not make the synchronous host dispatcher await it. |
+| Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations over exact `Js.Function1` values | Preserve the Promise and callback objects; do not make the synchronous host dispatcher await either one. |
 | Server references | Exact response objects registered by `RpcSessionAtPos` | Mirrored `RpcRef`/`ResolvedRef` records plus a bounded global store | Keep the response object graph exact so upstream reference reachability remains authoritative. |
 | Request cancellation | Native `AbortController` passed through call options | No general RPC cancellation path | Bind the native objects when a changing-props fixture requires cancellation. |
 | Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Lean values retained in JSL for browser-side rendering | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
@@ -57,10 +57,15 @@ native Promise only when its declared result is an exact `Js` resource. In
 that case the dispatcher roots the Promise object and immediately returns its
 handle; it does not await, poll, cancel, or translate the Promise.
 
-`Js.Promise.then_` and `Js.Promise.catch_` call the corresponding native
-methods. Their Lean callbacks become ordinary JavaScript functions, so the
-Promise and JavaScript garbage collector determine continuation reachability.
-This is sufficient for a direct `RpcSessionAtPos.call` binding without JSPI.
+`Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and `catchValue` call the
+corresponding native methods with exact `Js.Function1` values. The separate
+`then` forms expose direct-value, assimilated-Promise, and `undefined` result
+shapes rather than hiding JavaScript's `Awaited` behavior. They do not convert
+Lean closures. An application that needs a Lean-authored continuation first
+calls the explicit `Js.Function.ofLean` or `ofLeanVoid` conversion. A native
+React state setter can instead be passed directly to `thenVoid`; the Promise's
+ordinary JavaScript reachability keeps that function callable even after VIR
+teardown.
 JSPI would only be needed for a different API that suspends the running Lean
 call until the Promise settles.
 
@@ -90,8 +95,12 @@ only for response data proven not to contain server references.
 the minimal direct boundary. The fixture calls an exact session supplied both
 directly and through `Surface.rpcSession`, verifies that the request object
 reaches `session.call` by identity, receives the same native Promise object,
-chains Lean callbacks through native `Promise.then` and `Promise.catch`, and
-reads a response property without structurally decoding the response.
+chains explicitly converted Lean callbacks through native `Promise.then` and
+`Promise.catch`, passes a native state-setter-shaped function directly to
+`thenVoid`, and reads a response property without structurally decoding the
+response. The native-function regression settles after runtime disposal and
+therefore also proves that the Promise path adds no VIR callback lifetime to
+native functions.
 
 The first browser acceptance fixture should next call a real
 `@[server_rpc_method]` through the position-specific session and retain the

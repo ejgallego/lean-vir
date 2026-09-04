@@ -31,6 +31,10 @@ try {
     "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
     "Vir.Fixtures.InfoviewRpcPromise.callMessage",
     "Vir.Fixtures.InfoviewRpcPromise.recover",
+    "Vir.Fixtures.InfoviewRpcPromise.eraseExact",
+    "Vir.Fixtures.InfoviewRpcPromise.castElementOr",
+    "Vir.Fixtures.InfoviewRpcPromise.settleIntoState",
+    "Vir.Fixtures.InfoviewRpcPromise.thenPromiseExact",
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
@@ -41,6 +45,43 @@ try {
     defaultHostBindings: createBrowserHostBindings(),
   });
   try {
+    const previousElement = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "Element",
+    );
+    class TestElement {}
+    Object.defineProperty(globalThis, "Element", {
+      configurable: true,
+      writable: true,
+      value: TestElement,
+    });
+    try {
+      const element = new TestElement();
+      const fallback = new TestElement();
+      assert.equal(
+        runtime.call(
+          "Vir.Fixtures.InfoviewRpcPromise.castElementOr",
+          element,
+          fallback,
+        ),
+        element,
+      );
+      assert.equal(
+        runtime.call(
+          "Vir.Fixtures.InfoviewRpcPromise.castElementOr",
+          "not an element",
+          fallback,
+        ),
+        fallback,
+      );
+    } finally {
+      if (previousElement) {
+        Object.defineProperty(globalThis, "Element", previousElement);
+      } else {
+        delete globalThis.Element;
+      }
+    }
+
     const requests = [];
     const calls = [];
     const response = { message: "exact Promise response" };
@@ -56,6 +97,10 @@ try {
     };
 
     requests.push({ message: "exact Promise request identity" });
+    assert.equal(
+      runtime.call("Vir.Fixtures.InfoviewRpcPromise.eraseExact", requests[0]),
+      requests[0],
+    );
     const exactResult = runtime.call(
       "Vir.Fixtures.InfoviewRpcPromise.callExact",
       session,
@@ -95,6 +140,33 @@ try {
       assert.equal(call.method, "Vir.Fixtures.InfoviewRpcPromise.echo");
       assert.equal(call.params, requests[index]);
     }
+
+    assert.equal(
+      await runtime.call(
+        "Vir.Fixtures.InfoviewRpcPromise.thenPromiseExact",
+        exactPromise,
+        (value) => Promise.resolve(value.message),
+      ),
+      response.message,
+    );
+
+    let resolveAfterDispose;
+    const lateValue = { message: "native callback after VIR disposal" };
+    const stateUpdates = [];
+    const latePromise = new Promise((resolve) => {
+      resolveAfterDispose = resolve;
+    });
+    const lateChain = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.settleIntoState",
+      latePromise,
+      (value) => {
+        stateUpdates.push(value);
+      },
+    );
+    runtime.dispose();
+    resolveAfterDispose(lateValue);
+    assert.equal(await lateChain, undefined);
+    assert.deepEqual(stateUpdates, [lateValue]);
   } finally {
     runtime.dispose();
   }

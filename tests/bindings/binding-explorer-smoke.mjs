@@ -358,7 +358,7 @@ assert.deepEqual(elementRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 728,
-  mappedTargets: 22,
+  mappedTargets: 23,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",

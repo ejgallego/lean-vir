@@ -120,6 +120,7 @@ Lean code can call JavaScript by importing `Vir.Common`, `Vir.Browser`, or
 `Vir.Host` and adding an opaque declaration marked with `@[vir_js "target.name"]`.
 Bind new targets in `hostBindings` when creating
 the browser runtime. The current host boundary is synchronous; a native
-Promise can cross as an exact `Js` value, but awaiting it requires direct
-Promise continuations or an explicit callback/polling design until the runtime
-grows an async boundary.
+Promise can cross as an exact `Js` value. Direct continuations consume exact
+`Js.Function1` values, and `Js.Function.ofLean` makes any Lean-closure
+conversion explicit. Awaiting a Promise inside the running Lean call still
+requires a future async boundary.

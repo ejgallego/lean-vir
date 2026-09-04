@@ -159,6 +159,32 @@ try {
     eventBindings["browser.eventTarget.asElement"](nonElementTarget),
     null,
   );
+  assert.equal(
+    elementBindings["browser.element.fromAny"](elementTarget),
+    elementTarget,
+  );
+  assert.equal(
+    elementBindings["browser.element.fromAny"]("not an element"),
+    null,
+  );
+  class ForeignElement {}
+  const foreignElement = new ForeignElement();
+  foreignElement.ownerDocument = {
+    defaultView: { Element: ForeignElement },
+  };
+  assert.equal(
+    elementBindings["browser.element.fromAny"](foreignElement),
+    foreignElement,
+  );
+  const hostileValue = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("hostile property access");
+      },
+    },
+  );
+  assert.equal(elementBindings["browser.element.fromAny"](hostileValue), null);
 } finally {
   if (previousElement) {
     Object.defineProperty(globalThis, "Element", previousElement);

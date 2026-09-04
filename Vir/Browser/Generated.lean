@@ -971,6 +971,22 @@ opaque setTextContent
     (textContent : @& Lean.Vir.Js.Nullable String) :
     DomM Unit
 
+/--
+Generated binding for reviewed VIR protocol `browser.element.from-any`.
+
+Checks an erased JavaScript value with the browser Element brand and preserves the exact JavaScript identity on success.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.element.fromAny"]
+opaque fromAnyNullable
+    (value : @& Lean.Vir.Js.Any) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
 end Element
 
 namespace ElementCSSInlineStyle

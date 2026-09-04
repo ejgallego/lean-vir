@@ -46,7 +46,8 @@ Ordinary host imports use a deliberately narrow type surface:
 | `Lean.Vir.Js α`          | The exact JavaScript value                                      | Phantom-typed JavaScript value.           |
 | `Lean.Vir.Js.Nullable α` | The exact value or `null`                                       | Native nullable result or argument.       |
 | `Lean.Vir.JSL α`         | An ordinary JavaScript object backed by one Lean root           | Store an opaque Lean value in JavaScript. |
-| Function argument        | An ordinary JavaScript function backed by one Lean closure root | JavaScript callback into Lean.            |
+| `Lean.Vir.Js.Function1 α β` | An exact ordinary JavaScript function                         | Native unary function with a phantom call shape. |
+| Lean function argument   | An ordinary JavaScript function backed by one Lean closure root | Explicit callback conversion into Lean.   |
 | `Unit`                   | `undefined`                                                     | No result.                                |
 
 Raw Lean scalars and structures are rejected on an ordinary host-import
@@ -54,6 +55,20 @@ boundary. Named declarations marked `@[vir_js_explicit_conversion "..."]`
 are the explicit exception used by conversions such as `js.string.value`.
 Exported Lean functions called from JavaScript use the separate structural
 interface codec.
+
+`Js.Function1 argument result` does not wrap a function and VIR does not
+dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
+`Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native
+functions such as React state setters already cross as `Js.Function1` values
+and need no conversion. `Js.erase` similarly forgets only a phantom type and
+returns the exact same JavaScript value as `Js.Any`.
+
+Unknown values narrow through the polymorphic `Js.cast` operation. Its
+`Js.Cast` instance selects a type-specific predicate and returns
+`Except Js.TypeConvError (Js target)` in the instance's effect. The initial
+browser `Element` instance delegates to one brand check that returns the exact
+input on success. `Js.Object` is not the universal source type: JavaScript
+primitives, `null`, and `undefined` erase to `Js.Any` as well.
 
 The package manifest currently calls the raw JavaScript-value lane
 `hostResource`. That is a legacy ABI classification name, not a JavaScript

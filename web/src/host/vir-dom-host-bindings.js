@@ -33,6 +33,7 @@ export function createBrowserEventHostBindings() {
 
 export function createBrowserElementHostBindings() {
   return {
+    "browser.element.fromAny": (value) => (isElement(value) ? value : null),
     "browser.elementCSSInlineStyle.fromElement": (element) =>
       isElementCSSInlineStyle(element) ? element : null,
     "browser.elementCSSInlineStyle.getStyle": (element) => element.style,
@@ -112,10 +113,18 @@ function isKeyboardEvent(value) {
 }
 
 function isElement(value) {
-  return (
-    typeof globalThis.Element === "function" &&
-    value instanceof globalThis.Element
-  );
+  try {
+    if (
+      typeof globalThis.Element === "function" &&
+      value instanceof globalThis.Element
+    ) {
+      return true;
+    }
+    const ownerElement = value?.ownerDocument?.defaultView?.Element;
+    return typeof ownerElement === "function" && value instanceof ownerElement;
+  } catch {
+    return false;
+  }
 }
 
 function isInputElement(value) {

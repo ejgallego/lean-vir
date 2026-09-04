@@ -101,7 +101,7 @@ namespace Infoview.RpcSession
 /--
 Generated binding for reviewed VIR protocol `infoview.rpc-session.call`.
 
-Calls the exact position-specific infoview RPC session with the exact method string and request object and returns its native Promise.
+Calls the exact position-specific infoview RPC session with the exact method string and request object, omits its optional ClientRequestOptions argument, and returns its native Promise.
 
 Binding contract: `generation.protocolOperations`.
 
