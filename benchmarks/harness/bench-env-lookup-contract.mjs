@@ -38,6 +38,8 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/runtime/interface-effects.js",
   "web/src/runtime/interface-manifest.js",
   "web/src/runtime/interface-tags.js",
+  "web/src/runtime/ir-package.js",
+  "web/src/runtime/module-name.js",
   "web/src/runtime/object-abi-exports.js",
   "web/src/runtime/object-abi.js",
   "web/src/runtime/object-values.js",

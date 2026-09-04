@@ -9,6 +9,7 @@ module
 public import Vir.GeneratePackage.Emit
 public import Vir.GeneratePackage.Report
 import Vir.ClientNativeExternManifest
+import Vir.Hash
 
 public section
 
@@ -116,7 +117,7 @@ def analyzePackage
   return {
     closure
     manifest
-    report := reportFor generatedAt targets closure manifest
+    report := reportFor generatedAt closure manifest
   }
 
 def buildPackageFromIndex
@@ -159,30 +160,13 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"JavaScript host imports: {manifest.hostImports.size}"
       IO.println s!"interface exports: {manifest.exports.size}"
       for target in manifest.metadata.targets do
-        IO.println s!"target: {target.origin.display} [{target.mode}] roots: {namesSummary target.resolvedRoots}"
+        IO.println s!"target: {target.origin.display} [{target.mode.metadataName}] roots: {namesSummary target.resolvedRoots}"
       return 0
   | .error err =>
       IO.eprintln err
       return 1
 
-private def sha256Files (paths : Array System.FilePath) : IO (Array String) := do
-  if paths.isEmpty then
-    return #[]
-  let out ← IO.Process.output {
-    cmd := "sha256sum"
-    args := #["--zero"] ++ paths.map (fun path => path.toString)
-  }
-  if out.exitCode != 0 then
-    throw <| IO.userError s!"sha256sum failed: {out.stderr.trimAscii.toString}"
-  let records := out.stdout.split (· == '\u0000') |>.filter (fun record => !record.isEmpty)
-  let hashes := records.toArray.map (fun record => (record.take 64).toString)
-  unless hashes.size == paths.size &&
-      hashes.all (fun hash => hash.length == 64 &&
-        hash.toList.all ("0123456789abcdef".contains ·)) do
-    throw <| IO.userError "sha256sum returned invalid batch output"
-  return hashes
-
-def packageSetMemberJson
+private def packageSetMemberJson
     (moduleName path : String) (role : PackageSetMemberRole)
     (byteLength : Nat) (sha256 : String) : String :=
   jsonObject #[
@@ -193,14 +177,14 @@ def packageSetMemberJson
     ("sha256", jsonString sha256)
   ]
 
-def packageSetDescriptorJson (members : Array String) : String :=
+private def packageSetDescriptorJson (members : Array String) : String :=
   jsonObject #[
     ("format", jsonString packageSetFormat),
     ("version", jsonNat currentPackageSetVersion),
     ("packages", jsonArray members)
   ] ++ "\n"
 
-structure PendingPackageSetMember where
+private structure PendingPackageSetMember where
   moduleName : Name
   role : PackageSetMemberRole
   relativePath : String
@@ -293,7 +277,7 @@ unsafe def runModuleSet
         outputPath := packagePath
         byteLength := bytes.size
       }
-      let hashes ← sha256Files (pendingMembers.map (fun member => member.outputPath))
+      let hashes ← Vir.sha256Files (pendingMembers.map (fun member => member.outputPath))
       let members := pendingMembers.zip hashes |>.map fun (member, sha256) =>
         packageSetMemberJson member.moduleName.toString member.relativePath member.role
           member.byteLength sha256

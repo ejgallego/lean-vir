@@ -35,6 +35,7 @@ import {
   formatBytes,
   setReadyState,
 } from "./pages/page-utils.js";
+import { createLatestLoadGate } from "./pages/latest-load.js";
 import { fetchBytes } from "../src/vir-runtime.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import { formatPackageTarget } from "../src/runtime/package-targets.js";
@@ -65,30 +66,20 @@ let requestedAutoRun = query.get("run") === "1";
 let runtime = null;
 let interfaceEntries = [];
 let currentPackageQuery = null;
+const packageLoadGate = createLatestLoadGate();
 
 function showError(error, status = "Failed") {
   resultOutput.textContent = errorMessage(error);
+  runEntryButton.disabled = runtime === null || interfaceEntries.length === 0;
   setReadyState(statusEl, status, false);
   console.error(error);
 }
 
-function resetPackageState() {
-  runtime?.dispose();
-  runtime = null;
-  interfaceEntries = [];
-  currentPackageQuery = null;
+function beginPackageLoad() {
+  const token = packageLoadGate.begin();
   runEntryButton.disabled = true;
-  entrySelect.replaceChildren();
-  inputFields.replaceChildren();
-  resultOutput.textContent = "...";
-  packageName.textContent = "...";
-  packageSize.textContent = "...";
-  declCount.textContent = "...";
-  exportCount.textContent = "...";
-  ptrWidth.textContent = "...";
-  sourceTargets.textContent = "...";
-  sourceTargets.removeAttribute("title");
-  toolchain.textContent = "...";
+  setReadyState(statusEl, "Loading", false);
+  return token;
 }
 
 function selectedInterfaceEntry() {
@@ -222,9 +213,9 @@ function inputOverride(entry, input, index) {
   return null;
 }
 
-function renderManifestEntries(manifest) {
-  validateInterfaceManifest(manifest);
-  const diagnostics = manifestDiagnostics(manifest);
+function validatedManifestEntries(manifest) {
+  const validated = validateInterfaceManifest(manifest);
+  const diagnostics = manifestDiagnostics(validated);
   if (diagnostics.length > 0) {
     const lines = diagnostics.map(
       (diagnostic) =>
@@ -234,7 +225,11 @@ function renderManifestEntries(manifest) {
       `package contains unsupported interface exports:\n${lines.join("\n")}`,
     );
   }
-  interfaceEntries = manifest.exports;
+  return validated.exports;
+}
+
+function renderManifestEntries(entries) {
+  interfaceEntries = entries;
   entrySelect.replaceChildren();
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
@@ -284,7 +279,7 @@ function renderPackageMetadata(metadata, packageInfo) {
     (member) => `${member.role}: ${member.module} (${member.path})`,
   );
 
-  exportCount.textContent = String(runtime.packageInfo.interfaceExports);
+  exportCount.textContent = String(packageInfo.interfaceExports);
   sourceTargets.textContent = `${compactTargets.join(" / ") || "unknown"}${memberSummary}`;
   sourceTargets.title = [...fullTargets, ...memberDetails].join("\n");
   toolchain.textContent =
@@ -347,44 +342,73 @@ function renderResult(value) {
   resultOutput.dataset.multiline = String(text.includes("\n"));
 }
 
-async function loadPackageSet(label, irPackageSet, packageQuery = null) {
+async function loadPackageSet(token, label, irPackageSet, packageQuery = null) {
+  const candidate = await runtimeFactory.createRuntime({ irPackageSet });
+  if (packageLoadGate.discardStale(token, () => candidate.dispose())) return;
+
+  let entries;
+  try {
+    entries = validatedManifestEntries(candidate.interfaceManifest);
+  } catch (error) {
+    candidate.dispose();
+    throw error;
+  }
+
+  const previousRuntime = runtime;
+  const previousEntries = interfaceEntries;
+  const previousPackageQuery = currentPackageQuery;
+  runtime = candidate;
   currentPackageQuery = packageQuery;
-  runtime = await runtimeFactory.createRuntime({ irPackageSet });
-  syncPackagePreset();
-  packageName.textContent = label;
-  packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);
-  declCount.textContent = String(runtime.packageInfo.count);
-  ptrWidth.textContent = `${runtime.targetPointerBytes()} bytes`;
-  renderManifestEntries(runtime.interfaceManifest);
-  renderPackageMetadata(runtime.packageMetadata, runtime.packageInfo);
-  runEntryButton.disabled = interfaceEntries.length === 0;
-  setReadyState(statusEl, "Ready", true);
-  updateLocationForSelectedEntry();
+  try {
+    syncPackagePreset();
+    packageName.textContent = label;
+    packageSize.textContent = formatBytes(candidate.packageInfo.byteLength);
+    declCount.textContent = String(candidate.packageInfo.count);
+    ptrWidth.textContent = `${candidate.targetPointerBytes()} bytes`;
+    renderManifestEntries(entries);
+    renderPackageMetadata(candidate.packageMetadata, candidate.packageInfo);
+    runEntryButton.disabled = interfaceEntries.length === 0;
+    setReadyState(statusEl, "Ready", true);
+    updateLocationForSelectedEntry();
+  } catch (error) {
+    runtime = previousRuntime;
+    interfaceEntries = previousEntries;
+    currentPackageQuery = previousPackageQuery;
+    candidate.dispose();
+    throw error;
+  }
+  previousRuntime?.dispose();
   if (requestedAutoRun) {
     requestedAutoRun = false;
     const entry = selectedInterfaceEntry();
     if (entry !== null) {
-      renderResult(evaluateEntry(runtime, entry));
+      renderResult(evaluateEntry(candidate, entry));
     }
   }
 }
 
 async function loadPackageUrl() {
-  resetPackageState();
-  setReadyState(statusEl, "Loading", false);
+  const token = beginPackageLoad();
   const label = packageUrl.value.trim() || defaultPackageFile;
-  const url = assetPathFor(label, import.meta.env.BASE_URL);
-  const packageInput = /\.irpkg-set\.json(?:[?#]|$)/u.test(label)
-    ? url
-    : [await fetchBytes(url)];
-  await loadPackageSet(label, packageInput, label);
+  try {
+    const url = assetPathFor(label, import.meta.env.BASE_URL);
+    const packageInput = /\.irpkg-set\.json(?:[?#]|$)/u.test(label)
+      ? url
+      : [await fetchBytes(url)];
+    await loadPackageSet(token, label, packageInput, label);
+  } catch (error) {
+    if (packageLoadGate.isCurrent(token)) showError(error, "Failed");
+  }
 }
 
 async function loadPackageFile(file) {
-  resetPackageState();
-  setReadyState(statusEl, "Loading", false);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  await loadPackageSet(file.name, [bytes]);
+  const token = beginPackageLoad();
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await loadPackageSet(token, file.name, [bytes]);
+  } catch (error) {
+    if (packageLoadGate.isCurrent(token)) showError(error, "Failed");
+  }
 }
 
 function evaluateEntry(runtime, entry) {
@@ -401,18 +425,14 @@ function evaluateEntry(runtime, entry) {
 }
 
 loadUrlButton.addEventListener("click", () => {
-  loadPackageUrl().catch((error) => {
-    showError(error, "Failed");
-  });
+  void loadPackageUrl();
 });
 
 packagePreset.addEventListener("change", () => {
   if (packagePreset.value === "") return;
   packageUrl.value = packagePreset.value;
   requestedEntry = null;
-  loadPackageUrl().catch((error) => {
-    showError(error, "Failed");
-  });
+  void loadPackageUrl();
 });
 
 packageUrl.addEventListener("input", syncPackagePreset);
@@ -420,9 +440,7 @@ packageUrl.addEventListener("input", syncPackagePreset);
 packageFile.addEventListener("change", () => {
   const file = packageFile.files?.[0];
   if (!file) return;
-  loadPackageFile(file).catch((error) => {
-    showError(error, "Failed");
-  });
+  void loadPackageFile(file);
 });
 
 entrySelect.addEventListener("change", () => {
@@ -447,10 +465,14 @@ runEntryButton.addEventListener("click", () => {
   }
 });
 
+window.addEventListener("beforeunload", () => {
+  packageLoadGate.begin();
+  runtime?.dispose();
+  runtime = null;
+});
+
 renderPackagePresets();
 packageUrl.value = query.get("package") ?? defaultPackageFile;
 syncPackagePreset();
 
-loadPackageUrl().catch((error) => {
-  showError(error, "Failed");
-});
+void loadPackageUrl();

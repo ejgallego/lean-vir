@@ -10,7 +10,7 @@ import { demoHostImportTargets } from "../../scripts/native/demo-host-import-tar
 export async function smokeNodeHostRuntime(context) {
   const runtime = await createVirRuntime({
     wasmBytes: context.wasmBytes,
-    irPackageSetBytes: [context.hostPackageBytes],
+    irPackageSet: [context.hostPackageBytes],
   });
   const actualTargets = runtime.interfaceManifest.hostImports
     .map((entry) => entry.target)
@@ -24,7 +24,9 @@ export async function smokeNodeHostRuntime(context) {
     );
   }
 
-  assertMissingBrowserProvider(runtime, "HostInterop.titleHandshake", ["smoke"]);
+  assertMissingBrowserProvider(runtime, "HostInterop.titleHandshake", [
+    "smoke",
+  ]);
   assertMissingBrowserProvider(runtime, "ReactCounter.mount", ["#react"]);
   runtime.dispose();
 }
@@ -36,7 +38,10 @@ function assertMissingBrowserProvider(runtime, entry, args) {
   } catch (error) {
     message = error instanceof Error ? error.message : String(error);
   }
-  if (!/host import binding not found/.test(message) || runtime.liveCallbacks.size !== 0) {
+  if (
+    !/host import binding not found/.test(message) ||
+    runtime.liveCallbacks.size !== 0
+  ) {
     throw new Error(
       `${entry} must require an explicit browser host: ${JSON.stringify({ message, callbacks: runtime.liveCallbacks.size })}`,
     );

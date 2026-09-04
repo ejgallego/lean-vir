@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean
+import Vir.Hash
 
 open Lean
 open System
@@ -225,8 +226,7 @@ def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
     let relPath ← jsonField file "path" Json.getStr?
     let expected ← jsonField file "sha256" Json.getStr?
     let filePath := sdkDir / FilePath.mk relPath
-    let hashLine ← run "sha256sum" #[filePath.toString]
-    let actual := (hashLine.splitOn " ").head?.getD ""
+    let actual ← Vir.sha256File filePath
     if actual != expected then
       throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
 

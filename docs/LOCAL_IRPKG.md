@@ -53,9 +53,10 @@ lists roots, packaged declarations, native externs, initializer globals,
 interface exports, JavaScript host imports, and any loud diagnostics.
 
 On success, the command prints a package summary: package format, Lean
-toolchain, generation time, total declarations, interface exports, JavaScript
-host imports, source targets, and resolved roots. The same data is embedded in
-`manifest.metadata`.
+toolchain, total declarations, interface exports, JavaScript host imports,
+source targets, and resolved roots. Stable build identity is embedded in
+`manifest.metadata`; the adjacent diagnostic report alone records wall-clock
+generation time.
 
 Local package generation also builds `build/lean-lib`, which provides the
 project-owned `Vir.*` modules for host import declarations.
@@ -99,8 +100,8 @@ npm run dev
 
 Open `/dev.html`. The page creates a fresh WASM instance, loads the selected
 `.irpkg`, reads the embedded interface manifest, and generates entry controls
-from that manifest. The header also shows the package metadata, including
-source targets, toolchain, generation time, declaration count, and export count.
+from that manifest. The header also shows source targets, toolchain,
+declaration count, and export count.
 
 There are three package loading paths:
 

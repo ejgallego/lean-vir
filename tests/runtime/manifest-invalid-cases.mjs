@@ -19,6 +19,28 @@ function packageTarget(overrides = {}) {
   };
 }
 
+function hostImport(overrides = {}) {
+  return {
+    slot: 0,
+    name: "Example.jsHost",
+    source: "Example.lean",
+    target: "test.host",
+    boundary: "hostResource",
+    symbol: "vir_host_import_0",
+    arity: 2,
+    erasedPrefixArgs: 0,
+    args: [
+      {
+        name: "value",
+        type: { type: "Nat", interfaceTag: 0 },
+      },
+    ],
+    result: { type: "Nat", interfaceTag: 0 },
+    effect: "runtime",
+    ...overrides,
+  };
+}
+
 export const invalidManifestCases = [
   {
     name: "missing manifest version",
@@ -188,7 +210,17 @@ export const invalidManifestCases = [
         role: "dependency",
       };
     },
-    pattern: /packageSetMember\.module must be normalized/,
+    pattern: /packageSetMember\.module must be a normalized Lean module name/,
+  },
+  {
+    name: "invalid package-set member module syntax",
+    mutate: (manifest) => {
+      manifest.metadata.packageSetMember = {
+        module: "Example/Dependency",
+        role: "dependency",
+      };
+    },
+    pattern: /packageSetMember\.module must be a normalized Lean module name/,
   },
   {
     name: "dependency package-set member with target",
@@ -615,13 +647,7 @@ export const invalidManifestCases = [
   {
     name: "host import missing boundary",
     mutate: (manifest) => {
-      manifest.hostImports = [
-        {
-          name: "jsHost",
-          target: "test.host",
-          effect: "runtime",
-        },
-      ];
+      manifest.hostImports = [hostImport({ boundary: undefined })];
     },
     pattern:
       /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
@@ -629,14 +655,7 @@ export const invalidManifestCases = [
   {
     name: "host import unsupported boundary",
     mutate: (manifest) => {
-      manifest.hostImports = [
-        {
-          name: "jsHost",
-          target: "test.host",
-          boundary: "implicit",
-          effect: "runtime",
-        },
-      ];
+      manifest.hostImports = [hostImport({ boundary: "implicit" })];
     },
     pattern:
       /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
@@ -644,16 +663,65 @@ export const invalidManifestCases = [
   {
     name: "legacy wire host boundary rejected",
     mutate: (manifest) => {
-      manifest.hostImports = [
-        {
-          name: "jsHost",
-          target: "test.host",
-          boundary: "wire",
-          effect: "runtime",
-        },
-      ];
+      manifest.hostImports = [hostImport({ boundary: "wire" })];
     },
     pattern:
       /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+  },
+  {
+    name: "host import missing target",
+    mutate: (manifest) => {
+      manifest.hostImports = [hostImport({ target: undefined })];
+    },
+    pattern: /hostImports\[0\]\.target must be a non-empty string/,
+  },
+  {
+    name: "host import missing args",
+    mutate: (manifest) => {
+      manifest.hostImports = [hostImport({ args: undefined })];
+    },
+    pattern: /hostImports\[0\]\.args must be an array/,
+  },
+  {
+    name: "host import missing result",
+    mutate: (manifest) => {
+      manifest.hostImports = [hostImport({ result: undefined })];
+    },
+    pattern: /hostImports\[0\]\.result must be an object/,
+  },
+  {
+    name: "host import non-sequential slot",
+    mutate: (manifest) => {
+      manifest.hostImports = [hostImport({ slot: 1 })];
+    },
+    pattern: /hostImports\[0\]\.slot must be 0/,
+  },
+  {
+    name: "host import arity mismatch",
+    mutate: (manifest) => {
+      manifest.hostImports = [hostImport({ arity: 1 })];
+    },
+    pattern:
+      /arity does not match erased arguments, value arguments, and effect \(2\)/,
+  },
+  {
+    name: "duplicate host import name",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        hostImport(),
+        hostImport({ slot: 1, symbol: "vir_host_import_1" }),
+      ];
+    },
+    pattern: /hostImports\[1\]\.name duplicates another host import/,
+  },
+  {
+    name: "duplicate host import symbol",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        hostImport(),
+        hostImport({ slot: 1, name: "Example.otherHost" }),
+      ];
+    },
+    pattern: /hostImports\[1\]\.symbol duplicates another host import/,
   },
 ];

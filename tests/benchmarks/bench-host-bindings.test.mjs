@@ -11,7 +11,9 @@ import { createBenchmarkHostBindings } from "../../benchmarks/harness/bench-host
 
 test("benchmark callbacks use the exact self-owning function contract", () => {
   const released = [];
-  const bindings = createBenchmarkHostBindings((callback) => released.push(callback));
+  const bindings = createBenchmarkHostBindings((callback) =>
+    released.push(callback),
+  );
   const callback = Object.freeze((value) => value + 7n);
 
   assert.equal(bindings["test.callNatCallback"](5n, callback), 12n);
@@ -22,7 +24,9 @@ test("benchmark callbacks use the exact self-owning function contract", () => {
 
 test("benchmark callbacks release their root after failure", () => {
   const released = [];
-  const bindings = createBenchmarkHostBindings((callback) => released.push(callback));
+  const bindings = createBenchmarkHostBindings((callback) =>
+    released.push(callback),
+  );
   const callback = () => {
     throw new Error("callback failed");
   };
@@ -48,5 +52,8 @@ test("benchmark document bindings retain exact object identity", () => {
     undefined,
   );
   assert.equal(bindings["browser.document.current"](), documentValue);
-  assert.equal(bindings["browser.document.getTitle"](documentValue), "benchmark");
+  assert.equal(
+    bindings["browser.document.getTitle"](documentValue),
+    "benchmark",
+  );
 });

@@ -190,7 +190,7 @@ selection cannot reuse a package from another profile. A missing root package,
 report, descriptor-listed shard, or member whose byte length or SHA-256 no
 longer matches the descriptor invalidates the cached descriptor target.
 The cache verifier checks sizes from filesystem metadata and hashes all
-members in one `sha256sum` invocation.
+members in one portable Node crypto invocation.
 
 The descriptor is currently one Lake target: when it is invalidated, the facet
 regenerates the root and every reached dependency member as a complete set. It

@@ -209,13 +209,17 @@ const vir = await factory.createRuntime({ irPackageSet: packageSet });
 
 `fetchIrPackageSet` validates the descriptor, resolves normalized relative
 member paths, fetches them in parallel, and verifies every declared byte length
-and SHA-256. It returns `{ format, version, descriptorUrl, members }`; each
+and SHA-256. Runtime creation then parses every member before Wasm instantiation,
+binds its embedded `packageSetMember` module and role to the descriptor entry,
+requires dependency-first/root-last order, and rejects mixed Lean toolchain or
+format identities. It returns `{ format, version, descriptorUrl, members }`; each
 member preserves its `module`, `role`, resolved `url`, integrity metadata, and
 `bytes`. Passing that structured value as `irPackageSet` keeps transport
 identity in `vir.packageInfo.packageSet`; runtime metadata omits the member
 bytes. Passing a byte array is the low-level form for hosts that intentionally
-manage descriptor validation and transport themselves, and therefore leaves
-`packageInfo.packageSet` as `null`. A custom `fetchBytes` factory option can
+manage descriptor transport themselves; embedded member identities, order, and
+toolchain consistency are still validated, and `packageInfo.packageSet` is
+`null`. A custom `fetchBytes` factory option can
 provide filesystem, cache, or authenticated transport semantics.
 
 The runtime validates or fetches `irPackageSet` before instantiating Wasm. An
@@ -286,8 +290,8 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   nested type descriptors as read-only after installation: the runtime caches
   derived export, layout, and normalization plans for the loaded package.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
-  package format version, Lean toolchain, generation time, source targets, and
-  resolved roots.
+  package format version, Lean toolchain, source targets, and resolved roots.
+  Wall-clock generation time is intentionally confined to diagnostic reports.
 - `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
   declaration name.
 - `vir.callTimed(name, ...args)` performs the same call and returns

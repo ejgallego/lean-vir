@@ -17,8 +17,7 @@ namespace Vir.GeneratePackage
 open Lean.IR
 
 def reportFor
-    (generatedAt : String) (_targets : Array Target)
-    (closure : Closure) (manifest : InterfaceManifest) : String :=
+    (generatedAt : String) (closure : Closure) (manifest : InterfaceManifest) : String :=
   let roots :=
     manifest.metadata.targets.foldl (fun acc target => acc ++ target.resolvedRoots) #[]
   let loadedLines :=

@@ -68,6 +68,10 @@ try {
     runtime.packageTargetModeLabel("packageOnly"),
     "package-only roots",
   );
+  assert.equal(
+    runtime.packageTargetModeLabel("markedModules"),
+    "marked declarations across imported modules",
+  );
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
   assert.equal(
@@ -112,6 +116,14 @@ try {
       resolvedRoots: ["Example.value"],
     }),
     "Example.lean [explicit roots] roots: Example.value",
+  );
+  assert.equal(
+    packageTargets.formatPackageTarget({
+      source: "Example.lean",
+      mode: "markedModules",
+      resolvedRoots: ["Example.value"],
+    }),
+    "Example.lean [marked declarations across imported modules] roots: Example.value",
   );
   assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);

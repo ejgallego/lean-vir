@@ -6,10 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import {
   formatInterfaceEffectPrefix,
+  interfaceEffectRuntimeTag,
   requireInterfaceEffect,
 } from "./interface-effects.js";
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 import { validatePackageTargets } from "./package-targets.js";
+import { requireNormalizedModuleName } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 export const INTERFACE_MANIFEST_VERSION = 8;
@@ -186,13 +188,7 @@ function validatePackageSetMember(member, targets, metadataLabel) {
   if (!isRecord(member)) {
     throw new Error(`${label} must be an object`);
   }
-  requireString(member.module, `${label}.module`);
-  if (
-    member.module !== member.module.trim() ||
-    /[\u0000-\u001f\u007f]/u.test(member.module)
-  ) {
-    throw new Error(`${label}.module must be normalized`);
-  }
+  requireNormalizedModuleName(member.module, label);
   if (member.role !== "dependency" && member.role !== "root") {
     throw new Error(`${label}.role must be dependency or root`);
   }
@@ -228,12 +224,49 @@ function validatePackageSetSurface(member, exports, hostImports) {
 }
 
 function validateManifestHostImports(hostImports) {
+  const names = new Set();
+  const symbols = new Set();
   hostImports.forEach((entry, index) => {
     const label = `embedded interface manifest hostImports[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${label} must be an object`);
     }
+    requireNonNegativeInteger(entry.slot, `${label}.slot`);
+    if (entry.slot !== index) {
+      throw new Error(`${label}.slot must be ${index}`);
+    }
+    for (const field of ["name", "source", "target", "symbol"]) {
+      requireString(entry[field], `${label}.${field}`);
+    }
+    requireUnique(names, entry.name, `${label}.name`, "host import");
+    requireUnique(symbols, entry.symbol, `${label}.symbol`, "host import");
+    requireNonNegativeInteger(entry.arity, `${label}.arity`);
+    requireNonNegativeInteger(
+      entry.erasedPrefixArgs,
+      `${label}.erasedPrefixArgs`,
+    );
+    if (!Array.isArray(entry.args)) {
+      throw new Error(`${label}.args must be an array`);
+    }
+    entry.args.forEach((arg, argIndex) => {
+      const argLabel = `${label}.args[${argIndex}]`;
+      if (!isRecord(arg)) {
+        throw new Error(`${argLabel} must be an object`);
+      }
+      requireString(arg.name, `${argLabel}.name`);
+      validateInterfaceRootType(arg.type, `${argLabel}.type`);
+    });
+    validateInterfaceRootType(entry.result, `${label}.result`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    const expectedArity =
+      entry.erasedPrefixArgs +
+      entry.args.length +
+      interfaceEffectRuntimeTag(entry.effect);
+    if (entry.arity !== expectedArity) {
+      throw new Error(
+        `${label}.arity does not match erased arguments, value arguments, and effect (${expectedArity})`,
+      );
+    }
     requireHostImportBoundary(entry.boundary, `${label}.boundary`);
   });
 }

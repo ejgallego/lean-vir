@@ -6,7 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import { releaseCallbackRoot } from "../../web/src/runtime/callbacks.js";
 
-export function createBenchmarkHostBindings(releaseCallback = releaseCallbackRoot) {
+export function createBenchmarkHostBindings(
+  releaseCallback = releaseCallbackRoot,
+) {
   const documentValue = { title: "" };
   return {
     "browser.document.current": () => documentValue,

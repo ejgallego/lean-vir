@@ -72,8 +72,8 @@ def PackageTargetMetadata.toJson (target : PackageTargetMetadata) : String :=
     | .module name => ("module", jsonName name)
   jsonObject #[
     origin,
-    ("mode", jsonString target.mode),
-    ("roots", jsonArray (target.roots.map jsonName)),
+    ("mode", jsonString target.mode.metadataName),
+    ("roots", jsonArray (target.mode.roots.map jsonName)),
     ("resolvedRoots", jsonArray (target.resolvedRoots.map jsonName))
   ]
 

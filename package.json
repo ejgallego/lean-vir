@@ -135,7 +135,7 @@
     "test:runtime": "npm run test:runtime:unit && node tests/runtime/runner.mjs",
     "test:runtime:lean": "node tests/runtime/runner.mjs --group lean",
     "test:runtime:pure": "node tests/runtime/runner.mjs --group pure",
-    "test:runtime:unit": "node --test tests/runtime/runner-core.test.mjs",
+    "test:runtime:unit": "node --test tests/runtime/*.test.mjs",
     "test:wasm-extensions": "node tests/runtime/wasm-extensions.mjs",
     "test:upstream": "npm run build:demo && npm run test:upstream:no-build",
     "test:upstream:no-build": "node tests/upstream/runner.mjs",

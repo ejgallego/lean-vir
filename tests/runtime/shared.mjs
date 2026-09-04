@@ -163,6 +163,31 @@ export function assertValidManifestShape() {
       .entry,
     "ok",
   );
+  const withPureHostImport = structuredClone(validManifestShape);
+  withPureHostImport.hostImports = [
+    {
+      slot: 0,
+      name: "Example.pureHost",
+      source: "Example.lean",
+      target: "test.pureHost",
+      boundary: "hostResource",
+      symbol: "vir_host_import_0",
+      arity: 1,
+      erasedPrefixArgs: 0,
+      args: [
+        {
+          name: "value",
+          type: { type: "Nat", interfaceTag: 0 },
+        },
+      ],
+      result: { type: "Nat", interfaceTag: 0 },
+      effect: "pure",
+    },
+  ];
+  assert.equal(
+    validateInterfaceManifest(withPureHostImport).hostImports[0].arity,
+    1,
+  );
 }
 
 export function assertInvalidManifest(mutator, pattern, options = {}) {

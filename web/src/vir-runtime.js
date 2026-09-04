@@ -7,6 +7,8 @@ Author: Emilio J. Gallego Arias
 import { VirRuntime } from "./runtime/core.js";
 import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
+import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
+import { requireNormalizedModuleName } from "./runtime/module-name.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -285,23 +287,21 @@ async function resolvePackageSetInput(factory, input) {
       );
     }
     return {
-      bytes: input.map((bytes, index) =>
-        asBytes(bytes, `irPackageSet member ${index + 1}`),
-      ),
+      bytes: validateIrPackageSetMembers(input).bytes,
       info: null,
     };
   }
   if (typeof input === "string" || input instanceof URL) {
     const fetched = await factory.fetchIrPackageSet(input);
-    return {
-      bytes: await packageSetMemberBytes(fetched, { verify: false }),
-      info: runtimePackageSetInfo(fetched),
-    };
+    const bytes = await packageSetMemberBytes(fetched, { verify: false });
+    const info = runtimePackageSetInfo(fetched);
+    validateIrPackageSetMembers(bytes, { members: info.members });
+    return { bytes, info };
   }
-  return {
-    bytes: await packageSetMemberBytes(input),
-    info: runtimePackageSetInfo(input),
-  };
+  const bytes = await packageSetMemberBytes(input);
+  const info = runtimePackageSetInfo(input);
+  validateIrPackageSetMembers(bytes, { members: info.members });
+  return { bytes, info };
 }
 
 const packageSetTextDecoder = new TextDecoder();
@@ -401,47 +401,6 @@ function requireNormalizedPackageSetPath(path, label) {
     parts.some((part) => part === "" || part === "." || part === "..")
   ) {
     throw new Error(`${label}.path must be a normalized relative path`);
-  }
-}
-
-function requireNormalizedModuleName(moduleName, label) {
-  if (typeof moduleName !== "string" || moduleName.trim() === "") {
-    throw new Error(`${label} has no module`);
-  }
-  if (
-    moduleName !== moduleName.trim() ||
-    /[\u0000-\u001f\u007f/\\:#?%]/u.test(moduleName)
-  ) {
-    throw new Error(`${label}.module must be a normalized Lean module name`);
-  }
-  let offset = 0;
-  while (offset < moduleName.length) {
-    if (moduleName[offset] === "«") {
-      const end = moduleName.indexOf("»", offset + 1);
-      if (end === offset + 1 || end < 0) {
-        throw new Error(
-          `${label}.module must be a normalized Lean module name`,
-        );
-      }
-      offset = end + 1;
-    } else {
-      const end = moduleName.indexOf(".", offset);
-      const component = moduleName.slice(
-        offset,
-        end < 0 ? moduleName.length : end,
-      );
-      if (component === "" || /[\s«»]/u.test(component)) {
-        throw new Error(
-          `${label}.module must be a normalized Lean module name`,
-        );
-      }
-      offset += component.length;
-    }
-    if (offset === moduleName.length) return;
-    if (moduleName[offset] !== "." || offset + 1 === moduleName.length) {
-      throw new Error(`${label}.module must be a normalized Lean module name`);
-    }
-    offset += 1;
   }
 }
 

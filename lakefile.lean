@@ -91,18 +91,28 @@ private def virJsonNatField? (json : Lean.Json) (field : String) : Option Nat :=
   | .ok value => some value
   | .error _ => none
 
+private def virNodeCmd : String :=
+  if System.Platform.isWindows then "node.exe" else "node"
+
+private def virSha256Script : String :=
+  "import { readFileSync } from \"node:fs\";" ++
+  "import { createHash } from \"node:crypto\";" ++
+  "for (const path of process.argv.slice(1)) {" ++
+  "process.stdout.write(createHash(\"sha256\").update(readFileSync(path)).digest(\"hex\") + \"\\n\");" ++
+  "}"
+
 private def virSha256Files? (paths : Array System.FilePath) : IO (Option (Array String)) := do
   if paths.isEmpty then
     return some #[]
   try
     let out ← IO.Process.output {
-      cmd := "sha256sum"
-      args := #["--zero"] ++ paths.map (fun path => path.toString)
+      cmd := virNodeCmd
+      args := #["--input-type=module", "--eval", virSha256Script, "--"] ++
+        paths.map (fun path => path.toString)
     }
     if out.exitCode != 0 then
       return none
-    let records := out.stdout.split (· == '\u0000') |>.filter (fun record => !record.isEmpty)
-    let hashes := records.toArray.map (fun record => (record.take 64).toString)
+    let hashes := out.stdout.splitOn "\n" |>.filter (fun hash => !hash.isEmpty) |>.toArray
     if hashes.size == paths.size && hashes.all (fun hash =>
         hash.length == 64 && hash.toList.all ("0123456789abcdef".contains ·)) then
       return some hashes

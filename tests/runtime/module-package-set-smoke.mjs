@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 import {
   IR_PACKAGE_SECTION,
   readIrPackageInfo,
+  replaceIrPackageManifest,
 } from "../../scripts/packages/irpkg-format.mjs";
 import { repositoryRoot as repoRoot } from "../../scripts/repository-paths.mjs";
 import {
@@ -120,9 +121,32 @@ assert.throws(
     runtime.loadIrPackageSetBytes([
       packageBytes[0],
       packageBytes[0],
-      packageBytes[1],
+      ...packageBytes.slice(1),
     ]),
-  /duplicate IR declaration `ModuleSetFixture\./,
+  /duplicates embedded module "ModuleSetFixture\.Shared"/,
+);
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
+assert.throws(
+  () =>
+    runtime.loadIrPackageSetBytes([
+      packageBytes.at(-1),
+      ...packageBytes.slice(0, -1),
+    ]),
+  /member 1 embeds role "root"; expected "dependency"/,
+);
+assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
+const mismatchedToolchainManifest = structuredClone(
+  packageInfoByModule.get("ModuleSetFixture.Left").manifest,
+);
+mismatchedToolchainManifest.metadata.leanGithash = "different-checkpoint";
+assert.throws(
+  () =>
+    runtime.loadIrPackageSetBytes([
+      packageBytes[0],
+      replaceIrPackageManifest(packageBytes[1], mismatchedToolchainManifest),
+      ...packageBytes.slice(2),
+    ]),
+  /mixes metadata\.leanGithash/,
 );
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), expectedAnswer);
 runtime.loadIrPackageSetBytes(packageBytes);
@@ -153,9 +177,23 @@ const structuredFactory = createVirRuntimeFactory({
   wasmBytes,
   fetchBytes: (path) => readFile(path),
 });
-const fetchedPackageSet = await structuredFactory.fetchIrPackageSet(
-  pathToFileURL(descriptorPath),
+const descriptorUrl = pathToFileURL(descriptorPath);
+const descriptorClaimMismatch = structuredClone(descriptor);
+descriptorClaimMismatch.packages[0].module = "Claimed.Dependency";
+descriptorClaimMismatch.packages.at(-1).module = "Claimed.Root";
+const mismatchFactory = createVirRuntimeFactory({
+  wasmBytes: new Uint8Array(),
+  fetchBytes: (path) =>
+    String(path) === descriptorUrl.href
+      ? new TextEncoder().encode(JSON.stringify(descriptorClaimMismatch))
+      : readFile(path),
+});
+await assert.rejects(
+  () => mismatchFactory.createRuntime({ irPackageSet: descriptorUrl }),
+  /member 1 embeds module "ModuleSetFixture\.Shared"; descriptor claims "Claimed\.Dependency"/,
 );
+const fetchedPackageSet =
+  await structuredFactory.fetchIrPackageSet(descriptorUrl);
 assert.deepEqual(
   fetchedPackageSet.members.map(({ module, role }) => [module, role]),
   descriptor.packages.map(({ module, role }) => [module, role]),
@@ -165,9 +203,8 @@ await assert.rejects(
   () => structuredFactory.createRuntime({ irPackageSet: fetchedPackageSet }),
   /no longer matches its integrity metadata/,
 );
-const verifiedPackageSet = await structuredFactory.fetchIrPackageSet(
-  pathToFileURL(descriptorPath),
-);
+const verifiedPackageSet =
+  await structuredFactory.fetchIrPackageSet(descriptorUrl);
 const structuredRuntime = await structuredFactory.createRuntime({
   irPackageSet: verifiedPackageSet,
 });
@@ -177,7 +214,7 @@ assert.equal(
 );
 assert.equal(
   structuredRuntime.packageInfo.packageSet.descriptorUrl,
-  pathToFileURL(descriptorPath).href,
+  descriptorUrl.href,
 );
 structuredRuntime.dispose();
 

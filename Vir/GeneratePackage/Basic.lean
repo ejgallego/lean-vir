@@ -124,11 +124,6 @@ def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
     if source.aliases.contains target.source.toString then some source.key else none)
     |>.getD target.source.normalize.toString
 
-/-- Preserve the first caller-supplied spelling for diagnostics and manifests. -/
-def DeclIndex.displaySourceForKey (index : DeclIndex) (sourceKey : String) : String :=
-  index.sources.findSome? (fun source =>
-    if source.key == sourceKey then some source.display else none) |>.getD sourceKey
-
 def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
   index.sources.find? (fun source => source.aliases.contains target.source.toString)
 
@@ -183,8 +178,7 @@ def DeclIndexDiagnostic.toPackageDiagnostic (diagnostic : DeclIndexDiagnostic) :
 
 structure PackageTargetMetadata where
   origin : PackageTargetOrigin
-  mode : String
-  roots : Array Name
+  mode : TargetMode
   resolvedRoots : Array Name
 
 inductive PackageSetMemberRole where

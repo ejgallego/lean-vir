@@ -155,6 +155,89 @@ export async function smokeRunnerFailure(cdp, origin, url, expected) {
   }
 }
 
+export async function smokeAtomicPackageLoads(cdp, origin) {
+  await navigate(
+    cdp,
+    `${origin}${basePath}dev.html?package=local-fib.irpkg&entry=fib`,
+  );
+  await waitForReady(cdp);
+  const raced = await evaluate(
+    cdp,
+    `new Promise((resolve, reject) => {
+      const originalFetch = window.fetch.bind(window);
+      const input = document.querySelector("#dev-package-url");
+      const load = document.querySelector("#dev-load-url");
+      window.fetch = (resource, init) => {
+        const url = String(resource);
+        if (url.endsWith("/slow-a.irpkg")) {
+          return new Promise((finish) => setTimeout(
+            () => finish(originalFetch(new URL("local-mergesort.irpkg", window.location.href), init)),
+            250,
+          ));
+        }
+        if (url.endsWith("/slow-b.irpkg")) {
+          return originalFetch(new URL("local-fib.irpkg", window.location.href), init);
+        }
+        return originalFetch(resource, init);
+      };
+      input.value = "slow-a.irpkg";
+      load.click();
+      input.value = "slow-b.irpkg";
+      load.click();
+      const deadline = Date.now() + 5000;
+      const poll = () => {
+        const status = document.querySelector("#status")?.textContent?.trim();
+        const name = document.querySelector("#dev-package-name")?.textContent?.trim();
+        if (status === "Ready" && name === "slow-b.irpkg") {
+          setTimeout(() => {
+            window.fetch = originalFetch;
+            resolve({
+              status: document.querySelector("#status")?.textContent?.trim(),
+              name: document.querySelector("#dev-package-name")?.textContent?.trim(),
+              runDisabled: document.querySelector("#dev-run-entry")?.disabled,
+            });
+          }, 400);
+        } else if (Date.now() > deadline) {
+          window.fetch = originalFetch;
+          reject(new Error("latest package load did not win"));
+        } else {
+          setTimeout(poll, 25);
+        }
+      };
+      poll();
+    })`,
+  );
+  assert.deepEqual(raced, {
+    status: "Ready",
+    name: "slow-b.irpkg",
+    runDisabled: false,
+  });
+
+  await evaluate(
+    cdp,
+    `(() => {
+      const input = document.querySelector("#dev-package-url");
+      input.value = "missing-after-ready.irpkg";
+      document.querySelector("#dev-load-url").click();
+    })()`,
+  );
+  await waitForStatus(cdp, "Failed");
+  const retained = await evaluate(
+    cdp,
+    `({
+      name: document.querySelector("#dev-package-name")?.textContent?.trim(),
+      runDisabled: document.querySelector("#dev-run-entry")?.disabled,
+      entry: document.querySelector("#dev-entry-select")?.value,
+    })`,
+  );
+  assert.deepEqual(retained, {
+    name: "slow-b.irpkg",
+    runDisabled: false,
+    entry: "fib",
+  });
+  assert.equal(await runSelectedEntry(cdp, ["8"]), "21");
+}
+
 export async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
   const info = await packageInfoFor(packageFile);
   await navigate(

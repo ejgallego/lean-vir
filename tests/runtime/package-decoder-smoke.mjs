@@ -107,7 +107,7 @@ const partialSetRuntime = await factory.createRuntime();
 assertFailedSetCleanly(
   partialSetRuntime,
   [defaultPackageBytes, badPackage],
-  /IR package-set member 2 load failed.*invalid IR package magic/,
+  /IR package-set member 2 is invalid: invalid IR package magic/,
 );
 partialSetRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
 assert.equal(partialSetRuntime.call("fib", 8), "21");

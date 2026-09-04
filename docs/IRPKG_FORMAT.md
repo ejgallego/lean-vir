@@ -45,7 +45,10 @@ to its exact package bytes. Paths are normalized, same-directory-relative
 paths: absolute URLs, parent traversal, query strings, fragments, backslashes,
 and percent escapes are rejected. The loader validates the complete structure
 before fetching members, then verifies every length and digest before loading
-the set.
+the set. Before Wasm instantiation, it also parses each member and requires the
+embedded `metadata.packageSetMember` module and role to match the corresponding
+descriptor entry. Raw byte-array loads enforce the same embedded identity and
+dependency-first/root-last order.
 
 Dependency shard filenames are ordinal identities (`0.irpkg`, `1.irpkg`, ...),
 while the descriptor carries the Lean module identity. This keeps filesystem
@@ -53,7 +56,9 @@ escaping out of module names and makes bytes reproducible across checkout
 locations. Each member manifest also records `metadata.packageSetMember` with
 its module and `dependency` or `root` role. Dependency members have no public
 targets; the root has the stable module target `{ "module": ..., "mode":
-"markedModule" }` rather than the generated driver's local path.
+"markedModule" }` rather than the generated driver's local path. All members in
+a set must record the same package/manifest versions and exact Lean version,
+toolchain, and git hash.
 
 See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
 module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)
@@ -97,8 +102,9 @@ The loader requires exactly one of each current section kind:
 
 The section payload encodings are the same payloads that the pre-v10 linear
 stream used. Format 10 makes the envelope self-describing; it does not add
-deeper semantic validation beyond required sections, bounds, duplicate-section
-checks, and section-local trailing-byte checks.
+new binary-section semantics beyond required sections, bounds,
+duplicate-section checks, and section-local trailing-byte checks. The runtime
+separately validates the embedded manifest schema and package-set identities.
 
 The export-summary array order is also the structural call identity used by
 `vir_resolve_call_export`. JavaScript resolves all public keys for a manifest

@@ -18,6 +18,7 @@ const PACKAGE_TARGET_MODE_LABEL = Object.freeze({
   [PACKAGE_TARGET_MODE.ALL]: "public definitions",
   [PACKAGE_TARGET_MODE.MARKED]: "marked declarations",
   [PACKAGE_TARGET_MODE.MARKED_MODULE]: "marked module",
+  markedModules: "marked declarations across imported modules",
 });
 
 export function packageTargetModeLabel(mode) {

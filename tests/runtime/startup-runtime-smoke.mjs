@@ -143,7 +143,7 @@ const invalidInstallRuntime = new VirRuntime({
   vir_package_decl_count: () => 0,
 });
 assert.throws(
-  () => invalidInstallRuntime.loadIrPackageSetBytes([Uint8Array.of(1)]),
+  () => invalidInstallRuntime.installIrPackageSetBytes([Uint8Array.of(1)]),
   /exports\[0\]\.startup must be a boolean/,
 );
 assert.deepEqual(installCalls, ["append", "prepare", "abort"]);
