@@ -67,10 +67,7 @@ assert.equal(element.props.children[0], first);
 assert.equal(element.props.children[1], second);
 
 const fragmentProps = { key: "fragment-key" };
-const fragment = reactBindings["react.node.fragment"](
-  fragmentProps,
-  children,
-);
+const fragment = reactBindings["react.node.fragment"](fragmentProps, children);
 assert.equal(React.isValidElement(fragment), true);
 assert.equal(fragment.type, React.Fragment);
 
@@ -136,26 +133,41 @@ assert.equal(fragment.type, React.Fragment);
 }
 
 {
+  const retryLifecycle = createHostLifecycle();
+  let unmounts = 0;
+  const bindings = createReactRootHostBindings(retryLifecycle, () => ({
+    render() {},
+    unmount() {
+      unmounts++;
+      if (unmounts === 1) throw new Error("unmount failed");
+    },
+  }));
+  const root = bindings["react.root.create"]({});
+  assert.throws(() => bindings["react.root.unmount"](root), /unmount failed/);
+  assert.equal(retryLifecycle.debugResourceCounts().active, 1);
+  retryLifecycle.dispose();
+  assert.equal(unmounts, 2);
+  assert.equal(retryLifecycle.debugResourceCounts().active, 0);
+}
+
+{
   const target = {};
   const rendered = [];
   let unmounts = 0;
   const roots = [];
-  const bindings = createReactRootHostBindings(
-    lifecycle,
-    (container) => {
-      assert.equal(container, target);
-      const root = {
-        render(value) {
-          rendered.push(value);
-        },
-        unmount() {
-          unmounts++;
-        },
-      };
-      roots.push(root);
-      return root;
-    },
-  );
+  const bindings = createReactRootHostBindings(lifecycle, (container) => {
+    assert.equal(container, target);
+    const root = {
+      render(value) {
+        rendered.push(value);
+      },
+      unmount() {
+        unmounts++;
+      },
+    };
+    roots.push(root);
+    return root;
+  });
   const root = bindings["react.root.create"](target);
   assert.equal(root, roots[0]);
   bindings["react.root.renderNode"](root, element);

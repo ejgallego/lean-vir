@@ -9,7 +9,6 @@ import { EditorContext, useRpcSession } from "@leanprover/infoview";
 import { createRoot } from "../src/vir-react-dom-client.js";
 import {
   createBrowserHostBindings,
-  createHostLifecycle,
   normalizeProofWidgetsRpcRef,
 } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
@@ -774,39 +773,23 @@ export async function loadRuntimeService({
 }
 
 async function createRuntimeService({ rpcSession, hostContext, sources }) {
-  const resources = createHostLifecycle();
   const runtimeOptions = await loadRuntimeOptionsFromSources({
     rpcSession,
     sources,
   });
-  runtimeOptions.defaultHostBindings = (runtimeRef) =>
+  runtimeOptions.defaultHostBindings = () =>
     createBrowserHostBindings({
-      resources,
-      runtimeRef,
       infoviewCommandDispatcher: createInfoviewCommandDispatcher({
         hostContext,
         packageRevision: sources.packageSource.revision ?? "",
       }),
       reactHostBindings: createBrowserReactHostBindings,
     });
-  try {
-    return {
-      packageRevision: sources.packageSource.revision ?? "",
-      disposed: false,
-      resources,
-      runtime: await createBundledVirRuntime(runtimeOptions),
-    };
-  } catch (error) {
-    try {
-      resources.dispose();
-    } catch (cleanupError) {
-      throw new AggregateError(
-        [error, cleanupError],
-        "VIR runtime creation failed during host cleanup",
-      );
-    }
-    throw error;
-  }
+  return {
+    packageRevision: sources.packageSource.revision ?? "",
+    disposed: false,
+    runtime: await createBundledVirRuntime(runtimeOptions),
+  };
 }
 
 function createInfoviewCommandDispatcher({

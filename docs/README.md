@@ -79,8 +79,8 @@ ownership diagrams.
 - [JS_API.md](JS_API.md): runtime wrapper API details.
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md): Lean-side host import helpers and
   demo APIs.
-- [HOST_BINDINGS.md](HOST_BINDINGS.md): JavaScript host bindings, virtual
-  hosts, and resources.
+- [HOST_BINDINGS.md](HOST_BINDINGS.md): JavaScript host bindings, exact-value
+  roots, and active-resource teardown.
 
 ## Maintainer Guides
 

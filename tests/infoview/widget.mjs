@@ -581,7 +581,6 @@ const irPackageFirstService = await loadRuntimeService({
 });
 const jsBoolValue = (_service, value) => value;
 const rpcRefResource = (_service, ref) => ref;
-assert.equal(irPackageFirstService.resources.phase, "active");
 assert.equal(
   typeof irPackageFirstService.runtime.hostState.defaultBindings[
     "react.root.create"

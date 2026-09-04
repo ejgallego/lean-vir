@@ -42,8 +42,12 @@ class FakeElement {
     this.classes = new Set();
     this.styles = new Map();
     this.classList = {
-      add: (name) => this.classes.add(name),
-      remove: (name) => this.classes.delete(name),
+      add: (name) => {
+        this.classes.add(name);
+      },
+      remove: (name) => {
+        this.classes.delete(name);
+      },
       toggle: (name) => {
         if (this.classes.has(name)) {
           this.classes.delete(name);
@@ -54,7 +58,9 @@ class FakeElement {
       },
     };
     this.style = {
-      setProperty: (name, value) => this.styles.set(name, value),
+      setProperty: (name, value) => {
+        this.styles.set(name, value);
+      },
     };
   }
 
@@ -128,7 +134,9 @@ try {
     queuedFrames.set(id, callback);
     return id;
   };
-  globalThis.cancelAnimationFrame = (id) => queuedFrames.delete(id);
+  globalThis.cancelAnimationFrame = (id) => {
+    queuedFrames.delete(id);
+  };
   console.error = (...args) => hostErrors.push(args);
 
   const packagePath = join(tempDir, "slides-canvas.irpkg");
@@ -141,11 +149,11 @@ try {
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
   const { wasmBytes } = await readRuntimeArtifacts();
-  const resources = createHostLifecycle();
+  const lifecycle = createHostLifecycle();
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageSetBytes: [await readFile(packagePath)],
-    defaultHostBindings: createBrowserHostBindings({ resources }),
+    defaultHostBindings: createBrowserHostBindings({ lifecycle }),
   });
   try {
     for (const target of [
@@ -199,7 +207,7 @@ try {
     assert.equal(status.textContent, "Lean text width: 64");
     assert.deepEqual(drawCalls, [["measureText", "Lean VIR"]]);
     assert.equal(queuedFrames.size, 1);
-    const mountedActiveValues = resources.debugResourceCounts().active;
+    const mountedActiveValues = lifecycle.debugResourceCounts().active;
 
     const [[frameId, drawFrame]] = queuedFrames.entries();
     queuedFrames.delete(frameId);
@@ -222,7 +230,7 @@ try {
       "the Lean callback should schedule the next frame",
     );
     assert.equal(
-      resources.debugResourceCounts().active,
+      lifecycle.debugResourceCounts().active,
       mountedActiveValues,
       "a frame should not accumulate active values",
     );
@@ -243,7 +251,7 @@ try {
       "the Lean callback should keep scheduling frames",
     );
     assert.equal(
-      resources.debugResourceCounts().active,
+      lifecycle.debugResourceCounts().active,
       mountedActiveValues,
       "repeated frames should not accumulate active values",
     );
@@ -273,7 +281,7 @@ try {
       "the bouncing frame loop should keep running",
     );
     assert.equal(
-      resources.debugResourceCounts().active,
+      lifecycle.debugResourceCounts().active,
       mountedActiveValues,
       "the bounce should not accumulate active values",
     );

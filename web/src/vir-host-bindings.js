@@ -10,12 +10,10 @@ import {
   createTimerHostBindings,
 } from "./host/vir-active-host-bindings.js";
 import {
-  createCSSStyleDeclarationHostBindings,
+  createBrowserElementHostBindings,
+  createBrowserEventHostBindings,
+  createBrowserHtmlInputElementHostBindings,
   createDOMTokenListHostBindings,
-  createElementHostBindings,
-  createEventListenerValueHostBindings,
-  createHtmlInputElementHostBindings,
-  createKeyboardEventHostBindings,
 } from "./host/vir-dom-host-bindings.js";
 import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
@@ -28,9 +26,12 @@ export {
 } from "./host-boundary.js";
 export { createHostLifecycle } from "./host/vir-active-host-bindings.js";
 export {
+  createBrowserElementHostBindings,
+  createBrowserEventHostBindings,
+  createBrowserHtmlInputElementHostBindings,
+} from "./host/vir-dom-host-bindings.js";
+export {
   createInfoviewHostBindings,
-  normalizeInfoviewDocumentPosition,
-  normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
 } from "./host/vir-infoview-host-bindings.js";
 
@@ -46,10 +47,7 @@ export function createCommonHostBindings() {
 export function createConsoleHostBindings() {
   return {
     "browser.console.current": () => browserConsole(),
-    "browser.console.log": (consoleValue, message) => {
-      consoleValue.log(message);
-      return undefined;
-    },
+    "browser.console.log": (consoleValue, message) => consoleValue.log(message),
   };
 }
 
@@ -70,73 +68,11 @@ export function createBrowserDocumentHostBindings() {
   };
 }
 
-export function createBrowserEventHostBindings() {
-  return {
-    ...createEventListenerValueHostBindings(),
-    ...createKeyboardEventHostBindings({
-      fromEvent: (event) => (isKeyboardEvent(event) ? event : null),
-    }),
-    "browser.event.target": (event) => event.target,
-    "browser.event.currentTarget": (event) => event.currentTarget,
-    "browser.eventTarget.asElement": (target) =>
-      isElement(target) ? target : null,
-    "browser.event.preventDefault": (event) => {
-      event.preventDefault();
-      return undefined;
-    },
-    "browser.event.stopPropagation": (event) => {
-      event.stopPropagation();
-      return undefined;
-    },
-    "browser.event.formValue": (event) => formControlEventValue(event),
-  };
-}
-
-export function createBrowserElementHostBindings() {
-  return {
-    ...createCSSStyleDeclarationHostBindings({
-      fromElement: (element) =>
-        isElementCSSInlineStyle(element) ? element : null,
-    }),
-    ...createElementHostBindings({
-      querySelector: (target, selector) => target.querySelector(selector),
-      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
-      getInnerHTML: (target) => target.innerHTML,
-      setInnerHTML: (target, html) => {
-        target.innerHTML = html;
-      },
-      getTextContent: (target) => target.textContent,
-      setTextContent: (target, text) => {
-        target.textContent = text;
-      },
-      getClassList: (target) => target.classList,
-      setClassList: (target, classList) => {
-        target.classList = classList;
-      },
-      getAttribute: (target, name) => target.getAttribute(name),
-      setAttribute: (target, name, value) => target.setAttribute(name, value),
-      addEventListener: (target, eventName, listener) =>
-        target.addEventListener(eventName, listener),
-      removeEventListener: (target, eventName, listener) =>
-        target.removeEventListener(eventName, listener),
-    }),
-    "browser.element.appendChild": (parent, child) => {
-      parent.appendChild(child);
-      return child;
-    },
-    "browser.element.remove": (element) => {
-      element.remove();
-      return undefined;
-    },
-  };
-}
-
 export function createBrowserCanvasHostBindings() {
   return {
     "js.value.browser.canvasStyle.string": (style) => style,
-    "browser.htmlCanvasElement.fromElement": (element) => {
-      return isCanvasElement(element) ? element : null;
-    },
+    "browser.htmlCanvasElement.fromElement": (element) =>
+      isCanvasElement(element) ? element : null,
     "browser.htmlCanvasElement.getWidth": (canvas) => canvas.width,
     "browser.htmlCanvasElement.setWidth": (canvas, width) => {
       canvas.width = width;
@@ -187,17 +123,7 @@ export function createBrowserCanvasHostBindings() {
   };
 }
 
-export function createBrowserHtmlInputElementHostBindings() {
-  return createHtmlInputElementHostBindings({
-    fromElement: (element) => (isInputElement(element) ? element : null),
-  });
-}
-
-export function createBrowserTimerHostBindings(state) {
-  return createTimerHostBindings(state);
-}
-
-export function createBrowserAnimationHostBindings(state) {
+export function createBrowserAnimationHostBindings(lifecycle) {
   const requestFrame = (callback) => {
     const request = browserAnimationFunction("requestAnimationFrame");
     browserAnimationFunction("cancelAnimationFrame");
@@ -205,25 +131,18 @@ export function createBrowserAnimationHostBindings(state) {
   };
   const cancelFrame = (frame) =>
     browserAnimationFunction("cancelAnimationFrame")(frame);
-  return createAnimationHostBindings(state, { requestFrame, cancelFrame });
+  return createAnimationHostBindings(lifecycle, { requestFrame, cancelFrame });
 }
 
 export function createBrowserHostBindings({
-  resources = createHostLifecycle(),
+  lifecycle = createHostLifecycle(),
   infoviewCommandDispatcher = null,
   reactHostBindings = null,
 } = {}) {
-  const state = resources;
-  let reactBindings = {};
-  if (reactHostBindings !== null && reactHostBindings !== undefined) {
-    if (typeof reactHostBindings !== "function") {
-      throw new Error("reactHostBindings must be a host binding factory");
-    }
-    reactBindings = normalizeHostBindingMap(
-      reactHostBindings(state),
-      "reactHostBindings factory result",
-    );
-  }
+  const reactBindings =
+    reactHostBindings === null || reactHostBindings === undefined
+      ? {}
+      : createReactHostBindings(reactHostBindings, lifecycle);
   return {
     ...createCommonHostBindings(),
     ...createConsoleHostBindings(),
@@ -233,18 +152,28 @@ export function createBrowserHostBindings({
     ...createDOMTokenListHostBindings(),
     ...createBrowserHtmlInputElementHostBindings(),
     ...createBrowserCanvasHostBindings(),
-    ...createBrowserTimerHostBindings(state),
-    ...createBrowserAnimationHostBindings(state),
+    ...createTimerHostBindings(lifecycle),
+    ...createBrowserAnimationHostBindings(lifecycle),
     ...createInfoviewHostBindings({
       commandDispatcher: infoviewCommandDispatcher,
     }),
     ...reactBindings,
-    [VIR_HOST_DISPOSE]: () => state.dispose(),
+    [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
   };
 }
 
+function createReactHostBindings(factory, lifecycle) {
+  if (typeof factory !== "function") {
+    throw new Error("reactHostBindings must be a host binding factory");
+  }
+  return normalizeHostBindingMap(
+    factory(lifecycle),
+    "reactHostBindings factory result",
+  );
+}
+
 function normalizeHostBindingMap(value, label) {
-  if (typeof value !== "object" || Array.isArray(value)) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a host binding object`);
   }
   return value;
@@ -282,69 +211,4 @@ function browserAnimationFunction(name) {
 function isCanvasElement(value) {
   const Canvas = globalThis.HTMLCanvasElement;
   return typeof Canvas === "function" && value instanceof Canvas;
-}
-
-function isInputElement(value) {
-  return (
-    typeof globalThis.HTMLInputElement === "function" &&
-    value instanceof globalThis.HTMLInputElement
-  );
-}
-
-function isElementCSSInlineStyle(value) {
-  return typeof value?.style?.setProperty === "function";
-}
-
-function isKeyboardEvent(value) {
-  const KeyboardEvent = globalThis.KeyboardEvent;
-  if (typeof KeyboardEvent !== "function") return false;
-  const getKey = Object.getOwnPropertyDescriptor(
-    KeyboardEvent.prototype,
-    "key",
-  )?.get;
-  if (typeof getKey !== "function") return false;
-  try {
-    Reflect.apply(getKey, value, []);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isTextAreaElement(value) {
-  return (
-    typeof globalThis.HTMLTextAreaElement === "function" &&
-    value instanceof globalThis.HTMLTextAreaElement
-  );
-}
-
-function isSelectElement(value) {
-  return (
-    typeof globalThis.HTMLSelectElement === "function" &&
-    value instanceof globalThis.HTMLSelectElement
-  );
-}
-
-function isElement(value) {
-  return (
-    typeof globalThis.Element === "function" &&
-    value instanceof globalThis.Element
-  );
-}
-
-function formControlEventValue(event) {
-  const currentValue = formControlValue(event?.currentTarget);
-  if (currentValue !== null) return currentValue;
-  return formControlValue(event?.target);
-}
-
-function formControlValue(value) {
-  if (
-    !isInputElement(value) &&
-    !isTextAreaElement(value) &&
-    !isSelectElement(value)
-  ) {
-    return null;
-  }
-  return String(value.value ?? "");
 }

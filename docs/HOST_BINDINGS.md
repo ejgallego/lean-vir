@@ -125,9 +125,16 @@ termination operation:
 
 The shared `HostLifecycle` registers each active value together with its exact
 cleanup function. Runtime disposal invokes those functions without inspecting
-or guessing methods on the value. Terminal host operations remove their
-registration before performing platform cleanup and are safe to repeat where
-the platform API is repeatable.
+or guessing methods on the value. Timer and frame completion remove their
+registration before invoking user code. Explicit React-root unmount removes
+its registration only after the platform unmount succeeds, so a failed unmount
+remains visible to runtime teardown.
+
+Each browser binding-factory invocation owns a fresh lifecycle unless the
+caller explicitly supplies one. Package replacement can therefore dispose a
+failed or superseded generation without invalidating the live generation.
+Preconstructed binding maps are reference-counted only so intentional sharing
+across an atomic replacement remains safe.
 
 Host calls are failure-atomic. Immediately before invoking a binding, the
 runtime opens a private transaction. An active resource created by that call

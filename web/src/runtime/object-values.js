@@ -152,9 +152,7 @@ export class ObjectValueRuntime {
 
   makeJsObjectValue(type, value, label) {
     if (!directJsResultSupported(type)) {
-      throw new Error(
-        `${label} has unsupported direct JavaScript result type`,
-      );
+      throw new Error(`${label} has unsupported direct JavaScript result type`);
     }
     return this.makeObjectValue(type, value, label);
   }
@@ -1529,24 +1527,6 @@ export class ObjectValueRuntime {
   liftObjectResource(obj, label) {
     if (this.exports.vir_obj_resource_is_valid(obj) !== 0) {
       return this.exports.vir_obj_resource_externref(obj);
-    }
-    // Some effect callback paths can expose one IO.ok wrapper around a Js result
-    // at the JS lift boundary. Keep this resource-only; ordinary Lean tag-0
-    // constructors must continue through their declared value decoders.
-    if (
-      this.exports.vir_obj_is_scalar(obj) === 0 &&
-      this.exports.vir_obj_tag(obj) === 0
-    ) {
-      const field = this.exports.vir_obj_field(obj, 0);
-      if (field !== 0) {
-        try {
-          if (this.exports.vir_obj_resource_is_valid(field) !== 0) {
-            return this.exports.vir_obj_resource_externref(field);
-          }
-        } finally {
-          this.exports.vir_obj_dec(field);
-        }
-      }
     }
     throw new Error(`${label} did not lift to a live host resource`);
   }

@@ -50,8 +50,8 @@ This check makes six mechanically enforceable claims:
    isolated behind `@[vir_js_explicit_conversion]`; they cannot be hidden in an
    ordinary binding.
 4. Every declared target must have a matching key in a shipped browser/React,
-   virtual Node, or runtime-intrinsic provider map, and every such provider key
-   must have a compiled declaration.
+   environment-neutral Node, or runtime-intrinsic provider map, and every such
+   provider key must have a compiled declaration.
 5. Public Lean-to-target links come from transitive references in compiled IR.
    Each link carries its declaration path; the report does not infer callers
    from naming or source text.
@@ -286,7 +286,7 @@ compiled Vir + Vir.Infoview environments
   -> compiler-decoded vir_js metadata
   -> public declaration call reachability and exact paths
 
-browser/React + virtual Node provider keys + runtime intrinsics
+browser/React + environment-neutral Node provider keys + runtime intrinsics
   -> strict target-name reconciliation JSON
 
 reviewed protocol operations + correspondence suggestions

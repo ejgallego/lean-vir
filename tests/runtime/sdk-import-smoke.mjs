@@ -132,8 +132,8 @@ try {
   const hostBindings = await import(
     pathToFileURL(join(jsDir, "vir-host-bindings.js"))
   );
-  const resources = hostBindings.createHostLifecycle();
-  const bindings = reactHostBindings.createBrowserReactHostBindings(resources);
+  const lifecycle = hostBindings.createHostLifecycle();
+  const bindings = reactHostBindings.createBrowserReactHostBindings(lifecycle);
   assert.equal(
     typeof reactHostBindings.createBrowserReactHostBindings,
     "function",
@@ -145,6 +145,7 @@ try {
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");
+  lifecycle.dispose();
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

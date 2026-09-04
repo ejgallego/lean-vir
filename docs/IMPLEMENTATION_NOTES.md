@@ -97,11 +97,11 @@ instead of reading it back from DOM attributes.
 Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 `Event.inputChecked?`; both check `Event.currentTarget` before `target`.
 `onChange` and `onSubmit` callbacks can also forward `Event.preventDefault` and
-`Event.stopPropagation` through the same opaque event resource. The virtual
-Node document mirrors DOM `querySelector` for missing selectors and returns a
-static `NodeList` from `querySelectorAll`; tests explicitly pre-seed single or
-multiple matching fixtures. Root rerender, unmount, package reload,
-and runtime disposal reuse the existing resource and callback lifetime model.
+`Event.stopPropagation` through the same opaque event resource. The Node entry
+point installs only environment-neutral JavaScript-value and console bindings;
+DOM and React packages require an explicit real host. Root rerender, unmount,
+package reload, and runtime disposal reuse the exact-value and callback
+lifetime model.
 Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.

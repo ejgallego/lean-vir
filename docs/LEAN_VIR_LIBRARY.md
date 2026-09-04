@@ -77,11 +77,11 @@ For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
 `Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
-bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
-document bindings and explicit unsupported React shims. The JavaScript-side binding composition reference
-lives in [JS_API.md](JS_API.md). This section documents the repository-local
-package generator; downstream Lake packages should prefer the facet workflow
-above.
+bindings from `lean-vir/react-host-bindings`. The Node wrapper installs only
+environment-neutral JavaScript-value and console bindings; it has no DOM or
+React implementation. The JavaScript-side binding composition reference lives
+in [JS_API.md](JS_API.md). This section documents the repository-local package
+generator; downstream Lake packages should prefer the facet workflow above.
 
 1. Import the Lean module that provides the host import.
 

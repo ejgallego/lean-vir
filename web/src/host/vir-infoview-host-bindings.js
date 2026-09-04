@@ -6,18 +6,13 @@ Author: Emilio J. Gallego Arias
 
 export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
   return {
-    "infoview.documentPosition": (uri, fileName, line, character, label) => ({
-      uri,
-      fileName,
-      line,
-      character,
-      label,
-    }),
+    "infoview.documentPosition": (uri, fileName, line, character, label) =>
+      documentPosition(uri, fileName, line, character, label),
     "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
     "infoview.command.revealPosition": (position) =>
-      revealInfoviewPosition(commandDispatcher, position),
+      dispatchInfoviewCommand(commandDispatcher, "revealPosition", position),
     "infoview.command.insertText": (position, text) =>
-      insertInfoviewText(commandDispatcher, position, text),
+      dispatchInfoviewCommand(commandDispatcher, "insertText", position, text),
     "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
       id,
       label,
@@ -36,26 +31,14 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
       normalizeProofWidgetsResolvedRef(ref),
     "proofwidgets.rpc.inspectRef": (ref) =>
-      inspectProofWidgetsRpcRef(commandDispatcher, ref),
+      dispatchInfoviewCommand(
+        commandDispatcher,
+        "proofwidgetsRpcInspectRef",
+        ref,
+      ),
     "proofwidgets.rpc.resolveRef": (ref, callback) =>
       resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
   };
-}
-
-export function normalizeInfoviewDocumentPosition(position) {
-  if (position === null || typeof position !== "object") {
-    return null;
-  }
-  const uri = typeof position.uri === "string" ? position.uri : "";
-  if (uri.length === 0) {
-    return null;
-  }
-  const line = nonNegativeInteger(position.line);
-  const character = nonNegativeInteger(position.character);
-  if (line === null || character === null) {
-    return null;
-  }
-  return { uri, line, character };
 }
 
 export function normalizeProofWidgetsRpcRef(ref) {
@@ -82,7 +65,7 @@ export function normalizeProofWidgetsRpcRef(ref) {
   return normalized;
 }
 
-export function normalizeProofWidgetsResolvedRef(ref) {
+function normalizeProofWidgetsResolvedRef(ref) {
   const value = ref !== null && typeof ref === "object" ? ref : {};
   return {
     id: stringField(value.id),
@@ -124,48 +107,7 @@ function writeTextToHostClipboard(text) {
   return false;
 }
 
-function revealInfoviewPosition(commandDispatcher, position) {
-  const normalized = normalizeInfoviewDocumentPosition(position);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "revealPosition",
-    normalized,
-  );
-}
-
-function insertInfoviewText(commandDispatcher, position, text) {
-  const normalized = normalizeInfoviewDocumentPosition(position);
-  if (normalized === null || typeof text !== "string") {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "insertText",
-    normalized,
-    text,
-  );
-}
-
-function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null) {
-    return false;
-  }
-  return dispatchInfoviewCommand(
-    commandDispatcher,
-    "proofwidgetsRpcInspectRef",
-    normalized,
-  );
-}
-
 function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
-  const normalized = normalizeProofWidgetsRpcRef(ref);
-  if (normalized === null || typeof callback !== "function") {
-    return false;
-  }
   const handler = infoviewCommandHandler(
     commandDispatcher,
     "proofwidgetsRpcResolveRef",
@@ -175,7 +117,7 @@ function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
   }
   let result;
   try {
-    result = handler(normalized);
+    result = handler(ref);
   } catch (error) {
     reportInfoviewHostError(error);
     return false;
@@ -190,13 +132,13 @@ function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
   ) {
     result
       .then((info) => {
-        callHostCallback(callback, normalizeProofWidgetsResolvedRef(info));
+        callHostCallback(callback, info);
       })
       .catch((error) => {
         reportInfoviewHostError(error);
       });
   } else {
-    callHostCallback(callback, normalizeProofWidgetsResolvedRef(result));
+    callHostCallback(callback, result);
   }
   return true;
 }
@@ -226,17 +168,12 @@ function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
 }
 
 function infoviewCommandHandler(commandDispatcher, name) {
-  const dispatcher =
-    commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
-  if (typeof dispatcher === "function") {
-    return (...payload) => dispatcher(name, ...payload);
-  }
   if (
-    dispatcher !== null &&
-    typeof dispatcher === "object" &&
-    typeof dispatcher[name] === "function"
+    commandDispatcher !== null &&
+    typeof commandDispatcher === "object" &&
+    typeof commandDispatcher[name] === "function"
   ) {
-    return (...payload) => dispatcher[name](...payload);
+    return (...payload) => commandDispatcher[name](...payload);
   }
   return null;
 }
@@ -251,11 +188,6 @@ function callHostCallback(callback, value) {
 
 function reportInfoviewHostError(error) {
   console.error(error);
-  const status = globalThis.document?.querySelector?.("#status") ?? null;
-  if (status !== null) {
-    status.textContent = "Trap";
-    status.dataset.ready = "false";
-  }
 }
 
 function copyTextWithExecCommand(text) {
@@ -294,6 +226,23 @@ function nullableField(value, name) {
   return value === null ? {} : { [name]: value };
 }
 
+function documentPosition(uri, fileName, line, character, label) {
+  const lineNumber = nonNegativeInteger(line);
+  const characterNumber = nonNegativeInteger(character);
+  if (lineNumber === null || characterNumber === null) {
+    throw new Error(
+      "infoview document position requires non-negative safe-integer coordinates",
+    );
+  }
+  return {
+    uri,
+    fileName,
+    line: lineNumber,
+    character: characterNumber,
+    label,
+  };
+}
+
 function nonNegativeInteger(value) {
   if (typeof value === "bigint") {
     return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER)
@@ -302,10 +251,6 @@ function nonNegativeInteger(value) {
   }
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value >= 0 ? value : null;
-  }
-  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : null;
   }
   return null;
 }

@@ -483,8 +483,8 @@ cleared.
 Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
 -/
 def setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout) := do
-  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
-  setTimeoutJs jsDelay callback
+  let jsDelay ← Lean.Vir.JsValue.ofFloat (UInt64.ofNat delayMs.toNat).toFloat
+  setTimeoutJs callback jsDelay
 
 /--
 Runs `callback` every `delayMs` milliseconds until cleared.
@@ -495,8 +495,8 @@ disposed.
 Reference: [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval).
 -/
 def setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval) := do
-  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
-  setIntervalJs jsDelay callback
+  let jsDelay ← Lean.Vir.JsValue.ofFloat (UInt64.ofNat delayMs.toNat).toFloat
+  setIntervalJs callback jsDelay
 
 end Timer
 

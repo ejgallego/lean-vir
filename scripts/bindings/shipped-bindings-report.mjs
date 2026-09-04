@@ -157,9 +157,9 @@ async function readInventory(path) {
 }
 
 function collectProviders() {
-  const browserResources = createHostLifecycle();
+  const browserLifecycle = createHostLifecycle();
   const browser = createBrowserHostBindings({
-    resources: browserResources,
+    lifecycle: browserLifecycle,
     reactHostBindings: createBrowserReactHostBindings,
   });
   const node = {

@@ -16,12 +16,6 @@ export class HostLifecycle {
     this.activeCleanups = new Map();
   }
 
-  stageResult(value, { onAbort = null } = {}) {
-    this.requireActive();
-    if (typeof onAbort === "function") registerHostCallRollback(onAbort);
-    return value;
-  }
-
   addDisposable(value, cleanup) {
     if (typeof cleanup !== "function") {
       throw new Error("active host cleanup must be a function");
@@ -82,27 +76,20 @@ export function createHostLifecycle() {
   return new HostLifecycle();
 }
 
-export function createTimerHostBindings(resources) {
+export function createTimerHostBindings(lifecycle) {
   const timeouts = new Map();
   const intervals = new Map();
   return {
-    "browser.timer.setTimeout": (delayMs, callback) => {
-      const delay = jsNatAsDelay(delayMs);
-      const registration = createScheduledCallbackRegistration(
-        resources,
-        callback,
-        {
-          label: "browser timeout",
-          schedule: (run) => globalThis.setTimeout(run, delay),
-          cancel: globalThis.clearTimeout.bind(globalThis),
-          invoke: (leanCallback) => leanCallback(),
-          onInactive: (token) => timeouts.delete(token),
-        },
-      );
-      if (registration.active) timeouts.set(registration.token, registration);
-      return resources.stageResult(registration.token, {
-        onAbort: registration.dispose,
+    "browser.timer.setTimeout": (callback, delayMs) => {
+      const registration = createCallbackRegistration(lifecycle, callback, {
+        oneShot: true,
+        schedule: (run) => globalThis.setTimeout(run, delayMs),
+        cancel: globalThis.clearTimeout.bind(globalThis),
+        onInactive: (token) => timeouts.delete(token),
       });
+      if (registration.active) timeouts.set(registration.token, registration);
+      registerHostCallRollback(registration.dispose);
+      return registration.token;
     },
     "browser.timer.clearTimeout": (timeout) => {
       const registration = timeouts.get(timeout);
@@ -110,23 +97,16 @@ export function createTimerHostBindings(resources) {
       else registration.dispose();
       return undefined;
     },
-    "browser.timer.setInterval": (delayMs, callback) => {
-      const delay = jsNatAsDelay(delayMs);
-      const registration = createRecurringCallbackRegistration(
-        resources,
-        callback,
-        {
-          label: "browser interval",
-          schedule: (run) => globalThis.setInterval(run, delay),
-          cancel: globalThis.clearInterval.bind(globalThis),
-          invoke: (leanCallback) => leanCallback(),
-          onInactive: (token) => intervals.delete(token),
-        },
-      );
-      intervals.set(registration.token, registration);
-      return resources.stageResult(registration.token, {
-        onAbort: registration.dispose,
+    "browser.timer.setInterval": (callback, delayMs) => {
+      const registration = createCallbackRegistration(lifecycle, callback, {
+        oneShot: false,
+        schedule: (run) => globalThis.setInterval(run, delayMs),
+        cancel: globalThis.clearInterval.bind(globalThis),
+        onInactive: (token) => intervals.delete(token),
       });
+      intervals.set(registration.token, registration);
+      registerHostCallRollback(registration.dispose);
+      return registration.token;
     },
     "browser.timer.clearInterval": (interval) => {
       const registration = intervals.get(interval);
@@ -138,27 +118,21 @@ export function createTimerHostBindings(resources) {
 }
 
 export function createAnimationHostBindings(
-  resources,
+  lifecycle,
   { requestFrame, cancelFrame },
 ) {
   const frames = new Map();
   return {
     "browser.animation.requestAnimationFrame": (callback) => {
-      const registration = createScheduledCallbackRegistration(
-        resources,
-        callback,
-        {
-          label: "browser animation frame",
-          schedule: requestFrame,
-          cancel: cancelFrame,
-          invoke: (leanCallback, timestamp) => leanCallback(Number(timestamp)),
-          onInactive: (token) => frames.delete(token),
-        },
-      );
-      if (registration.active) frames.set(registration.token, registration);
-      return resources.stageResult(registration.token, {
-        onAbort: registration.dispose,
+      const registration = createCallbackRegistration(lifecycle, callback, {
+        oneShot: true,
+        schedule: requestFrame,
+        cancel: cancelFrame,
+        onInactive: (token) => frames.delete(token),
       });
+      if (registration.active) frames.set(registration.token, registration);
+      registerHostCallRollback(registration.dispose);
+      return registration.token;
     },
     "browser.animation.cancelAnimationFrame": (frame) => {
       const registration = frames.get(frame);
@@ -169,24 +143,13 @@ export function createAnimationHostBindings(
   };
 }
 
-function jsNatAsDelay(delay) {
-  if (typeof delay !== "bigint" || delay < 0n || delay > 0xffffffffn) {
-    throw new Error("timer delay must be a Js Nat in the UInt32 range");
-  }
-  return Number(delay);
-}
-
-function createScheduledCallbackRegistration(
-  resources,
+function createCallbackRegistration(
+  lifecycle,
   callback,
-  { label, schedule, cancel, invoke, onInactive },
+  { oneShot, schedule, cancel, onInactive },
 ) {
-  if (typeof callback !== "function") {
-    throw new Error(`${label} callback must be a function`);
-  }
   let token;
-  let active = false;
-  let completed = false;
+  let active = true;
   const registration = {
     get token() {
       return token;
@@ -194,104 +157,27 @@ function createScheduledCallbackRegistration(
     get active() {
       return active;
     },
-    dispose: once(() => {
-      const errors = [];
-      collectCleanupError(errors, () =>
-        resources.removeDisposable(registration),
-      );
-      collectCleanupError(errors, () => onInactive?.(token));
-      if (active) {
-        active = false;
-        collectCleanupError(errors, () => cancel(token));
-      }
-      throwCollectedErrors(errors, `${label} cancellation failed`);
-    }),
-  };
-  const run = (...args) => {
-    if (completed) return undefined;
-    completed = true;
-    active = false;
-    const errors = [];
-    collectCleanupError(errors, () => invoke(callback, ...args));
-    collectCleanupError(errors, () => resources.removeDisposable(registration));
-    collectCleanupError(errors, () => onInactive?.(token));
-    throwCollectedErrors(
-      errors,
-      `${label} callback or completion cleanup failed`,
-    );
-    return undefined;
-  };
-  try {
-    token = schedule(run);
-    if (!completed) {
-      active = true;
-      resources.addDisposable(registration, registration.dispose);
-    }
-  } catch (error) {
-    const errors = [error];
-    collectCleanupError(errors, registration.dispose);
-    throwCollectedErrors(
-      errors,
-      `${label} registration failed during rollback`,
-    );
-  }
-  return registration;
-}
-
-function createRecurringCallbackRegistration(
-  resources,
-  callback,
-  { label, schedule, cancel, invoke, onInactive },
-) {
-  if (typeof callback !== "function") {
-    throw new Error(`${label} callback must be a function`);
-  }
-  let token;
-  let active = true;
-  let scheduled = false;
-  const registration = {
-    get token() {
-      return token;
-    },
-    dispose: once(() => {
+    dispose: () => {
+      if (!active) return undefined;
       active = false;
-      const errors = [];
-      collectCleanupError(errors, () =>
-        resources.removeDisposable(registration),
-      );
-      collectCleanupError(errors, () => onInactive?.(token));
-      if (scheduled) {
-        scheduled = false;
-        collectCleanupError(errors, () => cancel(token));
-      }
-      throwCollectedErrors(errors, `${label} cancellation failed`);
-    }),
+      lifecycle.removeDisposable(registration);
+      onInactive?.(token);
+      cancel(token);
+      return undefined;
+    },
   };
   const run = (...args) => {
     if (!active) return undefined;
-    invoke(callback, ...args);
-    return undefined;
+    if (oneShot) {
+      active = false;
+      lifecycle.removeDisposable(registration);
+      onInactive?.(token);
+    }
+    return callback(...args);
   };
-  try {
-    token = schedule(run);
-    scheduled = true;
-    resources.addDisposable(registration, registration.dispose);
-  } catch (error) {
-    const errors = [error];
-    collectCleanupError(errors, registration.dispose);
-    throwCollectedErrors(
-      errors,
-      `${label} registration failed during rollback`,
-    );
+  token = schedule(run);
+  if (active) {
+    lifecycle.addDisposable(registration, registration.dispose);
   }
   return registration;
-}
-
-function once(fn) {
-  let called = false;
-  return (...args) => {
-    if (called) return undefined;
-    called = true;
-    return fn(...args);
-  };
 }

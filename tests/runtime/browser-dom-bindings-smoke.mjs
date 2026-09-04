@@ -17,7 +17,11 @@ import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-
 const calls = [];
 const consoleCalls = [];
 const consoleBindings = createConsoleHostBindings();
-const consoleValue = { log: (message) => consoleCalls.push(message) };
+const consoleValue = {
+  log: (message) => {
+    consoleCalls.push(message);
+  },
+};
 consoleBindings["browser.console.log"](consoleValue, "exact receiver");
 assert.deepEqual(consoleCalls, ["exact receiver"]);
 assert.equal(
@@ -74,8 +78,12 @@ const element = {
   textContent: "",
   attributes: new Map(),
   _classList: {
-    add: (name) => calls.push(["class.add", name]),
-    remove: (name) => calls.push(["class.remove", name]),
+    add: (name) => {
+      calls.push(["class.add", name]);
+    },
+    remove: (name) => {
+      calls.push(["class.remove", name]);
+    },
     toggle: (name) => {
       calls.push(["class.toggle", name]);
       return true;
@@ -88,7 +96,9 @@ const element = {
     calls.push(["class.set", value]);
   },
   _style: {
-    setProperty: (name, value) => calls.push(["style.property", name, value]),
+    setProperty: (name, value) => {
+      calls.push(["style.property", name, value]);
+    },
   },
   get style() {
     return this._style;
@@ -96,18 +106,25 @@ const element = {
   set style(value) {
     calls.push(["style.text", value]);
   },
-  appendChild: (value) => calls.push(["append", value]),
-  remove: () => calls.push(["remove"]),
+  appendChild: (value) => {
+    calls.push(["append", value]);
+    return value;
+  },
+  remove: () => {
+    calls.push(["remove"]);
+  },
   getAttribute(name) {
     return this.attributes.get(name) ?? null;
   },
   setAttribute(name, value) {
     this.attributes.set(name, value);
   },
-  addEventListener: (name, listener) =>
-    calls.push(["listener.add", name, listener]),
-  removeEventListener: (name, listener) =>
-    calls.push(["listener.remove", name, listener]),
+  addEventListener: (name, listener) => {
+    calls.push(["listener.add", name, listener]);
+  },
+  removeEventListener: (name, listener) => {
+    calls.push(["listener.remove", name, listener]);
+  },
 };
 const elementBindings = createBrowserElementHostBindings();
 const eventBindings = createBrowserEventHostBindings();

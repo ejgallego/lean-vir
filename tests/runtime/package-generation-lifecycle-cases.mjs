@@ -6,7 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import { fileURLToPath } from "node:url";
 
-import { createVirRuntimeFactory } from "../../web/src/vir-runtime.js";
+import {
+  createVirImports,
+  createVirRuntimeFactory,
+} from "../../web/src/vir-runtime.js";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   createCommonHostBindings,
@@ -64,8 +67,22 @@ export async function runIrPackageLifecycleSmoke({
   );
 
   const bindingGenerations = [];
+  let failNextInstantiation = false;
+  let sharedBindingDisposals = 0;
   const hostRuntime = await createVirRuntimeFactory({
     wasmBytes,
+    imports: (module, hostState) => {
+      if (failNextInstantiation) {
+        failNextInstantiation = false;
+        throw new Error("replacement import construction failed");
+      }
+      return createVirImports(module, {}, hostState);
+    },
+    hostBindings: {
+      [VIR_HOST_DISPOSE]: () => {
+        sharedBindingDisposals += 1;
+      },
+    },
     defaultHostBindings: () => {
       const lifecycle = createHostLifecycle();
       const documentValue = { title: "" };
@@ -96,8 +113,27 @@ export async function runIrPackageLifecycleSmoke({
     "Lean VIR host: first",
   );
 
-  hostRuntime.loadIrPackageSetBytes([await readFile(secondPackage)]);
-  const secondGenerationLifecycle = bindingGenerations[1];
+  const secondPackageBytes = await readFile(secondPackage);
+  failNextInstantiation = true;
+  assert.throws(
+    () => hostRuntime.loadIrPackageSetBytes([secondPackageBytes]),
+    /replacement import construction failed/,
+  );
+  const failedGenerationLifecycle = bindingGenerations[1];
+  assert.equal(
+    failedGenerationLifecycle.phase,
+    "disposed",
+    "failed replacement must dispose its fresh active-resource lifecycle",
+  );
+  assert.equal(firstGenerationLifecycle.phase, "active");
+  assert.equal(
+    sharedBindingDisposals,
+    0,
+    "failed replacement must preserve a binding map leased by the live runtime",
+  );
+
+  hostRuntime.loadIrPackageSetBytes([secondPackageBytes]);
+  const secondGenerationLifecycle = bindingGenerations[2];
   assert.notEqual(
     secondGenerationLifecycle,
     firstGenerationLifecycle,
@@ -133,6 +169,7 @@ export async function runIrPackageLifecycleSmoke({
     "Lean VIR host: second",
   );
   hostRuntime.dispose();
+  assert.equal(sharedBindingDisposals, 1);
 
   const initializerRuntime = await createVirRuntimeFactory({
     wasmBytes,

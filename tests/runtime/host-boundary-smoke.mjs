@@ -89,66 +89,58 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
   lifecycle.dispose();
   assert.deepEqual(events, ["cancel"]);
   assert.equal(lifecycle.phase, "disposed");
+  let rejectedCleanup = 0;
   assert.throws(
-    () => lifecycle.stageResult({}),
+    () => lifecycle.addDisposable({}, () => rejectedCleanup++),
     /host lifecycle cannot register/,
   );
+  assert.equal(rejectedCleanup, 1);
   lifecycle.dispose();
 }
 
 {
-  const lifecycle = createHostLifecycle();
-  let rolledBack = 0;
-  const transaction = beginHostCallTransaction();
-  assert.equal(
-    lifecycle.stageResult(false, { onAbort: () => rolledBack++ }),
-    false,
-  );
-  abortHostCallTransaction(transaction);
-  assert.equal(rolledBack, 1);
-  lifecycle.dispose();
-}
-
-{
-  const position = {
-    uri: "file:///Main.lean",
-    line: 3n,
-    character: "7",
-    label: "ignored by command protocol",
-  };
   const calls = [];
-  const functionBindings = createInfoviewHostBindings({
-    commandDispatcher: (name, ...payload) => {
-      calls.push([name, ...payload]);
+  const bindings = createInfoviewHostBindings({
+    commandDispatcher: {
+      insertText(...payload) {
+        calls.push(payload);
+      },
     },
   });
+  const position = bindings["infoview.documentPosition"](
+    "file:///Main.lean",
+    "Main.lean",
+    3n,
+    7n,
+    "Main",
+  );
   assert.equal(
-    functionBindings["infoview.command.insertText"](position, "exact text"),
+    bindings["infoview.command.insertText"](position, "exact text"),
     true,
   );
   assert.deepEqual(calls, [
     [
-      "insertText",
-      { uri: "file:///Main.lean", line: 3, character: 7 },
+      {
+        uri: "file:///Main.lean",
+        fileName: "Main.lean",
+        line: 3,
+        character: 7,
+        label: "Main",
+      },
       "exact text",
     ],
   ]);
-
-  const objectCalls = [];
-  const objectBindings = createInfoviewHostBindings({
-    commandDispatcher: {
-      insertText(...payload) {
-        objectCalls.push(payload);
-      },
-    },
-  });
-  assert.equal(
-    objectBindings["infoview.command.insertText"](position, "object text"),
-    true,
+  assert.throws(
+    () =>
+      bindings["infoview.documentPosition"](
+        "file:///Main.lean",
+        "Main.lean",
+        -1n,
+        0n,
+        "Main",
+      ),
+    /non-negative safe-integer coordinates/,
   );
-  assert.deepEqual(objectCalls, [
-    [{ uri: "file:///Main.lean", line: 3, character: 7 }, "object text"],
-  ]);
 }
 
 {
@@ -201,8 +193,8 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
     const bindings = createTimerHostBindings(lifecycle);
     let timeoutCalls = 0;
     const timeout = bindings["browser.timer.setTimeout"](
-      7n,
       () => timeoutCalls++,
+      7,
     );
     assert.equal(timeout, timeoutTokens[0]);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 1 });
@@ -210,9 +202,9 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
     assert.equal(timeoutCalls, 1);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
 
-    const interval = bindings["browser.timer.setInterval"](11n, () => {
+    const interval = bindings["browser.timer.setInterval"](() => {
       throw new Error("interval callback boom");
-    });
+    }, 11);
     assert.equal(interval, intervalToken);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 1 });
     assert.throws(() => intervalRun(), /interval callback boom/);
@@ -223,8 +215,8 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
 
     const transaction = beginHostCallTransaction();
     const abortedTimeout = bindings["browser.timer.setTimeout"](
-      7n,
       () => undefined,
+      7,
     );
     assert.equal(abortedTimeout, timeoutTokens[1]);
     abortHostCallTransaction(transaction);
@@ -238,7 +230,7 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
       throw new Error("schedule failed");
     };
     assert.throws(
-      () => bindings["browser.timer.setInterval"](11n, () => undefined),
+      () => bindings["browser.timer.setInterval"](() => undefined, 11),
       /schedule failed/,
     );
     assert.deepEqual(cancellations, [
@@ -253,16 +245,16 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
     };
     let synchronousCalls = 0;
     assert.equal(
-      bindings["browser.timer.setTimeout"](7n, () => synchronousCalls++),
+      bindings["browser.timer.setTimeout"](() => synchronousCalls++, 7),
       synchronousToken,
     );
     assert.equal(synchronousCalls, 1);
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });
     assert.throws(
       () =>
-        bindings["browser.timer.setTimeout"](7n, () => {
+        bindings["browser.timer.setTimeout"](() => {
           throw new Error("timeout callback boom");
-        }),
+        }, 7),
       /timeout callback boom/,
     );
     assert.deepEqual(lifecycle.debugResourceCounts(), { active: 0 });

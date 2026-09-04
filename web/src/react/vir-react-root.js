@@ -4,46 +4,22 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import {
-  collectCleanupError,
-  throwCollectedErrors,
-} from "../runtime/cleanup.js";
+import { registerHostCallRollback } from "../host-boundary.js";
 
-export function createReactRootHostBindings(
-  lifecycle,
-  createRoot,
-) {
-  function createTrackedRoot(container) {
-    const root = createRoot(container);
-    lifecycle.addDisposable(root, () => cleanupTrackedRoot(root));
-    return root;
-  }
-
-  function cleanupTrackedRoot(root) {
-    root.unmount();
-  }
-
+export function createReactRootHostBindings(lifecycle, createRoot) {
   function releaseRoot(root) {
-    const errors = [];
-    collectCleanupError(errors, () => lifecycle.removeDisposable(root));
-    collectCleanupError(errors, () => cleanupTrackedRoot(root));
-    throwCollectedErrors(errors, "React root release failed");
+    root.unmount();
+    lifecycle.removeDisposable(root);
   }
 
   return {
     "react.root.create": (container) => {
-      const root = createTrackedRoot(container);
-      return lifecycle.stageResult(root, {
-        onAbort: () => releaseRoot(root),
-      });
+      const root = createRoot(container);
+      lifecycle.addDisposable(root, () => root.unmount());
+      registerHostCallRollback(() => releaseRoot(root));
+      return root;
     },
-    "react.root.renderNode": (root, node) => {
-      root.render(node);
-      return undefined;
-    },
-    "react.root.unmount": (root) => {
-      releaseRoot(root);
-      return undefined;
-    },
+    "react.root.renderNode": (root, node) => root.render(node),
+    "react.root.unmount": (root) => releaseRoot(root),
   };
 }

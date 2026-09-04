@@ -94,6 +94,13 @@ assert.throws(
   () => createExportedBrowserHostBindings({ reactHostBindings: {} }),
   /reactHostBindings must be a host binding factory/,
 );
+assert.throws(
+  () =>
+    createExportedBrowserHostBindings({
+      reactHostBindings: () => null,
+    }),
+  /reactHostBindings factory result must be a host binding object/,
+);
 assert.equal(VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
 assert.equal(VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
 assert.equal(NODE_VIR_WASM_RELEASE_FILE, VIR_WASM_RELEASE_FILE);
@@ -169,7 +176,6 @@ assert.throws(
     },
   });
   try {
-    const resources = createExportedHostLifecycle();
     const primitiveResource = false;
     assert.equal(primitiveResource, false);
     const commonBindings = createExportedCommonHostBindings();
@@ -430,8 +436,11 @@ assert.equal(getCheckedImport?.result?.type, "Js");
 const setTimeoutImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.timer.setTimeout",
 );
-assert.equal(setTimeoutImport?.args[0]?.type?.type, "Js");
+assert.equal(setTimeoutImport?.args[0]?.type?.kind, "function");
+assert.equal(setTimeoutImport?.args[1]?.type?.type, "Js");
 const setIntervalImport = hostImportTarget("browser.timer.setInterval");
+assert.equal(setIntervalImport?.args[0]?.type?.kind, "function");
+assert.equal(setIntervalImport?.args[1]?.type?.type, "Js");
 assert.equal(setIntervalImport?.result?.type, "Interval");
 const clearIntervalImport = hostImportTarget("browser.timer.clearInterval");
 assert.equal(clearIntervalImport?.args[0]?.type?.type, "Interval");

@@ -17,7 +17,7 @@ values:
 - state values, actions, setters, and dispatchers are the values returned or
   stored by React.
 
-There is no React-node wrapper, ownership lease, virtual node graph, or alias
+There is no React-node wrapper, ownership lease, parallel node graph, or alias
 table. `React.createElement` decides which parts of props and children it
 copies or retains, exactly as it does in JavaScript.
 

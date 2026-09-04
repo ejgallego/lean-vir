@@ -8,12 +8,9 @@ import * as React from "react";
 import * as ReactDOMClient from "./vir-react-dom-client.js";
 import { createReactRootHostBindings } from "./react/vir-react-root.js";
 
-export function createBrowserReactHostBindings(state) {
+export function createBrowserReactHostBindings(lifecycle) {
   return {
-    ...createReactRootHostBindings(
-      state,
-      (target) => ReactDOMClient.createRoot(target),
-    ),
+    ...createReactRootHostBindings(lifecycle, ReactDOMClient.createRoot),
     "react.node.text": (value) => value,
     "react.elementType.tag": (tag) => tag,
     "react.node.createElement": (elementType, props, children) =>
@@ -31,23 +28,14 @@ export function createBrowserReactHostBindings(state) {
     "react.useMemo": (calculate, deps) => React.useMemo(calculate, deps),
     "react.useCallback": (callback, deps) => React.useCallback(callback, deps),
     "react.useContext": (context) => React.useContext(context),
-    "react.useEffect": (setup) => {
-      React.useEffect(setup);
-      return undefined;
-    },
-    "react.useEffectWithDeps": (setup, deps) => {
-      React.useEffect(setup, deps);
-      return undefined;
-    },
+    "react.useEffect": (setup) => React.useEffect(setup),
+    "react.useEffectWithDeps": (setup, deps) => React.useEffect(setup, deps),
     "react.ref.get": (ref) => ref.current,
     "react.ref.set": (ref, value) => {
       ref.current = value;
       return undefined;
     },
-    "react.state.modify": (setter, update) => {
-      setter(update);
-      return undefined;
-    },
+    "react.state.modify": (setter, update) => setter(update),
     "js.value.react.reducer": (reducer) => reducer,
     "js.value.react.memoCalculation": (calculate) => calculate,
     "js.value.react.callback": (callback) => callback,
@@ -55,8 +43,9 @@ export function createBrowserReactHostBindings(state) {
       const value = effect.setup();
       return () => effect.cleanup(value);
     },
-    "js.value.react.component": (render) => function LeanComponent(props) {
-      return render(props.leanProps);
-    },
+    "js.value.react.component": (render) =>
+      function LeanComponent(props) {
+        return render(props.leanProps);
+      },
   };
 }

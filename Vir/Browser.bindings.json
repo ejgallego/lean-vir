@@ -499,13 +499,13 @@
         "target": "browser.timer.setTimeout",
         "lean": "Lean.Vir.Browser.Timer.setTimeoutJs",
         "marker": "vir_js",
-        "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.",
+        "reason": "VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout", "semantics": "preserving" },
         "activeEffect": "register",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
-          { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
-          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "DomM Unit", "representation": "callback" } }
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "DomM Unit", "representation": "callback" } },
+          { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
       },
@@ -530,13 +530,13 @@
         "target": "browser.timer.setInterval",
         "lean": "Lean.Vir.Browser.Timer.setIntervalJs",
         "marker": "vir_js",
-        "reason": "VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.",
+        "reason": "VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval", "semantics": "preserving" },
         "activeEffect": "register",
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [
-          { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
-          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "DomM Unit", "representation": "callback" } }
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "DomM Unit", "representation": "callback" } },
+          { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
       },

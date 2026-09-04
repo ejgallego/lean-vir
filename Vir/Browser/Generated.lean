@@ -1463,18 +1463,18 @@ namespace Timer
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setTimeout`.
 
-VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
+VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setTimeout"]
 opaque setTimeoutJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
+    (callback : DomM Unit)
+    (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Timeout)
 
 /--
@@ -1496,18 +1496,18 @@ opaque clearTimeout
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setInterval`.
 
-VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
+VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setInterval"]
 opaque setIntervalJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
+    (callback : DomM Unit)
+    (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Interval)
 
 /--
