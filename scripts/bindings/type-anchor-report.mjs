@@ -471,6 +471,21 @@ function compareAnchor(anchor, lean, tsSymbols) {
     tsSymbols,
     new Set(),
   );
+  if (tsSymbol.optional === true) {
+    return anchorResult(
+      anchor,
+      "weak",
+      [
+        diagnostic(
+          "typescript_optional_property_not_represented",
+          "The structural comparison does not represent TypeScript optional-property undefined semantics",
+        ),
+        ...shapeComparison.diagnostics,
+      ],
+      leanDescriptor,
+      tsSymbol,
+    );
+  }
   return anchorResult(
     anchor,
     shapeComparison.status,
@@ -494,8 +509,6 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     relation,
     notes: reviewedDiagnostics.map((item) => item.message),
     diagnostics: reviewedDiagnostics,
-    ...(anchor.category ? { category: anchor.category } : {}),
-    ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
     ...(tsSymbol ? { tsSymbol } : {}),
@@ -570,7 +583,16 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
       return compareShapes(lean.element, ts.element, tsSymbols, seen);
     case "option": {
       const element = compareShapes(lean.element, ts.element, tsSymbols, seen);
-      const absence = ts.absence ?? "null";
+      const absence = ts.absence;
+      if (absence === undefined) {
+        return comparison("weak", [
+          diagnostic(
+            "typescript_absence_provenance_missing",
+            "TypeScript option is missing null-versus-undefined absence provenance",
+          ),
+          ...element.diagnostics,
+        ]);
+      }
       if (absence === "null") return element;
       return comparison("weak", [
         diagnostic(

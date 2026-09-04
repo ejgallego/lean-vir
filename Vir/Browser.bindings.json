@@ -7,7 +7,7 @@
   "lean": { "modules": ["Vir.Browser", "Vir.Browser.Generated"] },
   "generation": {
     "output": "Vir/Browser/Generated.lean",
-    "irOutput": "build/bindings/browser.generated-operations.json",
+    "operationsOutput": "build/bindings/browser.generated-operations.json",
     "imports": ["Vir.Browser.Types"],
     "namespace": "Lean.Vir.Browser",
     "abiProfile": {

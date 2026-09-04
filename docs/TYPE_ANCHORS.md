@@ -40,7 +40,9 @@ npm run render:type-anchors:html
 The comparison report classifies explicit fixture relations as `exact`,
 `compatible`, `weak`, or `missing`. These statuses describe only the compared
 interface shapes. They do not verify JavaScript provider behavior, callback
-lifetime, ownership, or semantic fidelity.
+lifetime, ownership, or semantic fidelity. Missing null-versus-`undefined`
+provenance and optional TypeScript properties are always `weak`; the comparator
+does not guess their absence semantics.
 
 For shipped binding architecture, guarantees, and the primary interactive
 report, see [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md). For the translation

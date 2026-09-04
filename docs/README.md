@@ -102,8 +102,8 @@ ownership diagrams.
   modalities, generated-operation provenance, and justified exceptions.
 - [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): the consolidated binding library
   explorer, colocated API-group manifests, exhaustive `vir_js` inventory,
-  forward and reverse browsing, faithful boundary policy, and shipped provider
-  key reconciliation.
+  forward and reverse browsing, preserving boundary contracts, and shipped
+  provider key reconciliation.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary

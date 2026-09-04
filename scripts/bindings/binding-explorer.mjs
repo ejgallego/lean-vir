@@ -254,6 +254,75 @@ function semanticCoverageRecord(operations, confirmedTargets, candidateTargets) 
   return { status, relations };
 }
 
+export function classifyGenerationMember({
+  generated,
+  confirmedTargets,
+  adaptedTargets,
+  candidateTargets,
+  unsupported,
+  ambiguousCandidate,
+}) {
+  if (generated) {
+    return {
+      disposition: "generated",
+      provenance: "generator",
+      ...(confirmedTargets.length === 0
+        ? { diagnostics: [{
+            code: "generated-binding-unreachable",
+            severity: "error",
+            message: "The member is selected for generation but has no confirmed shipped target.",
+            action: "Regenerate the Lean source and reconcile its compiled target.",
+          }] }
+        : {}),
+    };
+  }
+  if (adaptedTargets.length !== 0) {
+    return {
+      disposition: "adapted",
+      provenance: "reviewed-protocol",
+    };
+  }
+  if (unsupported !== undefined) {
+    return {
+      disposition: "unsupported",
+      provenance: "annotation",
+    };
+  }
+  if (confirmedTargets.length !== 0) {
+    return {
+      disposition: "needs-annotation",
+      provenance: "reviewed-protocol",
+      diagnostics: [{
+        code: "direct-typescript-lowering-required",
+        severity: "action",
+        message: "VIR ships a generated reviewed protocol for this upstream operation, but does not yet lower it directly from TypeScript.",
+        action: "Express the correspondence in the TypeScript lowering policy, or keep it explicitly protocol-specific.",
+      }],
+    };
+  }
+  if (candidateTargets.length !== 0) {
+    return {
+      disposition: "needs-annotation",
+      provenance: "candidate",
+      candidateTargets,
+      diagnostics: [{
+        code: ambiguousCandidate
+          ? "ambiguous-upstream-correspondence"
+          : "upstream-correspondence-unconfirmed",
+        severity: "action",
+        message: ambiguousCandidate
+          ? "More than one upstream operation may correspond to a shipped target."
+          : "A name-based candidate connects this upstream operation to a shipped target, but the identity is not authored.",
+        action: "Confirm the operation identity in the binding configuration before generation.",
+      }],
+    };
+  }
+  return {
+    disposition: "not-selected",
+    provenance: "none",
+  };
+}
+
 function generationRecord(
   generatedMembers,
   symbol,
@@ -272,53 +341,16 @@ function generationRecord(
     mapping.typescript === symbol.id).map((mapping) => mapping.target))].sort();
   const unsupported = unsupportedEntries.find((entry) =>
     unsupportedEntryCoversSymbol(entry, symbol));
-  const diagnostics = [];
-  let disposition;
-  let provenance;
-
-  if (generatedMembers.has(symbol.id)) {
-    disposition = "generated";
-    provenance = "generator";
-    if (confirmedTargets.length === 0) {
-      diagnostics.push({
-        code: "generated-binding-unreachable",
-        severity: "error",
-        message: "The member is selected for generation but has no confirmed shipped target.",
-        action: "Regenerate the Lean source and reconcile its compiled target.",
-      });
-    }
-  } else if (adaptedTargets.length !== 0) {
-    disposition = "adapted";
-    provenance = "reviewed-protocol";
-  } else if (unsupported !== undefined) {
-    disposition = "unsupported";
-    provenance = "annotation";
-  } else if (confirmedTargets.length !== 0) {
-    disposition = "needs-annotation";
-    provenance = "reviewed-protocol";
-    diagnostics.push({
-      code: "direct-typescript-lowering-required",
-      severity: "action",
-      message: "VIR ships a generated reviewed protocol for this upstream operation, but does not yet lower it directly from TypeScript.",
-      action: "Express the correspondence in the TypeScript lowering policy, or keep it explicitly protocol-specific.",
-    });
-  } else if (candidateTargets.length !== 0) {
-    disposition = "needs-annotation";
-    provenance = "candidate";
-    diagnostics.push({
-      code: targetMappings.some((mapping) => mapping.status === "ambiguous")
-        ? "ambiguous-upstream-correspondence"
-        : "upstream-correspondence-unconfirmed",
-      severity: "action",
-      message: targetMappings.some((mapping) => mapping.status === "ambiguous")
-        ? "More than one upstream operation may correspond to a shipped target."
-        : "A name-based candidate connects this upstream operation to a shipped target, but the identity is not authored.",
-      action: "Confirm the operation identity in the binding configuration before generation.",
-    });
-  } else {
-    disposition = "not-selected";
-    provenance = "none";
-  }
+  const classification = classifyGenerationMember({
+    generated: generatedMembers.has(symbol.id),
+    confirmedTargets,
+    adaptedTargets,
+    candidateTargets,
+    unsupported,
+    ambiguousCandidate: targetMappings.some((mapping) => mapping.status === "ambiguous"),
+  });
+  const visibleCandidateTargets = classification.candidateTargets ?? [];
+  const diagnostics = [...(classification.diagnostics ?? [])];
 
   for (const operation of member.mapping?.operations ?? []) {
     if (operation.missing !== true) continue;
@@ -333,15 +365,17 @@ function generationRecord(
 
   const targets = [...new Set([...confirmedTargets, ...adaptedTargets])].sort();
   return {
-    disposition,
-    provenance,
+    disposition: classification.disposition,
+    provenance: classification.provenance,
     targets,
     semanticCoverage: semanticCoverageRecord(
       generatedOperations,
       targets,
-      candidateTargets,
+      visibleCandidateTargets,
     ),
-    ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
+    ...(visibleCandidateTargets.length === 0
+      ? {}
+      : { candidateTargets: visibleCandidateTargets }),
     ...(unsupported === undefined ? {} : {
       unsupported: {
         source: unsupported.typescript,
@@ -1230,7 +1264,7 @@ export async function runBindingExplorerCli(argv) {
   console.log(`  member evidence: ${report.summary.coverage.evidence.derived} TypeScript-derived, ${report.summary.coverage.evidence["protocol-linked"]} protocol-linked, ${report.summary.coverage.evidence["contract-linked"]} contract-linked, ${report.summary.coverage.evidence.unreviewed} awaiting review, ${report.summary.coverage.evidence.suggested} suggested, ${report.summary.coverage.evidence.ambiguous} ambiguous, ${report.summary.coverage.evidence.missing} not provided`);
   console.log(`  boundary generation: ${report.summary.generation.boundaries.targets}/${report.summary.targets} targets generated, ${report.summary.generation.boundaries.typescriptDerived} TypeScript-derived, ${report.summary.generation.boundaries.reviewedProtocols} reviewed protocols (${report.summary.generation.protocolRelations.upstreamAdapters} upstream adapters, ${report.summary.generation.protocolRelations.virOwned} VIR-owned, ${report.summary.generation.protocolRelations.localContracts} local-contract, ${report.summary.generation.protocolRelations.unclassified} unclassified), ${report.summary.generation.boundaries.handwrittenDeclarations} handwritten declarations`);
   console.log(`  semantic relation: ${report.summary.generation.semanticRelations.preserving} preserving, ${report.summary.generation.semanticRelations.changing} explicit adapters, ${report.summary.generation.semanticRelations.unreviewed} require review, ${report.summary.generation.semanticRelations["vir-owned"]} VIR-owned, ${report.summary.generation.semanticRelations["local-contract"]} local-contract`);
-  console.log(`  upstream semantic coverage: ${report.summary.generation.semanticCoverage.faithful} with faithful boundary, ${report.summary.generation.semanticCoverage["adapter-only"]} adapter-only, ${report.summary.generation.semanticCoverage.unreviewed} unreviewed, ${report.summary.generation.semanticCoverage["local-contract"]} local-contract, ${report.summary.generation.semanticCoverage.candidate} candidate, ${report.summary.generation.semanticCoverage["not-provided"]} not provided`);
+  console.log(`  upstream semantic coverage: ${report.summary.generation.semanticCoverage.faithful} with preserving contracts, ${report.summary.generation.semanticCoverage["adapter-only"]} adapter-only, ${report.summary.generation.semanticCoverage.unreviewed} unreviewed, ${report.summary.generation.semanticCoverage["local-contract"]} local-contract, ${report.summary.generation.semanticCoverage.candidate} candidate, ${report.summary.generation.semanticCoverage["not-provided"]} not provided`);
   console.log(`  private active effects: ${report.summary.generation.activeEffects.register} register, ${report.summary.generation.activeEffects.use} use, ${report.summary.generation.activeEffects.release} release`);
   console.log(`  upstream member review: ${report.summary.generation.disposition.generated} generated, ${report.summary.generation.disposition.adapted} reviewed protocols, ${report.summary.generation.disposition["needs-annotation"]} need annotation, ${report.summary.generation.disposition.unsupported} unsupported, ${report.summary.generation.disposition["not-selected"]} not selected`);
   console.log(`  author actions: ${report.summary.generation.workItems}`);

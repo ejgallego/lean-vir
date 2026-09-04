@@ -70,11 +70,20 @@ test("structural anchors reject binding-policy transformations", async () => {
   try {
     const declarations = join(directory, "demo.d.ts");
     await writeFile(declarations, "export type Value = string;\n");
-    await assert.rejects(
-      generateDescriptorFile({
-        files: [declarations],
-        anchors: null,
-        anchorsData: {
+    const generate = (anchorsData, anchors = null) => generateDescriptorFile({
+      files: [declarations],
+      anchors,
+      anchorsData,
+      symbols: new Set(),
+      symbolFiles: [],
+      sourceUrl: null,
+      dependencyDepth: 0,
+      dependencyPolicy: null,
+      dependencyPolicyData: null,
+    });
+    for (const [anchorsData, expected] of [
+      [
+        {
           version: 1,
           anchors: [{
             lean: "Demo.Value",
@@ -82,51 +91,89 @@ test("structural anchors reject binding-policy transformations", async () => {
             portIntent: { representation: "hostResource" },
           }],
         },
-        symbols: new Set(),
-        symbolFiles: [],
-        sourceUrl: null,
-        dependencyDepth: 0,
-        dependencyPolicy: null,
-        dependencyPolicyData: null,
-      }),
-      /portIntent is not a structural anchor field/u,
+        /portIntent is not a structural anchor field/u,
+      ],
+      [{ version: 1, anchors: [], metadata: {} }, /metadata is not an anchor-file field/u],
+      [{ version: 1, anchors: [null] }, /anchors\[0\] must be an object/u],
+      [
+        {
+          version: 1,
+          anchors: [{ lean: "Demo.Value", ts: "Value", category: "legacy" }],
+        },
+        /category is not a structural anchor field/u,
+      ],
+      [
+        {
+          version: 1,
+          anchors: [{ lean: "Demo.Value", ts: "Value", target: "demo.value" }],
+        },
+        /target is not a structural anchor field/u,
+      ],
+    ]) {
+      await assert.rejects(generate(anchorsData), expected);
+    }
+    const nullAnchors = join(directory, "null-anchors.json");
+    await writeFile(nullAnchors, "null\n");
+    await assert.rejects(
+      generate(undefined, nullAnchors),
+      /anchor file must be \{ version: 1, anchors: \[\.\.\.\] \}/u,
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test("the comparator does not equate TypeScript undefined with Lean Option", async () => {
+test("the comparator fails closed on TypeScript absence semantics", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-nullish-comparison-"));
   try {
     const descriptors = join(directory, "descriptors.json");
     const manifest = join(directory, "manifest.json");
+    const string = { kind: "primitive", name: "string" };
+    const option = (absence) => ({
+      kind: "option",
+      ...(absence === undefined ? {} : { absence }),
+      element: string,
+    });
+    const functionShape = (result) => ({
+      kind: "function",
+      effect: "pure",
+      args: [],
+      result,
+    });
     await writeFile(descriptors, `${JSON.stringify({
       version: 1,
-      symbols: [{
-        id: "maybeUndefined",
-        kind: "function",
-        shape: {
+      symbols: [
+        {
+          id: "maybeUndefined",
           kind: "function",
-          effect: "pure",
-          args: [],
-          result: {
-            kind: "option",
-            absence: "undefined",
-            element: { kind: "primitive", name: "string" },
-          },
+          shape: functionShape(option("undefined")),
         },
-      }],
-      anchors: [{ id: "maybe_undefined", lean: "Demo.maybeUndefined", ts: "maybeUndefined" }],
+        {
+          id: "missingAbsence",
+          kind: "function",
+          shape: functionShape(option(undefined)),
+        },
+        {
+          id: "optionalProperty",
+          kind: "property",
+          optional: true,
+          shape: functionShape(option("null")),
+        },
+      ],
+      anchors: [
+        { id: "maybe_undefined", lean: "Demo.maybeString", ts: "maybeUndefined" },
+        { id: "missing_absence", lean: "Demo.maybeString", ts: "missingAbsence" },
+        { id: "optional_property", lean: "Demo.maybeString", ts: "optionalProperty" },
+      ],
     }, null, 2)}\n`);
     await writeFile(manifest, `${JSON.stringify({
       version: INTERFACE_MANIFEST_VERSION,
       artifact: "lean-vir-ir-package",
       metadata: {},
       exports: [{
-        id: "maybeUndefined",
-        jsName: "maybeUndefined",
-        entry: "Demo.maybeUndefined",
+        id: "maybeString",
+        jsName: "maybeString",
+        entry: "Demo.maybeString",
         source: "Demo.lean",
         startup: false,
         args: [],
@@ -142,10 +189,13 @@ test("the comparator does not equate TypeScript undefined with Lean Option", asy
     }, null, 2)}\n`);
 
     const report = await buildTypeAnchorReport({ descriptors, manifest });
-    assert.equal(report.results[0]?.status, "weak");
-    assert.equal(
-      report.results[0]?.diagnostics[0]?.code,
-      "typescript_undefined_not_represented",
+    assert.deepEqual(
+      report.results.map((result) => [result.id, result.status, result.diagnostics[0]?.code]),
+      [
+        ["maybe_undefined", "weak", "typescript_undefined_not_represented"],
+        ["missing_absence", "weak", "typescript_absence_provenance_missing"],
+        ["optional_property", "weak", "typescript_optional_property_not_represented"],
+      ],
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

@@ -36,10 +36,10 @@
     "generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["output", "irOutput", "imports", "namespace", "abiProfile", "resources"],
+      "required": ["output", "operationsOutput", "imports", "namespace", "abiProfile", "resources"],
       "properties": {
         "output": { "type": "string", "minLength": 1 },
-        "irOutput": { "type": "string", "minLength": 1 },
+        "operationsOutput": { "type": "string", "minLength": 1 },
         "imports": {
           "type": "array",
           "minItems": 1,

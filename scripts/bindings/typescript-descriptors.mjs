@@ -851,20 +851,27 @@ function parameterName(name, fallback) {
 }
 
 function validateAnchors(anchorData, symbolIds) {
-  if (anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
+  if (anchorData === null || typeof anchorData !== "object" || Array.isArray(anchorData) ||
+      anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
     throw new Error("anchor file must be { version: 1, anchors: [...] }");
+  }
+  const unknownDocumentField = Object.keys(anchorData).find((field) =>
+    !["version", "anchors"].includes(field));
+  if (unknownDocumentField !== undefined) {
+    throw new Error(`${unknownDocumentField} is not an anchor-file field`);
   }
   const anchorFields = new Set([
     "id",
     "lean",
     "ts",
     "relation",
-    "category",
-    "target",
     "note",
   ]);
   const ids = new Set();
   for (const [index, anchor] of anchorData.anchors.entries()) {
+    if (anchor === null || typeof anchor !== "object" || Array.isArray(anchor)) {
+      throw new Error(`anchors[${index}] must be an object`);
+    }
     const unknown = Object.keys(anchor).find((field) => !anchorFields.has(field));
     if (unknown !== undefined) {
       throw new Error(`anchors[${index}].${unknown} is not a structural anchor field`);
@@ -881,7 +888,7 @@ function validateAnchors(anchorData, symbolIds) {
     if (anchor.relation !== undefined && !["audit", "coverageGap"].includes(anchor.relation)) {
       throw new Error(`anchors[${index}].relation must be audit or coverageGap`);
     }
-    for (const field of ["id", "category", "target", "note"]) {
+    for (const field of ["id", "note"]) {
       if (anchor[field] !== undefined &&
           (typeof anchor[field] !== "string" || anchor[field].length === 0)) {
         throw new Error(`anchors[${index}].${field} must be a non-empty string`);

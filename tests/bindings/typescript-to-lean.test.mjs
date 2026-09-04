@@ -20,7 +20,7 @@ const stringShape = { kind: "primitive", name: "string" };
 const nullableStringShape = { kind: "option", absence: "null", element: stringShape };
 const generation = {
   output: "Vir/Demo/Generated.lean",
-  irOutput: "build/bindings/demo.generated-operations.json",
+  operationsOutput: "build/bindings/demo.generated-operations.json",
   imports: ["Vir.Demo.Types"],
   namespace: "Lean.Vir.Demo",
   abiProfile: {

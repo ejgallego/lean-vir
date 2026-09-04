@@ -162,9 +162,9 @@ must not replace the public JavaScript value.
 
 `npm run generate:lean-bindings` creates one operation record for every
 selected TypeScript operation and every reviewed protocol operation.
-It then renders all downstream views from those records. Ignored debugging
-artifacts use `lean-vir-binding-operation-ir` version 2 and are written per
-library under:
+It renders the Lean declarations and the binding-policy portions of the
+explorer from those records. Ignored debugging artifacts use
+`lean-vir-binding-operation-ir` version 2 and are written per library under:
 
 ```text
 build/bindings/*.generated-operations.json
@@ -316,10 +316,10 @@ The TypeScript compiler extracts declaration display text, JSDoc, source
 locations, and documentation links into the descriptor. Generation copies
 those fields into the generated binding operation and emits the JSDoc plus an
 upstream source link on the public Lean declaration. The explorer consumes the
-same descriptor and operation record: it renders JSDoc paragraphs and links, TypeScript and Lean code
-with language-aware token classes, and the exact conversion policy that
-produced each generated declaration. No separate handwritten method
-documentation database is involved.
+same descriptor and operation record: it renders JSDoc paragraphs and links,
+TypeScript and Lean code with language-aware token classes, and the exact
+conversion policy that produced each generated declaration. No separate
+handwritten method documentation database is involved.
 
 The explorer documents the generated operation's derived policy and provenance.
 Provider behavior remains a separately tested runtime claim; it is never
@@ -337,8 +337,8 @@ lifetimes, and exceptions on immediate values are errors.
 
 Exceptions are intended for semantics that TypeScript declarations do not
 express, such as a host retaining a callback until explicit release. They are
-not a place to restate ordinary profile defaults. The generated operation marks every
-override and its reason, so review can distinguish inference from policy.
+not a place to restate ordinary profile defaults. The generated operation marks
+every override and its reason, so review can distinguish inference from policy.
 An exception's optional `semantics` field records whether the reviewed override
 preserves upstream behavior or creates an explicit semantic adapter. Omitting
 that field leaves the operation visibly unreviewed rather than inferring

@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 
 import {
   buildBindingExplorerReport,
+  classifyGenerationMember,
   renderBindingExplorerHtml,
 } from "../../scripts/bindings/binding-explorer.mjs";
 import {
@@ -39,6 +40,27 @@ test("binding explorer rendering injects one script-safe report", () => {
   assert.throws(
     () => renderBindingExplorerHtml("no marker", {}),
     /exactly one report marker/u,
+  );
+});
+
+test("unsupported members do not expose automatic binding candidates", () => {
+  assert.deepEqual(
+    classifyGenerationMember({
+      generated: false,
+      confirmedTargets: [],
+      adaptedTargets: [],
+      candidateTargets: ["demo.widget.render"],
+      unsupported: {
+        typescript: "Widget.render",
+        scope: "symbol",
+        note: "Not part of the VIR surface.",
+      },
+      ambiguousCandidate: false,
+    }),
+    {
+      disposition: "unsupported",
+      provenance: "annotation",
+    },
   );
 });
 
@@ -80,7 +102,7 @@ test("reviewed method mappings require their named public declaration to reach t
     lean: { modules: ["Vir.Demo"] },
     generation: {
       output: "Vir/Demo/Generated.lean",
-      irOutput: "build/bindings/demo.generated-operations.json",
+      operationsOutput: "build/bindings/demo.generated-operations.json",
       imports: ["Vir.Demo.Types"],
       namespace: "Lean.Vir.Demo",
       abiProfile: {
@@ -177,7 +199,7 @@ test("binding entry points own help and error exit status", () => {
   const helpCases = [
     ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR upstream reference, shipped inventory, and author actions/u],
     ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
-    ["generate-lean-bindings.mjs", /Generate faithful Lean host declarations/u],
+    ["generate-lean-bindings.mjs", /Generate Lean host declarations/u],
     ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],
     ["generate-ts-descriptors.mjs", /Generate Lean VIR TypeScript descriptor JSON/u],
     ["render-type-anchors.mjs", /Render a Verso\/Blueprint-friendly Markdown fragment/u],

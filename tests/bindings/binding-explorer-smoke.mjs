@@ -633,7 +633,7 @@ for (const member of [
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="faithful-metric"/u);
-assert.match(html, /upstream entries with a faithful boundary/u);
+assert.match(html, /upstream entries with preserving contracts/u);
 assert.match(html, /id="adapter-metric"/u);
 assert.match(html, /id="coverage" aria-label="Filter upstream semantic coverage"/u);
 assert.match(html, /id="search" type="search"/u);

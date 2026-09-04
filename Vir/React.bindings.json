@@ -7,7 +7,7 @@
   "lean": { "modules": ["Vir.React", "Vir.React.Generated"] },
   "generation": {
     "output": "Vir/React/Generated.lean",
-    "irOutput": "build/bindings/react.generated-operations.json",
+    "operationsOutput": "build/bindings/react.generated-operations.json",
     "imports": ["Vir.React.Types"],
     "namespace": "Lean.Vir",
     "abiProfile": {

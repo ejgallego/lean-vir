@@ -134,9 +134,9 @@ const dispositionLabel = (value) => ({
 })[value] ?? value;
 const semanticCoverageDefinitions = new Map([
   ["faithful", {
-    filter: "Has faithful boundary",
-    badge: "faithful boundary available",
-    summary: "with faithful boundary",
+    filter: "Has preserving contract",
+    badge: "preserving contract recorded",
+    summary: "with preserving contracts",
   }],
   ["adapter-only", {
     filter: "Adapter only",

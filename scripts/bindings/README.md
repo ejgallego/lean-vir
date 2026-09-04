@@ -1,7 +1,7 @@
 # Binding tooling
 
 This directory owns the shipped-JavaScript-binding inventory, TypeScript
-descriptor generation, faithful Lean declaration generation, and the
+descriptor generation, Lean declaration generation, and the
 consolidated upstream reference/shipped inventory/author actions document. It
 also retains a standalone type-anchor comparator for fixture and debugging
 work. Use the stable
@@ -35,7 +35,8 @@ upstream-shaped reference, a complete shipped-boundary inventory, and
 actionable author findings with semantic TypeScript/Lean highlighting;
 convenience APIs do not count as upstream bindings.
 
-Each generated operation also carries a semantic relation independent of provider presence.
+Each generated operation also carries a semantic relation independent of
+provider presence.
 Unmodified TypeScript-derived operations start as preserving by construction;
 the generator then folds in reviewed receiver and resource-mapping facts.
 Non-identity resource mappings and omitted host-global receivers therefore
@@ -46,8 +47,8 @@ behavior remains separately trusted and tested.
 
 Runtime provider reconciliation is deliberately narrower: it proves that every
 compiled target has a matching provider-map key and that no key is orphaned. It
-does not inspect provider behavior or mechanically enforce the generated operation's
-retention and terminal-cleanup policy.
+does not inspect provider behavior or mechanically enforce the generated
+operation's retention and terminal-cleanup policy.
 
 Related ownership:
 
@@ -55,7 +56,8 @@ Related ownership:
   code-generation policy, and their schema.
 - `Vir/*/Generated.lean`: checked-in generated declarations consumed by the
   shipped Lean library.
-- `fixtures/type-anchors/`: authored structural-comparison and package-generator inputs.
+- `fixtures/type-anchors/`: authored structural-comparison and package-generator
+  inputs.
 - `tests/bindings/`: unit and end-to-end tool coverage.
 - `web/tools/binding-explorer/`: maintained static explorer presentation.
 - `build/bindings/` and `build/type-descriptors/`: ignored generated outputs.
