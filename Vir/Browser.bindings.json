@@ -45,44 +45,27 @@
       "KeyboardEvent": "KeyboardEvent",
       "TextMetrics": "TextMetrics"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "ElementCSSInlineStyle.style", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
-      "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": {
-        "signature": "only",
         "omittedOptionalParameters": ["counterclockwise"],
         "semantics": "preserving",
         "reason": "Omitting counterclockwise preserves the TypeScript default value false."
       },
-      "CanvasRenderingContext2D.beginPath": { "signature": "only" },
-      "CanvasRenderingContext2D.clearRect": { "signature": "only" },
-      "CanvasRenderingContext2D.closePath": { "signature": "only" },
       "CanvasRenderingContext2D.fill": {
         "signature": 0,
         "omittedOptionalParameters": ["fillRule"],
         "semantics": "preserving",
         "reason": "The selected overload is fill(fillRule?), and omitting fillRule preserves its nonzero default."
       },
-      "CanvasRenderingContext2D.fillRect": { "signature": "only" },
-      "CanvasRenderingContext2D.lineTo": { "signature": "only" },
-      "CanvasRenderingContext2D.measureText": { "signature": "only" },
-      "CanvasRenderingContext2D.moveTo": { "signature": "only" },
-      "CanvasRenderingContext2D.restore": { "signature": "only" },
-      "CanvasRenderingContext2D.rotate": { "signature": "only" },
-      "CanvasRenderingContext2D.save": { "signature": "only" },
       "CanvasRenderingContext2D.stroke": {
         "signature": 0,
         "semantics": "preserving",
         "reason": "The selected zero-argument overload is the complete current-path stroke operation."
       },
-      "CanvasRenderingContext2D.strokeRect": { "signature": "only" },
-      "CanvasRenderingContext2D.translate": { "signature": "only" },
       "Console.log": {
-        "signature": "only",
         "fixedRestParameters": { "data": ["message"] }
       },
       "CSSStyleDeclaration.setProperty": {
-        "signature": "only",
         "omittedOptionalParameters": ["priority"],
         "semantics": "preserving",
         "reason": "Omitting priority preserves CSSStyleDeclaration.setProperty's default empty priority while passing the exact declaration, property, value, and result unchanged."
@@ -94,19 +77,16 @@
       "Document.querySelector": { "signature": 4 },
       "Document.querySelectorAll": { "signature": 4 },
       "DOMTokenList.add": {
-        "signature": "only",
         "fixedRestParameters": { "tokens": ["className"] },
         "semantics": "preserving",
         "reason": "The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap."
       },
       "DOMTokenList.remove": {
-        "signature": "only",
         "fixedRestParameters": { "tokens": ["className"] },
         "semantics": "preserving",
         "reason": "The selected one-token call passes the exact DOMTokenList receiver and token unchanged; additional variadic tokens remain an explicit coverage gap."
       },
       "DOMTokenList.toggle": {
-        "signature": "only",
         "omittedOptionalParameters": ["force"],
         "semantics": "preserving",
         "reason": "Omitting force selects DOMTokenList.toggle's standard toggle behavior without changing the receiver, token, or result."
@@ -116,25 +96,18 @@
         "omittedOptionalParameters": ["options"],
         "parameterRenames": { "type": "event" }
       },
-      "Element.appendChild": { "signature": "only" },
-      "Element.getAttribute": { "signature": "only" },
       "Element.querySelector": { "signature": 4 },
       "Element.querySelectorAll": { "signature": 4 },
-      "Element.remove": { "signature": "only" },
       "Element.removeEventListener": {
         "signature": 1,
         "omittedOptionalParameters": ["options"],
         "parameterRenames": { "type": "event" }
       },
-      "Element.setAttribute": { "signature": "only" },
-      "Event.preventDefault": { "signature": "only" },
-      "Event.stopPropagation": { "signature": "only" },
       "HTMLCanvasElement.getContext": {
         "signature": 0,
         "fixedArguments": { "contextId": "2d" },
         "omittedOptionalParameters": ["options"]
-      },
-      "requestAnimationFrame": { "signature": "only" }
+      }
     },
     "exceptions": {
       "browser.animation.cancelAnimationFrame": {
@@ -648,65 +621,17 @@
       "targets": ["browser.document.*"],
       "lean": { "public": ["Lean.Vir.Browser.Document"] },
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Document"], "docs": "https://developer.mozilla.org/docs/Web/API/Document" },
-      "comparison": { "report": "build/type-descriptors/document-v1.report.json" },
       "mappings": [
         {
           "typescript": "Document.title",
           "accessors": {
-            "get": { "target": "browser.document.getTitle", "lean": "Lean.Vir.Browser.Document.getTitle", "anchor": "document.title.get" },
-            "set": { "target": "browser.document.setTitle", "lean": "Lean.Vir.Browser.Document.setTitle", "anchor": "document.title.set" }
+            "get": { "target": "browser.document.getTitle", "lean": "Lean.Vir.Browser.Document.getTitle" },
+            "set": { "target": "browser.document.setTitle", "lean": "Lean.Vir.Browser.Document.setTitle" }
           }
         },
         { "typescript": "Document.querySelector", "targets": ["browser.document.querySelector"], "lean": ["Lean.Vir.Browser.Document.querySelector"] },
         { "typescript": "Document.querySelectorAll", "targets": ["browser.document.querySelectorAll"], "lean": ["Lean.Vir.Browser.Document.querySelectorAll"] },
         { "typescript": "Document.createElement", "targets": ["browser.document.createElement"], "lean": ["Lean.Vir.Browser.Document.createElement"] }
-      ],
-      "anchors": [
-        {
-          "id": "document.title.get",
-          "category": "Document property",
-          "lean": "Lean.Vir.Browser.Document.getTitle",
-          "ts": "Document.title",
-          "target": "browser.document.getTitle",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get" }
-        },
-        {
-          "id": "document.title.set",
-          "category": "Document property",
-          "lean": "Lean.Vir.Browser.Document.setTitle",
-          "ts": "Document.title",
-          "target": "browser.document.setTitle",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set" }
-        },
-        {
-          "id": "document.querySelector",
-          "category": "Document selectors",
-          "lean": "Lean.Vir.Browser.Document.querySelector",
-          "ts": "Document.querySelector",
-          "target": "browser.document.querySelector",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "overload": 4 }
-        },
-        {
-          "id": "document.querySelectorAll",
-          "category": "Document selectors",
-          "lean": "Lean.Vir.Browser.Document.querySelectorAll",
-          "ts": "Document.querySelectorAll",
-          "target": "browser.document.querySelectorAll",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "overload": 4 }
-        },
-        {
-          "id": "document.createElement",
-          "category": "Document creation",
-          "lean": "Lean.Vir.Browser.Document.createElement",
-          "ts": "Document.createElement",
-          "target": "browser.document.createElement",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "overload": 2, "omittedOptionalParameters": ["options"] }
-        }
       ]
     },
     {
@@ -715,22 +640,21 @@
       "targets": ["browser.element.*", "browser.domTokenList.*", "browser.elementCSSInlineStyle.*", "browser.cssStyleDeclaration.*", "js.value.browser.eventListener"],
       "lean": { "public": ["Lean.Vir.Browser.Element", "Lean.Vir.Browser.ElementCSSInlineStyle", "Lean.Vir.Browser.CSSStyleDeclaration"] },
       "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["Element", "DOMTokenList", "ElementCSSInlineStyle", "CSSStyleDeclaration"], "docs": "https://developer.mozilla.org/docs/Web/API/Element" },
-      "comparison": { "report": "build/type-descriptors/element-v1.report.json" },
       "mappings": [
         { "typescript": "Element.querySelector", "targets": ["browser.element.querySelector"], "lean": ["Lean.Vir.Browser.Element.querySelector"] },
         { "typescript": "Element.querySelectorAll", "targets": ["browser.element.querySelectorAll"], "lean": ["Lean.Vir.Browser.Element.querySelectorAll"] },
         {
           "typescript": "Element.innerHTML",
           "accessors": {
-            "get": { "target": "browser.element.getInnerHTML", "lean": "Lean.Vir.Browser.Element.getInnerHTML", "anchor": "element.innerHTML.get" },
-            "set": { "target": "browser.element.setInnerHTML", "lean": "Lean.Vir.Browser.Element.setInnerHTML", "anchor": "element.innerHTML.set" }
+            "get": { "target": "browser.element.getInnerHTML", "lean": "Lean.Vir.Browser.Element.getInnerHTML" },
+            "set": { "target": "browser.element.setInnerHTML", "lean": "Lean.Vir.Browser.Element.setInnerHTML" }
           }
         },
         {
           "typescript": "Element.textContent",
           "accessors": {
-            "get": { "target": "browser.element.getTextContent", "lean": "Lean.Vir.Browser.Element.getTextContent", "anchor": "element.textContent.get" },
-            "set": { "target": "browser.element.setTextContent", "lean": "Lean.Vir.Browser.Element.setTextContent", "anchor": "element.textContent.set" }
+            "get": { "target": "browser.element.getTextContent", "lean": "Lean.Vir.Browser.Element.getTextContent" },
+            "set": { "target": "browser.element.setTextContent", "lean": "Lean.Vir.Browser.Element.setTextContent" }
           }
         },
         { "typescript": "Element.getAttribute", "targets": ["browser.element.getAttribute"], "lean": ["Lean.Vir.Browser.Element.getAttribute"] },
@@ -757,44 +681,6 @@
         { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.cssStyleDeclaration.setProperty"], "lean": ["Lean.Vir.Browser.CSSStyleDeclaration.setProperty"], "receiverName": "declaration" },
         { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
         { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListenerJs"] }
-      ],
-      "anchors": [
-        {
-          "id": "element.innerHTML.get",
-          "category": "Element property",
-          "lean": "Lean.Vir.Browser.Element.getInnerHTML",
-          "ts": "Element.innerHTML",
-          "target": "browser.element.getInnerHTML",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get" }
-        },
-        {
-          "id": "element.innerHTML.set",
-          "category": "Element property",
-          "lean": "Lean.Vir.Browser.Element.setInnerHTML",
-          "ts": "Element.innerHTML",
-          "target": "browser.element.setInnerHTML",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set" }
-        },
-        {
-          "id": "element.textContent.get",
-          "category": "Element property",
-          "lean": "Lean.Vir.Browser.Element.getTextContent",
-          "ts": "Element.textContent",
-          "target": "browser.element.getTextContent",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "get" }
-        },
-        {
-          "id": "element.textContent.set",
-          "category": "Element property",
-          "lean": "Lean.Vir.Browser.Element.setTextContent",
-          "ts": "Element.textContent",
-          "target": "browser.element.setTextContent",
-          "relation": "audit",
-          "portIntent": { "disposition": "bind", "accessor": "set" }
-        }
       ]
     },
     {

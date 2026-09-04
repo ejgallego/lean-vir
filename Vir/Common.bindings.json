@@ -22,7 +22,6 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "common.echo-string", "group": "common", "target": "common.echoString",

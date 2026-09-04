@@ -36,7 +36,7 @@
     "generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["output", "irOutput", "imports", "namespace", "abiProfile", "resources", "members"],
+      "required": ["output", "irOutput", "imports", "namespace", "abiProfile", "resources"],
       "properties": {
         "output": { "type": "string", "minLength": 1 },
         "irOutput": { "type": "string", "minLength": 1 },
@@ -51,11 +51,6 @@
         "resources": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/resourceMapping" }
-        },
-        "members": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
         },
         "methodPolicies": {
           "type": "object",
@@ -167,18 +162,13 @@
     "methodPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["signature"],
+      "minProperties": 1,
       "dependentRequired": {
         "semantics": ["reason"],
         "reason": ["semantics"]
       },
       "properties": {
-        "signature": {
-          "oneOf": [
-            { "const": "only" },
-            { "type": "integer", "minimum": 0 }
-          ]
-        },
+        "signature": { "type": "integer", "minimum": 0 },
         "omittedOptionalParameters": {
           "type": "array",
           "uniqueItems": true,
@@ -417,14 +407,6 @@
           }
         },
         "upstream": { "$ref": "#/$defs/upstream" },
-        "comparison": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["report"],
-          "properties": {
-            "report": { "type": "string", "minLength": 1 }
-          }
-        },
         "mappings": {
           "type": "array",
           "items": {
@@ -434,72 +416,20 @@
             ]
           }
         },
-        "anchors": {
+        "unsupported": {
           "type": "array",
-          "items": { "$ref": "#/$defs/anchor" }
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/unsupportedEntry" }
         }
       }
     },
-    "anchor": {
+    "unsupportedEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "lean", "ts", "relation", "portIntent"],
+      "required": ["typescript", "scope", "note"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "category": { "type": "string", "minLength": 1 },
-        "lean": { "type": "string", "minLength": 1 },
-        "ts": { "type": "string", "minLength": 1 },
-        "target": { "type": "string", "minLength": 1 },
-        "relation": { "enum": ["audit", "coverageGap"] },
-        "portIntent": { "$ref": "#/$defs/portIntent" },
-        "note": { "type": "string", "minLength": 1 },
-        "advisorySemantics": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/advisorySemantic" }
-        }
-      }
-    },
-    "portIntent": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["disposition"],
-          "properties": { "disposition": { "const": "unsupported" } }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["disposition"],
-          "properties": {
-            "disposition": { "const": "bind" },
-            "accessor": { "enum": ["get", "set"] },
-            "effect": { "type": "string", "minLength": 1 },
-            "omittedOptionalParameters": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
-            },
-            "overload": { "type": "integer", "minimum": 0 },
-            "receiver": { "enum": ["borrowed", "owned", "consumed"] },
-            "representation": { "const": "hostResource" },
-            "resourceArguments": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": { "type": "integer", "minimum": 0 }
-            },
-            "resultRepresentation": { "const": "hostResource" }
-          }
-        }
-      ]
-    },
-    "advisorySemantic": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["topic", "note"],
-      "properties": {
-        "topic": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "typescript": { "type": "string", "minLength": 1 },
+        "scope": { "enum": ["symbol", "surface"] },
         "note": { "type": "string", "minLength": 1 }
       }
     },
@@ -555,7 +485,6 @@
       "properties": {
         "target": { "type": "string", "minLength": 1 },
         "lean": { "type": "string", "minLength": 1 },
-        "anchor": { "type": "string", "minLength": 1 },
         "receiverName": { "type": "string", "minLength": 1 },
         "parameterName": { "type": "string", "minLength": 1 }
       }

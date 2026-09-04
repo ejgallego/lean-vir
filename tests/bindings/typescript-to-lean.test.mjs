@@ -10,7 +10,6 @@ import test from "node:test";
 import {
   buildGeneratedOperations,
   generatedOperationDocument,
-  materializeGeneratedAnchors,
 } from "../../scripts/bindings/binding-modalities.mjs";
 import {
   leanType,
@@ -44,9 +43,7 @@ const generation = {
   },
   resources: { Widget: "Widget" },
   members: ["Widget.getAttribute", "Widget.label"],
-  methodPolicies: {
-    "Widget.getAttribute": { signature: "only" },
-  },
+  methodPolicies: {},
   exceptions: {},
 };
 const config = {
@@ -61,12 +58,10 @@ const config = {
         get: {
           target: "demo.widget.getLabel",
           lean: "Lean.Vir.Demo.Widget.getLabel",
-          anchor: "widget.label.get",
         },
         set: {
           target: "demo.widget.setLabel",
           lean: "Lean.Vir.Demo.Widget.setLabel",
-          anchor: "widget.label.set",
         },
       },
     }, {
@@ -74,24 +69,6 @@ const config = {
       targets: ["demo.widget.getAttribute"],
       lean: ["Lean.Vir.Demo.Widget.getAttribute"],
     }],
-    anchors: [
-      {
-        id: "widget.label.get",
-        lean: "Lean.Vir.Demo.Widget.getLabel",
-        ts: "Widget.label",
-        target: "demo.widget.getLabel",
-        relation: "audit",
-        portIntent: { disposition: "bind", accessor: "get" },
-      },
-      {
-        id: "widget.label.set",
-        lean: "Lean.Vir.Demo.Widget.setLabel",
-        ts: "Widget.label",
-        target: "demo.widget.setLabel",
-        relation: "audit",
-        portIntent: { disposition: "bind", accessor: "set" },
-      },
-    ],
   }],
 };
 const descriptor = {
@@ -154,10 +131,10 @@ test("optional properties fail closed before accessor generation", () => {
   );
 });
 
-test("operation IR records derived modalities and their provenance", () => {
+test("generated binding operations record derived modalities and their provenance", () => {
   const operations = buildGeneratedOperations(config, generation, descriptors);
-  const getter = operations.find((operation) => operation.id === "widget.label.get");
-  const setter = operations.find((operation) => operation.id === "widget.label.set");
+  const getter = operations.find((operation) => operation.id === "demo.widget.getLabel");
+  const setter = operations.find((operation) => operation.id === "demo.widget.setLabel");
 
   assert.deepEqual(getter.receiver.argument.modalities, {
     representation: "js-resource",
@@ -184,7 +161,7 @@ test("operation IR records derived modalities and their provenance", () => {
   assert.deepEqual(getter.semantics, {
     relation: "preserving",
     evidence: "typescript-derived",
-    detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+    detail: "The generated operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
   assert.equal(generatedOperationDocument(config, generation, operations).version, 2);
 
@@ -195,7 +172,7 @@ test("operation IR records derived modalities and their provenance", () => {
     reason: "The demo deliberately accepts a wider event marker.",
   };
   const widenedGetter = buildGeneratedOperations(config, widened, descriptors).find(
-    (operation) => operation.id === "widget.label.get",
+    (operation) => operation.id === "demo.widget.getLabel",
   );
   assert.deepEqual(widenedGetter.semantics, {
     relation: "changing",
@@ -261,29 +238,6 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   assert.equal(operation.exception, undefined);
   assert.deepEqual(operation.typeParameters, ["α"]);
 
-  const protocolConfig = structuredClone(config);
-  protocolConfig.generation = protocolGeneration;
-  protocolConfig.roots[0].anchors = [{
-    id: "widget.subscribe",
-    lean: "Lean.Vir.Demo.Widget.subscribe",
-    ts: "Widget.subscribe",
-    target: "demo.widget.subscribe",
-    relation: "audit",
-    portIntent: { disposition: "bind" },
-  }];
-  const [anchor] = materializeGeneratedAnchors(
-    protocolConfig,
-    protocolConfig.roots[0],
-    descriptor,
-    { version: 1, anchors: protocolConfig.roots[0].anchors },
-  ).anchors;
-  assert.deepEqual(anchor.portIntent, {
-    disposition: "bind",
-    effect: "dom",
-    receiver: "borrowed",
-    resultRepresentation: "hostResource",
-  });
-  assert.equal(anchor.modalityContract.protocol.reason, protocolGeneration.protocolOperations[0].reason);
   assert.deepEqual(operation.protocol.upstreamRelation, {
     kind: "upstream-adapter",
     member: "Widget.getAttribute",
@@ -323,14 +277,14 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   );
 });
 
-test("an explicit single-signature policy generates faithful methods and documentation", () => {
+test("a unique TypeScript signature generates faithful methods and documentation", () => {
   const output = renderLeanBindings(config, generation, descriptors);
   const operations = buildGeneratedOperations(config, generation, descriptors);
   const method = operations.find((operation) => operation.id === "demo.widget.getAttribute");
 
   assert.match(output, /opaque getAttribute\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(name : @& Lean\.Vir\.Js String\) :\n    DomM \(Lean\.Vir\.Js\.Nullable String\)/u);
   assert.match(output, /Returns the named attribute\./u);
-  assert.equal(method.typescript.signaturePolicy.selection, "only");
+  assert.equal(method.typescript.signaturePolicy.selection, "unique");
   assert.equal(method.typescript.documentation, "Returns the named attribute.");
   assert.deepEqual(method.arguments[0].modalities, {
     representation: "js-resource",
@@ -349,6 +303,7 @@ test("an explicit single-signature policy generates faithful methods and documen
   assert.match(namedReceiver, /opaque getAttribute\n    \(self : @& Lean\.Vir\.Js Widget\)/u);
 
   const renamedGeneration = structuredClone(generation);
+  renamedGeneration.methodPolicies["Widget.getAttribute"] = {};
   renamedGeneration.methodPolicies["Widget.getAttribute"].parameterRenames = {
     name: "attribute",
   };
@@ -418,6 +373,7 @@ test("generated exceptions distinguish unreviewed boundaries and semantic adapte
 
 test("method semantics have exactly one policy authority", () => {
   const conflicting = structuredClone(generation);
+  conflicting.methodPolicies["Widget.getAttribute"] = {};
   conflicting.methodPolicies["Widget.getAttribute"].semantics = "preserving";
   conflicting.methodPolicies["Widget.getAttribute"].reason =
     "The selected TypeScript signature is preserved.";
@@ -451,13 +407,9 @@ test("TypeScript parameter names that are Lean keywords are escaped", () => {
   assert.match(output, /opaque getAttribute/u);
 });
 
-test("method generation fails closed without a matching signature policy", () => {
+test("method generation defaults only unique signatures and fails closed on overloads", () => {
   const unreviewed = structuredClone(generation);
-  delete unreviewed.methodPolicies["Widget.getAttribute"];
-  assert.throws(
-    () => renderLeanBindings(config, unreviewed, descriptors),
-    /requires an explicit generation\.methodPolicies entry/u,
-  );
+  assert.doesNotThrow(() => renderLeanBindings(config, unreviewed, descriptors));
 
   const overloadedDescriptors = structuredClone(descriptors);
   const method = overloadedDescriptors.get("widget").symbols.find((symbol) =>
@@ -465,12 +417,13 @@ test("method generation fails closed without a matching signature policy", () =>
   method.shape = { kind: "union", options: [method.shape, method.shape] };
   assert.throws(
     () => renderLeanBindings(config, generation, overloadedDescriptors),
-    /requires exactly one TypeScript signature/u,
+    /is overloaded and requires an explicit generation\.methodPolicies signature/u,
   );
 });
 
 test("optional method parameters require an explicit trailing omission", () => {
   const optionalGeneration = structuredClone(generation);
+  optionalGeneration.methodPolicies["Widget.getAttribute"] = {};
   optionalGeneration.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = ["mode"];
   const optionalDescriptors = structuredClone(descriptors);
   const method = optionalDescriptors.get("widget").symbols.find((symbol) =>
@@ -511,7 +464,6 @@ test("optional method parameters require an explicit trailing omission", () => {
 test("rest parameters require an explicit fixed-arity specialization", () => {
   const restGeneration = structuredClone(generation);
   restGeneration.methodPolicies["Widget.getAttribute"] = {
-    signature: "only",
     fixedRestParameters: { tokens: ["className"] },
   };
   const restDescriptors = structuredClone(descriptors);
@@ -549,7 +501,6 @@ test("rest parameters require an explicit fixed-arity specialization", () => {
 test("reviewed method specializations can project a disposer signature", () => {
   const disposerGeneration = structuredClone(generation);
   disposerGeneration.methodPolicies["Widget.getAttribute"] = {
-    signature: "only",
     omittedOptionalParameters: ["options"],
     omittedRequiredParameters: ["type"],
     parameterRenames: { listener: "subscription" },
@@ -600,6 +551,7 @@ test("reviewed method specializations can project a disposer signature", () => {
 
 test("reviewed argument overrides can identify retained callbacks", () => {
   const callbackGeneration = structuredClone(generation);
+  callbackGeneration.methodPolicies["Widget.getAttribute"] = {};
   callbackGeneration.methodPolicies["Widget.getAttribute"].parameterRenames = {
     name: "callback",
   };
@@ -631,6 +583,7 @@ test("reviewed argument overrides can identify retained callbacks", () => {
 
 test("literal parameters can be fixed by a reviewed host specialization", () => {
   const fixedGeneration = structuredClone(generation);
+  fixedGeneration.methodPolicies["Widget.getAttribute"] = {};
   fixedGeneration.methodPolicies["Widget.getAttribute"].fixedArguments = {
     name: "data-id",
   };
@@ -666,35 +619,6 @@ test("literal parameters can be fixed by a reviewed host specialization", () => 
   );
 });
 
-test("generated anchors project comparator intent from operation IR", () => {
-  const root = config.roots[0];
-  const materialized = materializeGeneratedAnchors(
-    config,
-    root,
-    descriptor,
-    { version: 1, anchors: root.anchors },
-  );
-  const getter = materialized.anchors.find((anchor) => anchor.id === "widget.label.get");
-  const setter = materialized.anchors.find((anchor) => anchor.id === "widget.label.set");
-
-  assert.deepEqual(getter.portIntent, {
-    disposition: "bind",
-    accessor: "get",
-    effect: "dom",
-    receiver: "borrowed",
-    resultRepresentation: "hostResource",
-  });
-  assert.deepEqual(setter.portIntent, {
-    disposition: "bind",
-    accessor: "set",
-    effect: "dom",
-    receiver: "borrowed",
-    resourceArguments: [0],
-  });
-  assert.equal(getter.modalityContract.profile, "demo-faithful-v1");
-  assert.equal(getter.modalityContract.source, "generated-operation-ir");
-});
-
 test("unsupported TypeScript shapes fail closed", () => {
   assert.throws(
     () => leanType({ kind: "primitive", name: "boolean" }, generation, "Widget.enabled"),
@@ -704,7 +628,7 @@ test("unsupported TypeScript shapes fail closed", () => {
 
 test("exceptions cannot retain a borrowed resource beyond the call", () => {
   const unsafeGeneration = structuredClone(generation);
-  unsafeGeneration.exceptions["widget.label.set"] = {
+  unsafeGeneration.exceptions["demo.widget.setLabel"] = {
     reason: "The host stores this value.",
     arguments: { label: { retention: "runtime" } },
   };
@@ -717,26 +641,11 @@ test("exceptions cannot retain a borrowed resource beyond the call", () => {
 
 test("exceptions must contain a concrete, justified override", () => {
   const emptyException = structuredClone(generation);
-  emptyException.exceptions["widget.label.get"] = { reason: "No policy change." };
+  emptyException.exceptions["demo.widget.getLabel"] = { reason: "No policy change." };
 
   assert.throws(
     () => renderLeanBindings(config, emptyException, descriptors),
     /must define an override/u,
-  );
-});
-
-test("anchors cannot author modalities derived by generation", () => {
-  const authored = structuredClone(config);
-  authored.roots[0].anchors[0].portIntent.receiver = "borrowed";
-
-  assert.throws(
-    () => materializeGeneratedAnchors(
-      authored,
-      authored.roots[0],
-      descriptor,
-      { version: 1, anchors: authored.roots[0].anchors },
-    ),
-    /authors derived modality field portIntent\.receiver/u,
   );
 });
 
@@ -761,9 +670,9 @@ test("selected properties can explicitly leave one accessor unshipped", () => {
   property.accessors.set.parameterName = "value";
 
   const operations = buildGeneratedOperations(partial, generation, descriptors);
-  const setter = operations.find((operation) => operation.id === "widget.label.set");
+  const setter = operations.find((operation) => operation.id === "demo.widget.setLabel");
   const output = renderLeanBindings(partial, generation, descriptors);
-  assert.equal(operations.some((operation) => operation.id === "widget.label.get"), false);
+  assert.equal(operations.some((operation) => operation.id === "demo.widget.getLabel"), false);
   assert.equal(setter.receiver.argument.name, "self");
   assert.equal(setter.arguments[0].name, "value");
   assert.doesNotMatch(output, /opaque getLabel/u);

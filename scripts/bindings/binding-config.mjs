@@ -40,6 +40,23 @@ function validationMessage(label, errors) {
   return `${label} does not match Vir/bindings.schema.json: ${details}`;
 }
 
+function deriveGeneratedMembers(config) {
+  if (config.generation === undefined) return config;
+  const members = [...new Set(config.roots.flatMap((root) =>
+    (root.mappings ?? []).map((mapping) => mapping.typescript)))].sort();
+  return {
+    ...config,
+    generation: { ...config.generation, members },
+  };
+}
+
+export function unsupportedEntryCoversSymbol(entry, symbol) {
+  return entry.typescript === symbol.id ||
+    (entry.scope === "surface" &&
+      (entry.typescript === symbol.surfaceRoot ||
+        symbol.id.startsWith(`${entry.typescript}.`)));
+}
+
 function validateLibrarySemantics(config, label) {
   validateGenerationProfile(config.generation, `${label} generation`);
   const rootIds = new Set();
@@ -52,6 +69,31 @@ function validateLibrarySemantics(config, label) {
   for (const root of config.roots) {
     if (rootIds.has(root.id)) throw new Error(`${label} repeats root id ${root.id}`);
     rootIds.add(root.id);
+    const unsupported = root.unsupported ?? [];
+    const unsupportedIds = new Set(unsupported.map((entry) => entry.typescript));
+    if (unsupportedIds.size !== unsupported.length) {
+      throw new Error(`${label} repeats an unsupported TypeScript entry in root ${root.id}`);
+    }
+    const mapped = new Set((root.mappings ?? []).map((entry) => entry.typescript));
+    const contradictory = unsupported.find((entry) =>
+      [...mapped].some((member) => unsupportedEntryCoversSymbol(entry, { id: member })));
+    if (contradictory !== undefined) {
+      throw new Error(
+        `${label} marks mapped TypeScript entry ${contradictory.typescript} unsupported in root ${root.id}`,
+      );
+    }
+    const protocolMembers = new Set((config.generation?.protocolOperations ?? [])
+      .filter((operation) => operation.group === root.id &&
+        ["upstream-adapter", "local-contract"].includes(operation.upstreamRelation.kind))
+      .map((operation) => operation.upstreamRelation.member));
+    const contradictoryProtocol = unsupported.find((entry) =>
+      [...protocolMembers].some((member) =>
+        unsupportedEntryCoversSymbol(entry, { id: member })));
+    if (contradictoryProtocol !== undefined) {
+      throw new Error(
+        `${label} marks protocol-linked TypeScript entry ${contradictoryProtocol.typescript} unsupported in root ${root.id}`,
+      );
+    }
   }
 }
 
@@ -59,8 +101,9 @@ export async function validateBindingConfig(config, path = schemaPath) {
   const label = labelFor(path);
   const validate = await bindingConfigValidator();
   if (!validate(config)) throw new Error(validationMessage(label, validate.errors ?? []));
-  validateLibrarySemantics(config, label);
-  return { ...config, path: label };
+  const normalized = deriveGeneratedMembers(config);
+  validateLibrarySemantics(normalized, label);
+  return { ...normalized, path: label };
 }
 
 export async function loadBindingConfig(path) {

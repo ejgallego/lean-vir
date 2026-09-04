@@ -22,7 +22,6 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "proofwidgets.rpc.ref-base", "group": "rpc-references", "target": "proofwidgets.rpc.ref",

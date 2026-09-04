@@ -465,198 +465,19 @@ function compareAnchor(anchor, lean, tsSymbols) {
     }
     return anchorResult(anchor, "missing", diagnostics, leanDescriptor, tsSymbol);
   }
-  const normalized = applyPortIntent(leanDescriptor.shape, tsSymbol, anchor.portIntent);
-  const shapeComparison = compareShapes(normalized.lean, normalized.ts, tsSymbols, new Set());
-  let status = shapeComparison.status;
-  if (normalized.mismatch && statusRank[status] < statusRank.weak) status = "weak";
-  if (!normalized.mismatch && status === "exact" && normalized.diagnostics.length !== 0) status = "compatible";
+  const shapeComparison = compareShapes(
+    leanDescriptor.shape,
+    tsSymbol.shape,
+    tsSymbols,
+    new Set(),
+  );
   return anchorResult(
     anchor,
-    status,
-    [...normalized.diagnostics, ...shapeComparison.diagnostics],
+    shapeComparison.status,
+    shapeComparison.diagnostics,
     leanDescriptor,
     tsSymbol,
   );
-}
-
-function applyPortIntent(leanShape, tsSymbol, portIntent) {
-  let lean = leanShape;
-  let ts = tsSymbol.shape;
-  const diagnostics = [];
-  let mismatch = false;
-  if (portIntent === undefined) return { lean, ts, diagnostics, mismatch };
-
-  if (typeof portIntent.accessor === "string") {
-    if (tsSymbol.kind !== "property" || !["get", "set"].includes(portIntent.accessor)) {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_accessor_mismatch",
-        `reviewed ${portIntent.accessor} accessor intent requires a TypeScript property`,
-      ));
-    } else if (portIntent.accessor === "get") {
-      const accessorType = tsSymbol.accessors?.get ?? ts;
-      ts = { kind: "function", effect: "pure", args: [], result: accessorType };
-      diagnostics.push(diagnostic(
-        "reviewed_property_getter",
-        "Lean exposes the TypeScript property getter as a function",
-        "info",
-      ));
-    } else {
-      const accessorType = tsSymbol.accessors?.set ?? ts;
-      ts = {
-        kind: "function",
-        effect: "pure",
-        args: [{ name: "value", type: accessorType }],
-        result: { kind: "primitive", name: "void" },
-      };
-      diagnostics.push(diagnostic(
-        "reviewed_property_setter",
-        "Lean exposes the TypeScript property setter as a function",
-        "info",
-      ));
-    }
-  }
-
-  if (portIntent.overload !== undefined) {
-    if (!Number.isInteger(portIntent.overload) || ts.kind !== "union" ||
-        portIntent.overload < 0 || portIntent.overload >= ts.options.length ||
-        ts.options[portIntent.overload]?.kind !== "function") {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_overload_mismatch",
-        `reviewed overload ${portIntent.overload} is unavailable`,
-      ));
-    } else {
-      ts = ts.options[portIntent.overload];
-      diagnostics.push(diagnostic(
-        "reviewed_overload",
-        `reviewed port intent selects TypeScript overload ${portIntent.overload}`,
-        "info",
-      ));
-    }
-  }
-
-  if (portIntent.representation === "hostResource") {
-    if (lean.kind === "resource") {
-      ts = { kind: "resource", name: lean.name };
-      diagnostics.push(diagnostic(
-        "reviewed_resource_representation",
-        "reviewed port intent represents the TypeScript object as a host resource",
-        "info",
-      ));
-    } else {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_representation_mismatch",
-        `reviewed hostResource intent found Lean ${lean.kind}`,
-      ));
-    }
-  }
-
-  if (typeof portIntent.receiver === "string" &&
-      (tsSymbol.kind === "method" ||
-        (tsSymbol.kind === "property" && typeof portIntent.accessor === "string"))) {
-    if (lean.kind === "function" && (lean.args ?? []).length !== 0) {
-      lean = { ...lean, args: lean.args.slice(1) };
-      diagnostics.push(diagnostic(
-        tsSymbol.kind === "method"
-          ? "reviewed_explicit_method_receiver"
-          : "reviewed_explicit_property_receiver",
-        `Lean exposes the TypeScript member receiver as an explicit ${portIntent.receiver} argument`,
-        "info",
-      ));
-    } else {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_receiver_mismatch",
-        "reviewed member receiver intent has no corresponding Lean function argument",
-      ));
-    }
-  }
-
-  if (typeof portIntent.effect === "string") {
-    if (lean.kind === "function" && ts.kind === "function" && lean.effect === portIntent.effect) {
-      ts = { ...ts, effect: portIntent.effect };
-      diagnostics.push(diagnostic(
-        "reviewed_effect",
-        `reviewed port intent supplies the ${portIntent.effect} effect absent from TypeScript declarations`,
-        "info",
-      ));
-    } else {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_effect_mismatch",
-        `reviewed ${portIntent.effect} effect does not match the Lean descriptor`,
-      ));
-    }
-  }
-
-  if (Array.isArray(portIntent.resourceArguments)) {
-    if (lean.kind !== "function" || ts.kind !== "function") {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_resource_argument_mismatch",
-        "reviewed resource arguments require Lean and TypeScript functions",
-      ));
-    } else {
-      const args = [...(ts.args ?? [])];
-      for (const index of portIntent.resourceArguments) {
-        if (!Number.isInteger(index) || lean.args?.[index]?.type?.kind !== "resource" || args[index] === undefined) {
-          mismatch = true;
-          diagnostics.push(diagnostic(
-            "port_intent_resource_argument_mismatch",
-            `reviewed resource argument ${index} has no corresponding Lean resource`,
-          ));
-          continue;
-        }
-        args[index] = { ...args[index], type: { kind: "resource", name: lean.args[index].type.name } };
-        diagnostics.push(diagnostic(
-          "reviewed_resource_argument",
-          `reviewed port intent represents TypeScript argument ${index} as a JavaScript resource`,
-          "info",
-        ));
-      }
-      ts = { ...ts, args };
-    }
-  }
-
-  if (Array.isArray(portIntent.omittedOptionalParameters) && ts.kind === "function") {
-    const omitted = new Set(portIntent.omittedOptionalParameters);
-    const removable = (ts.args ?? []).filter((arg) => omitted.has(arg.name) && arg.optional === true);
-    if (removable.length === omitted.size) {
-      ts = { ...ts, args: ts.args.filter((arg) => !omitted.has(arg.name)) };
-      diagnostics.push(diagnostic(
-        "reviewed_optional_parameters_omitted",
-        `reviewed port intent omits optional TypeScript parameters: ${[...omitted].join(", ")}`,
-        "info",
-      ));
-    } else {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_optional_parameter_mismatch",
-        "reviewed omitted parameters are not optional TypeScript parameters",
-      ));
-    }
-  }
-
-  if (portIntent.resultRepresentation === "hostResource" && lean.kind === "function" && ts.kind === "function") {
-    if (lean.result?.kind === "resource") {
-      ts = { ...ts, result: { kind: "resource", name: lean.result.name } };
-      diagnostics.push(diagnostic(
-        "reviewed_resource_result",
-        "reviewed port intent represents the TypeScript result as a host resource",
-        "info",
-      ));
-    } else {
-      mismatch = true;
-      diagnostics.push(diagnostic(
-        "port_intent_result_mismatch",
-        `reviewed hostResource result intent found Lean ${lean.result?.kind ?? "?"}`,
-      ));
-    }
-  }
-
-  return { lean, ts, diagnostics, mismatch };
 }
 
 function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
@@ -676,9 +497,6 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     ...(anchor.category ? { category: anchor.category } : {}),
     ...(anchor.target ? { target: anchor.target } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
-    ...(anchor.advisorySemantics ? { advisorySemantics: anchor.advisorySemantics } : {}),
-    ...(anchor.portIntent ? { portIntent: anchor.portIntent } : {}),
-    ...(anchor.modalityContract ? { modalityContract: anchor.modalityContract } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
     ...(tsSymbol ? { tsSymbol } : {}),
   };

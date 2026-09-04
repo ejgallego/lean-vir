@@ -240,7 +240,6 @@ export function renderHtmlReport(report) {
     .notes { margin-top: 10px; color: var(--muted); }
     .diagnostics { margin: 10px 0 0; padding-left: 22px; color: var(--muted); }
     .diagnostics code { color: var(--fg); }
-    .intent { margin-top: 12px; }
     .hover {
       margin-top: 10px;
       padding: 10px;
@@ -300,10 +299,6 @@ function renderHtmlAnchor(result) {
     : escapeHtml(JSON.stringify(result.tsSymbol?.shape ?? {}, null, 2));
   const leanDisplay = escapeHtml(formatLeanDescriptor(result.leanDescriptor));
   const diagnostics = renderHtmlDiagnostics(result.diagnostics ?? []);
-  const intent = result.portIntent === undefined
-    ? ""
-    : `<section class="intent"><p class="pane-title">Mechanically checked comparison policy</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre></section>`;
-  const advisory = renderHtmlAdvisorySemantics(result.advisorySemantics ?? []);
   return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
         <div class="anchor-head">
           <div class="name">
@@ -327,19 +322,10 @@ function renderHtmlAnchor(result) {
             <pre><code>${leanDisplay}</code></pre>
           </section>
         </div>
-        ${intent}
-        ${advisory}
         ${diagnostics}
         ${notes}
         ${hover}
       </article>`;
-}
-
-function renderHtmlAdvisorySemantics(entries) {
-  if (entries.length === 0) return "";
-  const items = entries.map((entry) =>
-    `<li><code>${escapeHtml(entry.topic)}</code>: ${escapeHtml(entry.note)}</li>`).join("");
-  return `<section class="intent"><p class="pane-title">Advisory semantics — not mechanically verified</p><ul>${items}</ul></section>`;
 }
 
 function renderHtmlDiagnostics(diagnostics) {
@@ -367,12 +353,6 @@ function renderAnchor(result) {
     `<p>TypeScript: <a href="${escapeAttr(href)}" title="${escapeAttr(hover)}"><code>${escapeHtml(result.ts)}</code></a></p>`,
     `<p>Relation: <code>${escapeHtml(result.relation ?? "audit")}</code></p>`,
     ts?.display ? `<pre><code>${escapeHtml(ts.display)}</code></pre>` : "",
-    result.portIntent === undefined
-      ? ""
-      : `<p>Mechanically checked comparison policy:</p><pre><code>${escapeHtml(JSON.stringify(result.portIntent, null, 2))}</code></pre>`,
-    (result.advisorySemantics ?? []).length === 0
-      ? ""
-      : `<p>Advisory semantics (not mechanically verified):</p><ul>${result.advisorySemantics.map((entry) => `<li><code>${escapeHtml(entry.topic)}</code>: ${escapeHtml(entry.note)}</li>`).join("")}</ul>`,
     diagnostics.length === 0 ? "" : `<ul>${diagnostics.join("")}</ul>`,
     result.note === undefined ? "" : `<p>${escapeHtml(result.note)}</p>`,
     "</div>",

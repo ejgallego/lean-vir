@@ -22,7 +22,6 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "infoview.document-position", "group": "commands", "target": "infoview.documentPosition",

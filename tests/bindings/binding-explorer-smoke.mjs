@@ -26,22 +26,14 @@ const publicTargetEdges = report.publicEntries.reduce(
 const reachedTargets = new Set(report.publicEntries.flatMap((entry) =>
   entry.targets.map((target) => target.target)));
 const analysisCounts = countBy(roots.map((root) => root.analysis.status));
-const comparisons = roots.flatMap((root) => root.comparison === undefined ? [] : [root.comparison]);
-const semantic = Object.fromEntries(["exact", "compatible", "weak", "missing"].map((status) => [
-  status,
-  comparisons.reduce((sum, comparison) => sum + comparison.summary[status], 0),
-]));
 const coveredRoots = roots.filter((root) =>
   ["complete", "in-progress", "automatic"].includes(root.analysis.status));
 const coverageMembers = coveredRoots.flatMap((root) => root.coverage.members);
 const coverageStatuses = countBy(coverageMembers.map((member) => member.status));
 const coverageEvidenceStatuses = [
-  "exact",
-  "compatible",
   "derived",
   "protocol-linked",
   "contract-linked",
-  "weak",
   "unreviewed",
   "suggested",
   "ambiguous",
@@ -58,14 +50,15 @@ const semanticRelationCounts = countBy(generatedOperations.map((operation) =>
   operation.semantics.relation));
 
 assert.equal(report.format, "lean-vir-binding-explorer");
-assert.equal(report.version, 2);
+assert.equal(report.version, 3);
 assert.deepEqual(report.boundaryAnalysis, {
   representationPolicy: "compiler-validated-coarse-boundary",
   ordinaryBoundary: "Unit, JavaScript resources, object handles, and resource-shaped callbacks",
   conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
   providerCoverage: "target-name-presence-only",
   providerBehavior: "not-mechanically-verified",
-  semanticParity: "library-specific type anchors",
+  semanticClassification: "recorded-on-generated-binding-operation",
+  semanticParity: "not-mechanically-verified",
 });
 assert.equal(report.summary.libraries, report.libraries.length);
 assert.equal(report.summary.apiGroups, roots.length);
@@ -90,12 +83,11 @@ assert.deepEqual(report.summary.analysis, {
   complete: analysisCounts.complete ?? 0,
   inProgress: analysisCounts["in-progress"] ?? 0,
   automatic: analysisCounts.automatic ?? 0,
-  curated: analysisCounts.curated ?? 0,
   needsInput: analysisCounts["needs-input"] ?? 0,
   notRun: analysisCounts["not-run"] ?? 0,
   notApplicable: analysisCounts["not-applicable"] ?? 0,
 });
-assert.deepEqual(report.summary.semantic, semantic);
+assert.equal(report.summary.semantic, undefined);
 assert.equal(
   report.summary.upstreamSymbols,
   roots.reduce((sum, root) => sum + (root.typescript?.symbols.length ?? 0), 0),
@@ -255,19 +247,10 @@ assert.deepEqual(documentRoot?.analysis, {
 assert.equal(documentRoot?.findingStatus, "none");
 assert.deepEqual(documentRoot?.upstream.roots, ["Document"]);
 assert.ok(documentRoot?.bindings.some((binding) => binding.target === "browser.document.getTitle"));
-assert.deepEqual(documentRoot?.comparison.summary, {
-  exact: 0,
-  compatible: 5,
-  weak: 0,
-  missing: 0,
-});
 assert.deepEqual(documentRoot?.coverage.summary, {
-  exact: 0,
-  compatible: 4,
-  derived: 0,
+  derived: 4,
   "protocol-linked": 0,
   "contract-linked": 0,
-  weak: 0,
   unreviewed: 0,
   suggested: 0,
   ambiguous: 0,
@@ -275,7 +258,7 @@ assert.deepEqual(documentRoot?.coverage.summary, {
   mappedTargets: 6,
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
-assert.equal(documentTitle?.status, "compatible");
+assert.equal(documentTitle?.status, "derived");
 assert.deepEqual(documentTitle?.generation, {
   disposition: "generated",
   provenance: "generator",
@@ -286,16 +269,15 @@ assert.deepEqual(documentTitle?.generation, {
   },
   diagnostics: [],
 });
-const documentTitleGetter = documentRoot?.comparison.results.find(
-  (result) => result.id === "document.title.get",
+const documentTitleGetter = documentRoot?.generatedOperations.find(
+  (operation) => operation.host.target === "browser.document.getTitle",
 );
-assert.equal(documentTitleGetter?.modalityContract.profile, "browser-dom-faithful-v1");
-assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "argument");
+assert.equal(documentTitleGetter?.receiver.kind, "argument");
 assert.equal(
-  documentTitleGetter?.modalityContract.receiver.argument.type,
+  documentTitleGetter?.receiver.argument.type,
   "Lean.Vir.Js Document",
 );
-assert.deepEqual(documentTitleGetter?.modalityContract.result.modalities, {
+assert.deepEqual(documentTitleGetter?.result.modalities, {
   representation: "js-resource",
   ownership: "owned",
 });
@@ -309,20 +291,18 @@ assert.deepEqual(
   [
     {
       target: "browser.document.getTitle",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Document.title",
       lean: ["Lean.Vir.Browser.Document.getTitle"],
-      anchors: ["document.title.get"],
       accessor: "get",
     },
     {
       target: "browser.document.setTitle",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Document.title",
       lean: ["Lean.Vir.Browser.Document.setTitle"],
-      anchors: ["document.title.set"],
       accessor: "set",
     },
   ],
@@ -331,7 +311,7 @@ const documentQuerySelector = documentRoot?.coverage.members.find(
   (member) => member.id === "Document.querySelector",
 );
 assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
-assert.equal(documentQuerySelector?.status, "compatible");
+assert.equal(documentQuerySelector?.status, "derived");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
 assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
@@ -341,19 +321,10 @@ assert.deepEqual(elementRoot?.analysis, {
   status: "complete",
   scope: "complete-upstream-surface",
 });
-assert.deepEqual(elementRoot?.comparison.summary, {
-  exact: 0,
-  compatible: 4,
-  weak: 0,
-  missing: 0,
-});
 assert.deepEqual(elementRoot?.coverage.summary, {
-  exact: 0,
-  compatible: 2,
-  derived: 14,
+  derived: 16,
   "protocol-linked": 0,
   "contract-linked": 0,
-  weak: 0,
   unreviewed: 0,
   suggested: 0,
   ambiguous: 0,
@@ -379,7 +350,7 @@ assert.equal(elementGetAttribute?.generation.disposition, "generated");
 assert.equal(elementGetAttribute?.generation.semanticCoverage.status, "faithful");
 const generatedGetAttribute = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.getAttribute");
-assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "only");
+assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "unique");
 assert.match(generatedGetAttribute?.typescript.documentation, /MDN Reference/u);
 assert.equal(generatedGetAttribute?.arguments[0].type, "Lean.Vir.Js String");
 assert.equal(generatedGetAttribute?.result.lean, "Lean.Vir.Js.Nullable String");
@@ -490,7 +461,7 @@ assert.equal(generatedContext2D?.result.lean, "Lean.Vir.Js.Nullable CanvasRender
 const elementTextContent = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.textContent",
 );
-assert.equal(elementTextContent?.status, "compatible");
+assert.equal(elementTextContent?.status, "derived");
 assert.equal(elementTextContent?.generation.disposition, "generated");
 assert.deepEqual(elementTextContent?.mapping.targets, [
   "browser.element.getTextContent",
@@ -502,25 +473,23 @@ assert.deepEqual(
   [
     {
       target: "browser.element.getTextContent",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Element.textContent",
       lean: ["Lean.Vir.Browser.Element.getTextContent"],
-      anchors: ["element.textContent.get"],
       accessor: "get",
     },
     {
       target: "browser.element.setTextContent",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Element.textContent",
       lean: ["Lean.Vir.Browser.Element.setTextContent"],
-      anchors: ["element.textContent.set"],
       accessor: "set",
     },
   ],
 );
-assert.equal(elementInnerHTML?.status, "compatible");
+assert.equal(elementInnerHTML?.status, "derived");
 assert.equal(elementInnerHTML?.generation.disposition, "generated");
 assert.deepEqual(elementInnerHTML?.mapping.targets, [
   "browser.element.getInnerHTML",
@@ -532,20 +501,18 @@ assert.deepEqual(
   [
     {
       target: "browser.element.getInnerHTML",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Element.innerHTML",
       lean: ["Lean.Vir.Browser.Element.getInnerHTML"],
-      anchors: ["element.innerHTML.get"],
       accessor: "get",
     },
     {
       target: "browser.element.setInnerHTML",
-      status: "compatible",
+      status: "derived",
       source: "reviewed",
       typescript: "Element.innerHTML",
       lean: ["Lean.Vir.Browser.Element.setInnerHTML"],
-      anchors: ["element.innerHTML.set"],
       accessor: "set",
     },
   ],
@@ -554,18 +521,15 @@ assert.deepEqual(
 const canvasElement = roots.find((root) =>
   root.library === "browser" && root.id === "canvas-element");
 assert.deepEqual(canvasElement?.analysis, {
-  status: "in-progress",
+  status: "complete",
   scope: "complete-upstream-surface",
 });
 assert.equal(canvasElement?.findingStatus, "none");
 assert.deepEqual(canvasElement?.summary, { bindings: 6, provided: 6, issues: 0, roadmap: 0 });
 assert.deepEqual(canvasElement?.coverage.summary, {
-  exact: 0,
-  compatible: 0,
   derived: 3,
   "protocol-linked": 0,
   "contract-linked": 0,
-  weak: 0,
   unreviewed: 0,
   suggested: 0,
   ambiguous: 0,
@@ -588,7 +552,7 @@ assert.deepEqual(localCommands?.analysis, {
 assert.ok(localCommands?.bindings.some((binding) =>
   binding.target === "infoview.command.insertText"));
 assert.equal(localCommands?.coverage.summary["contract-linked"], 3);
-assert.equal(localCommands?.coverage.summary.compatible, 0);
+assert.equal(localCommands?.coverage.summary.compatible, undefined);
 assert.equal(localCommands?.coverage.summary.missing, 0);
 assert.equal(localCommands?.workItems.length, 0);
 assert.ok(localCommands?.generatedOperations.every((operation) =>
@@ -602,7 +566,7 @@ assert.deepEqual(localRpcReferences?.analysis, {
   scope: "complete-upstream-surface",
 });
 assert.equal(localRpcReferences?.coverage.summary["contract-linked"], 5);
-assert.equal(localRpcReferences?.coverage.summary.compatible, 0);
+assert.equal(localRpcReferences?.coverage.summary.compatible, undefined);
 assert.equal(localRpcReferences?.coverage.summary.missing, 0);
 assert.equal(localRpcReferences?.workItems.length, 0);
 
@@ -613,40 +577,24 @@ assert.deepEqual(reactDomRoot?.analysis, {
 });
 assert.equal(reactDomRoot?.findingStatus, "none");
 assert.equal(reactDomRoot?.summary.roadmap, 3);
-assert.deepEqual(reactDomRoot?.comparison.summary, {
-  exact: 0,
-  compatible: 4,
-  weak: 0,
-  missing: 3,
-});
-assert.equal(
-  reactDomRoot?.comparison.results.find((result) => result.id === "react_dom.root.create")?.target,
-  "react.root.create",
-);
-assert.deepEqual(
-  reactDomRoot?.comparison.results.find((result) =>
-    result.id === "react_dom.root.resource")?.advisorySemantics,
-  [
-    { topic: "ownership", note: "The host is expected to own the root resource." },
-    { topic: "lifetime", note: "The root is expected to remain live until unmount or runtime disposal." },
-  ],
-);
-const reactRootRender = reactDomRoot?.comparison.results.find((result) =>
-  result.id === "react_dom.root.render");
+const reactRootRender = reactDomRoot?.generatedOperations.find((operation) =>
+  operation.host.target === "react.root.renderNode");
 const reactRootRenderCoverage = reactDomRoot?.coverage.members.find((member) =>
   member.id === "Root.render")?.generation.semanticCoverage;
-assert.equal(reactRootRender?.status, "compatible");
-assert.equal(reactRootRender?.target, "react.root.renderNode");
+assert.equal(reactRootRender?.typescript.member, "Root.render");
 assert.equal(reactRootRenderCoverage?.status, "faithful");
 assert.deepEqual(reactRootRenderCoverage?.relations, ["preserving"]);
-assert.ok(!(reactRootRender?.diagnostics ?? []).some((diagnostic) =>
-  diagnostic.code === "typescript_dependency_abstract"));
 assert.ok(!(reactDomRoot?.generatedOperations ?? []).some((operation) =>
   operation.host.target === "react.root.render"));
-assert.ok(reactDomRoot?.comparison.results.some((result) =>
-  result.id === "react_dom.hydration.entrypoint" &&
-  result.status === "missing" &&
-  result.portIntent.disposition === "unsupported"));
+assert.ok(reactDomRoot?.roadmap.some((entry) => entry.typescript === "hydrateRoot"));
+assert.equal(
+  reactDomRoot?.roadmap.find((entry) => entry.typescript === "hydrateRoot")?.scope,
+  "symbol",
+);
+const inheritedUnsupported = reactDomRoot?.coverage.members.find((member) =>
+  member.id !== "RootOptions" && member.generation.unsupported?.source === "RootOptions");
+assert.equal(inheritedUnsupported?.generation.unsupported.scope, "surface");
+assert.equal(inheritedUnsupported?.generation.unsupported.inherited, true);
 assert.equal(
   reactDomRoot?.workItems.filter((item) =>
     item.code === "semantic-fidelity-review-required").length,

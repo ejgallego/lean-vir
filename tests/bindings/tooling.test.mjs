@@ -78,6 +78,28 @@ test("reviewed method mappings require their named public declaration to reach t
     description: "Demo bindings.",
     path: "Vir/Demo.bindings.json",
     lean: { modules: ["Vir.Demo"] },
+    generation: {
+      output: "Vir/Demo/Generated.lean",
+      irOutput: "build/bindings/demo.generated-operations.json",
+      imports: ["Vir.Demo.Types"],
+      namespace: "Lean.Vir.Demo",
+      abiProfile: {
+        id: "demo-v1",
+        effect: { id: "runtime", lean: "RuntimeM" },
+        types: { void: { lean: "Unit", representation: "immediate" } },
+        resource: {
+          constructor: "Lean.Vir.Js",
+          nullableConstructor: "Lean.Vir.Js.Nullable",
+          argument: { passing: "borrowed", retention: "call" },
+          result: { ownership: "owned" },
+        },
+        receiver: { default: { passing: "borrowed", retention: "call" }, globalTypes: {} },
+      },
+      resources: { Widget: "Widget" },
+      members: ["Widget.render"],
+      methodPolicies: {},
+      exceptions: {},
+    },
     roots: [{
       id: "widget",
       title: "Widget",
@@ -97,6 +119,8 @@ test("reviewed method mappings require their named public declaration to reach t
       kind: "method",
       surfaceRoot: "Widget",
       display: "render(): void;",
+      source: { path: "demo.d.ts", startLine: 1 },
+      shape: { kind: "function", args: [], result: { kind: "primitive", name: "void" } },
     }],
   };
 
@@ -202,30 +226,4 @@ test("binding entry points propagate a returned nonzero status", async () => {
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
-});
-
-test("type anchor rendering distinguishes checked policy from advisory semantics", () => {
-  const result = {
-    id: "demo",
-    lean: "Demo.root",
-    ts: "Root",
-    status: "compatible",
-    relation: "audit",
-    notes: [],
-    diagnostics: [],
-    portIntent: { disposition: "bind", representation: "hostResource" },
-    advisorySemantics: [{
-      topic: "lifetime",
-      note: "Expected to remain live until release.",
-    }],
-  };
-  const report = {
-    summary: { exact: 0, compatible: 1, weak: 0, missing: 0 },
-    diagnosticSummary: { error: 0, warning: 0, info: 0 },
-    results: [result],
-  };
-
-  const html = renderTypeAnchorReport(report, "html");
-  assert.match(html, /Mechanically checked comparison policy/u);
-  assert.match(html, /Advisory semantics — not mechanically verified/u);
 });
