@@ -62,9 +62,9 @@ export default function VirInfoviewWidget(props) {
   const [proofWidgetsExpr, setProofWidgetsExpr] = React.useState(null);
   const irPackageRevisionRef = React.useRef("");
   const refreshGenerationRef = React.useRef(0);
-  const baseSurface = surfaceFromInfoviewProps(props);
+  const baseSurface = surfaceFromInfoviewProps(props, null, rpcSession);
   const baseSurfaceKey = surfaceCacheKey(baseSurface);
-  const surface = surfaceFromInfoviewProps(props, proofWidgetsExpr);
+  const surface = surfaceFromInfoviewProps(props, proofWidgetsExpr, rpcSession);
   const surfaceKey = surfaceCacheKey(surface);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
@@ -294,7 +294,7 @@ export default function VirInfoviewWidget(props) {
     return () => {
       disposed = true;
     };
-  }, [runtimeToken, baseSurfaceKey, irPackageKey]);
+  }, [runtimeToken, baseSurfaceKey, irPackageKey, rpcSession]);
 
   React.useEffect(() => {
     const loaded = loadedRef.current;
@@ -319,7 +319,7 @@ export default function VirInfoviewWidget(props) {
         message: errorMessage(error, setupHintRef.current),
       });
     }
-  }, [runtimeToken, surfaceKey, mountId]);
+  }, [runtimeToken, surfaceKey, mountId, rpcSession]);
 
   return e(
     "section",
@@ -410,7 +410,11 @@ function releaseLoadedWidget(loaded) {
   throwCollectedErrors(errors, "VIR widget cleanup failed");
 }
 
-export function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
+export function surfaceFromInfoviewProps(
+  props,
+  proofWidgetsExpr = null,
+  rpcSession,
+) {
   const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
     goalFromInteractiveGoal(goal, index, "goal"),
   );
@@ -428,12 +432,14 @@ export function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
     goals: [...goals, ...termGoal],
     selectedLocations: selections.map((selection) => selection.label),
     selections,
+    rpcSession,
     proofWidgetsExpr,
   };
 }
 
 export function surfaceCacheKey(surface) {
-  return JSON.stringify(surface);
+  const { rpcSession: _rpcSession, ...serializableSurface } = surface;
+  return JSON.stringify(serializableSurface);
 }
 
 export function proofWidgetsExprFromSavedRef(saved) {

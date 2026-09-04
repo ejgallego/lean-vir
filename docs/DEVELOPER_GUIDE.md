@@ -38,7 +38,10 @@ For a Lean-to-JavaScript host import:
 6. Successful lowering commits the transaction; failure rolls back any newly
    created active resource.
 
-Host imports are synchronous. A Promise result is rejected before commit.
+Host imports execute synchronously. A binding may return a native `Promise`
+only when the declared result is an exact `Js` resource: the Promise object is
+rooted and returned without awaiting it. Returning a Promise where VIR must
+lower a structural or immediate result is rejected before commit.
 
 ## JavaScript Values And Ownership
 

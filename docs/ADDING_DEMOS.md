@@ -119,6 +119,7 @@ inputs.
 Lean code can call JavaScript by importing `Vir.Common`, `Vir.Browser`, or
 `Vir.Host` and adding an opaque declaration marked with `@[vir_js "target.name"]`.
 Bind new targets in `hostBindings` when creating
-the browser runtime. The current host boundary is synchronous; async browser
-APIs need an explicit callback/polling design until the runtime grows an async
-boundary.
+the browser runtime. The current host boundary is synchronous; a native
+Promise can cross as an exact `Js` value, but awaiting it requires direct
+Promise continuations or an explicit callback/polling design until the runtime
+grows an async boundary.

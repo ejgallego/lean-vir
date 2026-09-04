@@ -140,9 +140,10 @@ Host calls are failure-atomic. Immediately before invoking a binding, the
 runtime opens a private transaction. An active resource created by that call
 registers an undo operation. The transaction commits only after the returned
 JavaScript value has been completely lowered to Lean. If the binding throws,
-returns a Promise, or result lowering fails, rollback terminates the newly
-created activity. This transaction is out of band and does not alter the
-returned value.
+returns a Promise for a non-resource result, or result lowering fails, rollback
+terminates the newly created activity. A Promise declared as an exact `Js`
+result is simply rooted and commits like any other JavaScript object. This
+transaction is out of band and does not alter the returned value.
 
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
 resources. Runtime teardown attempts every cleanup and reports multiple
@@ -257,10 +258,12 @@ const vir = await createVirRuntime({
 });
 ```
 
-Bindings are synchronous. Returning a Promise is an error. User bindings
-override built-ins with the same target name. Do not manually encode handles,
-wrap values, or perform conversions that belong in an explicitly named Lean
-adapter.
+Bindings execute synchronously. Returning a Promise is allowed only as an
+exact `Js` resource result; VIR roots the Promise object without awaiting it.
+Returning a Promise for a structurally lowered or immediate result is an
+error. User bindings override built-ins with the same target name. Do not
+manually encode handles, wrap values, or perform conversions that belong in an
+explicitly named Lean adapter.
 
 ## Validation
 

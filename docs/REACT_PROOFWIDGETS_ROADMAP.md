@@ -212,21 +212,25 @@ A realistic path has three layers:
    improvement; inside this repository we can avoid external patches, but raw
    binary transfer would need support from the host webview/RPC surface.
 3. **Infoview/RPC compatibility.** Extend the current typed cursor/goal/selection
-   surface with snapshot-aware RPC, server-side references, and broader
-   structured edit and tactic commands.
-   This is the layer needed for tactic UIs and proof-script editing, and it
-   should stay narrow and typed instead of exposing an arbitrary JavaScript RPC
-   bag to Lean. The first reference slice is intentionally smaller than this
-   final target: `Vir.ProofWidgets.Rpc` provides `RpcRef`, `WithRpcRef α`,
-   `ExprWithCtx.save`, and a host-dispatched `resolveRef` action so
-   `InteractiveExpr`-shaped component props can cross the Lean/JS boundary and
-   update component-owned React state from an async callback.
+   surface using the official position-specific RPC session, native Promise,
+   server-side references, and broader structured edit and tactic commands.
+   `Vir.Infoview.Surface` now carries the exact `RpcSessionAtPos` object and
+   `RpcSession.call` returns its exact native Promise. Direct Promise
+   continuations and generic property access keep requests, responses, and
+   nested reference objects in their ordinary JavaScript representation; VIR
+   does not add an RPC scheduler or decoded response model.
+   The earlier `Vir.ProofWidgets.Rpc` slice provides `RpcRef`, `WithRpcRef α`,
+   `ExprWithCtx.save`, and a host-dispatched `resolveRef` action. It remains a
+   provisional compatibility path, not the final RPC architecture.
    `Vir.Infoview.Surface` now carries a live server-owned
    `WithRpcRef ExprWithCtx` prop backed by a typed `Js ServerRef` host
    resource. `Vir.Infoview.ProofWidgetsRpc` builds that prop from Lean's
    current interactive goal at the cursor and still resolves descriptor
-   fallbacks through the active Lean server snapshot. Broader ExprWithCtx
-   construction and structured edit and tactic commands remain future work.
+   fallbacks through the active Lean server snapshot. Once a real direct
+   session fixture covers that client, the duplicate resolver, descriptor
+   normalizer, and reference store should be removed. Native request options,
+   cancellation, broader ExprWithCtx construction, and structured edit and
+   tactic commands remain future work.
 
 ## Porting Targets
 

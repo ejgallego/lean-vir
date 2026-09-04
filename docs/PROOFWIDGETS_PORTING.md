@@ -49,7 +49,17 @@ narrow reference-shaped interactive case:
   `WithRpcRef ExprWithCtx` and whose click handler calls
   `ProofWidgets.Rpc.resolve`.
 
-The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
+The preferred RPC foundation now exposes the exact position-specific
+`RpcSessionAtPos` object as `Surface.rpcSession`. `RpcSession.call` receives an
+exact JavaScript request value and returns its native `Js.Promise`; direct
+Promise continuations and object-property access do not decode or copy the
+response graph. The runtime boundary fixture proves session transport through
+the infoview surface, request identity, native Promise identity, fulfillment
+and rejection continuations, and exact response-property transport through
+real Wasm. It does not yet exercise a live Lean server method, cancellation,
+or a genuine server-owned reference.
+
+The older RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
 public Lean helpers convert `RpcRef` to a `Js RpcRef` resource through
 `proofwidgets.rpc.ref` before calling `proofwidgets.rpc.resolveRef`; the
@@ -70,7 +80,10 @@ ordinary React state to render the async result from the callback, keeping the
 component behavior close to a JavaScript React component. This proves the
 typed prop, host-dispatch, component-state, current-goal construction, and
 infoview RPC round trip needed by an `InteractiveExpr`-style port. It is not
-yet proof-script editing or the full ProofWidgets RPC request model.
+yet proof-script editing or the full ProofWidgets RPC request model. Once the
+direct session fixture covers this client, the older resolver, normalized
+descriptor, and global reference store should be retired rather than
+maintained as a second RPC architecture.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

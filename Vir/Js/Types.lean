@@ -76,6 +76,17 @@ end NodeList
 abbrev NodeList (α : Type) : Type :=
   Lean.Vir.Js (NodeList.Value α)
 
+namespace Promise
+
+/-- Phantom shape for a native JavaScript `Promise` whose fulfillment value has Lean view `α`. -/
+opaque Value (α : Type) : Type
+
+end Promise
+
+/-- JavaScript-owned native `Promise`; VIR does not await or schedule it. -/
+abbrev Promise (α : Type) : Type :=
+  Lean.Vir.Js (Promise.Value α)
+
 end Js
 
 namespace LeanRef

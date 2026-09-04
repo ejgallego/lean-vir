@@ -1,0 +1,103 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+
+import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
+import { createVirRuntime } from "../../web/src/vir-runtime.js";
+import { createProofSurfaceFixture } from "../support/proof-surface-fixtures.mjs";
+import {
+  assert,
+  join,
+  readFile,
+  readRuntimeArtifacts,
+  runVirIrpkg,
+} from "./shared.mjs";
+
+const tempDir = await mkdtemp(join(tmpdir(), "lean-vir-infoview-rpc-"));
+
+try {
+  const packagePath = join(tempDir, "infoview-rpc-promise.irpkg");
+  const generated = runVirIrpkg([
+    packagePath,
+    join(tempDir, "infoview-rpc-promise.report.md"),
+    "--target",
+    "fixtures/runtime/InfoviewRpcPromise.lean",
+    "Vir.Fixtures.InfoviewRpcPromise.callExact",
+    "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
+    "Vir.Fixtures.InfoviewRpcPromise.callMessage",
+    "Vir.Fixtures.InfoviewRpcPromise.recover",
+  ]);
+  assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+
+  const { wasmBytes } = await readRuntimeArtifacts();
+  const runtime = await createVirRuntime({
+    wasmBytes,
+    irPackageSetBytes: [await readFile(packagePath)],
+    defaultHostBindings: createBrowserHostBindings(),
+  });
+  try {
+    const requests = [];
+    const calls = [];
+    const response = { message: "exact Promise response" };
+    const exactPromise = Promise.resolve(response);
+    const session = {
+      call(method, params) {
+        calls.push({ method, params });
+        if (params === requests[3]) {
+          return Promise.reject(new Error("expected rejection"));
+        }
+        return exactPromise;
+      },
+    };
+
+    requests.push({ message: "exact Promise request identity" });
+    const exactResult = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.callExact",
+      session,
+      requests[0],
+    );
+    assert.equal(exactResult, exactPromise);
+
+    requests.push({ message: "surface session request identity" });
+    const surfaceResult = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
+      createProofSurfaceFixture({ rpcSession: session }),
+      requests[1],
+    );
+    assert.equal(surfaceResult, exactPromise);
+
+    requests.push({ message: "continuation request identity" });
+    const result = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.callMessage",
+      session,
+      requests[2],
+    );
+    assert.equal(result instanceof Promise, true);
+    assert.equal(await result, response.message);
+
+    requests.push({ message: "rejected request identity" });
+    const fallback = { message: "exact fallback identity" };
+    const recovered = runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.recover",
+      session,
+      requests[3],
+      fallback,
+    );
+    assert.equal(await recovered, fallback);
+
+    assert.equal(calls.length, 4);
+    for (const [index, call] of calls.entries()) {
+      assert.equal(call.method, "Vir.Fixtures.InfoviewRpcPromise.echo");
+      assert.equal(call.params, requests[index]);
+    }
+  } finally {
+    runtime.dispose();
+  }
+} finally {
+  await rm(tempDir, { recursive: true, force: true });
+}

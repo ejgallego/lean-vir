@@ -157,6 +157,18 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
+        "id": "javascript.object.get", "group": "object", "target": "js.object.get",
+        "lean": "Lean.Vir.Js.Object.get", "marker": "vir_js",
+        "reason": "Reads an exact property value from an ordinary JavaScript object without decoding or copying it.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["object", "α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "object", "role": "receiver", "type": { "lean": "Lean.Vir.Js object", "representation": "js-resource", "resourceInner": "object" } },
+          { "name": "name", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
         "id": "javascript.function.call-void", "group": "function", "target": "js.function.callVoid",
         "lean": "Lean.Vir.Js.Function.callVoid", "marker": "vir_js",
         "reason": "Calls the exact JavaScript function with one exact JavaScript argument and discards its void result.",
@@ -167,6 +179,30 @@
           { "name": "argument", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.promise.then", "group": "promise", "target": "js.promise.then",
+        "lean": "Lean.Vir.Js.Promise.then_", "marker": "vir_js",
+        "reason": "Calls native Promise.then with the exact Promise and fulfillment callback and returns the exact chained Promise.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
+          { "name": "onFulfilled", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value β" } }
+      },
+      {
+        "id": "javascript.promise.catch", "group": "promise", "target": "js.promise.catch",
+        "lean": "Lean.Vir.Js.Promise.catch_", "marker": "vir_js",
+        "reason": "Calls native Promise.catch with the exact Promise and rejection callback and returns the exact recovered Promise.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.catch", "semantics": "preserving" },
+        "typeParameters": ["α", "error"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
+          { "name": "onRejected", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js error → RuntimeM (Lean.Vir.Js α)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } }
       },
       {
         "id": "javascript.array.empty", "group": "array", "target": "js.array.empty",
@@ -273,6 +309,13 @@
       "targets": ["js.function.*"],
       "lean": { "public": ["Lean.Vir.Js.Function"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Function"] }
+    },
+    {
+      "id": "promise",
+      "title": "Promise",
+      "targets": ["js.promise.*"],
+      "lean": { "public": ["Lean.Vir.Js.Promise"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Promise"] }
     },
     {
       "id": "array",

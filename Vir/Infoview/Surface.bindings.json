@@ -68,6 +68,19 @@
           { "name": "text", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "infoview.rpc-session.call", "group": "rpc-session", "target": "infoview.rpcSession.call",
+        "lean": "Lean.Vir.Infoview.RpcSession.call", "marker": "vir_js",
+        "reason": "Calls the exact position-specific infoview RPC session with the exact method string and request object and returns its native Promise.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "RpcSessionAtPos.call", "semantics": "preserving" },
+        "typeParameters": ["params", "result"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "session", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.RpcSession", "representation": "js-resource", "resourceInner": "Infoview.RpcSession" } },
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "params", "type": { "lean": "Lean.Vir.Js params", "representation": "js-resource", "resourceInner": "params" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise result", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value result" } }
       }
     ]
   },
@@ -88,6 +101,18 @@
         "kind": "local",
         "declarations": ["Vir/Infoview/Surface.contract.d.ts"],
         "roots": ["InfoviewCommandHost"]
+      }
+    },
+    {
+      "id": "rpc-session",
+      "title": "Infoview RPC session",
+      "targets": ["infoview.rpcSession.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.RpcSession"] },
+      "upstream": {
+        "kind": "typescript",
+        "package": "@leanprover/infoview-api",
+        "declarations": ["Vir/Infoview/RpcSession.contract.d.ts"],
+        "roots": ["RpcSessionAtPos"]
       }
     }
   ]

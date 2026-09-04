@@ -89,6 +89,11 @@ export const runtimeTests = Object.freeze(
       group: "lean",
     },
     {
+      id: "infoview-rpc-promise",
+      file: "infoview-rpc-promise-smoke.mjs",
+      group: "lean",
+    },
+    {
       id: "package-generation",
       file: "package-generation-smoke.mjs",
       group: "lean",

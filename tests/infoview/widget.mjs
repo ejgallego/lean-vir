@@ -263,7 +263,12 @@ const infoviewPropsFixture = {
   ],
   selectedLocations: [{ kind: "hypothesis" }],
 };
-assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture), {
+const surfaceFixture = surfaceFromInfoviewProps(
+  infoviewPropsFixture,
+  null,
+  rpcSession,
+);
+assert.deepEqual(surfaceFixture, {
   position: "Example.lean:7:3",
   cursor: {
     uri: "file:///workspace/Example.lean",
@@ -301,16 +306,16 @@ assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture), {
       label: "hypothesis",
     },
   ],
+  rpcSession,
   proofWidgetsExpr: null,
 });
+assert.equal(surfaceFixture.goals[0].target, "xs.reverse.reverse = xs");
 assert.equal(
-  surfaceFromInfoviewProps(infoviewPropsFixture).goals[0].target,
-  "xs.reverse.reverse = xs",
-);
-assert.equal(
-  surfaceCacheKey(surfaceFromInfoviewProps(infoviewPropsFixture)),
+  surfaceCacheKey(surfaceFixture),
   surfaceCacheKey(
-    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture)),
+    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture), null, {
+      call: rpcSession.call,
+    }),
   ),
 );
 assert.equal(
@@ -612,7 +617,7 @@ const serverOwnedExpr = proofWidgetsExprFromSavedRef({
   },
 });
 assert.deepEqual(
-  surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr)
+  surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr, rpcSession)
     .proofWidgetsExpr.value,
   {
     code: "ReactProofWidget.mount",

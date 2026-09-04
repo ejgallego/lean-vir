@@ -12,6 +12,9 @@ public section
 
 namespace Lean.Vir.Infoview
 
+/-- Phantom marker for the exact position-specific infoview RPC session object. -/
+opaque RpcSession : Type
+
 /-- Cursor position for the current infoview snapshot. -/
 structure DocumentPosition where
   uri : String
@@ -53,6 +56,7 @@ structure Surface where
   goals : Array Goal
   selectedLocations : Array String
   selections : Array SelectedLocation
+  rpcSession : Lean.Vir.Js RpcSession
   proofWidgetsExpr : Option (Lean.Vir.ProofWidgets.WithRpcRef Lean.Vir.ProofWidgets.ExprWithCtx)
 
 end Lean.Vir.Infoview

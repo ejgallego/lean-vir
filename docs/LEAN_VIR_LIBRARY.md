@@ -483,6 +483,16 @@ infoview shell asks the Lean server to create a standard
 shell stores the server RPC handle as a typed `Js ServerRef` host resource
 instead of serializing the handle through a string field.
 
+The preferred direct RPC lane is separate from that provisional resolver.
+`Vir.Infoview.Surface.rpcSession` carries the exact position-specific
+`RpcSessionAtPos` object returned by the official infoview hook.
+`Vir.Infoview.RpcSession.call` invokes its native `call` method with exact
+JavaScript method and request values and returns `Js.Promise response` without
+awaiting or decoding it. `Js.Promise.then_`, `Js.Promise.catch_`, and the
+generic `Js.Object.get` operation continue on exact native values. This keeps
+server-reference objects inside the response graph under the official RPC
+session's reachability rules.
+
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md` and `docs/PROOFWIDGETS_PORTING.md`.
@@ -492,6 +502,7 @@ provides the first infoview-facing shell:
 
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`
+- `Lean.Vir.Infoview.RpcSession`
 - `Lean.Vir.Infoview.ProofWidgetsRpc`
 - `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
@@ -640,8 +651,8 @@ are narrower than exports: low-level host declarations should expose
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
 `Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The current
 host boundary rejects raw Lean scalar, structure, array, list, option, and
-product imports and is synchronous; returning a JavaScript `Promise` is an
-error. The
+product imports and executes synchronously. A JavaScript `Promise` may be
+returned only as an exact `Js` resource; VIR does not await it. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
@@ -668,5 +679,7 @@ If package generation fails, inspect the generated report:
   the normal Lean IR closure reached an unsupported native runtime primitive.
 
 If a host import is missing at runtime, check that the manifest target string
-matches the key in `hostBindings`. If a binding returns a `Promise`, the
-runtime rejects the call because host imports are synchronous.
+matches the key in `hostBindings`. If a binding returns a `Promise`, its result
+must be declared as an exact `Js` resource. Structural and immediate Promise
+results are rejected because lowering them would require suspending the Lean
+call.

@@ -274,7 +274,68 @@ opaque set
     (value : @& Lean.Vir.Js α) :
     RuntimeM Unit
 
+/--
+Generated binding for reviewed VIR protocol `javascript.object.get`.
+
+Reads an exact property value from an ordinary JavaScript object without decoding or copying it.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.object.get"]
+opaque get
+    {object : Type}
+    {α : Type}
+    (object : @& Lean.Vir.Js object)
+    (name : @& Lean.Vir.Js String) :
+    RuntimeM (Lean.Vir.Js α)
+
 end Js.Object
+
+namespace Js.Promise
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then`.
+
+Calls native Promise.then with the exact Promise and fulfillment callback and returns the exact chained Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.then"]
+opaque then_
+    {α : Type}
+    {β : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Promise β)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.catch`.
+
+Calls native Promise.catch with the exact Promise and rejection callback and returns the exact recovered Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onRejected callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.catch"]
+opaque catch_
+    {α : Type}
+    {error : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onRejected : Lean.Vir.Js error → RuntimeM (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js.Promise α)
+
+end Js.Promise
 
 namespace JsValue
 

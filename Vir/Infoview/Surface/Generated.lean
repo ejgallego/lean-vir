@@ -96,4 +96,28 @@ opaque insertTextJs
 
 end Infoview.Command
 
+namespace Infoview.RpcSession
+
+/--
+Generated binding for reviewed VIR protocol `infoview.rpc-session.call`.
+
+Calls the exact position-specific infoview RPC session with the exact method string and request object and returns its native Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.rpcSession.call"]
+opaque call
+    {params : Type}
+    {result : Type}
+    (session : @& Lean.Vir.Js Infoview.RpcSession)
+    (method : @& Lean.Vir.Js String)
+    (params : @& Lean.Vir.Js params) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise result)
+
+end Infoview.RpcSession
+
 end Lean.Vir

@@ -531,7 +531,9 @@ value matching the manifest host boundary mode. `Js.Nullable` is the actual
 value or `null`; it is not a wrapper. Explicit conversion imports receive or
 return decoded scalar values for that named converter. Host imports are
 synchronous; returning a
-`Promise` is an error. Object-style `imports` factory options are treated as
+`Promise` is an error unless the declared result is an exact `Js` resource, in
+which case the native Promise object crosses synchronously without being
+awaited. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
@@ -694,6 +696,8 @@ exports fail during package generation instead of being omitted silently.
 A failed replacement leaves the active runtime and its metadata intact; failed
 initial installation exposes no package. If old-runtime cleanup fails during
 handover, the wrapper becomes disposed, as described above.
-JavaScript host imports are sync-only and limited
-to 128 imported declarations with IR arity at most 6; async host calls will need
-a later Promise/JSPI-shaped boundary.
+JavaScript host imports execute synchronously and
+are limited to 128 imported declarations with IR arity at most 6. Native
+Promises may cross as exact `Js` values and be observed with ordinary Promise
+continuations; suspending a Lean call on one still needs a later JSPI-shaped
+boundary.
