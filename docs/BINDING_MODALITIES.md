@@ -7,14 +7,14 @@ translation of three reviewed inputs:
 pinned TypeScript declaration
   + library ABI profile
   + named, justified exceptions
-  = canonical operation IR
+  = generated binding operation
   = Lean source + explorer explanation
 ```
 
 This keeps TypeScript as the authority for API shape while making the host ABI
 choices explicit and reusable. The reviewed mapping identifies the TypeScript
-operation, Lean declaration, and host target once; generated operation IR
-carries the derived modalities.
+operation, Lean declaration, and host target once; the generated binding
+operation carries the operation's TypeScript-level type and derived modalities.
 
 ## Semantics Fidelity
 
@@ -40,8 +40,8 @@ it does not occupy the upstream operation's faithful documentation lane or
 count as semantics-preserving coverage. Unsupported or ambiguous semantics
 fail closed until they have an explicit representation or reviewed policy.
 
-Canonical operation IR records this separately from provider and reachability
-evidence:
+Each generated binding operation records this separately from provider and
+reachability evidence:
 
 - `preserving` claims that the generated contract preserves upstream-observable
   behavior;
@@ -69,7 +69,7 @@ Generated bindings preserve the upstream value itself whenever it can cross as
 a JavaScript resource. `Js`, borrowing, ownership, and an effect carrier are
 boundary semantics, not intermediate representations. A VIR-specific props,
 node, collection, or scalar algebra cannot replace a representable upstream
-value in the canonical operation. Explicitly named builders and conversions may
+value in the generated operation. Explicitly named builders and conversions may
 sit above that operation, but the audit reports them as adapters rather than API
 fidelity.
 
@@ -158,9 +158,9 @@ policy. It covers ordinary objects, functions, native timer/frame tokens, and
 `null` payloads. Resource liveness and cleanup state stay out-of-band; they
 must not replace the public JavaScript value.
 
-## Canonical Operation IR
+## Generated Binding Operations
 
-`npm run generate:lean-bindings` creates a canonical operation record for every
+`npm run generate:lean-bindings` creates one operation record for every
 selected TypeScript operation and every reviewed protocol operation.
 It then renders all downstream views from those records. Ignored debugging
 artifacts use `lean-vir-binding-operation-ir` version 2 and are written per
@@ -185,7 +185,8 @@ Each operation records:
 - the reason for any explicit exception;
 - a protocol's machine-readable upstream relation.
 
-The checked-in `Vir/**/Generated.lean` declarations are rendered from this IR.
+The checked-in `Vir/**/Generated.lean` declarations are rendered from these
+records.
 The binding explorer shows generated operations in an expandable conversion
 policy panel. There is no second shipped anchor or comparator policy to keep in
 sync.
@@ -313,14 +314,14 @@ lifetime.
 
 The TypeScript compiler extracts declaration display text, JSDoc, source
 locations, and documentation links into the descriptor. Generation copies
-those fields into operation IR and emits the JSDoc plus an upstream source link
-on the public Lean declaration. The explorer consumes the same descriptor and
-operation IR: it renders JSDoc paragraphs and links, TypeScript and Lean code
+those fields into the generated binding operation and emits the JSDoc plus an
+upstream source link on the public Lean declaration. The explorer consumes the
+same descriptor and operation record: it renders JSDoc paragraphs and links, TypeScript and Lean code
 with language-aware token classes, and the exact conversion policy that
 produced each generated declaration. No separate handwritten method
 documentation database is involved.
 
-The explorer documents the operation IR's derived policy and provenance.
+The explorer documents the generated operation's derived policy and provenance.
 Provider behavior remains a separately tested runtime claim; it is never
 promoted from provider-key presence.
 
@@ -336,7 +337,7 @@ lifetimes, and exceptions on immediate values are errors.
 
 Exceptions are intended for semantics that TypeScript declarations do not
 express, such as a host retaining a callback until explicit release. They are
-not a place to restate ordinary profile defaults. The operation IR marks every
+not a place to restate ordinary profile defaults. The generated operation marks every
 override and its reason, so review can distinguish inference from policy.
 An exception's optional `semantics` field records whether the reviewed override
 preserves upstream behavior or creates an explicit semantic adapter. Omitting

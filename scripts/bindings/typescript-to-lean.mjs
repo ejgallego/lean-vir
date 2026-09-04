@@ -22,7 +22,7 @@ export { leanType } from "./binding-modalities.mjs";
 function usage() {
   console.log(`usage: node scripts/bindings/generate-lean-bindings.mjs (--config FILE ... | --config-dir DIR) [--check]
 
-Generate faithful Lean host declarations and canonical operation IR from TypeScript declarations.
+Generate faithful Lean host declarations and binding-operation records from TypeScript declarations.
 
 Options:
   --config FILE  Binding-library configuration containing a generation block; repeatable.
@@ -258,7 +258,7 @@ export async function generateLeanBindings(configPath) {
   return {
     output: generatedPath(generation.output, ".lean", "generated output"),
     text: renderLeanOperations(generation, operations),
-    irOutput: generatedPath(generation.irOutput, ".json", "operation IR output"),
+    irOutput: generatedPath(generation.irOutput, ".json", "generated-operation output"),
     irText: `${JSON.stringify(document, null, 2)}\n`,
     members: generation.members.length,
     operations: operations.length,

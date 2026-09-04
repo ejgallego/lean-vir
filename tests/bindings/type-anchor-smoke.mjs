@@ -99,19 +99,6 @@ declare function schedule(value: number): void;
         lean: "Demo.Gap",
         ts: "Demo.Box",
         relation: "coverageGap",
-        portIntent: { disposition: "unsupported" },
-      },
-      {
-        id: "controls_reset",
-        lean: "Demo.reset",
-        ts: "Demo.Controls.reset",
-        portIntent: { receiver: "borrowed", effect: "dom" },
-      },
-      {
-        id: "controls_label_get",
-        lean: "Demo.getLabel",
-        ts: "Demo.Controls.label",
-        portIntent: { accessor: "get", receiver: "borrowed", effect: "dom" },
       },
     ],
   }, null, 2)}\n`);
@@ -280,6 +267,14 @@ declare function schedule(value: number): void;
       },
     },
   );
+  assert.equal(
+    descriptorComparison.symbols.find((symbol) => symbol.id === "Demo.Controls.label")?.kind,
+    "property",
+  );
+  assert.equal(
+    descriptorComparison.symbols.find((symbol) => symbol.id === "Demo.Controls.reset")?.kind,
+    "method",
+  );
   assert.equal(ambientComparison.symbols.find((symbol) => symbol.id === "schedule")?.shape.options.length, 2);
   assert.deepEqual(dependencyComparison.dependencies.unresolved, []);
   assert.deepEqual(
@@ -292,32 +287,19 @@ declare function schedule(value: number): void;
   );
   assert.deepEqual(comparison.summary, {
     exact: 1,
-    compatible: 3,
+    compatible: 1,
     weak: 0,
     missing: 2,
   });
   assert.deepEqual(comparison.diagnosticSummary, {
     error: 1,
     warning: 0,
-    info: 8,
+    info: 2,
   });
   assert.equal(comparison.results.find((result) => result.id === "missing")?.diagnostics[0]?.code,
     "lean_descriptor_missing");
   assert.equal(comparison.results.find((result) => result.id === "gap")?.diagnostics[0]?.severity, "info");
-  assert.deepEqual(comparison.results.find((result) => result.id === "gap")?.portIntent,
-    { disposition: "unsupported" });
-  assert.equal(comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.tsSymbol.kind, "method");
-  assert.equal(comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.leanDescriptor.kind,
-    "public");
   assert.match(comparison.inputs.shippedInventory, /inventory\.json$/u);
-  assert.deepEqual(
-    comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.diagnostics.map((item) => item.code),
-    ["reviewed_explicit_method_receiver", "reviewed_effect", "primitive_representation_compatible"],
-  );
-  assert.deepEqual(
-    comparison.results.find((result) => result.ts === "Demo.Controls.label")?.diagnostics.map((item) => item.code),
-    ["reviewed_property_getter", "reviewed_explicit_property_receiver", "reviewed_effect"],
-  );
   const markdown = await readFile(rendered, "utf8");
   assert.match(markdown, /href="types\.d\.ts#L3-L5"/);
   assert.match(markdown, /title="exact: Demo\.Box -&gt; Demo\.Box/);

@@ -131,7 +131,7 @@ test("optional properties fail closed before accessor generation", () => {
   );
 });
 
-test("operation IR records derived modalities and their provenance", () => {
+test("generated binding operations record derived modalities and their provenance", () => {
   const operations = buildGeneratedOperations(config, generation, descriptors);
   const getter = operations.find((operation) => operation.id === "demo.widget.getLabel");
   const setter = operations.find((operation) => operation.id === "demo.widget.setLabel");
@@ -161,7 +161,7 @@ test("operation IR records derived modalities and their provenance", () => {
   assert.deepEqual(getter.semantics, {
     relation: "preserving",
     evidence: "typescript-derived",
-    detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+    detail: "The generated operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
   assert.equal(generatedOperationDocument(config, generation, operations).version, 2);
 

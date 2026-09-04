@@ -194,9 +194,8 @@ export async function generateDescriptorFile({
   const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
-  const rawAnchorData = anchorsData ??
+  const anchorData = anchorsData ??
     (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
-  const anchorData = rawAnchorData;
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -855,8 +854,21 @@ function validateAnchors(anchorData, symbolIds) {
   if (anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
     throw new Error("anchor file must be { version: 1, anchors: [...] }");
   }
+  const anchorFields = new Set([
+    "id",
+    "lean",
+    "ts",
+    "relation",
+    "category",
+    "target",
+    "note",
+  ]);
   const ids = new Set();
   for (const [index, anchor] of anchorData.anchors.entries()) {
+    const unknown = Object.keys(anchor).find((field) => !anchorFields.has(field));
+    if (unknown !== undefined) {
+      throw new Error(`anchors[${index}].${unknown} is not a structural anchor field`);
+    }
     if (typeof anchor.lean !== "string" || anchor.lean.length === 0) {
       throw new Error(`anchors[${index}].lean must be a non-empty string`);
     }
@@ -869,9 +881,11 @@ function validateAnchors(anchorData, symbolIds) {
     if (anchor.relation !== undefined && !["audit", "coverageGap"].includes(anchor.relation)) {
       throw new Error(`anchors[${index}].relation must be audit or coverageGap`);
     }
-    if (anchor.portIntent !== undefined &&
-        (anchor.portIntent === null || typeof anchor.portIntent !== "object" || Array.isArray(anchor.portIntent))) {
-      throw new Error(`anchors[${index}].portIntent must be an object`);
+    for (const field of ["id", "category", "target", "note"]) {
+      if (anchor[field] !== undefined &&
+          (typeof anchor[field] !== "string" || anchor[field].length === 0)) {
+        throw new Error(`anchors[${index}].${field} must be a non-empty string`);
+      }
     }
     const id = anchor.id ?? `${anchor.lean} -> ${anchor.ts}`;
     if (ids.has(id)) throw new Error(`duplicate anchor id ${id}`);

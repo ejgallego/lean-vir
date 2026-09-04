@@ -15,7 +15,6 @@ import {
 } from "../../scripts/bindings/binding-config.mjs";
 
 const report = JSON.parse(await readFile("build/bindings/shipped-v1.coverage.json", "utf8"));
-const html = await readFile("build/bindings/shipped-v1.dashboard.html", "utf8");
 const declarations = report.bindings.flatMap((binding) => binding.declarations);
 const configPaths = await discoverBindingConfigPaths(resolve("Vir"));
 const configs = await Promise.all(configPaths.map(loadBindingConfig));
@@ -124,21 +123,6 @@ assert.equal(
   "hostResource",
 );
 assert.equal(byTarget.get("react.root.create")?.status, "provided");
-
-assert.match(
-  html,
-  new RegExp(`id="provided-metric">${report.summary.provided}/${report.summary.totalTargets}`),
-);
-assert.match(html, /Provider key present/u);
-assert.match(html, /does not verify provider modality or behavior/u);
-assert.match(html, /id="search" type="search"/u);
-assert.match(html, /id="boundary"/u);
-const dataMatch = html.match(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/u);
-assert.ok(dataMatch, "dashboard should embed its machine report");
-assert.deepEqual(JSON.parse(dataMatch[1]).summary, report.summary);
-const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/gu)];
-assert.ok(scripts.length >= 2, "dashboard should include data and interaction scripts");
-Function(scripts.at(-1)[1]);
 
 console.log(
   `shipped bindings smoke ok: ${report.summary.virJs} vir_js + ` +

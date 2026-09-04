@@ -58,7 +58,7 @@ ownership diagrams.
   explorer and exhaustive compiler/runtime reconciliation for shipped
   JavaScript boundaries.
 - [BINDING_MODALITIES.md](BINDING_MODALITIES.md) owns the generated
-  TypeScript-to-Lean ABI profile, operation IR, and exception model.
+  TypeScript-to-Lean ABI profile, generated binding-operation model, and exception policy.
 - [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
   renderer details.
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns implementation paths, call-flow
@@ -99,7 +99,7 @@ ownership diagrams.
 - [TYPE_ANCHORS.md](TYPE_ANCHORS.md): standalone fixture/debug comparison of
   TypeScript and compiler-produced Lean interface descriptors.
 - [BINDING_MODALITIES.md](BINDING_MODALITIES.md): deterministic binding
-  modalities, operation IR provenance, and justified exceptions.
+  modalities, generated-operation provenance, and justified exceptions.
 - [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): the consolidated binding library
   explorer, colocated API-group manifests, exhaustive `vir_js` inventory,
   forward and reverse browsing, faithful boundary policy, and shipped provider

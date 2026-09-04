@@ -45,6 +45,7 @@ test("binding configuration rejects unknown unsupported-entry fields", async () 
   const invalid = structuredClone(browser);
   invalid.roots.find((root) => root.id === "document").unsupported = [{
     typescript: "Document.cookie",
+    scope: "symbol",
     note: "Not selected.",
     retention: "until somebody reviews it",
   }];
@@ -58,8 +59,8 @@ test("binding configuration rejects unknown unsupported-entry fields", async () 
 test("binding configuration rejects duplicate unsupported entries", async () => {
   const invalid = structuredClone(browser);
   invalid.roots.find((root) => root.id === "document").unsupported = [
-    { typescript: "Document.cookie", note: "Not selected." },
-    { typescript: "Document.cookie", note: "Still not selected." },
+    { typescript: "Document.cookie", scope: "symbol", note: "Not selected." },
+    { typescript: "Document.cookie", scope: "symbol", note: "Still not selected." },
   ];
 
   await assert.rejects(
@@ -72,12 +73,55 @@ test("binding configuration rejects mapped entries marked unsupported", async ()
   const invalid = structuredClone(browser);
   invalid.roots.find((root) => root.id === "document").unsupported = [{
     typescript: "Document.title",
+    scope: "symbol",
     note: "Contradicts its mapping.",
   }];
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
     /marks mapped TypeScript entry Document\.title unsupported in root document/u,
+  );
+});
+
+test("surface-level unsupported entries reject mapped descendants", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document").unsupported = [{
+    typescript: "Document",
+    scope: "surface",
+    note: "Contradicts a mapped member of the surface.",
+  }];
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /marks mapped TypeScript entry Document unsupported in root document/u,
+  );
+});
+
+test("binding configuration rejects protocol-linked entries marked unsupported", async () => {
+  const reactPath = new URL("../../Vir/React.bindings.json", import.meta.url).pathname;
+  const react = JSON.parse(await readFile(reactPath, "utf8"));
+  react.roots.find((root) => root.id === "hooks").unsupported = [{
+    typescript: "React.useCallback",
+    scope: "symbol",
+    note: "Contradicts its reviewed protocol.",
+  }];
+
+  await assert.rejects(
+    validateBindingConfig(react, reactPath),
+    /marks protocol-linked TypeScript entry React\.useCallback unsupported in root hooks/u,
+  );
+});
+
+test("unsupported entries require an explicit symbol or surface scope", async () => {
+  const invalid = structuredClone(browser);
+  invalid.roots.find((root) => root.id === "document").unsupported = [{
+    typescript: "Document.cookie",
+    note: "Ambiguous scope.",
+  }];
+
+  await assert.rejects(
+    validateBindingConfig(invalid, browserPath),
+    /must have required property 'scope'/u,
   );
 });
 

@@ -50,6 +50,13 @@ function deriveGeneratedMembers(config) {
   };
 }
 
+export function unsupportedEntryCoversSymbol(entry, symbol) {
+  return entry.typescript === symbol.id ||
+    (entry.scope === "surface" &&
+      (entry.typescript === symbol.surfaceRoot ||
+        symbol.id.startsWith(`${entry.typescript}.`)));
+}
+
 function validateLibrarySemantics(config, label) {
   validateGenerationProfile(config.generation, `${label} generation`);
   const rootIds = new Set();
@@ -68,10 +75,23 @@ function validateLibrarySemantics(config, label) {
       throw new Error(`${label} repeats an unsupported TypeScript entry in root ${root.id}`);
     }
     const mapped = new Set((root.mappings ?? []).map((entry) => entry.typescript));
-    const contradictory = unsupported.find((entry) => mapped.has(entry.typescript));
+    const contradictory = unsupported.find((entry) =>
+      [...mapped].some((member) => unsupportedEntryCoversSymbol(entry, { id: member })));
     if (contradictory !== undefined) {
       throw new Error(
         `${label} marks mapped TypeScript entry ${contradictory.typescript} unsupported in root ${root.id}`,
+      );
+    }
+    const protocolMembers = new Set((config.generation?.protocolOperations ?? [])
+      .filter((operation) => operation.group === root.id &&
+        ["upstream-adapter", "local-contract"].includes(operation.upstreamRelation.kind))
+      .map((operation) => operation.upstreamRelation.member));
+    const contradictoryProtocol = unsupported.find((entry) =>
+      [...protocolMembers].some((member) =>
+        unsupportedEntryCoversSymbol(entry, { id: member })));
+    if (contradictoryProtocol !== undefined) {
+      throw new Error(
+        `${label} marks protocol-linked TypeScript entry ${contradictoryProtocol.typescript} unsupported in root ${root.id}`,
       );
     }
   }

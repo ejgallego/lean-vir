@@ -426,9 +426,10 @@
     "unsupportedEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["typescript", "note"],
+      "required": ["typescript", "scope", "note"],
       "properties": {
         "typescript": { "type": "string", "minLength": 1 },
+        "scope": { "enum": ["symbol", "surface"] },
         "note": { "type": "string", "minLength": 1 }
       }
     },

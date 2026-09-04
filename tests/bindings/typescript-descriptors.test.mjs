@@ -65,6 +65,37 @@ test("descriptor options preserve null, undefined, and nullish absence", async (
   }
 });
 
+test("structural anchors reject binding-policy transformations", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-structural-anchors-"));
+  try {
+    const declarations = join(directory, "demo.d.ts");
+    await writeFile(declarations, "export type Value = string;\n");
+    await assert.rejects(
+      generateDescriptorFile({
+        files: [declarations],
+        anchors: null,
+        anchorsData: {
+          version: 1,
+          anchors: [{
+            lean: "Demo.Value",
+            ts: "Value",
+            portIntent: { representation: "hostResource" },
+          }],
+        },
+        symbols: new Set(),
+        symbolFiles: [],
+        sourceUrl: null,
+        dependencyDepth: 0,
+        dependencyPolicy: null,
+        dependencyPolicyData: null,
+      }),
+      /portIntent is not a structural anchor field/u,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("the comparator does not equate TypeScript undefined with Lean Option", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-nullish-comparison-"));
   try {

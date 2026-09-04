@@ -72,11 +72,13 @@ provider argument handling, retention, callback leases, result adoption, or
 terminal cleanup, so it is not a mechanical provider-modality audit. The
 compiler/runtime check also does not claim that all upstream APIs have been
 ported, or that every phantom resource name has been proven equivalent to an
-upstream TypeScript type. Configured API groups and canonical operation IR
+upstream TypeScript type. Configured API groups and generated binding operations
 provide declaration evidence; focused lifecycle tests provide separate runtime
 evidence. The explorer keeps these layers visibly distinct.
 The consolidated machine report records this guarantee boundary explicitly in
-its `boundaryAnalysis` object rather than leaving it implicit in prose.
+its `boundaryAnalysis` object rather than leaving it implicit in prose. That
+object distinguishes the semantic classification recorded on each generated
+binding operation from parity, which is not mechanically verified.
 
 ## Terminology and dispositions
 
@@ -89,7 +91,7 @@ Each upstream member has a generation record with three independent facts:
 
 - **semantic coverage** is `faithful`, `adapter-only`, `unreviewed`,
   `local-contract`, `candidate`, or `not-provided`. It is computed once from
-  the canonical operations associated with the member. A changing adapter no
+  the generated operations associated with the member. A changing adapter no
   longer appears as faithful coverage merely because its provider key exists.
   `unreviewed` dominates mixed coverage; otherwise one preserving operation is
   enough for the machine status `faithful`, while a member with only changing
@@ -113,14 +115,15 @@ Each upstream member has a generation record with three independent facts:
 Only dispositions with an actionable diagnostic appear under author actions.
 In particular, `not-selected` is not an error or author action, and
 an explicitly `unsupported` upstream member remains a visible reference/roadmap
-gap without becoming immediate binding-author work.
+gap without becoming immediate binding-author work. Every unsupported entry
+explicitly says whether it covers only the named symbol or its expanded surface.
 Every work item names a diagnostic code, explains the evidence, and gives the
 next required action. Reviewed protocols may still use `needs-annotation`
 until their upstream identity and direct TypeScript lowering are fully
 expressed.
 
 A directly generated operation is `derived`: the TypeScript shape, ABI policy,
-and emitted Lean type are one canonical operation record. An upstream adapter
+and emitted Lean type are one generated operation record. An upstream adapter
 is `protocol-linked`, and a local declaration operation is `contract-linked`.
 
 A **public Lean API** row is a public executable declaration in the measured
@@ -142,12 +145,12 @@ The intended construction is:
 
 ```text
 TypeScript declaration + VIR ABI policy + explicit annotation
-  -> canonical operation IR
+  -> generated binding operation
   -> generated Lean declaration
 ```
 
-The operation IR preserves JavaScript resources, supported null-only
-nullability, overloads, receiver shape, effects, and authored ownership or
+The generated operation keeps the operation's TypeScript-level type together
+with the selected overload, receiver shape, effect, and authored ownership or
 retention policy. Descriptors distinguish `null`, `undefined`, and nullish
 absence; generation rejects the latter two and optional properties until they
 have explicit representations. Convenience conversions belong in a separate
@@ -203,9 +206,9 @@ Every binding repair or addition should satisfy these landing gates:
 
 Every external shipped binding is generated. Shipped targets must also acquire
 authored upstream identity or an explicit no-parity protocol classification.
-Unsupported selected
-operations and weak type translations remain author actions; unselected
-upstream operations may remain visible in the reference without failing CI.
+Unreviewed translations and unresolved canonical-policy failures remain author
+actions. Explicitly unsupported operations remain roadmap entries, while
+unselected upstream operations may remain visible without failing CI.
 
 The abrupt migration covers Browser, JavaScript core, React, Common, Infoview,
 and ProofWidgets. Further slices should replace reviewed protocol operations
@@ -213,7 +216,7 @@ with direct TypeScript lowering where an upstream declaration exists, without
 changing their host target or public faithful type unnecessarily.
 
 Request planners and correspondence ranking consume the same authored
-API-group configurations and canonical operation data as generation. A
+API-group configurations and generated operation data as generation. A
 suggestion never becomes a confirmed binding automatically. Generated
 declarations target the faithful layer; conversion wrappers remain an explicit
 downstream policy choice.
@@ -260,8 +263,10 @@ declaration for each shipped operation.
 An unshipped operation uses an explicit `{ "missing": true, "note": "..." }`
 entry, so partial property coverage cannot be mistaken for a faithful pair.
 Explicitly unsupported upstream entries carry only their TypeScript identity
-and a reason. Derived type, modality, and semantic policy lives exclusively in
-operation IR.
+and a reason, plus an explicit `symbol` or `surface` scope. Surface scope also
+classifies members expanded from the named interface or alias. The generated
+binding operation is the sole record of derived type, modality, and semantic
+policy.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a mapping that disagrees with its generated
@@ -275,7 +280,7 @@ TypeScript declarations + configured upstream entry points
   -> complete upstream documentation catalog
 
 binding selection + ABI profile + explicit annotations
-  -> canonical operation IR
+  -> generated binding operations
   -> reproducible faithful Lean declarations
 
 compiled Vir + Vir.Infoview environments
@@ -288,7 +293,7 @@ browser/React + environment-neutral Node provider keys + runtime intrinsics
 reviewed protocol operations + correspondence suggestions
   -> direct-lowering and annotation work items
 
-catalog + operation IR + compiled/runtime evidence + work items
+catalog + generated binding operations + compiled/runtime evidence + work items
   -> one machine report
   -> upstream-shaped reference
   -> complete shipped-boundary inventory
@@ -330,7 +335,7 @@ roots or members. Types referenced by signatures remain part of the declaration
 rather than a heuristic "related types" section.
 
 Generated boundaries lead with a structured Lean signature derived from the
-canonical operation IR. Receiver, argument, result, effect, representation,
+same generated binding operation. Receiver, argument, result, effect, representation,
 passing, retention, and ownership annotations are interactive and expose their
 policy provenance on hover or keyboard focus. For TypeScript-derived operations,
 the same card aligns the selected TypeScript shape with the emitted Lean
@@ -355,7 +360,8 @@ Unselected upstream entries contribute to coverage totals but are not issues.
 Explicitly unsupported selected entries appear under `report.json`'s roadmap;
 only compiler, provider, reachability, and canonical-policy failures are issues.
 
-`build/bindings/shipped-v1.coverage.json` and
-`build/bindings/shipped-v1.dashboard.html` are lower-level reconciliation
-artifacts. Focused type-anchor rendering remains an explicit fixture-debugging
-command and is not part of the default binding generation or check workflow.
+`build/bindings/shipped-v1.coverage.json` is the lower-level compiler/provider
+reconciliation input to the consolidated explorer; it intentionally has no
+second human dashboard. Focused type-anchor rendering remains an explicit
+fixture-debugging command and is validated separately from the default shipped
+binding generation workflow.

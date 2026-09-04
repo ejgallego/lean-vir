@@ -57,7 +57,8 @@ assert.deepEqual(report.boundaryAnalysis, {
   conversionBoundary: "explicit vir_js_explicit_conversion declarations only",
   providerCoverage: "target-name-presence-only",
   providerBehavior: "not-mechanically-verified",
-  semanticParity: "canonical-generated-operation-ir",
+  semanticClassification: "recorded-on-generated-binding-operation",
+  semanticParity: "not-mechanically-verified",
 });
 assert.equal(report.summary.libraries, report.libraries.length);
 assert.equal(report.summary.apiGroups, roots.length);
@@ -586,6 +587,14 @@ assert.deepEqual(reactRootRenderCoverage?.relations, ["preserving"]);
 assert.ok(!(reactDomRoot?.generatedOperations ?? []).some((operation) =>
   operation.host.target === "react.root.render"));
 assert.ok(reactDomRoot?.roadmap.some((entry) => entry.typescript === "hydrateRoot"));
+assert.equal(
+  reactDomRoot?.roadmap.find((entry) => entry.typescript === "hydrateRoot")?.scope,
+  "symbol",
+);
+const inheritedUnsupported = reactDomRoot?.coverage.members.find((member) =>
+  member.id !== "RootOptions" && member.generation.unsupported?.source === "RootOptions");
+assert.equal(inheritedUnsupported?.generation.unsupported.scope, "surface");
+assert.equal(inheritedUnsupported?.generation.unsupported.inherited, true);
 assert.equal(
   reactDomRoot?.workItems.filter((item) =>
     item.code === "semantic-fidelity-review-required").length,

@@ -468,7 +468,7 @@ function derivedSemantics(exception, methodPolicy = null, policyFacts = []) {
     primary = {
       relation: "preserving",
       evidence: "typescript-derived",
-      detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+      detail: "The generated operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
     };
   } else if (exception.semantics === undefined) {
     primary = {

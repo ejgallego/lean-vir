@@ -20,7 +20,7 @@
     "mailbox:archive": "node scripts/mailbox.mjs archive",
     "check:api-coverage": "node scripts/check-api-coverage.mjs",
     "generate:shipped-bindings-inventory": "lake build vir_js_inventory Vir Vir.Infoview && lake exe vir_js_inventory build/type-descriptors/vir-js-shipped-v1.lean.json Vir Vir.Infoview",
-    "generate:shipped-bindings-report": "node scripts/bindings/generate-shipped-bindings-report.mjs --lean build/type-descriptors/vir-js-shipped-v1.lean.json --out build/bindings/shipped-v1.coverage.json --html build/bindings/shipped-v1.dashboard.html",
+    "generate:shipped-bindings-report": "node scripts/bindings/generate-shipped-bindings-report.mjs --lean build/type-descriptors/vir-js-shipped-v1.lean.json --out build/bindings/shipped-v1.coverage.json",
     "generate:shipped-bindings": "npm run generate:shipped-bindings-inventory && npm run generate:shipped-bindings-report",
     "check:shipped-bindings": "npm run generate:shipped-bindings && npm run test:shipped-bindings",
     "test:shipped-bindings": "node tests/bindings/shipped-bindings-smoke.mjs",

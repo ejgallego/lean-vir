@@ -394,9 +394,9 @@
         }
       ],
       "unsupported": [
-        { "typescript": "RootOptions", "note": "Root creation options are not exposed by the current VIR React surface." },
-        { "typescript": "hydrateRoot", "note": "Hydration is not exposed by the current VIR React surface." },
-        { "typescript": "HydrationOptions", "note": "Hydration options are paired with the unsupported hydration entry point." }
+        { "typescript": "RootOptions", "scope": "surface", "note": "Root creation options are not exposed by the current VIR React surface." },
+        { "typescript": "hydrateRoot", "scope": "symbol", "note": "Hydration is not exposed by the current VIR React surface." },
+        { "typescript": "HydrationOptions", "scope": "surface", "note": "Hydration options are paired with the unsupported hydration entry point." }
       ]
     },
     {

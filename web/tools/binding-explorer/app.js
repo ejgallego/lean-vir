@@ -985,13 +985,22 @@ function renderUpstreamSymbol(group, symbol) {
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
   const relation = state?.semanticCoverage.status;
+  const unsupportedNote = state?.unsupported === undefined
+    ? ""
+    : '<p class="note">Explicitly unsupported (' + escapeHtml(state.unsupported.scope) +
+      " scope" +
+      (state.unsupported.inherited
+        ? " inherited from <code>" + escapeHtml(state.unsupported.source) + "</code>"
+        : "") + "): " + escapeHtml(state.unsupported.note) + "</p>";
+  const unboundNote = unsupportedNote || (state === undefined
+    ? ""
+    : '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>');
   const lean = state !== undefined && !["candidate", "not-provided"].includes(relation)
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
       renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
       escapeHtml(leanPaneTitle(state.semanticCoverage)) + '</div>' +
       renderLeanCards(state.targets) + "</div></div>"
-    : renderCode(symbol.display, "typescript") +
-      (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
+    : renderCode(symbol.display, "typescript") + unboundNote;
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
     coverage + " " + evidence + '</summary><div class="card-head">' +

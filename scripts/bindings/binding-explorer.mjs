@@ -9,7 +9,11 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { scriptSafeJson } from "../json-utils.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
-import { discoverBindingConfigPaths, loadBindingConfig } from "./binding-config.mjs";
+import {
+  discoverBindingConfigPaths,
+  loadBindingConfig,
+  unsupportedEntryCoversSymbol,
+} from "./binding-config.mjs";
 import { buildGeneratedOperations } from "./binding-modalities.mjs";
 import { generateDescriptorFile } from "./typescript-descriptors.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
@@ -177,6 +181,7 @@ function unsupportedRoadmap(config, bindingRoot, typeScript) {
       kind: "unsupported-upstream-entry",
       message: entry.note,
       typescript: entry.typescript,
+      scope: entry.scope,
     };
   });
 }
@@ -227,11 +232,6 @@ function reviewedMappingOperations(mapping) {
   }));
 }
 
-function unsupportedForSymbol(entries, symbol) {
-  return entries.find((entry) =>
-    entry.typescript === symbol.id || entry.typescript === symbol.surfaceRoot);
-}
-
 function operationUpstreamMember(operation) {
   if (operation.typescript.kind !== "protocol") return operation.typescript.member;
   const relation = operation.protocol?.upstreamRelation;
@@ -270,7 +270,8 @@ function generationRecord(
     mapping.source === "protocol-relation" &&
     ["upstream-adapter", "local-contract"].includes(mapping.relation.kind) &&
     mapping.typescript === symbol.id).map((mapping) => mapping.target))].sort();
-  const unsupported = unsupportedForSymbol(unsupportedEntries, symbol);
+  const unsupported = unsupportedEntries.find((entry) =>
+    unsupportedEntryCoversSymbol(entry, symbol));
   const diagnostics = [];
   let disposition;
   let provenance;
@@ -341,6 +342,14 @@ function generationRecord(
       candidateTargets,
     ),
     ...(candidateTargets.length === 0 ? {} : { candidateTargets }),
+    ...(unsupported === undefined ? {} : {
+      unsupported: {
+        source: unsupported.typescript,
+        scope: unsupported.scope,
+        inherited: unsupported.typescript !== symbol.id,
+        note: unsupported.note,
+      },
+    }),
     diagnostics,
   };
 }
@@ -1125,7 +1134,8 @@ export async function buildBindingExplorerReport(coverage, configs, typeScriptSu
     providers: coverage.providers,
     boundaryAnalysis: {
       ...coverage.analysis,
-      semanticParity: "canonical-generated-operation-ir",
+      semanticClassification: "recorded-on-generated-binding-operation",
+      semanticParity: "not-mechanically-verified",
     },
     summary: {
       libraries: libraries.length,
