@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
+import { validateIrPackageSetMembers } from "./ir-package.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
@@ -25,20 +26,16 @@ const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 const OBJECT_CALL_UNAVAILABLE = Symbol("object-call-unavailable");
 
-function normalizePackageSetBytes(packages) {
-  if (!Array.isArray(packages) || packages.length === 0) {
-    throw new TypeError("IR package set must be a non-empty array ordered dependencies first, root last");
-  }
-  return packages.map((bytes, index) => asBytes(bytes, `IR package-set member ${index + 1}`));
-}
-
 export class VirRuntime extends ObjectValueRuntime {
-  constructor(exports, {
-    module = null,
-    packageInfo = null,
-    hostState = null,
-    createReplacementRuntime = null,
-  } = {}) {
+  constructor(
+    exports,
+    {
+      module = null,
+      packageInfo = null,
+      hostState = null,
+      createReplacementRuntime = null,
+    } = {},
+  ) {
     super();
     this.exports = exports;
     this.module = module;
@@ -60,8 +57,10 @@ export class VirRuntime extends ObjectValueRuntime {
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
     }
-    if (typeof this.exports.vir_package_interface_manifest_size === "function" &&
-        this.exports.vir_package_interface_manifest_size() !== 0) {
+    if (
+      typeof this.exports.vir_package_interface_manifest_size === "function" &&
+      this.exports.vir_package_interface_manifest_size() !== 0
+    ) {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
@@ -81,67 +80,109 @@ export class VirRuntime extends ObjectValueRuntime {
 
   lastPackageError() {
     const len = this.exports.vir_last_package_error_size?.() ?? 0;
-    return len === 0 ? "" : this.readWasmString(this.exports.vir_last_package_error(), len);
+    return len === 0
+      ? ""
+      : this.readWasmString(this.exports.vir_last_package_error(), len);
   }
 
-  loadIrPackageSetBytes(packages) {
+  loadIrPackageSetBytes(packages, packageSet = null) {
     this.requireLiveRuntime();
-    const packageBytes = normalizePackageSetBytes(packages);
+    const packageBytes = validateIrPackageSetMembers(packages, {
+      members: packageSet?.members ?? null,
+    }).bytes;
     if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
       if (typeof this.createReplacementRuntime !== "function") {
-        throw new Error("IR package-set reload requires a factory-managed VirRuntime");
+        throw new Error(
+          "IR package-set reload requires a factory-managed VirRuntime",
+        );
       }
-      return this.replaceIrPackageSetBytes(packageBytes);
+      return this.replaceIrPackageSetBytes(packageBytes, packageSet);
     }
-    return this.installIrPackageSetBytes(packageBytes);
+    return this.installIrPackageSetBytes(packageBytes, packageSet);
   }
 
-  installIrPackageSetBytes(packageBytes) {
+  installIrPackageSetBytes(packageBytes, packageSet = null) {
     this.requireFunction("vir_begin_ir_package_set");
     this.requireFunction("vir_append_ir_package");
+    this.requireFunction("vir_prepare_ir_package_set");
     this.requireFunction("vir_finish_ir_package_set");
+    this.requireFunction("vir_abort_ir_package_set");
     if (this.exports.vir_begin_ir_package_set() === 0) {
       const detail = this.lastPackageError();
-      throw new Error(`IR package-set setup failed${detail ? `: ${detail}` : ""}`);
-    }
-
-    let byteLength = 0;
-    for (let index = 0; index < packageBytes.length; index += 1) {
-      const bytes = packageBytes[index];
-      byteLength += bytes.byteLength;
-      const ptr = this.allocBytes(bytes);
-      try {
-        if (this.exports.vir_append_ir_package(ptr, bytes.byteLength) === 0) {
-          const detail = this.lastPackageError();
-          throw new Error(
-            `IR package-set member ${index + 1} load failed${detail ? `: ${detail}` : ""}`,
-          );
-        }
-      } finally {
-        this.freeBytes(ptr);
-      }
-    }
-
-    const count = this.exports.vir_finish_ir_package_set();
-    if (count === 0) {
-      const detail = this.lastPackageError();
-      throw new Error(`IR package-set finalization failed${detail ? `: ${detail}` : ""}`);
-    }
-    const providerCount = this.packageDeclCount();
-    if (providerCount !== null && providerCount !== count) {
       throw new Error(
-        `IR package-set declaration count mismatch: load returned ${count}, provider has ${providerCount}`,
+        `IR package-set setup failed${detail ? `: ${detail}` : ""}`,
       );
     }
-    return this.finishPackageInstall({
-      count: providerCount ?? count,
-      byteLength,
-      packageCount: packageBytes.length,
-    });
+
+    let transactionOpen = true;
+    try {
+      let byteLength = 0;
+      for (let index = 0; index < packageBytes.length; index += 1) {
+        const bytes = packageBytes[index];
+        byteLength += bytes.byteLength;
+        const ptr = this.allocBytes(bytes);
+        try {
+          if (this.exports.vir_append_ir_package(ptr, bytes.byteLength) === 0) {
+            const detail = this.lastPackageError();
+            throw new Error(
+              `IR package-set member ${index + 1} load failed${detail ? `: ${detail}` : ""}`,
+            );
+          }
+        } finally {
+          this.freeBytes(ptr);
+        }
+      }
+
+      if (this.exports.vir_prepare_ir_package_set() === 0) {
+        const detail = this.lastPackageError();
+        throw new Error(
+          `IR package-set validation failed${detail ? `: ${detail}` : ""}`,
+        );
+      }
+      const interfaceManifest = this.readPackageManifest();
+      this.hostState?.setManifest(interfaceManifest);
+
+      const count = this.exports.vir_finish_ir_package_set();
+      if (count === 0) {
+        const detail = this.lastPackageError();
+        throw new Error(
+          `IR package-set finalization failed${detail ? `: ${detail}` : ""}`,
+        );
+      }
+      const providerCount = this.packageDeclCount();
+      if (providerCount !== null && providerCount !== count) {
+        throw new Error(
+          `IR package-set declaration count mismatch: load returned ${count}, provider has ${providerCount}`,
+        );
+      }
+      transactionOpen = false;
+      return this.finishPackageInstall({
+        count: providerCount ?? count,
+        byteLength,
+        packageCount: packageBytes.length,
+        interfaceManifest,
+        packageSet,
+      });
+    } catch (error) {
+      const errors = [error];
+      if (transactionOpen) {
+        collectCleanupError(errors, () =>
+          this.exports.vir_abort_ir_package_set(),
+        );
+      }
+      collectCleanupError(errors, () => this.clearPackageMetadata());
+      throwCollectedErrors(errors, "IR package-set rollback failed");
+    }
   }
 
-  finishPackageInstall({ count, byteLength, packageCount }) {
-    this.interfaceManifest = this.readPackageManifest();
+  finishPackageInstall({
+    count,
+    byteLength,
+    packageCount,
+    interfaceManifest,
+    packageSet,
+  }) {
+    this.interfaceManifest = interfaceManifest;
     this.hostState?.setManifest(this.interfaceManifest);
     this.packageMetadata = this.interfaceManifest.metadata;
     this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
@@ -153,13 +194,15 @@ export class VirRuntime extends ObjectValueRuntime {
       interfaceExports: this.interfaceManifest.exports.length,
       hostImports: this.interfaceManifest.hostImports?.length ?? 0,
       metadata: this.packageMetadata,
+      packageSet,
     };
     return this.packageInfo;
   }
 
-  replaceIrPackageSetBytes(packageBytes) {
+  replaceIrPackageSetBytes(packageBytes, packageSet = null) {
     return this.replacePackageState(
-      (replacement) => replacement.installIrPackageSetBytes(packageBytes),
+      (replacement) =>
+        replacement.installIrPackageSetBytes(packageBytes, packageSet),
       "IR package-set",
     );
   }
@@ -220,11 +263,13 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   hasPackageState() {
-    return this.packageInfo !== null ||
+    return (
+      this.packageInfo !== null ||
       this.interfaceManifest !== null ||
       this.packageMetadata !== null ||
       (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 ||
-      (this.packageDeclCount() ?? 0) !== 0;
+      (this.packageDeclCount() ?? 0) !== 0
+    );
   }
 
   readPackageManifest() {
@@ -233,11 +278,19 @@ export class VirRuntime extends ObjectValueRuntime {
 
     const len = this.exports.vir_package_interface_manifest_size();
     if (len === 0) {
-      throw new Error("IR package does not contain an embedded interface manifest");
+      throw new Error(
+        "IR package does not contain an embedded interface manifest",
+      );
     }
-    const text = this.readWasmString(this.exports.vir_package_interface_manifest(), len);
+    const text = this.readWasmString(
+      this.exports.vir_package_interface_manifest(),
+      len,
+    );
     const manifest = JSON.parse(text);
-    return validateInterfaceManifest(manifest);
+    this.requireFunction("vir_package_format_version");
+    return validateInterfaceManifest(manifest, {
+      packageFormatVersion: this.exports.vir_package_format_version(),
+    });
   }
 
   rebuildManifestExports() {
@@ -252,7 +305,8 @@ export class VirRuntime extends ObjectValueRuntime {
       registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
       this.entryCallCache.set(entry, { exportIndex });
       if (entry.jsName && isIdentifier(entry.jsName)) {
-        this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
+        this.exportsByName[entry.jsName] = (...args) =>
+          this.callEntry(entry, args);
       }
     }
   }
@@ -282,7 +336,9 @@ export class VirRuntime extends ObjectValueRuntime {
   runStartupEntries() {
     this.requireLiveRuntime();
     if (this.interfaceManifest === null) {
-      throw new Error("cannot run VIR startup hooks before loading an IR package");
+      throw new Error(
+        "cannot run VIR startup hooks before loading an IR package",
+      );
     }
     for (const entry of this.interfaceManifest.exports) {
       if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
@@ -296,7 +352,9 @@ export class VirRuntime extends ObjectValueRuntime {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
-      throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
+      throw new Error(
+        `${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`,
+      );
     }
 
     const cache = this.callCacheFor(entry);
@@ -304,7 +362,9 @@ export class VirRuntime extends ObjectValueRuntime {
     if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
       return objectResult;
     }
-    throw new Error(`object ABI does not support interface entry ${entry.entry}`);
+    throw new Error(
+      `object ABI does not support interface entry ${entry.entry}`,
+    );
   }
 
   tryObjectResolvedCall(entry, args, cache, timing = null) {
@@ -321,13 +381,29 @@ export class VirRuntime extends ObjectValueRuntime {
       try {
         for (let index = 0; index < plan.args.length; index++) {
           const arg = plan.args[index];
-          argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+          argObjs.push(
+            this.makeObjectValue(
+              arg.type,
+              args[index],
+              `${entry.entry} argument ${arg.name}`,
+            ),
+          );
         }
       } finally {
         if (timing !== null) timing.endMarshal(marshalStarted);
       }
-      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) =>
-        this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`), timing);
+      return this.callResolvedObjects(
+        entry,
+        cache,
+        argObjs,
+        (resultObj) =>
+          this.liftOwnedObjectValue(
+            plan.resultType,
+            resultObj,
+            `${entry.entry} result`,
+          ),
+        timing,
+      );
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
@@ -338,8 +414,10 @@ export class VirRuntime extends ObjectValueRuntime {
       return cache.objectCallPlan;
     }
     const resultType = entry.result;
-    if (!objectResultSupported(resultType) ||
-        !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
+    if (
+      !objectResultSupported(resultType) ||
+      !entry.args.every((arg) => objectArgumentSupported(arg.type))
+    ) {
       cache.objectCallPlan = null;
       return null;
     }
@@ -380,9 +458,12 @@ export class VirRuntime extends ObjectValueRuntime {
     if (cache.callSlot !== undefined) {
       return cache.callSlot;
     }
-    const callSlot = this.exports.vir_resolve_call_export(cache.exportIndex) >>> 0;
+    const callSlot =
+      this.exports.vir_resolve_call_export(cache.exportIndex) >>> 0;
     if (callSlot === 0) {
-      throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
+      throw new Error(
+        this.lastCallError() || `call entry not found: ${entry.entry}`,
+      );
     }
     cache.callSlot = callSlot;
     return callSlot;
@@ -390,7 +471,9 @@ export class VirRuntime extends ObjectValueRuntime {
 
   lastCallError() {
     const len = this.exports.vir_call_error_size?.() ?? 0;
-    return len === 0 ? "" : this.readWasmString(this.exports.vir_call_error(), len);
+    return len === 0
+      ? ""
+      : this.readWasmString(this.exports.vir_call_error(), len);
   }
 
   allocBytes(bytes) {
@@ -413,7 +496,11 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   writePointerArray(ptr, values) {
-    const view = new DataView(this.exports.memory.buffer, ptr, values.length * 4);
+    const view = new DataView(
+      this.exports.memory.buffer,
+      ptr,
+      values.length * 4,
+    );
     for (let index = 0; index < values.length; index++) {
       view.setUint32(index * 4, values[index], true);
     }
@@ -424,7 +511,9 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   readWasmString(ptr, len) {
-    return textDecoder.decode(new Uint8Array(this.exports.memory.buffer, ptr, len));
+    return textDecoder.decode(
+      new Uint8Array(this.exports.memory.buffer, ptr, len),
+    );
   }
 
   readWasmBytes(ptr, len) {
@@ -456,12 +545,20 @@ export class VirRuntime extends ObjectValueRuntime {
     this.requireFunction("vir_closure_call_objects");
     const fnArgs = requireFunctionArgs(type, "callback");
     if (args.length !== fnArgs.length) {
-      throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
+      throw new Error(
+        `callback expects ${fnArgs.length} arguments, got ${args.length}`,
+      );
     }
     const argObjs = [];
     try {
       fnArgs.forEach((arg, index) => {
-        argObjs.push(this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`));
+        argObjs.push(
+          this.makeObjectValue(
+            arg.type,
+            args[index],
+            `callback argument ${arg.name}`,
+          ),
+        );
       });
       return this.callClosureObjects(rootId, type, argObjs);
     } finally {
@@ -475,11 +572,18 @@ export class VirRuntime extends ObjectValueRuntime {
     try {
       this.hostState?.clearCallError();
       if (argObjs.length !== 0) {
-        argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
+        argvPtr = this.allocByteLength(
+          argObjs.length * 4,
+          "callback argv pointer array",
+        );
         this.writePointerArray(argvPtr, argObjs);
       }
       try {
-        resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+        resultObj = this.exports.vir_closure_call_objects(
+          rootId,
+          argvPtr,
+          argObjs.length,
+        );
       } catch (error) {
         const hostError = this.hostState?.takeCallError();
         throw hostError ?? error;
@@ -492,7 +596,11 @@ export class VirRuntime extends ObjectValueRuntime {
       if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
-      return this.liftOwnedObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
+      return this.liftOwnedObjectValue(
+        requireFunctionResult(type, "callback"),
+        resultObj,
+        "callback result",
+      );
     } finally {
       if (argvPtr !== 0) {
         this.freeBytes(argvPtr);
@@ -509,7 +617,9 @@ export class VirRuntime extends ObjectValueRuntime {
 
   lastClosureCallError() {
     const len = this.exports.vir_closure_call_error_size?.() ?? 0;
-    return len === 0 ? "" : this.readWasmString(this.exports.vir_closure_call_error(), len);
+    return len === 0
+      ? ""
+      : this.readWasmString(this.exports.vir_closure_call_error(), len);
   }
 
   dispose() {
@@ -559,7 +669,7 @@ function boxedCallEntryNames(manifest) {
   for (const target of manifest?.metadata?.targets ?? []) {
     for (const root of target?.resolvedRoots ?? []) {
       if (typeof root === "string" && root.endsWith("._boxed")) {
-        names.add(root.slice(0, -("._boxed".length)));
+        names.add(root.slice(0, -"._boxed".length));
       }
     }
   }

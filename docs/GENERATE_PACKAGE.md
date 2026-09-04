@@ -28,10 +28,18 @@ Targets have one of five modes:
   `@[vir_export]` or `@[vir_startup]` in a source file.
 - `--target-marked-module <driver.lean> <module>`: package marked declarations
   owned by one imported module while excluding marked declarations from its
-  dependencies, then follow opaque declaration ownership to load reached module
-  IR for composable package-set emission. The CLI's internal
+  dependencies. The CLI's internal
   `--module-set-output` arguments provide descriptor and shard destinations to
   the Lake `:vir` facet.
+
+The corresponding manifest `mode` values are `explicit`, `packageOnly`,
+`all`, `marked`, and `markedModule`. `Target` represents these alternatives
+with `TargetMode`, so callers cannot construct contradictory combinations of
+selection booleans.
+
+Every target mode follows opaque declaration ownership and loads the reached
+module IR before validating the final closure. The module-marked mode also
+retains declaration ownership for composable package-set emission.
 
 ## Module Map
 
@@ -52,6 +60,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures and attribute-time marker
   validation.
+- `Vir.LeanName`: strict dotted-name parsing shared by package tools,
+  client-native manifests, inventories, and infoview entrypoints.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
 - `Vir.HostMetadata`: host-import marker identity and the single encoder/decoder
@@ -144,8 +154,9 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 8. `Emit.emitPackage` writes the binary package only when the closure and
    manifest have no diagnostics that would make the package ambiguous or
    unsupported. `Run.runModuleSet` partitions a successful closure by module,
-   filters Lean's dependency-first module order to the reached owners, and
-   preserves initializer metadata in each owning member. Dependency members
+   filters Lean's dependency-first runtime module order to the reached owners,
+   ignores meta-only import edges, and preserves initializer metadata in each
+   owning member. Dependency members
    have empty public manifests and the root retains the aggregate interface.
 
 ## Ownership Checklist
@@ -173,7 +184,7 @@ for the full matrix.
   changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
   `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
-  /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
+/tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
   change.
 - Lean library packaging or import layout: `bash scripts/build-lean-lib.sh`.
 
@@ -184,12 +195,20 @@ package generation run. This is stricter than Lean's module system because the
 current `.irpkg` format stores declarations by Lean name and the closure lookup
 must not depend on source order.
 
-The same source may appear in more than one target mode. This is useful when a
-package needs a public export target plus a package-only support target.
+The same canonical source file may appear in more than one target mode, even
+through different lexical paths or symlinks. The frontend resolves each input
+with `realPath`, elaborates the file exactly once, then applies each target
+selection to the shared environment. This is useful when a package needs a
+public export target plus a package-only support target without repeating
+`#eval`, `run_cmd`, macro, or initializer elaboration effects.
 
 The generator does not rewrite source commands. A target containing `#eval`,
 `run_cmd`, macros, or initializers is responsible for their normal elaboration
 behavior and any resulting output.
+
+Closure selection is declaration-driven. An otherwise-unreferenced imported
+module is not included solely because it has an initializer; browser-visible
+lifecycle work should be exposed as a reached `@[vir_startup]` declaration.
 
 ## Interface Notes
 
@@ -286,8 +305,9 @@ path.
 - `Missing IR Declarations`: a requested root or closure dependency was not
   present in the loaded source environments. Check the target source path,
   imports, explicit root names, and whether a package-only support target is
-  needed. For a module-system export, this can be the opaque imported boundary
-  named by the earlier attribute diagnostic.
+  needed. For a module-system export, generation normally loads the owning
+  module automatically; a remaining failure means that ownership could not be
+  resolved or the owning module still did not provide compiled IR.
 - `Missing Native Extern Registrations`: the closure reached a Lean runtime
   primitive that needs a local demo shim. Add the registration in
   `Vir.GeneratePackage.NativeExterns`, then run `npm run check:native-externs`;

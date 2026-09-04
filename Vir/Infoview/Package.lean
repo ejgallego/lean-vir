@@ -4,11 +4,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean.DeclarationRange
-import Lean.Widget
-import Init.System.Uri
-import Vir.GeneratePackage
-import Vir.Infoview.Assets
+module
+
+public import Lean.DeclarationRange
+public import Lean.Widget
+public meta import Lean.Widget
+public import Init.System.Uri
+public import Vir.GeneratePackage
+public meta import Vir.GeneratePackage
+public import Vir.Infoview.Assets
+
+public section
 
 namespace Lean.Vir.Infoview
 
@@ -19,12 +25,21 @@ structure IRPackage where
   roots : Array String
   deriving Server.RpcEncodable
 
-structure IRPackageRequest where
-  package : IRPackage
+/--
+Meta-phase mirror of `IRPackage` for server RPC requests. `IRPackage` remains a
+runtime value because it is embedded in widget props; its generated
+`RpcEncodable` instance therefore cannot be called from a `meta` RPC handler.
+-/
+meta structure IRPackageRpc where
+  roots : Array String
+  deriving Server.RpcEncodable
+
+meta structure IRPackageRequest where
+  package : IRPackageRpc
   pos : Lsp.Position
   deriving Server.RpcEncodable
 
-structure IRPackageResponse where
+meta structure IRPackageResponse where
   source : String
   roots : Array String
   byteSize : String
@@ -33,54 +48,49 @@ structure IRPackageResponse where
   report : String
   deriving Server.RpcEncodable
 
-structure IRPackageInfo where
+meta structure IRPackageInfo where
   source : String
   roots : Array String
   revision : String
   deriving Server.RpcEncodable
 
-def nameFromDotted (text : String) : Except String Name := do
-  if text.isEmpty then
-    throw "root name must be non-empty"
-  let parts := text.splitOn "."
-  if parts.any (fun part => part.isEmpty) then
-    throw s!"root name `{text}` must not contain empty components"
-  return parts.foldl (fun name part => .str name part) .anonymous
-
-def irPackageRoots (package : IRPackage) : Except String (Array Name) := do
-  if package.roots.isEmpty then
+private meta def irPackageRootNames (roots : Array String) : Except String (Array Name) := do
+  if roots.isEmpty then
     throw "at least one root name is required"
   let mut names : Array Name := #[]
-  for root in package.roots do
-    let name ← nameFromDotted root
+  for root in roots do
+    let name ← Vir.parseDottedName root
     if !names.contains name then
       names := names.push name
   return names
 
-def documentSourceName (doc : Server.FileWorker.EditableDocument) : String :=
+meta def irPackageRoots (package : IRPackage) : Except String (Array Name) :=
+  irPackageRootNames package.roots
+
+meta def documentSourceName (doc : Server.FileWorker.EditableDocument) : String :=
   match System.Uri.fileUriToPath? doc.meta.uri with
   | some path => path.toString
   | none => doc.meta.uri
 
-def sortedNames (names : Array Name) : Array Name :=
+meta def sortedNames (names : Array Name) : Array Name :=
   names.qsort (fun lhs rhs => lhs.toString < rhs.toString)
 
-def dedupNames (names : Array Name) : Array Name :=
+meta def dedupNames (names : Array Name) : Array Name :=
   names.foldl (fun acc name =>
     if acc.contains name then acc else acc.push name) #[]
 
-def hashArray (seed : UInt64) (items : Array α) (hashItem : α → UInt64) : UInt64 :=
+meta def hashArray (seed : UInt64) (items : Array α) (hashItem : α → UInt64) : UInt64 :=
   items.foldl (fun h item => mixHash h (hashItem item)) (mixHash seed (hash items.size))
 
-def hashOption (seed : UInt64) (value? : Option α) (hashItem : α → UInt64) : UInt64 :=
+meta def hashOption (seed : UInt64) (value? : Option α) (hashItem : α → UInt64) : UInt64 :=
   match value? with
   | none => mixHash seed (hash "none")
   | some value => mixHash (mixHash seed (hash "some")) (hashItem value)
 
-def hashBool (value : Bool) : UInt64 :=
+meta def hashBool (value : Bool) : UInt64 :=
   if value then hash "true" else hash "false"
 
-partial def irTypeHash : IRType → UInt64
+meta partial def irTypeHash : IRType → UInt64
   | .float => hash "IRType.float"
   | .uint8 => hash "IRType.uint8"
   | .uint16 => hash "IRType.uint16"
@@ -98,33 +108,33 @@ partial def irTypeHash : IRType → UInt64
   | .tagged => hash "IRType.tagged"
   | .void => hash "IRType.void"
 
-def varHash (x : VarId) : UInt64 :=
+meta def varHash (x : VarId) : UInt64 :=
   hash x.idx
 
-def joinPointHash (j : JoinPointId) : UInt64 :=
+meta def joinPointHash (j : JoinPointId) : UInt64 :=
   hash j.idx
 
-def argHash : Arg → UInt64
+meta def argHash : Arg → UInt64
   | .var x => mixHash (hash "Arg.var") (varHash x)
   | .erased => hash "Arg.erased"
 
-def paramHash (param : Param) : UInt64 :=
+meta def paramHash (param : Param) : UInt64 :=
   mixHash
     (mixHash (mixHash (hash "Param") (varHash param.x)) (hashBool param.borrow))
     (irTypeHash param.ty)
 
-def ctorInfoHash (info : CtorInfo) : UInt64 :=
+meta def ctorInfoHash (info : CtorInfo) : UInt64 :=
   mixHash
     (mixHash
       (mixHash (mixHash (hash "CtorInfo") (hash info.name)) (hash info.cidx))
       (hash info.size))
     (mixHash (hash info.usize) (hash info.ssize))
 
-def litValHash : LitVal → UInt64
+meta def litValHash : LitVal → UInt64
   | .num value => mixHash (hash "LitVal.num") (hash value)
   | .str value => mixHash (hash "LitVal.str") (hash value)
 
-def exprHash : IR.Expr → UInt64
+meta def exprHash : IR.Expr → UInt64
   | .ctor info args =>
       hashArray (mixHash (hash "Expr.ctor") (ctorInfoHash info)) args argHash
   | .reset n x =>
@@ -157,7 +167,7 @@ def exprHash : IR.Expr → UInt64
 
 mutual
 
-partial def fnBodyHash : FnBody → UInt64
+meta partial def fnBodyHash : FnBody → UInt64
   | .vdecl x ty expr body =>
       mixHash
         (mixHash
@@ -216,7 +226,7 @@ partial def fnBodyHash : FnBody → UInt64
   | .unreachable =>
       hash "FnBody.unreachable"
 
-partial def altHash : Alt → UInt64
+meta partial def altHash : Alt → UInt64
   | .ctor info body =>
       mixHash (mixHash (hash "Alt.ctor") (ctorInfoHash info)) (fnBodyHash body)
   | .default body =>
@@ -224,17 +234,17 @@ partial def altHash : Alt → UInt64
 
 end
 
-def declInfoHash (info : DeclInfo) : UInt64 :=
+meta def declInfoHash (info : DeclInfo) : UInt64 :=
   hashOption (hash "DeclInfo") info.sorryDep? hash
 
-private def hostImportMetadataHash (metadata : Vir.HostMetadata.HostImportMetadata) : UInt64 :=
+private meta def hostImportMetadataHash (metadata : Vir.HostMetadata.HostImportMetadata) : UInt64 :=
   mixHash (hash metadata.marker.attributeName) (hash metadata.target)
 
-private def virExternMetadataHash (decl : Decl) : UInt64 :=
+private meta def virExternMetadataHash (decl : Decl) : UInt64 :=
   hashOption (hash "VirExternMetadata")
     (Vir.GeneratePackage.virJsMetadataFromDecl? decl) hostImportMetadataHash
 
-def irDeclHash : Decl → UInt64
+meta def irDeclHash : Decl → UInt64
   | .fdecl name params resultType body info =>
       mixHash
         (hashArray (mixHash (mixHash (hash "Decl.fdecl") (hash name)) (irTypeHash resultType)) params paramHash)
@@ -245,12 +255,12 @@ def irDeclHash : Decl → UInt64
         (hashArray (mixHash (mixHash (hash "Decl.extern") (hash name)) (irTypeHash resultType)) params paramHash)
         (virExternMetadataHash decl)
 
-def closureIRHash (closure : Vir.GeneratePackage.Closure) : UInt64 :=
+meta def closureIRHash (closure : Vir.GeneratePackage.Closure) : UInt64 :=
   let decls := closure.decls.qsort fun lhs rhs => lhs.decl.name.toString < rhs.decl.name.toString
   hashArray (hash "ClosureIR") decls fun loaded =>
     mixHash (mixHash (hash loaded.source) (hash loaded.decl.name)) (irDeclHash loaded.decl)
 
-def sourceRangeHash
+meta def sourceRangeHash
     (doc : Server.FileWorker.EditableDocument)
     (range : DeclarationRange) : UInt64 :=
   let start := doc.meta.text.ofPosition range.pos
@@ -260,7 +270,7 @@ def sourceRangeHash
     s!"{range.pos.line}:{range.pos.column}-{range.endPos.line}:{range.endPos.column}"
   mixHash (hash text) (hash positionToken)
 
-def localClosureDeclNames
+meta def localClosureDeclNames
     (source : String)
     (closure : Vir.GeneratePackage.Closure) : Array Name :=
   let names := closure.decls.foldl (fun names loaded =>
@@ -270,7 +280,7 @@ def localClosureDeclNames
       names) #[]
   sortedNames (dedupNames names)
 
-def packageRangeTokenFrom
+meta def packageRangeTokenFrom
     (doc : Server.FileWorker.EditableDocument)
     (ranges : Array (Name × Option DeclarationRanges)) : Option String := Id.run do
   let mut count := 0
@@ -286,19 +296,19 @@ def packageRangeTokenFrom
   else
     some s!"source-ranges:{count}:{h}"
 
-def packageClosure
+meta def packageClosure
     (source : String)
     (roots : Array Name)
     (snap : Server.Snapshots.Snapshot) :
     Vir.GeneratePackage.Closure :=
   let target : Vir.GeneratePackage.Target := {
     source := System.FilePath.mk source
-    roots := roots
+    mode := .explicit roots
   }
   let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
   Vir.GeneratePackage.collectClosure #[target] index
 
-def packageRangeToken?
+meta def packageRangeToken?
     (doc : Server.FileWorker.EditableDocument)
     (source : String)
     (closure : Vir.GeneratePackage.Closure)
@@ -313,7 +323,7 @@ def packageRangeToken?
     return result
   return packageRangeTokenFrom doc ranges
 
-def packageClosureToken
+meta def packageClosureToken
     (doc : Server.FileWorker.EditableDocument)
     (source : String)
     (roots : Array Name)
@@ -323,7 +333,7 @@ def packageClosureToken
   let rangeToken := rangeToken?.getD "source-ranges:none"
   return s!"closure-ir:{closure.decls.size}:{closureIRHash closure}:{rangeToken}"
 
-def irPackageRevision
+meta def irPackageRevision
     (_doc : Server.FileWorker.EditableDocument)
     (roots : Array Name)
     (token : String) : String :=
@@ -331,9 +341,9 @@ def irPackageRevision
   s!"ir-package:{token}:{rootToken}"
 
 @[server_rpc_method]
-def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageInfo) := do
+meta def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageInfo) := do
   let roots ←
-    match irPackageRoots params.package with
+    match irPackageRootNames params.package.roots with
     | .ok roots => pure roots
     | .error message =>
         throwThe RequestError { code := .invalidParams, message := s!"Invalid VIR IR package roots: {message}" }
@@ -348,9 +358,9 @@ def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageI
     }
 
 @[server_rpc_method]
-def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageResponse) := do
+meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackageResponse) := do
   let roots ←
-    match irPackageRoots params.package with
+    match irPackageRootNames params.package.roots with
     | .ok roots => pure roots
     | .error message =>
         throwThe RequestError { code := .invalidParams, message := s!"Invalid VIR IR package roots: {message}" }
@@ -361,7 +371,7 @@ def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackage
     let revision := irPackageRevision doc roots token
     let target : Vir.GeneratePackage.Target := {
       source := System.FilePath.mk source
-      roots := roots
+      mode := .explicit roots
     }
     let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
     match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with

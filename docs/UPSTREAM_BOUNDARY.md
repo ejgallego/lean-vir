@@ -451,13 +451,17 @@ descriptors use Lean's dependency-first module-initialization order, while each
 member retains its owning initializer metadata. `vir_begin_ir_package_set`
 clears the candidate,
 `vir_append_ir_package` transactionally decodes each ordinary format-10 member,
-and `vir_finish_ir_package_set` runs the aggregate initializer table once after
-all declarations are available. The final root member supplies the interface
-manifest and export summaries. Duplicate declarations, initializer globals,
-host imports, and export summaries are rejected before a member is appended.
-JavaScript adopts the candidate only after the whole set and root manifest are
-valid, so a partial dependency graph is never exposed through the public
-runtime wrapper.
+`vir_prepare_ir_package_set` builds the aggregate indices without running user
+initializers, and `vir_finish_ir_package_set` runs the initializer table once.
+The final root member supplies the interface manifest and export summaries.
+JavaScript validates that manifest—including its binary-header format version
+and member/target invariants—between prepare and finish. Any decode, prepare,
+or manifest failure calls `vir_abort_ir_package_set`, releasing all staged
+state. Duplicate declarations, initializer globals, host imports, and export
+summaries are rejected before a member is appended. JavaScript adopts the
+candidate only after the whole set is valid and initialized, so neither a
+partial dependency graph nor initialization under an invalid host contract is
+exposed through the public runtime wrapper.
 
 Manifest export indices remain scoped to the root package manifest rather than
 becoming global package identities. Individual package unload, version solving,

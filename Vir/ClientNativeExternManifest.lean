@@ -61,7 +61,7 @@ private def validateFields (path : System.FilePath) : Json → IO Unit
 private def parseNames
     (path : System.FilePath) (field : String) (values : Array String) : IO (Array Name) := do
   values.mapM fun value =>
-    match parseDottedName value with
+    match Vir.parseDottedName value with
     | .ok name => pure name
     | .error error => manifestError path s!"field `{field}`: {error}"
 

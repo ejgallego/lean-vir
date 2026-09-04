@@ -53,12 +53,19 @@ lists roots, packaged declarations, native externs, initializer globals,
 interface exports, JavaScript host imports, and any loud diagnostics.
 
 On success, the command prints a package summary: package format, Lean
-toolchain, generation time, total declarations, interface exports, JavaScript
-host imports, source targets, and resolved roots. The same data is embedded in
-`manifest.metadata`.
+toolchain, total declarations, interface exports, JavaScript host imports,
+source targets, and resolved roots. Stable build identity is embedded in
+`manifest.metadata`; the adjacent diagnostic report alone records wall-clock
+generation time.
 
 Local package generation also builds `build/lean-lib`, which provides the
 project-owned `Vir.*` modules for host import declarations.
+
+When a selected declaration crosses an opaque module-system import, the local
+generator loads the owning module's compiled IR and folds the reached closure
+into its single output package. Lake's `:vir` facet uses the same closure logic
+but preserves module ownership in a package-set descriptor and dependency
+members.
 
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.
@@ -93,8 +100,8 @@ npm run dev
 
 Open `/dev.html`. The page creates a fresh WASM instance, loads the selected
 `.irpkg`, reads the embedded interface manifest, and generates entry controls
-from that manifest. The header also shows the package metadata, including
-source targets, toolchain, generation time, declaration count, and export count.
+from that manifest. The header also shows source targets, toolchain,
+declaration count, and export count.
 
 There are three package loading paths:
 
@@ -105,9 +112,9 @@ There are three package loading paths:
 - Load a package URL, which is relative to Vite's served assets. For example,
   `fixtures-basic.irpkg` resolves to `web/public/fixtures-basic.irpkg`.
 
-The development runner treats each selection as a focused one-member set. It
-does not load `.irpkg-set.json` descriptors; use `irPackageSetUrl` through the
-JavaScript runtime API for a Lake-generated module package set.
+The development runner treats `.irpkg` selections as focused one-member sets
+and loads `.irpkg-set.json` URLs as complete module package sets. Application
+code uses the single `irPackageSet` runtime option for either form.
 
 The package runner accepts URL parameters:
 
@@ -201,8 +208,9 @@ single-field structures.
 
 The local source workflow emits one `.irpkg` member. Lake module-system clients
 build `:vir`: the generator uses Lean's declaration-to-module ownership data to
-materialize reached opaque imports and emits a JSON-described set of ordinary
-format-10 `.irpkg` members.
+materialize reached opaque imports and emits a version-2 JSON-described set of
+ordinary format-10 `.irpkg` members. The descriptor binds every member to its
+module, role, byte length, and SHA-256 before the runtime accepts the set.
 The browser still does not load `.olean` or Lean's raw `.ir` format. The WASM
 side decodes every package member into real Lean IR objects and serves their
 aggregate declaration table through `lean_ir_find_env_decl`.

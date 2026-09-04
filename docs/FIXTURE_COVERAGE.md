@@ -52,7 +52,14 @@ the informational postponed-compilation path. The Lake facet smoke also builds
 external `module` sources that import the typed marker preflight, full interface
 classifier, and complete `Vir.GeneratePackage` pipeline APIs. It covers the
 safe stop at an opaque imported declaration, while package generation loads the
-owning module and reports the remaining unsupported dependency path.
+owning module and reports the remaining unsupported dependency path. The
+module-set fixture also checks dependency-first initialization through a
+private import and verifies that a reached imported declaration is packaged
+without becoming a public interface export. Root initializer coverage verifies
+that the public member initializes last. The fixture excludes actual meta-only
+and otherwise-unreached initializer modules. The Lake facet smoke mutates an
+imported implementation, a descriptor member, and a client-native manifest to
+verify source, member-integrity, and environment-profile invalidation.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather

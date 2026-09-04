@@ -19,7 +19,7 @@ const { wasmBytes, hostPackageBytes, defaultPackageBytes } =
 
 const hostRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: createCallbackHostBindings(),
 });
 
@@ -44,7 +44,7 @@ assert.equal(calledWith, nativeItem);
 let retainedCallback = null;
 const retainedCallbackRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       retainedCallback = callback;
@@ -78,7 +78,7 @@ assert.throws(() => retainedCallback(4n), /disposed runtime/);
 
 const nestedCallbackErrorRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => callback(input, input),
     "test.recordNat": () => undefined,
@@ -94,7 +94,7 @@ nestedCallbackErrorRuntime.dispose();
 let throwingCallback = null;
 const throwingBindingRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       throwingCallback = callback;
@@ -117,7 +117,7 @@ throwingBindingRuntime.dispose();
 let bindingDisposals = 0;
 const reloadRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     ...createCallbackHostBindings(),
     [VIR_HOST_DISPOSE]() {

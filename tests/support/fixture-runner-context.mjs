@@ -60,7 +60,7 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
   async function instantiateWasm(packagePath) {
     const wasm = await upstreamWasmBytes();
     const irPackage = await readFile(packagePath);
-    return createVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
+    return createVirRuntime({ wasmBytes: wasm, irPackageSet: [irPackage] });
   }
 
   async function generatePackage(fixture) {

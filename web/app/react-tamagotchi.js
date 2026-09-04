@@ -54,7 +54,7 @@ async function mountTamagotchi() {
   clearMount();
   try {
     const packageMemberBytes = await fetchBytes(`${import.meta.env.BASE_URL}${packageFile}`);
-    runtime = await runtimeFactory.createRuntime({ irPackageSetBytes: [packageMemberBytes] });
+    runtime = await runtimeFactory.createRuntime({ irPackageSet: [packageMemberBytes] });
     renderRuntimeSummary();
     const mounted = runtime.call(tamagotchiEntry, tamagotchiSelector);
     setTamagotchiResult(

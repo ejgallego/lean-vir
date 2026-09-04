@@ -73,7 +73,7 @@ function runtimeForPackage(packageFile) {
     runtimePromises.set(
       packageFile,
       packageBytes(packageFile).then((bytes) =>
-        runtimeFactory.createRuntime({ irPackageSetBytes: [bytes] })),
+        runtimeFactory.createRuntime({ irPackageSet: [bytes] })),
     );
   }
   return runtimePromises.get(packageFile);

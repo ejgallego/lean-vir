@@ -29,7 +29,7 @@ def readExtraNames (path : System.FilePath) : IO (Array Name) := do
     let line := line.trimAscii.toString
     if line.isEmpty || line.startsWith "#" then
       continue
-    let name ← IO.ofExcept (parseDottedName line)
+    let name ← IO.ofExcept (Vir.parseDottedName line)
     if names.contains name then
       throw <| IO.userError s!"duplicate extra native extern `{name}`"
     names := names.push name

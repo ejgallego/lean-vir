@@ -169,7 +169,9 @@ export const browserRunnerCaseSpecs = [
     entryName: "Vir.Fixtures.InterfaceShapes.profileStatsBump",
     expected: {
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
+      runInputs: [
+        `{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`,
+      ],
       result: `{
   "enabled": false,
   "level": 3,
@@ -223,7 +225,9 @@ export const browserRunnerCaseSpecs = [
     expected: {
       input: `{"nickname":"","active":false,"visits":0,"score":0,"tags":[]}`,
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`],
+      runInputs: [
+        `{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`,
+      ],
       result: `{
   "nickname": "lean!",
   "active": false,
@@ -241,7 +245,9 @@ export const browserRunnerCaseSpecs = [
     entryName: "Vir.Fixtures.RecursiveTypes.treeRootScore",
     expected: {
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"kind":"branch","fields":{"left":{"kind":"leaf","value":4},"right":{"kind":"branch","fields":{"left":{"kind":"leaf","value":5},"right":{"kind":"leaf","value":6}}}}}`],
+      runInputs: [
+        `{"kind":"branch","fields":{"left":{"kind":"leaf","value":4},"right":{"kind":"branch","fields":{"left":{"kind":"leaf","value":5},"right":{"kind":"leaf","value":6}}}}}`,
+      ],
       result: "515",
     },
   },
@@ -259,7 +265,9 @@ export const browserRunnerCaseSpecs = [
     entryName: "Vir.Fixtures.RecursiveTypes.jsonRootScore",
     expected: {
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"kind":"object","value":[{"fst":"flag","snd":{"kind":"bool","value":true}},{"fst":"empty","snd":{"kind":"null"}}]}`],
+      runInputs: [
+        `{"kind":"object","value":[{"fst":"flag","snd":{"kind":"bool","value":true}},{"fst":"empty","snd":{"kind":"null"}}]}`,
+      ],
       result: "22",
     },
   },
@@ -279,15 +287,17 @@ export const browserRunnerFailureSpecs = [
       packageName: "...",
       entryCount: 0,
       exports: "...",
-      result: /IR package-set member 1 load failed: invalid IR package magic `not-lean-vir`/,
+      result:
+        /IR package-set member 1 is invalid: invalid IR package magic `not-lean-vir`/,
     },
   },
   {
     url: "dev.html?package=unsupported-interface.irpkg",
     expected: {
-      packageName: "unsupported-interface.irpkg",
+      packageName: "...",
       entryCount: 0,
-      result: /package contains unsupported interface exports:[\s\S]*BrowserSmoke\.unsupported/,
+      result:
+        /package contains unsupported interface exports:[\s\S]*BrowserSmoke\.unsupported/,
     },
   },
 ];

@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Browser
-import Vir.ProofWidgets.Rpc
-import Vir.Infoview.Surface.Generated
+module
+
+public import Vir.Browser
+public import Vir.ProofWidgets.Rpc
+public import Vir.Infoview.Surface.Generated
+
+public section
 
 namespace Lean.Vir.Infoview
 

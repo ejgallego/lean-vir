@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Infoview
-import Vir.Examples.Style
-import Vir.React
+module
+
+public import Vir.Infoview
+public import Vir.Examples.Style
+public import Vir.React
+
+public section
 
 namespace ReactProofWidget
 

@@ -39,6 +39,7 @@ static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_set_has_members = false;
 static bool g_package_set_open = false;
+static bool g_package_set_prepared = false;
 static bool g_package_ready = false;
 static bool g_initializers_ran = false;
 static uint32_t g_package_format_version = 0;
@@ -77,6 +78,7 @@ static void clear_loaded_package_state() {
     g_interface_manifest.clear();
     g_package_set_has_members = false;
     g_package_set_open = false;
+    g_package_set_prepared = false;
     g_package_ready = false;
     g_initializers_ran = false;
     g_package_format_version = 0;
@@ -331,7 +333,7 @@ bool append_package(uint8_t const * data, size_t size) {
     return append_package_state(data, size);
 }
 
-bool finish_package_set() {
+bool prepare_package_set() {
     if (!g_package_set_open) {
         g_last_error = "IR package set is not open";
         return false;
@@ -344,6 +346,16 @@ bool finish_package_set() {
     if (!build_decl_indices()) {
         return false;
     }
+    g_package_set_prepared = true;
+    return true;
+}
+
+bool finish_package_set() {
+    if (!g_package_set_prepared) {
+        g_last_error = "IR package set is not prepared";
+        return false;
+    }
+    g_package_set_prepared = false;
     if (!run_package_initializers_state()) {
         return false;
     }
@@ -467,6 +479,10 @@ char const * package_interface_manifest() {
 
 uint32_t package_interface_manifest_size() {
     return static_cast<uint32_t>(g_interface_manifest.size());
+}
+
+uint32_t package_format_version() {
+    return g_package_format_version;
 }
 
 } // namespace lean::vir

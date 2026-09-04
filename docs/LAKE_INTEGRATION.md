@@ -26,12 +26,17 @@ described under [Install The Browser SDK](#install-the-browser-sdk).
 
 ## Mark The Browser Surface
 
-Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
-Use `@[vir_startup]` for startup hooks that the browser host should run after
-loading the package.
+Import `Vir.Browser` for the browser types and import `Vir.Attributes` at meta
+time for `@[vir_export]` and `@[vir_startup]`. The umbrella `Vir` module remains
+available when a source intentionally needs the whole public surface.
 
 ```lean
-import Vir
+module
+
+public import Vir.Browser
+meta import Vir.Attributes
+
+public section
 
 open Lean.Vir.Browser
 
@@ -92,14 +97,15 @@ the full browser-facing `Vir` library:
 ```lean
 module
 
-public meta import Vir.Attributes
+meta import Vir.Attributes
 
 @[vir_export]
 public def MyModule.value : Nat := 42
 ```
 
-The canvas example below currently uses the legacy-source path because the
-broader browser library has not yet migrated to the module system.
+The canvas example below uses this same module-system path. The narrower
+`Vir.Attributes` import remains useful for packages that need marker metadata
+without the browser-facing library.
 
 ## Opt Into A Lean Extern Reference Body
 
@@ -122,11 +128,12 @@ The command accepts only `@[extern] def`s with transparent kernel bodies. It
 rejects bodyless or opaque declarations, duplicate requests, non-externs, and
 directly recursive fallbacks. Lean's
 ordinary native compiler continues to use the extern; the command compiles a
-private reference-body clone only for VIR closure resolution. Package
-generation emits an adapter at the original name and preserves the extern's
-IR parameter ownership while calling the clone. Any dependencies newly exposed
-by the reference body must still have ordinary IR or a registered native
-provider.
+reserved-name reference-body clone only for VIR closure resolution. In a Lean
+module the clone is exported as an internal compiler artifact so the generated
+`import all` driver can load it; it is not a user-facing declaration. Package
+generation emits an adapter at the original name and preserves the extern's IR
+parameter ownership while calling the clone. Any dependencies newly exposed by
+the reference body must still have ordinary IR or a registered native provider.
 
 Use this only as an explicit package portability decision. It does not add the
 extern symbol to the shared runtime, enable general dynamic lookup, or affect
@@ -144,28 +151,46 @@ report under `.lake/build/vir/module-sets/`:
 ```text
 MySlides/Runtime.irpkg-set.json
 MySlides/Runtime.irpkg
-MySlides/Runtime.parts/MySlides.Support.irpkg
+MySlides/Runtime.parts/0.irpkg
 MySlides/Runtime.report.md
 ```
 
-For current, legacy Lean modules the generator re-elaborates the module source.
-When Lake supplies compiled module IR, the facet depends on that `.ir` and uses
-a generated `import all MySlides.Runtime` driver.
+For legacy Lean source files that do not produce compiled module IR, the
+generator re-elaborates the source. For module-system files, the facet depends
+on Lake's `.ir` artifact and uses a generated
+`import all MySlides.Runtime` driver.
 
 Every member is an ordinary format-10 `.irpkg` that owns its module's
-declarations and initializer metadata. The descriptor filters Lean's canonical
-dependency-first module order to the reached modules and puts the root last.
+declarations and initializer metadata. The descriptor reconstructs a
+dependency-first order from Lean's loaded module graphs, filters it to the
+reached runtime modules, ignores meta-only import edges, and puts the root
+last.
+Dependency shard paths use stable ordinals; module identity lives in the
+descriptor and each member manifest. The root manifest records the selected
+module instead of the checkout-local generated driver path, so otherwise
+identical module sets are byte-for-byte reproducible across build directories.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all
 members before running initializer globals in that module order. Duplicate
 declaration, initializer, host-import, or export-summary identities fail the
 candidate load.
 
+Packaging is rooted in `@[vir_export]`, `@[vir_startup]`, or explicitly
+selected declarations. Merely importing a module for initializer side effects
+does not make that module a package member. Model browser lifecycle work as a
+reached `@[vir_startup]` hook instead of relying on an otherwise-unreferenced
+Lean module initializer.
+
 The descriptor is the facet's returned artifact. The facet depends on Lake's
 transitive import artifacts, so changing an imported
 implementation regenerates the affected set even when the root module's public
-interface and `.olean` remain unchanged. A missing root package, report, or
-descriptor-listed shard also invalidates the cached descriptor target.
+interface and `.olean` remain unchanged. The selected
+`VIR_NATIVE_EXTERN_MANIFEST` path and contents are also build inputs, so native
+selection cannot reuse a package from another profile. A missing root package,
+report, descriptor-listed shard, or member whose byte length or SHA-256 no
+longer matches the descriptor invalidates the cached descriptor target.
+The cache verifier checks sizes from filesystem metadata and hashes all
+members in one portable Node crypto invocation.
 
 The descriptor is currently one Lake target: when it is invalidated, the facet
 regenerates the root and every reached dependency member as a complete set. It
@@ -173,6 +198,10 @@ does not yet cache unchanged members independently. Before rebuilding, the
 facet removes the previous descriptor, root, and root-specific shard directory,
 so a failed generation cannot leave an old descriptor advertising stale or
 partially replaced members.
+
+Package manifests omit wall-clock generation time, so clean builds with the
+same source/toolchain/profile inputs can produce the same package bytes. The
+separate Markdown report retains its generation timestamp for local diagnosis.
 
 An executable or renderer that consumes the package should declare the facet as
 a build dependency:
@@ -228,7 +257,7 @@ import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: "./vir/sdk/wasm/vir-upstream.wasm",
-  irPackageSetUrl: "./vir/module-sets/MySlides/Runtime.irpkg-set.json",
+  irPackageSet: "./vir/module-sets/MySlides/Runtime.irpkg-set.json",
 });
 vir.runStartupEntries();
 ```

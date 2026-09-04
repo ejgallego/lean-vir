@@ -6,14 +6,20 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public meta import Vir.Attributes
+meta import Vir.Attributes
 public import ModuleSetFixture.Left
 public import ModuleSetFixture.Right
+public import ModuleSetFixture.Facade
+import ModuleSetFixture.Unreached
+meta import ModuleSetFixture.MetaOnly
 
 namespace ModuleSetFixture.Root
 
+public initialize rootValue : Nat ← pure 1
+
 @[vir_export]
 public def answer : Nat :=
-  ModuleSetFixture.Left.value + ModuleSetFixture.Right.value
+  rootValue + ModuleSetFixture.Left.value + ModuleSetFixture.Right.value +
+    ModuleSetFixture.Facade.value - 1
 
 end ModuleSetFixture.Root

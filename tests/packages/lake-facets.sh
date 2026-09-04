@@ -34,12 +34,18 @@ assert_module_fixture_descriptor() {
     import fs from "node:fs";
     const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
     if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
-    if (descriptor.version !== 1) process.exit(1);
+    if (descriptor.version !== 2) process.exit(1);
+    for (const entry of descriptor.packages) {
+      if (!Number.isSafeInteger(entry.byteLength) || entry.byteLength <= 0) process.exit(1);
+      if (!/^[0-9a-f]{64}$/.test(entry.sha256)) process.exit(1);
+    }
     const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
     const expected = [
-      ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
-      ["ModuleSetFixture.Left", "dependency", "Root.parts/ModuleSetFixture.Left.irpkg"],
-      ["ModuleSetFixture.Right", "dependency", "Root.parts/ModuleSetFixture.Right.irpkg"],
+      ["ModuleSetFixture.Shared", "dependency", "Root.parts/0.irpkg"],
+      ["ModuleSetFixture.Left", "dependency", "Root.parts/1.irpkg"],
+      ["ModuleSetFixture.Right", "dependency", "Root.parts/2.irpkg"],
+      ["ModuleSetFixture.InternalBase", "dependency", "Root.parts/3.irpkg"],
+      ["ModuleSetFixture.Facade", "dependency", "Root.parts/4.irpkg"],
       ["ModuleSetFixture.Root", "root", "Root.irpkg"],
     ];
     if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
@@ -56,12 +62,27 @@ test -f "$canvas_report"
 
 module_set="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg-set.json"
 module_set_root="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg"
-module_set_shared="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/ModuleSetFixture.Shared.irpkg"
+module_set_shared="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/0.irpkg"
 test -f "$module_set"
 test -f "$module_set_root"
 test -f "$module_set_shared"
 
 assert_module_fixture_descriptor "$module_set"
+module_set_root_hash="$(sha256sum "$module_set_root" | cut -d' ' -f1)"
+module_set_shared_hash="$(sha256sum "$module_set_shared" | cut -d' ' -f1)"
+
+for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
+  mkdir -p "$repro_dir/Root.parts"
+  printf '%s\n' 'module' 'import all ModuleSetFixture.Root' > "$repro_dir/Driver.lean"
+  lake env .lake/build/bin/vir_irpkg \
+    "$repro_dir/Root.irpkg" "$repro_dir/Root.report.md" \
+    --module-set-output "$repro_dir/Root.irpkg-set.json" "$repro_dir/Root.parts" \
+    ModuleSetFixture.Root Root.irpkg Root.parts \
+    --target-marked-module "$repro_dir/Driver.lean" ModuleSetFixture.Root
+done
+cmp "$tmp/repro-a/Root.irpkg-set.json" "$tmp/repro-b/Root.irpkg-set.json"
+cmp "$tmp/repro-a/Root.irpkg" "$tmp/repro-b/Root.irpkg"
+diff -rq "$tmp/repro-a/Root.parts" "$tmp/repro-b/Root.parts"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
 printf '%s\n' 'obsolete' > "$obsolete_shard"
@@ -75,6 +96,8 @@ node --input-type=module -e '
 lake build +ModuleSetFixture.Root:vir
 test ! -e "$obsolete_shard"
 assert_module_fixture_descriptor "$module_set"
+test "$(sha256sum "$module_set_root" | cut -d' ' -f1)" = "$module_set_root_hash"
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" = "$module_set_shared_hash"
 
 node --input-type=module -e '
   import fs from "node:fs";
@@ -107,6 +130,12 @@ mv "$module_set_shared" "$tmp/shard-replaced-by-directory.irpkg"
 mkdir "$module_set_shared"
 lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
+
+printf '%s\n' 'corrupt-member-bytes' >> "$module_set_shared"
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" != "$module_set_shared_hash"
+lake build +ModuleSetFixture.Root:vir
+test "$(sha256sum "$module_set_shared" | cut -d' ' -f1)" = "$module_set_shared_hash"
 assert_module_fixture_descriptor "$module_set"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
@@ -147,19 +176,20 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   '' \
   '@[vir_export]' \
-  'public def Smoke.Dependency.importedValue : Nat := 41' > "$tmp/Smoke/Dependency.lean"
+  'public def Lean.SmokeDependency.importedValue : Nat := 41' > "$tmp/Smoke/Dependency.lean"
 
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Smoke.Dependency' \
   '' \
   '@[vir_export]' \
-  'public def Smoke.NewRuntime.value : Nat := 43' \
+  'public def Smoke.NewRuntime.value : Nat :=' \
+  '  Lean.SmokeDependency.importedValue + 2' \
   '' \
   '@[vir_startup]' \
   'public def Smoke.NewRuntime.start : Unit := ()' > "$tmp/Smoke/NewRuntime.lean"
@@ -167,7 +197,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Vir.HostValidation' \
   '' \
   '#check vir_export' \
@@ -225,6 +255,11 @@ printf '%s\n' \
   '' \
   'public import Vir.GeneratePackage' \
   '' \
+  '#check Vir.GeneratePackage.TargetMode' \
+  '#check Vir.GeneratePackage.TargetMode.explicit' \
+  '#check Vir.GeneratePackage.TargetMode.packageOnly' \
+  '#check Vir.GeneratePackage.TargetMode.markedModule' \
+  '#check Vir.parseDottedName' \
   '#check Vir.GeneratePackage.moduleNameFor' \
   '#check Vir.GeneratePackage.collectClosure' \
   '#check Vir.GeneratePackage.virJsMetadataFromDecl?' \
@@ -237,6 +272,42 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
+  'meta import Vir.Attributes' \
+  'meta import Vir.ExternFallback' \
+  '' \
+  '@[extern "smoke_client_native_first"]' \
+  'public def Smoke.ClientNative.first (value : UInt32) : UInt32 := value + 1' \
+  '' \
+  '@[extern "smoke_client_native_second"]' \
+  'public def Smoke.ClientNative.second (value : UInt32) : UInt32 := value + 2' \
+  '' \
+  'vir_extern_fallback Smoke.ClientNative.first, Smoke.ClientNative.second' \
+  '' \
+  '@[vir_export]' \
+  'public def Smoke.ClientNative.value (value : UInt32) : UInt32 :=' \
+  '  Smoke.ClientNative.first value + Smoke.ClientNative.second value' > "$tmp/Smoke/ClientNative.lean"
+
+printf '%s\n' \
+  '#include <stdint.h>' \
+  'uint32_t smoke_client_native_first(uint32_t value) { return value + 1; }' \
+  'uint32_t smoke_client_native_second(uint32_t value) { return value + 2; }' \
+  > "$tmp/client-native.c"
+
+write_client_native_manifest() {
+  local externs="$1"
+  printf '%s\n' \
+    '{' \
+    '  "format": "lean-vir-client-native-externs",' \
+    '  "version": 1,' \
+    '  "modules": ["Smoke.ClientNative"],' \
+    "  \"externs\": $externs," \
+    '  "providerSources": ["client-native.c"]' \
+    '}' > "$tmp/client-native.json"
+}
+
+printf '%s\n' \
+  'module' \
+  '' \
   'public import Init.System.IO' \
   '' \
   'public def Smoke.OpaqueDependency.environmentHome : IO String := do' \
@@ -245,7 +316,7 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Smoke.OpaqueDependency' \
   '' \
   '@[vir_export]' \
@@ -319,9 +390,11 @@ test -f "$report"
 
 module_package="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg"
 module_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
+module_dependency="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.parts/0.irpkg"
 module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
 test -f "$module_descriptor"
+test -f "$module_dependency"
 test -f "$module_driver"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
@@ -338,16 +411,32 @@ node --input-type=module -e '
   import fs from "node:fs";
   const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
   const entries = Object.fromEntries(manifest.exports.map((entry) => [entry.entry, entry]));
+  if (manifest.metadata.targets[0]?.mode !== "markedModule") process.exit(1);
   if (manifest.exports.length !== 2) process.exit(1);
   if (entries["Smoke.NewRuntime.value"]?.startup !== false) process.exit(1);
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);
-  if (entries["Smoke.Dependency.importedValue"] !== undefined) process.exit(1);
+  if (entries["Lean.SmokeDependency.importedValue"] !== undefined) process.exit(1);
 ' "$tmp/module-package.json"
+
+module_dependency_hash_before="$(sha256sum "$module_dependency" | cut -d' ' -f1)"
+printf '%s\n' \
+  'module' \
+  '' \
+  'meta import Vir.Attributes' \
+  '' \
+  '@[vir_export]' \
+  'public def Lean.SmokeDependency.importedValue : Nat := 42' > "$tmp/Smoke/Dependency.lean"
+lake -d "$tmp" build +Smoke.NewRuntime:vir
+module_dependency_hash_after="$(sha256sum "$module_dependency" | cut -d' ' -f1)"
+if [ "$module_dependency_hash_before" = "$module_dependency_hash_after" ]; then
+  echo "imported implementation change did not invalidate the VIR dependency shard" >&2
+  exit 1
+fi
 
 printf '%s\n' \
   'module' \
   '' \
-  'public meta import Vir.Attributes' \
+  'meta import Vir.Attributes' \
   'public import Smoke.OpaqueDependency' \
   '' \
   '@[vir_export]' \
@@ -361,6 +450,38 @@ if lake -d "$tmp" build +Smoke.NewRuntime:vir \
 fi
 test ! -e "$module_descriptor"
 test ! -e "$module_package"
+
+client_native_package="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.irpkg"
+client_native_report="$tmp/.lake/build/vir/module-sets/Smoke/ClientNative.report.md"
+write_client_native_manifest \
+  '["Smoke.ClientNative.first", "Smoke.ClientNative.second"]'
+VIR_NATIVE_EXTERN_MANIFEST="$tmp/client-native.json" \
+  lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_first_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+
+printf '%s\n' 'stale-client-native-report' > "$client_native_report"
+write_client_native_manifest \
+  '["Smoke.ClientNative.second", "Smoke.ClientNative.first"]'
+VIR_NATIVE_EXTERN_MANIFEST="$tmp/client-native.json" \
+  lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_second_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+if grep -q 'stale-client-native-report' "$client_native_report"; then
+  echo "client-native manifest contents did not invalidate the VIR package-set facet" >&2
+  exit 1
+fi
+test "$client_native_first_hash" = "$client_native_second_hash"
+
+printf '%s\n' 'stale-client-native-report' > "$client_native_report"
+lake -d "$tmp" build +Smoke.ClientNative:vir
+client_native_fallback_hash="$(sha256sum "$client_native_package" | cut -d' ' -f1)"
+if grep -q 'stale-client-native-report' "$client_native_report"; then
+  echo "removing the client-native manifest profile did not invalidate the VIR package-set facet" >&2
+  exit 1
+fi
+if [ "$client_native_second_hash" = "$client_native_fallback_hash" ]; then
+  echo "removing the client-native manifest profile did not change the VIR package set" >&2
+  exit 1
+fi
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"

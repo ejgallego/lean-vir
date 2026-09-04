@@ -18,20 +18,13 @@ namespace Vir.GeneratePackage
 open Lean.IR
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
-  let mode :=
-    if target.packageOnly then "packageOnly"
-    else if target.includeAll then "all"
-    else if target.resolveImportedModules then "markedModules"
-    else if target.includeMarked then "marked"
-    else "explicit"
   {
-    source := target.source.toString
-    mode := mode
-    roots := target.roots
+    origin := target.publicOrigin
+    mode := target.mode
     resolvedRoots := resolvedRootsForTarget index target
   }
 
-def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
+def collectPackageMetadata (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
     packageFormatVersion := currentPackageFormatVersion
@@ -39,7 +32,6 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
     leanGithash := Lean.githash
-    generatedAt := generatedAt
     targets := targets.map (targetMetadataFor index)
   }
 
@@ -74,8 +66,8 @@ def collectInterfaceManifest
     diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toPackageDiagnostic)
   }
   for target in targets do
-    let source := target.source.toString
-    match index.envForSource? source with
+    let source := target.publicSource
+    match index.envForSource? (index.sourceKeyFor target) with
     | none =>
         manifest := { manifest with diagnostics := manifest.diagnostics.push {
           name := .anonymous,
@@ -84,7 +76,7 @@ def collectInterfaceManifest
         } }
     | some env =>
         let candidates := exportCandidatesFor index target
-        if target.includeMarked && candidates.isEmpty then
+        if target.mode.selectsMarked && candidates.isEmpty then
           manifest := { manifest with diagnostics := manifest.diagnostics.push {
             name := .anonymous,
             source,

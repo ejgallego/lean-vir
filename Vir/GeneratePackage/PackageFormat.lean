@@ -14,11 +14,11 @@ def packageMagic : String := "lean-vir-ir-package"
 
 def currentPackageFormatVersion : Nat := 10
 
-def currentInterfaceManifestVersion : Nat := 7
+def currentInterfaceManifestVersion : Nat := 8
 
 def packageSetFormat : String := "lean-vir-ir-package-set"
 
-def currentPackageSetVersion : Nat := 1
+def currentPackageSetVersion : Nat := 2
 
 def packageSectionDeclarations : Nat := 1
 def packageSectionInitGlobals : Nat := 2

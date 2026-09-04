@@ -8,7 +8,10 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 
-import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "../packages/irpkg-generator.mjs";
+import {
+  irpkgGeneratorFailureMessage,
+  prepareVirIrpkgSync,
+} from "../packages/irpkg-generator.mjs";
 import { readIrPackageFile } from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
@@ -94,22 +97,28 @@ export async function runTypeAnchorManifestCli(argv) {
 
   await mkdir(dirname(cli.packagePath), { recursive: true });
   await mkdir(dirname(cli.report), { recursive: true });
-  const result = spawnSync(generator.path, [
-    cli.packagePath,
-    cli.report,
-    "--target",
-    repoRelativePath(cli.source),
-    ...roots,
-  ], {
-    cwd: root,
-    env: generator.env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const result = spawnSync(
+    generator.path,
+    [
+      cli.packagePath,
+      cli.report,
+      "--target",
+      repoRelativePath(cli.source),
+      ...roots,
+    ],
+    {
+      cwd: root,
+      env: generator.env,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   if ((result.status ?? 1) !== 0) {
     process.stderr.write(result.stderr);
     process.stdout.write(result.stdout);
-    throw new Error(`Lean anchor package generation failed; see ${relative(root, cli.report)}`);
+    throw new Error(
+      `Lean anchor package generation failed; see ${relative(root, cli.report)}`,
+    );
   }
 
   const info = await readIrPackageFile(cli.packagePath);
@@ -120,7 +129,9 @@ export async function runTypeAnchorManifestCli(argv) {
     root,
     staleHint: "rerun the corresponding generation step without --check",
   });
-  console.log(`${action} ${relative(root, cli.out)} (${manifest.exports.length} exports)`);
+  console.log(
+    `${action} ${relative(root, cli.out)} (${manifest.exports.length} exports)`,
+  );
   return 0;
 }
 
@@ -140,11 +151,13 @@ async function readAliases(path) {
 }
 
 export function normalizeTypeAnchorManifest(manifest, aliases) {
-  const metadata = { ...manifest.metadata, generatedAt: "normalized" };
+  const metadata = { ...manifest.metadata };
   if (Array.isArray(metadata.targets)) {
     metadata.targets = metadata.targets.map((target) => ({
       ...target,
-      ...(typeof target.source === "string" ? { source: repoRelativePath(target.source) } : {}),
+      ...(typeof target.source === "string"
+        ? { source: repoRelativePath(target.source) }
+        : {}),
     }));
   }
   if (aliases.length !== 0) metadata.typeAnchorAliases = aliases;
@@ -159,7 +172,9 @@ export function normalizeTypeAnchorManifest(manifest, aliases) {
 function normalizeSourceField(entry) {
   return {
     ...entry,
-    ...(typeof entry.source === "string" ? { source: repoRelativePath(entry.source) } : {}),
+    ...(typeof entry.source === "string"
+      ? { source: repoRelativePath(entry.source) }
+      : {}),
   };
 }
 
