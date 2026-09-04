@@ -115,8 +115,9 @@ Each generated library has a named `generation.abiProfile` in its
   call;
 - resource results are owned;
 - operations run in `DomM`;
-- `Document` is a host-global receiver, while `Element` is an explicit
-  borrowed receiver.
+- `Document`, `Console`, and `Element` are explicit borrowed receivers;
+  separate VIR-owned `current` operations expose the host globals where
+  needed.
 
 Binding-library configuration format version 2 makes semantic policy explicit.
 Only exactly identical resource marker names may use the short string form.
@@ -204,8 +205,9 @@ existing Lean binder names without treating spelling as a semantic exception.
 Type or modality differences still require a justified
 `generation.exceptions` entry. Canvas `fillStyle` and `strokeStyle`, for
 example, use the opaque JavaScript-owned `CanvasStyle` marker for their faithful
-raw getter/setter pairs. Their existing string-valued setters are separately
-classified generated convenience adapters.
+raw getter/setter pairs. `CanvasStyle.ofString` is a separate explicit
+conversion into the string arm of that union; the convenience setters call the
+faithful generated property setter after that conversion.
 
 ## Method Selection
 
@@ -261,11 +263,10 @@ escaped Lean identifiers.
 The browser slice includes global functions, DOM methods, and properties.
 Selected overloads, parameter projections and renames, fixed-arity rest
 specializations, callbacks, primitive resources, and receiver/result overrides
-are all recorded in the same IR. In particular, the event-listener pair records
-registration as returning a removable listener value and removal as a
-receiver-free terminal operation. Removal clears VIR's private teardown record;
-ordinary JavaScript aliases still refer to the same already-removed listener
-value.
+are all recorded in the same IR. The event-listener pair preserves the native
+receiver/event/listener triple and returns `Unit`; the separately declared
+`EventListener.ofLean` conversion creates the exact JavaScript function used by
+both native calls.
 
 ## Reviewed Protocol Operations
 
@@ -299,8 +300,7 @@ contract preserves or intentionally changes that member's observable behavior.
 Operations that need repository-private teardown may additionally declare an
 `activeEffect` role:
 
-- `register` creates a private listener, pending timer/frame, or React-root
-  teardown record;
+- `register` creates a pending timer/frame or React-root teardown record;
 - `use` operates through an existing private record without replacing the
   public JavaScript value;
 - `release` removes the record and performs the corresponding upstream

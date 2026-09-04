@@ -6,17 +6,17 @@ JavaScript boundary contract in [HOST_BINDINGS.md](HOST_BINDINGS.md).
 
 ## Implementation Map
 
-| Area                  | Main files                                                          | Responsibility                                                                              |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Lean library          | `Vir/`                                                              | Runtime monads, JavaScript phantom types, browser/React APIs, and interface classification. |
-| Package tools         | `tools/`                                                            | IR package construction, manifests, closure discovery, and reports.                         |
-| Interpreter shim      | `wasm/upstream_shim/`                                               | Upstream interpreter integration, package provider, object ABI, and externref roots.        |
-| Runtime facade        | `web/src/vir-runtime.js`, `web/src/runtime/core.js`                 | Instantiation, package replacement, calls, and disposal.                                    |
-| Object ABI            | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js` | Lean object lowering/lifting and host-import dispatch.                                      |
-| JS boundary           | `web/src/host-boundary.js`                                          | Externref roots and host-call rollback transactions.                                        |
-| Active host lifecycle | `web/src/host/vir-host-resources.js`                                | Listener, timer, frame, and React-root teardown.                                            |
-| Browser providers     | `web/src/vir-host-bindings.js`                                      | Browser and infoview target implementations.                                                |
-| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`              | Official browser React adapter and explicit Node unsupported shims.                         |
+| Area                  | Main files                                                                   | Responsibility                                                                              |
+| --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Lean library          | `Vir/`                                                                       | Runtime monads, JavaScript phantom types, browser/React APIs, and interface classification. |
+| Package tools         | `tools/`                                                                     | IR package construction, manifests, closure discovery, and reports.                         |
+| Interpreter shim      | `wasm/upstream_shim/`                                                        | Upstream interpreter integration, package provider, object ABI, and externref roots.        |
+| Runtime facade        | `web/src/vir-runtime.js`, `web/src/runtime/core.js`                          | Instantiation, package replacement, calls, and disposal.                                    |
+| Object ABI            | `web/src/runtime/object-values.js`, `web/src/runtime/host-state.js`          | Lean object lowering/lifting and host-import dispatch.                                      |
+| JS boundary           | `web/src/host-boundary.js`                                                   | Externref roots and host-call rollback transactions.                                        |
+| Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
+| Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |
+| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Official browser React host and explicit Node unsupported shims.                            |
 
 ## Top-Level Call Flow
 
@@ -61,8 +61,9 @@ WeakMaps hide that association. Finalizers are a best-effort GC backstop;
 runtime disposal is the deterministic release boundary. Neither value exposes
 public retain/release methods.
 
-Explicit `HostLifecycle` state is only for active platform registrations:
-listeners, schedules, animation frames, and React roots. If a new active value
+Explicit `HostLifecycle` state is only for schedules, animation frames, and
+React roots. Native event listeners follow the DOM's receiver/type/function
+identity protocol and remain caller-managed. If a new lifecycle-managed value
 is returned by a host call, register its rollback before returning it. Do not
 put passive values in the lifecycle merely to observe their reachability.
 
@@ -79,9 +80,9 @@ component purity, hook ordering, effect discipline, valid dependencies, and
 replay-safe reducers. A Lean helper may improve ergonomics, but it must be
 named and documented as an adapter if it changes the upstream operation.
 
-Node virtual bindings intentionally stop at DOM/event test doubles. React
-operations fail with a browser-host-required error. Add React semantic tests to
-the official Chromium suite instead of extending the virtual host.
+The Node wrapper deliberately provides no DOM or React implementation. Add
+browser and React semantic tests to the official Chromium suite; focused Node
+tests may inject only the individual host operations they exercise.
 
 ## Adding A Host Import
 

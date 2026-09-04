@@ -6,11 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import {
-  createVirRuntime,
-  createVirtualDocumentState,
-  ensureVirtualElementState,
-} from "../../web/src/vir-runtime-node.js";
+import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { readRuntimeArtifacts } from "./shared.mjs";
 
 const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
@@ -94,35 +90,5 @@ assert.throws(
   /closure root id is not live|disposed runtime/,
 );
 wrongArityRuntime.dispose();
-
-const rollbackDocumentState = createVirtualDocumentState();
-const rollbackElement = ensureVirtualElementState(
-  rollbackDocumentState,
-  "#rollback",
-);
-const rollbackRuntime = await createVirRuntime({
-  wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
-  virtualDocumentState: rollbackDocumentState,
-  hostBindings: {
-    "test.callNatCallback": (input, callback) => callback(input),
-    "test.recordNat": () => undefined,
-  },
-});
-const makeObjectValue = rollbackRuntime.makeJsObjectValue.bind(rollbackRuntime);
-rollbackRuntime.makeJsObjectValue = (type, value, label) => {
-  if (label === "browser.element.addEventListener result") {
-    throw new Error("forced host result publication failure");
-  }
-  return makeObjectValue(type, value, label);
-};
-assert.throws(
-  () => rollbackRuntime.call("HostInterop.mountCallbackEvent", "#rollback"),
-  /forced host result publication failure/,
-);
-assert.deepEqual(rollbackElement.listeners.get("click"), []);
-assert.equal(rollbackDocumentState.resources.debugResourceCounts().active, 0);
-assert.equal(rollbackRuntime.liveCallbacks.size, 0);
-rollbackRuntime.dispose();
 
 console.log("self-owning callback lifecycle smoke ok");

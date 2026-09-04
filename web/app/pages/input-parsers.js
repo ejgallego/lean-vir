@@ -25,7 +25,7 @@ export function parseIntText(text) {
 }
 
 export function parseByteArrayInput(text) {
-  return parseDelimitedNumberText(text).map((part) => {
+  return Uint8Array.from(parseDelimitedNumberText(text), (part) => {
     if (!/^\d+$/.test(part)) {
       throw new Error(`invalid byte literal: ${part}`);
     }

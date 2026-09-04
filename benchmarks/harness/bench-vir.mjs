@@ -29,11 +29,7 @@ import {
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../../web/src/vir-runtime.js";
-import {
-  createVirRuntime as createNodeVirRuntime,
-  createVirtualDocumentState,
-  ensureVirtualElementState,
-} from "../../web/src/vir-runtime-node.js";
+import { createVirRuntime as createNodeVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { runSync } from "../../scripts/process-utils.mjs";
 import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
 import {
@@ -51,8 +47,6 @@ const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
 const hostScalarIterations = 250;
 const callbackIterations = 1000;
-const domResourceIterations = 300;
-const reactRootIterations = 500;
 const scalarRecordIterations = 5000;
 const nestedRecordIterations = 3000;
 const recursiveValueIterations = 2000;
@@ -67,10 +61,6 @@ const formatTagIterations = 4;
 const formatTagLowerIterations = 8;
 const formatEmptyIterations = 12;
 const formatEmptyLowerIterations = 20;
-const reactTextRenderIterations = 300;
-const reactTextRenderWidth = 40;
-const reactCallbackRenderIterations = 200;
-const reactCallbackRenderWidth = 20;
 const profileStatsInput = {
   enabled: true,
   level: 2,
@@ -188,9 +178,6 @@ async function instantiateRuntimes() {
     readPublicArtifact(hostPackageFile),
     readPublicArtifact(prettyPackageFile),
   ]);
-  const virtualDocumentState = createVirtualDocumentState();
-  ensureVirtualElementState(virtualDocumentState, "#bench-dom");
-  ensureVirtualElementState(virtualDocumentState, "#bench-react");
   const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
   const prettyRuntime = await createBrowserVirRuntime({
     wasmBytes: wasm,
@@ -199,7 +186,6 @@ async function instantiateRuntimes() {
   const hostRuntime = await createNodeVirRuntime({
     wasmBytes: wasm,
     irPackageSetBytes: [hostPackage],
-    virtualDocumentState,
     hostBindings: createBenchmarkHostBindings(),
   });
   return {
@@ -220,14 +206,15 @@ function readPublicArtifact(file) {
 }
 
 function createBenchmarkHostBindings() {
+  const documentValue = { title: "" };
   return {
-    "test.callNatCallback": (input, callback) => {
-      try {
-        return callback(input);
-      } finally {
-        callback.release();
-      }
+    "browser.document.current": () => documentValue,
+    "browser.document.getTitle": (document) => document.title,
+    "browser.document.setTitle": (document, title) => {
+      document.title = title;
+      return undefined;
     },
+    "test.callNatCallback": (input, callback) => callback(input),
     "test.recordNat": () => undefined,
   };
 }
@@ -912,48 +899,6 @@ addWasmBenchmark(
   () => benchRepeated("callback-roundtrip", callbackIterations, () =>
     Number(hostRuntime.call("HostInterop.callbackRoundTripLoop", callbackIterations))),
 );
-addWasmBenchmark(
-  "Host/resource paths",
-  "dom-listener-resource",
-  `DOM listener resource create/remove x ${domResourceIterations}`,
-  () => benchRepeated("dom-listener-resource", domResourceIterations, () => {
-    let acc = 0;
-    for (let i = 0; i < domResourceIterations; i++) {
-      acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
-    }
-    return acc;
-  }),
-);
-addWasmBenchmark(
-  "Host/resource paths",
-  "react-root-lifecycle",
-  `React root mount/render/unmount x ${reactRootIterations}`,
-  () => benchRepeated("react-root-lifecycle", reactRootIterations, () =>
-    Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations))),
-);
-addWasmBenchmark(
-  "React Node resource paths",
-  "react-node-text-render",
-  `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
-  () => benchRepeated("react-node-text-render", reactTextRenderIterations, () => Number(hostRuntime.call(
-    "ReactCounter.renderWideTextLoop",
-    "#bench-react",
-    reactTextRenderWidth,
-    reactTextRenderIterations,
-  ))),
-);
-addWasmBenchmark(
-  "React Node resource paths",
-  "react-node-callback-render",
-  `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
-  () => benchRepeated("react-node-callback-render", reactCallbackRenderIterations, () => Number(hostRuntime.call(
-    "ReactCounter.renderCallbackTreeLoop",
-    "#bench-react",
-    reactCallbackRenderWidth,
-    reactCallbackRenderIterations,
-  ))),
-);
-
 if (benchmarkReports.length === 0) {
   throw new Error(`no benchmark names contain: ${args.filters.join(", ")}`);
 }

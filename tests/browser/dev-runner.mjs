@@ -16,7 +16,7 @@ import {
   waitForReady,
   waitForStatus,
 } from "./harness.mjs";
-import { interfaceInputTag } from "../../web/src/pages/interface-inputs.js";
+import { interfaceInputTag } from "../../web/app/pages/interface-inputs.js";
 import {
   encodeInvalidMagicPackage,
   readIrPackageInfo,

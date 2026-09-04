@@ -144,7 +144,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /nakedStateSetterIdentity/,
     /unsupported type `Lean\.Vir\.React\.StateSetter Nat`/,
     /nakedPropsIdentity/,
-    /unsupported type `Lean\.Vir\.React\.Props`/,
+    /unsupported type `Lean\.Vir\.Js\.Object\.Value`/,
   ], [
     "indexedPairIdentity",
     "implicitBump",

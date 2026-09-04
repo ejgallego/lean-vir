@@ -19,8 +19,8 @@ import { INTERFACE_TAG } from "./interface-tags.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import {
   OBJECT_VALUE_EXPORTS,
-  hostResourceArgumentSupported,
-  hostResourceResultSupported,
+  directJsArgumentSupported,
+  directJsResultSupported,
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
@@ -29,7 +29,7 @@ import {
   writeObjectScalarField,
 } from "./object-abi.js";
 import {
-  asByteArrayBytes,
+  requireByteArrayBytes,
   enumValue,
   flattenStructureSubobjects,
   normalizeBoundedUnsignedDecimal,
@@ -134,18 +134,13 @@ function createLeanObjectHandle(cell) {
   return handle;
 }
 
-function createLeanObjectHandleResource(cell, _label) {
-  return createLeanObjectHandle(cell);
-}
-
 function requireLeanObjectHandle(resource, runtime, label) {
-  const handle = resource;
-  const cell = leanObjectHandleStates.get(handle);
+  const cell = leanObjectHandleStates.get(resource);
   if (cell?.runtime !== runtime || cell.live !== true) {
     throw new Error(`${label} must be a live Lean object handle resource`);
   }
   normalizeObjectPointer(cell.object, label);
-  return { handle, cell };
+  return cell;
 }
 
 export class ObjectValueRuntime {
@@ -156,15 +151,9 @@ export class ObjectValueRuntime {
   }
 
   makeJsObjectValue(type, value, label) {
-    if (!hostResourceResultSupported(type)) {
-      throw new Error(
-        `${label} has unsupported JavaScript host resource result type`,
-      );
+    if (!directJsResultSupported(type)) {
+      throw new Error(`${label} has unsupported direct JavaScript result type`);
     }
-    return this.makeObjectValue(type, value, label);
-  }
-
-  makeExplicitConversionObjectValue(type, value, label) {
     return this.makeObjectValue(type, value, label);
   }
 
@@ -467,7 +456,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectByteArray(value, label) {
-    const bytes = asByteArrayBytes(value);
+    const bytes = requireByteArrayBytes(value);
     const inputPtr = this.allocBytes(bytes);
     try {
       const argObj = this.exports.vir_obj_byte_array(
@@ -580,7 +569,7 @@ export class ObjectValueRuntime {
         );
       }
       this.hostState.trackLeanObjectHandleCell(cell);
-      return createLeanObjectHandleResource(cell, label);
+      return createLeanObjectHandle(cell);
     } catch (error) {
       releaseLeanObjectHandleCell(cell);
       throw error;
@@ -588,7 +577,7 @@ export class ObjectValueRuntime {
   }
 
   leanObjectHandleCell(resource, label) {
-    return requireLeanObjectHandle(resource, this, label).cell;
+    return requireLeanObjectHandle(resource, this, label);
   }
 
   releaseLeanObjectHandleCell(cell) {
@@ -596,15 +585,12 @@ export class ObjectValueRuntime {
   }
 
   makeObjectExpr(value, label) {
-    const expr =
-      typeof value === "string"
-        ? { kind: "const", name: value, levels: [] }
-        : value;
+    const expr = value;
     switch (expr?.kind) {
       case "bvar":
         return this.makeObjectDecimal(
           "vir_obj_expr_bvar",
-          normalizeDecimal(expr.index ?? expr.deBruijnIndex, `${label}.index`, {
+          normalizeDecimal(expr.index, `${label}.index`, {
             signed: false,
           }),
           label,
@@ -624,10 +610,7 @@ export class ObjectValueRuntime {
           label,
         );
       case "sort": {
-        let level = this.makeObjectLevel(
-          expr.level ?? expr.u,
-          `${label}.level`,
-        );
+        let level = this.makeObjectLevel(expr.level, `${label}.level`);
         try {
           const obj = this.exports.vir_obj_expr_sort(level);
           if (obj === 0)
@@ -641,10 +624,7 @@ export class ObjectValueRuntime {
         }
       }
       case "const": {
-        let levels = this.makeObjectLevelList(
-          expr.levels ?? [],
-          `${label}.levels`,
-        );
+        let levels = this.makeObjectLevelList(expr.levels, `${label}.levels`);
         try {
           return this.withWasmString(
             requireString(expr.name, `${label}.name`),
@@ -677,11 +657,10 @@ export class ObjectValueRuntime {
           label,
         );
       case "lam":
-      case "lambda":
         return this.makeObjectExprBinding(
           "vir_obj_expr_lambda",
-          expr.name ?? expr.binderName,
-          expr.type ?? expr.binderType,
+          expr.name,
+          expr.type,
           expr.body,
           normalizeBinderInfo(
             expr.binderInfo ?? "default",
@@ -690,11 +669,10 @@ export class ObjectValueRuntime {
           label,
         );
       case "forall":
-      case "forallE":
         return this.makeObjectExprBinding(
           "vir_obj_expr_forall",
-          expr.name ?? expr.binderName,
-          expr.type ?? expr.binderType,
+          expr.name,
+          expr.type,
           expr.body,
           normalizeBinderInfo(
             expr.binderInfo ?? "default",
@@ -703,13 +681,9 @@ export class ObjectValueRuntime {
           label,
         );
       case "let":
-      case "letE":
         return this.makeObjectExprLet(expr, label);
       case "lit": {
-        let literal = this.makeObjectLiteral(
-          expr.literal ?? expr.value,
-          `${label}.literal`,
-        );
+        let literal = this.makeObjectLiteral(expr.literal, `${label}.literal`);
         try {
           const obj = this.exports.vir_obj_expr_lit(literal);
           if (obj === 0)
@@ -734,8 +708,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectLevel(value, label) {
-    const level =
-      typeof value === "string" ? { kind: value } : (value ?? { kind: "zero" });
+    const level = value;
     switch (level.kind) {
       case "zero": {
         const obj = this.exports.vir_obj_level_zero();
@@ -746,10 +719,7 @@ export class ObjectValueRuntime {
         return obj;
       }
       case "succ": {
-        let child = this.makeObjectLevel(
-          level.of ?? level.level,
-          `${label}.of`,
-        );
+        let child = this.makeObjectLevel(level.of, `${label}.of`);
         try {
           const obj = this.exports.vir_obj_level_succ(child);
           if (obj === 0)
@@ -765,18 +735,18 @@ export class ObjectValueRuntime {
       case "max":
         return this.makeObjectLevelBinary(
           "vir_obj_level_max",
-          level.left ?? level.lhs,
+          level.left,
           `${label}.left`,
-          level.right ?? level.rhs,
+          level.right,
           `${label}.right`,
           label,
         );
       case "imax":
         return this.makeObjectLevelBinary(
           "vir_obj_level_imax",
-          level.left ?? level.lhs,
+          level.left,
           `${label}.left`,
-          level.right ?? level.rhs,
+          level.right,
           `${label}.right`,
           label,
         );
@@ -802,7 +772,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectLevelList(levels, label) {
-    const values = levels == null ? [] : normalizeArray(levels, label);
+    const values = normalizeArray(levels, label);
     const levelObjs = [];
     try {
       values.forEach((level, index) => {
@@ -815,12 +785,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectLiteral(value, label) {
-    const literal =
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "bigint"
-        ? { kind: typeof value === "string" ? "string" : "nat", value }
-        : value;
+    const literal = value;
     switch (literal?.kind) {
       case "nat":
         return this.makeObjectDecimal(
@@ -933,7 +898,7 @@ export class ObjectValueRuntime {
       value = this.makeObjectExpr(expr.value, `${label}.value`);
       body = this.makeObjectExpr(expr.body, `${label}.body`);
       return this.withWasmString(
-        requireString(expr.name ?? expr.declName, `${label}.name`),
+        requireString(expr.name, `${label}.name`),
         `${label}.name`,
         (namePtr, nameLen) => {
           const obj = this.exports.vir_obj_expr_let(
@@ -960,17 +925,14 @@ export class ObjectValueRuntime {
   }
 
   makeObjectExprProj(expr, label) {
-    let structure = this.makeObjectExpr(
-      expr.struct ?? expr.expr,
-      `${label}.struct`,
-    );
+    let structure = this.makeObjectExpr(expr.struct, `${label}.struct`);
     try {
       return this.withWasmString(
         requireString(expr.typeName, `${label}.typeName`),
         `${label}.typeName`,
         (typeNamePtr, typeNameLen) =>
           this.withWasmString(
-            normalizeDecimal(expr.index ?? expr.idx, `${label}.index`, {
+            normalizeDecimal(expr.index, `${label}.index`, {
               signed: false,
             }),
             `${label}.index`,
@@ -1546,15 +1508,11 @@ export class ObjectValueRuntime {
   }
 
   liftJsObjectValue(type, obj, label) {
-    if (!hostResourceArgumentSupported(type)) {
+    if (!directJsArgumentSupported(type)) {
       throw new Error(
-        `${label} has unsupported JavaScript host resource argument type`,
+        `${label} has unsupported direct JavaScript argument type`,
       );
     }
-    return this.liftObjectValue(type, obj, label);
-  }
-
-  liftExplicitConversionObjectValue(type, obj, label) {
     return this.liftObjectValue(type, obj, label);
   }
 
@@ -1570,29 +1528,11 @@ export class ObjectValueRuntime {
     if (this.exports.vir_obj_resource_is_valid(obj) !== 0) {
       return this.exports.vir_obj_resource_externref(obj);
     }
-    // Some effect callback paths can expose one IO.ok wrapper around a Js result
-    // at the JS lift boundary. Keep this resource-only; ordinary Lean tag-0
-    // constructors must continue through their declared value decoders.
-    if (
-      this.exports.vir_obj_is_scalar(obj) === 0 &&
-      this.exports.vir_obj_tag(obj) === 0
-    ) {
-      const field = this.exports.vir_obj_field(obj, 0);
-      if (field !== 0) {
-        try {
-          if (this.exports.vir_obj_resource_is_valid(field) !== 0) {
-            return this.exports.vir_obj_resource_externref(field);
-          }
-        } finally {
-          this.exports.vir_obj_dec(field);
-        }
-      }
-    }
     throw new Error(`${label} did not lift to a live host resource`);
   }
 
   retainLeanObjectHandleValue(resource, label) {
-    const cell = requireLeanObjectHandle(resource, this, label).cell;
+    const cell = requireLeanObjectHandle(resource, this, label);
     const object = normalizeObjectPointer(cell.object, label);
     this.exports.vir_obj_inc(object);
     return object;

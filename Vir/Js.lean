@@ -66,6 +66,13 @@ private def nullableCollectionResourceItem? {α : Type}
 
 namespace Array
 
+/-- Reads one array slot with an explicitly selected JavaScript phantom type. -/
+def getJs {α : Type}
+    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    (index : @& Lean.Vir.Js Float) :
+    RuntimeM (Lean.Vir.Js α) :=
+  getAs array index
+
 /-- Builds a native JavaScript array from JavaScript-owned values. -/
 def ofArray {α : Type}
     (values : _root_.Array (Lean.Vir.Js α)) :

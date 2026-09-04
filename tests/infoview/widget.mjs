@@ -63,7 +63,6 @@ const {
   taggedTextToPlain,
   validateWidgetEntry,
   validateWidgetComponentEntry,
-  validateWidgetUnmountEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
 const wasmBytes = await readFile(
@@ -166,7 +165,7 @@ const rpcSession = {
         typeName: "Const",
         summary: "server-owned resolve smoke",
         expression: "ReactProofWidget.mount",
-        typeText: "String -> Surface -> DomM Bool",
+        typeText: "Root -> Component -> Surface -> DomM Unit",
         context: "",
         source: "examples/ReactProofWidget.lean",
         position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
@@ -208,14 +207,9 @@ assert.equal(
   validateWidgetEntry(runtime, "ReactProofWidget.mount").entry,
   "ReactProofWidget.mount",
 );
-assert.equal(
-  validateWidgetUnmountEntry(runtime, "ReactProofWidget.unmount").entry,
-  "ReactProofWidget.unmount",
-);
-assert.equal(validateWidgetUnmountEntry(runtime, ""), null);
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /String -> Component -> Surface -> Bool/,
+  /Root -> Component -> Surface -> Unit/,
 );
 assert.throws(
   () =>
@@ -227,7 +221,7 @@ assert.throws(
               entry: "WrongSurface.mount",
               effect: "dom",
               args: [
-                { type: { interfaceTag: INTERFACE_TAG.STRING } },
+                { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
                 { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
                 {
                   type: {
@@ -236,18 +230,14 @@ assert.throws(
                   },
                 },
               ],
-              result: { interfaceTag: INTERFACE_TAG.BOOL },
+              result: { interfaceTag: INTERFACE_TAG.UNIT },
             },
           ],
         },
       },
       "WrongSurface.mount",
     ),
-  /String -> Component -> Surface -> Bool/,
-);
-assert.throws(
-  () => validateWidgetUnmountEntry(runtime, "ReactProofWidget.mount"),
-  /String -> DomM Bool/,
+  /Root -> Component -> Surface -> Unit/,
 );
 assert.equal(
   taggedTextToPlain({
@@ -339,7 +329,6 @@ assert.equal(
         roots: [
           "ReactProofWidget.createComponent",
           "ReactProofWidget.mount",
-          "ReactProofWidget.unmount",
         ],
       },
       { line: 0, character: 0 },
@@ -356,7 +345,7 @@ assert.deepEqual(
       typeName: "Const",
       summary: "create server ref smoke",
       expression: "ReactProofWidget.mount",
-      typeText: "String -> Surface -> DomM Bool",
+      typeText: "Root -> Component -> Surface -> DomM Unit",
       context: "",
     },
     { line: 2, character: 4 },
@@ -370,7 +359,7 @@ assert.deepEqual(
       typeName: "Const",
       summary: "create server ref smoke",
       expression: "ReactProofWidget.mount",
-      typeText: "String -> Surface -> DomM Bool",
+      typeText: "Root -> Component -> Surface -> DomM Unit",
       context: "",
       source: "examples/ReactProofWidget.lean",
       position: "ReactProofWidget.lean:3:5",
@@ -387,7 +376,7 @@ assert.deepEqual(createdExprWithCtxRefRequests.at(-1), {
     typeName: "Const",
     summary: "create server ref smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
   },
   pos: { line: 2, character: 4 },
@@ -451,7 +440,7 @@ assert.deepEqual(
     typeName: "Const",
     summary: "server-owned resolve smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
     source: "examples/ReactProofWidget.lean",
     position: "ReactProofWidget.lean:8:2",
@@ -474,7 +463,7 @@ assert.deepEqual(
       typeName: "Const",
       summary: "resolve smoke",
       expression: "ReactProofWidget.mount",
-      typeText: "String -> Surface -> DomM Bool",
+      typeText: "Root -> Component -> Surface -> DomM Unit",
       context: "",
     },
     { line: 4, character: 2 },
@@ -486,7 +475,7 @@ assert.deepEqual(
     typeName: "Const",
     summary: "resolve smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
     source: "examples/ReactProofWidget.lean",
     position: "ReactProofWidget.lean:5:3",
@@ -518,7 +507,6 @@ const runtimeOptions = await loadRuntimeOptions({
     roots: [
       "ReactProofWidget.createComponent",
       "ReactProofWidget.mount",
-      "ReactProofWidget.unmount",
     ],
   },
   position: { line: 0, character: 0 },
@@ -538,7 +526,6 @@ const reloadIRPackage = {
   roots: [
     "ReactProofWidget.createComponent",
     "ReactProofWidget.mount",
-    "ReactProofWidget.unmount",
   ],
 };
 const reloadPosition = { line: 0, character: 0 };
@@ -575,12 +562,10 @@ const irPackageServiceConfig = {
     roots: [
       "ReactProofWidget.createComponent",
       "ReactProofWidget.mount",
-      "ReactProofWidget.unmount",
     ],
   },
   componentEntry: "ReactProofWidget.createComponent",
   entry: "ReactProofWidget.mount",
-  unmountEntry: "ReactProofWidget.unmount",
   position: { line: 0, character: 0 },
   setupHint: "",
 };
@@ -596,7 +581,6 @@ const irPackageFirstService = await loadRuntimeService({
 });
 const jsBoolValue = (_service, value) => value;
 const rpcRefResource = (_service, ref) => ref;
-assert.equal(irPackageFirstService.resources.phase, "active");
 assert.equal(
   typeof irPackageFirstService.runtime.hostState.defaultBindings[
     "react.root.create"
@@ -615,18 +599,6 @@ assert.equal(
   ],
   "function",
 );
-assert.equal(
-  typeof irPackageFirstService.runtime.hostState.defaultBindings[
-    "react.root.renderIntoSelector"
-  ],
-  "function",
-);
-assert.equal(
-  typeof irPackageFirstService.runtime.hostState.defaultBindings[
-    "react.root.unmountSelector"
-  ],
-  "function",
-);
 const serverOwnedExpr = proofWidgetsExprFromSavedRef({
   ref: { __rpcref: 18 },
   info: {
@@ -635,7 +607,7 @@ const serverOwnedExpr = proofWidgetsExprFromSavedRef({
     typeName: "ExprWithCtx",
     summary: "server-owned prop smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
   },
 });
@@ -644,7 +616,7 @@ assert.deepEqual(
     .proofWidgetsExpr.value,
   {
     code: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
   },
 );
@@ -661,7 +633,7 @@ assert.equal(
         typeName: "Const",
         summary: "host binding smoke",
         expression: "ReactProofWidget.mount",
-        typeText: "String -> Surface -> DomM Bool",
+        typeText: "Root -> Component -> Surface -> DomM Unit",
         context: "",
       }),
     ),
@@ -677,7 +649,7 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
     typeName: "Const",
     summary: "host binding smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
   },
   pos: { line: 0, character: 0 },
@@ -704,7 +676,7 @@ assert.equal(
         typeName: "Const",
         summary: "host resolve smoke",
         expression: "ReactProofWidget.mount",
-        typeText: "String -> Surface -> DomM Bool",
+        typeText: "Root -> Component -> Surface -> DomM Unit",
         context: "",
       }),
       resolvedCallback,
@@ -721,7 +693,7 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
     typeName: "Const",
     summary: "host resolve smoke",
     expression: "ReactProofWidget.mount",
-    typeText: "String -> Surface -> DomM Bool",
+    typeText: "Root -> Component -> Surface -> DomM Unit",
     context: "",
   },
   pos: { line: 0, character: 0 },
@@ -733,7 +705,7 @@ assert.deepEqual(resolvedCallbackInfo, {
   typeName: "Const",
   summary: "host resolve smoke",
   expression: "ReactProofWidget.mount",
-  typeText: "String -> Surface -> DomM Bool",
+  typeText: "Root -> Component -> Surface -> DomM Unit",
   context: "",
   source: "examples/ReactProofWidget.lean",
   position: "ReactProofWidget.lean:1:1",
@@ -778,7 +750,7 @@ assert.deepEqual(serverOwnedCallbackInfo, {
   typeName: "Const",
   summary: "server-owned resolve smoke",
   expression: "ReactProofWidget.mount",
-  typeText: "String -> Surface -> DomM Bool",
+  typeText: "Root -> Component -> Surface -> DomM Unit",
   context: "",
   source: "examples/ReactProofWidget.lean",
   position: "ReactProofWidget.lean:1:1",
@@ -807,7 +779,7 @@ assert.equal(
         typeName: "Const",
         summary: "moved host context smoke",
         expression: "ReactProofWidget.mount",
-        typeText: "String -> Surface -> DomM Bool",
+        typeText: "Root -> Component -> Surface -> DomM Unit",
         context: "",
       }),
     ),

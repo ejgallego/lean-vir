@@ -130,7 +130,10 @@ assert.equal(
   "70",
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.ListOption.sumScore", { inl: 12 }),
+  runtime.call("Vir.Fixtures.ListOption.sumScore", {
+    kind: "inl",
+    value: 12,
+  }),
   "12",
 );
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 0), {
@@ -219,7 +222,7 @@ assert.equal(
 assert.deepEqual(
   runtime.call(
     "Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip",
-    [65, 66, 67],
+    Uint8Array.from([65, 66, 67]),
   ),
   Uint8Array.from([65, 66, 67]),
 );
@@ -240,10 +243,7 @@ assert.equal(
   "0",
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", {
-    kind: "some",
-    value: 41,
-  }),
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", 41),
   "42",
 );
 assert.equal(
@@ -255,7 +255,7 @@ assert.equal(
   "ok!",
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", { some: 6 }),
+  runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", 6),
   "17",
 );
 assert.deepEqual(
@@ -269,7 +269,10 @@ assert.deepEqual(
   },
 );
 assert.equal(
-  runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]),
+  runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", {
+    fst: 4,
+    snd: 5,
+  }),
   "9",
 );
 assert.equal(
@@ -283,7 +286,7 @@ assert.equal(
 assert.equal(
   runtime.call("Vir.Fixtures.InterfaceShapes.listProdNatStringScore", [
     { fst: 4, snd: "ab" },
-    [5, "c"],
+    { fst: 5, snd: "c" },
   ]),
   "12",
 );
@@ -633,6 +636,38 @@ assert.throws(
 assert.throws(
   () => runtime.call("fib", -1),
   /fib argument arg1 must be non-negative/,
+);
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", new Set([1, 2])),
+  /must be an array/,
+);
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", "1.5"),
+  /must be a number/,
+);
+assert.throws(
+  () =>
+    runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", {
+      ...profileStatsInput,
+      tier: 1,
+    }),
+  /must be an enum constructor name/,
+);
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [1, 2]),
+  /must be a Uint8Array/,
+);
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]),
+  /must be a pair \{ fst, snd \}/,
+);
+assert.throws(
+  () => runtime.call("Vir.Fixtures.ListOption.sumScore", { inl: 12 }),
+  /must specify tagged-union kind/,
+);
+assert.throws(
+  () => leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", "Nat"),
+  /unsupported Lean\.Expr kind undefined/,
 );
 
 runtime.dispose();

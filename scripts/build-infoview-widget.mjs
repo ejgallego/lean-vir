@@ -17,17 +17,14 @@ for (const arg of args) {
   }
 }
 const check = args.has("--check");
-const entryPoint = new URL("../web/src/vir-infoview-widget.js", import.meta.url);
+const entryPoint = new URL("../web/app/vir-infoview-widget.js", import.meta.url);
 const outFile = new URL("../build/generated/infoview/vir-infoview-widget.js", import.meta.url);
 const repoRoot = new URL("..", import.meta.url);
 
 const infoviewReactDomClientPlugin = {
   name: "infoview-react-dom-client",
   setup(build) {
-    build.onResolve({ filter: /^\.\/vir-react-dom-client\.js$/ }, (args) => {
-      if (!args.importer.endsWith("/web/src/vir-react-host-bindings.js")) {
-        return null;
-      }
+    build.onResolve({ filter: /vir-react-dom-client\.js$/ }, () => {
       return {
         namespace: "infoview-react-dom-client",
         path: "vir-react-dom-client",

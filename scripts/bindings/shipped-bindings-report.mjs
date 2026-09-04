@@ -13,9 +13,9 @@ import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
 import {
   createBrowserHostBindings,
+  createCommonHostBindings,
+  createConsoleHostBindings,
   createHostLifecycle,
-  createNodeHostBindings,
-  createVirtualDocumentState,
 } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 import { RUNTIME_INTRINSIC_HOST_TARGETS } from "../../web/src/runtime/host-state.js";
@@ -157,17 +157,19 @@ async function readInventory(path) {
 }
 
 function collectProviders() {
-  const browserResources = createHostLifecycle();
+  const browserLifecycle = createHostLifecycle();
   const browser = createBrowserHostBindings({
-    resources: browserResources,
+    lifecycle: browserLifecycle,
     reactHostBindings: createBrowserReactHostBindings,
   });
-  const nodeState = createVirtualDocumentState();
-  const node = createNodeHostBindings(nodeState);
+  const node = {
+    ...createCommonHostBindings(),
+    ...createConsoleHostBindings(),
+  };
   try {
     return [
       provider("browser", "Browser + React host map", Object.keys(browser)),
-      provider("node", "Virtual Node host map", Object.keys(node)),
+      provider("node", "Environment-neutral Node host map", Object.keys(node)),
       provider(
         "runtime-intrinsic",
         "VIR object-handle dispatcher",
@@ -176,7 +178,6 @@ function collectProviders() {
     ];
   } finally {
     browser[VIR_HOST_DISPOSE]?.();
-    node[VIR_HOST_DISPOSE]?.();
   }
 }
 

@@ -108,23 +108,23 @@ export function objectResultSupported(type, selfType = null) {
   }
 }
 
-export function hostResourceArgumentSupported(type) {
-  if (hostResourceValueSupported(type)) {
+export function directJsArgumentSupported(type) {
+  if (directJsValueSupported(type)) {
     return true;
   }
   if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
   const args = requireFunctionArgs(type, "host resource callback");
-  return args.every((arg) => hostResourceValueSupported(arg.type)) &&
-    hostResourceValueSupported(requireFunctionResult(type, "host resource callback"));
+  return args.every((arg) => directJsValueSupported(arg.type)) &&
+    directJsValueSupported(requireFunctionResult(type, "host resource callback"));
 }
 
-export function hostResourceResultSupported(type) {
-  return hostResourceValueSupported(type);
+export function directJsResultSupported(type) {
+  return directJsValueSupported(type);
 }
 
-function hostResourceValueSupported(type) {
+function directJsValueSupported(type) {
   switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:

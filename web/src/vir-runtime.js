@@ -11,6 +11,7 @@ import {
   collectCleanupError,
   throwCollectedErrors,
 } from "./runtime/cleanup.js";
+import { disposeHostBindings } from "./host-boundary.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 export {
@@ -170,8 +171,7 @@ export class VirRuntimeFactory {
     return this.instantiateModule(module);
   }
 
-  instantiateModule(module, { disposeBindingsOnFailure = true } = {}) {
-    const hostBindings = this.hostBindingsLease.acquire();
+  instantiateModule(module) {
     const defaultHostBindings =
       typeof this.defaultHostBindings === "function"
         ? this.defaultHostBindings()
@@ -179,14 +179,16 @@ export class VirRuntimeFactory {
     const defaultHostBindingsLease =
       this.defaultHostBindingsLease ??
       new HostBindingsLease(defaultHostBindings);
+    const hostBindings = this.hostBindingsLease.acquire();
     const defaultBindings = defaultHostBindingsLease.acquire();
-    const hostState = new VirHostState({
-      hostBindings: hostBindings.value,
-      defaultHostBindings: defaultBindings.value,
-      releaseHostBindings: hostBindings.release,
-      releaseDefaultHostBindings: defaultBindings.release,
-    });
+    let hostState = null;
     try {
+      hostState = new VirHostState({
+        hostBindings: hostBindings.value,
+        defaultHostBindings: defaultBindings.value,
+        releaseHostBindings: hostBindings.release,
+        releaseDefaultHostBindings: defaultBindings.release,
+      });
       const imports =
         typeof this.imports === "function"
           ? this.imports(module, hostState)
@@ -197,16 +199,16 @@ export class VirRuntimeFactory {
       return new VirRuntime(instance.exports, {
         module,
         hostState,
-        createReplacementRuntime: () =>
-          this.instantiateModule(module, {
-            disposeBindingsOnFailure: false,
-          }),
+        createReplacementRuntime: () => this.instantiateModule(module),
       });
     } catch (error) {
       const errors = [error];
-      collectCleanupError(errors, () =>
-        hostState.dispose({ disposeBindings: disposeBindingsOnFailure }),
-      );
+      if (hostState !== null) {
+        collectCleanupError(errors, () => hostState.dispose());
+      } else {
+        collectCleanupError(errors, () => releaseBindings(defaultBindings));
+        collectCleanupError(errors, () => releaseBindings(hostBindings));
+      }
       throwCollectedErrors(
         errors,
         "VirRuntime instantiation failed during cleanup",
@@ -345,6 +347,10 @@ class HostBindingsLease {
       },
     };
   }
+}
+
+function releaseBindings(bindings) {
+  if (bindings.release()) disposeHostBindings(bindings.value);
 }
 
 function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {

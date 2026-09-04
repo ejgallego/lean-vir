@@ -38,9 +38,9 @@ end Infoview
 namespace Infoview.Clipboard
 
 /--
-Generated explicit protocol operation semantic adapter for TypeScript `Clipboard.writeText`.
+Generated binding for reviewed VIR protocol `infoview.clipboard.write-text`.
 
-Adapter policy: Adapts Clipboard.writeText to the infoview capability protocol. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.
+Implements the local synchronous infoview clipboard capability. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.
 
 Binding contract: `generation.protocolOperations`.
 

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
 import {
+  createBrowserHostBindings as createExportedBrowserHostBindings,
   createCommonHostBindings as createExportedCommonHostBindings,
   createBrowserDocumentHostBindings as createExportedBrowserDocumentHostBindings,
   createBrowserElementHostBindings as createExportedBrowserElementHostBindings,
@@ -25,12 +26,6 @@ import {
   debugWasmUrlFor as debugNodeWasmUrlFor,
   VIR_WASM_DEV_FILE as NODE_VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE as NODE_VIR_WASM_RELEASE_FILE,
-  createVirtualDocumentHostBindings,
-  createVirtualDocumentState,
-  createVirtualElementState,
-  createVirtualEventState,
-  ensureVirtualElementState,
-  ensureVirtualElementStates,
 } from "../../web/src/vir-runtime-node.js";
 import {
   PACKAGE_FORMAT_VERSION,
@@ -66,12 +61,17 @@ const runtime = await createVirRuntime({
   irPackageSetBytes: [defaultPackageBytes],
 });
 const callbackRecords = [];
-const virtualDocumentState = createVirtualDocumentState();
+const testDocument = { title: "" };
 const hostRuntime = await createVirRuntime({
   wasmBytes,
   irPackageSetBytes: [hostPackageBytes],
-  virtualDocumentState,
   hostBindings: {
+    "browser.document.current": () => testDocument,
+    "browser.document.getTitle": (documentValue) => documentValue.title,
+    "browser.document.setTitle": (documentValue, title) => {
+      documentValue.title = title;
+      return undefined;
+    },
     "test.callNatCallback": (input, callback) => callback(input),
     "test.recordNat": (value) => {
       callbackRecords.push(Number(jsNatResourceValue(value)));
@@ -90,6 +90,17 @@ const leanRuntime = await createVirRuntime({
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(typeof createExportedHostLifecycle, "function");
+assert.throws(
+  () => createExportedBrowserHostBindings({ reactHostBindings: {} }),
+  /reactHostBindings must be a host binding factory/,
+);
+assert.throws(
+  () =>
+    createExportedBrowserHostBindings({
+      reactHostBindings: () => null,
+    }),
+  /reactHostBindings factory result must be a host binding object/,
+);
 assert.equal(VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
 assert.equal(VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
 assert.equal(NODE_VIR_WASM_RELEASE_FILE, VIR_WASM_RELEASE_FILE);
@@ -165,15 +176,16 @@ assert.throws(
     },
   });
   try {
-    const resources = createExportedHostLifecycle();
     const primitiveResource = false;
     assert.equal(primitiveResource, false);
-    const commonBindings = createExportedCommonHostBindings(resources);
-    const documentBindings =
-      createExportedBrowserDocumentHostBindings(resources);
-    const elementBindings = createExportedBrowserElementHostBindings(resources);
-    const sharedElementNullable =
-      documentBindings["browser.document.querySelector"]("#shared");
+    const commonBindings = createExportedCommonHostBindings();
+    const documentBindings = createExportedBrowserDocumentHostBindings();
+    const elementBindings = createExportedBrowserElementHostBindings();
+    const documentValue = documentBindings["browser.document.current"]();
+    assert.equal(documentValue, globalThis.document);
+    const sharedElementNullable = documentBindings[
+      "browser.document.querySelector"
+    ](documentValue, "#shared");
     assert.equal(
       commonBindings["js.nullable.isNull"](sharedElementNullable),
       false,
@@ -263,16 +275,6 @@ assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseStateImports[0]?.result?.type, "Js");
-const reactStateValueImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.stateTuple.value",
-);
-assert.equal(reactStateValueImport?.args[0]?.type?.type, "Js");
-assert.equal(reactStateValueImport?.result?.type, "Js");
-const reactStateSetterImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.stateTuple.setter",
-);
-assert.equal(reactStateSetterImport?.args[0]?.type?.type, "Js");
-assert.equal(reactStateSetterImport?.result?.type, "Js");
 const reactUseReducerImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useReducer",
 );
@@ -284,31 +286,6 @@ for (const entry of reactUseReducerImports) {
   assert.equal(entry.args[1]?.type?.type, "Js");
   assert.equal(entry.result?.type, "Js");
 }
-const reactReducerDispatchImports =
-  hostRuntime.interfaceManifest.hostImports.filter(
-    (entry) => entry.target === "react.reducer.dispatch",
-  );
-assert.equal(reactReducerDispatchImports.length, 1);
-for (const entry of reactReducerDispatchImports) {
-  assert.equal(entry.effect, "runtime");
-  assert.equal(entry.args[0]?.type?.kind, "resource");
-  assert.equal(entry.args[1]?.type?.type, "Js");
-  assert.equal(entry.result?.type, "Unit");
-}
-const reactReducerStateValueImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.reducerTuple.value",
-  );
-assert.equal(reactReducerStateValueImport?.effect, "runtime");
-assert.equal(reactReducerStateValueImport?.args[0]?.type?.type, "Js");
-assert.equal(reactReducerStateValueImport?.result?.type, "Js");
-const reactReducerStateDispatchImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.reducerTuple.dispatch",
-  );
-assert.equal(reactReducerStateDispatchImport?.effect, "runtime");
-assert.equal(reactReducerStateDispatchImport?.args[0]?.type?.type, "Js");
-assert.equal(reactReducerStateDispatchImport?.result?.type, "Js");
 const reactUseRefImports = hostRuntime.interfaceManifest.hostImports.filter(
   (entry) => entry.target === "react.useRef",
 );
@@ -359,8 +336,6 @@ for (const target of [
   "js.bool.value",
   "js.float.value",
   "js.value.proofwidgets.resolvedRef.value",
-  "js.value.react.eventHandler",
-  "js.value.react.property",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
@@ -393,7 +368,7 @@ assert.deepEqual(
     .sort(),
   ["js.leanRef", "js.leanRef.value"],
 );
-for (const target of ["react.state.modify", "react.state.set"]) {
+for (const target of ["react.state.modify"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "hostResource");
@@ -402,25 +377,38 @@ const documentSetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.setTitle",
 );
 assert.equal(documentSetTitleImport?.boundary, "hostResource");
+assert.equal(documentSetTitleImport?.args[0]?.name, "document");
 assert.equal(documentSetTitleImport?.args[0]?.type?.type, "Js");
+assert.equal(documentSetTitleImport?.args[1]?.type?.type, "Js");
 const documentGetTitleImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.getTitle",
 );
 assert.equal(documentGetTitleImport?.result?.type, "Js");
+assert.equal(documentGetTitleImport?.args[0]?.name, "document");
+assert.equal(documentGetTitleImport?.args[0]?.type?.type, "Js");
 const querySelectorImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.document.querySelector",
 );
 assert.equal(querySelectorImport?.args[0]?.type?.type, "Js");
+assert.equal(querySelectorImport?.args[0]?.name, "document");
+assert.equal(querySelectorImport?.args[1]?.type?.type, "Js");
 const keyboardEventNarrowingImport = hostImportTarget(
   "browser.keyboardEvent.fromEvent",
 );
 assert.equal(keyboardEventNarrowingImport?.args[0]?.type?.type, "Event");
 assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
-const keyboardEventKeyImport = hostImportTarget(
-  "browser.keyboardEvent.getKey",
-);
+const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
+const eventTargetImport = hostImportTarget("browser.event.target");
+assert.equal(eventTargetImport?.args[0]?.type?.type, "Event");
+assert.equal(eventTargetImport?.result?.type, "Js");
+const eventTargetNarrowingImport = hostImportTarget(
+  "browser.eventTarget.asElement",
+);
+assert.equal(eventTargetNarrowingImport?.args[0]?.name, "target");
+assert.equal(eventTargetNarrowingImport?.args[0]?.type?.type, "Js");
+assert.equal(eventTargetNarrowingImport?.result?.type, "Js");
 const inlineStyleNarrowingImport = hostImportTarget(
   "browser.elementCSSInlineStyle.fromElement",
 );
@@ -448,8 +436,11 @@ assert.equal(getCheckedImport?.result?.type, "Js");
 const setTimeoutImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "browser.timer.setTimeout",
 );
-assert.equal(setTimeoutImport?.args[0]?.type?.type, "Js");
+assert.equal(setTimeoutImport?.args[0]?.type?.kind, "function");
+assert.equal(setTimeoutImport?.args[1]?.type?.type, "Js");
 const setIntervalImport = hostImportTarget("browser.timer.setInterval");
+assert.equal(setIntervalImport?.args[0]?.type?.kind, "function");
+assert.equal(setIntervalImport?.args[1]?.type?.type, "Js");
 assert.equal(setIntervalImport?.result?.type, "Interval");
 const clearIntervalImport = hostImportTarget("browser.timer.clearInterval");
 assert.equal(clearIntervalImport?.args[0]?.type?.type, "Interval");
@@ -557,38 +548,6 @@ if (reactRenderNodeImport !== undefined) {
   assert.equal(reactRenderNodeImport.args[1]?.type?.type, "Js");
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
-const reactRenderIntoSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.renderIntoSelector",
-  );
-if (reactRenderIntoSelectorImport !== undefined) {
-  assert.equal(reactRenderIntoSelectorImport.args[0]?.type?.type, "Js");
-  assert.equal(reactRenderIntoSelectorImport.result?.type, "Js");
-}
-const reactUnmountSelectorImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.root.unmountSelector",
-  );
-assert.equal(reactUnmountSelectorImport?.args[0]?.type?.type, "Js");
-assert.equal(reactUnmountSelectorImport?.result?.type, "Js");
-const reactPropertyImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "js.value.react.property",
-);
-assert.equal(reactPropertyImport?.effect, "runtime");
-assert.equal(
-  reactPropertyImport?.args[0]?.type?.name,
-  "Lean.Vir.React.Property",
-);
-assert.equal(reactPropertyImport?.result?.type, "Js");
-const reactEventHandlerImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "js.value.react.eventHandler",
-);
-assert.equal(reactEventHandlerImport?.effect, "runtime");
-assert.equal(
-  reactEventHandlerImport?.args[0]?.type?.name,
-  "Lean.Vir.React.EventHandler",
-);
-assert.equal(reactEventHandlerImport?.result?.type, "Js");
 for (const target of [
   "js.value.react.component",
   "js.value.react.effectCallback",
@@ -597,38 +556,6 @@ for (const target of [
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "explicitConversion");
   assert.equal(entry?.result?.type, "Js");
-}
-const reactDepsEmptyImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.deps.empty",
-);
-assert.equal(reactDepsEmptyImport?.effect, "react");
-assert.equal(reactDepsEmptyImport?.args.length, 0);
-assert.equal(reactDepsEmptyImport?.result?.type, "Js");
-const reactDepsPushImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.deps.push",
-);
-assert.equal(reactDepsPushImport?.effect, "react");
-assert.equal(reactDepsPushImport?.args[0]?.type?.type, "Js");
-assert.equal(reactDepsPushImport?.args[1]?.type?.type, "Js");
-assert.equal(reactDepsPushImport?.result?.type, "Unit");
-const reactPropsEmptyImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.props.empty",
-);
-assert.equal(reactPropsEmptyImport?.effect, "react");
-assert.equal(reactPropsEmptyImport?.args.length, 0);
-assert.equal(reactPropsEmptyImport?.result?.type, "Js");
-for (const target of [
-  "react.props.setProperty",
-  "react.props.setEventHandler",
-  "react.props.setRef",
-]) {
-  const entry = hostRuntime.interfaceManifest.hostImports.find(
-    (hostImport) => hostImport.target === target,
-  );
-  assert.equal(entry?.effect, "react");
-  assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.type, "Js");
-  assert.equal(entry?.result?.type, "Unit");
 }
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.some((entry) =>
@@ -667,67 +594,6 @@ const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(
 assert.equal(reactFragmentImport?.effect, "react");
 assert.equal(reactFragmentImport?.args[0]?.type?.type, "Js");
 assert.equal(reactFragmentImport?.args[1]?.type?.type, "Js");
-const reactPropValueType = findTypeDescriptor(
-  reactPropertyImport?.args[0]?.type,
-  (type) =>
-    type.kind === "customInductive" &&
-    typeof type.name === "string" &&
-    type.name.endsWith(".PropValue"),
-);
-assert.deepEqual(
-  reactPropValueType?.constructors.map((ctor) => ctor.jsName),
-  ["string", "bool", "int", "float", "style", "classList"],
-);
-const virtualQueryState = createVirtualDocumentState();
-const virtualQueryHost = createVirtualDocumentHostBindings(virtualQueryState);
-const virtualNullableHost = createExportedCommonHostBindings(
-  virtualQueryState.resources,
-);
-assert.equal(
-  virtualNullableHost["js.nullable.isNull"](
-    virtualQueryHost["browser.document.querySelector"]("#missing"),
-  ),
-  true,
-);
-ensureVirtualElementState(virtualQueryState, "#present");
-const virtualPresentElement = virtualNullableHost["js.nullable.value"](
-  virtualQueryHost["browser.document.querySelector"]("#present"),
-);
-assert.notEqual(virtualPresentElement, null);
-assert.equal(
-  virtualQueryHost["browser.element.getTextContent"](virtualPresentElement),
-  "",
-);
-let virtualMissingEventTarget = "not-dispatched";
-let virtualMissingEventCurrentTarget = "not-dispatched";
-const virtualMissingEventCallback = (event) => {
-  virtualMissingEventTarget = virtualQueryHost["browser.event.target"](event);
-  virtualMissingEventCurrentTarget =
-    virtualQueryHost["browser.event.currentTarget"](event);
-};
-const virtualMissingEventListener = virtualQueryHost[
-  "browser.element.addEventListener"
-](virtualPresentElement, "click", virtualMissingEventCallback);
-virtualQueryState.elements
-  .get("#present")
-  .listeners.get("click")[0]
-  .dispatch(
-    createVirtualEventState({
-      target: "#missing",
-      currentTarget: "#missing",
-    }),
-  );
-assert.equal(
-  virtualNullableHost["js.nullable.isNull"](virtualMissingEventTarget),
-  true,
-);
-assert.equal(
-  virtualNullableHost["js.nullable.isNull"](virtualMissingEventCurrentTarget),
-  true,
-);
-virtualQueryHost["browser.element.removeEventListener"](
-  virtualMissingEventListener,
-);
 const browserRuntime = await createBrowserVirRuntime({
   wasmBytes,
   irPackageSetBytes: [hostPackageBytes],
@@ -749,107 +615,7 @@ assert.equal(
   "Lean VIR host: runtime smoke",
 );
 assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), "12");
-
-ensureVirtualElementStates(virtualDocumentState, ".query-all", [
-  createVirtualElementState({ textContent: "first match" }),
-  createVirtualElementState({ textContent: "second match" }),
-]);
-const queryRootBaseline =
-  hostRuntime.hostState.resourceRoots.debugCounts().active;
-assert.equal(
-  hostRuntime.call("HostInterop.querySelectorAllCount", ".query-all"),
-  "2",
-);
-assert.equal(
-  hostRuntime.call("HostInterop.querySelectorAllLeanCount", ".query-all"),
-  "2",
-);
-assert.equal(
-  hostRuntime.call("HostInterop.querySelectorAllArrayCount", ".query-all"),
-  "2",
-);
-assert.equal(
-  hostRuntime.call("HostInterop.querySelectorAllFirstText", ".query-all"),
-  "first match",
-);
-assert.equal(
-  hostRuntime.call("HostInterop.querySelectorAllCountLoop", ".query-all", 1000),
-  "2000",
-);
-const elementQueryRoot = ensureVirtualElementState(
-  virtualDocumentState,
-  "#element-query",
-);
-elementQueryRoot.queries.set("[data-e]", [
-  createVirtualElementState({ attributes: new Map([["data-e", "0"]]) }),
-  createVirtualElementState({ attributes: new Map([["data-e", "1"]]) }),
-]);
-assert.equal(
-  hostRuntime.call(
-    "HostInterop.elementQuerySelectorAllCount",
-    "#element-query",
-    "[data-e]",
-  ),
-  "2",
-);
-assert.equal(
-  hostRuntime.call(
-    "HostInterop.elementQuerySelectorText",
-    "#element-query",
-    "[data-e]",
-  ),
-  "",
-);
-elementQueryRoot.queries.get("[data-e]")[0].textContent = "first child";
-assert.equal(
-  hostRuntime.call(
-    "HostInterop.elementQuerySelectorText",
-    "#element-query",
-    "[data-e]",
-  ),
-  "first child",
-);
-assert.equal(
-  hostRuntime.call(
-    "HostInterop.elementInnerHTMLRoundTrip",
-    "#element-query",
-    "<svg></svg>",
-  ),
-  "<svg></svg>",
-);
-assert.equal(
-  hostRuntime.call(
-    "HostInterop.setInlineStyleProperty",
-    "#element-query",
-    "color",
-    "purple",
-  ),
-  true,
-);
-assert.equal(elementQueryRoot.style.properties.get("color"), "purple");
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
-const keyTarget = ensureVirtualElementState(
-  virtualDocumentState,
-  "#key-target",
-);
-assert.equal(hostRuntime.call("HostInterop.mountKeyTitle", "#key-target"), "1");
-keyTarget.listeners
-  .get("keydown")[0]
-  .dispatch(createVirtualEventState({ key: "Enter" }));
-assert.equal(virtualDocumentState.title, "Enter");
-keyTarget.listeners
-  .get("keydown")[0]
-  .dispatch(createVirtualEventState());
-assert.equal(virtualDocumentState.title, "");
-assert.equal(
-  hostRuntime.hostState.resourceRoots.debugCounts().active,
-  queryRootBaseline,
-  "querySelectorAll should release passive selector, NodeList, array, and element roots",
-);
-assert.ok(
-  hostRuntime.liveCallbacks.size >= 1,
-  "the runtime must track the live keydown callback root",
-);
 hostRuntime.dispose();
 assert.equal(
   hostRuntime.liveCallbacks.size,

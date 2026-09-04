@@ -6,10 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
-import {
-  createCommonHostBindings,
-  createHostLifecycle,
-} from "../../web/src/vir-host-bindings.js";
+import { createCommonHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { createCallbackHostBindings, readRuntimeArtifacts } from "./shared.mjs";
 
@@ -57,43 +54,38 @@ const floatCases = [
 }
 
 {
-  const resources = createHostLifecycle();
-  const bindings = createCommonHostBindings(resources);
-  try {
-    assert.throws(
-      () => bindings["js.float"]("1.5"),
-      /js\.float expects a number/,
+  const bindings = createCommonHostBindings();
+  assert.throws(
+    () => bindings["js.float"]("1.5"),
+    /js\.float expects a number/,
+  );
+  const stringResource = "1.5";
+  assert.throws(
+    () => bindings["js.float.value"](stringResource),
+    /js\.float\.value expects a JS number/,
+  );
+
+  for (const expected of floatCases) {
+    const encoded = bindings["js.float"](expected);
+    assertSameFloat(
+      encoded,
+      expected,
+      `Float -> Js Float (${floatLabel(expected)})`,
     );
-    const stringResource = "1.5";
-    assert.throws(
-      () => bindings["js.float.value"](stringResource),
-      /js\.float\.value expects a JS number/,
+    assertSameFloat(
+      bindings["js.float.value"](encoded),
+      expected,
+      `Float -> Js Float -> Float (${floatLabel(expected)})`,
     );
 
-    for (const expected of floatCases) {
-      const encoded = bindings["js.float"](expected);
-      assertSameFloat(
-        encoded,
-        expected,
-        `Float -> Js Float (${floatLabel(expected)})`,
-      );
-      assertSameFloat(
-        bindings["js.float.value"](encoded),
-        expected,
-        `Float -> Js Float -> Float (${floatLabel(expected)})`,
-      );
-
-      const jsValue = expected;
-      const decoded = bindings["js.float.value"](jsValue);
-      const reencoded = bindings["js.float"](decoded);
-      assertSameFloat(
-        reencoded,
-        expected,
-        `Js Float -> Float -> Js Float (${floatLabel(expected)})`,
-      );
-    }
-  } finally {
-    resources.dispose();
+    const jsValue = expected;
+    const decoded = bindings["js.float.value"](jsValue);
+    const reencoded = bindings["js.float"](decoded);
+    assertSameFloat(
+      reencoded,
+      expected,
+      `Js Float -> Float -> Js Float (${floatLabel(expected)})`,
+    );
   }
 }
 

@@ -274,7 +274,7 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 - [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
   JavaScript.
 - [docs/HOST_BINDINGS.md](docs/HOST_BINDINGS.md) for JavaScript host binding
-  targets, virtual hosts, and resource cleanup.
+  targets, external hosts, and resource cleanup.
 - [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
   import helpers.
 - [docs/REACT_WASM_BINDINGS.md](docs/REACT_WASM_BINDINGS.md) for the
@@ -291,8 +291,8 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   shipped JavaScript boundary.
 - `wasm/upstream_shim/` owns the local interpreter, package, ABI, and WASI
   boundary sources.
-- `web/src/` contains runtime and host-binding code; browser page entry points
-  live under `web/src/apps/`, reusable page helpers under `web/src/pages/`, and
+- `web/src/` contains the distributable runtime and host-binding code;
+  repository browser applications and page helpers live under `web/app/`, and
   reusable static tool templates under `web/tools/`.
 - `examples/` contains runnable applications and tutorials; `fixtures/`
   contains regression-only Lean and host inputs, including the authored

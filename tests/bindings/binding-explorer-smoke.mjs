@@ -182,13 +182,13 @@ assert.equal(
   report.summary.generation.boundaries.operations,
 );
 assert.equal(report.summary.generation.semanticRelations.unreviewed, 0);
-assert.ok(report.summary.generation.semanticRelations.changing > 0);
+assert.equal(report.summary.generation.semanticRelations.changing, 0);
 assert.ok(Object.values(report.summary.generation.activeEffects)
   .every((count) => count > 0));
 assert.equal(
   generatedOperations.find((operation) =>
     operation.id === "infoview.clipboard.write-text")?.semantics.relation,
-  "changing",
+  "local-contract",
 );
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
@@ -272,7 +272,7 @@ assert.deepEqual(documentRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 267,
-  mappedTargets: 5,
+  mappedTargets: 6,
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
 assert.equal(documentTitle?.status, "compatible");
@@ -281,8 +281,8 @@ assert.deepEqual(documentTitle?.generation, {
   provenance: "generator",
   targets: ["browser.document.getTitle", "browser.document.setTitle"],
   semanticCoverage: {
-    status: "adapter-only",
-    relations: ["changing"],
+    status: "faithful",
+    relations: ["preserving"],
   },
   diagnostics: [],
 });
@@ -290,7 +290,11 @@ const documentTitleGetter = documentRoot?.comparison.results.find(
   (result) => result.id === "document.title.get",
 );
 assert.equal(documentTitleGetter?.modalityContract.profile, "browser-dom-faithful-v1");
-assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "global");
+assert.equal(documentTitleGetter?.modalityContract.receiver.kind, "argument");
+assert.equal(
+  documentTitleGetter?.modalityContract.receiver.argument.type,
+  "Lean.Vir.Js Document",
+);
 assert.deepEqual(documentTitleGetter?.modalityContract.result.modalities, {
   representation: "js-resource",
   ownership: "owned",
@@ -330,7 +334,7 @@ assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "compatible");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
-assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "adapter-only");
+assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -354,7 +358,7 @@ assert.deepEqual(elementRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 728,
-  mappedTargets: 21,
+  mappedTargets: 22,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
@@ -384,19 +388,20 @@ const generatedAddEventListener = elementRoot?.generatedOperations.find((operati
   operation.typescript.member === "Element.addEventListener");
 const generatedRemoveEventListener = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.removeEventListener");
-assert.equal(generatedAddEventListener?.arguments[1].role, "callback");
-assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "until-release");
-assert.equal(generatedAddEventListener?.result.lean, "Lean.Vir.Js EventListener");
-assert.equal(generatedAddEventListener?.semantics.relation, "changing");
-assert.equal(generatedAddEventListener?.activeEffect, "register");
-assert.equal(generatedRemoveEventListener?.receiver.kind, "none");
+assert.equal(generatedAddEventListener?.arguments[1].role, "argument");
+assert.equal(generatedAddEventListener?.arguments[1].modalities.representation, "js-resource");
+assert.equal(generatedAddEventListener?.arguments[1].modalities.retention, "call");
+assert.equal(generatedAddEventListener?.result.lean, "Unit");
+assert.equal(generatedAddEventListener?.semantics.relation, "preserving");
+assert.equal(generatedAddEventListener?.activeEffect, undefined);
+assert.equal(generatedRemoveEventListener?.receiver.kind, "argument");
 assert.deepEqual(
   generatedRemoveEventListener?.typescript.signaturePolicy.omittedRequiredParameters,
-  ["type"],
+  [],
 );
-assert.equal(generatedRemoveEventListener?.arguments[0].modalities.passing, "consumed");
-assert.equal(generatedRemoveEventListener?.semantics.relation, "changing");
-assert.equal(generatedRemoveEventListener?.activeEffect, "release");
+assert.equal(generatedRemoveEventListener?.arguments[1].modalities.passing, "borrowed");
+assert.equal(generatedRemoveEventListener?.semantics.relation, "preserving");
+assert.equal(generatedRemoveEventListener?.activeEffect, undefined);
 assert.match(app, /function highlightCode/u);
 assert.match(app, /Generated conversion policy/u);
 assert.match(style, /\.tok-keyword/u);
@@ -427,14 +432,13 @@ assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGra
 assert.equal(generatedFillStyleGetter?.semantics.relation, "preserving");
 assert.deepEqual(canvasFillStyle?.generation.semanticCoverage, {
   status: "faithful",
-  relations: ["changing", "preserving"],
+  relations: ["preserving"],
 });
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
 assert.equal(generatedFillStyleSetter?.arguments[0].type, "Lean.Vir.Js CanvasStyle");
 assert.ok(canvasRoot?.generatedOperations.some((operation) =>
-  operation.host.target === "browser.canvas2d.setFillStyle" &&
-  operation.protocol?.upstreamRelation.member === "CanvasRenderingContext2D.fillStyle" &&
-  operation.protocol?.upstreamRelation.accessor === "set"));
+  operation.host.target === "js.value.browser.canvasStyle.string" &&
+  operation.protocol?.upstreamRelation.kind === "vir-owned"));
 
 const canvasLineWidth = canvasRoot?.coverage.members.find((member) =>
   member.id === "CanvasRenderingContext2D.lineWidth");
@@ -659,9 +663,13 @@ const semanticCoverageByMember = new Map(roots.flatMap((root) =>
     member.generation.semanticCoverage.status,
   ])));
 for (const member of [
+  "browser/console:Console.log",
+  "browser/document:Document.createElement",
+  "browser/document:Document.querySelector",
+  "browser/document:Document.querySelectorAll",
   "browser/document:Document.title",
 ]) {
-  assert.equal(semanticCoverageByMember.get(member), "adapter-only");
+  assert.equal(semanticCoverageByMember.get(member), "faithful");
 }
 for (const member of [
   "browser/element:Element.classList",

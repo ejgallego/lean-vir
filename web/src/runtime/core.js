@@ -512,21 +512,21 @@ export class VirRuntime extends ObjectValueRuntime {
     return len === 0 ? "" : this.readWasmString(this.exports.vir_closure_call_error(), len);
   }
 
-  dispose({ disposeBindings = true } = {}) {
+  dispose() {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
     const errors = [];
     try {
-      collectCleanupError(errors, () => this.teardownPackageResources({ disposeBindings }));
+      collectCleanupError(errors, () => this.teardownPackageResources());
     } finally {
       this.markDisposed();
     }
     throwCollectedErrors(errors, "VirRuntime disposal failed");
   }
 
-  teardownPackageResources({ disposeBindings = true } = {}) {
+  teardownPackageResources() {
     const errors = [];
-    collectCleanupError(errors, () => this.hostState?.dispose({ disposeBindings }));
+    collectCleanupError(errors, () => this.hostState?.dispose());
     collectCleanupError(errors, () => this.releaseLiveCallbacks());
     throwCollectedErrors(errors, "VirRuntime package resource teardown failed");
   }

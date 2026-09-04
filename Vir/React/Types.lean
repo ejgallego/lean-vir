@@ -66,10 +66,12 @@ opaque Reducer (state action : Type) : Type
 opaque ReducerDispatch (state action : Type) : Type
 
 /-- Exact JavaScript array returned by `React.useState`. -/
-opaque StateTuple (α : Type) : Type
+abbrev StateTuple (_α : Type) : Type :=
+  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
 
 /-- Exact JavaScript array returned by `React.useReducer`. -/
-opaque ReducerTuple (state action : Type) : Type
+abbrev ReducerTuple (_state _action : Type) : Type :=
+  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
 
 /-- Native JavaScript calculation function accepted by `React.useMemo`. -/
 opaque MemoCalculation (α : Type) : Type
@@ -91,8 +93,9 @@ opaque Context (α : Type) : Type
 /-- React ref object returned by `useRef`. -/
 opaque Ref (α : Type) : Type
 
-/-- Marker for a JavaScript-owned React props object. -/
-opaque Props : Type
+/-- React props are ordinary JavaScript objects. -/
+abbrev Props : Type :=
+  Lean.Vir.Js.Object.Value
 
 /-- A single React `style` object entry. Use camelCase property names. -/
 structure StyleProperty where
@@ -142,8 +145,9 @@ structure ReducerState (state action : Type) where
 /-- React node object created by the JavaScript host through React's public API. -/
 opaque Node : Type
 
-/-- JavaScript-owned React hook dependency list. -/
-opaque DependencyList : Type
+/-- React dependency lists are ordinary JavaScript arrays. -/
+abbrev DependencyList : Type :=
+  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
 
 /--
 An exact JavaScript React function component whose props originate in Lean.

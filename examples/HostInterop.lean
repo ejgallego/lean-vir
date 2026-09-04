@@ -31,7 +31,8 @@ def recordNat (value : Nat) : DomM Unit := do
   recordNatJs jsValue
 
 private def setDocumentTitle (title : String) : DomM Unit := do
-  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.Browser.Document.setTitle
+    (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString title)
 
 private def getElementText
     (element : Lean.Vir.Js Lean.Vir.Browser.Element) : DomM String := do
@@ -46,7 +47,8 @@ private def setElementText
 def titleHandshake (label : String) : DomM String := do
   let title := "Lean VIR host: " ++ label
   setDocumentTitle title
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+  Lean.Vir.JsValue.toString
+    (← Lean.Vir.Browser.Document.getTitle (← Lean.Vir.Browser.Document.current))
 
 partial def titleHandshakeLoopAux (remaining acc : Nat) : DomM Nat := do
   match remaining with
@@ -66,23 +68,27 @@ def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   Lean.Vir.JsValue.toFloat jsValue
 
 def querySelectorAllCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString
+    (← Lean.Vir.Browser.Document.current) selector
   Lean.Vir.Js.NodeList.length nodes
 
 def querySelectorAllLeanCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString
+    (← Lean.Vir.Browser.Document.current) selector
   let elements ← Lean.Vir.Js.NodeList.toLeanArray nodes
   pure elements.size
 
 def querySelectorAllArrayCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAllString
+    (← Lean.Vir.Browser.Document.current) selector
   let jsElements ← Lean.Vir.Js.NodeList.toArray nodes
   let elements ← Lean.Vir.Js.Array.toLeanArray jsElements
   pure elements.size
 
 def querySelectorAllFirstText (selector : String) : DomM String := do
   let element? ← do
-    let nodes ← Lean.Vir.Browser.Document.querySelectorAllString selector
+    let nodes ← Lean.Vir.Browser.Document.querySelectorAllString
+      (← Lean.Vir.Browser.Document.current) selector
     Lean.Vir.Js.NodeList.item nodes 0
   match element? with
   | none => pure ""
@@ -100,14 +106,16 @@ def querySelectorAllCountLoop (selector : String) (count : Nat) : DomM Nat :=
   querySelectorAllCountLoopAux selector count 0
 
 def elementQuerySelectorAllCount (selector childSelector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure 0
   | some element =>
     let nodes ← Lean.Vir.Browser.Element.querySelectorAllString element childSelector
     Lean.Vir.Js.NodeList.length nodes
 
 def elementQuerySelectorText (selector childSelector : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ""
   | some element =>
     match ← Lean.Vir.Browser.Element.querySelectorString element childSelector with
@@ -115,7 +123,8 @@ def elementQuerySelectorText (selector childSelector : String) : DomM String := 
     | some child => getElementText child
 
 def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure ""
   | some element =>
     let jsHtml ← Lean.Vir.JsValue.ofString html
@@ -125,7 +134,8 @@ def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
 
 def setInlineStyleProperty
     (selector name value : String) : DomM Bool := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure false
   | some element =>
       match ← Lean.Vir.Browser.ElementCSSInlineStyle.fromElement element with
@@ -136,7 +146,8 @@ def setInlineStyleProperty
           pure true
 
 def setElementClassList (selector classes : String) : DomM Bool := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | none => pure false
   | some element =>
       Lean.Vir.Browser.Element.setClassList element
@@ -161,7 +172,8 @@ def callbackRoundTripLoop (count : Nat) : Lean.Vir.RuntimeM Nat :=
   callbackRoundTripLoopAux count 0
 
 def mountCallbackEvent (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         recordNat 101
@@ -169,11 +181,12 @@ def mountCallbackEvent (selector : String) : DomM Nat := do
   | none => pure 0
 
 def mountAndRemoveCallbackEvent (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         recordNat 102
-      Lean.Vir.Browser.Element.removeEventListener listener
+      Lean.Vir.Browser.Element.removeEventListener element "click" listener
       pure 1
   | none => pure 0
 
@@ -188,7 +201,8 @@ def mountAndRemoveCallbackEventLoop (selector : String) (count : Nat) : DomM Nat
   mountAndRemoveCallbackEventLoopAux selector count 0
 
 def mountCallbackText (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         setElementText element "callback:clicked"
@@ -196,16 +210,18 @@ def mountCallbackText (selector : String) : DomM Nat := do
   | none => pure 0
 
 def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         setElementText element "callback:removed-fired"
-      Lean.Vir.Browser.Element.removeEventListener listener
+      Lean.Vir.Browser.Element.removeEventListener element "click" listener
       pure 1
   | none => pure 0
 
 def mountKeyTitle (selector : String) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString selector with
+  match ← Lean.Vir.Browser.Document.querySelectorString
+      (← Lean.Vir.Browser.Document.current) selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
         setDocumentTitle (← Lean.Vir.Browser.Event.keyString event)

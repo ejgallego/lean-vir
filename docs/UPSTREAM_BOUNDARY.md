@@ -646,7 +646,9 @@ object result returned by `vir_closure_call_objects`. Collection is a
 best-effort release backstop and runtime disposal deterministically calls
 `vir_closure_release`. The closure root table is re-entrant: executing a callback
 can register nested closures and may reallocate the table while a callback is
-running.
+running. The native caller therefore snapshots the selected root's function,
+arity, and effect flag before application and retains no table pointer across
+that re-entrant call.
 The JavaScript import dispatcher records synchronous host exceptions out of
 band because the C++ trampoline must return a structurally valid Lean object.
 Both top-level object calls and closure calls clear and consume that same error

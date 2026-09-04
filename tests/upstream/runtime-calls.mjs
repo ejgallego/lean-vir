@@ -54,7 +54,10 @@ export function smokeRuntimeCalls(runtime) {
     throw new Error(`generic String input: expected 1381, got ${genericStringScore}`);
   }
 
-  const genericByteArrayScore = runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]);
+  const genericByteArrayScore = runtime.call(
+    "Vir.Fixtures.Basic.byteArrayInputScore",
+    Uint8Array.from([65, 66, 67]),
+  );
   if (genericByteArrayScore !== "136") {
     throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
   }

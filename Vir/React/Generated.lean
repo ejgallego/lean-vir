@@ -93,26 +93,6 @@ opaque tagJs
 
 end React.ElementType
 
-namespace React.EventHandler
-
-/--
-Generated binding for reviewed VIR protocol `react.event-handler.to-js`.
-
-Explicitly lowers an event descriptor to a JavaScript object containing the exact callback function.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; value lean-owned/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.eventHandler"]
-opaque toJs
-    (value : Lean.Vir.React.EventHandler) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js Lean.Vir.React.EventHandler)
-
-end React.EventHandler
-
 namespace React.Hooks
 
 /--
@@ -256,42 +236,6 @@ opaque useEffectWithDeps
 
 end React.Hooks
 
-namespace React.Hooks.DependencyList
-
-/--
-Generated binding for reviewed VIR protocol `react.dependencies.empty`.
-
-Allocates an empty JavaScript dependency list for React hooks.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.deps.empty"]
-opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)
-
-/--
-Generated binding for reviewed VIR protocol `react.dependencies.push`.
-
-Appends a JavaScript-owned identity value to a hook dependency list.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; deps js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.deps.push"]
-opaque push
-    {α : Type}
-    (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList)
-    (value : @& Lean.Vir.Js α) :
-    Lean.Vir.React.ReactM Unit
-
-end React.Hooks.DependencyList
-
 namespace React.MemoCalculation
 
 /--
@@ -405,96 +349,6 @@ opaque fragmentWithKeyJs
 
 end React.Node
 
-namespace React.Property
-
-/--
-Generated binding for reviewed VIR protocol `react.property.to-js`.
-
-Explicitly lowers VIR's reviewed React Property algebra to an ordinary JavaScript descriptor object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.property"]
-opaque toJs
-    (value : @& Lean.Vir.React.Property) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js Lean.Vir.React.Property)
-
-end React.Property
-
-namespace React.Props
-
-/--
-Generated binding for reviewed VIR protocol `react.props.empty`.
-
-Allocates an empty JavaScript React props object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.props.empty"]
-opaque empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Props)
-
-/--
-Generated binding for reviewed VIR protocol `react.props.set-property`.
-
-Installs the reviewed descriptor's exact JavaScript value on the props object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; property js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.props.setProperty"]
-opaque setProperty
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (property : @& Lean.Vir.Js Lean.Vir.React.Property) :
-    Lean.Vir.React.ReactM Unit
-
-/--
-Generated binding for reviewed VIR protocol `react.props.set-event-handler`.
-
-Installs the descriptor's exact callback function on the JavaScript props object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; handler js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.props.setEventHandler"]
-opaque setEventHandler
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (handler : @& Lean.Vir.Js Lean.Vir.React.EventHandler) :
-    Lean.Vir.React.ReactM Unit
-
-/--
-Generated binding for reviewed VIR protocol `react.props.set-ref`.
-
-Installs the exact React ref object on a JavaScript props object.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; ref js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.props.setRef"]
-opaque setRef
-    {α : Type}
-    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (ref : @& Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) :
-    Lean.Vir.React.ReactM Unit
-
-end React.Props
-
 namespace React.Reducer
 
 /--
@@ -516,69 +370,6 @@ opaque ofLean
     Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Reducer state action))
 
 end React.Reducer
-
-namespace React.ReducerDispatch
-
-/--
-Generated binding for reviewed VIR protocol `react.reducer.dispatch`.
-
-Passes the exact JavaScript action to React's reducer dispatch function.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; dispatch js-resource/borrowed/call; action js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.reducer.dispatch"]
-opaque dispatchJs
-    {state : Type}
-    {action : Type}
-    (dispatch : @& Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action))
-    (action : @& Lean.Vir.Js action) :
-    Lean.Vir.RuntimeM Unit
-
-end React.ReducerDispatch
-
-namespace React.ReducerTuple
-
-/--
-Generated binding for reviewed VIR protocol `react.reducer-tuple.value`.
-
-Projects index zero from the exact JavaScript array returned by React.useReducer.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.reducerTuple.value"]
-opaque value
-    {state : Type}
-    {action : Type}
-    (result : @& Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state)
-
-/--
-Generated binding for reviewed VIR protocol `react.reducer-tuple.dispatch`.
-
-Projects the exact native dispatch function from index one of React.useReducer's result array.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.reducerTuple.dispatch"]
-opaque dispatch
-    {state : Type}
-    {action : Type}
-    (result : @& Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action))
-
-end React.ReducerTuple
 
 namespace React.Ref
 
@@ -672,60 +463,9 @@ opaque create
     (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
-/--
-Generated binding for reviewed VIR protocol `react.root.render-selector`.
-
-VIR-owned convenience protocol that finds a selector, creates a root, and renders the exact node value.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.renderIntoSelector"]
-opaque renderIntoSelectorJs
-    (selector : @& Lean.Vir.Js String)
-    (node : @& Lean.Vir.Js Lean.Vir.React.Node) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `react.root.unmount-selector`.
-
-VIR-owned convenience protocol that unmounts and releases the root associated with a selector.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; selector js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.root.unmountSelector"]
-opaque unmountSelectorJs
-    (selector : @& Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
 end React.Root
 
 namespace React.StateSetter
-
-/--
-Generated binding for reviewed VIR protocol `react.state.set`.
-
-Enqueues one concrete JavaScript-owned state value through a React setter.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.state.set"]
-opaque set
-    {α : Type}
-    (setter : @& Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js α)))
-    (value : @& Lean.Vir.Js α) :
-    Lean.Vir.RuntimeM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.state.modify`.
@@ -746,43 +486,5 @@ opaque modify
     Lean.Vir.RuntimeM Unit
 
 end React.StateSetter
-
-namespace React.StateTuple
-
-/--
-Generated binding for reviewed VIR protocol `react.state-tuple.value`.
-
-Projects index zero from the exact JavaScript array returned by React.useState.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.stateTuple.value"]
-opaque value
-    {α : Type}
-    (result : @& Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js α)
-
-/--
-Generated binding for reviewed VIR protocol `react.state-tuple.setter`.
-
-Projects the exact native setter function from index one of React.useState's result array.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.stateTuple.setter"]
-opaque setter
-    {α : Type}
-    (result : @& Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js α)))
-
-end React.StateTuple
 
 end Lean.Vir

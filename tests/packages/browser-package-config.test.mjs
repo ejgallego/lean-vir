@@ -12,7 +12,7 @@ import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import {
   browserPackageConfigVersion,
   deriveBrowserPackageConfig,
-} from "../../web/src/pages/browser-package-config.js";
+} from "../../web/app/pages/browser-package-config.js";
 
 function packageSpec(id, overrides = {}) {
   return { id, file: `${id}.irpkg`, fixtureSources: [], ...overrides };

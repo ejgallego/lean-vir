@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "../pages/browser-packages.js";
-import { createVirRuntime, fetchBytes } from "../vir-runtime.js";
+import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
+import { createVirRuntime, fetchBytes } from "../src/vir-runtime.js";
 
 const output = document.querySelector("#runtime-example-output");
 let vir = null;
@@ -33,7 +33,10 @@ try {
     natToNat: vir.call("fib", 12),
     natArrayToNat: vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]),
     stringToNat: vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"),
-    byteArrayToNat: vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]),
+    byteArrayToNat: vir.call(
+      "Vir.Fixtures.Basic.byteArrayInputScore",
+      Uint8Array.from([65, 66, 67]),
+    ),
     leanToBrowserTitle: hostVir.call("HostInterop.titleHandshake", "runtime example"),
   };
 

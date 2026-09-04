@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { JSON_INPUT_INTERFACE_TAGS, INTERFACE_TAG } from "../runtime/interface-tags.js";
+import { JSON_INPUT_INTERFACE_TAGS, INTERFACE_TAG } from "../../src/runtime/interface-tags.js";
 
 export function interfaceInputTag(type) {
   if (type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) return "SELECT";

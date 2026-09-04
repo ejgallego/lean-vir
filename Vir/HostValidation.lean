@@ -84,8 +84,8 @@ public structure HostImportAnalysis where
   signature : ClassifiedSignature
   boundary : HostImportBoundary
 
-private def isGenericJsResource : InterfaceType → Bool
-  | .resource name label => name == `Lean.Vir.Js && label == "Js"
+private def isJsResource : InterfaceType → Bool
+  | .resource .. => true
   | _ => false
 
 private def isLeanObjectHandle : InterfaceType → Bool
@@ -120,8 +120,8 @@ private def isJsValueConversionSignature (signature : ClassifiedSignature) : Boo
     match signature.args[0]? with
     | some arg =>
         signature.args.size == 1 &&
-          ((isGenericJsResource arg.type && isExplicitConversionResult signature.result) ||
-            (isExplicitConversionArgument arg.type && isGenericJsResource signature.result))
+          ((isJsResource arg.type && isExplicitConversionResult signature.result) ||
+            (isExplicitConversionArgument arg.type && isJsResource signature.result))
     | none => false
 
 private def isLeanObjectHandleSignature
@@ -132,9 +132,9 @@ private def isLeanObjectHandleSignature
     match target, signature.args[0]? with
     | "js.leanRef", some arg =>
         signature.args.size == 1 && isLeanObjectHandle arg.type &&
-          isGenericJsResource signature.result
+          isJsResource signature.result
     | "js.leanRef.value", some arg =>
-        signature.args.size == 1 && isGenericJsResource arg.type &&
+        signature.args.size == 1 && isJsResource arg.type &&
           isLeanObjectHandle signature.result
     | _, _ => false
 

@@ -77,11 +77,11 @@ For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
 `Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
-bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
-document bindings and explicit unsupported React shims. The JavaScript-side binding composition reference
-lives in [JS_API.md](JS_API.md). This section documents the repository-local
-package generator; downstream Lake packages should prefer the facet workflow
-above.
+bindings from `lean-vir/react-host-bindings`. The Node wrapper installs only
+environment-neutral JavaScript-value and console bindings; it has no DOM or
+React implementation. The JavaScript-side binding composition reference lives
+in [JS_API.md](JS_API.md). This section documents the repository-local package
+generator; downstream Lake packages should prefer the facet workflow above.
 
 1. Import the Lean module that provides the host import.
 
@@ -94,8 +94,9 @@ above.
    ```lean
    def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
-     Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+     let document ← Lean.Vir.Browser.Document.current
+     Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+     Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
    ```
 
 3. Generate a package with that declaration as a root.
@@ -126,15 +127,17 @@ const vir = await createVirRuntime({
 vir.call("titleHandshake", "browser handshake");
 ```
 
-Browser event listeners use the same default bindings. Lean passes a closure
-directly with `Element.addEventListener`; the host retains that closure
-until the listener is removed or the runtime is disposed.
+Browser event listeners use the same default bindings. The convenience call
+creates an ordinary JavaScript function with `EventListener.ofLean`, passes it
+unchanged to `Element.addEventListener`, and returns it so callers can later use
+the same identity with `Element.removeEventListener`.
 
 ```lean
 import Vir.Browser
 
 def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString "#run" with
+  let document ← Lean.Vir.Browser.Document.current
+  match ← Lean.Vir.Browser.Document.querySelectorString document "#run" with
   | none => pure ()
   | some button =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener
@@ -145,30 +148,18 @@ def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
       pure ()
 ```
 
-In Node tests or command-line tools, import the Node wrapper instead:
+Node tests and command-line tools may use the environment-neutral wrapper:
 
 ```js
 import {
   createVirRuntime,
-  ensureVirtualElementState,
-  ensureVirtualElementStates,
 } from "lean-vir/vir-runtime-node";
 ```
 
-That wrapper uses the same runtime and installs virtual browser bindings for
-`Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`,
-`Lean.Vir.Browser.Event`, `Lean.Vir.Browser.HTMLInputElement`, timers,
-and animation frames. It also exports
-`createVirtualElementState`, `createVirtualEventState`,
-`ensureVirtualElementState`, and `ensureVirtualElementStates` for direct
-callback tests. React operations are explicit unsupported shims; React
-semantics are tested with official React in Chromium. Virtual
-`Document.querySelector` returns a nullable JavaScript resource for missing
-selectors; the explicit `Document.querySelectorString` convenience wrapper
-converts that result to `none`. Call
-`ensureVirtualElementState(state, selector)` in JS tests when the fixture
-should exist. Use `ensureVirtualElementStates` to seed all results returned by
-virtual `Document.querySelectorAll`.
+That wrapper uses the same runtime and installs only environment-neutral
+JavaScript value and console operations. It has no DOM or React model. Run
+browser semantics in Chromium, or pass a focused external `hostBindings` map
+when a non-browser test needs a particular operation.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -322,9 +313,10 @@ and open `build/bindings/index.html` to inspect the current checkout. This
 overview records the intended shape without duplicating that generated
 inventory:
 
-- `Document` exposes the host-global document's title, selector, and element
-  creation operations. Helpers ending in `String` perform explicit conversion
-  from Lean-owned text.
+- `Document` operations take an exact JavaScript receiver. `Document.current`
+  separately retrieves the host-global document, and helpers ending in
+  `String` perform explicit conversion from Lean-owned text without hiding
+  receiver selection.
 - `Element` exposes tree, query, content, attribute, listener, and exact
   `DOMTokenList` operations. `Element.ClassList` is a Lean convenience over the
   generated `Element.classList` and `DOMTokenList` boundaries.
@@ -332,17 +324,18 @@ inventory:
   capability without changing identity. Its generated `style` getter returns
   the exact `CSSStyleDeclaration`; `CSSStyleDeclaration.setProperty` preserves
   the upstream `string | null` value.
-- `Event` exposes targets and propagation operations. `KeyboardEvent.fromEvent`
-  performs checked identity-preserving narrowing before the generated exact
-  `KeyboardEvent.key` getter; form helpers similarly make their narrowing and
-  string conversion explicit.
+- `Event` exposes exact `EventTarget | null` properties and propagation
+  operations. `EventTarget.asElement` and `KeyboardEvent.fromEvent` perform
+  checked identity-preserving narrowing; form helpers likewise make narrowing
+  and string conversion explicit.
 - `HTMLInputElement` and `HTMLCanvasElement` provide checked element narrowing.
   The canvas surface preserves exact context, text-metric, and style values.
 - Timers, intervals, animation frames, and event listeners use private host
   teardown records for active effects. Their JavaScript tokens and values cross
   the public boundary directly.
-- `Console.log` is the deliberately specialized single-JavaScript-string
-  console boundary.
+- `Console.logJs` is the deliberately specialized single-JavaScript-string
+  boundary with an exact `Js Console` receiver; `Console.current` separately
+  retrieves the host-global console.
 
 `Vir.React` provides the first React-specific imports and a native `ReactNode`
 resource surface. React root lifetime operations and event callbacks use
@@ -511,7 +504,9 @@ provides the first infoview-facing shell:
 `Lean.Vir.Infoview.Clipboard.writeText` remains a public `String -> DomM Bool`
 helper, but its low-level host target receives an explicit
 `Lean.Vir.Js String` resource via `JsValue.ofString` and returns an explicit
-`Lean.Vir.Js Bool` resource. The infoview command and proof-widget RPC command
+`Lean.Vir.Js Bool` resource. This is the local synchronous
+`InfoviewClipboardHost` capability, not a binding that claims the asynchronous
+browser `Clipboard.writeText` contract. The infoview command and proof-widget RPC command
 helpers follow the same `Js Bool` result convention at the low-level host
 boundary. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
 `DocumentPosition -> DomM Bool` shape, but first builds a `Js DocumentPosition`
@@ -523,19 +518,19 @@ infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
 entry names. The package roots are built from the active Lean server snapshot.
 The component entry must have signature
 `RuntimeM (Js (React.Component Surface))`; the mount entry must accept
-`String -> Js (React.Component Surface) -> Surface -> DomM Bool`; and the
-optional unmount entry must have signature `String -> DomM Bool`. The shell
-creates the exact JavaScript component function once per loaded runtime
-service, then passes that same value with the selector and current infoview
-`Surface` on every render. It reloads the runtime service only when the widget
-IR package revision changes. That revision token hashes the compiled IR closure
-and local source ranges, so imported helper changes are detected once the
-active Lean snapshot contains them.
+`Js React.Root -> Js (React.Component Surface) -> Surface -> DomM Unit`. The
+shell owns the official React root, creates the exact JavaScript component
+function once per loaded runtime service, and passes those same values with the
+current infoview `Surface` on every render. It unmounts the root before runtime
+disposal and reloads the service only when the widget IR package revision
+changes. That revision token hashes the compiled IR closure and local source
+ranges, so imported helper changes are detected once the active Lean snapshot
+contains them.
 
 `vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
 widgets: users provide a `RuntimeM (Js (React.Component Surface))` factory, and
-the command declares the standard `createComponent`, selector-owned
-`mount`/`unmount`, `irPackage`, and `widgetProps` entries in the current
+the command declares the standard `createComponent`, `mount`, `irPackage`, and
+`widgetProps` entries in the current
 namespace. `ReactWidget` is the lower-level expansion target when a caller
 needs to assemble those pieces manually.
 `examples/tutorials/ReactProofWidgetHello.lean` is the minimal live example and
@@ -544,7 +539,7 @@ uses the goal surface and editor edit command without duplicating the infoview.
 `node tests/infoview/widget.mjs` checks that the shell module loads and
 that the proof-widget entries have the required signatures.
 
-The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
+The JavaScript runtime binding map, external-host behavior, cleanup hooks,
 and external browser/React API references are documented in
 `docs/HOST_BINDINGS.md`.
 
@@ -557,8 +552,9 @@ namespace HostInterop
 
 def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
   let title := "Lean VIR host: " ++ label
-  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+  let document ← Lean.Vir.Browser.Document.current
+  Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
 
 end HostInterop
 ```
@@ -593,8 +589,8 @@ Host imports use an explicit JavaScript-resource boundary by default. Use
 JavaScript `null`, or callback arguments whose own arguments/results are
 `Unit` or resources. Nested callback arguments are rejected. Raw Lean scalars,
 structures, arrays, lists, options, and products are rejected unless the target
-is a built-in conversion primitive such as `js.nat.value` or
-`js.value.react.property`. `Unit` results should return `undefined` or `null`.
+is a built-in conversion primitive such as `js.nat.value`. `Unit` results
+should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim
@@ -605,12 +601,13 @@ runtime disposal is the deterministic release boundary.
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
-`Element.addEventListener`, `Timer.setTimeout`,
+`EventListener.ofLean`, `Timer.setTimeout`,
 `Animation.requestAnimationFrame`, and raw React Node rendering use the callback ABI.
 The underlying browser and React APIs determine event and callback validity;
-VIR adds no callback scope. Listener, timeout, frame, and React-root
-registrations are explicitly terminated on removal, cancellation, firing,
-unmount, package reload, or runtime disposal. See
+VIR adds no callback scope. DOM listeners use native function-identity removal;
+VIR-owned timeout, frame, and React-root registrations are explicitly
+terminated on cancellation, firing, unmount, package reload, or runtime
+disposal. See
 [HOST_BINDINGS.md](HOST_BINDINGS.md) for the contract and the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for follow-up work.
 

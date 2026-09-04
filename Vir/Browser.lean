@@ -24,6 +24,16 @@ def keyString (event : @& Lean.Vir.Js KeyboardEvent) : DomM String := do
 
 end KeyboardEvent
 
+namespace EventTarget
+
+/-- Narrows an exact `EventTarget` to `Element` without changing its JavaScript identity. -/
+def asElement
+    (target : @& Lean.Vir.Js EventTarget) :
+    DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← asElementNullable target)
+
+end EventTarget
+
 namespace Event
 
 /--
@@ -36,7 +46,9 @@ follows browser semantics.
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
 def targetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← getTarget event)
+  match ← Lean.Vir.Js.Nullable.toOption (← getTarget event) with
+  | none => pure none
+  | some target => EventTarget.asElement target
 
 /--
 Returns the current event target as a DOM element when the current target is an
@@ -49,7 +61,9 @@ stronger event lifetime.
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
 def currentTargetOption (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
-  Lean.Vir.Js.Nullable.toOption (← getCurrentTarget event)
+  match ← Lean.Vir.Js.Nullable.toOption (← getCurrentTarget event) with
+  | none => pure none
+  | some target => EventTarget.asElement target
 
 /--
 Returns the keyboard key represented by an event, or the empty string for
@@ -66,39 +80,31 @@ end Event
 
 namespace Console
 
-/--
-Logs a message through the JavaScript host's console binding.
-
-The default browser/runtime binding calls `console.log`. The host call is
-synchronous and returns `Unit`.
+/-- Converts a Lean string before calling the exact `Console.log` binding.
 
 Reference: [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static).
 -/
-def log (message : @& String) : IO Unit :=
+def log (console : @& Lean.Vir.Js Console) (message : @& String) : IO Unit :=
   Lean.Vir.RuntimeM.run do
     let jsMessage ← Lean.Vir.JsValue.ofString message
-    logJs jsMessage
+    logJs console jsMessage
 
 end Console
 
 namespace Document
 
 /--
-Returns the first element matching a CSS selector.
-
-In a browser this calls `document.querySelector(selector)`. In Node tests, use
-the `lean-vir/vir-runtime-node` wrapper for virtual document state. The virtual
-binding follows DOM lookup behavior: a missing selector returns `none`. Tests
-that need an element fixture should pre-seed it from JavaScript with
-`ensureVirtualElementState`.
+Converts a Lean selector before calling the exact `Document.querySelector`
+binding. A missing selector returns `none`.
 
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
 def querySelectorString
+    (document : @& Lean.Vir.Js Document)
     (selector : @& String) :
     DomM (Option (Lean.Vir.Js Element)) := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
-  Lean.Vir.Js.Nullable.toOption (← querySelector jsSelector)
+  Lean.Vir.Js.Nullable.toOption (← querySelector document jsSelector)
 
 /--
 Returns the static list of elements matching a CSS selector.
@@ -110,13 +116,17 @@ handles remain valid independently of the list.
 Reference: [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll).
 -/
 def querySelectorAllString
+    (document : @& Lean.Vir.Js Document)
     (selector : @& String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
-  querySelectorAll (← Lean.Vir.JsValue.ofString selector)
+  querySelectorAll document (← Lean.Vir.JsValue.ofString selector)
 
-/-- Converts a Lean tag name before calling `document.createElement`. -/
-def createElementString (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
-  createElement (← Lean.Vir.JsValue.ofString tagName)
+/-- Converts a Lean tag name before calling the exact `Document.createElement` binding. -/
+def createElementString
+    (document : @& Lean.Vir.Js Document)
+    (tagName : @& String) :
+    DomM (Lean.Vir.Js Element) := do
+  createElement document (← Lean.Vir.JsValue.ofString tagName)
 
 end Document
 
@@ -216,11 +226,8 @@ def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Boo
 end ClassList
 
 /--
-Registers a browser event listener backed by a Lean callback closure.
-
-The host retains the callback until `Element.removeEventListener` is called or
-the owning runtime is disposed. The callback receives an opaque event resource
-that is valid only during that event dispatch.
+Registers an exact JavaScript event-listener function and returns that same
+function so it can be passed to `Element.removeEventListener`.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
@@ -230,7 +237,17 @@ def addEventListener
     (callback : Lean.Vir.Js Event → DomM Unit) :
     DomM (Lean.Vir.Js EventListener) := do
   let jsEvent ← Lean.Vir.JsValue.ofString event
-  addEventListenerJs element jsEvent callback
+  let listener ← EventListener.ofLean callback
+  addEventListenerJs element jsEvent listener
+  pure listener
+
+/-- Removes the exact listener previously registered for this element and event name. -/
+def removeEventListener
+    (element : @& Lean.Vir.Js Element)
+    (event : @& String)
+    (listener : @& Lean.Vir.Js EventListener) : DomM Unit := do
+  let jsEvent ← Lean.Vir.JsValue.ofString event
+  removeEventListenerJs element jsEvent listener
 
 end Element
 
@@ -240,8 +257,7 @@ namespace HTMLInputElement
 Narrows a generic DOM element to an `HTMLInputElement` when possible.
 
 In a browser this returns `some` exactly when the element is an
-`HTMLInputElement`. In Node tests, use the `lean-vir/vir-runtime-node` wrapper
-for virtual document state.
+`HTMLInputElement`. Non-browser runtimes must supply an explicit DOM host.
 
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
@@ -251,8 +267,8 @@ def fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js H
 /--
 Reads the `checked` property of a checkbox or radio input.
 
-In a browser this reads `input.checked`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this reads `input.checked`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
@@ -263,8 +279,8 @@ def getCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool := do
 /--
 Sets the `checked` property of a checkbox or radio input.
 
-In a browser this writes `input.checked`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this writes `input.checked`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
@@ -275,8 +291,8 @@ def setCheckedBool (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : 
 /--
 Reads the `value` property of an input element.
 
-In a browser this reads `input.value`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this reads `input.value`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
@@ -287,8 +303,8 @@ def getValueString (input : @& Lean.Vir.Js HTMLInputElement) : DomM String := do
 /--
 Sets the `value` property of an input element.
 
-In a browser this writes `input.value`. In Node tests, use the
-`lean-vir/vir-runtime-node` wrapper for virtual document state.
+In a browser this writes `input.value`. Non-browser runtimes must supply an
+explicit DOM host.
 
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
@@ -377,15 +393,15 @@ def arc
   withFloat startAngle fun startAngle => withFloat endAngle fun endAngle =>
   arcJs ctx x y radius startAngle endAngle
 
-/-- Sets the context's CSS fill style. -/
+/-- Converts a Lean string to the string arm of `CanvasStyle`, then uses the exact setter. -/
 def setFillStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setFillStyleJs ctx (← Internal.ownedString style)
+  setFillStyleValue ctx (← CanvasStyle.ofString style)
 
-/-- Sets the context's CSS stroke style. -/
+/-- Converts a Lean string to the string arm of `CanvasStyle`, then uses the exact setter. -/
 def setStrokeStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setStrokeStyleJs ctx (← Internal.ownedString style)
+  setStrokeStyleValue ctx (← CanvasStyle.ofString style)
 
 /-- Sets the context's stroke width. -/
 def setLineWidth
@@ -467,8 +483,8 @@ cleared.
 Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
 -/
 def setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout) := do
-  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
-  setTimeoutJs jsDelay callback
+  let jsDelay ← Lean.Vir.JsValue.ofFloat (UInt64.ofNat delayMs.toNat).toFloat
+  setTimeoutJs callback jsDelay
 
 /--
 Runs `callback` every `delayMs` milliseconds until cleared.
@@ -479,8 +495,8 @@ disposed.
 Reference: [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval).
 -/
 def setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval) := do
-  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
-  setIntervalJs jsDelay callback
+  let jsDelay ← Lean.Vir.JsValue.ofFloat (UInt64.ofNat delayMs.toNat).toFloat
+  setIntervalJs callback jsDelay
 
 end Timer
 

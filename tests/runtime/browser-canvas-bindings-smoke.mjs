@@ -32,17 +32,41 @@ const ctx = {
   translate: (...args) => canvasCalls.push(["translate", ...args]),
   rotate: (...args) => canvasCalls.push(["rotate", ...args]),
 };
-const canvas = {
-  width: 300,
-  height: 150,
-  getContext: (kind) => (kind === "2d" ? ctx : null),
-};
+class FakeHTMLCanvasElement {
+  constructor() {
+    this.width = 300;
+    this.height = 150;
+  }
+
+  getContext(kind) {
+    return kind === "2d" ? ctx : null;
+  }
+}
+
+const nativeCanvasElement = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "HTMLCanvasElement",
+);
+Object.defineProperty(globalThis, "HTMLCanvasElement", {
+  configurable: true,
+  writable: true,
+  value: FakeHTMLCanvasElement,
+});
+const canvas = new FakeHTMLCanvasElement();
 const canvasBindings = createBrowserCanvasHostBindings();
 assert.equal(
   canvasBindings["browser.htmlCanvasElement.fromElement"](canvas),
   canvas,
 );
 assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"]({}), null);
+delete globalThis.HTMLCanvasElement;
+assert.equal(
+  canvasBindings["browser.htmlCanvasElement.fromElement"]({
+    getContext: () => ctx,
+  }),
+  null,
+);
+globalThis.HTMLCanvasElement = FakeHTMLCanvasElement;
 assert.equal(canvasBindings["browser.htmlCanvasElement.getWidth"](canvas), 300);
 assert.equal(
   canvasBindings["browser.htmlCanvasElement.getHeight"](canvas),
@@ -71,8 +95,13 @@ canvasBindings["browser.canvas2d.arc"](ctx, 5, 6, 7, 0, 3.14);
 canvasBindings["browser.canvas2d.closePath"](ctx);
 canvasBindings["browser.canvas2d.fill"](ctx);
 canvasBindings["browser.canvas2d.stroke"](ctx);
-canvasBindings["browser.canvas2d.setFillStyle"](ctx, "#f80");
-canvasBindings["browser.canvas2d.setStrokeStyle"](ctx, "black");
+const fillStyle = canvasBindings["js.value.browser.canvasStyle.string"]("#f80");
+const strokeStyle =
+  canvasBindings["js.value.browser.canvasStyle.string"]("black");
+assert.equal(fillStyle, "#f80");
+assert.equal(strokeStyle, "black");
+canvasBindings["browser.canvas2d.setFillStyleValue"](ctx, fillStyle);
+canvasBindings["browser.canvas2d.setStrokeStyleValue"](ctx, strokeStyle);
 canvasBindings["browser.canvas2d.setLineWidth"](ctx, 2.25);
 assert.equal(canvasBindings["browser.canvas2d.getFillStyle"](ctx), "#f80");
 assert.equal(canvasBindings["browser.canvas2d.getStrokeStyle"](ctx), "black");
@@ -107,5 +136,11 @@ assert.deepEqual(canvasCalls, [
 assert.equal(ctx.fillStyle, gradient);
 assert.equal(ctx.strokeStyle, pattern);
 assert.equal(ctx.lineWidth, 2.25);
+
+if (nativeCanvasElement === undefined) {
+  delete globalThis.HTMLCanvasElement;
+} else {
+  Object.defineProperty(globalThis, "HTMLCanvasElement", nativeCanvasElement);
+}
 
 console.log("vir browser canvas bindings smoke ok");

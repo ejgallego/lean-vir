@@ -14,17 +14,16 @@ The module is also exposed through the package entry point:
 import { createVirRuntime, VIR_HOST_DISPOSE } from "lean-vir";
 ```
 
-Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
-can import the Node wrapper:
+Node tests and command-line tools can import the environment-neutral wrapper:
 
 ```js
 import {
   createVirRuntime,
-  createVirtualElementState,
-  createVirtualEventState,
-  ensureVirtualElementState,
 } from "lean-vir/vir-runtime-node";
 ```
+
+It does not emulate a DOM or React. Packages with browser imports must run in a
+browser or receive an explicit external `hostBindings` implementation.
 
 Custom hosts can import the built-in binding factories directly:
 
@@ -74,29 +73,28 @@ Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
 
 The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 
-| Module                              | Role                                                                                                      |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `vir-runtime.js`                    | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
-| `vir-runtime-node.js`               | Node wrapper that installs virtual browser bindings and unsupported React shims for tests/tools.          |
-| `runtime/call-timing.js`            | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
-| `runtime/callbacks.js`              | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
-| `runtime/cleanup.js`                | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
-| `runtime/core.js`                   | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
-| `runtime/object-values.js`          | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
-| `runtime/vir-codec.js`              | Binary reader/writer and interface type descriptor codec.                                                 |
-| `runtime/host-state.js`             | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
-| `runtime/object-abi.js`             | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
-| `runtime/object-abi-exports.js`     | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
-| `runtime/vir-value-normalizers.js`  | Input normalization helpers used by object ABI lowering.                                                  |
-| `vir-host-bindings.js`              | Public common/browser host binding factories and stable re-exports.                                       |
-| `host-boundary.js`                  | Exact-value externref roots and host-call rollback transactions.                                          |
-| `host/vir-host-resources.js`        | Explicit teardown for listeners, schedules, frames, and React roots.                                      |
-| `host/vir-virtual-host-bindings.js` | Virtual document/event bindings and unsupported React shims for Node tests/tools.                         |
-| `react/vir-react-node.js`           | Browser React node, props, children, and component element construction.                                  |
-| `react/vir-react-hooks.js`          | Direct official browser React hook operations.                                                            |
-| `vir-react-host-bindings.js`        | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
-| `runtime/interface-manifest.js`     | Manifest validation, diagnostics, and type formatting helpers.                                            |
-| `runtime/interface-tags.js`         | Shared interface descriptor tag constants and JSON-input tag set.                                         |
+| Module                               | Role                                                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `vir-runtime.js`                     | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring.               |
+| `vir-runtime-node.js`                | Node wrapper with environment-neutral JavaScript value and console bindings.                             |
+| `runtime/call-timing.js`             | Internal accumulator for opt-in synchronous runtime call phase attribution.                               |
+| `runtime/callbacks.js`               | Private Lean closure roots associated with ordinary JavaScript functions.                                 |
+| `runtime/cleanup.js`                 | Cleanup error collection with deterministic single-error and aggregate reporting.                         |
+| `runtime/core.js`                    | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
+| `runtime/object-values.js`           | Object ABI lowering and lifting between JavaScript values and owned Lean objects.                         |
+| `runtime/vir-codec.js`               | Binary reader/writer and interface type descriptor codec.                                                 |
+| `runtime/host-state.js`              | Host import dispatch, exact-value externref roots, binding lookup, and disposal.                          |
+| `runtime/object-abi.js`              | Object ABI support checks, layout planning, scalar packing, and unpacking helpers.                        |
+| `runtime/object-abi-exports.js`      | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling.                    |
+| `runtime/vir-value-normalizers.js`   | Input normalization helpers used by object ABI lowering.                                                  |
+| `vir-host-bindings.js`               | Public common/browser host binding factories and stable re-exports.                                       |
+| `host-boundary.js`                   | Exact-value externref roots and host-call rollback transactions.                                          |
+| `host/vir-active-host-bindings.js`   | Shared active lifecycle plus schedule and frame teardown.                                                 |
+| `host/vir-infoview-host-bindings.js` | Repository-owned infoview/ProofWidgets command protocol and validation.                                   |
+| `react/vir-react-root.js`            | Exact React root creation, rendering, and teardown forwarding.                                            |
+| `vir-react-host-bindings.js`         | Browser React root/component/hook bindings; imports `react` and `react-dom/client`.                       |
+| `runtime/interface-manifest.js`      | Manifest validation, diagnostics, and type formatting helpers.                                            |
+| `runtime/interface-tags.js`          | Shared interface descriptor tag constants and JSON-input tag set.                                         |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
@@ -111,8 +109,8 @@ names an entry point above.
 ## Host Bindings
 
 The browser runtime installs the built-in `common.*` and `browser.*` host
-bindings by default. The complete target map, factory list, virtual Node
-helpers, custom binding rules, and cleanup behavior are documented in
+bindings by default. The complete target map, factory list, custom binding
+rules, and cleanup behavior are documented in
 `docs/HOST_BINDINGS.md`.
 
 `defaultHostBindings` may be either a binding map or a function returning a
@@ -121,23 +119,21 @@ of React dependencies, compose the React binding group explicitly:
 
 ```js
 import { createVirRuntimeFactory } from "lean-vir";
-import {
-  createBrowserHostBindings,
-  createHostLifecycle,
-} from "lean-vir/host-bindings";
+import { createBrowserHostBindings } from "lean-vir/host-bindings";
 import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 
 const factory = createVirRuntimeFactory({
   wasmUrl: "vir-upstream.wasm",
-  defaultHostBindings: () => {
-    const lifecycle = createHostLifecycle();
-    return createBrowserHostBindings({
-      resources: lifecycle,
+  defaultHostBindings: () =>
+    createBrowserHostBindings({
       reactHostBindings: createBrowserReactHostBindings,
-    });
-  },
+    }),
 });
 ```
+
+The `reactHostBindings` option is deliberately a factory. The browser host
+passes its own lifecycle to that factory so runtime disposal reaches every
+React root; preconstructed binding maps are rejected.
 
 ## Browser Usage
 
@@ -389,17 +385,15 @@ use generated Lean `_boxed` declarations automatically.
 JavaScript number and preserve NaN, infinities, and signed zero across the
 opaque `Lean.Vir.Js Float` resource boundary.
 
-Nullary inductive enums are accepted as constructor names, generated JavaScript
-names, or constructor indexes. Results are returned as the constructor's
-generated JavaScript name.
+Nullary inductive enums use their generated JavaScript constructor name in both
+directions.
 
-Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
-`{ some: value }`, or the bare inner value. Option results are returned as
-`null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`.
-`Sum`/`Except` inputs are accepted as `{ kind, value }`, `{ tag, value }`, or
-single-constructor-key objects such as `{ inl: 4 }` and `{ ok: value }`;
-results are returned as `{ kind, value }`. Non-indexed custom inductives use
+Options use `null` for `none` and the bare inner value for `some`. Products use
+`{ fst, snd }` in both directions. Arrays and lists use JavaScript arrays,
+`ByteArray` uses `Uint8Array`, floats use JavaScript numbers, and `Sum`/`Except`
+values use `{ kind, value }`.
+Lowering accepts the same canonical shapes that lifting returns; text parsing
+and other UI conveniences belong in application code. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
 and multi-field constructors accept and return `{ kind, fields }`.
@@ -421,8 +415,9 @@ For example, a recursive `Tree Nat` value with constructors
 
 For a custom inductive with a nullary constructor and a recursive single-field
 constructor, use `{ kind: "null" }` and `{ kind: "array", value: [...] }`.
-The `{ tag, value }` and single-constructor-key input aliases are only for
-`Sum`/`Except`, not for custom inductives.
+Tagged unions use their canonical `{ kind, value }` representation in both
+directions; alternate tag fields and single-constructor-key objects are not
+accepted.
 
 Non-indexed structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
@@ -473,19 +468,20 @@ Import one of the provided modules:
 import Vir.Browser
 
 def titleRoundtrip (title : String) : Lean.Vir.Browser.DomM String := do
-  Lean.Vir.Browser.Document.setTitle (← Lean.Vir.JsValue.ofString title)
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle)
+  let document ← Lean.Vir.Browser.Document.current
+  Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
+  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
 ```
 
 `Document.title` is exposed as the faithful `getTitle`/`setTitle` property
-pair. Applications choose where to place conversions or other policy; the
-binding layer does not add a second upstream operation for a convenience
-wrapper.
+pair with an explicit `Js Document` receiver. `Document.current` separately
+retrieves the host-global document as an exact JavaScript value. Applications
+choose where to place conversions or other policy; the binding layer does not
+hide global receiver selection inside the upstream operation.
 
 The full Lean-side declaration list is maintained in
 `docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
-virtual Node helpers, and resource lifetime rules are maintained in
-`docs/HOST_BINDINGS.md`.
+and resource lifetime rules are maintained in `docs/HOST_BINDINGS.md`.
 
 The built-in `common.*` and `browser.*` targets do not require a
 `hostBindings` option:
@@ -503,10 +499,10 @@ Browser React root, native Node construction, component, and hook targets are
 provided by `lean-vir/react-host-bindings`.
 Use the `defaultHostBindings` composition shown above when a browser package
 calls `Lean.Vir.React.Root.*`, `Lean.Vir.React.Node.*`, or
-`Lean.Vir.React.Hooks.*`. The browser runtime requires `globalThis.document`
-for `browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or
-pass explicit `hostBindings`; the Node wrapper provides virtual document and
-event values, while React operations explicitly require the browser host.
+`Lean.Vir.React.Hooks.*`. `Document.current` requires `globalThis.document` in
+the browser host. The Node wrapper does not provide document, event, or React
+operations. Supply an external host explicitly when a non-browser environment
+can implement them.
 
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive the exact JavaScript values and return a
@@ -535,8 +531,7 @@ def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.*` bindings, including selector
-helpers such as `react.root.renderIntoSelector`:
+default `common.*`, `browser.*`, and `react.*` bindings:
 
 ```js
 const vir = await createVirRuntime({
@@ -558,8 +553,8 @@ keeps their private Lean roots alive, with runtime disposal as the deterministic
 cleanup boundary. If argument conversion, binding execution, synchronous-result
 validation, or result conversion fails, the runtime releases callbacks lifted
 for that failed call. Built-in active-resource creators also roll back a newly
-installed listener, timer, animation frame, or React root when the result cannot
-be published to Lean.
+installed timer, animation frame, or React root when the result cannot be
+published to Lean.
 Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
@@ -583,12 +578,13 @@ payload. `FinalizationRegistry` is a best-effort abandonment backstop; its
 schedule is not deterministic. `vir.dispose()` is the deterministic boundary:
 it releases remaining Lean roots and invalidates subsequent callback calls.
 
-Listeners, timers, frames, and React roots are active resources with explicit
-platform termination. Each built-in `HostLifecycle` entry stores its exact
-cleanup function; it does not infer cleanup from methods on the JavaScript
-value. A private host-call transaction also rolls back a newly created active
-resource if result lowering fails. Passive values are never inserted into this
-lifecycle.
+Timers, frames, and React roots are active resources with explicit platform
+termination. Each built-in `HostLifecycle` entry stores its exact cleanup
+function; it does not infer cleanup from methods on the JavaScript value. A
+private host-call transaction also rolls back a newly created active resource
+if result lowering fails. Passive values and native event listeners are never
+inserted into this lifecycle; the DOM retains a listener until the caller
+removes that exact function or the target becomes unreachable.
 
 Synchronous JavaScript exceptions raised by a host binding are recorded by the
 Wasm import boundary and consumed by the owning call. This applies equally to

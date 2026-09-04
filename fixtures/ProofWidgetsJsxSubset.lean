@@ -154,7 +154,8 @@ def View : RuntimeM (Component Unit) := do
         <button id="proofwidgets-jsx-action" className="pw-jsx-action"
             onClick={do
               let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
-              Lean.Vir.Browser.Document.setTitle title}>
+              Lean.Vir.Browser.Document.setTitle
+                (← Lean.Vir.Browser.Document.current) title}>
           {Html.text "mark"}
         </button>
         <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
@@ -168,7 +169,8 @@ def View : RuntimeM (Component Unit) := do
 
 def mount (selector : String) : DomM Bool := do
   let component ← View
-  Lean.Vir.React.Root.renderComponentIntoSelector selector component (componentProps ())
+  Lean.Vir.React.Root.mountFromSelector selector fun root =>
+    Lean.Vir.React.Root.renderComponent root component (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-jsx-subset-root"

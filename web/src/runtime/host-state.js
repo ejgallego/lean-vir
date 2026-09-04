@@ -8,8 +8,8 @@ import {
   abortHostCallTransaction,
   beginHostCallTransaction,
   commitHostCallTransaction,
+  disposeHostBindings,
   ExternrefRoots,
-  VIR_HOST_DISPOSE,
 } from "../host-boundary.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { releaseCallbackRoots } from "./callbacks.js";
@@ -198,7 +198,7 @@ export class VirHostState {
         const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
         try {
           const value = explicitConversionTarget
-            ? this.runtime.liftExplicitConversionObjectValue(
+            ? this.runtime.liftObjectValue(
                 arg.type,
                 argObjects[index],
                 `${entry.target} argument ${arg.name}`,
@@ -227,11 +227,7 @@ export class VirHostState {
         }
         const resultLabel = `${entry.target} result`;
         const resultObject = explicitConversionTarget
-          ? this.runtime.makeExplicitConversionObjectValue(
-              entry.result,
-              value,
-              resultLabel,
-            )
+          ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
           : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
         commitHostCallTransaction(transaction);
         return resultObject;
@@ -339,7 +335,7 @@ export class VirHostState {
     );
   }
 
-  dispose({ disposeBindings = true } = {}) {
+  dispose() {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
     const errors = [];
@@ -350,7 +346,7 @@ export class VirHostState {
         errors,
         () => this.releaseHostBindings?.() ?? true,
       );
-      if (disposeBindings && userRelease.ok && userRelease.value) {
+      if (userRelease.ok && userRelease.value) {
         collectCleanupError(errors, () =>
           disposeHostBindings(this.userBindings),
         );
@@ -359,7 +355,7 @@ export class VirHostState {
         errors,
         () => this.releaseDefaultHostBindings?.() ?? true,
       );
-      if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
+      if (defaultRelease.ok && defaultRelease.value) {
         collectCleanupError(errors, () =>
           disposeHostBindings(this.defaultBindings),
         );
@@ -402,14 +398,6 @@ function isGenericJsResourceDescriptor(type) {
     type?.kind === "resource" &&
     type?.name === "Lean.Vir.Js"
   );
-}
-
-function disposeHostBindings(bindings) {
-  if (bindings === null || bindings === undefined) return;
-  const disposer = bindings[VIR_HOST_DISPOSE];
-  if (typeof disposer === "function") {
-    disposer.call(bindings);
-  }
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {

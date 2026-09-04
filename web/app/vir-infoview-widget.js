@@ -6,15 +6,19 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import { EditorContext, useRpcSession } from "@leanprover/infoview";
+import { createRoot } from "../src/vir-react-dom-client.js";
 import {
   createBrowserHostBindings,
-  createHostLifecycle,
   normalizeProofWidgetsRpcRef,
-} from "./vir-host-bindings.js";
-import { createBrowserReactHostBindings } from "./vir-react-host-bindings.js";
-import { createVirRuntime as createBundledVirRuntime } from "./vir-runtime.js";
-import { isEffectfulInterfaceEffect } from "./runtime/interface-effects.js";
-import { INTERFACE_TAG } from "./runtime/interface-tags.js";
+} from "../src/vir-host-bindings.js";
+import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
+import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
+import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
+import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
 let nextMountId = 0;
@@ -51,6 +55,7 @@ export default function VirInfoviewWidget(props) {
     message: "Loading VIR widget...",
   });
   const [mountId] = React.useState(() => freshMountId(props.mountId));
+  const mountElementRef = React.useRef(null);
   const loadedRef = React.useRef(null);
   const [reloadToken, setReloadToken] = React.useState(0);
   const [runtimeToken, setRuntimeToken] = React.useState(0);
@@ -101,10 +106,6 @@ export default function VirInfoviewWidget(props) {
         config.componentEntry,
       );
       const entry = validateWidgetEntry(service.runtime, config.entry);
-      const unmountEntry = validateWidgetUnmountEntry(
-        service.runtime,
-        config.unmountEntry,
-      );
       const component = service.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
@@ -115,14 +116,17 @@ export default function VirInfoviewWidget(props) {
       const current = loadedRef.current;
       loadedRef.current = null;
       if (current !== null) {
-        releaseLoadedWidget(current, mountId);
+        releaseLoadedWidget(current);
+      }
+      if (mountElementRef.current === null) {
+        throw new Error("VIR widget mount element is unavailable");
       }
       loadedRef.current = {
         service,
+        root: createRoot(mountElementRef.current),
         componentEntry,
         component,
         entry,
-        unmountEntry,
       };
       service = null;
       setProofWidgetsExpr(null);
@@ -148,7 +152,7 @@ export default function VirInfoviewWidget(props) {
       disposed = true;
       const loaded = loadedRef.current;
       if (loaded !== null) {
-        releaseLoadedWidget(loaded, mountId);
+        releaseLoadedWidget(loaded);
         if (loadedRef.current === loaded) {
           loadedRef.current = null;
         }
@@ -160,7 +164,6 @@ export default function VirInfoviewWidget(props) {
     irPackageKey,
     props.componentEntry,
     props.entry,
-    props.unmountEntry,
     mountId,
   ]);
 
@@ -181,7 +184,6 @@ export default function VirInfoviewWidget(props) {
     irPackageKey,
     props.componentEntry,
     props.entry,
-    props.unmountEntry,
     mountId,
     reloadToken,
   ]);
@@ -236,7 +238,6 @@ export default function VirInfoviewWidget(props) {
     irPackageKey,
     props.componentEntry,
     props.entry,
-    props.unmountEntry,
     props.autoReloadMs,
   ]);
 
@@ -301,24 +302,18 @@ export default function VirInfoviewWidget(props) {
       return;
     }
     try {
-      const selector = `#${mountId}`;
-      const mounted = loaded.service.runtime.call(
+      loaded.service.runtime.call(
         loaded.entry.entry,
-        selector,
+        loaded.root,
         loaded.component,
         surface,
       );
-      if (mounted !== true) {
-        throw new Error(
-          `VIR widget entry ${loaded.entry.entry} did not mount ${selector}`,
-        );
-      }
       setStatus({ kind: "ready", message: loaded.entry.entry });
     } catch (error) {
       if (loadedRef.current === loaded) {
         loadedRef.current = null;
       }
-      releaseLoadedWidget(loaded, mountId);
+      releaseLoadedWidget(loaded);
       setStatus({
         kind: "error",
         message: errorMessage(error, setupHintRef.current),
@@ -338,6 +333,7 @@ export default function VirInfoviewWidget(props) {
       style: shellStyle,
     },
     e("div", {
+      ref: mountElementRef,
       id: mountId,
       className: "vir-infoview-widget-mount",
       style: mountStyle,
@@ -361,14 +357,14 @@ export function validateWidgetEntry(runtime, entryName) {
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 3 ||
-    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
+    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
     entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
     entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
     entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
+    entry.result?.interfaceTag !== INTERFACE_TAG.UNIT
   ) {
     throw new Error(
-      `VIR widget entry ${entryName} must be an effectful String -> Component -> Surface -> Bool entry`,
+      `VIR widget entry ${entryName} must be an effectful Root -> Component -> Surface -> Unit entry`,
     );
   }
   return entry;
@@ -392,25 +388,6 @@ export function validateWidgetComponentEntry(runtime, entryName) {
   return entry;
 }
 
-export function validateWidgetUnmountEntry(runtime, entryName) {
-  if (entryName.length === 0) {
-    return null;
-  }
-  const entry = requireWidgetManifestEntry(runtime, entryName, "unmount entry");
-  if (
-    !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 1 ||
-    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
-  ) {
-    throw new Error(
-      `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry ` +
-        `(Lean: String -> DomM Bool)`,
-    );
-  }
-  return entry;
-}
-
 function requireWidgetManifestEntry(runtime, entryName, label) {
   const entry =
     runtime.findManifestEntry?.(entryName) ??
@@ -426,20 +403,11 @@ function requireWidgetManifestEntry(runtime, entryName, label) {
   return entry;
 }
 
-function unmountWidgetSelector(loaded, mountId) {
-  if (loaded.unmountEntry === null) {
-    return;
-  }
-  try {
-    loaded.service.runtime.call(loaded.unmountEntry.entry, `#${mountId}`);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-function releaseLoadedWidget(loaded, mountId) {
-  unmountWidgetSelector(loaded, mountId);
-  disposeRuntimeService(loaded.service);
+function releaseLoadedWidget(loaded) {
+  const errors = [];
+  collectCleanupError(errors, () => loaded.root.unmount());
+  collectCleanupError(errors, () => disposeRuntimeService(loaded.service));
+  throwCollectedErrors(errors, "VIR widget cleanup failed");
 }
 
 export function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
@@ -737,7 +705,6 @@ function widgetRuntimeConfigFromProps(props) {
     irPackage,
     componentEntry: requiredString(props.componentEntry, "componentEntry"),
     entry: requiredString(props.entry, "entry"),
-    unmountEntry: optionalString(props.unmountEntry, "unmountEntry"),
     position: requiredPosition(props.pos, "pos"),
     autoReloadMs: optionalNonNegativeInteger(
       props.autoReloadMs,
@@ -806,39 +773,23 @@ export async function loadRuntimeService({
 }
 
 async function createRuntimeService({ rpcSession, hostContext, sources }) {
-  const resources = createHostLifecycle();
   const runtimeOptions = await loadRuntimeOptionsFromSources({
     rpcSession,
     sources,
   });
-  runtimeOptions.defaultHostBindings = (runtimeRef) =>
+  runtimeOptions.defaultHostBindings = () =>
     createBrowserHostBindings({
-      resources,
-      runtimeRef,
       infoviewCommandDispatcher: createInfoviewCommandDispatcher({
         hostContext,
         packageRevision: sources.packageSource.revision ?? "",
       }),
       reactHostBindings: createBrowserReactHostBindings,
     });
-  try {
-    return {
-      packageRevision: sources.packageSource.revision ?? "",
-      disposed: false,
-      resources,
-      runtime: await createBundledVirRuntime(runtimeOptions),
-    };
-  } catch (error) {
-    try {
-      resources.dispose();
-    } catch (cleanupError) {
-      throw new AggregateError(
-        [error, cleanupError],
-        "VIR runtime creation failed during host cleanup",
-      );
-    }
-    throw error;
-  }
+  return {
+    packageRevision: sources.packageSource.revision ?? "",
+    disposed: false,
+    runtime: await createBundledVirRuntime(runtimeOptions),
+  };
 }
 
 function createInfoviewCommandDispatcher({

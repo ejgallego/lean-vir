@@ -44,7 +44,7 @@ function or object.
 
 ## React Fidelity
 
-The browser adapter installs official React and ReactDOM behavior:
+The browser host installs official React and ReactDOM behavior:
 
 - actual props objects and child/dependency arrays;
 - actual React elements returned by `React.createElement`;
@@ -63,15 +63,16 @@ returns the setup function passed unchanged to `useEffect`. Hook-order and
 effect correctness remain the programmer's responsibility.
 
 Official React 19, ReactDOM, and Chromium are the sole semantic oracle. The
-Node virtual document supplies cleanup-safe unsupported React shims and does
-not emulate nodes, hooks, reconciliation, roots, or commits.
+Node wrapper supplies no React providers and does not emulate nodes, hooks,
+reconciliation, roots, or commits.
 
 ## Lifecycle Boundary
 
 Ordinary React and JavaScript values use their native reference graph. VIR
 keeps explicit teardown only for active resources with public termination:
-listeners, timers, animation frames, and React roots. A host-call transaction
-rolls back a newly created active resource if result publication fails.
+timers, animation frames, and React roots. A host-call transaction rolls back a
+newly created active resource if result publication fails. Native DOM listener
+lifetime instead follows the exact target/type/function protocol.
 
 Direct root submission needs no VIR commit protocol: React receives the exact
 JavaScript node graph, and JavaScript reachability owns that graph. VIR tracks
@@ -97,8 +98,8 @@ boundary.
   `createHostLifecycle`.
 - `lean-vir/react-host-bindings` imports React and ReactDOM and exports the
   browser React binding factory.
-- `lean-vir/vir-runtime-node` installs virtual DOM bindings and unsupported
-  React shims for tests and tools.
+- `lean-vir/vir-runtime-node` installs only environment-neutral JavaScript
+  value and console bindings for tests and tools.
 
 ## Local Probes
 

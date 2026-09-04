@@ -54,7 +54,6 @@ try {
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
   const codec = modules["runtime/vir-codec.js"];
-  const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
 
@@ -99,7 +98,6 @@ try {
   );
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
-  assert.equal(Object.hasOwn(reactNode, "virtualReactTextContent"), false);
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
@@ -134,8 +132,8 @@ try {
   const hostBindings = await import(
     pathToFileURL(join(jsDir, "vir-host-bindings.js"))
   );
-  const resources = hostBindings.createHostLifecycle();
-  const bindings = reactHostBindings.createBrowserReactHostBindings(resources);
+  const lifecycle = hostBindings.createHostLifecycle();
+  const bindings = reactHostBindings.createBrowserReactHostBindings(lifecycle);
   assert.equal(
     typeof reactHostBindings.createBrowserReactHostBindings,
     "function",
@@ -146,9 +144,8 @@ try {
   assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
-  assert.equal(typeof bindings["react.root.renderIntoSelector"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");
-  assert.equal(typeof bindings["react.root.unmountSelector"], "function");
+  lifecycle.dispose();
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

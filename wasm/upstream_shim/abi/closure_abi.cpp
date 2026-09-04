@@ -84,27 +84,32 @@ extern "C" object * vir_closure_call_objects(uint32_t root_id, object ** argv, u
         g_closure_call_error = "closure root id is not live";
         return nullptr;
     }
-    object * fn = root->value;
-    if (argc != root->arity) {
+    object * const fn = root->value;
+    uint32_t const arity = root->arity;
+    bool const is_io = root->is_io;
+    if (argc != arity) {
         cleanup_object_args(argc, argv);
         g_closure_call_error =
             "closure argument count mismatch: expected " +
-            std::to_string(root->arity) +
+            std::to_string(arity) +
             ", got " + std::to_string(argc);
         return nullptr;
     }
 
+    // Applying an interpreted closure can re-enter JavaScript and root more
+    // closures, which may reallocate g_closure_roots. Do not retain a pointer
+    // into that vector across the application.
     std::vector<object *> args;
-    args.reserve(argc + (root->is_io ? 1 : 0));
+    args.reserve(argc + (is_io ? 1 : 0));
     for (uint32_t i = 0; i < argc; i++) {
         args.push_back(argv[i]);
     }
-    if (root->is_io) {
+    if (is_io) {
         args.push_back(lean_io_mk_world());
     }
     lean_inc(fn);
     object * result = apply_n(fn, static_cast<unsigned>(args.size()), args.data());
-    if (root->is_io) {
+    if (is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
             g_closure_call_error = "IO callback failed";

@@ -6,8 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import {
   createVirRuntimeFactory,
-  createVirtualDocumentState,
-  ensureVirtualElementState,
 } from "../../web/src/vir-runtime-node.js";
 import {
   assert,
@@ -23,12 +21,36 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   await writeRuntimeFixture(hostSource, "FreshHost.lean");
 
   generateIrPackage(hostSource, hostPackage);
-  const freshHostDocumentState = createVirtualDocumentState();
-  ensureVirtualElementState(freshHostDocumentState, "#fresh");
+  const freshElement = {
+    attributes: new Map(),
+    textContent: "",
+  };
+  const freshDocument = {
+    title: "",
+    querySelector: (selector) => (selector === "#fresh" ? freshElement : null),
+  };
   const hostFactory = createVirRuntimeFactory({
     wasmBytes,
-    virtualDocumentState: freshHostDocumentState,
     hostBindings: {
+      "browser.document.current": () => freshDocument,
+      "browser.document.getTitle": (documentValue) => documentValue.title,
+      "browser.document.setTitle": (documentValue, title) => {
+        documentValue.title = title;
+        return undefined;
+      },
+      "browser.document.querySelector": (documentValue, selector) =>
+        documentValue.querySelector(selector),
+      "browser.element.getTextContent": (element) => element.textContent,
+      "browser.element.setTextContent": (element, text) => {
+        element.textContent = text;
+        return undefined;
+      },
+      "browser.element.getAttribute": (element, name) =>
+        element.attributes.get(name) ?? null,
+      "browser.element.setAttribute": (element, name, value) => {
+        element.attributes.set(name, value);
+        return undefined;
+      },
       "test.react.value": () => 7n,
       "test.runtime.value": () => 9n,
     },
@@ -36,7 +58,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostRuntime = await hostFactory.createRuntime({
     irPackageSetBytes: [await readFile(hostPackage)],
   });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 17);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
     hostRuntime.interfaceManifest.exports.find(
       (entry) => entry.entry === "freshEchoBang",
@@ -142,10 +164,8 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
   await writeRuntimeFixture(jsObjectSource, "FreshJsObject.lean");
   generateIrPackage(jsObjectSource, jsObjectPackage);
-  const jsObjectDocumentState = createVirtualDocumentState();
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,
-    virtualDocumentState: jsObjectDocumentState,
     hostBindings: {
       "test.js.id": (value) => value,
       "test.js.length": (value) => BigInt(value.length),
@@ -253,15 +273,9 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const reactExternalPackage = join(freshDir, "react-external-component.irpkg");
   await writeRuntimeFixture(reactExternalSource, "ReactExternalComponent.lean");
   generateIrPackage(reactExternalSource, reactExternalPackage);
-  const reactExternalDocumentState = createVirtualDocumentState();
-  ensureVirtualElementState(
-    reactExternalDocumentState,
-    "#react-external-component",
-  );
-  const externalBadge = createVirtualExternalBadgeComponent();
+  const externalBadge = createExternalBadgeComponent();
   const reactExternalRuntime = await createVirRuntimeFactory({
     wasmBytes,
-    virtualDocumentState: reactExternalDocumentState,
     hostBindings: {
       "test.react.externalBadge": () => externalBadge,
     },
@@ -283,9 +297,9 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(
     reactExternalRuntime.interfaceManifest.hostImports.find(
-      (entry) => entry.target === "react.props.setRef",
+      (entry) => entry.target === "js.object.set",
     )?.effect,
-    "react",
+    "runtime",
   );
   assert.throws(
     () =>
@@ -293,13 +307,13 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
         "Vir.Fixtures.ReactExternalComponent.mount",
         "#react-external-component",
       ),
-    /require.*browser React host/,
+    /host import binding not found: js\.value\.react\.component/,
   );
   assert.equal(reactExternalRuntime.liveCallbacks.size, 0);
   reactExternalRuntime.dispose();
 }
 
-function createVirtualExternalBadgeComponent() {
+function createExternalBadgeComponent() {
   function VirExternalBadge() {}
   VirExternalBadge.displayName = "VirExternalBadge";
   return VirExternalBadge;

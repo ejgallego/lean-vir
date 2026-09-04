@@ -4,9 +4,19 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  collectCleanupError,
+  throwCollectedErrors,
+} from "./runtime/cleanup.js";
+
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
+
+export function disposeHostBindings(bindings) {
+  const disposer = bindings?.[VIR_HOST_DISPOSE];
+  if (typeof disposer === "function") disposer.call(bindings);
+}
 
 let externrefTableSupport = null;
 
@@ -62,14 +72,10 @@ export function abortHostCallTransaction(transaction) {
   closeHostCallTransaction(transaction);
   const errors = [];
   for (const rollback of transaction.rollbacks.reverse()) {
-    try {
-      rollback();
-    } catch (error) {
-      errors.push(asError(error));
-    }
+    collectCleanupError(errors, rollback);
   }
   transaction.rollbacks.length = 0;
-  throwHostBoundaryErrors(errors, "host call rollback failed");
+  throwCollectedErrors(errors, "host call rollback failed");
   return undefined;
 }
 
@@ -137,14 +143,4 @@ export class ExternrefRoots {
       reusable: this.freeRootIds.length,
     };
   }
-}
-
-function throwHostBoundaryErrors(errors, message) {
-  if (errors.length === 0) return;
-  if (errors.length === 1) throw errors[0];
-  throw new AggregateError(errors, message);
-}
-
-function asError(error) {
-  return error instanceof Error ? error : new Error(String(error));
 }

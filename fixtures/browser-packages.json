@@ -133,10 +133,7 @@
         },
         {
           "source": "fixtures/ProofWidgetsHtml.lean",
-          "roots": [
-            "ProofWidgetsHtml.mount",
-            "ProofWidgetsHtml.mountDefault"
-          ]
+          "roots": ["ProofWidgetsHtml.mount", "ProofWidgetsHtml.mountDefault"]
         },
         {
           "source": "fixtures/ProofWidgetsJsxSubset.lean",
@@ -149,8 +146,7 @@
           "source": "examples/tutorials/ReactProofWidgetHello.lean",
           "roots": [
             "ReactProofWidgetHello.createComponent",
-            "ReactProofWidgetHello.mount",
-            "ReactProofWidgetHello.unmount"
+            "ReactProofWidgetHello.mount"
           ]
         },
         {
@@ -158,7 +154,6 @@
           "roots": [
             "ReactProofWidget.createComponent",
             "ReactProofWidget.mount",
-            "ReactProofWidget.unmount",
             "ReactProofWidget.renderSnapshotIntoSelector"
           ]
         }

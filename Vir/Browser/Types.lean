@@ -47,6 +47,12 @@ instance : Nonempty (DomM α) :=
 
 end DomM
 
+/-- Exact JavaScript `Console` receiver. -/
+opaque Console : Type
+
+/-- Exact browser `Document` receiver. -/
+opaque Document : Type
+
 /--
 Browser DOM element object class.
 
@@ -71,10 +77,13 @@ opaque CSSStyleDeclaration : Type
 /-- Exact browser `Event` value; its practical validity follows browser semantics. -/
 opaque Event : Type
 
+/-- Exact browser `EventTarget` value returned by event properties. -/
+opaque EventTarget : Type
+
 /-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
 opaque KeyboardEvent : Type
 
-/-- Handle for a browser event-listener registration. -/
+/-- Exact JavaScript function value accepted by the DOM event-listener APIs. -/
 opaque EventListener : Type
 
 /-- Browser `HTMLInputElement` object class. -/

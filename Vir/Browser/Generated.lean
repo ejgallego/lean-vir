@@ -430,63 +430,64 @@ opaque translateJs
     (y : @& Lean.Vir.Js Float) :
     DomM Unit
 
-/--
-Generated explicit protocol operation semantic adapter for TypeScript `CanvasRenderingContext2D.fillStyle`.
-
-Adapter policy: Convenience adapter for the string arm of CanvasRenderingContext2D.fillStyle.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setFillStyle"]
-opaque setFillStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
-/--
-Generated explicit protocol operation semantic adapter for TypeScript `CanvasRenderingContext2D.strokeStyle`.
-
-Adapter policy: Convenience adapter for the string arm of CanvasRenderingContext2D.strokeStyle.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.canvas2d.setStrokeStyle"]
-opaque setStrokeStyleJs
-    (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
-    (style : @& Lean.Vir.Js String) :
-    DomM Unit
-
 end CanvasRenderingContext2D
+
+namespace CanvasStyle
+
+/--
+Generated binding for reviewed VIR protocol `browser.canvas-style.of-string`.
+
+Explicitly injects a Lean-owned string into the string arm of the exact JavaScript CanvasStyle union without changing its value.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; style lean-owned/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.browser.canvasStyle.string"]
+opaque ofString
+    (style : @& String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js CanvasStyle)
+
+end CanvasStyle
 
 namespace Console
 
 /--
-Generated explicit method semantic adapter for TypeScript `Console.log`.
+Generated reviewed method specialization of TypeScript `Console.log`.
 
 The **`console.log()`** static method outputs a message to the console.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/console/log_static)
 
-Adapter policy: VIR specializes Console.log's variadic unknown-value surface to the shipped single JavaScript-string boundary. The shipped console boundary uses the host-global console instead of accepting an arbitrary Console receiver.
+Specialization policy: The selected one-message call passes the exact Console receiver and JavaScript string unchanged; additional variadic values remain an explicit coverage gap.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Console); message js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: console js-resource/borrowed/call; message js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.console.log"]
 opaque logJs
+    (console : @& Lean.Vir.Js Console)
     (message : @& Lean.Vir.Js String) :
     Lean.Vir.RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.console.current`.
+
+Returns the host-global Console as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.console.current"]
+opaque current : Lean.Vir.RuntimeM (Lean.Vir.Js Console)
 
 end Console
 
@@ -519,102 +520,118 @@ end CSSStyleDeclaration
 namespace Document
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.createElement`.
+Generated reviewed method specialization of TypeScript `Document.createElement`.
 
 In an HTML document, the **`document.createElement()`** method creates the HTML element specified by localName, or an HTMLUnknownElement if localName isn't recognized.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/createElement)
 
-Adapter policy: The non-generic string overload is the stable VIR DOM creation surface and returns the exact element under the common Element phantom type. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic string overload passes the exact Document receiver and tag name unchanged and returns the exact element under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12929
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); tagName js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; tagName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.createElement"]
 opaque createElement
+    (document : @& Lean.Vir.Js Document)
     (tagName : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js Element)
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.querySelector`.
+Generated reviewed method specialization of TypeScript `Document.querySelector`.
 
 Returns the first element that is a descendant of node that matches selectors.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelector)
 
-Adapter policy: The non-generic selector overload returns the exact element under VIR's common Element phantom type. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact nullable value under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.querySelector"]
 opaque querySelector
+    (document : @& Lean.Vir.Js Document)
     (selectors : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js.Nullable Element)
 
 /--
-Generated explicit method semantic adapter for TypeScript `Document.querySelectorAll`.
+Generated reviewed method specialization of TypeScript `Document.querySelectorAll`.
 
 Returns all element descendants of node that match selectors.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/querySelectorAll)
 
-Adapter policy: The non-generic selector overload returns the exact JavaScript NodeList with Element-typed entries. The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
+Specialization policy: The selected non-generic selector overload passes the exact Document receiver and selector unchanged and returns the exact NodeList under VIR's common Element phantom type.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.querySelectorAll"]
 opaque querySelectorAll
+    (document : @& Lean.Vir.Js Document)
     (selectors : @& Lean.Vir.Js String) :
     DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Document.title`.
+Faithful generated getter binding for TypeScript `Document.title`.
 
 The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
-Adapter policy: The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
-
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.getTitle"]
-opaque getTitle : DomM (Lean.Vir.Js String)
+opaque getTitle
+    (document : @& Lean.Vir.Js Document) :
+    DomM (Lean.Vir.Js String)
 
 /--
-Generated explicit setter semantic adapter for TypeScript `Document.title`.
+Faithful generated setter binding for TypeScript `Document.title`.
 
 The **`document.title`** property gets or sets the current title of the document. When present, it defaults to the value of the <title>.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Document/title)
 
-Adapter policy: The shipped document boundaries use the host-global document instead of accepting an arbitrary Document receiver.
-
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: receiver global (Document); title js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; title js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.document.setTitle"]
 opaque setTitle
+    (document : @& Lean.Vir.Js Document)
     (title : @& Lean.Vir.Js String) :
     DomM Unit
+
+/--
+Generated binding for reviewed VIR protocol `browser.document.current`.
+
+Returns the host-global Document as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.document.current"]
+opaque current : DomM (Lean.Vir.Js Document)
 
 end Document
 
@@ -688,13 +705,13 @@ end DOMTokenList
 namespace Element
 
 /--
-Generated explicit method semantic adapter for TypeScript `Element.addEventListener`.
+Generated reviewed method specialization of TypeScript `Element.addEventListener`.
 
-Adapter policy: VIR specializes DOM listener registration to a Lean callback retained until the returned listener value is passed to terminal removal.
+Specialization policy: VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact listener to Element.addEventListener; options remain an explicit coverage gap.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13915
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -702,8 +719,8 @@ This declaration is generated; edit the TypeScript source or binding configurati
 opaque addEventListenerJs
     (element : @& Lean.Vir.Js Element)
     (event : @& Lean.Vir.Js String)
-    (callback : Lean.Vir.Js Event → DomM Unit) :
-    DomM (Lean.Vir.Js EventListener)
+    (listener : @& Lean.Vir.Js EventListener) :
+    DomM Unit
 
 /--
 Generated reviewed method specialization of TypeScript `Element.appendChild`.
@@ -880,19 +897,21 @@ opaque remove
     DomM Unit
 
 /--
-Generated explicit method semantic adapter for TypeScript `Element.removeEventListener`.
+Generated reviewed method specialization of TypeScript `Element.removeEventListener`.
 
-Adapter policy: VIR replaces the DOM receiver, event name, and callback triple with the listener value returned by registration; terminal removal removes the listener, releases the callback, and does not revoke JavaScript aliases.
+Specialization policy: VIR selects the JavaScript function arm of EventListenerOrEventListenerObject and passes the exact receiver, event name, and listener to Element.removeEventListener; options remain an explicit coverage gap.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13917
 
-ABI profile `browser-dom-faithful-v1`: receiver none; listener js-resource/consumed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.element.removeEventListener"]
-opaque removeEventListener
-    (listener : Lean.Vir.Js EventListener) :
+opaque removeEventListenerJs
+    (element : @& Lean.Vir.Js Element)
+    (event : @& Lean.Vir.Js String)
+    (listener : @& Lean.Vir.Js EventListener) :
     DomM Unit
 
 /--
@@ -1006,13 +1025,11 @@ end ElementCSSInlineStyle
 namespace Event
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Event.currentTarget`.
+Faithful generated getter binding for TypeScript `Event.currentTarget`.
 
 The **`currentTarget`** read-only property of the Event interface identifies the element to which the event handler has been attached.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/currentTarget)
-
-Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -1023,7 +1040,7 @@ This declaration is generated; edit the TypeScript source or binding configurati
 @[vir_js "browser.event.currentTarget"]
 opaque getCurrentTarget
     (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable Element)
+    DomM (Lean.Vir.Js.Nullable EventTarget)
 
 /--
 Faithful generated method binding for TypeScript `Event.preventDefault`.
@@ -1062,13 +1079,11 @@ opaque stopPropagation
     DomM Unit
 
 /--
-Generated explicit getter semantic adapter for TypeScript `Event.target`.
+Faithful generated getter binding for TypeScript `Event.target`.
 
 The read-only **`target`** property of the Event interface is a reference to the object onto which the event was dispatched. It is different from Event.currentTarget when the event handler is called during the bubbling or capturing phase of the event.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Event/target)
-
-Adapter policy: The shipped DOM event API deliberately narrows EventTarget to Element and represents a non-element target as null.
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
@@ -1079,7 +1094,7 @@ This declaration is generated; edit the TypeScript source or binding configurati
 @[vir_js "browser.event.target"]
 opaque getTarget
     (event : @& Lean.Vir.Js Event) :
-    DomM (Lean.Vir.Js.Nullable Element)
+    DomM (Lean.Vir.Js.Nullable EventTarget)
 
 /--
 Generated binding for reviewed VIR protocol `browser.event.formValue`.
@@ -1098,6 +1113,46 @@ opaque formValueNullable
     DomM (Lean.Vir.Js.Nullable String)
 
 end Event
+
+namespace EventListener
+
+/--
+Generated binding for reviewed VIR protocol `browser.event-listener.of-lean`.
+
+Explicitly converts a transferred Lean event callback into an ordinary JavaScript function that can be passed unchanged to addEventListener and removeEventListener.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.browser.eventListener"]
+opaque ofLean
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js EventListener)
+
+end EventListener
+
+namespace EventTarget
+
+/--
+Generated binding for reviewed VIR protocol `browser.event-target.as-element`.
+
+Checks whether an EventTarget is an Element and preserves the exact JavaScript identity on success; this is explicit narrowing, not an Event property adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; target js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.eventTarget.asElement"]
+opaque asElementNullable
+    (target : @& Lean.Vir.Js EventTarget) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+end EventTarget
 
 namespace HTMLCanvasElement
 
@@ -1408,18 +1463,18 @@ namespace Timer
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setTimeout`.
 
-VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
+VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setTimeout"]
 opaque setTimeoutJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
+    (callback : DomM Unit)
+    (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Timeout)
 
 /--
@@ -1441,18 +1496,18 @@ opaque clearTimeout
 /--
 Generated binding for reviewed VIR protocol `browser.timer.setInterval`.
 
-VIR adapts the Lean argument order and callback, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
+VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; delayMs js-resource/borrowed/call; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setInterval"]
 opaque setIntervalJs
-    (delayMs : @& Lean.Vir.Js Nat)
-    (callback : DomM Unit) :
+    (callback : DomM Unit)
+    (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Interval)
 
 /--

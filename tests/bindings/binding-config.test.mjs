@@ -156,7 +156,11 @@ test("semantic review classifications are fail-closed enums", async () => {
   );
 
   const missingGlobalReason = structuredClone(browser);
-  delete missingGlobalReason.generation.abiProfile.receiver.globalTypes.Document.reason;
+  missingGlobalReason.generation.abiProfile.receiver.globalTypes.Console = {
+    semantics: "changing",
+    reason: "test-only global receiver policy",
+  };
+  delete missingGlobalReason.generation.abiProfile.receiver.globalTypes.Console.reason;
   await assert.rejects(
     validateBindingConfig(missingGlobalReason, browserPath),
     /must have required property 'reason'/u,

@@ -17,13 +17,13 @@ values:
 - state values, actions, setters, and dispatchers are the values returned or
   stored by React.
 
-There is no React-node wrapper, ownership lease, virtual node graph, or alias
+There is no React-node wrapper, ownership lease, parallel node graph, or alias
 table. `React.createElement` decides which parts of props and children it
 copies or retains, exactly as it does in JavaScript.
 
 ## Construction
 
-Lean builders make the low-level values pleasant to construct:
+The low-level API constructs the exact JavaScript values explicitly:
 
 ```lean
 import Vir.React
@@ -31,22 +31,25 @@ import Vir.React
 open Lean.Vir.React
 
 def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
-  Node.sectionWith
-    #[Props.className "greeting"]
-    #[← Node.text s!"Hello, {name}"]
+  do
+    let props ← Lean.Vir.Js.Object.empty
+    Lean.Vir.Js.Object.set props
+      (← Lean.Vir.JsValue.ofString "className")
+      (← Lean.Vir.JsValue.ofString "greeting")
+    let children ← Lean.Vir.Js.Array.ofArray #[← Node.text s!"Hello, {name}"]
+    Node.createElementTag "section" props children
 ```
 
-The builders are explicit construction conveniences:
+The operations are generic JavaScript construction primitives:
 
-- `react.props.empty` creates `{}`;
-- property and event-handler operations mutate that object;
+- `js.object.empty` creates `{}` and `js.object.set` assigns an exact value;
 - generic `js.array.empty` / `js.array.push` build the exact child array;
 - `react.node.createElement` forwards the values to `React.createElement`;
 - fragment construction forwards to `React.Fragment`.
 
-`PropValue` conversion is intentionally visible. It converts the Lean helper
-description to the JavaScript value stored in props; it is not hidden inside
-the native `createElement` binding.
+The optional `Vir.ProofWidgets.Html` and JSX modules provide higher-level Lean
+notation. They are not part of the React host protocol and do not introduce a
+JavaScript wrapper or alternate props representation.
 
 ## Roots And Components
 
@@ -132,8 +135,7 @@ This is generic JSL behavior. There is no React-specific JSL alias or lease.
 ## Browser-Only Semantics
 
 Official React 19, ReactDOM, and Chromium are the semantic oracle. The Node
-virtual document is not a React renderer. Its React providers are explicit
-cleanup-safe unsupported shims and do not emulate nodes, hooks, roots,
+wrapper has no React providers and does not emulate nodes, hooks, roots,
 reconciliation, Strict Mode, Suspense, or commits.
 
 Runtime-only unit tests may use a fake root to verify generic active-resource

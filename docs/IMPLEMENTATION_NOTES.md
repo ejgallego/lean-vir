@@ -69,14 +69,16 @@ through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
 object ABI on the package-call path.
 
 The host-import path supports Lean function values as ordinary JavaScript
-functions. `Element.addEventListener`, `Timer.setTimeout`, and
+functions. `EventListener.ofLean`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` root Lean closures in the WASM shim and
 associate the root with the function through private WeakMap state. Normal
 JavaScript reachability keeps the function alive. Callback finalization is a
 best-effort backstop; runtime teardown remains the deterministic upper bound.
-Loading a new package into an existing runtime terminates the old runtime's
-active registrations before installing the new manifest. Event values follow
-the underlying browser semantics. The current contract is in
+`Element.addEventListener` and `Element.removeEventListener` receive that exact
+function and follow native identity rules. Loading a new package into an
+existing runtime terminates VIR-owned schedules and roots before installing the
+new manifest; it does not invent DOM-listener teardown that JavaScript does not
+provide. Event values follow the underlying browser semantics. The current contract is in
 [HOST_BINDINGS.md](HOST_BINDINGS.md), while
 callback-specific follow-up work remains in the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md).
@@ -95,11 +97,11 @@ instead of reading it back from DOM attributes.
 Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 `Event.inputChecked?`; both check `Event.currentTarget` before `target`.
 `onChange` and `onSubmit` callbacks can also forward `Event.preventDefault` and
-`Event.stopPropagation` through the same opaque event resource. The virtual
-Node document mirrors DOM `querySelector` for missing selectors and returns a
-static `NodeList` from `querySelectorAll`; tests explicitly pre-seed single or
-multiple matching fixtures. Root rerender, unmount, package reload,
-and runtime disposal reuse the existing resource and callback lifetime model.
+`Event.stopPropagation` through the same opaque event resource. The Node entry
+point installs only environment-neutral JavaScript-value and console bindings;
+DOM and React packages require an explicit real host. Root rerender, unmount,
+package reload, and runtime disposal reuse the exact-value and callback
+lifetime model.
 Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
@@ -116,9 +118,11 @@ and deterministic teardown.
 Ordinary composite values use their actual JavaScript reference graph. VIR does
 not mirror props, arrays, closures, framework state, or React hook state in a
 second ownership graph. Result lifting still releases callbacks created during
-a failed host call. Active listener, timer, frame, and newly created root
-results remain provisional until result lowering succeeds, so a failed call
-reverses the registration instead of leaving it active.
+a failed host call. Timer, frame, and newly created root results remain
+provisional until result lowering succeeds, so a failed call reverses the
+registration instead of leaving it active. Native event listeners use the
+DOM's exact receiver/type/function removal protocol and are not lifecycle
+records.
 
 Browser React uses React's exact setter, reducer, ref, memo, dependency, and
 render semantics. VIR does not add purity, replay, or hook-order guarantees that

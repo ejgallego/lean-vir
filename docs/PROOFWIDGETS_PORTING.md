@@ -53,7 +53,7 @@ The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
 public Lean helpers convert `RpcRef` to a `Js RpcRef` resource through
 `proofwidgets.rpc.ref` before calling `proofwidgets.rpc.resolveRef`; the
-browser/virtual hosts normalize that resource behind the low-level target.
+browser host normalizes that resource behind the low-level target.
 Resolve callbacks receive a `Js ResolvedRef` resource, and the public Lean
 wrapper calls `js.value.proofwidgets.resolvedRef.value` before invoking the
 user callback. In the infoview, `Surface.proofWidgetsExpr` now carries a live

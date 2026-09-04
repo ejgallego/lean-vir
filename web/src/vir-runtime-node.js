@@ -6,9 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir-runtime.js";
 import {
-  createNodeHostBindings,
-  createHostLifecycle,
-  createVirtualDocumentState,
+  createCommonHostBindings,
+  createConsoleHostBindings,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
@@ -24,34 +23,18 @@ export {
   VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";
 export {
-  createNodeHostBindings,
-  createVirtualDocumentHostBindings,
-  createVirtualDocumentState,
-  createVirtualElementState,
-  ensureVirtualElementState,
-  ensureVirtualElementStates,
-  createVirtualEventState,
-  createVirtualEventHostBindings,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
 
 export function createVirRuntimeFactory(options = {}) {
-  const {
-    hostBindings = null,
-    virtualDocumentState = createVirtualDocumentState(),
-    ...browserOptions
-  } = options;
-  let firstGeneration = true;
+  const { hostBindings = null, ...browserOptions } = options;
   return createBrowserVirRuntimeFactory({
     ...browserOptions,
-    defaultHostBindings: () => {
-      const resources = firstGeneration
-        ? virtualDocumentState.resources
-        : createHostLifecycle();
-      firstGeneration = false;
-      return createNodeHostBindings(virtualDocumentState, resources);
-    },
+    defaultHostBindings: () => ({
+      ...createCommonHostBindings(),
+      ...createConsoleHostBindings(),
+    }),
     hostBindings,
   });
 }

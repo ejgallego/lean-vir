@@ -7,9 +7,14 @@ Author: Emilio J. Gallego Arias
 import { fileURLToPath } from "node:url";
 
 import {
+  createVirImports,
   createVirRuntimeFactory,
-  createVirtualDocumentState,
-} from "../../web/src/vir-runtime-node.js";
+} from "../../web/src/vir-runtime.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
+import {
+  createCommonHostBindings,
+  createHostLifecycle,
+} from "../../web/src/vir-host-bindings.js";
 import {
   assert,
   join,
@@ -61,12 +66,40 @@ export async function runIrPackageLifecycleSmoke({
     generatedSecond.stderr || generatedSecond.stdout,
   );
 
-  const documentState = createVirtualDocumentState();
+  const bindingGenerations = [];
+  let failNextInstantiation = false;
+  let sharedBindingDisposals = 0;
   const hostRuntime = await createVirRuntimeFactory({
     wasmBytes,
-    virtualDocumentState: documentState,
+    imports: (module, hostState) => {
+      if (failNextInstantiation) {
+        failNextInstantiation = false;
+        throw new Error("replacement import construction failed");
+      }
+      return createVirImports(module, {}, hostState);
+    },
+    hostBindings: {
+      [VIR_HOST_DISPOSE]: () => {
+        sharedBindingDisposals += 1;
+      },
+    },
+    defaultHostBindings: () => {
+      const lifecycle = createHostLifecycle();
+      const documentValue = { title: "" };
+      bindingGenerations.push(lifecycle);
+      return {
+        ...createCommonHostBindings(),
+        "browser.document.current": () => documentValue,
+        "browser.document.getTitle": (document) => document.title,
+        "browser.document.setTitle": (document, title) => {
+          document.title = title;
+          return undefined;
+        },
+        [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
+      };
+    },
   }).createRuntime({ irPackageSetBytes: [await readFile(firstPackage)] });
-  const firstGenerationLifecycle = documentState.resources;
+  const firstGenerationLifecycle = bindingGenerations[0];
   const ordinaryValue = { generation: "first" };
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
@@ -80,14 +113,34 @@ export async function runIrPackageLifecycleSmoke({
     "Lean VIR host: first",
   );
 
-  hostRuntime.loadIrPackageSetBytes([await readFile(secondPackage)]);
+  const secondPackageBytes = await readFile(secondPackage);
+  failNextInstantiation = true;
+  assert.throws(
+    () => hostRuntime.loadIrPackageSetBytes([secondPackageBytes]),
+    /replacement import construction failed/,
+  );
+  const failedGenerationLifecycle = bindingGenerations[1];
+  assert.equal(
+    failedGenerationLifecycle.phase,
+    "disposed",
+    "failed replacement must dispose its fresh active-resource lifecycle",
+  );
+  assert.equal(firstGenerationLifecycle.phase, "active");
+  assert.equal(
+    sharedBindingDisposals,
+    0,
+    "failed replacement must preserve a binding map leased by the live runtime",
+  );
+
+  hostRuntime.loadIrPackageSetBytes([secondPackageBytes]);
+  const secondGenerationLifecycle = bindingGenerations[2];
   assert.notEqual(
-    documentState.resources,
+    secondGenerationLifecycle,
     firstGenerationLifecycle,
     "package replacement should install a fresh active-resource lifecycle",
   );
   assert.equal(firstGenerationLifecycle.phase, "disposed");
-  assert.equal(documentState.resources.phase, "active");
+  assert.equal(secondGenerationLifecycle.phase, "active");
   assert.deepEqual(
     ordinaryValue,
     { generation: "first" },
@@ -116,6 +169,7 @@ export async function runIrPackageLifecycleSmoke({
     "Lean VIR host: second",
   );
   hostRuntime.dispose();
+  assert.equal(sharedBindingDisposals, 1);
 
   const initializerRuntime = await createVirRuntimeFactory({
     wasmBytes,

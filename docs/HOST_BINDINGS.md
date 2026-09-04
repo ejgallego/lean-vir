@@ -119,16 +119,22 @@ runtime is disposed fails instead of entering freed Lean state.
 Explicit lifecycle bookkeeping is reserved for activities with a real
 termination operation:
 
-- DOM event listeners;
 - timeouts and intervals;
 - animation frames;
 - React roots.
 
 The shared `HostLifecycle` registers each active value together with its exact
 cleanup function. Runtime disposal invokes those functions without inspecting
-or guessing methods on the value. Terminal host operations remove their
-registration before performing platform cleanup and are safe to repeat where
-the platform API is repeatable.
+or guessing methods on the value. Timer and frame completion remove their
+registration before invoking user code. Explicit React-root unmount removes
+its registration only after the platform unmount succeeds, so a failed unmount
+remains visible to runtime teardown.
+
+Each browser binding-factory invocation owns a fresh lifecycle unless the
+caller explicitly supplies one. Package replacement can therefore dispose a
+failed or superseded generation without invalidating the live generation.
+Preconstructed binding maps are reference-counted only so intentional sharing
+across an atomic replacement remains safe.
 
 Host calls are failure-atomic. Immediately before invoking a binding, the
 runtime opens a private transaction. An active resource created by that call
@@ -146,11 +152,14 @@ failures as an `AggregateError`.
 
 The built-in groups closely follow their browser APIs:
 
-- `browser.document.*` exposes title, selectors, and element creation;
+- `browser.document.*` exposes the exact `Document` receiver, title,
+  selectors, and element creation. The separate `browser.document.current`
+  operation retrieves the host-global document;
 - `browser.element.*` exposes queries, content, attributes, tree operations,
   classes, styles, and event listeners;
-- `browser.event.*` exposes targets, keyboard keys, cancellation, and form
-  values;
+- `browser.event.*` exposes exact `EventTarget | null` values, keyboard keys,
+  cancellation, and form values; `browser.eventTarget.asElement` is separate
+  checked identity-preserving narrowing;
 - `browser.htmlInputElement.*` and `browser.htmlCanvasElement.*` narrow and
   operate on the actual browser objects;
 - `browser.canvas2d.*` forwards to the actual 2D context;
@@ -159,16 +168,22 @@ The built-in groups closely follow their browser APIs:
 - `infoview.*` and `proofwidgets.rpc.*` connect the widget host.
 
 Convenience conversions have separate Lean names. For example,
-`Document.querySelector` uses `Js String`, while `querySelectorString`
-explicitly converts a Lean `String` first. This keeps conversion out of the
-faithful low-level binding.
+`Document.querySelector` accepts exact `Js Document` and `Js String` values,
+while `querySelectorString` keeps the same explicit receiver and converts only
+the Lean `String`. This keeps both conversion and ambient-global selection out
+of the faithful low-level binding.
 
-Event-listener registration is the principal browser adapter in this slice.
-Unlike `EventTarget.addEventListener`, it returns an explicit removable
-subscription so Lean can unregister without reconstructing the original
-receiver/type/callback triple. The binding audit records this semantic change;
-ordinary DOM objects and scheduling tokens are never replaced with VIR handle
-objects.
+Canvas fill and stroke properties use the exact `Js CanvasStyle` union value.
+`CanvasStyle.ofString` is the explicit conversion from Lean-owned text into
+the union's string arm; both convenience setters then call the same faithful
+generated property setter used for gradients and patterns.
+
+Event-listener registration passes the exact JavaScript listener function to
+the native `addEventListener` method and returns `Unit`, just like the selected
+upstream overload. Removal requires the same receiver, event name, and function
+identity. `EventListener.ofLean` is separate conversion sugar that turns a Lean
+closure into an ordinary self-owning JavaScript function; the DOM, not a VIR
+registration handle, retains that function.
 
 ## React Bindings
 
@@ -186,15 +201,19 @@ The browser React host uses official React 19 and ReactDOM:
 VIR does not emulate hook state, render replay, reconciliation, lanes, or
 commit semantics. Official React running in Chromium is the semantic oracle.
 
-The Node virtual document remains useful for DOM-independent host tests, but
-its React bindings are explicit cleanup-safe unsupported shims. Attempting to
-construct nodes, roots, or use hooks there reports that the browser React host
-is required.
+`createBrowserHostBindings` accepts its optional React bindings as a factory,
+not as a preconstructed map. The browser host passes its one `HostLifecycle`
+to that factory so React roots cannot be registered in a hidden independent
+lifecycle.
+
+The Node wrapper installs no DOM or React providers. This avoids treating local
+test doubles as browser or React semantics. Non-browser callers that genuinely
+have a DOM implementation can supply it explicitly through `hostBindings`.
 
 The principal intentional React conveniences are:
 
-- Lean builders for props, property descriptions, event-handler descriptions,
-  and child arrays;
+- optional Lean-side ProofWidgets builders, which lower to exact props objects
+  and child arrays before the React call;
 - `Component.ofLean`, which explicitly creates an ordinary reusable JavaScript
   component function whose identity React observes;
 - `EffectCallback.ofLean`, which explicitly creates React's setup-function
@@ -208,31 +227,13 @@ no callback-render or component-render path. Direct `Root.renderNode` needs no
 VIR acknowledgement for superseded submissions because React retains the exact
 JavaScript node graph.
 
-## Node Virtual Bindings
+## Non-browser Hosts
 
-Use the Node wrapper for virtual document and event tests:
-
-```js
-import {
-  createVirRuntime,
-  createVirtualDocumentState,
-  ensureVirtualElementState,
-} from "lean-vir/vir-runtime-node";
-
-const virtualDocumentState = createVirtualDocumentState();
-ensureVirtualElementState(virtualDocumentState, "#target");
-
-const vir = await createVirRuntime({
-  wasmBytes,
-  irPackageSetBytes: [packageBytes],
-  virtualDocumentState,
-});
-```
-
-Virtual elements and events are plain JavaScript test doubles. Values returned
-from one binding can be passed directly to another. Package replacement
-disposes the previous generation's active lifecycle, but does not invalidate
-ordinary JavaScript values merely because they were observed by that runtime.
+`lean-vir/vir-runtime-node` provides only environment-neutral JavaScript value
+operations and console bindings. It deliberately has no built-in DOM model.
+Tests should inject the smallest binding map they exercise; applications that
+need a DOM outside a browser should use an external DOM implementation and
+adapt its exact objects through `hostBindings`.
 
 ## Custom Targets
 
