@@ -203,9 +203,14 @@ unsafe def runModuleSet
   let some target := targets[0]?
     | IO.eprintln "module package-set generation requires one target"
       return 1
-  if let some targetModule := target.mode.markedModule? then
-    if targetModule != rootModule then
-      IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
+  match target.mode with
+  | .marked => pure ()
+  | .markedModule targetModule =>
+      if targetModule != rootModule then
+        IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
+        return 1
+  | _ =>
+      IO.eprintln "module package-set generation requires a marked source or marked module target"
       return 1
 
   let index ← loadRunDeclIndex targets

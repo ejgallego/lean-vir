@@ -12,9 +12,13 @@ import { asBytes } from "./vir-codec.js";
 
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
+// Keep this FNV-1a-64 definition aligned with the Lean emitter and C++ decoder.
+const FNV64_OFFSET_BASIS = 14695981039346656037n;
+const FNV64_PRIME = 1099511628211n;
+const U64_MASK = 0xffffffffffffffffn;
 
 export const IR_PACKAGE_MAGIC = "lean-vir-ir-package";
-export const IR_PACKAGE_VERSION = 10;
+export const IR_PACKAGE_VERSION = 11;
 export const IR_PACKAGE_SECTION = Object.freeze({
   DECLARATIONS: 1,
   INIT_GLOBALS: 2,
@@ -143,7 +147,15 @@ export function validateIrPackageSetMembers(packages, { members = null } = {}) {
   return { bytes, manifests };
 }
 
-export function replaceIrPackageManifest(input, manifest) {
+/**
+ * Rewrite a package manifest for tests and development tools. Set
+ * `bindContract: false` only to construct an intentionally stale package.
+ */
+export function replaceIrPackageManifest(
+  input,
+  manifest,
+  { bindContract = true } = {},
+) {
   const bytes = asBytes(input, "IR package bytes");
   const info = readIrPackageInfoInternal(bytes);
   const manifestText = JSON.stringify(
@@ -156,14 +168,18 @@ export function replaceIrPackageManifest(input, manifest) {
     info.package.sections,
     IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
   );
-  const newManifestSectionByteLength = 4 + manifestBytes.byteLength;
+  const newManifestSectionByteLength = 12 + manifestBytes.byteLength;
   const oldManifestEnd = manifestSection.offset + manifestSection.byteLength;
   const newManifestEnd = manifestSection.offset + newManifestSectionByteLength;
   const delta = newManifestSectionByteLength - manifestSection.byteLength;
   const output = new Uint8Array(bytes.byteLength + delta);
   output.set(bytes.subarray(0, manifestSection.offset), 0);
-  writeU32(output, manifestSection.offset, manifestBytes.byteLength);
-  output.set(manifestBytes, manifestSection.offset + 4);
+  const checksum = bindContract
+    ? manifestChecksum(manifestBytes)
+    : readU64(bytes, manifestSection.offset);
+  writeU64(output, manifestSection.offset, checksum);
+  writeU32(output, manifestSection.offset + 8, manifestBytes.byteLength);
+  output.set(manifestBytes, manifestSection.offset + 12);
   output.set(bytes.subarray(oldManifestEnd), newManifestEnd);
   for (const section of info.package.sections) {
     const offset =
@@ -209,12 +225,22 @@ function readIrPackageInfoInternal(input, { path = null } = {}) {
     sections,
     IR_PACKAGE_SECTION.INTERFACE_MANIFEST,
   );
-  const manifestString = readString(bytes, manifestSection.offset);
+  const expectedManifestChecksum = readU64(bytes, manifestSection.offset);
+  const manifestString = readString(bytes, manifestSection.offset + 8);
   if (
     manifestString.nextOffset !==
     manifestSection.offset + manifestSection.byteLength
   ) {
     throw new Error("interface manifest section has trailing bytes");
+  }
+  const manifestBytes = bytes.subarray(
+    manifestSection.offset + 12,
+    manifestString.nextOffset,
+  );
+  if (manifestChecksum(manifestBytes) !== expectedManifestChecksum) {
+    throw new Error(
+      "IR package interface manifest checksum does not match its binary contract",
+    );
   }
   let manifest;
   try {
@@ -296,6 +322,9 @@ function readSectionDirectory(bytes, offset) {
     const directoryEntryOffset = offset;
     const kind = readU32(bytes, offset);
     offset += 4;
+    if (!SECTION_NAMES.has(kind)) {
+      throw new Error(`IR package has unknown section kind ${kind}`);
+    }
     const sectionOffset = readU32(bytes, offset);
     offset += 4;
     const byteLength = readU32(bytes, offset);
@@ -314,7 +343,31 @@ function readSectionDirectory(bytes, offset) {
       directoryEntryOffset,
     });
   }
+  validateSectionLayout(sections, offset);
   return sections;
+}
+
+function validateSectionLayout(sections, directoryEnd) {
+  const ordered = [...sections].sort(
+    (left, right) => left.offset - right.offset || left.kind - right.kind,
+  );
+  let previous = null;
+  for (const section of ordered) {
+    if (section.offset < directoryEnd) {
+      throw new Error(
+        `IR package section ${section.name} starts inside the package header or section directory`,
+      );
+    }
+    if (
+      previous !== null &&
+      section.offset < previous.offset + previous.byteLength
+    ) {
+      throw new Error(
+        `IR package sections ${previous.name} and ${section.name} overlap`,
+      );
+    }
+    previous = section;
+  }
 }
 
 function publicSectionInfo(section) {
@@ -375,6 +428,25 @@ function writeU32(bytes, offset, value) {
   bytes[offset + 1] = (value >>> 8) & 0xff;
   bytes[offset + 2] = (value >>> 16) & 0xff;
   bytes[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function readU64(bytes, offset) {
+  return (
+    BigInt(readU32(bytes, offset)) | (BigInt(readU32(bytes, offset + 4)) << 32n)
+  );
+}
+
+function writeU64(bytes, offset, value) {
+  writeU32(bytes, offset, Number(value & 0xffffffffn));
+  writeU32(bytes, offset + 4, Number(value >> 32n));
+}
+
+function manifestChecksum(bytes) {
+  let hash = FNV64_OFFSET_BASIS;
+  for (const byte of bytes) {
+    hash = ((hash ^ BigInt(byte)) * FNV64_PRIME) & U64_MASK;
+  }
+  return hash;
 }
 
 function errorMessage(error) {

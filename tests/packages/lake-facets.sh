@@ -84,6 +84,18 @@ cmp "$tmp/repro-a/Root.irpkg-set.json" "$tmp/repro-b/Root.irpkg-set.json"
 cmp "$tmp/repro-a/Root.irpkg" "$tmp/repro-b/Root.irpkg"
 diff -rq "$tmp/repro-a/Root.parts" "$tmp/repro-b/Root.parts"
 
+if lake env .lake/build/bin/vir_irpkg \
+    "$tmp/invalid-root.irpkg" "$tmp/invalid-root.report.md" \
+    --module-set-output "$tmp/invalid-root.irpkg-set.json" "$tmp/invalid-root.parts" \
+    ModuleSetFixture.Root invalid-root.irpkg invalid-root.parts \
+    --target-all "$tmp/repro-a/Driver.lean" \
+    > "$tmp/invalid-root.stdout" 2> "$tmp/invalid-root.stderr"; then
+  echo "module package-set generation accepted a non-marked root target" >&2
+  exit 1
+fi
+grep -q 'requires a marked source or marked module target' \
+  "$tmp/invalid-root.stderr"
+
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
 printf '%s\n' 'obsolete' > "$obsolete_shard"
 node --input-type=module -e '

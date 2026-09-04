@@ -267,7 +267,7 @@ not in the manifest resource descriptor. Naked marker types such as
 `Lean.Vir.Browser.Element` remain unsupported boundary types because they do not
 cross as `Lean.Vir.Js α`.
 
-The recursive type tree is embedded in the JSON manifest. Package format 10
+The recursive type tree is embedded in the JSON manifest. Package format 11
 stores package payloads behind a small section directory and embeds a direct
 package-owned export call-summary table.
 Normal `vir_call_resolved_objects` calls carry only owned Lean object pointers;

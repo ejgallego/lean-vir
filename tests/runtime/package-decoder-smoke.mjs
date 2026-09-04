@@ -8,11 +8,29 @@ import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import {
   encodeInvalidMagicPackage,
   IR_PACKAGE_SECTION,
+  readIrPackageInfo,
+  replaceIrPackageManifest,
 } from "../../scripts/packages/irpkg-format.mjs";
 import { assert, readRuntimeArtifacts } from "./shared.mjs";
 
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const factory = createVirRuntimeFactory({ wasmBytes });
+
+const renamedExportManifest = structuredClone(
+  readIrPackageInfo(defaultPackageBytes).manifest,
+);
+renamedExportManifest.exports[0].entry = "Review.RenamedExport";
+await assert.rejects(
+  () =>
+    factory.createRuntime({
+      irPackageSet: [
+        replaceIrPackageManifest(defaultPackageBytes, renamedExportManifest, {
+          bindContract: false,
+        }),
+      ],
+    }),
+  /interface manifest checksum does not match its binary contract/,
+);
 
 const unloaded = await factory.createRuntime();
 assert.equal(unloaded.packageInfo, null);
@@ -48,6 +66,21 @@ assertFailedCleanly(
 );
 assertFailedCleanly(
   badPackageRuntime,
+  unknownFirstSectionKind(defaultPackageBytes),
+  /unknown section kind 99/,
+);
+assertFailedCleanly(
+  badPackageRuntime,
+  sectionInsideDirectory(defaultPackageBytes),
+  /starts inside the package header or section directory/,
+);
+assertFailedCleanly(
+  badPackageRuntime,
+  overlapFirstTwoSections(defaultPackageBytes),
+  /sections declarations and initGlobals overlap/,
+);
+assertFailedCleanly(
+  badPackageRuntime,
   oversizeSectionEntryCount(
     defaultPackageBytes,
     IR_PACKAGE_SECTION.INIT_GLOBALS,
@@ -70,16 +103,6 @@ assertFailedCleanly(
   ),
   /export summary entry count 4294967295 exceeds remaining section bytes/,
 );
-assertFailedCleanly(
-  badPackageRuntime,
-  replacePackageText(
-    defaultPackageBytes,
-    '"packageFormatVersion":10',
-    '"packageFormatVersion":11',
-  ),
-  /packageFormatVersion must match package header version 10/,
-);
-
 const partialDecodeRuntime = await factory.createRuntime();
 const partialDeclarationPackage =
   truncateDeclarationSection(defaultPackageBytes);
@@ -184,30 +207,36 @@ function oversizeSectionDirectoryCount(packageBytes) {
   return bytes;
 }
 
+function unknownFirstSectionKind(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = dataView(bytes);
+  const { sectionCount } = packageHeaderOffsets(view);
+  view.setUint32(sectionCount + 4, 99, true);
+  return bytes;
+}
+
+function sectionInsideDirectory(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = dataView(bytes);
+  const { sectionCount } = packageHeaderOffsets(view);
+  view.setUint32(sectionCount + 8, sectionCount + 4, true);
+  return bytes;
+}
+
+function overlapFirstTwoSections(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = dataView(bytes);
+  const { sectionCount } = packageHeaderOffsets(view);
+  const firstOffset = view.getUint32(sectionCount + 8, true);
+  view.setUint32(sectionCount + 4 + 12 + 4, firstOffset, true);
+  return bytes;
+}
+
 function oversizeSectionEntryCount(packageBytes, kind) {
   const bytes = Uint8Array.from(packageBytes);
   const view = dataView(bytes);
   const section = findPackageSection(view, kind);
   view.setUint32(section.offset, 0xffffffff, true);
-  return bytes;
-}
-
-function replacePackageText(packageBytes, sourceText, replacementText) {
-  assert.equal(sourceText.length, replacementText.length);
-  const bytes = Uint8Array.from(packageBytes);
-  const source = new TextEncoder().encode(sourceText);
-  const replacement = new TextEncoder().encode(replacementText);
-  let offset = -1;
-  for (let index = 0; index <= bytes.length - source.length; index += 1) {
-    if (
-      source.every((byte, sourceIndex) => bytes[index + sourceIndex] === byte)
-    ) {
-      offset = index;
-      break;
-    }
-  }
-  assert.notEqual(offset, -1, `package did not contain ${sourceText}`);
-  bytes.set(replacement, offset);
   return bytes;
 }
 

@@ -4,9 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import {
-  createVirRuntimeFactory,
-} from "../../web/src/vir-runtime-node.js";
+  readIrPackageInfo,
+  replaceIrPackageManifest,
+} from "../../scripts/packages/irpkg-format.mjs";
 import {
   assert,
   generateIrPackage,
@@ -55,8 +57,24 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.runtime.value": () => 9n,
     },
   });
+  const hostPackageBytes = await readFile(hostPackage);
+  const mismatchedHostManifest = structuredClone(
+    readIrPackageInfo(hostPackageBytes).manifest,
+  );
+  mismatchedHostManifest.hostImports[0].target += ".mismatch";
+  await assert.rejects(
+    () =>
+      hostFactory.createRuntime({
+        irPackageSet: [
+          replaceIrPackageManifest(hostPackageBytes, mismatchedHostManifest, {
+            bindContract: false,
+          }),
+        ],
+      }),
+    /interface manifest checksum does not match its binary contract/,
+  );
   const hostRuntime = await hostFactory.createRuntime({
-    irPackageSet: [await readFile(hostPackage)],
+    irPackageSet: [hostPackageBytes],
   });
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(

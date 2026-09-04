@@ -682,7 +682,7 @@ const vir = await createVirRuntime({
 
 ## Current Limits
 
-The browser loads descriptor-ordered sets of format-10 `.irpkg` members. A
+The browser loads descriptor-ordered sets of format-11 `.irpkg` members. A
 focused package is represented as a one-member set. It does not load `.olean` or
 Lean's raw `.ir` format in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently, and a

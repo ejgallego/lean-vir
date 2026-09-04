@@ -450,18 +450,26 @@ The provider can stage a complete package set in one fresh instance. Generated
 descriptors use Lean's dependency-first module-initialization order, while each
 member retains its owning initializer metadata. `vir_begin_ir_package_set`
 clears the candidate,
-`vir_append_ir_package` transactionally decodes each ordinary format-10 member,
+`vir_append_ir_package` transactionally decodes each ordinary format-11 member,
 `vir_prepare_ir_package_set` builds the aggregate indices without running user
 initializers, and `vir_finish_ir_package_set` runs the initializer table once.
 The final root member supplies the interface manifest and export summaries.
-JavaScript validates that manifest—including its binary-header format version
-and member/target invariants—between prepare and finish. Any decode, prepare,
-or manifest failure calls `vir_abort_ir_package_set`, releasing all staged
-state. Duplicate declarations, initializer globals, host imports, and export
-summaries are rejected before a member is appended. JavaScript adopts the
-candidate only after the whole set is valid and initialized, so neither a
-partial dependency graph nor initialization under an invalid host contract is
-exposed through the public runtime wrapper.
+Each format-11 member binds the exact generated manifest bytes to its binary
+envelope with a non-cryptographic 64-bit checksum, which both decoders verify.
+JavaScript then validates the manifest's binary-header format version and
+member/target invariants between prepare and finish. Any decode, prepare, or
+manifest failure calls `vir_abort_ir_package_set`, releasing all staged state.
+Duplicate declarations, initializer globals, host imports, and export summaries
+are rejected before a member is appended. JavaScript adopts the candidate only
+after the whole set is valid and initialized, so neither a partial dependency
+graph nor initialization under an invalid host contract is exposed through the
+public runtime wrapper.
+
+This transaction protects provider state and public-runtime handover. It cannot
+undo arbitrary externally observable work—such as console output or unmanaged
+DOM mutation—from an initializer that succeeds before a later initializer
+fails. Browser lifecycle work should use reached `@[vir_startup]` entries and
+managed host resources so candidate disposal can release it.
 
 Manifest export indices remain scoped to the root package manifest rather than
 becoming global package identities. Individual package unload, version solving,
@@ -486,7 +494,7 @@ declaration when present. The returned call slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
-In package format 10, the package has an explicit section directory and a direct
+In package format 11, the package has an explicit section directory and a direct
 export call-summary section. `vir_call_resolved_objects` uses that table to
 validate object argument counts, effect handling, and boxed wasm32 boundary
 requirements. Resolved calls without a package-owned summary fail.

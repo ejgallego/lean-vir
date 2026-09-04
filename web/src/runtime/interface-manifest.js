@@ -11,7 +11,7 @@ import {
 } from "./interface-effects.js";
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 import { validatePackageTargets } from "./package-targets.js";
-import { requireNormalizedModuleName } from "./module-name.js";
+import { requireModuleIdentity } from "./module-name.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 export const INTERFACE_MANIFEST_VERSION = 8;
@@ -188,7 +188,7 @@ function validatePackageSetMember(member, targets, metadataLabel) {
   if (!isRecord(member)) {
     throw new Error(`${label} must be an object`);
   }
-  requireNormalizedModuleName(member.module, label);
+  requireModuleIdentity(member.module, label);
   if (member.role !== "dependency" && member.role !== "root") {
     throw new Error(`${label}.role must be dependency or root`);
   }
@@ -197,18 +197,20 @@ function validatePackageSetMember(member, targets, metadataLabel) {
     throw new Error(`${label} dependency members must not have public targets`);
   }
   if (member.role === "root") {
-    if (packageTargets.length === 0) {
-      throw new Error(`${label} root member must have a public package target`);
+    if (packageTargets.length !== 1) {
+      throw new Error(
+        `${label} root member must have exactly one public target`,
+      );
     }
-    const moduleTargets = packageTargets.filter(
-      (target) => target.mode === "markedModule",
-    );
-    if (
-      moduleTargets.length !== 0 &&
-      !moduleTargets.some((target) => target.module === member.module)
-    ) {
+    const [target] = packageTargets;
+    if (target.mode === "markedModule" && target.module !== member.module) {
       throw new Error(
         `${label} root member must match its markedModule target`,
+      );
+    }
+    if (target.mode !== "markedModule" && target.mode !== "marked") {
+      throw new Error(
+        `${label} root member target must use markedModule or marked mode`,
       );
     }
   }

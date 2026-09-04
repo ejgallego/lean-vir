@@ -188,6 +188,24 @@ export function assertValidManifestShape() {
     validateInterfaceManifest(withPureHostImport).hostImports[0].arity,
     1,
   );
+  const legacySourceRoot = structuredClone(validManifestShape);
+  legacySourceRoot.metadata.targets = [
+    {
+      source: "Legacy.lean",
+      mode: "marked",
+      roots: [],
+      resolvedRoots: ["Legacy.entry"],
+    },
+  ];
+  legacySourceRoot.metadata.packageSetMember = {
+    module: "Opaque-Module-Identity",
+    role: "root",
+  };
+  assert.equal(
+    validateInterfaceManifest(legacySourceRoot).metadata.packageSetMember
+      .module,
+    "Opaque-Module-Identity",
+  );
 }
 
 export function assertInvalidManifest(mutator, pattern, options = {}) {

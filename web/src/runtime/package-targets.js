@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { requireModuleIdentity } from "./module-name.js";
+
 export const PACKAGE_TARGET_MODE = Object.freeze({
   EXPLICIT: "explicit",
   PACKAGE_ONLY: "packageOnly",
@@ -61,8 +63,7 @@ export function validatePackageTargets(
     }
     if (hasSource)
       requireNormalizedString(target.source, `${targetLabel}.source`);
-    if (hasModule)
-      requireNormalizedString(target.module, `${targetLabel}.module`);
+    if (hasModule) requireModuleIdentity(target.module, targetLabel);
     if (target.mode === PACKAGE_TARGET_MODE.MARKED_MODULE && !hasModule) {
       throw new Error(`${targetLabel}.mode markedModule requires a module`);
     }

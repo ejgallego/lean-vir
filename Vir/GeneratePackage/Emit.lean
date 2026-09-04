@@ -57,6 +57,20 @@ def emitString (value : String) : EmitM Unit := do
   emitU32 bytes.size
   emitBytes bytes
 
+/--
+The non-cryptographic checksum binds the complete manifest bytes to the binary
+package envelope. Packages already contain executable code, so this detects
+stale or independently rewritten sections rather than authenticating input.
+-/
+private def manifestChecksum (value : String) : UInt64 :=
+  value.toUTF8.foldl
+    (fun hash byte => (hash ^^^ byte.toUInt64) * 1099511628211)
+    14695981039346656037
+
+private def emitU64 (value : UInt64) : EmitM Unit := do
+  emitU32 (value &&& 0xffffffff).toNat
+  emitU32 (value >>> 32).toNat
+
 partial def emitName : Name -> EmitM Unit
   | .anonymous => emitU8 PackageIRTags.nameAnonymous
   | .str pre part => do
@@ -237,8 +251,10 @@ def packageSections (closure : Closure) (manifest : InterfaceManifest) : Except 
     emitArray manifest.hostImports emitHostImport
   let exportSummaries ← emitToBytes do
     emitArray manifest.exports emitInterfaceExportSummary
+  let interfaceManifestJson := manifest.toJson
   let interfaceManifest ← emitToBytes do
-    emitString manifest.toJson
+    emitU64 (manifestChecksum interfaceManifestJson)
+    emitString interfaceManifestJson
   return #[
     { kind := packageSectionDeclarations, bytes := decls },
     { kind := packageSectionInitGlobals, bytes := initGlobals },

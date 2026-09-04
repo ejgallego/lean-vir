@@ -101,7 +101,7 @@ const installCalls = [];
 const invalidManifestText = JSON.stringify({
   version: 8,
   metadata: {
-    packageFormatVersion: 10,
+    packageFormatVersion: 11,
     manifestVersion: 8,
     targets: [],
   },
@@ -139,7 +139,7 @@ const invalidInstallRuntime = new VirRuntime({
   vir_package_interface_manifest: () => manifestPtr,
   vir_package_interface_manifest_size: () =>
     prepared ? invalidManifestBytes.length : 0,
-  vir_package_format_version: () => 10,
+  vir_package_format_version: () => 11,
   vir_package_decl_count: () => 0,
 });
 assert.throws(

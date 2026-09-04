@@ -12,7 +12,7 @@ namespace Vir.GeneratePackage
 
 def packageMagic : String := "lean-vir-ir-package"
 
-def currentPackageFormatVersion : Nat := 10
+def currentPackageFormatVersion : Nat := 11
 
 def currentInterfaceManifestVersion : Nat := 8
 

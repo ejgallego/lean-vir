@@ -160,7 +160,11 @@ generator re-elaborates the source. For module-system files, the facet depends
 on Lake's `.ir` artifact and uses a generated
 `import all MySlides.Runtime` driver.
 
-Every member is an ordinary format-10 `.irpkg` that owns its module's
+The compiled-module root records one `markedModule` target. The legacy fallback
+records one `marked` source target; package-set generation rejects all other
+target modes.
+
+Every member is an ordinary format-11 `.irpkg` that owns its module's
 declarations and initializer metadata. The descriptor reconstructs a
 dependency-first order from Lean's loaded module graphs, filters it to the
 reached runtime modules, ignores meta-only import edges, and puts the root
@@ -171,9 +175,9 @@ module instead of the checkout-local generated driver path, so otherwise
 identical module sets are byte-for-byte reproducible across build directories.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all
-members before running initializer globals in that module order. Duplicate
-declaration, initializer, host-import, or export-summary identities fail the
-candidate load.
+members, verifies each manifest's format-11 contract checksum and schema, then
+runs initializer globals in that module order. Duplicate declaration,
+initializer, host-import, or export-summary identities fail the candidate load.
 
 Packaging is rooted in `@[vir_export]`, `@[vir_startup]`, or explicitly
 selected declarations. Merely importing a module for initializer side effects

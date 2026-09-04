@@ -25,8 +25,18 @@ using ir::type;
 using namespace package_ir;
 namespace tags = package_ir_tags;
 
+// Keep this FNV-1a-64 definition aligned with the Lean emitter and JS decoder.
+uint64_t manifest_checksum(std::string const & value) {
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (unsigned char byte : value) {
+        hash ^= byte;
+        hash *= UINT64_C(1099511628211);
+    }
+    return hash;
+}
+
 static bool supported_package_version(uint32_t version) {
-    return version == 10;
+    return version == 11;
 }
 
 class reader : public package_binary_reader {
@@ -545,12 +555,18 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
     }
 
     reader manifest_reader(data + directory.interface_manifest.offset, directory.interface_manifest.byte_length);
+    uint64_t expected_manifest_checksum = manifest_reader.u32();
+    expected_manifest_checksum |= static_cast<uint64_t>(manifest_reader.u32()) << 32;
     out.interface_manifest = manifest_reader.string();
     if (!finish_section(manifest_reader, package_section_label(package_section_interface_manifest), error)) {
         return false;
     }
     if (out.interface_manifest.empty()) {
         error = "IR package is missing an embedded interface manifest";
+        return false;
+    }
+    if (manifest_checksum(out.interface_manifest) != expected_manifest_checksum) {
+        error = "IR package interface manifest checksum does not match its binary contract";
         return false;
     }
 

@@ -8,7 +8,7 @@ import { VirRuntime } from "./runtime/core.js";
 import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
 import { validateIrPackageSetMembers } from "./runtime/ir-package.js";
-import { requireNormalizedModuleName } from "./runtime/module-name.js";
+import { requireModuleIdentity } from "./runtime/module-name.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -344,7 +344,7 @@ function parseIrPackageSetDescriptor(bytes) {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`${label} must be an object`);
     }
-    requireNormalizedModuleName(entry.module, label);
+    requireModuleIdentity(entry.module, label);
     if (modules.has(entry.module)) {
       throw new Error(
         `${label} duplicates module ${JSON.stringify(entry.module)}`,

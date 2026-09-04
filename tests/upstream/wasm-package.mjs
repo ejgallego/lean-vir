@@ -107,6 +107,7 @@ export async function smokeWasmPackageBoundary(context) {
   const exports = await instantiateVirModule(context.wasmModule);
   assertRequiredExports(exports);
   assertInvalidPackageDiagnostic(exports);
+  assertInvalidSectionLayouts(exports, context.defaultPackageBytes);
   loadIrPackageSet(exports, [context.defaultPackageBytes]);
   return {
     exports,
@@ -204,6 +205,103 @@ function assertInvalidPackageDiagnostic(exports) {
   } finally {
     exports.vir_free_bytes?.(badPackagePtr);
   }
+}
+
+function assertInvalidSectionLayouts(exports, packageBytes) {
+  const cases = [
+    [
+      unknownFirstSectionKind(packageBytes),
+      "unknown IR package section kind 99",
+    ],
+    [
+      sectionInsideDirectory(packageBytes),
+      "starts inside the package header or section directory",
+    ],
+    [
+      overlapFirstTwoSections(packageBytes),
+      "sections `declarations` and `init globals` overlap",
+    ],
+    [
+      corruptManifestChecksum(packageBytes),
+      "interface manifest checksum does not match its binary contract",
+    ],
+  ];
+  for (const [bytes, expected] of cases) {
+    if (exports.vir_begin_ir_package_set() === 0) {
+      throw new Error(
+        "IR package-set setup failed before section-layout check",
+      );
+    }
+    const ptr = exports.vir_alloc_bytes(bytes.byteLength);
+    try {
+      new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+      if (exports.vir_append_ir_package(ptr, bytes.byteLength) !== 0) {
+        throw new Error(
+          `invalid section layout unexpectedly loaded: ${expected}`,
+        );
+      }
+      const error = lastPackageError(exports);
+      if (!error.includes(expected)) {
+        throw new Error(
+          `invalid section layout diagnostic did not include ${JSON.stringify(expected)}: ${error}`,
+        );
+      }
+    } finally {
+      exports.vir_abort_ir_package_set();
+      exports.vir_free_bytes?.(ptr);
+    }
+  }
+}
+
+function unknownFirstSectionKind(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const sectionCount = packageSectionCountOffset(bytes);
+  new DataView(bytes.buffer).setUint32(sectionCount + 4, 99, true);
+  return bytes;
+}
+
+function sectionInsideDirectory(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const sectionCount = packageSectionCountOffset(bytes);
+  new DataView(bytes.buffer).setUint32(
+    sectionCount + 8,
+    sectionCount + 4,
+    true,
+  );
+  return bytes;
+}
+
+function overlapFirstTwoSections(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = new DataView(bytes.buffer);
+  const sectionCount = packageSectionCountOffset(bytes);
+  const firstOffset = view.getUint32(sectionCount + 8, true);
+  view.setUint32(sectionCount + 4 + 12 + 4, firstOffset, true);
+  return bytes;
+}
+
+function corruptManifestChecksum(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  bytes[packageSectionOffset(bytes, 5)] ^= 1;
+  return bytes;
+}
+
+function packageSectionOffset(bytes, expectedKind) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const sectionCountOffset = packageSectionCountOffset(bytes);
+  const sectionCount = view.getUint32(sectionCountOffset, true);
+  for (let index = 0; index < sectionCount; index += 1) {
+    const entryOffset = sectionCountOffset + 4 + index * 12;
+    if (view.getUint32(entryOffset, true) === expectedKind) {
+      return view.getUint32(entryOffset + 4, true);
+    }
+  }
+  throw new Error(`IR package has no section kind ${expectedKind}`);
+}
+
+function packageSectionCountOffset(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return 4 + view.getUint32(0, true) + 8;
 }
 
 function readWasmString(exports, ptr, len) {

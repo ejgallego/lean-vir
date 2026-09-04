@@ -89,7 +89,7 @@ await assertInvalidDescriptor(
 );
 await assertInvalidEntry(
   { ...validDescriptor.packages[1], module: "" },
-  /entry 1 has no module/,
+  /entry 1\.module must be a non-empty module identity/,
 );
 await assertInvalidEntry(
   { ...validDescriptor.packages[1], path: "" },
@@ -119,12 +119,12 @@ for (const path of [
 }
 await assertInvalidEntry(
   { ...validDescriptor.packages[1], module: " ModuleSetFixture.Root" },
-  /module must be a normalized Lean module name/,
+  /module must be a non-empty module identity/,
 );
-for (const module of ["..", "A B", "A/B", "A:", "«»", "A."]) {
+for (const module of ["A\u0000B", "A\nB", "A\u007fB"]) {
   await assertInvalidEntry(
     { ...validDescriptor.packages[1], module },
-    /module must be a normalized Lean module name/,
+    /module must be a non-empty module identity/,
   );
 }
 const escapedModuleSet = await createVirRuntimeFactory({
@@ -139,6 +139,16 @@ const escapedModuleSet = await createVirRuntimeFactory({
       : encoder.encode(String(url)),
 }).fetchIrPackageSet(descriptorUrl);
 assert.equal(escapedModuleSet.members[0].module, "«Example Dependency»");
+const opaqueModuleSet = await createVirRuntimeFactory({
+  fetchBytes: async (url) =>
+    String(url) === descriptorUrl.href
+      ? encodeDescriptor({
+          ...validDescriptor,
+          packages: [packageEntry("A/B", "root", "Root.irpkg")],
+        })
+      : encoder.encode(String(url)),
+}).fetchIrPackageSet(descriptorUrl);
+assert.equal(opaqueModuleSet.members[0].module, "A/B");
 await assertInvalidDescriptor(
   {
     ...validDescriptor,

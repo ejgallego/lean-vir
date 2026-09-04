@@ -251,7 +251,7 @@ Version constants are intentionally small and explicit:
 - `npm run check:package-abi` verifies package magic, package-set descriptor
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.
-- `Vir/GeneratePackage/PackageIRTags.lean` owns the format-10 package `Name`
+- `Vir/GeneratePackage/PackageIRTags.lean` owns the format-11 package `Name`
   and declaration-IR tag assignments; `scripts/native/ir-codec-tags.mjs` maps the
   C++ enum structure. `npm run check:ir-codec-tags` verifies the assignments
   and that the emitter/decoder use every non-reserved tag.

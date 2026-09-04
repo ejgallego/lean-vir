@@ -96,8 +96,8 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.metadata.packageFormatVersion = 9;
     },
-    options: { packageFormatVersion: 10 },
-    pattern: /packageFormatVersion must match package header version 10/,
+    options: { packageFormatVersion: 11 },
+    pattern: /packageFormatVersion must match package header version 11/,
   },
   {
     name: "non-array package targets",
@@ -210,17 +210,17 @@ export const invalidManifestCases = [
         role: "dependency",
       };
     },
-    pattern: /packageSetMember\.module must be a normalized Lean module name/,
+    pattern: /packageSetMember\.module must be a non-empty module identity/,
   },
   {
-    name: "invalid package-set member module syntax",
+    name: "package-set member module with control character",
     mutate: (manifest) => {
       manifest.metadata.packageSetMember = {
-        module: "Example/Dependency",
+        module: "Example\u0000Dependency",
         role: "dependency",
       };
     },
-    pattern: /packageSetMember\.module must be a normalized Lean module name/,
+    pattern: /packageSetMember\.module must be a non-empty module identity/,
   },
   {
     name: "dependency package-set member with target",
@@ -260,6 +260,31 @@ export const invalidManifestCases = [
       };
     },
     pattern: /root member must match its markedModule target/,
+  },
+  {
+    name: "root package-set member with unsupported target mode",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [packageTarget({ mode: "all" })];
+      manifest.metadata.packageSetMember = {
+        module: "Example.Root",
+        role: "root",
+      };
+    },
+    pattern: /root member target must use markedModule or marked mode/,
+  },
+  {
+    name: "root package-set member with multiple targets",
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({ mode: "marked" }),
+        packageTarget({ source: "Other.lean", mode: "marked" }),
+      ];
+      manifest.metadata.packageSetMember = {
+        module: "Example.Root",
+        role: "root",
+      };
+    },
+    pattern: /root member must have exactly one public target/,
   },
   {
     name: "non-boolean startup marker",
