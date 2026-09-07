@@ -58,9 +58,9 @@ def emitString (value : String) : EmitM Unit := do
   emitBytes bytes
 
 /--
-The non-cryptographic checksum binds the complete manifest bytes to the binary
-package envelope. Packages already contain executable code, so this detects
-stale or independently rewritten sections rather than authenticating input.
+The non-cryptographic checksum detects corruption of the manifest bytes, not
+agreement with the other sections. The runtime checks the independently stored
+export/host-import fields separately; neither check authenticates executable IR.
 -/
 private def manifestChecksum (value : String) : UInt64 :=
   value.toUTF8.foldl

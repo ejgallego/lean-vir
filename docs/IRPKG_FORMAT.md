@@ -77,7 +77,7 @@ multi-byte integers are unsigned little-endian 32-bit values.
 | Field             | Encoding | Meaning                                                    |
 | ----------------- | -------- | ---------------------------------------------------------- |
 | magic             | string   | Must be `lean-vir-ir-package`.                             |
-| package format    | u32      | Currently `10`.                                            |
+| package format    | u32      | Currently `11`.                                            |
 | declaration count | u32      | Number of declaration entries in the declarations section. |
 | section count     | u32      | Number of section directory entries.                       |
 
@@ -110,19 +110,27 @@ little-endian `u32` values, followed by the usual length-prefixed UTF-8 string.
 
 The section payload encodings are the same payloads that the pre-v10 linear
 stream used, except that format 11 prefixes the manifest with a checksum of its
-exact UTF-8 bytes. Format 10 requires known, unique section kinds whose bounded,
-non-overlapping payloads begin after the complete header and directory. Each
-section decoder also rejects trailing bytes. The runtime separately validates
+exact UTF-8 bytes. The directory requires known, unique section kinds whose
+bounded, non-overlapping payloads begin after the complete header and directory.
+Each section decoder also rejects trailing bytes. The runtime separately validates
 the manifest checksum, embedded schema, and package-set identities. The checksum
-detects stale or independently rewritten package sections; it is not an
-authenticity boundary because an IR package already contains executable code.
+detects corruption of the manifest bytes, not agreement with other sections;
+it is not an authenticity boundary because an IR package already contains
+executable code.
 
 The export-summary array order is also the structural call identity used by
 `vir_resolve_call_export`. JavaScript resolves all public keys for a manifest
 export to that export's array index, so escaped dots and string-versus-numeric
 name components are never recovered by parsing `Name.toString` output. The
-checksum binds the complete generated manifest—including export and host-import
-descriptors—to the binary package before any initializer can run.
+runtime also calls `vir_validate_package_contract` between prepare and finish:
+one transient binary projection of the validated manifest is compared with the
+decoded call tables. It checks ordered export names, argument counts, IO and
+boxed-boundary flags, and ordered host-import names, targets, symbols, arities,
+erased-prefix counts and IO flags. Names are rendered structurally with the
+pinned Lean printing rules, not parsed from text. Recomputing a manifest checksum
+cannot bypass this comparison. Detailed interface types and effect labels are
+not independently stored in those tables and remain producer-owned metadata;
+this check does not authenticate a package or prove its IR implements its types.
 
 Decoded Lean objects are runtime-owned, not views into the package bytes.
 Package IR constructor helpers consume owned child references, and the decoded

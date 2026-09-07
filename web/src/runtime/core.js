@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
 import { validateIrPackageSetMembers } from "./ir-package.js";
+import { encodePackageContract } from "./package-contract.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { RuntimeCallTiming } from "./call-timing.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
@@ -288,9 +289,20 @@ export class VirRuntime extends ObjectValueRuntime {
     );
     const manifest = JSON.parse(text);
     this.requireFunction("vir_package_format_version");
-    return validateInterfaceManifest(manifest, {
+    const validated = validateInterfaceManifest(manifest, {
       packageFormatVersion: this.exports.vir_package_format_version(),
     });
+    this.requireFunction("vir_validate_package_contract");
+    const contract = encodePackageContract(validated);
+    const ptr = this.allocBytes(contract);
+    try {
+      if (this.exports.vir_validate_package_contract(ptr, contract.length) === 0) {
+        throw new Error(this.lastPackageError());
+      }
+    } finally {
+      this.freeBytes(ptr);
+    }
+    return validated;
   }
 
   rebuildManifestExports() {

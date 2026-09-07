@@ -12,6 +12,7 @@ const requiredFunctionExports = [
   "vir_begin_ir_package_set",
   "vir_append_ir_package",
   "vir_prepare_ir_package_set",
+  "vir_validate_package_contract",
   "vir_finish_ir_package_set",
   "vir_abort_ir_package_set",
   "vir_last_package_error",
@@ -223,7 +224,7 @@ function assertInvalidSectionLayouts(exports, packageBytes) {
     ],
     [
       corruptManifestChecksum(packageBytes),
-      "interface manifest checksum does not match its binary contract",
+      "interface manifest checksum mismatch",
     ],
   ];
   for (const [bytes, expected] of cases) {

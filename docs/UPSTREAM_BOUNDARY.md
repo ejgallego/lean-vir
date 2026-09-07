@@ -454,16 +454,24 @@ clears the candidate,
 `vir_prepare_ir_package_set` builds the aggregate indices without running user
 initializers, and `vir_finish_ir_package_set` runs the initializer table once.
 The final root member supplies the interface manifest and export summaries.
-Each format-11 member binds the exact generated manifest bytes to its binary
-envelope with a non-cryptographic 64-bit checksum, which both decoders verify.
+Each format-11 member protects its manifest bytes against corruption with a
+non-cryptographic 64-bit checksum, which both decoders verify; this does not
+establish agreement with the binary call tables.
 JavaScript then validates the manifest's binary-header format version and
-member/target invariants between prepare and finish. Any decode, prepare, or
+member/target invariants between prepare and finish. Before installing host
+bindings or running initializers, `vir_validate_package_contract` compares one
+manifest projection against the ordered binary export and host-import fields
+listed in `docs/IRPKG_FORMAT.md`. Any decode, prepare, or
 manifest failure calls `vir_abort_ir_package_set`, releasing all staged state.
 Duplicate declarations, initializer globals, host imports, and export summaries
 are rejected before a member is appended. JavaScript adopts the candidate only
 after the whole set is valid and initialized, so neither a partial dependency
 graph nor initialization under an invalid host contract is exposed through the
 public runtime wrapper.
+
+The JavaScript runtime and Wasm must come from the same revision. A Wasm without
+`vir_validate_package_contract` is rejected rather than silently skipping the
+check; this ABI requirement does not change the format-11 package encoding.
 
 This transaction protects provider state and public-runtime handover. It cannot
 undo arbitrary externally observable work—such as console output or unmanaged

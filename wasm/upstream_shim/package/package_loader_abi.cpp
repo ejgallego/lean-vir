@@ -43,6 +43,10 @@ extern "C" uint32_t vir_finish_ir_package_set(void) {
     return lean::vir::package_decl_count();
 }
 
+extern "C" uint32_t vir_validate_package_contract(uint8_t const * data, uint32_t size) {
+    return lean::vir::validate_package_contract(data, size) ? 1 : 0;
+}
+
 extern "C" void vir_abort_ir_package_set(void) {
     lean::vir::clear_loaded_package();
 }

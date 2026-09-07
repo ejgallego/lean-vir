@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { encodePackageContract } from "../../web/src/runtime/package-contract.js";
 import {
   encodeInvalidMagicPackage,
   IR_PACKAGE_SECTION,
@@ -24,12 +25,10 @@ await assert.rejects(
   () =>
     factory.createRuntime({
       irPackageSet: [
-        replaceIrPackageManifest(defaultPackageBytes, renamedExportManifest, {
-          bindContract: false,
-        }),
+        replaceIrPackageManifest(defaultPackageBytes, renamedExportManifest),
       ],
     }),
-  /interface manifest checksum does not match its binary contract/,
+  /manifest\/binary contract mismatch:.*export.*entry/,
 );
 
 const unloaded = await factory.createRuntime();
@@ -46,7 +45,89 @@ const second = await factory.createRuntime({
 assert.equal(first.call("SortDemo.demo"), "192");
 assert.equal(second.call("fib", 8), "21");
 
+const contract = encodePackageContract(first.interfaceManifest);
+function validateContract(bytes) {
+  const ptr = first.allocBytes(bytes);
+  try {
+    return first.exports.vir_validate_package_contract(ptr, bytes.length);
+  } finally {
+    first.freeBytes(ptr);
+  }
+}
+assert.equal(validateContract(contract), 1);
+for (const bytes of [
+  contract.subarray(0, 0),
+  contract.subarray(0, 4),
+  contract.subarray(0, contract.length - 1),
+]) {
+  assert.equal(validateContract(bytes), 0);
+  assert.match(first.lastPackageError(), /invalid IR package contract/);
+}
+assert.equal(validateContract(Uint8Array.from([...contract, 0])), 0);
+assert.match(first.lastPackageError(), /trailing bytes/);
+const invalidBooleanContract = Uint8Array.from(contract);
+invalidBooleanContract[
+  12 + new TextEncoder().encode(first.interfaceManifest.exports[0].entry).length
+] = 2;
+assert.equal(validateContract(invalidBooleanContract), 0);
+assert.match(first.lastPackageError(), /invalid boolean tag 2/);
+assert.equal(validateContract(contract), 1);
+assert.equal(first.lastPackageError(), "");
+
 const badPackageRuntime = await factory.createRuntime();
+// Recompute the manifest checksum on purpose: agreement must be checked against
+// the independently decoded tables, not inferred from a self-consistent hash.
+for (const [field, mutate] of [
+  ["export count", (m) => m.exports.pop()],
+  ["entry", (m) => m.exports.reverse()],
+  [
+    "argument count",
+    (m) => {
+      m.exports[0].args = [];
+    },
+  ],
+  [
+    "effect",
+    (m) => {
+      m.exports[0].effect = "runtime";
+    },
+  ],
+  [
+    "boxed boundary",
+    (m) => {
+      m.exports[0].result = { type: "Float", interfaceTag: 10 };
+    },
+  ],
+]) {
+  const manifest = structuredClone(
+    readIrPackageInfo(defaultPackageBytes).manifest,
+  );
+  mutate(manifest);
+  assertFailedCleanly(
+    badPackageRuntime,
+    replaceIrPackageManifest(defaultPackageBytes, manifest),
+    new RegExp(`manifest/binary contract mismatch:.*${field}`),
+  );
+}
+
+// An independently rewritten binary summary must also fail with an unchanged
+// (and therefore still checksum-valid) manifest.
+for (const [field, offset, value] of [
+  ["effect", 0, 1],
+  ["argument count", 1, 2],
+  ["boxed boundary", 5, 1],
+]) {
+  const bytes = Uint8Array.from(defaultPackageBytes);
+  const view = dataView(bytes);
+  const section = findPackageSection(view, IR_PACKAGE_SECTION.EXPORT_SUMMARIES);
+  const fields = skipName(view, section.offset + 4);
+  bytes[fields + offset] = value;
+  assertFailedCleanly(
+    badPackageRuntime,
+    bytes,
+    new RegExp(`manifest/binary contract mismatch:.*${field}`),
+  );
+}
 const badPackage = encodeInvalidMagicPackage();
 assertFailedCleanly(badPackageRuntime, badPackage, /invalid IR package magic/);
 assertFailedCleanly(
@@ -145,6 +226,15 @@ assert.notEqual(first.interfaceManifest, null);
 assert.notEqual(first.packageMetadata, null);
 assert.equal(first.call("fib", 8), "21");
 
+assert.throws(
+  () =>
+    first.loadIrPackageSetBytes([
+      replaceIrPackageManifest(defaultPackageBytes, renamedExportManifest),
+    ]),
+  /manifest\/binary contract mismatch:.*export.*entry/,
+);
+assert.equal(first.call("fib", 8), "21");
+
 first.dispose();
 second.dispose();
 badPackageRuntime.dispose();
@@ -181,6 +271,14 @@ function truncateDeclarationSection(packageBytes) {
   );
   view.setUint32(declarations.byteLengthOffset, declarationBytes - 32, true);
   return bytes;
+}
+
+function skipName(view, offset) {
+  const tag = view.getUint8(offset++);
+  if (tag === 0) return offset;
+  assert.ok(tag === 1 || tag === 2, `unexpected name tag ${tag}`);
+  offset = skipName(view, offset);
+  return offset + 4 + (tag === 1 ? view.getUint32(offset, true) : 0);
 }
 
 function invalidateFirstDeclarationNameTag(packageBytes) {

@@ -148,14 +148,10 @@ export function validateIrPackageSetMembers(packages, { members = null } = {}) {
 }
 
 /**
- * Rewrite a package manifest for tests and development tools. Set
- * `bindContract: false` only to construct an intentionally stale package.
+ * Rewrite a package manifest and its corruption checksum for tests and tools.
+ * This does not update the binary call tables or establish agreement with them.
  */
-export function replaceIrPackageManifest(
-  input,
-  manifest,
-  { bindContract = true } = {},
-) {
+export function replaceIrPackageManifest(input, manifest) {
   const bytes = asBytes(input, "IR package bytes");
   const info = readIrPackageInfoInternal(bytes);
   const manifestText = JSON.stringify(
@@ -174,10 +170,7 @@ export function replaceIrPackageManifest(
   const delta = newManifestSectionByteLength - manifestSection.byteLength;
   const output = new Uint8Array(bytes.byteLength + delta);
   output.set(bytes.subarray(0, manifestSection.offset), 0);
-  const checksum = bindContract
-    ? manifestChecksum(manifestBytes)
-    : readU64(bytes, manifestSection.offset);
-  writeU64(output, manifestSection.offset, checksum);
+  writeU64(output, manifestSection.offset, manifestChecksum(manifestBytes));
   writeU32(output, manifestSection.offset + 8, manifestBytes.byteLength);
   output.set(manifestBytes, manifestSection.offset + 12);
   output.set(bytes.subarray(oldManifestEnd), newManifestEnd);
@@ -239,7 +232,7 @@ function readIrPackageInfoInternal(input, { path = null } = {}) {
   );
   if (manifestChecksum(manifestBytes) !== expectedManifestChecksum) {
     throw new Error(
-      "IR package interface manifest checksum does not match its binary contract",
+      "IR package interface manifest checksum mismatch",
     );
   }
   let manifest;

@@ -160,7 +160,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const escapedGenerated = runVirIrpkg([
     escapedPackage,
     escapedReport,
-    "--target-all",
+    "--target-marked",
     escapedSource,
   ]);
   assert.equal(
@@ -188,6 +188,22 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(escapedRuntime.call(numericTextEntry.entry, 7), "9");
   assert.equal(escapedRuntime.call(numericTextEntry.id, 8), "10");
   assert.equal(escapedRuntime.call(numericTextEntry.jsName, 9), "11");
+  for (const [entry, increment] of [
+    ["café", 3],
+    ["αβ₁", 4],
+    ["#meta.part.with.dot", 5],
+    ["?mvar.part.with.dot", 6],
+    ["Inaccessible.part.with.dot✝", 7],
+    ["Hygienic.part.with.dot._hyg", 2],
+    ["Nested.«?part»", 9],
+    ["Empty.«»", 2],
+    ["Closing.»", 2],
+    ["Numeral.1", 2],
+    ["Hygienic.numeric.part._hyg.2", 2],
+    ["Inaccessible.numeric.part✝.3", 2],
+  ]) {
+    assert.equal(escapedRuntime.call(entry, 10), String(10 + increment), entry);
+  }
   escapedRuntime.dispose();
 
   const freshAliasEntry = manifestEntry(freshManifest, "freshAliasBump");

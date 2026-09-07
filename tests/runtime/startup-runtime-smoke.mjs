@@ -149,4 +149,39 @@ assert.throws(
 assert.deepEqual(installCalls, ["append", "prepare", "abort"]);
 assert.equal(invalidInstallRuntime.packageInfo, null);
 
+// A schema-valid but binary-inconsistent manifest is rejected at the same
+// pre-initializer boundary, before it can configure host imports.
+const validManifest = JSON.parse(invalidManifestText);
+validManifest.exports[0].startup = false;
+const validManifestBytes = new TextEncoder().encode(
+  JSON.stringify(validManifest),
+);
+new Uint8Array(memory.buffer, manifestPtr, validManifestBytes.length).set(
+  validManifestBytes,
+);
+invalidInstallRuntime.exports.vir_package_interface_manifest_size = () =>
+  prepared ? validManifestBytes.length : 0;
+invalidInstallRuntime.exports.vir_validate_package_contract = () => {
+  installCalls.push("validate contract");
+  return 0;
+};
+invalidInstallRuntime.lastPackageError = () => "test contract mismatch";
+invalidInstallRuntime.hostState = {
+  setManifest: (manifest) => {
+    if (manifest !== null) installCalls.push("install host");
+  },
+};
+installCalls.length = 0;
+assert.throws(
+  () => invalidInstallRuntime.installIrPackageSetBytes([Uint8Array.of(1)]),
+  /test contract mismatch/,
+);
+assert.deepEqual(installCalls, [
+  "append",
+  "prepare",
+  "validate contract",
+  "abort",
+]);
+assert.equal(invalidInstallRuntime.packageInfo, null);
+
 console.log("vir startup hook runtime smoke ok");

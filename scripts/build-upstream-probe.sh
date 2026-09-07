@@ -543,6 +543,7 @@ exports=(
   -Wl,--export=vir_begin_ir_package_set
   -Wl,--export=vir_append_ir_package
   -Wl,--export=vir_prepare_ir_package_set
+  -Wl,--export=vir_validate_package_contract
   -Wl,--export=vir_finish_ir_package_set
   -Wl,--export=vir_abort_ir_package_set
   -Wl,--export=vir_last_package_error

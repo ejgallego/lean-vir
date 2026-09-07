@@ -566,7 +566,7 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
     if (manifest_checksum(out.interface_manifest) != expected_manifest_checksum) {
-        error = "IR package interface manifest checksum does not match its binary contract";
+        error = "IR package interface manifest checksum mismatch";
         return false;
     }
 

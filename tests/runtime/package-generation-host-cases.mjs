@@ -66,16 +66,71 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     () =>
       hostFactory.createRuntime({
         irPackageSet: [
-          replaceIrPackageManifest(hostPackageBytes, mismatchedHostManifest, {
-            bindContract: false,
-          }),
+          replaceIrPackageManifest(hostPackageBytes, mismatchedHostManifest),
         ],
       }),
-    /interface manifest checksum does not match its binary contract/,
+    /manifest\/binary contract mismatch:.*host.*target/,
   );
   const hostRuntime = await hostFactory.createRuntime({
     irPackageSet: [hostPackageBytes],
   });
+  for (const [field, mutate] of [
+    ["count", (m) => m.hostImports.pop()],
+    [
+      "name",
+      (m) => {
+        m.hostImports[0].name += ".mismatch";
+      },
+    ],
+    [
+      "symbol",
+      (m) => {
+        m.hostImports[0].symbol += "_mismatch";
+      },
+    ],
+    [
+      "arity",
+      (m) => {
+        const entry = m.hostImports[0];
+        entry.arity += 1;
+        entry.args.push({
+          name: "extra",
+          type: { type: "Nat", interfaceTag: 0 },
+        });
+      },
+    ],
+    [
+      "erased prefix arguments",
+      (m) => {
+        const entry = m.hostImports.find((entry) => entry.args.length > 0);
+        entry.erasedPrefixArgs += 1;
+        entry.args.pop();
+      },
+    ],
+    [
+      "effect",
+      (m) => {
+        const entry = m.hostImports[0];
+        entry.effect = "pure";
+        entry.args.push({
+          name: "world",
+          type: { type: "Nat", interfaceTag: 0 },
+        });
+      },
+    ],
+  ]) {
+    const manifest = structuredClone(
+      readIrPackageInfo(hostPackageBytes).manifest,
+    );
+    mutate(manifest);
+    assert.throws(
+      () =>
+        hostRuntime.loadIrPackageSetBytes([
+          replaceIrPackageManifest(hostPackageBytes, manifest),
+        ]),
+      new RegExp(`manifest/binary contract mismatch:.*host.*${field}`),
+    );
+  }
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
     hostRuntime.interfaceManifest.exports.find(

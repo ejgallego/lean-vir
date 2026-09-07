@@ -175,8 +175,9 @@ module instead of the checkout-local generated driver path, so otherwise
 identical module sets are byte-for-byte reproducible across build directories.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all
-members, verifies each manifest's format-11 contract checksum and schema, then
-runs initializer globals in that module order. Duplicate declaration,
+members, verifies each manifest's format-11 corruption checksum and schema,
+checks the root manifest against the aggregate binary export/host-import tables,
+then runs initializer globals in that module order. Duplicate declaration,
 initializer, host-import, or export-summary identities fail the candidate load.
 
 Packaging is rooted in `@[vir_export]`, `@[vir_startup]`, or explicitly

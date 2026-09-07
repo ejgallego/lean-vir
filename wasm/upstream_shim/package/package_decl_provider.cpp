@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 #include "decl_provider.h"
 #include "interpreter/interpreter_bridge.h"
+#include "package_binary_reader.h"
 #include "package_decl_provider_types.h"
 
 #include <stddef.h>
@@ -15,6 +16,7 @@ Author: Emilio J. Gallego Arias
 #include <utility>
 #include <vector>
 
+#include "runtime/utf8.h"
 #include "util/name.h"
 #include "util/name_hash_map.h"
 
@@ -24,6 +26,9 @@ extern "C" lean::object * lean_run_init(
     lean::object * decl,
     lean::object * init_decl,
     lean::object * world);
+
+extern "C" uint8_t l_Lean_isIdFirst(uint32_t c);
+extern "C" uint8_t l_Lean_isIdRest(uint32_t c);
 
 namespace lean::vir {
 namespace {
@@ -87,6 +92,60 @@ static void clear_loaded_package_state() {
 static std::string lean_name_string(object * value) {
     name n(value, true);
     return n.to_string();
+}
+
+static std::string manifest_name_part(std::string const & part, bool escape) {
+    if (!escape || part.find("»") != std::string::npos) {
+        return part;
+    }
+    size_t offset = 0;
+    bool identifier = !part.empty() && l_Lean_isIdFirst(next_utf8(part, offset));
+    while (identifier && offset < part.size()) {
+        identifier = l_Lean_isIdRest(next_utf8(part, offset));
+    }
+    return identifier ? part : "«" + part + "»";
+}
+
+static std::string manifest_name_string(object * value) {
+    // Mirror the pinned Init/Data/ToString/Name.lean printer over structural
+    // Names, using Lean's compiled character predicates (no module initializer
+    // is needed). C++ name::escape differs for Unicode and internal names;
+    // linking the full Lean printer would also retain its module initializers.
+    std::vector<name> parts;
+    for (name n(value, true); n; n = n.get_prefix()) {
+        parts.push_back(n);
+    }
+    if (parts.empty()) {
+        return "[anonymous]";
+    }
+    bool escape = true;
+    // isInaccessibleUserName and hasMacroScopes both inspect the last string
+    // component, skipping only trailing numeral components.
+    for (name const & part : parts) {
+        if (part.is_string()) {
+            std::string text = part.get_string().to_std_string();
+            escape = text != "_hyg" && text != "_inaccessible" &&
+                text.find("✝") == std::string::npos;
+            break;
+        }
+    }
+    name const & root = parts.back();
+    if (root.is_string()) {
+        std::string text = root.get_string().to_std_string();
+        if (!text.empty() && (text[0] == '#' || text[0] == '?')) {
+            escape = false;
+        }
+    }
+    std::string result;
+    for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+        if (it != parts.rbegin()) {
+            result += '.';
+        }
+        result += it->is_string()
+            ? manifest_name_part(it->get_string().to_std_string(), escape)
+            : it->get_numeral().to_std_string();
+    }
+    return result;
 }
 
 static bool build_decl_indices() {
@@ -360,6 +419,77 @@ bool finish_package_set() {
         return false;
     }
     g_package_ready = true;
+    return true;
+}
+
+bool validate_package_contract(uint8_t const * data, size_t size) {
+    g_last_error.clear();
+    if (!g_package_set_prepared && !g_package_ready) {
+        g_last_error = "IR package set is not prepared";
+        return false;
+    }
+    if (data == nullptr && size != 0) {
+        g_last_error = "IR package contract pointer is null";
+        return false;
+    }
+    package_binary_reader r(data, size);
+    auto matches = [&](bool equal, std::string const & field) {
+        if (!r.ok) {
+            g_last_error = "invalid IR package contract: " + r.error();
+            return false;
+        }
+        if (!equal) {
+            g_last_error = "IR package manifest/binary contract mismatch: " + field;
+            return false;
+        }
+        return true;
+    };
+
+    uint32_t export_count = r.u32();
+    if (!matches(export_count == g_export_summaries.size(), "export count")) {
+        return false;
+    }
+    for (uint32_t i = 0; i < export_count; ++i) {
+        export_call_summary_entry const & actual = g_export_summaries[i];
+        std::string field = "export " + std::to_string(i) + " ";
+        std::string entry = r.string();
+        uint32_t arg_count = r.u32();
+        bool is_io = r.boolean();
+        bool boxed = r.boolean();
+        if (!matches(entry == manifest_name_string(actual.name), field + "entry") ||
+            !matches(arg_count == actual.arg_count, field + "argument count") ||
+            !matches(is_io == actual.is_io, field + "effect") ||
+            !matches(boxed == actual.needs_boxed_wasm32_boundary, field + "boxed boundary")) {
+            return false;
+        }
+    }
+
+    uint32_t host_count = r.u32();
+    if (!matches(host_count == g_host_imports.size(), "host import count")) {
+        return false;
+    }
+    for (uint32_t i = 0; i < host_count; ++i) {
+        host_import_entry const & actual = g_host_imports[i];
+        std::string field = "host import " + std::to_string(i) + " ";
+        std::string name = r.string();
+        std::string target = r.string();
+        std::string symbol = r.string();
+        uint32_t arity = r.u32();
+        uint32_t erased_prefix_args = r.u32();
+        bool is_io = r.boolean();
+        if (!matches(name == manifest_name_string(actual.name), field + "name") ||
+            !matches(target == actual.target, field + "target") ||
+            !matches(symbol == actual.symbol, field + "symbol") ||
+            !matches(arity == actual.arity, field + "arity") ||
+            !matches(erased_prefix_args == actual.erased_prefix_args, field + "erased prefix arguments") ||
+            !matches(is_io == actual.is_io, field + "effect")) {
+            return false;
+        }
+    }
+    if (!r.at_end()) {
+        g_last_error = "invalid IR package contract: trailing bytes";
+        return false;
+    }
     return true;
 }
 

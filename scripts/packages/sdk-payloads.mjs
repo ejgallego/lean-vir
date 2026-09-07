@@ -17,6 +17,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/callbacks.js", "web/src/runtime/callbacks.js"],
   ["js/runtime/cleanup.js", "web/src/runtime/cleanup.js"],
   ["js/runtime/core.js", "web/src/runtime/core.js"],
+  ["js/runtime/package-contract.js", "web/src/runtime/package-contract.js"],
   ["js/runtime/object-values.js", "web/src/runtime/object-values.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
   ["js/runtime/host-state.js", "web/src/runtime/host-state.js"],
