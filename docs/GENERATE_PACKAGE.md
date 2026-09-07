@@ -17,6 +17,9 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `scripts/packages/lean-to-irpkg.mjs`,
   `scripts/packages/generate-browser-package.mjs`, and the fixture runner.
 
+The generator requires explicit targets; it has no built-in demo selection.
+The browser catalog owns demo roots and package composition.
+
 Targets separate input identity from four selection modes. Compiled-module
 inputs are built by Lake before invoking the generator:
 
@@ -68,7 +71,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.Interface.Model`: package-independent interface types, effects, runtime
   field layouts, host boundary kinds, and their user-facing labels.
 - `Vir.GeneratePackage.Basic`: package targets, collected declarations,
-  manifests, package ABI limits, and default browser targets.
+  manifests and package ABI limits.
 - `Vir.GeneratePackage.PackageFormat`: package magic, package section kinds,
   and current package/interface-manifest version constants used by generated
   bytes and metadata.

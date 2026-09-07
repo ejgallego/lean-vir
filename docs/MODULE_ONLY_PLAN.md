@@ -58,8 +58,14 @@ A shared pure normalizer owns validation, selection and
 output defaults; Lake builds the selected modules and supplies their search
 path. Fib, Quickstart and MergeSort are registered as example modules. Runtime
 source-fixture helpers temporarily call the low-level generator directly rather
-than depending on the removed public source-path CLI. Browser package assembly,
-generated test modules and external/type-anchor adapters are still pending.
+than depending on the removed public source-path CLI.
+
+Browser package assembly now plans explicit module inputs from the version-2
+catalog, retaining source paths only for fixture coverage and navigation.
+Root unions and package-only selections share a pure planner. Browser fixtures
+are registered modules with public interface declarations; hardcoded demo
+`defaultTargets` have been removed from the Lean library. Generated test modules
+and external/type-anchor adapters are still pending.
 
 ## Design Decisions
 
@@ -99,7 +105,7 @@ survive the completed migration merely to preserve old CLI spellings.
 | --- | --- | --- |
 | Local CLI/config (migrated) | `scripts/packages/lean-to-irpkg.mjs`, `prepare-irpkg.mjs`, example `.virpkg.json` files | Module names and version-2 configs; omitted-roots all-public behavior, explicit roots, and output/report defaults preserved. |
 | Generator preparation | `scripts/packages/irpkg-generator.mjs` | Build actual input modules and supply their project search environment, not only the VIR generator and optional prerequisites. |
-| Browser package assembly | `generate-browser-package.mjs`, `fixtures/browser-packages.json`, `defaultTargets` | Preserve multi-input root unions, deduplication, and the distinction between exports and package-only roots. |
+| Browser package assembly (migrated) | `generate-browser-package.mjs`, `fixtures/browser-packages.json` | Explicit modules preserve multi-input root unions and package-only roots; implicit Lean demo defaults removed. |
 | Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
 | Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
 | External package producers | `scripts/packages/lean-zip/`, `scripts/packages/illuminate/`, `benchmarks/browser/scripts/build-artifacts.mjs` | Resolve/build workload modules in their owning project environment. Preserve registries and artifact provenance; do not repin downstream projects as part of this plan. |
@@ -131,7 +137,8 @@ production input systems.
    imply a universal change to output partitioning.
 
    - [x] Migrate public npm CLI/configs and register their example modules.
-   - [ ] Migrate browser package assembly and remaining source fixtures.
+   - [x] Migrate browser package assembly and authored browser fixture modules.
+   - [ ] Migrate generated/runtime fixture inputs and remaining adapters.
 4. [ ] Migrate test generation and host oracles through a shared module-project
    helper. Keep tests intended to fail Lean elaboration separate from tests
    intended to fail VIR package validation. Preserve the oracle's

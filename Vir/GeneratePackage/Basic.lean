@@ -211,29 +211,4 @@ structure InterfaceManifest where
   hostImports : Array HostImport := #[]
   diagnostics : Array PackageDiagnostic := #[]
 
-def defaultTargets : Array Target := #[
-  {
-    origin := .source "examples/Fib.lean",
-    mode := .explicit #[`fib]
-  },
-  {
-    origin := .source "examples/Tamagotchi.lean",
-    mode := .explicit #[
-      `Tamagotchi.step
-    ]
-  },
-  {
-    origin := .source "examples/Tamagotchi.lean",
-    mode := .packageOnly #[
-      `Tamagotchi.run,
-      `Tamagotchi.trace,
-      `Tamagotchi.demoScript
-    ]
-  },
-  {
-    origin := .source "examples/MergeSort.lean",
-    mode := .explicit #[`SortDemo.demo, `SortDemo.demoFromArray]
-  }
-]
-
 end Vir.GeneratePackage

@@ -6,12 +6,19 @@ Author: Emilio J. Gallego Arias
 
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 
-import { fixtureRoots, validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
+import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
 import { repositoryRootUrl } from "../repository-paths.mjs";
-import { packageSpecs, validateFixturePackageCoverage } from "./browser-package-config.mjs";
+import {
+  packageSpecs,
+  validateFixturePackageCoverage,
+} from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
 import { runSync } from "../process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "../timing-utils.mjs";
+import {
+  planBrowserPackage,
+  selectBrowserPackages,
+} from "./browser-package-plan.mjs";
 
 const root = repositoryRootUrl;
 const manifestPath = new URL("fixtures/manifest.json", repositoryRootUrl);
@@ -52,22 +59,6 @@ function parseArgs(argv) {
   return { packages, copyPublic };
 }
 
-function addTarget(targets, source, roots) {
-  const existing = targets.get(source) ?? [];
-  targets.set(source, [...existing, ...roots]);
-}
-
-function targetArgsFor(targets, packageTargets) {
-  const targetArgs = [];
-  for (const [source, roots] of targets) {
-    targetArgs.push("--target", source, ...new Set(roots));
-  }
-  for (const [source, roots] of packageTargets) {
-    targetArgs.push("--package-target", source, ...new Set(roots));
-  }
-  return targetArgs;
-}
-
 function packagePathFor(spec) {
   return `build/generated/${spec.file}`;
 }
@@ -76,56 +67,45 @@ function publicPackagePathFor(spec) {
   return `web/public/${spec.file}`;
 }
 
-function targetsForSpec(spec, fixtures) {
-  const targets = new Map();
-  const packageTargets = new Map();
-  const fixtureSources = new Set(spec.fixtureSources ?? []);
-
-  for (const target of spec.targets ?? []) {
-    addTarget(target.packageOnly ? packageTargets : targets, target.source, target.roots ?? []);
-  }
-
-  for (const fixture of fixtures) {
-    if (fixtureSources.has(fixture.source)) {
-      addTarget(targets, fixture.source, fixtureRoots(fixture));
-    }
-  }
-
-  return { targets, packageTargets };
-}
-
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const manifestFixtures = validateFixturePackageCoverage(validateFixtureManifest(manifest));
-const selectedPackageSpecs = args.packages.size === 0
-  ? packageSpecs
-  : packageSpecs.filter((spec) => args.packages.has(spec.id) || args.packages.has(spec.file));
-
-if (selectedPackageSpecs.length !== (args.packages.size === 0 ? packageSpecs.length : args.packages.size)) {
-  const available = packageSpecs.map((spec) => `${spec.id} (${spec.file})`).join(", ");
-  throw new Error(`unknown package filter; available packages: ${available}`);
-}
+const manifestFixtures = validateFixturePackageCoverage(
+  validateFixtureManifest(manifest),
+);
+const plans = selectBrowserPackages(packageSpecs, args.packages).map(
+  (spec) => ({
+    spec,
+    ...planBrowserPackage(spec, manifestFixtures),
+  }),
+);
 
 const lakeTargets = [
-  ...new Set(selectedPackageSpecs.flatMap((spec) => spec.lakeTargets ?? [])),
+  ...new Set(
+    plans.flatMap(({ spec, modules }) => [
+      ...(spec.lakeTargets ?? []),
+      ...modules.map((module) => `+${module}`),
+    ]),
+  ),
 ];
 const generator = prepareVirIrpkgSync(root, { lakeTargets });
 if (!generator.ok) {
   process.exit(generator.status);
 }
 
-await mkdir(new URL("build/generated/", repositoryRootUrl), { recursive: true });
+await mkdir(new URL("build/generated/", repositoryRootUrl), {
+  recursive: true,
+});
 if (args.copyPublic) {
   await mkdir(new URL("web/public/", repositoryRootUrl), { recursive: true });
 }
 
 const packageTimings = [];
-for (const spec of selectedPackageSpecs) {
-  const { targets, packageTargets } = targetsForSpec(spec, manifestFixtures);
+for (const { spec, targetArgs } of plans) {
   const packagePath = packagePathFor(spec);
-  const reportPath = spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
+  const reportPath =
+    spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
   const packageStart = timerStart();
   try {
-    runSync(generator.path, [packagePath, reportPath, ...targetArgsFor(targets, packageTargets)], {
+    runSync(generator.path, [packagePath, reportPath, ...targetArgs], {
       cwd: root,
       env: generator.env,
     });
@@ -137,17 +117,23 @@ for (const spec of selectedPackageSpecs) {
     seconds: elapsedSeconds(packageStart),
   });
   if (args.copyPublic) {
-    await copyFile(new URL(packagePath, repositoryRootUrl), new URL(publicPackagePathFor(spec), repositoryRootUrl));
+    await copyFile(
+      new URL(packagePath, repositoryRootUrl),
+      new URL(publicPackagePathFor(spec), repositoryRootUrl),
+    );
   }
 }
 
-const packagesSeconds = packageTimings.reduce((sum, timing) => sum + timing.seconds, 0);
+const packagesSeconds = packageTimings.reduce(
+  (sum, timing) => sum + timing.seconds,
+  0,
+);
 const packageSummary = packageTimings
   .map((timing) => `${timing.id}=${formatSeconds(timing.seconds)}s`)
   .join(", ");
 console.log(
-  `browser package timing: lean-lib=${formatSeconds(generator.libSeconds)}s `
-  + `generator=${formatSeconds(generator.generatorSeconds)}s packages=${formatSeconds(packagesSeconds)}s `
-  + `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+  `browser package timing: lean-lib=${formatSeconds(generator.libSeconds)}s ` +
+    `generator=${formatSeconds(generator.generatorSeconds)}s packages=${formatSeconds(packagesSeconds)}s ` +
+    `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
 );
 console.log(`browser package files: ${packageSummary}`);

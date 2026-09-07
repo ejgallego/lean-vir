@@ -128,6 +128,7 @@ try {
   }
 
   for (const args of [
+    [],
     ["--target-module", moduleName],
     ["--package-module", moduleName],
     ["--target-marked-module"],

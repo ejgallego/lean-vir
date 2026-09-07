@@ -271,6 +271,10 @@ changes; `package.json` remains the exact command-order source of truth.
   `npm run test:runtime -- module-input`
 - Module-based npm CLI/config validation, selected-module builds and output:
   `npm run test:packages:unit` and `npm run test:runtime -- module-cli`
+- Browser module catalog, fixture-root unions or package-only selection:
+  `npm run test:packages:unit`, `npm run check:package`, then runtime/browser
+  checks against refreshed packages. Fixture module migration also requires
+  the native/Wasm oracle suite.
 - Lake module/package facets, downstream bundle input tracing and output
   ownership, marked-module selection, or SDK installer changes:
   `npm run test:lake`

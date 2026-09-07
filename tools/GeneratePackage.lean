@@ -84,8 +84,9 @@ def parseTargets (args : List String) : Except String (Array Vir.GeneratePackage
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
-  | [packagePath, reportPath] =>
-      Vir.GeneratePackage.run Vir.GeneratePackage.defaultTargets packagePath reportPath
+  | [_, _] =>
+      IO.eprintln "at least one explicit package target is required"
+      return 2
   | packagePath :: reportPath :: targetArgs =>
       match targetArgs with
       | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::

@@ -15,7 +15,7 @@ import {
 } from "../../web/app/pages/browser-package-config.js";
 
 function packageSpec(id, overrides = {}) {
-  return { id, file: `${id}.irpkg`, fixtureSources: [], ...overrides };
+  return { id, file: `${id}.irpkg`, fixtureInputs: [], ...overrides };
 }
 
 function browserConfig(overrides = {}) {
@@ -24,7 +24,9 @@ function browserConfig(overrides = {}) {
     defaultPackage: "fixtures-basic",
     hostPackage: "demo-host",
     packages: [
-      packageSpec("fixtures-basic", { fixtureSources: ["fixtures/Basic.lean"] }),
+      packageSpec("fixtures-basic", {
+        fixtureInputs: [{ source: "fixtures/Basic.lean", module: "Fixture.Basic" }],
+      }),
       packageSpec("demo-host"),
       packageSpec("pretty-printer"),
       packageSpec("fixtures-lean"),
@@ -44,7 +46,7 @@ test("checked-in fixture sources have exactly one browser package", async () => 
   const fixtures = validateFixtureManifest(JSON.parse(rawFixtureManifest));
   const sources = new Set(fixtures.map((fixture) => fixture.source));
 
-  assert.equal(browserPackageConfigVersion, 1);
+  assert.equal(browserPackageConfigVersion, 2);
   assert.equal(config.validateFixturePackageCoverage(fixtures), fixtures);
   for (const source of sources) {
     assert.match(config.packageFileForFixtureSource(source), /\.irpkg$/);
@@ -56,8 +58,8 @@ test("browser package configs reject malformed containers and versions", () => {
     assert.throws(() => deriveBrowserPackageConfig(config), /browser package config must be an object/);
   }
   assert.throws(
-    () => deriveBrowserPackageConfig(browserConfig({ version: 2 })),
-    /browser package config version must be 1, got 2/,
+    () => deriveBrowserPackageConfig(browserConfig({ version: 1 })),
+    /browser package config version must be 2, got 1/,
   );
   assert.throws(
     () => deriveBrowserPackageConfig(browserConfig({ typo: true })),
@@ -117,7 +119,7 @@ test("fixture source package assignments are unique and total", () => {
   assert.throws(
     () => deriveBrowserPackageConfig(browserConfig({
       packages: packages.map((spec) => spec.id === "fixtures-lean"
-        ? { ...spec, fixtureSources: ["fixtures/Basic.lean"] }
+        ? { ...spec, fixtureInputs: [{ source: "fixtures/Basic.lean", module: "Fixture.Basic" }] }
         : spec),
     })),
     /fixtures\/Basic\.lean: fixture source is assigned to both fixtures-basic\.irpkg and fixtures-lean\.irpkg/,
@@ -150,10 +152,10 @@ test("browser package entries reject unknown and malformed fields", () => {
   assert.throws(
     () => deriveBrowserPackageConfig(browserConfig({
       packages: packages.map((spec) => spec.id === "fixtures-basic"
-        ? { ...spec, fixtureSources: "fixtures/Basic.lean" }
+        ? { ...spec, fixtureInputs: "fixtures/Basic.lean" }
         : spec),
     })),
-    /fixtures-basic: fixtureSources must be an array/,
+    /fixtures-basic: fixtureInputs must be an array/,
   );
   assert.throws(
     () => deriveBrowserPackageConfig(browserConfig({
@@ -188,30 +190,130 @@ test("browser package targets validate their complete nested contract", () => {
     /fixtures-basic: targets must be an array/,
   );
   assert.doesNotThrow(() => deriveBrowserPackageConfig(configWithTarget({
-    source: "examples/Fib.lean",
+    module: "Fib",
     roots: ["fib"],
     packageOnly: false,
   })));
   assert.throws(
-    () => deriveBrowserPackageConfig(configWithTarget({ source: "examples/Fib.lean", root: "fib" })),
+    () => deriveBrowserPackageConfig(configWithTarget({ module: "Fib", root: "fib" })),
     /fixtures-basic: target at index 0: unknown field root/,
   );
   assert.throws(
-    () => deriveBrowserPackageConfig(configWithTarget({ source: "", roots: [] })),
-    /target at index 0 source must be a non-empty string/,
+    () => deriveBrowserPackageConfig(configWithTarget({ module: "", roots: ["fib"] })),
+    /target at index 0.module must be a non-empty module identity/,
   );
   assert.throws(
     () => deriveBrowserPackageConfig(configWithTarget({
-      source: "examples/Fib.lean",
+      module: "Fib",
       roots: "fib",
     })),
-    /target at index 0 roots must be an array/,
+    /target at index 0 roots must be a non-empty array/,
   );
   assert.throws(
     () => deriveBrowserPackageConfig(configWithTarget({
-      source: "examples/Fib.lean",
+      module: "Fib",
+      roots: ["fib"],
       packageOnly: "yes",
     })),
     /target at index 0 packageOnly must be a boolean/,
   );
+});
+
+test("module targets reject source aliases, empty selections, and option-shaped names", () => {
+  function withTarget(target) {
+    const config = browserConfig();
+    config.packages[0].targets = [target];
+    return config;
+  }
+  for (const target of [null, [], "Fib"]) {
+    assert.throws(() => deriveBrowserPackageConfig(withTarget(target)), /must be an object/);
+  }
+  assert.throws(
+    () => deriveBrowserPackageConfig(withTarget({ source: "examples/Fib.lean", roots: ["fib"] })),
+    /unknown field source/,
+  );
+  for (const roots of [undefined, null, [], "fib"]) {
+    assert.throws(
+      () => deriveBrowserPackageConfig(withTarget({ module: "Fib", roots })),
+      /roots must be a non-empty array/,
+    );
+  }
+  for (const name of [undefined, null, 42, "", " ", " Fib", "Fib\n", "--target-all-module"]) {
+    assert.throws(
+      () => deriveBrowserPackageConfig(withTarget({ module: name, roots: ["fib"] })),
+      /module identity|must not be an option/,
+    );
+    assert.throws(
+      () => deriveBrowserPackageConfig(withTarget({ module: "Fib", roots: [name] })),
+      /module identity|must not be an option/,
+    );
+  }
+  assert.doesNotThrow(() => deriveBrowserPackageConfig(withTarget({
+    module: "Demo.«Escaped module»",
+    roots: ["Demo.«Escaped root»"],
+    packageOnly: true,
+  })));
+});
+
+test("fixture inputs carry explicit module identities independent of source paths", () => {
+  function withInputs(fixtureInputs) {
+    const config = browserConfig();
+    config.packages[0].fixtureInputs = fixtureInputs;
+    return config;
+  }
+  const config = deriveBrowserPackageConfig(withInputs([
+    { source: "fixtures/Basic.lean", module: "Registered.«Different module»" },
+  ]));
+  assert.equal(config.packageFileForFixtureSource("fixtures/Basic.lean"), "fixtures-basic.irpkg");
+
+  for (const input of [null, [], "fixtures/Basic.lean"]) {
+    assert.throws(() => deriveBrowserPackageConfig(withInputs([input])), /must be an object/);
+  }
+  assert.throws(
+    () => deriveBrowserPackageConfig(withInputs([{ source: "fixtures/Basic.lean" }])),
+    /module must be a non-empty module identity/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(withInputs([{ module: "Fixture.Basic" }])),
+    /source must be a non-empty string/,
+  );
+  assert.throws(
+    () => deriveBrowserPackageConfig(withInputs([
+      { source: "fixtures/Basic.lean", module: "Fixture.Basic", roots: ["fib"] },
+    ])),
+    /unknown field roots/,
+  );
+  for (const module of ["--target-module", " Module", "Module\u0000"]) {
+    assert.throws(
+      () => deriveBrowserPackageConfig(withInputs([{ source: "fixtures/Basic.lean", module }])),
+      /module identity|must not be an option/,
+    );
+  }
+  const duplicate = { source: "fixtures/Basic.lean", module: "Fixture.Basic" };
+  assert.throws(
+    () => deriveBrowserPackageConfig(withInputs([duplicate, duplicate])),
+    /fixture source is assigned to both/,
+  );
+  const sharedModule = browserConfig();
+  sharedModule.packages[1].fixtureInputs = [
+    { source: "elsewhere/Basic.lean", module: "Fixture.Basic" },
+  ];
+  assert.throws(
+    () => deriveBrowserPackageConfig(sharedModule),
+    /Fixture.Basic: fixture module is assigned to both fixtures\/Basic.lean and elsewhere\/Basic.lean/,
+  );
+});
+
+test("package config rejects obsolete fixture aliases and malformed build prerequisites", () => {
+  const obsolete = browserConfig();
+  obsolete.packages[0].fixtureSources = ["fixtures/Basic.lean"];
+  assert.throws(() => deriveBrowserPackageConfig(obsolete), /unknown field fixtureSources/);
+  for (const lakeTargets of [null, "Vir", [""]]) {
+    const config = browserConfig();
+    config.packages[0].lakeTargets = lakeTargets;
+    assert.throws(() => deriveBrowserPackageConfig(config), /lakeTargets/);
+  }
+  const config = browserConfig();
+  config.packages[0].lakeTargets = ["Vir", "+Vir.Examples.Style:vir"];
+  assert.doesNotThrow(() => deriveBrowserPackageConfig(config));
 });
