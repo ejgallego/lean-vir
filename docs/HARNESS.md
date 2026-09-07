@@ -341,8 +341,19 @@ Runtime smoke tests are split into two groups:
 The runtime runner executes pure tests in parallel, but serializes Lean-group
 tests to avoid concurrent writes to shared Lean build outputs on cold CI
 checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
-per test process. Source-fixture helpers reuse the prepared low-level generator;
-the public npm CLI always builds its selected modules through Lake's cache.
+per test process. Migrated runtime fixtures use the shared temporary Lake-project
+helper in `tests/support/module-project.mjs`; remaining source-fixture tests
+still reuse the prepared low-level generator. The public npm CLI always builds
+its selected modules through Lake's cache.
+
+The test module-project helper accepts explicit simple module names and source
+text without rewriting headers or visibility. It pins the repository toolchain
+and local dependency; callers own scratch-directory cleanup. Always pair its
+`env()` result with its `directory` as cwd. Build only the intended module roots
+and check compilation before asserting package diagnostics. Do not combine
+independent negative fixtures into an umbrella import. Validate helper changes
+with `npm run test:fixtures:unit`, `npm run test:runtime -- module-project
+package-generation`, and the fixture oracle suite.
 
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.
@@ -350,8 +361,11 @@ the public npm CLI always builds its selected modules through Lake's cache.
 The local package-generation helper, browser package generator, and fixture
 runner use the `vir_irpkg` Lake executable instead of repeatedly starting
 `lean --run tools/GeneratePackage.lean`. The fixture runner builds that
-executable once, then reuses it for per-fixture packages while continuing to
-run the host oracle for every fixture.
+executable and selected fixture modules before parallel execution. It reuses
+them for per-fixture packages and runs a host driver for every fixture. Drivers
+import compiled runtime bodies (`import all`) instead of copying source text;
+they retain `interpreter.prefer_native false` and unsafe-entry handling. Thus
+`--no-build` skips the demo/Wasm build, not the selected Lean module builds.
 
 The build and test entry points print compact timing summaries that are useful
 when comparing CI runs:

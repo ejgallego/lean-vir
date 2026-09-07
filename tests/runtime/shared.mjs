@@ -22,6 +22,7 @@ import {
   prepareVirIrpkgSync,
 } from "../../scripts/packages/irpkg-generator.mjs";
 import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
+import { createTestModuleProject } from "../support/module-project.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceTypeDescriptor,
@@ -218,10 +219,19 @@ export function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function generateIrPackage(source, packagePath) {
-  // Temporary source fixture adapter; the public CLI now takes built modules.
+export async function generateIrPackage(module, source, packagePath) {
+  const generator = preparedVirIrpkg();
+  const project = await createTestModuleProject({
+    directory: `${packagePath}.modules`,
+    modules: { [module]: await readFile(source, "utf8") },
+  });
+  const built = project.build();
+  assert.equal(built.status, 0, `fixture compilation failed: ${built.error ?? ""}\n${built.stdout}\n${built.stderr}`);
   const reportPath = packagePath.replace(/\.irpkg$/, "") + ".report.md";
-  const generated = runVirIrpkg([packagePath, reportPath, "--target-all", source]);
+  const generated = spawnSync(generator.path,
+    [packagePath, reportPath, "--target-all-module", module], {
+      cwd: project.directory, env: project.env(), encoding: "utf8",
+    });
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   return generated;
 }

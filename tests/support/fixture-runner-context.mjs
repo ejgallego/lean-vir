@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { fixtureExpectation, fixtureRoots } from "../../fixtures/fixture-manifest.mjs";
@@ -14,35 +14,15 @@ import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import { classifyPackageFailure, packageDiagnostics } from "./fixture-diagnostics.mjs";
 import { evaluateFixtureRun } from "./fixture-result.mjs";
 
-export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator }) {
-  const sourceCache = new Map();
+export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator,
+  moduleBySource, hostProject, hostModuleById, hostEnv }) {
   let wasmBytesPromise = null;
 
-  async function fixtureSource(source) {
-    if (!sourceCache.has(source)) {
-      sourceCache.set(source, readFile(new URL(source, root), "utf8"));
-    }
-    return sourceCache.get(source);
-  }
-
   async function hostOracle(fixture) {
-    if (fixture.result?.type !== "Nat") {
-      throw new Error(`${fixture.id}: unsupported host result type ${fixture.result?.type}`);
-    }
-    const source = await fixtureSource(fixture.source);
-    const mainDecl = fixture.unsafe ? "unsafe def main : IO UInt32 := do" : "def main : IO UInt32 := do";
-    const hostSource = [
-      source,
-      "",
-      "set_option interpreter.prefer_native false",
-      mainDecl,
-      `  IO.println (toString ${fixture.entry})`,
-      "  return 0",
-      "",
-    ].join("\n");
-    const hostPath = new URL(`${fixture.id}.host.lean`, buildDir);
-    await writeFile(hostPath, hostSource);
-    const result = await runAsync("lean", ["--run", fileURLToPath(hostPath)], { cwd: root, capture: true });
+    const hostPath = hostProject.sourcePath(hostModuleById.get(fixture.id));
+    const result = await runAsync("lean", ["--run", hostPath], {
+      cwd: hostProject.directory, env: hostEnv, capture: true,
+    });
     requireSuccessfulProcess(result, `host oracle ${fixture.id}`);
     const lines = result.stdout.trim().split("\n").filter(Boolean);
     const value = lines.at(-1);
@@ -69,8 +49,8 @@ export function createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGene
     const args = [
       fileURLToPath(packagePath),
       fileURLToPath(reportPath),
-      "--target",
-      fixture.source,
+      "--target-module",
+      moduleBySource.get(fixture.source),
       ...fixtureRoots(fixture),
     ];
     const result = await runAsync(irpkgGenerator.path, args, {

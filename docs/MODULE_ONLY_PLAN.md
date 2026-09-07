@@ -56,16 +56,25 @@ mechanical source-origin constructor update; it still consumes `snap.env`.
 The public npm CLI and version-2 package configs now use explicit module names.
 A shared pure normalizer owns validation, selection and
 output defaults; Lake builds the selected modules and supplies their search
-path. Fib, Quickstart and MergeSort are registered as example modules. Runtime
-source-fixture helpers temporarily call the low-level generator directly rather
-than depending on the removed public source-path CLI.
+path. Fib, Quickstart and MergeSort are registered as example modules. Remaining
+runtime source-fixture helpers temporarily call the low-level generator
+directly rather than depending on the removed public source-path CLI.
 
 Browser package assembly now plans explicit module inputs from the version-2
 catalog, retaining source paths only for fixture coverage and navigation.
 Root unions and package-only selections share a pure planner. Browser fixtures
 are registered modules with public interface declarations; hardcoded demo
-`defaultTargets` have been removed from the Lean library. Generated test modules
-and external/type-anchor adapters are still pending.
+`defaultTargets` have been removed from the Lean library.
+
+The fixture runner now builds selected modules before parallel execution and
+generates packages by module identity. Its host drivers import compiled runtime
+IR using separate public and `import all` imports, preserving
+`interpreter.prefer_native false` and unsafe-entry handling without copying
+fixture bodies. One temporary Lake-project helper serves these drivers and the
+six all-public fresh runtime fixtures. It keeps each input separate, pins the
+dependency toolchain, and pairs Lake's search environment with its project cwd.
+Remaining direct-generator/negative tests and external/type-anchor adapters are
+still pending; their phase-specific coverage must survive migration.
 
 ## Design Decisions
 
@@ -144,6 +153,11 @@ production input systems.
    intended to fail VIR package validation. Preserve the oracle's
    `interpreter.prefer_native false` setting and unsafe-entry handling so the
    comparison does not silently switch execution modes.
+
+   - [x] Shared temporary Lake projects, authored fixture host/package inputs,
+     and six successful all-public runtime fixtures.
+   - [ ] Remaining direct-generator inputs, raw marker/extern bypasses, and
+     elaboration-negative tests (keep compilation and package rejection separate).
 5. [ ] Migrate infoview, type-anchor and external-producer adapters after
    coordinating the affected boundaries. Do not silently rebuild an external
    workload under VIR's unrelated project environment.

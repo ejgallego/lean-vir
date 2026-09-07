@@ -28,7 +28,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const freshPackage = join(freshDir, "fresh.irpkg");
   await writeRuntimeFixture(freshSource, "FreshUser.lean");
 
-  const generated = generateIrPackage(freshSource, freshPackage);
+  const generated = await generateIrPackage("FreshUser", freshSource, freshPackage);
   assert.match(generated.stdout, /\[all\]/);
 
   const freshRuntime = await factory.createRuntime({
@@ -45,7 +45,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
   assert.equal(freshManifest.metadata.targets.length, 1);
-  assert.equal(freshManifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshManifest.metadata.targets[0].module, "FreshUser");
+  assert.equal(freshManifest.metadata.targets[0].source, undefined);
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
   assert.ok(
@@ -106,7 +107,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     freshInspect.stderr || freshInspect.stdout,
   );
   const freshInfo = JSON.parse(freshInspect.stdout);
-  assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshInfo.manifest.metadata.targets[0].module, "FreshUser");
   assert.deepEqual(
     freshInfo.manifest.exports.map((entry) => entry.entry).sort(),
     freshEntries,
