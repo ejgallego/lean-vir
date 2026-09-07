@@ -235,6 +235,12 @@ assert.throws(
 );
 assert.equal(first.call("fib", 8), "21");
 
+const previousManifest = first.interfaceManifest;
+first.loadIrPackageSetBytes([defaultPackageBytes]);
+assert.notEqual(first.interfaceManifest, previousManifest);
+assert.ok(Object.isFrozen(first.interfaceManifest.exports[0].args[0].type));
+assert.equal(first.call("fib", 8), "21");
+
 first.dispose();
 second.dispose();
 badPackageRuntime.dispose();

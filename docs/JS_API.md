@@ -286,9 +286,11 @@ their cleanup hook runs once when the final runtime using the map is disposed.
 
 ## Calls And Manifest
 
-- `vir.interfaceManifest` is the embedded package manifest. Treat it and its
-  nested type descriptors as read-only after installation: the runtime caches
-  derived export, layout, and normalization plans for the loaded package.
+- `vir.interfaceManifest` is the embedded package manifest. The runtime freezes
+  this internally owned JSON tree, including nested type descriptors, on
+  installation so cached export, layout, and normalization plans cannot drift.
+  Use `structuredClone(vir.interfaceManifest)` for editable inspection data.
+  This does not freeze application values passed through host bindings.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, source targets, and resolved roots.
   Wall-clock generation time is intentionally confined to diagnostic reports.

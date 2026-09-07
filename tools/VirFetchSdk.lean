@@ -14,7 +14,7 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
-def sdkRuntimeAbiVersion : Nat := 1
+def sdkRuntimeAbiVersion : Nat := 2
 
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
@@ -222,11 +222,12 @@ def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO
 
 def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
   let files ← jsonField manifest "files" Json.getArr?
-  for file in files do
+  let entries ← files.mapM fun file => do
     let relPath ← jsonField file "path" Json.getStr?
     let expected ← jsonField file "sha256" Json.getStr?
-    let filePath := sdkDir / FilePath.mk relPath
-    let actual ← Vir.sha256File filePath
+    return (relPath, expected)
+  let hashes ← Vir.sha256Files (entries.map fun (relPath, _) => sdkDir / FilePath.mk relPath)
+  for ((relPath, expected), actual) in entries.zip hashes do
     if actual != expected then
       throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
 

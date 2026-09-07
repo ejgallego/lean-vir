@@ -39,10 +39,4 @@ def sha256Files (paths : Array System.FilePath) : IO (Array String) := do
     throw <| IO.userError "SHA-256 helper returned invalid batch output"
   return hashes
 
-def sha256File (path : System.FilePath) : IO String := do
-  let hashes ← sha256Files #[path]
-  let some hash := hashes[0]?
-    | throw <| IO.userError "SHA-256 helper returned no digest"
-  return hash
-
 end Vir

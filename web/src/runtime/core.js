@@ -302,7 +302,7 @@ export class VirRuntime extends ObjectValueRuntime {
     } finally {
       this.freeBytes(ptr);
     }
-    return validated;
+    return freezeManifestTree(validated);
   }
 
   rebuildManifestExports() {
@@ -668,6 +668,19 @@ export class VirRuntime extends ObjectValueRuntime {
     this.hostState = null;
     this.exportsByName = Object.create(null);
   }
+}
+
+// Only called on the runtime's own parsed JSON, never caller-owned host values
+// or standalone validator inputs. Cached call/layout plans require stable data.
+function freezeManifestTree(manifest) {
+  const pending = [manifest];
+  while (pending.length !== 0) {
+    const value = pending.pop();
+    if (value === null || typeof value !== "object") continue;
+    Object.freeze(value);
+    for (const child of Object.values(value)) pending.push(child);
+  }
+  return manifest;
 }
 
 function registerManifestEntryKey(map, key, entry) {

@@ -277,6 +277,10 @@ metadata, not in generated `.irpkg` manifests. The same artifact metadata
 records the exact build-time React and ReactDOM versions required by the
 optional browser React host; these versions come from `package-lock.json`.
 
+Runtime ABI version 2 requires the manifest/binary contract validation entrypoint
+and exposes deeply frozen installed manifest metadata. SDK installers reject
+older ABI versions before replacing an installed SDK.
+
 After any version bump, run at least:
 
 ```bash

@@ -8,7 +8,7 @@ import { IR_PACKAGE_VERSION } from "../../web/src/runtime/ir-package.js";
 
 export const PACKAGE_FORMAT_VERSION = IR_PACKAGE_VERSION;
 export const INTERFACE_MANIFEST_VERSION = 8;
-export const RUNTIME_ABI_VERSION = 1;
+export const RUNTIME_ABI_VERSION = 2;
 
 export const PACKAGE_VERSIONS = {
   packageFormatVersion: PACKAGE_FORMAT_VERSION,

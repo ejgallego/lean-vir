@@ -604,6 +604,35 @@ assert.throws(
 const fibEntry = runtime.findManifestEntry("fib");
 assert.notEqual(fibEntry, null);
 assert.equal(runtime.call("fib", 12), "144");
+// Installed metadata is an owned, deeply frozen JSON tree. In particular,
+// mutating a descriptor after the first call cannot stale a cached call plan.
+for (const manifest of [
+  runtime.interfaceManifest,
+  hostRuntime.interfaceManifest,
+]) {
+  const pending = [manifest];
+  while (pending.length !== 0) {
+    const value = pending.pop();
+    if (value === null || typeof value !== "object") continue;
+    assert.ok(Object.isFrozen(value));
+    for (const child of Object.values(value)) pending.push(child);
+  }
+}
+assert.throws(() => {
+  fibEntry.args[0].type.interfaceTag = 1;
+}, TypeError);
+assert.throws(() => {
+  runtime.interfaceManifest.exports.reverse();
+}, TypeError);
+assert.throws(() => {
+  runtime.packageMetadata.targets[0].resolvedRoots.push("unknown");
+}, TypeError);
+assert.throws(() => {
+  hostRuntime.interfaceManifest.hostImports[0].target = "unknown";
+}, TypeError);
+assert.equal(runtime.call("fib", 12), "144");
+// Freezing metadata must not freeze the real objects passed through host calls.
+assert.equal(Object.isFrozen(testDocument), false);
 assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",
