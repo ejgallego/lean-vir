@@ -25,6 +25,7 @@ import {
   evaluate,
 } from "../browser/harness.mjs";
 import { prepareVirIrpkgSync } from "../../scripts/packages/irpkg-generator.mjs";
+import { describeError, withCleanup } from "./rpc-test-support.js";
 
 // Test-only transport. The official RpcSessions implementation lives in the
 // browser; vscode-jsonrpc owns framing and cancellation over the real Lean LSP.
@@ -46,16 +47,8 @@ const calls = [];
 const diagnostics = [];
 let stderr = "";
 let deadline;
-const timedOut = new Promise((_, reject) => {
-  deadline = setTimeout(
-    () => reject(new Error(`RPC browser acceptance timed out: ${stderr}`)),
-    120000,
-  );
-});
-// Attach a handler while synchronous artifact preparation runs.
-timedOut.catch(() => {});
 
-try {
+await withCleanup(async () => {
   const packagePath = join(temp, "rpc.irpkg");
   const generator = prepareVirIrpkgSync(root, { lakeTargets: ["VirInfoview"] });
   assert.equal(
@@ -79,8 +72,9 @@ try {
         "render",
       ].map((n) => `RpcReferenceWidget.${n}`),
     ],
-    { cwd: root, env: generator.env, encoding: "utf8" },
+    { cwd: root, env: generator.env, encoding: "utf8", timeout: 120000 },
   );
+  if (generated.error) throw generated.error;
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   const [irPackage, wasm, bundle] = await Promise.all([
     readFile(packagePath),
@@ -95,6 +89,15 @@ try {
       define: { "process.env.NODE_ENV": '"development"' },
     }),
   ]);
+  // Builds use their existing preparation policy. The acceptance deadline starts
+  // only once the package, Wasm and browser bundle are ready.
+  const timedOut = new Promise((_, reject) => {
+    deadline = setTimeout(
+      () => reject(new Error(`RPC browser acceptance timed out: ${stderr}`)),
+      120000,
+    );
+  });
+  void timedOut.catch(() => {});
   child = spawn("lake", ["serve", "--", "-DstderrAsMessages=false"], {
     cwd: root,
     stdio: ["pipe", "pipe", "pipe"],
@@ -255,39 +258,78 @@ try {
     JSON.stringify(diagnostics),
   );
   console.log("real infoview RPC browser acceptance ok", result.value);
-} finally {
-  clearTimeout(deadline);
-  for (const interval of keepalives.values()) clearInterval(interval);
-  for (const token of pending.values()) token.cancel();
-  for (const gate of gates.values()) gate.resolve();
-  cdp?.close();
-  await chrome?.close();
-  if (server) {
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
-  }
-  if (connection && child?.exitCode === null) {
-    try {
-      await connection.sendNotification("textDocument/didClose", {
-        textDocument: { uri },
-      });
-      await Promise.race([
-        connection.sendRequest("shutdown"),
-        new Promise((resolve) => setTimeout(resolve, 1000)),
-      ]);
-      await connection.sendNotification("exit");
-    } catch {
-      /* A failed server may already have closed its pipe. */
-    }
-  }
-  child?.stdin.end();
-  if (child && child.exitCode === null) {
-    await Promise.race([
-      new Promise((resolve) => child.once("exit", resolve)),
-      new Promise((resolve) => setTimeout(resolve, 2000)),
-    ]);
-    if (child.exitCode === null) child.kill("SIGTERM");
-  }
-  connection?.dispose();
-  await rm(temp, { recursive: true, force: true });
-}
+}, [
+  ["deadline", () => clearTimeout(deadline)],
+  [
+    "keepalives",
+    () => {
+      for (const interval of keepalives.values()) clearInterval(interval);
+    },
+  ],
+  [
+    "pending RPC",
+    () =>
+      withCleanup(
+        async () => {},
+        Array.from(pending.values(), (token) => [
+          "cancel",
+          () => token.cancel(),
+        ]),
+      ),
+  ],
+  [
+    "response gates",
+    () => {
+      for (const gate of gates.values()) gate.resolve();
+    },
+  ],
+  ["CDP", () => cdp?.close()],
+  ["Chromium", () => chrome?.close()],
+  [
+    "HTTP server",
+    async () => {
+      if (server) {
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+      }
+    },
+  ],
+  [
+    "Lean shutdown",
+    async () => {
+      if (connection && child?.exitCode === null && child.signalCode === null) {
+        try {
+          await connection.sendNotification("textDocument/didClose", {
+            textDocument: { uri },
+          });
+          await Promise.race([
+            connection.sendRequest("shutdown"),
+            new Promise((resolve) => setTimeout(resolve, 1000)),
+          ]);
+          await connection.sendNotification("exit");
+        } catch {
+          /* A failed server may already have closed its pipe. */
+        }
+      }
+    },
+  ],
+  ["Lean stdin", () => child?.stdin.end()],
+  [
+    "Lean process",
+    async () => {
+      if (child && child.exitCode === null && child.signalCode === null) {
+        await Promise.race([
+          new Promise((resolve) => child.once("exit", resolve)),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+        if (child.exitCode === null && child.signalCode === null)
+          child.kill("SIGTERM");
+      }
+    },
+  ],
+  ["LSP connection", () => connection?.dispose()],
+  ["temporary files", () => rm(temp, { recursive: true, force: true })],
+]).catch((error) => {
+  console.error(JSON.stringify(describeError(error), null, 2));
+  process.exitCode = 1;
+});

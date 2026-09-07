@@ -12,24 +12,61 @@ Its `create` method returns a message and a genuine `Server.WithRpcRef` object;
 `read` accepts that exact reference back. The cancellation-only query mode and
 goal-snapshot methods are acceptance fixtures, not library APIs.
 
-Given a loaded VIR runtime and the infoview's official `useRpcSession()` result:
+Given a loaded VIR runtime `runtime` (declared with `let`), a DOM `container`,
+and the infoview's official `useRpcSession()` result `session`:
 
 ```js
-const view = runtime.call("RpcReferenceWidget.View"); // Once per runtime.
+import * as React from "react";
+import { createRoot } from "react-dom/client";
+import { createVirRuntime } from "lean-vir";
+import { RpcReferenceWidget } from "./rpc-reference-widget.js";
+
+let root = createRoot(container);
+let view = runtime.call("RpcReferenceWidget.View"); // Once per runtime.
 const query = { message: "Hello from Lean", fail: false, waitForCancellation: false };
 root.render(React.createElement(RpcReferenceWidget, { runtime, view, session, query }));
 ```
 
-Import `RpcReferenceWidget` from the JavaScript file. Keep `view` and `query`
-stable across unrelated renders; changing the session or query starts a request.
-The component shows the previous response during refresh or failure and preserves
-its child's counter. It does not manufacture a placeholder RPC response.
+Keep `view` and `query` stable across unrelated renders. To update the query or
+position, render into the same root with the same `view`. Here `nextSession` is
+the official session at the new position (or `session` if the position is unchanged):
+
+```js
+const nextQuery = { ...query, message: "Updated query" };
+root.render(React.createElement(RpcReferenceWidget, {
+  runtime, view, session: nextSession, query: nextQuery,
+}));
+```
+
+This starts a request while preserving the child's counter. The component shows
+the previous response during refresh or failure; it does not manufacture a
+placeholder RPC response.
+
+Replacing the runtime starts a new component lifetime. From the owning code,
+outside React rendering, unmount synchronously before disposing the old runtime.
+Then create a fresh runtime, component and root. `replacementOptions` contains
+the new package and the usual browser React providers; see the
+[runtime setup](../../docs/JS_API.md).
+
+```js
+root.unmount(); // Synchronously runs effect cleanup and detaches Lean callbacks.
+runtime.dispose();
+runtime = await createVirRuntime(replacementOptions);
+view = runtime.call("RpcReferenceWidget.View");
+root = createRoot(container); // An unmounted root cannot be rendered again.
+root.render(React.createElement(RpcReferenceWidget, {
+  runtime, view, session: nextSession, query: nextQuery,
+}));
+```
+
+The new child's counter starts at zero. Do not pass the old `view` to the new
+runtime: its function closes over the disposed Lean runtime.
 
 Cancellation is best effort: a successful response may already be on its way.
 The effect's `active` flag therefore guards publication independently of aborting.
-React and the native Promise own this behavior; VIR adds no scheduler. Unmount
-the React root before disposing the runtime. Pending continuations here are
-native JavaScript functions and cannot reenter disposed Lean closures.
+React and the native Promise own this behavior; VIR adds no scheduler. Pending
+continuations here are native JavaScript functions and cannot reenter disposed
+Lean closures.
 
 Do not copy a reference token into a Lean record or JSON string. `Js Reply` and
 the nested `Js.Any` reference retain the exact graph registered by the official

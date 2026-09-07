@@ -11,6 +11,7 @@ import { RpcReferenceWidget } from "../../examples/tutorials/rpc-reference-widge
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
+import { describeError, until, withCleanup } from "./rpc-test-support.js";
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,20 +26,13 @@ async function post(path, body) {
   return value.result;
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(predicate) {
-  for (let i = 0; i < 2000; i++) {
-    if (await predicate()) return;
-    await sleep(10);
-  }
-  throw new Error("RPC browser condition timed out");
-}
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.rpcAcceptance = run().then(
   (value) => ({ ok: true, value }),
   (error) => ({
     ok: false,
-    error: { message: error.message, stack: error.stack },
+    error: describeError(error),
   }),
 );
 
@@ -58,114 +52,122 @@ async function run() {
     void task.then(() => notifications.delete(task));
   };
   let nextId = 0;
-  const sessions = new RpcSessions({
-    async createRpcSession() {
-      return (await post("/connect", {})).sessionId;
-    },
-    closeRpcSession(sessionId) {
-      notify("/close", { sessionId });
-    },
-    release(params) {
-      notify("/release", params);
-    },
-    async call(params, options) {
-      const id = ++nextId;
-      const record = {
-        message: params.params?.message,
-        cancelled: false,
-        settled: false,
-      };
-      requests.push(record);
-      const promise = post("/call", { id, params });
-      const cancel = () => {
-        record.cancelled = true;
-        notify("/cancel", { id });
-      };
-      options?.abortSignal?.addEventListener("abort", cancel, { once: true });
-      if (options?.abortSignal?.aborted) cancel();
-      try {
-        record.value = await promise;
-        return record.value;
-      } catch (error) {
-        // Observe every rejection, even if the application's effect is inactive.
-        record.error = error;
-        throw error;
-      } finally {
-        record.settled = true;
-        options?.abortSignal?.removeEventListener("abort", cancel);
-      }
-    },
-  });
-  const sessionAt = (position) =>
-    sessions.connect(
-      { textDocument: { uri: config.uri }, position },
-      config.capabilities,
-    );
-  const a = sessionAt(config.a),
-    b = sessionAt(config.b);
-  check(
-    a === sessionAt(config.a) && a !== b,
-    "official sessions cache by position",
-  );
-  const [wasmBytes, packageBytes] = await Promise.all(
-    ["/runtime.wasm", "/rpc.irpkg"].map(
-      async (path) => new Uint8Array(await (await fetch(path)).arrayBuffer()),
-    ),
-  );
-  const makeRuntime = () =>
-    createVirRuntime({
-      wasmBytes,
-      irPackageSetBytes: [packageBytes],
-      defaultHostBindings: () =>
-        createBrowserHostBindings({
-          reactHostBindings: createBrowserReactHostBindings,
-        }),
-    });
-  let runtime = await makeRuntime();
-  let component = runtime.call("RpcReferenceWidget.View");
-  const root = createRoot(document.getElementById("app"));
+  let sessions, runtime, root;
   let rootUnmounted = false;
   const unmount = () => {
-    if (!rootUnmounted) {
+    if (root && !rootUnmounted) {
       React.act(() => root.unmount());
       rootUnmounted = true;
     }
   };
-  const query = (message, extra = {}) => ({
-    message,
-    fail: false,
-    waitForCancellation: false,
-    ...extra,
-  });
-  const render = (session, params) =>
-    React.act(() =>
-      root.render(
-        React.createElement(RpcReferenceWidget, {
-          session,
-          query: params,
-          runtime,
-          view: component,
-        }),
+  return withCleanup(async () => {
+    sessions = new RpcSessions({
+      async createRpcSession() {
+        return (await post("/connect", {})).sessionId;
+      },
+      closeRpcSession(sessionId) {
+        notify("/close", { sessionId });
+      },
+      release(params) {
+        notify("/release", params);
+      },
+      async call(params, options) {
+        const id = ++nextId;
+        const record = {
+          message: params.params?.message,
+          cancelled: false,
+          settled: false,
+        };
+        requests.push(record);
+        const promise = post("/call", { id, params });
+        const cancel = () => {
+          record.cancelled = true;
+          notify("/cancel", { id });
+        };
+        options?.abortSignal?.addEventListener("abort", cancel, { once: true });
+        if (options?.abortSignal?.aborted) cancel();
+        try {
+          record.value = await promise;
+          return record.value;
+        } catch (error) {
+          // Observe every rejection, even if the application's effect is inactive.
+          record.error = error;
+          throw error;
+        } finally {
+          record.settled = true;
+          options?.abortSignal?.removeEventListener("abort", cancel);
+        }
+      },
+    });
+    const sessionAt = (position) =>
+      sessions.connect(
+        { textDocument: { uri: config.uri }, position },
+        config.capabilities,
+      );
+    const a = sessionAt(config.a),
+      b = sessionAt(config.b);
+    check(
+      a === sessionAt(config.a) && a !== b,
+      "official sessions cache by position",
+    );
+    const [wasmBytes, packageBytes] = await Promise.all(
+      ["/runtime.wasm", "/rpc.irpkg"].map(
+        async (path) => new Uint8Array(await (await fetch(path)).arrayBuffer()),
       ),
     );
-  const request = (message) =>
-    requests.find((record) => record.message === message);
-  const settle = (message) =>
-    React.act(async () => {
-      await until(() => request(message)?.settled);
+    const makeRuntime = () =>
+      createVirRuntime({
+        wasmBytes,
+        irPackageSetBytes: [packageBytes],
+        defaultHostBindings: () =>
+          createBrowserHostBindings({
+            reactHostBindings: createBrowserReactHostBindings,
+          }),
+      });
+    runtime = await makeRuntime();
+    let component = runtime.call("RpcReferenceWidget.View");
+    root = createRoot(document.getElementById("app"));
+    const query = (message, extra = {}) => ({
+      message,
+      fail: false,
+      waitForCancellation: false,
+      ...extra,
     });
-  const gate = (action, message) => post("/gate", { action, message });
-  const ready = (message) => until(() => gate("status", message));
-  const release = (message) =>
-    React.act(async () => {
-      await gate("open", message);
-      await until(() => request(message)?.settled);
-    });
-  const text = () => document.body.textContent;
-  const status = () =>
-    document.querySelector("[data-rpc-status]")?.dataset.rpcStatus;
-  let goal;
-  try {
+    const render = (session, params) =>
+      React.act(() =>
+        root.render(
+          React.createElement(RpcReferenceWidget, {
+            session,
+            query: params,
+            runtime,
+            view: component,
+          }),
+        ),
+      );
+    const request = (message) =>
+      requests.find((record) => record.message === message);
+    const settle = (message) =>
+      React.act(async () => {
+        await until(
+          `request settled: ${message}`,
+          () => request(message)?.settled,
+        );
+      });
+    const gate = (action, message) => post("/gate", { action, message });
+    const ready = (message) =>
+      until(`server response gated: ${message}`, () => gate("status", message));
+    const release = (message) =>
+      React.act(async () => {
+        await gate("open", message);
+        await until(
+          `released request settled: ${message}`,
+          () => request(message)?.settled,
+        );
+      });
+    const text = () => document.body.textContent;
+    const status = () =>
+      document.querySelector("[data-rpc-status]")?.dataset.rpcStatus;
+    let goal;
     // Also exercise loading before the first genuine reply: no placeholder Reply.
     await gate("arm", "first");
     render(a, query("first"));
@@ -231,7 +233,9 @@ async function run() {
         () => null,
         (error) => error,
       );
-    await until(() => post("/started", { message: "cancel" }));
+    await until("cancellable request registered", () =>
+      post("/started", { message: "cancel" }),
+    );
     abort.abort();
     check(
       (await cancelled)?.code === -32800,
@@ -326,34 +330,43 @@ async function run() {
     );
     check(
       failures.length === 0,
-      `unexpected RPC failures: ${JSON.stringify(failures)}`,
+      `unexpected RPC failures: ${JSON.stringify(failures.map((record) => ({ ...record, error: describeError(record.error) })))}`,
     );
-  } finally {
-    try {
-      unmount();
-    } finally {
-      runtime.dispose();
-      sessions.dispose();
-      // RpcSessions schedules closeRpcSession via the session-id Promise.
-      await Promise.resolve();
-      while (notifications.size > 0) await Promise.all(notifications);
-      // Allow detached Promise/error events to report before asserting success.
-      await sleep(0);
-      globalThis.removeEventListener("unhandledrejection", onUnhandled);
-      globalThis.removeEventListener("error", onError);
-    }
-  }
-  check(
-    unexpected.length === 0,
-    `unhandled browser/transport errors: ${JSON.stringify(unexpected)}`,
-  );
-  return {
-    lateSuccesses: requests
-      .filter((record) => record.cancelled && record.value)
-      .map((r) => r.message),
-    cancellations: requests.filter((record) => record.error?.code === -32800)
-      .length,
-    realReference: goal.target,
-    requests: requests.length,
-  };
+    return {
+      lateSuccesses: requests
+        .filter((record) => record.cancelled && record.value)
+        .map((r) => r.message),
+      cancellations: requests.filter((record) => record.error?.code === -32800)
+        .length,
+      realReference: goal.target,
+      requests: requests.length,
+    };
+  }, [
+    ["React root", unmount],
+    ["VIR runtime", () => runtime?.dispose()],
+    ["RPC sessions", () => sessions?.dispose()],
+    [
+      "transport notifications",
+      async () => {
+        // RpcSessions schedules closeRpcSession via the session-id Promise.
+        await Promise.resolve();
+        while (notifications.size > 0) await Promise.all(notifications);
+        // Allow detached Promise/error events to report before asserting success.
+        await sleep(0);
+      },
+    ],
+    [
+      "rejection listener",
+      () => globalThis.removeEventListener("unhandledrejection", onUnhandled),
+    ],
+    ["error listener", () => globalThis.removeEventListener("error", onError)],
+    [
+      "browser errors",
+      () =>
+        check(
+          unexpected.length === 0,
+          `unhandled browser/transport errors: ${JSON.stringify(unexpected.map(describeError))}`,
+        ),
+    ],
+  ]);
 }
