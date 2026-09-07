@@ -118,6 +118,26 @@ opaque call
     (params : @& Lean.Vir.Js params) :
     Lean.Vir.RuntimeM (Lean.Vir.Js.Promise result)
 
+/--
+Generated binding for reviewed VIR protocol `infoview.rpc-session.call-options`.
+
+Passes the exact ClientRequestOptions and AbortSignal to the position-specific session; params use Js.Any to fit the interpreter arity limit without changing their value. Cancellation and Promise settlement follow the official RPC client and server.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; options js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.rpcSession.callWithOptions"]
+opaque callWithOptions
+    {result : Type}
+    (session : @& Lean.Vir.Js Infoview.RpcSession)
+    (method : @& Lean.Vir.Js String)
+    (params : @& Lean.Vir.Js.Any)
+    (options : @& Lean.Vir.Js Infoview.ClientRequestOptions) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise result)
+
 end Infoview.RpcSession
 
 end Lean.Vir

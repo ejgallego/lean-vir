@@ -12,6 +12,9 @@ The comparison was made against:
   `lean4-infoview/src/infoview/rpcSessions.tsx` and
   `lean4-infoview-api/src/rpcSessions.ts`.
 
+Browser acceptance uses the published official `@leanprover/infoview-api`
+package pinned to `0.13.0`, with the repository's pinned Lean server and React.
+
 ## Upstream execution path
 
 `mk_rpc_widget%` accepts a named server method of type:
@@ -42,10 +45,10 @@ Those pieces have distinct ownership:
 | --- | --- | --- | --- |
 | React component | JavaScript widget-module export | Exact JavaScript function created from a Lean closure | Keep the exact component value; do not add a component registry. |
 | RPC session | `useRpcSession(): RpcSessionAtPos` | `Surface.rpcSession` carries that exact object into VIR | Keep the position-specific session raw; do not add a session registry. |
-| RPC call | `session.call(method, params, options)` | Direct `RpcSession.call(session, method, params)` binding; options deferred | Add the exact optional options value when the cancellation fixture needs it; do not implement a VIR scheduler. |
+| RPC call | `session.call(method, params, options)` | Direct `RpcSession.call` and `callWithOptions` bindings | Keep the session, request, options and Promise exact. |
 | Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations over exact `Js.Function1` values | Preserve the Promise and callback objects; do not make the synchronous host dispatcher await either one. |
-| Server references | Exact response objects registered by `RpcSessionAtPos` | Mirrored `RpcRef`/`ResolvedRef` records plus a bounded global store | Keep the response object graph exact so upstream reference reachability remains authoritative. |
-| Request cancellation | Native `AbortController` passed through call options | No general RPC cancellation path | Bind the native objects when a changing-props fixture requires cancellation. |
+| Server references | Exact response objects registered by `RpcSessionAtPos` | Direct response/reference round trip; older descriptor API remains for the JSX demo | The duplicate global store has been removed; migrate the remaining descriptor consumer before deleting that API. |
+| Request cancellation | Native `AbortController` passed through call options | Exact options forwarded to the official client; real LSP cancellation tested | Cancellation does not guarantee local rejection; callers must still suppress stale results. |
 | Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Lean values retained in JSL for browser-side rendering | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
 | Returned HTML | Serialized upstream `ProofWidgets.Html` rendered by `HtmlDisplay` | `ProofWidgets.Html` is a direct `ReactM (Js React.Node)` action | Do not silently equate these types. Either use upstream `HtmlDisplay` for wire compatibility or return data and render it with the VIR-native API. |
 | Error display | Promise rejection plus upstream `mapRpcError` | Host command logs or callback failure | Preserve the rejection value first; presentation can be an explicit component helper. |
@@ -102,26 +105,47 @@ response. The native-function regression settles after runtime disposal and
 therefore also proves that the Promise path adds no VIR callback lifetime to
 native functions.
 
-The first browser acceptance fixture should next call a real
-`@[server_rpc_method]` through the position-specific session and retain the
-exact response in React state. It must cover:
+`npm run test:infoview:browser` now runs `examples/RpcReferenceWidget.lean`
+against real `@[server_rpc_method]` declarations in
+`fixtures/infoview/RpcBrowserServer.lean`. Official React keeps the response in
+state; the Lean-authored child renders it and keeps its own hook state across
+position changes. The example projects the exact nested reference and sends it
+back through Lean to the server. The acceptance also resolves the existing
+goal-reference method in a real `h : p` context.
 
-1. successful structured data;
-2. a response containing a genuine `Server.WithRpcRef`;
-3. Promise rejection;
-4. rerender at a new position;
-5. cancellation or stale-result handling using the same mechanism required in
-   TypeScript;
-6. unmount and package replacement without retained Lean callbacks.
+The test-only JavaScript parent demonstrates ordinary application effects:
+it passes a native AbortSignal, suppresses stale results, and unmounts React
+before disposing a VIR generation. Pending Promise continuations are native
+JavaScript functions, so they cannot reenter a disposed Lean runtime. This is
+coverage of that composition, not a claim about Lean-authored asynchronous
+effects or a new library request manager. Successful replies, rejection,
+cancellation (including already-aborted signals), rerender, replacement, and
+unmount are executable checks.
 
-The fixture should initially return data and render it through VIR's direct
-React API. A second compatibility fixture may return upstream serialized
+The runner reuses the Chromium harness, the official `RpcSessions` class, and
+`vscode-jsonrpc` for LSP framing/cancellation. Its localhost HTTP relay and
+keepalive scheduling are test transport only. It negotiates the actual RPC wire
+format and lets the official client register references; finalizer timing is
+not an acceptance condition. It builds only the example package and infoview
+imports and uses the existing matching Wasm artifact.
+
+`callWithOptions` takes `Js.Any` request data: the extra generic request
+parameter would exceed the current six-argument interpreter import limit
+(which includes erased type parameters and the world token). `Js.erase` keeps
+this a pure phantom-type change. The result remains polymorphic.
+
+A later compatibility fixture may return upstream serialized
 `ProofWidgets.Html` and delegate to upstream `HtmlDisplay`; it should not add a
 second VIR-owned HTML tree.
 
 ## Retirement target
 
-Once the direct session fixture covers the existing reference client, remove
-the provisional `ProofWidgets.RpcRef`, `ResolvedRef`, descriptor normalization,
-custom resolve command, and `proofWidgetsRpcRefStore`. The official RPC
-session and its server-reference lifecycle should be the only authority.
+The write-only global reference store and all retention through it are removed.
+Real reference resolution uses `Server.WithRpcRef.val` directly.
+
+The remaining provisional `ProofWidgets.RpcRef`, `ResolvedRef`, descriptor
+normalization, and custom resolve command still serve `InteractiveExpr` in the
+standalone JSX subset demo. Retiring those requires migrating that consumer;
+the native `RpcReferenceWidget` example is the replacement reference path.
+The legacy `storeKey` response field is compatibility metadata, not a store or
+an ownership key.

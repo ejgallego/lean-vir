@@ -15,6 +15,8 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
       dispatchInfoviewCommand(commandDispatcher, "insertText", position, text),
     "infoview.rpcSession.call": (session, method, params) =>
       session.call(method, params),
+    "infoview.rpcSession.callWithOptions": (session, method, params, options) =>
+      session.call(method, params, options),
     "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
       id,
       label,

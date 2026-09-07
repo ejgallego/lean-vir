@@ -505,6 +505,13 @@ generic `Js.Object.get` operation therefore continue on exact native values.
 This keeps server-reference objects inside the response graph under the
 official RPC session's reachability rules.
 
+`RpcSession.callWithOptions` forwards exact `Js ClientRequestOptions`, including
+its native AbortSignal. Its request argument is `Js.Any` to stay within the
+interpreter import arity limit; use the pure `Js.erase` on a typed request.
+`examples/RpcReferenceWidget.lean` and `test:infoview:browser` demonstrate a
+native React parent retaining real server responses and a Lean component
+rendering them, including a genuine `Server.WithRpcRef` round trip.
+
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md` and `docs/PROOFWIDGETS_PORTING.md`.

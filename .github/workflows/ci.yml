@@ -57,6 +57,7 @@ jobs:
       - run: npm run test:env-lookup:wasm-pair
       - run: npm run test:pages
       - run: npm run test:pages:browser
+      - run: npm run test:infoview:browser
       - run: npm run test:upstream:no-build
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4

@@ -79,21 +79,9 @@ meta structure StoredExprWithCtxRefRequest where
   packageRevision : String
   deriving Server.RpcEncodable
 
-meta initialize proofWidgetsRpcRefStore : IO.Ref (Array StoredExprWithCtx) ← IO.mkRef #[]
-
-meta def maxStoredProofWidgetsRpcRefs : Nat :=
-  1024
-
-meta def proofWidgetsRpcRefStoreKey (packageRevision id : String) : String :=
+/-- Compatibility metadata only; reference ownership belongs to the RPC session. -/
+meta def proofWidgetsRpcRefKey (packageRevision id : String) : String :=
   packageRevision ++ ":" ++ id
-
-meta def upsertStoredExprWithCtx
-    (stored : StoredExprWithCtx)
-    (items : Array StoredExprWithCtx) :
-    Array StoredExprWithCtx :=
-  (stored :: items.toList.filter (fun item => item.storeKey != stored.storeKey))
-    |>.take maxStoredProofWidgetsRpcRefs
-    |>.toArray
 
 meta def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefInfo :=
   {
@@ -117,7 +105,7 @@ meta def mkStoredExprWithCtx
     (knownConstant : Bool) :
     StoredExprWithCtx :=
   {
-    storeKey := proofWidgetsRpcRefStoreKey packageRevision ref.id
+    storeKey := proofWidgetsRpcRefKey packageRevision ref.id
     id := ref.id
     label := ref.label
     typeName := ref.typeName
@@ -137,9 +125,6 @@ meta def StoredExprWithCtx.refresh
     (knownConstant : Bool) :
     StoredExprWithCtx :=
   { stored with source, position, knownConstant }
-
-meta def rememberStoredExprWithCtx (stored : StoredExprWithCtx) : IO Unit :=
-  proofWidgetsRpcRefStore.modify (upsertStoredExprWithCtx stored)
 
 meta def lspPositionLabel (source : String) (pos : Lsp.Position) : String :=
   let fileName := (System.FilePath.mk source).fileName.getD source
@@ -169,7 +154,7 @@ meta def interactiveGoalStoredExprWithCtx
   let label := interactiveGoalLabel goal index
   let expression := goal.type.stripTags
   {
-    storeKey := proofWidgetsRpcRefStoreKey packageRevision id
+    storeKey := proofWidgetsRpcRefKey packageRevision id
     id
     label
     typeName := "ExprWithCtx"
@@ -184,7 +169,6 @@ meta def interactiveGoalStoredExprWithCtx
   }
 
 meta def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExprWithCtxRef := do
-  rememberStoredExprWithCtx stored
   let ref ← Server.WithRpcRef.mk stored
   return { ref, info := stored.toInfo }
 
@@ -216,7 +200,6 @@ meta def resolveProofWidgetsRpcRef
       (lspPositionLabel source params.pos)
       params.packageRevision
       (rpcRefKnownConstant snap.env params.ref)
-    rememberStoredExprWithCtx stored
     return stored.toInfo
 
 @[server_rpc_method]
@@ -232,7 +215,6 @@ meta def createProofWidgetsExprWithCtxRef
       (lspPositionLabel source params.pos)
       params.packageRevision
       (rpcRefKnownConstant snap.env params.ref)
-    rememberStoredExprWithCtx stored
     let ref ← Server.WithRpcRef.mk stored
     return { ref, info := stored.toInfo }
 
@@ -268,7 +250,6 @@ meta def resolveProofWidgetsExprWithCtxRef
     let source := documentSourceName doc
     let position := lspPositionLabel source params.pos
     let stored := params.ref.val.refresh source position (rpcRefIdKnownConstant snap.env params.ref.val.id)
-    rememberStoredExprWithCtx stored
     return stored.toInfo
 
 end Lean.Vir.Infoview

@@ -420,6 +420,13 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
+`npm run test:infoview:browser` is the focused real-server RPC acceptance check.
+It builds the current infoview imports and the small RPC example package, then
+uses `web/public/vir-upstream.wasm`, official React, the pinned infoview RPC
+client, and a real `lake serve` process in Chromium. It does not need a site
+build. If the Wasm artifact is missing or its producer changed, first build the
+matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
+
 ## Performance Comparisons
 
 Benchmark commands, artifact-cache behavior, and before/after comparison

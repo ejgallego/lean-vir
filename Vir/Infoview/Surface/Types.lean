@@ -15,6 +15,9 @@ namespace Lean.Vir.Infoview
 /-- Phantom marker for the exact position-specific infoview RPC session object. -/
 opaque RpcSession : Type
 
+/-- Exact infoview `ClientRequestOptions`, including its native AbortSignal. -/
+opaque ClientRequestOptions : Type
+
 /-- Cursor position for the current infoview snapshot. -/
 structure DocumentPosition where
   uri : String

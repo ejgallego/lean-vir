@@ -81,6 +81,20 @@
           { "name": "params", "type": { "lean": "Lean.Vir.Js params", "representation": "js-resource", "resourceInner": "params" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Promise result", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value result" } }
+      },
+      {
+        "id": "infoview.rpc-session.call-options", "group": "rpc-session", "target": "infoview.rpcSession.callWithOptions",
+        "lean": "Lean.Vir.Infoview.RpcSession.callWithOptions", "marker": "vir_js",
+        "reason": "Passes the exact ClientRequestOptions and AbortSignal to the position-specific session; params use Js.Any to fit the interpreter arity limit without changing their value. Cancellation and Promise settlement follow the official RPC client and server.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "RpcSessionAtPos.call", "semantics": "preserving" },
+        "typeParameters": ["result"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "session", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.RpcSession", "representation": "js-resource", "resourceInner": "Infoview.RpcSession" } },
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "params", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } },
+          { "name": "options", "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise result", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value result" } }
       }
     ]
   },

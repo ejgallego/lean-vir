@@ -132,6 +132,7 @@
     "test:benchmark-pages": "node tests/browser/benchmark-pages.mjs",
     "test:pages:browser": "node tests/browser/runner.mjs",
     "test:infoview": "lake build VirInfoview VirInfoviewFixtures Vir.Examples.Style && npm run check:infoview-bundle && lake env lean fixtures/infoview/Smoke.lean && lake env lean examples/VirNativeInfoview.lean && node tests/infoview/module-snapshot.mjs && node tests/infoview/widget.mjs",
+    "test:infoview:browser": "node tests/infoview/rpc-browser.mjs",
     "test:runtime": "npm run test:runtime:unit && node tests/runtime/runner.mjs",
     "test:runtime:lean": "node tests/runtime/runner.mjs --group lean",
     "test:runtime:pure": "node tests/runtime/runner.mjs --group pure",
@@ -142,12 +143,14 @@
     "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {
+    "@leanprover/infoview-api": "0.13.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "ajv": "^8.17.1",
     "esbuild": "^0.27.7",
     "typescript": "6.0.3",
-    "vite": "^8.0.13"
+    "vite": "^8.0.13",
+    "vscode-jsonrpc": "8.2.1"
   },
   "dependencies": {
     "react": "^19.2.7",
