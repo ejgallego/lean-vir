@@ -7,10 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  buildGeneratedOperations,
-  generatedOperationDocument,
-} from "../../scripts/bindings/binding-modalities.mjs";
+import { buildGeneratedOperations } from "../../scripts/bindings/binding-modalities.mjs";
 import {
   leanType,
   renderLeanBindings,
@@ -20,7 +17,6 @@ const stringShape = { kind: "primitive", name: "string" };
 const nullableStringShape = { kind: "option", absence: "null", element: stringShape };
 const generation = {
   output: "Vir/Demo/Generated.lean",
-  operationsOutput: "build/bindings/demo.generated-operations.json",
   imports: ["Vir.Demo.Types"],
   namespace: "Lean.Vir.Demo",
   abiProfile: {
@@ -163,8 +159,6 @@ test("generated binding operations record derived modalities and their provenanc
     evidence: "typescript-derived",
     detail: "The generated operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
   });
-  assert.equal(generatedOperationDocument(config, generation, operations).version, 2);
-
   const widened = structuredClone(generation);
   widened.resources.Widget = {
     lean: "Event",

@@ -154,7 +154,7 @@ assert.deepEqual(report.summary.generation, {
     "not-selected": dispositionCounts["not-selected"] ?? 0,
   },
   semanticCoverage: Object.fromEntries([
-    "faithful",
+    "preserving",
     "adapter-only",
     "unreviewed",
     "local-contract",
@@ -226,7 +226,7 @@ for (const [declaration, expectedType] of [
   assert.equal(
     publicEntries.get(declaration)?.type,
     expectedType,
-    `${declaration} must preserve its faithful JavaScript-boundary type`,
+    `${declaration} must preserve its JavaScript-boundary type`,
   );
 }
 assert.deepEqual(
@@ -264,7 +264,7 @@ assert.deepEqual(documentTitle?.generation, {
   provenance: "generator",
   targets: ["browser.document.getTitle", "browser.document.setTitle"],
   semanticCoverage: {
-    status: "faithful",
+    status: "preserving",
     relations: ["preserving"],
   },
   diagnostics: [],
@@ -314,7 +314,7 @@ assert.equal(documentQuerySelector?.inheritedFrom, "ParentNode");
 assert.equal(documentQuerySelector?.status, "derived");
 assert.equal(documentQuerySelector?.generation.disposition, "generated");
 assert.equal(documentQuerySelector?.generation.provenance, "generator");
-assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "faithful");
+assert.equal(documentQuerySelector?.generation.semanticCoverage.status, "preserving");
 
 const elementRoot = roots.find((root) => root.library === "browser" && root.id === "element");
 assert.deepEqual(elementRoot?.analysis, {
@@ -335,7 +335,7 @@ const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
 );
 assert.equal(elementClassList?.generation.disposition, "generated");
-assert.equal(elementClassList?.generation.semanticCoverage.status, "faithful");
+assert.equal(elementClassList?.generation.semanticCoverage.status, "preserving");
 assert.deepEqual(elementClassList?.generation.targets, [
   "browser.element.getClassList",
   "browser.element.setClassList",
@@ -347,7 +347,7 @@ const elementGetAttribute = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.getAttribute",
 );
 assert.equal(elementGetAttribute?.generation.disposition, "generated");
-assert.equal(elementGetAttribute?.generation.semanticCoverage.status, "faithful");
+assert.equal(elementGetAttribute?.generation.semanticCoverage.status, "preserving");
 const generatedGetAttribute = elementRoot?.generatedOperations.find((operation) =>
   operation.typescript.member === "Element.getAttribute");
 assert.equal(generatedGetAttribute?.typescript.signaturePolicy.selection, "unique");
@@ -402,7 +402,7 @@ assert.equal(generatedFillStyleGetter?.result.lean, "Lean.Vir.Js CanvasStyle");
 assert.match(generatedFillStyleGetter?.exception.reason, /full string, CanvasGradient, and CanvasPattern union/u);
 assert.equal(generatedFillStyleGetter?.semantics.relation, "preserving");
 assert.deepEqual(canvasFillStyle?.generation.semanticCoverage, {
-  status: "faithful",
+  status: "preserving",
   relations: ["preserving"],
 });
 assert.equal(generatedFillStyleSetter?.arguments[0].name, "style");
@@ -582,7 +582,7 @@ const reactRootRender = reactDomRoot?.generatedOperations.find((operation) =>
 const reactRootRenderCoverage = reactDomRoot?.coverage.members.find((member) =>
   member.id === "Root.render")?.generation.semanticCoverage;
 assert.equal(reactRootRender?.typescript.member, "Root.render");
-assert.equal(reactRootRenderCoverage?.status, "faithful");
+assert.equal(reactRootRenderCoverage?.status, "preserving");
 assert.deepEqual(reactRootRenderCoverage?.relations, ["preserving"]);
 assert.ok(!(reactDomRoot?.generatedOperations ?? []).some((operation) =>
   operation.host.target === "react.root.render"));
@@ -617,7 +617,7 @@ for (const member of [
   "browser/document:Document.querySelectorAll",
   "browser/document:Document.title",
 ]) {
-  assert.equal(semanticCoverageByMember.get(member), "faithful");
+  assert.equal(semanticCoverageByMember.get(member), "preserving");
 }
 for (const member of [
   "browser/element:Element.classList",
@@ -628,11 +628,11 @@ for (const member of [
   "browser/element:CSSStyleDeclaration.setProperty",
   "browser/event:KeyboardEvent.key",
 ]) {
-  assert.equal(semanticCoverageByMember.get(member), "faithful");
+  assert.equal(semanticCoverageByMember.get(member), "preserving");
 }
 
 assert.match(html, /<h1>Binding reference<\/h1>/u);
-assert.match(html, /id="faithful-metric"/u);
+assert.match(html, /id="preserving-metric"/u);
 assert.match(html, /upstream entries with preserving contracts/u);
 assert.match(html, /id="adapter-metric"/u);
 assert.match(html, /id="coverage" aria-label="Filter upstream semantic coverage"/u);
@@ -646,7 +646,7 @@ assert.doesNotMatch(html, /Public Lean API/u);
 assert.doesNotMatch(html, /Host targets/u);
 assert.match(app, /lean-vir\.binding-type-browser\.v1/u);
 assert.match(app, /semantics-preserving contract/u);
-assert.match(app, /Lean boundaries and explicit adapters/u);
+assert.match(app, /Preserving Lean boundary/u);
 assert.match(app, /semantic review required/u);
 assert.match(app, /elements\.semantics\.value/u);
 assert.match(app, /runtime provider keys present/u);

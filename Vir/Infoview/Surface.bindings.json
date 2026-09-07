@@ -7,7 +7,6 @@
   "lean": { "modules": ["Vir.Infoview.Surface", "Vir.Infoview.Surface.Generated"] },
   "generation": {
     "output": "Vir/Infoview/Surface/Generated.lean",
-    "operationsOutput": "build/bindings/infoview.generated-operations.json",
     "imports": ["Vir.Browser.Types", "Vir.Infoview.Surface.Types"],
     "namespace": "Lean.Vir",
     "abiProfile": {

@@ -14,7 +14,6 @@ import { pathToFileURL } from "node:url";
 
 import {
   buildBindingExplorerReport,
-  classifyGenerationMember,
   renderBindingExplorerHtml,
 } from "../../scripts/bindings/binding-explorer.mjs";
 import {
@@ -43,25 +42,152 @@ test("binding explorer rendering injects one script-safe report", () => {
   );
 });
 
-test("unsupported members do not expose automatic binding candidates", () => {
-  assert.deepEqual(
-    classifyGenerationMember({
-      generated: false,
-      confirmedTargets: [],
-      adaptedTargets: [],
-      candidateTargets: ["demo.widget.render"],
-      unsupported: {
-        typescript: "Widget.render",
-        scope: "symbol",
-        note: "Not part of the VIR surface.",
+const demoTypeScriptSurface = {
+  symbols: [{
+    id: "Widget.render",
+    kind: "method",
+    surfaceRoot: "Widget",
+    display: "render(): void;",
+    source: { path: "demo.d.ts", startLine: 1 },
+    shape: { kind: "function", args: [], result: { kind: "primitive", name: "void" } },
+  }],
+};
+
+function demoProtocolOperation(target, semantics) {
+  return {
+    id: target,
+    group: "widget",
+    target,
+    lean: `Lean.Vir.Demo.Widget.${target.split(".").at(-1)}`,
+    marker: "vir_js",
+    reason: `${target} has reviewed ${semantics} behavior.`,
+    upstreamRelation: { kind: "upstream-adapter", member: "Widget.render", semantics },
+    effect: { id: "runtime", lean: "RuntimeM" },
+    arguments: [],
+    result: { type: { lean: "Unit", representation: "immediate" } },
+  };
+}
+
+function demoGeneration(protocolOperations) {
+  return {
+    output: "Vir/Demo/Generated.lean",
+    imports: ["Vir.Demo.Types"],
+    namespace: "Lean.Vir.Demo",
+    abiProfile: {
+      id: "demo-v1",
+      effect: { id: "runtime", lean: "RuntimeM" },
+      types: { void: { lean: "Unit", representation: "immediate" } },
+      resource: {
+        constructor: "Lean.Vir.Js",
+        nullableConstructor: "Lean.Vir.Js.Nullable",
+        argument: { passing: "borrowed", retention: "call" },
+        result: { ownership: "owned" },
       },
-      ambiguousCandidate: false,
-    }),
-    {
-      disposition: "unsupported",
-      provenance: "annotation",
+      receiver: {
+        default: { passing: "borrowed", retention: "call" },
+        globalTypes: {},
+      },
     },
+    resources: {},
+    members: [],
+    methodPolicies: {},
+    exceptions: {},
+    protocolOperations,
+  };
+}
+
+async function buildAutomaticDemoReport(targets, {
+  unsupported = [],
+  protocolOperations = [],
+} = {}) {
+  const generation = demoGeneration(protocolOperations);
+  return buildBindingExplorerReport(
+    {
+      format: "lean-vir-shipped-bindings-coverage",
+      version: 1,
+      lean: {},
+      providers: [],
+      summary: {
+        totalTargets: targets.length,
+        provided: targets.length,
+        missingProvider: 0,
+        runtimeOnly: 0,
+        publicEntries: 0,
+        publicTargetEdges: 0,
+        targetsReachedByPublicEntries: 0,
+      },
+      bindings: targets.map((target) => ({
+        target,
+        status: "provided",
+        declarations: [{ module: "Vir.Demo", source: { path: generation.output } }],
+        providers: ["demo"],
+      })),
+      publicEntries: [],
+    },
+    [{
+      id: "demo",
+      title: "Demo",
+      description: "Demo bindings.",
+      path: "Vir/Demo.bindings.json",
+      lean: { modules: ["Vir.Demo"] },
+      generation,
+      roots: [{
+        id: "widget",
+        title: "Widget",
+        targets: ["demo.widget.*"],
+        lean: { public: ["Lean.Vir.Demo.Widget"] },
+        upstream: { kind: "typescript", roots: ["Widget"] },
+        unsupported,
+      }],
+    }],
+    new Map([["demo/widget", demoTypeScriptSurface]]),
+    repositoryPath("build", "bindings", "demo.coverage.json"),
   );
+}
+
+test("unsupported members are excluded from automatic correspondence", async () => {
+  const target = "demo.widget.render";
+  const report = await buildAutomaticDemoReport([target], {
+    unsupported: [{
+      typescript: "Widget.render",
+      scope: "symbol",
+      note: "Not part of the VIR surface.",
+    }],
+  });
+  const group = report.libraries[0].apiGroups[0];
+  const member = group.coverage.members[0];
+
+  assert.equal(member.status, "missing");
+  assert.equal(member.generation.disposition, "unsupported");
+  assert.equal(member.generation.semanticCoverage.status, "not-provided");
+  assert.equal(member.generation.candidateTargets, undefined);
+  assert.deepEqual(group.coverage.targetMappings, [{
+    target,
+    status: "unmatched",
+    source: "automatic",
+    candidates: [],
+  }]);
+  assert.ok(group.workItems.some((item) =>
+    item.code === "upstream-identity-missing" && item.target === target));
+});
+
+test("changing operations conservatively determine mixed member coverage", async () => {
+  const targets = ["demo.widget.render", "demo.widget.renderAdapted"];
+  const report = await buildAutomaticDemoReport(targets, {
+    protocolOperations: [
+      demoProtocolOperation(targets[0], "preserving"),
+      demoProtocolOperation(targets[1], "changing"),
+    ],
+  });
+  const coverage = report.libraries[0].apiGroups[0].coverage.members[0]
+    .generation.semanticCoverage;
+
+  assert.deepEqual(coverage, {
+    status: "adapter-only",
+    relations: ["changing", "preserving"],
+  });
+  assert.equal(report.summary.generation.semanticCoverage.preserving, 0);
+  assert.equal(report.summary.generation.semanticCoverage["adapter-only"], 1);
 });
 
 test("reviewed method mappings require their named public declaration to reach the target", async () => {
@@ -102,7 +228,6 @@ test("reviewed method mappings require their named public declaration to reach t
     lean: { modules: ["Vir.Demo"] },
     generation: {
       output: "Vir/Demo/Generated.lean",
-      operationsOutput: "build/bindings/demo.generated-operations.json",
       imports: ["Vir.Demo.Types"],
       namespace: "Lean.Vir.Demo",
       abiProfile: {

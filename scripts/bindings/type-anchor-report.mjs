@@ -12,6 +12,7 @@ import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
+import { validateTypeScriptAnchors } from "./typescript-descriptors.mjs";
 
 const statusRank = {
   exact: 0,
@@ -178,9 +179,20 @@ export async function buildTypeAnchorReport({
 }
 
 function validateTsDescriptors(value) {
-  if (value?.version !== 1 || !Array.isArray(value.symbols) || !Array.isArray(value.anchors)) {
+  if (value === null || typeof value !== "object" || Array.isArray(value) ||
+      value.version !== 1 || !Array.isArray(value.symbols) || !Array.isArray(value.anchors)) {
     throw new Error("descriptor JSON must be { version: 1, symbols: [...], anchors: [...] }");
   }
+  const symbolIds = new Set();
+  for (const [index, symbol] of value.symbols.entries()) {
+    if (symbol === null || typeof symbol !== "object" || Array.isArray(symbol) ||
+        typeof symbol.id !== "string" || symbol.id.length === 0) {
+      throw new Error(`symbols[${index}].id must be a non-empty string`);
+    }
+    if (symbolIds.has(symbol.id)) throw new Error(`duplicate TypeScript symbol id ${symbol.id}`);
+    symbolIds.add(symbol.id);
+  }
+  validateTypeScriptAnchors(value.anchors, symbolIds);
   return value;
 }
 

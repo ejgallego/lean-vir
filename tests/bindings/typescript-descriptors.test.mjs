@@ -123,6 +123,36 @@ test("structural anchors reject binding-policy transformations", async () => {
   }
 });
 
+test("the comparator rejects stale structural-anchor fields", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-stale-anchor-"));
+  try {
+    const descriptors = join(directory, "descriptors.json");
+    await writeFile(descriptors, `${JSON.stringify({
+      version: 1,
+      symbols: [{
+        id: "Value",
+        kind: "type",
+        shape: { kind: "primitive", name: "string" },
+      }],
+      anchors: [{
+        lean: "Demo.Value",
+        ts: "Value",
+        category: "legacy",
+      }],
+    }, null, 2)}\n`);
+
+    await assert.rejects(
+      buildTypeAnchorReport({
+        descriptors,
+        manifest: join(directory, "unused-manifest.json"),
+      }),
+      /category is not a structural anchor field/u,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("the comparator fails closed on TypeScript absence semantics", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-nullish-comparison-"));
   try {

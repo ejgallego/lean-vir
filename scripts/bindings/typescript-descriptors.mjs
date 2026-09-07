@@ -850,16 +850,8 @@ function parameterName(name, fallback) {
   return `arg${fallback}`;
 }
 
-function validateAnchors(anchorData, symbolIds) {
-  if (anchorData === null || typeof anchorData !== "object" || Array.isArray(anchorData) ||
-      anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
-    throw new Error("anchor file must be { version: 1, anchors: [...] }");
-  }
-  const unknownDocumentField = Object.keys(anchorData).find((field) =>
-    !["version", "anchors"].includes(field));
-  if (unknownDocumentField !== undefined) {
-    throw new Error(`${unknownDocumentField} is not an anchor-file field`);
-  }
+export function validateTypeScriptAnchors(anchors, symbolIds) {
+  if (!Array.isArray(anchors)) throw new Error("anchors must be an array");
   const anchorFields = new Set([
     "id",
     "lean",
@@ -868,7 +860,7 @@ function validateAnchors(anchorData, symbolIds) {
     "note",
   ]);
   const ids = new Set();
-  for (const [index, anchor] of anchorData.anchors.entries()) {
+  for (const [index, anchor] of anchors.entries()) {
     if (anchor === null || typeof anchor !== "object" || Array.isArray(anchor)) {
       throw new Error(`anchors[${index}] must be an object`);
     }
@@ -898,4 +890,17 @@ function validateAnchors(anchorData, symbolIds) {
     if (ids.has(id)) throw new Error(`duplicate anchor id ${id}`);
     ids.add(id);
   }
+}
+
+function validateAnchors(anchorData, symbolIds) {
+  if (anchorData === null || typeof anchorData !== "object" || Array.isArray(anchorData) ||
+      anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
+    throw new Error("anchor file must be { version: 1, anchors: [...] }");
+  }
+  const unknownDocumentField = Object.keys(anchorData).find((field) =>
+    !["version", "anchors"].includes(field));
+  if (unknownDocumentField !== undefined) {
+    throw new Error(`${unknownDocumentField} is not an anchor-file field`);
+  }
+  validateTypeScriptAnchors(anchorData.anchors, symbolIds);
 }

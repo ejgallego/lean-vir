@@ -7,7 +7,6 @@
   "lean": { "modules": ["Vir.ProofWidgets.Rpc", "Vir.ProofWidgets.Rpc.Generated"] },
   "generation": {
     "output": "Vir/ProofWidgets/Rpc/Generated.lean",
-    "operationsOutput": "build/bindings/proofwidgets.generated-operations.json",
     "imports": ["Vir.Browser.Types", "Vir.ProofWidgets.Rpc.Types"],
     "namespace": "Lean.Vir",
     "abiProfile": {

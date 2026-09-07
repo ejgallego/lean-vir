@@ -163,12 +163,9 @@ must not replace the public JavaScript value.
 `npm run generate:lean-bindings` creates one operation record for every
 selected TypeScript operation and every reviewed protocol operation.
 It renders the Lean declarations and the binding-policy portions of the
-explorer from those records. Ignored debugging artifacts use
-`lean-vir-binding-operation-ir` version 2 and are written per library under:
-
-```text
-build/bindings/*.generated-operations.json
-```
+explorer from those records. The records remain an in-memory generation model;
+the consolidated explorer report includes them where binding authors need to
+inspect their policy and provenance.
 
 Each operation records:
 

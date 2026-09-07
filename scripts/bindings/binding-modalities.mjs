@@ -1257,13 +1257,3 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
   }
   return operations;
 }
-
-export function generatedOperationDocument(config, generation, operations) {
-  return {
-    format: "lean-vir-binding-operation-ir",
-    version: 2,
-    library: config.id,
-    profile: generation.abiProfile,
-    operations,
-  };
-}

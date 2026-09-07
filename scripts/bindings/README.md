@@ -40,7 +40,7 @@ provider presence.
 Unmodified TypeScript-derived operations start as preserving by construction;
 the generator then folds in reviewed receiver and resource-mapping facts.
 Non-identity resource mappings and omitted host-global receivers therefore
-cannot silently count as faithful. Operation exceptions and upstream adapters
+cannot silently count as preserving. Operation exceptions and upstream adapters
 must likewise be reviewed as preserving or changing, and otherwise remain
 visible author actions. This classification is a contract claim. Provider
 behavior remains separately trusted and tested.

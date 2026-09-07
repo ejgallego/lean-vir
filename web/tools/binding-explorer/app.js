@@ -10,8 +10,8 @@ const generation = report.summary.generation;
 document.querySelector("#catalog-metric").textContent = String(
   Object.values(generation.semanticCoverage).reduce((sum, count) => sum + count, 0),
 );
-document.querySelector("#faithful-metric").textContent = String(
-  generation.semanticCoverage.faithful,
+document.querySelector("#preserving-metric").textContent = String(
+  generation.semanticCoverage.preserving,
 );
 document.querySelector("#adapter-metric").textContent = String(
   generation.semanticCoverage["adapter-only"],
@@ -133,7 +133,7 @@ const dispositionLabel = (value) => ({
   "not-selected": "not selected",
 })[value] ?? value;
 const semanticCoverageDefinitions = new Map([
-  ["faithful", {
+  ["preserving", {
     filter: "Has preserving contract",
     badge: "preserving contract recorded",
     summary: "with preserving contracts",
@@ -437,7 +437,7 @@ function renderReference() {
         '" data-group="' + escapeHtml(id) + '"><span><span class="name">' +
         escapeHtml(group.library.title + " · " + group.title) +
         '</span><span class="sub">' + escapeHtml(semanticCoverageSummary(coverage)) +
-        '</span></span><span class="pill faithful">upstream API</span></button>';
+        '</span></span><span class="pill preserving">upstream API</span></button>';
     }).join("");
   elements.results.querySelectorAll("[data-group]").forEach((button) =>
     button.addEventListener("click", () => selectGroup(button.dataset.group)));
@@ -821,7 +821,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
         rows.push(renderTransformationRow(
           formatTypeScriptParameter(argument),
           emitted.name + ": " + displayLeanName(emitted.type),
-          emitted.role === "callback" ? "retained callback policy" : "faithful representation",
+          emitted.role === "callback" ? "retained callback policy" : "preserving representation",
         ));
       }
     }
@@ -958,12 +958,8 @@ function renderGenerationPolicy(group, symbol) {
 }
 
 function leanPaneTitle(semanticCoverage) {
-  if (semanticCoverage?.status === "faithful" &&
-      semanticCoverage.relations?.includes("changing")) {
-    return "Lean boundaries and explicit adapters";
-  }
   return ({
-    faithful: "Faithful Lean boundary",
+    preserving: "Preserving Lean boundary",
     "adapter-only": "Explicit Lean semantic adapter",
     unreviewed: "Lean boundary — semantic review required",
     "local-contract": "Repository-local Lean contract",
@@ -1020,7 +1016,7 @@ function renderGroupDetail(group) {
     : "";
   const symbols = primarySymbols(group).filter((symbol) =>
     symbolMatchesReferenceFilters(group, symbol));
-  elements.detail.innerHTML = '<div class="badges"><span class="pill faithful">upstream API</span>' +
+  elements.detail.innerHTML = '<div class="badges"><span class="pill preserving">upstream API</span>' +
     upstream.map((value) => '<span class="badge">' + escapeHtml(value) + "</span>").join("") +
     "</div><h2>" + escapeHtml(group.title) + '</h2><p class="note">' +
     escapeHtml(group.description || group.library.description) + "</p>" + docs +

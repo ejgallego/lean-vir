@@ -89,16 +89,14 @@ and shipped runtime targets; the UI does not call them roots.
 
 Each upstream member has a generation record with three independent facts:
 
-- **semantic coverage** is `faithful`, `adapter-only`, `unreviewed`,
+- **semantic coverage** is `preserving`, `adapter-only`, `unreviewed`,
   `local-contract`, `candidate`, or `not-provided`. It is computed once from
   the generated operations associated with the member. A changing adapter no
-  longer appears as faithful coverage merely because its provider key exists.
-  `unreviewed` dominates mixed coverage; otherwise one preserving operation is
-  enough for the machine status `faithful`, while a member with only changing
-  operations is `adapter-only`. The UI describes that status as “has faithful
-  boundary,” and calls out mixed faithful/adapter members explicitly, so a
-  faithful primitive can coexist with named convenience adapters without
-  hiding either fact.
+  longer appears as preserving coverage merely because its provider key
+  exists. `unreviewed` dominates mixed coverage, followed by `adapter-only` if
+  any operation changes upstream semantics. A member is `preserving` only when
+  all of its classified upstream operations preserve semantics. The explorer
+  displays this classification without reinterpreting it.
 - **provenance** records whether upstream-correspondence evidence comes from
   direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
   annotation, or no implementation. This is distinct from declaration

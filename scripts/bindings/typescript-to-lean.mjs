@@ -10,7 +10,6 @@ import { repositoryRoot } from "../repository-paths.mjs";
 import { discoverBindingConfigPaths, loadBindingConfig } from "./binding-config.mjs";
 import {
   buildGeneratedOperations,
-  generatedOperationDocument,
   validateGenerationProfile,
 } from "./binding-modalities.mjs";
 import { validateLeanIdentifier } from "./lean-syntax.mjs";
@@ -22,7 +21,7 @@ export { leanType } from "./binding-modalities.mjs";
 function usage() {
   console.log(`usage: node scripts/bindings/generate-lean-bindings.mjs (--config FILE ... | --config-dir DIR) [--check]
 
-Generate Lean host declarations and binding-operation records from TypeScript declarations.
+Generate Lean host declarations from TypeScript declarations and binding policy.
 
 Options:
   --config FILE  Binding-library configuration containing a generation block; repeatable.
@@ -254,18 +253,10 @@ export async function generateLeanBindings(configPath) {
     }));
   }
   const operations = buildGeneratedOperations(config, generation, descriptorsByRoot);
-  const document = generatedOperationDocument(config, generation, operations);
   return {
     output: generatedPath(generation.output, ".lean", "generated output"),
     text: renderLeanOperations(generation, operations),
-    operationsOutput: generatedPath(
-      generation.operationsOutput,
-      ".json",
-      "generated-operation output",
-    ),
-    operationsText: `${JSON.stringify(document, null, 2)}\n`,
     members: generation.members.length,
-    operations: operations.length,
   };
 }
 
@@ -283,15 +274,7 @@ export async function runTypeScriptToLeanCli(argv) {
       root: repositoryRoot,
       staleHint: `run npm run generate:lean-bindings`,
     });
-    const operationsAction = await emitGeneratedFile(
-      generated.operationsOutput,
-      generated.operationsText,
-      {
-        root: repositoryRoot,
-      },
-    );
     console.log(`${sourceAction} ${relative(repositoryRoot, generated.output)} from ${generated.members} TypeScript members (${basename(config)})`);
-    console.log(`${operationsAction} ${relative(repositoryRoot, generated.operationsOutput)} (${generated.operations} operations with modality provenance)`);
   }
   return 0;
 }

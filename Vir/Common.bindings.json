@@ -7,7 +7,6 @@
   "lean": { "modules": ["Vir.Common", "Vir.Common.Generated"] },
   "generation": {
     "output": "Vir/Common/Generated.lean",
-    "operationsOutput": "build/bindings/common.generated-operations.json",
     "imports": ["Vir.Js"],
     "namespace": "Lean.Vir",
     "abiProfile": {
