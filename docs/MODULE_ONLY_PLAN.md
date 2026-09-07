@@ -1,0 +1,157 @@
+# Module-Only Package Inputs
+
+Status: code-backed plan; implementation not started. Baseline: PR #166,
+landed as `57c95a21895a8ddde5098a00ccd47b634fce1b64`.
+
+## Objective
+
+Remove support for non-module developments and simplify the producer API, not
+just require a `module` header. Support two input adapters:
+
+- Compiled modules, built by Lake, for reproducible CLI and artifact builds.
+- Elaborated module environments from the language server, for live editor
+  widgets including unsaved changes.
+
+Both adapters feed the same declaration indexing, dependency closure,
+interface validation and package emission. This is a deliberately breaking
+authoring/producer change; it does not require changing interpreter behavior.
+
+## Established Facts
+
+- `Target` in `Vir/GeneratePackage/Basic.lean` always carries a source path.
+  Only `TargetMode.markedModule` carries a module name. Input identity is
+  therefore coupled to root selection even for compiled-module builds.
+- `buildVirPackageSetFacet` in `lakefile.lean` branches on `artifacts.ir?`:
+  module inputs get a generated `import all` driver; other inputs fall back to
+  their original Lean source. Both paths still pass a source file to the CLI.
+- `loadDeclIndex` in `Vir/GeneratePackage/Frontend.lean` canonicalizes source
+  paths, collects aliases, and elaborates the files. Opaque dependency bodies
+  are subsequently loaded through their owning modules.
+- The server adapter already uses `declIndexFromEnvironment source snap.env`.
+  It does not reload the source or need the CLI fallback. Server-mode tests
+  cover private/transitive imports, private initialized values and unsaved
+  changes. There is no outstanding opaque-import workaround to remove here.
+- Package-set metadata already identifies module-owned roots without exposing
+  temporary driver paths. Removing physical CLI drivers is a different task
+  from changing that existing public metadata contract.
+
+These are the current contracts, not claims that the proposed changes below
+are implemented. See [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and
+[LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for today's supported workflow.
+
+## Design Decisions
+
+- Module identity and root selection become separate typed values. Preserve
+  explicit exports, package-only roots, all-public discovery and marked
+  export/startup selection; do not replace them all with marked exports.
+- Compiled inputs are selected by module identity within a resolved project
+  environment. Do not infer module names by replacing slashes in arbitrary
+  source paths. Lake owns compiling the inputs and their dependencies.
+- Module loading must not re-elaborate input bodies or execute their source
+  commands again. Compilation-time `#eval` output belongs to compilation.
+  Investigate Lean's existing import APIs before introducing another loader;
+  any temporary import environment remains internal, not a public driver API.
+- Selection and ownership must be explicit: all-public and marked selection
+  operate on the selected module, not every imported declaration. Preserve
+  intentional explicit selection of reachable imported roots where supported.
+- Adding `module` changes default visibility. Migrate exported declarations
+  and interface types with deliberate `public`/`public section` boundaries;
+  an empty all-public selection is not a successful mechanical migration.
+- Snapshots carry their own environment and document provenance. Resolve the
+  current module's local ownership explicitly rather than treating every
+  declaration without an imported-module index as a legacy root. Do not
+  replace an unsaved environment with the module's on-disk artifacts.
+- Keep source locations for diagnostics and browser source links. Remove
+  source paths as package-input identity, not every field named `source`.
+- Keep the core transformations pure where possible. Put filesystem reads,
+  module acquisition and artifact writes at the edges; use typed alternatives
+  rather than another combination of selection booleans.
+
+Exact Lean type and CLI names should be settled in the first implementation
+slice, with the two adapters expressed against one shared API. No compatibility
+aliases should survive the completed migration merely to preserve old CLI
+spellings.
+
+## Consumer Inventory
+
+| Group | Current source-based boundary | Migration requirement |
+| --- | --- | --- |
+| Local CLI/config | `scripts/packages/lean-to-irpkg.mjs`, `prepare-irpkg.mjs`, example `.virpkg.json` files | Select and build real modules; preserve omitted-roots all-public behavior, explicit roots, and output/report defaults. |
+| Generator preparation | `scripts/packages/irpkg-generator.mjs` | Build actual input modules and supply their project search environment, not only the VIR generator and optional prerequisites. |
+| Browser package assembly | `generate-browser-package.mjs`, `fixtures/browser-packages.json`, `defaultTargets` | Preserve multi-input root unions, deduplication, and the distinction between exports and package-only roots. |
+| Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
+| Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
+| External package producers | `scripts/packages/lean-zip/`, `scripts/packages/illuminate/`, `benchmarks/browser/scripts/build-artifacts.mjs` | Resolve/build workload modules in their owning project environment. Preserve registries and artifact provenance; do not repin downstream projects as part of this plan. |
+| Browser source display | `web/app/pages/browser-package-config.js`, fixture catalog/source helpers | Distinguish display/filter paths from compilation identity; preserve source navigation and package coverage checks. |
+| Live infoview | `Vir/Infoview/Package.lean` | Retain the environment adapter and revision/build consistency. Coordinate its API migration with the RPC owner after #169 adaptation. |
+
+This is an inventory of producer boundaries, not a count of files that need a
+`module` header. Generated test sources and dependencies are part of the work.
+Lean modules cannot import non-module developments; dependencies must satisfy
+the same requirement. External projects retain their own migration authority.
+
+## Reviewable Implementation Sequence
+
+One follow-up PR, split into behavioral commits. Temporary migration bridges
+may exist between commits; the final tree must not retain both old and new
+production input systems.
+
+1. [ ] Separate input identity from selection and define the common prepared
+   package input. Add focused tests for module-owned versus imported roots and
+   snapshot-local declarations before moving callers.
+2. [ ] Implement the compiled-module adapter and migrate the Lake facet. Remove
+   generated driver files and reject unsupported non-module inputs clearly.
+   Prove that package generation does not re-elaborate source bodies.
+3. [ ] Migrate shared producer/config helpers, repository examples and fixture
+   modules. Preserve multi-module bundled output; module-only inputs do not
+   imply a universal change to output partitioning.
+4. [ ] Migrate test generation and host oracles through a shared module-project
+   helper. Keep tests intended to fail Lean elaboration separate from tests
+   intended to fail VIR package validation. Preserve the oracle's
+   `interpreter.prefer_native false` setting and unsafe-entry handling so the
+   comparison does not silently switch execution modes.
+5. [ ] Migrate infoview, type-anchor and external-producer adapters after
+   coordinating the affected boundaries. Do not silently rebuild an external
+   workload under VIR's unrelated project environment.
+6. [ ] Remove dead source loaders, path aliases/caches, legacy ownership and
+   initialization-order special cases once both adapters express ownership
+   correctly. Update CLI/config validation and error messages.
+7. [ ] Update user guides and examples, run the acceptance checks below, and
+   review the final diff specifically for leftover migration bridges.
+
+## Acceptance And Corner Cases
+
+| Concern | Required evidence |
+| --- | --- |
+| Selection | Explicit versus package-only roots, marked startup/export selection, all-public discovery, no accidental re-export of dependency markers, empty and duplicate targets. |
+| Module closure | Public/private and transitive imports, shared dependency diamonds, opaque bodies, generated boxed entries and missing-body diagnostics. |
+| Initialization | Private initialized globals and dependency-first ordering, once-only shared initialization, preserved extern fallback ownership and behavior. |
+| Editor | Unsaved module edits survive packaging; revision and bytes refer to the same snapshot; imported dependencies and current-module locals remain distinguishable. |
+| Builds and cache | Real downstream Lake consumer, no source re-elaboration, repeated module reuse, deterministic bytes, relocation, dependency/registry changes and corrupted or missing artifacts. |
+| Negative tests | Attribute/elaboration rejection remains distinct from package-time rejection. An earlier import collision must not mask signature/startup validation coverage. |
+| Runtime/UI | Existing package sets, host bindings, real React/Chromium behavior and source links remain functional. No synthetic React implementation. |
+
+Use the smallest relevant commands from [HARNESS.md](HARNESS.md) per slice:
+`test:packages:unit`, `test:package-ir-builders`, `test:lake`,
+`test:runtime:lean`, `test:infoview`, fixture tests and the Chromium suite.
+Broaden at the shared boundaries; do not repeat expensive unchanged interpreter
+builds to validate a documentation or input-model-only change.
+
+## Review Risks And Non-Goals
+
+- A `module`-header-only sweep leaves most producer complexity intact.
+- Removing the ownerless-root fallback too early can break editor-local or
+  generated declarations. Replace its semantics before deleting its code.
+- Existing tests for source `#eval` and symlink elaboration need phase-correct
+  replacements, not deletion. Existing collision tests may fail earlier under
+  module imports; retain independent package-validation coverage.
+- Package outputs may change as source identity becomes module identity.
+  Review deterministic metadata changes and cache invalidation explicitly;
+  do not turn changed goldens into an unexamined bulk update.
+- Do not retire manifest 6/7 compatibility, change the runtime ABI, remove
+  singleton package sets/raw-byte transport, or require universal package-set
+  sharding as an incidental consequence of this migration.
+- Do not modify Lean's upstream interpreter or introduce a large new harness.
+- This plan is not a prerequisite for #169 RPC adaptation to landed #166.
+  Keep RPC, bindings, shared-assets and external consumers under their existing
+  owners. The follow-up begins locally; publication is a separate action.
