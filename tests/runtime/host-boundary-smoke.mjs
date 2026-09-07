@@ -136,12 +136,13 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 {
   const exactPromise = Promise.resolve({ exact: true });
+  let exactValue = exactPromise;
   const transactionEvents = [];
   const hostState = new VirHostState({
     hostBindings: {
       "test.promise.exact": () => {
         registerHostCallRollback(() => transactionEvents.push("exact"));
-        return exactPromise;
+        return exactValue;
       },
       "test.promise.structural": () => {
         registerHostCallRollback(() => transactionEvents.push("structural"));
@@ -188,6 +189,25 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
     ],
   });
   assert.equal(hostState.callObjects(0, 0, 0), exactPromise);
+  let propertyReads = 0;
+  for (const value of [
+    Object.defineProperty({}, "then", {
+      get() {
+        propertyReads++;
+        throw new Error("exact JS values must not be inspected for then");
+      },
+    }),
+    new Proxy({}, {
+      get() {
+        propertyReads++;
+        throw new Error("exact JS values must not be inspected through a proxy");
+      },
+    }),
+  ]) {
+    exactValue = value;
+    assert.equal(hostState.callObjects(0, 0, 0), value);
+  }
+  assert.equal(propertyReads, 0);
   assert.deepEqual(transactionEvents, []);
   assert.throws(
     () => hostState.callObjects(1, 0, 0),

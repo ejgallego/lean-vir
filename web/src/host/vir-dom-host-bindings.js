@@ -113,15 +113,16 @@ function isKeyboardEvent(value) {
 }
 
 function isElement(value) {
+  const Element = globalThis.Element;
+  if (typeof Element !== "function") return false;
+  const getTagName = Object.getOwnPropertyDescriptor(
+    Element.prototype,
+    "tagName",
+  )?.get;
+  if (typeof getTagName !== "function") return false;
   try {
-    if (
-      typeof globalThis.Element === "function" &&
-      value instanceof globalThis.Element
-    ) {
-      return true;
-    }
-    const ownerElement = value?.ownerDocument?.defaultView?.Element;
-    return typeof ownerElement === "function" && value instanceof ownerElement;
+    Reflect.apply(getTagName, value, []);
+    return true;
   } catch {
     return false;
   }

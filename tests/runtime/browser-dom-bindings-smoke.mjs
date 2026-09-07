@@ -131,15 +131,8 @@ const eventBindings = createBrowserEventHostBindings();
 const tokenBindings = createDOMTokenListHostBindings();
 const listener = () => undefined;
 
-const previousElement = Object.getOwnPropertyDescriptor(globalThis, "Element");
-class TestElement {}
-Object.defineProperty(globalThis, "Element", {
-  configurable: true,
-  writable: true,
-  value: TestElement,
-});
-try {
-  const elementTarget = new TestElement();
+{
+  const elementTarget = {};
   const nonElementTarget = {};
   assert.equal(
     eventBindings["browser.event.target"]({ target: elementTarget }),
@@ -151,30 +144,18 @@ try {
     }),
     nonElementTarget,
   );
-  assert.equal(
-    eventBindings["browser.eventTarget.asElement"](elementTarget),
-    elementTarget,
-  );
+  // Node has no native Element brand. Success and cross-realm cases run in Chromium.
   assert.equal(
     eventBindings["browser.eventTarget.asElement"](nonElementTarget),
     null,
   );
   assert.equal(
     elementBindings["browser.element.fromAny"](elementTarget),
-    elementTarget,
+    null,
   );
   assert.equal(
     elementBindings["browser.element.fromAny"]("not an element"),
     null,
-  );
-  class ForeignElement {}
-  const foreignElement = new ForeignElement();
-  foreignElement.ownerDocument = {
-    defaultView: { Element: ForeignElement },
-  };
-  assert.equal(
-    elementBindings["browser.element.fromAny"](foreignElement),
-    foreignElement,
   );
   const hostileValue = new Proxy(
     {},
@@ -185,12 +166,6 @@ try {
     },
   );
   assert.equal(elementBindings["browser.element.fromAny"](hostileValue), null);
-} finally {
-  if (previousElement) {
-    Object.defineProperty(globalThis, "Element", previousElement);
-  } else {
-    delete globalThis.Element;
-  }
 }
 
 assert.equal(

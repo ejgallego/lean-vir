@@ -221,8 +221,8 @@ export class VirHostState {
       try {
         const value = binding(...args);
         if (
-          isPromiseLike(value) &&
-          !isGenericJsResourceDescriptor(entry.result)
+          !isGenericJsResourceDescriptor(entry.result) &&
+          isPromiseLike(value)
         ) {
           throw new Error(
             `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,

@@ -45,27 +45,10 @@ try {
     defaultHostBindings: createBrowserHostBindings(),
   });
   try {
-    const previousElement = Object.getOwnPropertyDescriptor(
-      globalThis,
-      "Element",
-    );
-    class TestElement {}
-    Object.defineProperty(globalThis, "Element", {
-      configurable: true,
-      writable: true,
-      value: TestElement,
-    });
-    try {
-      const element = new TestElement();
-      const fallback = new TestElement();
-      assert.equal(
-        runtime.call(
-          "Vir.Fixtures.InfoviewRpcPromise.castElementOr",
-          element,
-          fallback,
-        ),
-        element,
-      );
+    {
+      // The checked cast rejects values without a native DOM brand. Native
+      // Element success and iframe cases belong to the Chromium suite.
+      const fallback = {};
       assert.equal(
         runtime.call(
           "Vir.Fixtures.InfoviewRpcPromise.castElementOr",
@@ -74,12 +57,6 @@ try {
         ),
         fallback,
       );
-    } finally {
-      if (previousElement) {
-        Object.defineProperty(globalThis, "Element", previousElement);
-      } else {
-        delete globalThis.Element;
-      }
     }
 
     const requests = [];
