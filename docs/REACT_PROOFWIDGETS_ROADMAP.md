@@ -1,9 +1,11 @@
 # ProofWidgets Compatibility Roadmap
 
-This note records the path from Vir's standalone React renderer toward
-richer ProofWidgets compatibility. The implemented renderer and its current
-API are tracked separately in `docs/REACT_NODE.md`; this file focuses on the
-future infoview/RPC and ProofWidgets-style layers.
+The target is ordinary ProofWidgets components implemented in Lean rather than
+TypeScript, running in the same browser React/infoview environment. Semantic
+divergences are compatibility defects or missing support unless a necessary
+Lean/JavaScript bridge obligation is identified explicitly. The implemented
+renderer is tracked in `docs/REACT_NODE.md`; concrete component parity targets
+are maintained in [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md).
 
 ## External Shape
 
@@ -36,22 +38,22 @@ stay close to the current ProofWidgets4 shape:
 - `ProofWidgets.Component Props`: a Lean value naming a React component export,
   with props encoded through `RpcEncodable` and a normal infoview widget-module
   loading path.
-- `ProofWidgets.Html`: a Lean tree with `element`, `text`, and `component`
+- The optional `ProofWidgets.Html`/`HtmlDisplay` path: a Lean tree with `element`, `text`, and `component`
   nodes, where component nodes carry a component hash/export, encoded props,
   and children.
 - `ProofWidgets.Html.ofComponent`: the standard way for Lean-authored HTML to
   embed another component.
 - `ProofWidgets.Jsx`: JSX-like syntax where lowercase tags are HTML elements
   and uppercase tags are `Component`s.
-- `mk_rpc_widget%`: the existing Lean-computed component pattern, which turns
+- `mk_rpc_widget%`: an optional server-computed component pattern, which turns
   an RPC method returning `Html` into a component.
 
 Lean VIR should therefore first grow the familiar React/ProofWidgets API
 surface, even if it exposes the same footguns as JavaScript React hooks. Hook
-order, render purity, StrictMode replay, and stale closure issues are real, but
-they should be handled by documentation, Lean-side linting, and later safer
-abstractions. They should not block the first compatibility layer from looking
-like React and ProofWidgets code that users already understand.
+order, render purity, StrictMode replay, and stale closure issues remain the
+programmer's responsibility just as in TypeScript. Explain them without promising
+new enforcement or adding a parallel scheduler. The serialized HTML path is one
+API to interoperate with, not the universal widget execution model.
 
 For Vir, full infoview compatibility remains a follow-up target.
 The current `Vir.Infoview` shell can mount a VIR package in the Lean infoview
@@ -230,31 +232,18 @@ A realistic path has three layers:
 
 ## Porting Targets
 
-Use upstream ProofWidgets4 examples as the compatibility test corpus. The first
-ports should be small enough to keep failures actionable, but representative
-enough to prevent us from designing an API in a vacuum:
-
-1. `ProofWidgets/Demos/Jsx.lean`: verifies JSX-like Lean syntax, lowercase HTML
-   tags, string/JSON attributes, children interpolation, and uppercase component
-   embedding. The independent `RpcReferenceWidget` example tests real RPC data
-   rendering without a synthetic reference demonstration.
-2. `ProofWidgets/Component/HtmlDisplay.lean` and
-   `ProofWidgets/Data/Html.lean`: verify the core `Html` and component-node
-   encoding.
-3. `ProofWidgets/Component/OfRpcMethod.lean`: verifies the Lean-computed
-   component shape analogous to `mk_rpc_widget%`.
-4. A small interactive example that uses React state/hooks from the component
-   render context, so we learn the real constraints before designing safer
-   wrappers.
-5. A tactic/editing example such as the selection/insert-conversion demos once
-   the infoview RPC/edit channel exists.
+Use the ordered component list in [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md).
+Compare each Lean implementation with its upstream TypeScript implementation in
+the same official React/infoview environment, reusing upstream dependencies.
+`InteractiveExpr`, `HtmlDisplay` and `MakeEditLink` are planned parity ports, not
+completed features. The current RPC tutorial supplies boundary evidence rather
+than substituting for any of those components.
 
 ## Open Questions
 
-- How much of ProofWidgets' RPC layer can be approximated without a full Lean
-  server snapshot/edit model.
-- How faithfully the initial component/JSX API can mirror
-  `ProofWidgets.Data.Html` before we need repository-specific extensions for
-  callbacks and hook-like behavior.
-- Whether future recursive-data improvements should support enough structure
-  sharing or mutual recursion to represent more of ProofWidgets directly.
+- Which official infoview context and component exports need direct bindings for
+  the selected ports?
+- Which shared server/client declarations and identity-preserving accessors would
+  remove duplicated schema assumptions without introducing a decoded object model?
+- What loading/export gaps remain for composing upstream and Lean-authored
+  components through the same widget-module interface?

@@ -118,7 +118,7 @@ async function run() {
     const makeRuntime = () =>
       createVirRuntime({
         wasmBytes,
-        irPackageSetBytes: [packageBytes],
+        irPackageSet: [packageBytes],
         defaultHostBindings: () =>
           createBrowserHostBindings({
             reactHostBindings: createBrowserReactHostBindings,

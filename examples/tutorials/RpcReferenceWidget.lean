@@ -4,8 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Infoview.Surface
-import Vir.React
+module
+
+public import Vir.Infoview.Surface
+public import Vir.React
+
+public section
 
 /-!
 A native RPC response can remain in React state and be rendered by Lean without

@@ -41,7 +41,7 @@ try {
   const { wasmBytes } = await readRuntimeArtifacts();
   const runtime = await createVirRuntime({
     wasmBytes,
-    irPackageSetBytes: [await readFile(packagePath)],
+    irPackageSet: [await readFile(packagePath)],
     defaultHostBindings: createBrowserHostBindings(),
   });
   try {

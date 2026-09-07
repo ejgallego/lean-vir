@@ -111,6 +111,13 @@ tests may inject only the individual host operations they exercise.
 - Are we claiming a property that TypeScript/JavaScript does not provide?
 - Is a Node test accidentally becoming a browser or React emulator?
 
+Before adding bridge bookkeeping, identify the concrete failure introduced by
+crossing the Lean/JavaScript boundary, check whether a simpler representation
+removes it, and supply a regression for any remaining mechanism. Do not turn
+upstream programmer responsibilities into new VIR guarantees. In compatibility
+reviews, distinguish missing support or semantic bugs from unavoidable foreign
+heap obligations and responsibilities shared with TypeScript clients.
+
 ## Validation
 
 Start focused and broaden for shared boundaries:

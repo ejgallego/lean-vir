@@ -141,6 +141,8 @@ ownership diagrams.
   ProofWidgets porting targets and external JS library binding pressure.
 - [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md):
   exact RPC-session, Promise, and server-reference compatibility boundary.
+- [PROOFWIDGETS_RPC_REVIEW.md](PROOFWIDGETS_RPC_REVIEW.md):
+  native RPC change scope, reviewer reading order and correctness questions.
 - [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and

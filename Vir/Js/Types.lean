@@ -71,7 +71,8 @@ end Function
 abbrev Function1 (argument result : Type) : Type :=
   Lean.Vir.Js (Function.Unary argument result)
 
-@[inline] private unsafe def eraseImpl {α : Type}
+/-- Runtime implementation of `Js.erase`; public so module importers can compile it. -/
+@[inline] unsafe def eraseImpl {α : Type}
     (value : Lean.Vir.Js α) : Lean.Vir.Js.Any :=
   unsafeCast value
 

@@ -1,13 +1,16 @@
 # ProofWidgets RPC Compatibility
 
-This document compares the upstream RPC-backed component path with VIR's
-current browser-native path. It is an implementation checklist, not a promise
-that VIR will reproduce an upstream JavaScript helper internally.
+ProofWidgets components are browser React exports that can use the infoview's
+contexts and libraries. VIR's goal is to author those components in Lean with
+the same React and JavaScript semantics as TypeScript-authored components.
+RPC is one dependency a component may use, not its universal execution model.
+This document records that boundary and the current acceptance evidence.
 
 The comparison was made against:
 
 - ProofWidgets4 commit `a8acbfd87375ff4abe14ce09db5b7664d383bc7f`, in
-  `ProofWidgets/Component/OfRpcMethod.lean` and `widget/src/ofRpcMethod.tsx`;
+  `ProofWidgets/Component/Basic.lean`, `ProofWidgets/Component/OfRpcMethod.lean`
+  and `widget/src/ofRpcMethod.tsx`;
 - vscode-lean4 commit `5a25e6abb2e973b4c89a053acc74c479c0bb2e9f`, in
   `lean4-infoview/src/infoview/rpcSessions.tsx` and
   `lean4-infoview-api/src/rpcSessions.ts`.
@@ -15,9 +18,10 @@ The comparison was made against:
 Browser acceptance uses the published official `@leanprover/infoview-api`
 package pinned to `0.13.0`, with the repository's pinned Lean server and React.
 
-## Upstream execution path
+## Optional server-rendered authoring path
 
-`mk_rpc_widget%` accepts a named server method of type:
+Upstream also offers `mk_rpc_widget%`: an authoring helper that accepts a named
+server method of type:
 
 ```lean
 Props → Lean.Server.RequestM (Lean.Server.RequestTask ProofWidgets.Html)
@@ -28,7 +32,10 @@ module calls the official `useRpcSession` hook, invokes
 `RpcSessionAtPos.call(method, props, options)`, tracks the returned native
 Promise through React state, cancels superseded work with `AbortController` or
 the legacy cancellable protocol, and renders the serialized `ProofWidgets.Html`
-with `HtmlDisplay`.
+with `HtmlDisplay`. This protocol is useful when server computation produces a
+serializable UI description. Its inability to serialize arbitrary closures or
+store React state in the server method does not restrict ordinary ProofWidgets
+React components, including the client components VIR aims to implement in Lean.
 
 Those pieces have distinct ownership:
 
@@ -49,9 +56,27 @@ Those pieces have distinct ownership:
 | Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations over exact `Js.Function1` values | Preserve the Promise and callback objects; do not make the synchronous host dispatcher await either one. |
 | Server references | Exact response objects registered by `RpcSessionAtPos` | Genuine `Server.WithRpcRef` response/reference round trip | Keep references exact; no descriptor resolver or separate retention store. |
 | Request cancellation | Native `AbortController` passed through call options | Exact options forwarded to the official client; real LSP cancellation tested | Cancellation does not guarantee local rejection; callers must still suppress stale results. |
-| Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Exact JavaScript request/response objects; JSL is only for non-wire Lean values | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
-| Returned HTML | Serialized upstream `ProofWidgets.Html` rendered by `HtmlDisplay` | `ProofWidgets.Html` is a direct `ReactM (Js React.Node)` action | Do not silently equate these types. Either use upstream `HtmlDisplay` for wire compatibility or return data and render it with the VIR-native API. |
+| Wire props and RPC data | `RpcEncodable` data supplied across the server boundary | Exact JavaScript request/response objects; JSL is only for non-wire Lean values | Construct the exact JavaScript wire value explicitly; browser-only props can also contain ordinary JS functions and objects. |
+| Optional serialized UI | Upstream `ProofWidgets.Html` rendered by `HtmlDisplay` | `Lean.Vir.ProofWidgets.Html` is a direct `ReactM (Js React.Node)` action | These are distinct authoring APIs. For upstream wire compatibility, pass the exact upstream `Html` value to upstream `HtmlDisplay`. |
 | Error display | Promise rejection plus upstream `mapRpcError` | Exact native Promise rejection, including the server error | Preserve the rejection value first; presentation can be an explicit component helper. |
+
+## Gaps, application rules, and bridge obligations
+
+- **Compatibility gaps:** the native RPC foundation is exercised, but the
+  reusable ProofWidgets components and their infoview-context integration still
+  need parity examples. The [porting plan](PROOFWIDGETS_PORTING.md) lists the
+  concrete targets. Testing a data-returning RPC method does not establish
+  `InteractiveExpr` or serialized-`Html` compatibility.
+- **Shared application rules:** component purity, hook ordering, valid effect
+  dependencies, cancellation, stale-result suppression, and agreement on wire
+  data remain the programmer's responsibilities just as in a TypeScript React
+  app. VIR does not impose additional Lean-level proofs of these properties.
+- **Foreign bridge obligations:** VIR must root exact JavaScript values while
+  Lean holds them, retain Lean heap references behind JSL objects and converted
+  callbacks, and release those foreign roots at runtime disposal. Owners must
+  unmount React before disposing the runtime whose component functions it uses.
+  These obligations do not require tracking React's internal hook queues or
+  owning ordinary JS object graphs separately.
 
 ## Exact Promise boundary
 
@@ -88,9 +113,19 @@ Lean.Vir.Js Response
     -> exact nested RpcPtr objects
 ```
 
-Generated property accessors may provide typed views of this object, but they
-must return the exact nested values. A decoded Lean snapshot is acceptable
-only for response data proven not to contain server references.
+Typed property accessors can provide views of this object, but they must return
+the exact nested values. Copying passive fields into a Lean snapshot is a
+separate explicit operation; any retained server references must still be held
+as their exact registered JS objects.
+
+Shared server/client datatype declarations, runtime validation, and decoding
+solve different problems. Shared declarations describe the expected wire shape
+and can reduce duplicated type definitions. They do not automatically validate a
+received object. A validator checks a value; a decoder constructs a different
+representation. Neither is mandatory merely because a component is authored in
+Lean, and neither should silently replace the registered reference objects.
+The current tutorial's typed projections assume the server's declared shape,
+as an unchecked TypeScript property access would; they are not schema validation.
 
 ## Boundary smoke and first acceptance fixture
 
@@ -139,9 +174,10 @@ parameter would exceed the current six-argument interpreter import limit
 (which includes erased type parameters and the world token). `Js.erase` keeps
 this a pure phantom-type change. The result remains polymorphic.
 
-A later compatibility fixture may return upstream serialized
-`ProofWidgets.Html` and delegate to upstream `HtmlDisplay`; it should not add a
-second VIR-owned HTML tree.
+A planned compatibility fixture will pass upstream serialized
+`ProofWidgets.Html` directly to upstream `HtmlDisplay`. It should reuse upstream
+module loading and rendering dependencies, including `InteractiveCode` where
+needed, rather than introduce another HTML wire dialect or renderer.
 
 ## Retired provisional path
 
