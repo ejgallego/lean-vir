@@ -192,7 +192,7 @@ for the full matrix.
   `lake build vir_irpkg`, and `npm run test:upstream`.
 - Interface type classification, abbrev unfolding, structures, inductives,
   resources, effects, or boxed-boundary checks: `lake build vir_irpkg` and
-  `npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib`. Add a
+  `npm run generate:irpkg -- Fib /tmp/vir-fib.irpkg fib`. Add a
   targeted fixture when the supported boundary surface changes.
 - Export discovery or host-import collection: `lake build vir_irpkg`,
   `npm run check:boundary-registry`, and
@@ -203,7 +203,7 @@ for the full matrix.
   `npm run check:boundary-registry`. If wrapper symbols or generated wrapper macros
   changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
-  `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
+  `lake build vir_irpkg`, `npm run generate:irpkg -- Fib
 /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
   change.
 - Lean library packaging or import layout: `bash scripts/build-lean-lib.sh`.
@@ -363,6 +363,6 @@ npm run check:native-externs
 npm run check:boundary-registry
 npm run check:native-wrappers
 bash scripts/build-lean-lib.sh
-npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib
+npm run generate:irpkg -- Fib /tmp/vir-fib.irpkg fib
 npm run test:runtime -- package-generation
 ```

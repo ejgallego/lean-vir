@@ -71,7 +71,7 @@ After loading the generated package, JavaScript calls ordinary exports with
 See [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for the complete downstream Lake
 workflow, including current module-boundary limitations and remediation.
 
-## Local One-File Workflow
+## Local Module Workflow
 
 For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
@@ -83,29 +83,31 @@ React implementation. The JavaScript-side binding composition reference lives
 in [JS_API.md](JS_API.md). This section documents the repository-local package
 generator; downstream Lake packages should prefer the facet workflow above.
 
-1. Import the Lean module that provides the host import.
+1. Start a module and import the library that provides the host import.
 
    ```lean
-   import Vir.Browser
+   module
+   public import Vir.Browser
    ```
 
 2. Write an exported Lean declaration that calls the host import.
 
    ```lean
-   def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
+   public def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
      let document ← Lean.Vir.Browser.Document.current
      Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString title)
      Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
    ```
 
-3. Generate a package with that declaration as a root.
+3. Save as `examples/MyDemo.lean`, add `MyDemo` to `VirExamples.roots` in
+   `lakefile.lean`, and generate a package with that declaration as a root.
 
    ```bash
-   npm run generate:irpkg -- MyDemo.lean web/public/my-demo.irpkg titleHandshake
+   npm run generate:irpkg -- MyDemo web/public/my-demo.irpkg titleHandshake
    ```
 
-   The command builds `Vir.*`, adds `build/lean-lib` to `LEAN_PATH`, writes
+   The command builds the module and generator, uses Lake's module search path, writes
    the `.irpkg`, and writes a report next to it. The report should list the
    JavaScript host imports collected from the package.
 
@@ -170,7 +172,10 @@ For custom JavaScript functions, declare the host import in Lean and bind the
 same target string in JavaScript.
 
 ```lean
-import Vir.Js
+module
+public import Vir.Js
+
+public section
 
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
@@ -181,10 +186,11 @@ def bumpViaJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
   Lean.Vir.JsValue.toNat output
 ```
 
-Generate a package with `bumpViaJs` as a root:
+Save as `examples/MyCustom.lean`, register `MyCustom` in `VirExamples.roots`,
+and generate a package with `bumpViaJs` as a root:
 
 ```bash
-npm run generate:irpkg -- MyCustom.lean web/public/custom.irpkg bumpViaJs
+npm run generate:irpkg -- MyCustom web/public/custom.irpkg bumpViaJs
 ```
 
 Then provide the matching JavaScript binding when creating the runtime:

@@ -53,6 +53,14 @@ Source flags, source elaboration and Lake's non-module fallback intentionally
 remain until consumers migrate. The infoview change in this slice is only the
 mechanical source-origin constructor update; it still consumes `snap.env`.
 
+The public npm CLI and version-2 package configs now use explicit module names.
+A shared pure normalizer owns validation, selection and
+output defaults; Lake builds the selected modules and supplies their search
+path. Fib, Quickstart and MergeSort are registered as example modules. Runtime
+source-fixture helpers temporarily call the low-level generator directly rather
+than depending on the removed public source-path CLI. Browser package assembly,
+generated test modules and external/type-anchor adapters are still pending.
+
 ## Design Decisions
 
 - Module identity and root selection become separate typed values. Preserve
@@ -89,7 +97,7 @@ survive the completed migration merely to preserve old CLI spellings.
 
 | Group | Current source-based boundary | Migration requirement |
 | --- | --- | --- |
-| Local CLI/config | `scripts/packages/lean-to-irpkg.mjs`, `prepare-irpkg.mjs`, example `.virpkg.json` files | Select and build real modules; preserve omitted-roots all-public behavior, explicit roots, and output/report defaults. |
+| Local CLI/config (migrated) | `scripts/packages/lean-to-irpkg.mjs`, `prepare-irpkg.mjs`, example `.virpkg.json` files | Module names and version-2 configs; omitted-roots all-public behavior, explicit roots, and output/report defaults preserved. |
 | Generator preparation | `scripts/packages/irpkg-generator.mjs` | Build actual input modules and supply their project search environment, not only the VIR generator and optional prerequisites. |
 | Browser package assembly | `generate-browser-package.mjs`, `fixtures/browser-packages.json`, `defaultTargets` | Preserve multi-input root unions, deduplication, and the distinction between exports and package-only roots. |
 | Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
@@ -121,6 +129,9 @@ production input systems.
 3. [ ] Migrate shared producer/config helpers, repository examples and fixture
    modules. Preserve multi-module bundled output; module-only inputs do not
    imply a universal change to output partitioning.
+
+   - [x] Migrate public npm CLI/configs and register their example modules.
+   - [ ] Migrate browser package assembly and remaining source fixtures.
 4. [ ] Migrate test generation and host oracles through a shared module-project
    helper. Keep tests intended to fail Lean elaboration separate from tests
    intended to fail VIR package validation. Preserve the oracle's

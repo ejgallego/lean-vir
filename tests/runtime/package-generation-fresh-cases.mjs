@@ -29,8 +29,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   await writeRuntimeFixture(freshSource, "FreshUser.lean");
 
   const generated = generateIrPackage(freshSource, freshPackage);
-  assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
-  assert.match(generated.stdout, /local package ready/);
+  assert.match(generated.stdout, /\[all\]/);
 
   const freshRuntime = await factory.createRuntime({
     irPackageSet: [await readFile(freshPackage)],

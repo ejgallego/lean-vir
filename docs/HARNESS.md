@@ -148,7 +148,7 @@ npm run compare:surface -- control.json candidate.json delta.json delta.md
 Package generation and inspection:
 
 ```bash
-npm run generate:irpkg -- examples/Fib.lean web/public/local-fib.irpkg
+npm run generate:irpkg -- Fib web/public/local-fib.irpkg
 npm run prepare:irpkg -- examples/quickstart.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
@@ -269,6 +269,8 @@ changes; `package.json` remains the exact command-order source of truth.
 - Direct compiled-module input, root selection, provenance, or source
   re-elaboration regressions:
   `npm run test:runtime -- module-input`
+- Module-based npm CLI/config validation, selected-module builds and output:
+  `npm run test:packages:unit` and `npm run test:runtime -- module-cli`
 - Lake module/package facets, downstream bundle input tracing and output
   ownership, marked-module selection, or SDK installer changes:
   `npm run test:lake`
@@ -335,9 +337,8 @@ Runtime smoke tests are split into two groups:
 The runtime runner executes pure tests in parallel, but serializes Lean-group
 tests to avoid concurrent writes to shared Lean build outputs on cold CI
 checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
-per test process. Internal helper calls may set `VIR_SKIP_IRPKG_BUILD=1` only
-after that setup has completed; routine manual use should keep using the npm
-commands above.
+per test process. Source-fixture helpers reuse the prepared low-level generator;
+the public npm CLI always builds its selected modules through Lake's cache.
 
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.

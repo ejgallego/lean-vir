@@ -243,7 +243,7 @@ assertLink(demoHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures
 assertLink(demoHtml, `dev.html?package=${boundaryPackageFile}&amp;entry=Vir_Fixtures_Boundary_floatScaleScore`);
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
-assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");
+assert.ok(devHtml.includes("npm run generate:irpkg -- MyModule"), "dev.html should show the module package command shape");
 assert.ok(formatHtml.includes("format-width-range"), "format.html should contain width controls");
 assert.ok(formatHtml.includes("format-output"), "format.html should contain rendered output controls");
 assert.ok(reactHtml.includes("react-pet-root"), "react.html should contain the React Tamagotchi mount");

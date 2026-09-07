@@ -1,6 +1,6 @@
 # Local IR Packages
 
-The local package path takes one Lean source file, packages one or more exported
+The local package path builds one registered Lean module, packages one or more exported
 declarations into a `.irpkg`, and loads that package in `/dev.html`. The browser
 runner reads the embedded manifest and renders entry controls automatically.
 
@@ -31,20 +31,20 @@ npm run dev -- --port 5173
 The general command shape is:
 
 ```bash
-npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
+npm run generate:irpkg -- <Module.Name> [package.irpkg] [root ...]
 ```
 
 Package the transitive closure for one or more explicit exports. This is the
-core "one Lean file, N browser entries" path:
+core "one Lean module, N browser entries" path:
 
 ```bash
-npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
+npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
 ```
 
-Package public source definitions by omitting roots:
+Package public definitions owned by the selected module by omitting roots:
 
 ```bash
-npm run generate:irpkg -- examples/Fib.lean build/generated/local.irpkg
+npm run generate:irpkg -- Fib build/generated/local.irpkg
 ```
 
 Both commands write an `.irpkg` with an embedded interface manifest and a report
@@ -58,8 +58,21 @@ source targets, and resolved roots. Stable build identity is embedded in
 `manifest.metadata`; the adjacent diagnostic report alone records wall-clock
 generation time.
 
-Local package generation also builds `build/lean-lib`, which provides the
-project-owned `Vir.*` modules for host import declarations.
+The command builds the selected module and generator with Lake, then loads
+compiled IR using Lake's module search path. Module source commands such as
+`#eval` run during compilation, not again during package generation.
+
+These npm commands operate in this repository's Lake workspace. Register a new
+module in the appropriate `lean_lib` roots/globs; for example, add `MyApp` to
+`VirExamples.roots` for `examples/MyApp.lean`. The source must begin with
+`module`; expose callable definitions with `public def` or `public section`.
+Use the module name `MyApp`, not its source path. For an independent downstream
+project, use the [Lake facet workflow](LAKE_INTEGRATION.md).
+
+With no output argument, `App.Widget` writes `build/generated/Widget.irpkg`
+and `build/generated/Widget.report.md`. Quoted module names require an explicit
+output path. The npm interface does not accept Lake target/facet syntax or
+source-path aliases.
 
 When a selected declaration crosses an opaque module-system import, the local
 generator loads the owning module's compiled IR and folds the reached closure
@@ -206,7 +219,7 @@ single-field structures.
 
 ## Current Scope
 
-The local source workflow emits one `.irpkg` member. Lake module-system clients
+The local module workflow emits one `.irpkg` member. Lake module-system clients
 build `:vir`: the generator uses Lean's declaration-to-module ownership data to
 materialize reached opaque imports and emits a version-2 JSON-described set of
 ordinary format-11 `.irpkg` members. The descriptor binds every member to its

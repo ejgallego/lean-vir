@@ -219,12 +219,9 @@ export function wait(ms) {
 }
 
 export function generateIrPackage(source, packagePath) {
-  ensureVirIrpkgBuilt();
-  const generated = spawnSync(
-    "node",
-    ["scripts/packages/lean-to-irpkg.mjs", source, packagePath],
-    { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
-  );
+  // Temporary source fixture adapter; the public CLI now takes built modules.
+  const reportPath = packagePath.replace(/\.irpkg$/, "") + ".report.md";
+  const generated = runVirIrpkg([packagePath, reportPath, "--target-all", source]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   return generated;
 }
@@ -234,13 +231,6 @@ let virJsBuilt = false;
 
 export function virIrpkgEnv() {
   return preparedVirIrpkg().env;
-}
-
-function skipVirIrpkgBuildEnv() {
-  return {
-    ...process.env,
-    VIR_SKIP_IRPKG_BUILD: "1",
-  };
 }
 
 export function ensureVirJsBuilt() {
@@ -327,14 +317,13 @@ async function assertUnsupportedInterfaceFile(
   patterns,
   roots,
 ) {
-  ensureVirIrpkgBuilt();
-  const generated = spawnSync(
-    "node",
-    roots === null
-      ? ["scripts/packages/lean-to-irpkg.mjs", source, packagePath]
-      : ["scripts/packages/lean-to-irpkg.mjs", source, packagePath, ...roots],
-    { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
-  );
+  const generated = runVirIrpkg([
+    packagePath,
+    reportPath,
+    ...(roots === null || roots.length === 0
+      ? ["--target-all", source]
+      : ["--target", source, ...roots]),
+  ]);
   assert.notEqual(
     generated.status,
     0,

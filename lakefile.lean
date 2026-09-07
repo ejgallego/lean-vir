@@ -43,7 +43,7 @@ lean_lib VirInfoview where
 /-- Non-default, buildable sources used by the public VIR examples. -/
 lean_lib VirExamples where
   srcDir := "examples"
-  roots := #[`SlidesCanvas]
+  roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort]
 
 /-- Module-system fixtures for composable package-set regression tests. -/
 lean_lib VirModuleFixtures where

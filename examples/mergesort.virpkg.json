@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "source": "examples/MergeSort.lean",
+  "version": 2,
+  "module": "MergeSort",
   "package": "web/public/local-mergesort.irpkg",
   "report": "build/generated/local-mergesort.report.md",
   "roots": ["SortDemo.demo", "SortDemo.demoFromArray", "SortDemo.sortArray"]

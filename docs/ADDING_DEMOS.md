@@ -30,16 +30,16 @@ Most example-only edits should only regenerate the relevant
 
 ## Local Package Runner
 
-For a narrower developer loop, generate a package from a single Lean file:
+For a narrower developer loop, generate a package from a registered Lean module:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
 ```
 
-When no roots are supplied, the utility packages public source definitions:
+When no roots are supplied, the utility packages public module definitions:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg
 ```
 
 Run `npm run dev` and open `/dev.html` to load a served package URL or upload the
