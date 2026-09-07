@@ -266,6 +266,9 @@ changes; `package.json` remains the exact command-order source of truth.
   `npm run test:runtime:unit`
 - Runtime package generation or SDK artifact import checks:
   `npm run test:runtime:lean`
+- Direct compiled-module input, root selection, provenance, or source
+  re-elaboration regressions:
+  `npm run test:runtime -- module-input`
 - Lake module/package facets, downstream bundle input tracing and output
   ownership, marked-module selection, or SDK installer changes:
   `npm run test:lake`

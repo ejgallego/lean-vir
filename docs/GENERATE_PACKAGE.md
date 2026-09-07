@@ -17,7 +17,23 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `scripts/packages/lean-to-irpkg.mjs`,
   `scripts/packages/generate-browser-package.mjs`, and the fixture runner.
 
-Targets have one of five modes:
+Targets separate input identity from four selection modes. Compiled-module
+inputs are built by Lake before invoking the generator:
+
+- `--target-module <module> <root>...`: export explicit roots.
+- `--package-module <module> <root>...`: include roots without exporting them.
+- `--target-all-module <module>`: discover public definitions owned by the module.
+- `--target-marked-module <module>`: select the module's marked exports/startups,
+  excluding markers owned by dependencies. The internal `--module-set-output`
+  arguments provide descriptor and shard destinations to the Lake `:vir` facet.
+
+Module inputs load compiled IR directly through an internal import environment;
+they take no driver source path and do not re-elaborate module bodies. Explicit
+roots may intentionally name imported declarations. Each module is acquired
+once per generator invocation even when multiple selections refer to it.
+
+Source-file adapters remain during the migration described in
+[MODULE_ONLY_PLAN.md](MODULE_ONLY_PLAN.md):
 
 - `--target <source.lean> <root>...`: package explicit roots and export them.
 - `--package-target <source.lean> <root>...`: include roots in the package
@@ -26,16 +42,12 @@ Targets have one of five modes:
   roots and exports.
 - `--target-marked <source.lean>`: package declarations marked with
   `@[vir_export]` or `@[vir_startup]` in a source file.
-- `--target-marked-module <driver.lean> <module>`: package marked declarations
-  owned by one imported module while excluding marked declarations from its
-  dependencies. The CLI's internal
-  `--module-set-output` arguments provide descriptor and shard destinations to
-  the Lake `:vir` facet.
-
 The corresponding manifest `mode` values are `explicit`, `packageOnly`,
-`all`, `marked`, and `markedModule`. `Target` represents these alternatives
-with `TargetMode`, so callers cannot construct contradictory combinations of
-selection booleans.
+`all`, `marked`, and `markedModule`. Internally `Target` carries an independent
+`PackageTargetOrigin` and four-case `TargetMode`. Only the wire encoder maps
+module origin plus marked selection to the existing `markedModule` spelling.
+The shared `DeclIndex` is the prepared input used by both filesystem/module
+loading and the server environment adapter; there is no parallel emitter.
 
 Every target mode follows opaque declaration ownership and loads the reached
 module IR before validating the final closure. The module-marked mode also
@@ -127,13 +139,15 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 
 ## Data Flow
 
-1. The CLI turns each target argument into a `Target`.
-2. `Frontend.frontendEnv` elaborates each source unchanged with async
-   elaboration disabled. Frontend commands such as `#eval` follow normal Lean
-   semantics and may produce output during package generation.
-3. `Frontend.loadDeclIndex` records each source environment, source-local IR
+1. The CLI turns each target argument into a `Target` with origin and selection.
+2. Source adapters use `Frontend.frontendEnv` to elaborate sources unchanged
+   with async elaboration disabled. Module adapters use
+   `frontendImportedModuleEnv` to acquire already-compiled declarations.
+   Source commands such as `#eval` execute during source elaboration, not when
+   generating a package from compiled modules.
+3. `Frontend.loadDeclIndex` records each input environment, input-owned IR
    declaration names, `@[vir_export]` and `@[vir_startup]` marker sets, and a
-   name-to-declaration index. Module-marked targets filter those sets to
+   name-to-declaration index. Module targets filter those sets to
    declarations owned by the requested module. If two different source targets
    define the same Lean declaration name, the index records a diagnostic instead
    of silently letting the later target overwrite the first.

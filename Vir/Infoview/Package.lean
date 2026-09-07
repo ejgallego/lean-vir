@@ -302,7 +302,7 @@ meta def packageClosure
     (snap : Server.Snapshots.Snapshot) :
     Vir.GeneratePackage.Closure :=
   let target : Vir.GeneratePackage.Target := {
-    source := System.FilePath.mk source
+    origin := .source source
     mode := .explicit roots
   }
   let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
@@ -370,7 +370,7 @@ meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPa
     let token ← packageClosureToken doc source roots snap
     let revision := irPackageRevision doc roots token
     let target : Vir.GeneratePackage.Target := {
-      source := System.FilePath.mk source
+      origin := .source source
       mode := .explicit roots
     }
     let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env

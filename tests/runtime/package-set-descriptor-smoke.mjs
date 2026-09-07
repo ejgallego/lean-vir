@@ -251,6 +251,51 @@ try {
 for (const mode of ["toString", "constructor", "__proto__", ["all"]]) {
   assert.equal(packageTargetModeLabel(mode), null);
 }
+for (const origin of [
+  { source: "Example.lean" },
+  { module: "Example" },
+]) {
+  const markedMode = origin.module ? "markedModule" : "marked";
+  for (const mode of ["explicit", "packageOnly", "all", markedMode]) {
+    const explicitRoots = mode === "explicit" || mode === "packageOnly";
+    const target = {
+      ...origin,
+      mode,
+      roots: explicitRoots ? ["Example.value"] : [],
+      resolvedRoots: ["Example.value"],
+    };
+    assert.doesNotThrow(() =>
+      validatePackageTargets([target], "targets", { manifestVersion: 8 }),
+    );
+    assert.throws(
+      () =>
+        validatePackageTargets(
+          [{ ...target, roots: explicitRoots ? [] : ["Example.value"] }],
+          "targets",
+          { manifestVersion: 8 },
+        ),
+      explicitRoots ? /roots must be non-empty/ : /roots must be empty/,
+    );
+  }
+  assert.throws(
+    () =>
+      validatePackageTargets(
+        [
+          {
+            ...origin,
+            mode: origin.module ? "marked" : "markedModule",
+            roots: [],
+            resolvedRoots: [],
+          },
+        ],
+        "targets",
+        { manifestVersion: 8 },
+      ),
+    origin.module
+      ? /module requires mode markedModule/
+      : /mode markedModule requires a module/,
+  );
+}
 const legacyTarget = {
   source: "Example.lean",
   mode: "markedModules",
@@ -260,6 +305,15 @@ const legacyTarget = {
 for (const manifestVersion of [6, 7]) {
   assert.doesNotThrow(() =>
     validatePackageTargets([legacyTarget], "targets", { manifestVersion }),
+  );
+  assert.throws(
+    () =>
+      validatePackageTargets(
+        [{ ...legacyTarget, source: undefined, module: "Example" }],
+        "targets",
+        { manifestVersion },
+      ),
+    /module requires mode markedModule/,
   );
 }
 assert.throws(

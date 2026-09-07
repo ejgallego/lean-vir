@@ -29,20 +29,15 @@ inductive TargetMode where
   | packageOnly (roots : Array Name)
   | all
   | marked
-  | markedModule (moduleName : Name)
 
 namespace TargetMode
 
 def roots : TargetMode → Array Name
   | .explicit roots | .packageOnly roots => roots
-  | .all | .marked | .markedModule _ => #[]
-
-def markedModule? : TargetMode → Option Name
-  | .markedModule moduleName => some moduleName
-  | _ => none
+  | .all | .marked => #[]
 
 def selectsMarked : TargetMode → Bool
-  | .marked | .markedModule _ => true
+  | .marked => true
   | _ => false
 
 def metadataName : TargetMode → String
@@ -50,19 +45,8 @@ def metadataName : TargetMode → String
   | .packageOnly _ => "packageOnly"
   | .all => "all"
   | .marked => "marked"
-  | .markedModule _ => "markedModule"
 
 end TargetMode
-
-/--
-A package input and its single, explicit selection mode. Keeping the mode as a
-sum type prevents contradictory states such as selecting both all declarations
-and marked declarations, or accidentally changing manifest metadata with an
-unrelated loading flag.
--/
-structure Target where
-  source : System.FilePath
-  mode : TargetMode
 
 inductive PackageTargetOrigin where
   | source (path : String)
@@ -74,19 +58,33 @@ def display : PackageTargetOrigin → String
   | .source path => path
   | .module name => s!"module {name}"
 
+def module? : PackageTargetOrigin → Option Name
+  | .source _ => none
+  | .module name => some name
+
 end PackageTargetOrigin
 
-def Target.publicOrigin (target : Target) : PackageTargetOrigin :=
-  match target.mode.markedModule? with
-  | some moduleName => .module moduleName
-  | none => .source target.source.toString
+/-- Input identity is independent of selection. Source inputs are a migration
+adapter; module inputs name compiled artifacts, never generated driver files. -/
+structure Target where
+  origin : PackageTargetOrigin
+  mode : TargetMode
 
 def Target.publicSource (target : Target) : String :=
-  target.publicOrigin.display
+  target.origin.display
 
-/-- Resolve a package input to the file identity used by frontend caches. -/
+/-- Resolve the input identity used by the shared declaration index. -/
 def Target.canonicalSourceKey (target : Target) : IO String := do
-  return (← IO.FS.realPath target.source).normalize.toString
+  match target.origin with
+  | .source path => return (← IO.FS.realPath path).normalize.toString
+  | .module _ => return target.publicSource
+
+/-- Preserve the existing wire spelling for marked module targets without
+coupling the internal selection type to module identity. -/
+def TargetMode.metadataNameFor (mode : TargetMode) (origin : PackageTargetOrigin) : String :=
+  match mode, origin with
+  | .marked, .module _ => "markedModule"
+  | _, _ => mode.metadataName
 
 structure LoadedDecl where
   source : String
@@ -121,11 +119,11 @@ structure DeclIndex where
 
 def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
   index.sources.findSome? (fun source =>
-    if source.aliases.contains target.source.toString then some source.key else none)
-    |>.getD target.source.normalize.toString
+    if source.aliases.contains target.publicSource then some source.key else none)
+    |>.getD target.publicSource
 
 def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
-  index.sources.find? (fun source => source.aliases.contains target.source.toString)
+  index.sources.find? (fun source => source.aliases.contains target.publicSource)
 
 structure InitGlobal where
   name : Name
@@ -215,17 +213,17 @@ structure InterfaceManifest where
 
 def defaultTargets : Array Target := #[
   {
-    source := "examples/Fib.lean",
+    origin := .source "examples/Fib.lean",
     mode := .explicit #[`fib]
   },
   {
-    source := "examples/Tamagotchi.lean",
+    origin := .source "examples/Tamagotchi.lean",
     mode := .explicit #[
       `Tamagotchi.step
     ]
   },
   {
-    source := "examples/Tamagotchi.lean",
+    origin := .source "examples/Tamagotchi.lean",
     mode := .packageOnly #[
       `Tamagotchi.run,
       `Tamagotchi.trace,
@@ -233,7 +231,7 @@ def defaultTargets : Array Target := #[
     ]
   },
   {
-    source := "examples/MergeSort.lean",
+    origin := .source "examples/MergeSort.lean",
     mode := .explicit #[`SortDemo.demo, `SortDemo.demoFromArray]
   }
 ]

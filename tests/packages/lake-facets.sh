@@ -109,12 +109,11 @@ fi
 
 for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
   mkdir -p "$repro_dir/Root.parts"
-  printf '%s\n' 'module' 'import all ModuleSetFixture.Root' > "$repro_dir/Driver.lean"
   lake env .lake/build/bin/vir_irpkg \
     "$repro_dir/Root.irpkg" "$repro_dir/Root.report.md" \
     --module-set-output "$repro_dir/Root.irpkg-set.json" "$repro_dir/Root.parts" \
     ModuleSetFixture.Root Root.irpkg Root.parts \
-    --target-marked-module "$repro_dir/Driver.lean" ModuleSetFixture.Root
+    --target-marked-module ModuleSetFixture.Root
 done
 cmp "$tmp/repro-a/Root.irpkg-set.json" "$tmp/repro-b/Root.irpkg-set.json"
 cmp "$tmp/repro-a/Root.irpkg" "$tmp/repro-b/Root.irpkg"
@@ -124,7 +123,7 @@ if lake env .lake/build/bin/vir_irpkg \
     "$tmp/invalid-root.irpkg" "$tmp/invalid-root.report.md" \
     --module-set-output "$tmp/invalid-root.irpkg-set.json" "$tmp/invalid-root.parts" \
     ModuleSetFixture.Root invalid-root.irpkg invalid-root.parts \
-    --target-all "$tmp/repro-a/Driver.lean" \
+    --target-all-module ModuleSetFixture.Root \
     > "$tmp/invalid-root.stdout" 2> "$tmp/invalid-root.stderr"; then
   echo "module package-set generation accepted a non-marked root target" >&2
   exit 1
@@ -324,7 +323,8 @@ printf '%s\n' \
   '#check Vir.GeneratePackage.TargetMode' \
   '#check Vir.GeneratePackage.TargetMode.explicit' \
   '#check Vir.GeneratePackage.TargetMode.packageOnly' \
-  '#check Vir.GeneratePackage.TargetMode.markedModule' \
+  '#check Vir.GeneratePackage.TargetMode.marked' \
+  '#check Vir.GeneratePackage.PackageTargetOrigin.module' \
   '#check Vir.parseDottedName' \
   '#check Vir.GeneratePackage.moduleNameFor' \
   '#check Vir.GeneratePackage.collectClosure' \
@@ -476,7 +476,7 @@ module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
 test -f "$module_descriptor"
 test -f "$module_dependency"
-test -f "$module_driver"
+test ! -e "$module_driver"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
 node --input-type=module -e '

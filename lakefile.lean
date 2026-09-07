@@ -48,7 +48,7 @@ lean_lib VirExamples where
 /-- Module-system fixtures for composable package-set regression tests. -/
 lean_lib VirModuleFixtures where
   srcDir := "fixtures/module-set"
-  globs := #[.andSubmodules `ModuleSetFixture]
+  globs := #[.submodules `ModuleSetFixture]
 
 /-- Infoview-only regression fixtures kept outside the public library. -/
 lean_lib VirInfoviewFixtures where
@@ -207,7 +207,6 @@ private def buildVirPackageSetFacet
   let reportPath := virModuleOutput mod "module-sets" "report.md"
   let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
   let shardDir := virModuleOutput mod "module-sets" "parts"
-  let driverPath := virModuleOutput mod "drivers" "lean"
   let moduleName := mod.name.toString
   let rootRelativePath := mod.fileName "irpkg"
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
@@ -231,22 +230,15 @@ private def buildVirPackageSetFacet
           removeFileIfExists descriptorPath
           removeFileIfExists packagePath
           removeDirAllIfExists shardDir
-          createParentDirs driverPath
           createParentDirs packagePath
           createParentDirs reportPath
           createParentDirs descriptorPath
           IO.FS.createDirAll shardDir
-          let sourcePath ←
-            if artifacts.ir?.isSome then
-              IO.FS.writeFile driverPath s!"module\nimport all {moduleName}\n"
-              pure driverPath
-            else
-              pure mod.leanFile
           let targetArgs :=
             if artifacts.ir?.isSome then
-              #["--target-marked-module", sourcePath.toString, moduleName]
+              #["--target-marked-module", moduleName]
             else
-              #["--target-marked", sourcePath.toString]
+              #["--target-marked", mod.leanFile.toString]
           proc {
             cmd := generator.toString
             args := #[

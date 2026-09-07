@@ -48,9 +48,27 @@ def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name :=
   env.header.moduleNames[moduleIdx]?
 
 def targetOwnsDecl (target : Target) (env : Environment) (name : Name) : Bool :=
-  match target.mode.markedModule? with
+  match target.origin.module? with
   | some moduleName => environmentModuleForDecl? env name == some moduleName
   | none => true
+
+/-- Enumerate the selected input, not just the import environment's local
+declarations. Loaded runtime IR takes precedence over opaque module entries. -/
+def declarationsForOrigin (origin : PackageTargetOrigin) (env : Environment) : Array Decl := Id.run do
+  match origin with
+  | .source _ => return (getDecls env).toArray
+  | .module moduleName =>
+      let some moduleIdx := env.header.moduleNames.findIdx? (· == moduleName)
+        | return #[]
+      let entries := declMapExt.getModuleIREntries env moduleIdx ++
+        declMapExt.getModuleEntries env moduleIdx
+      let mut seen : NameSet := {}
+      let mut decls := #[]
+      for decl in entries do
+        unless seen.contains decl.name do
+          seen := seen.insert decl.name
+          decls := decls.push decl
+      return decls
 
 def labelledDecls (env : Environment) (attrName : Name) : IO (Array Name) := do
   match (← Lean.labelExtensionMapRef.get)[attrName]? with
@@ -129,25 +147,24 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     if sources.any (fun (_, key) => key == sourceKey) then
       sources
     else
-      sources.push (target.source, sourceKey)
-  for (source, sourceKey) in sources do
+      sources.push (target.origin, sourceKey)
+  for (origin, sourceKey) in sources do
     let sourceTargets := keyedTargets.foldl (init := #[]) fun selected (target, key) =>
       if key == sourceKey then selected.push target else selected
-    let aliases := sourceTargets.map (fun target => target.source.toString)
-    let display := sourceTargets.findSome? (fun target =>
-      match target.mode.markedModule? with
-      | some _ => some target.publicSource
-      | none => none) |>.getD source.toString
-    let env <- frontendEnv source
+    let aliases := sourceTargets.map (·.publicSource)
+    let display := origin.display
+    let env ← match origin with
+      | .source path => frontendEnv path
+      | .module name => frontendImportedModuleEnv name
     let mut names : Array Name := #[]
-    for decl in getDecls env do
+    for decl in declarationsForOrigin origin env do
       if !sourceTargets.any (fun target => targetOwnsDecl target env decl.name) then
         continue
       if !Vir.ExportValidation.isExternFallbackClone env decl.name then
         names := names.push decl.name
       let module? := environmentModuleForDecl? env decl.name
       let loadedSource :=
-        if sourceTargets.any (fun target => target.mode.markedModule?.isSome) then
+        if origin.module?.isSome then
           module?.map (fun moduleName => s!"module {moduleName}") |>.getD display
         else
           display
@@ -173,7 +190,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       virExports := exports.foldl (fun selected name => selected.insert name) index.virExports
       virStartups := startups.foldl (fun selected name => selected.insert name) index.virStartups
       loadedModules := sourceTargets.foldl (init := index.loadedModules) fun modules target =>
-        match target.mode.markedModule? with
+        match target.origin.module? with
         | some moduleName => modules.insert moduleName
         | none => modules
     }
@@ -274,7 +291,7 @@ def DeclIndex.moduleInitializationOrderForTarget?
   let mut ordered := #[]
   let mut orderedSet : NameSet := {}
   while !remaining.isEmpty do
-    let preferred := match target.mode.markedModule? with
+    let preferred := match target.origin.module? with
       | some rootModule =>
           let withoutRoot := remaining.filter (· != rootModule)
           if withoutRoot.isEmpty then remaining else withoutRoot
@@ -327,7 +344,7 @@ def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
       if source.key == index.sourceKeyFor target then some source.env else none) with
   | none => #[]
   | some env =>
-      match target.mode.markedModule? with
+      match target.origin.module? with
       | some moduleName =>
           (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
             match env.getModuleIdxFor? name with

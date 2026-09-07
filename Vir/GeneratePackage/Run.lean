@@ -160,7 +160,7 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"JavaScript host imports: {manifest.hostImports.size}"
       IO.println s!"interface exports: {manifest.exports.size}"
       for target in manifest.metadata.targets do
-        IO.println s!"target: {target.origin.display} [{target.mode.metadataName}] roots: {namesSummary target.resolvedRoots}"
+        IO.println s!"target: {target.origin.display} [{target.mode.metadataNameFor target.origin}] roots: {namesSummary target.resolvedRoots}"
       return 0
   | .error err =>
       IO.eprintln err
@@ -205,12 +205,12 @@ unsafe def runModuleSet
       return 1
   match target.mode with
   | .marked => pure ()
-  | .markedModule targetModule =>
-      if targetModule != rootModule then
-        IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
-        return 1
   | _ =>
       IO.eprintln "module package-set generation requires a marked source or marked module target"
+      return 1
+  if let some targetModule := target.origin.module? then
+    if targetModule != rootModule then
+      IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
       return 1
 
   let index ← loadRunDeclIndex targets

@@ -130,7 +130,7 @@ directly recursive fallbacks. Lean's
 ordinary native compiler continues to use the extern; the command compiles a
 reserved-name reference-body clone only for VIR closure resolution. In a Lean
 module the clone is exported as an internal compiler artifact so the generated
-`import all` driver can load it; it is not a user-facing declaration. Package
+`import all` environment can load it; it is not a user-facing declaration. Package
 generation emits an adapter at the original name and preserves the extern's IR
 parameter ownership while calling the clone. Any dependencies newly exposed by
 the reference body must still have ordinary IR or a registered native provider.
@@ -156,9 +156,10 @@ MySlides/Runtime.report.md
 ```
 
 For legacy Lean source files that do not produce compiled module IR, the
-generator re-elaborates the source. For module-system files, the facet depends
-on Lake's `.ir` artifact and uses a generated
-`import all MySlides.Runtime` driver.
+generator still re-elaborates the source during the module-only migration.
+For module-system files, the facet depends on Lake's `.ir` artifact and passes
+the module name directly to the generator. No driver file is generated and no
+module body is re-elaborated during packaging.
 
 The compiled-module root records one `markedModule` target. The legacy fallback
 records one `marked` source target; package-set generation rejects all other
@@ -171,7 +172,7 @@ reached runtime modules, ignores meta-only import edges, and puts the root
 last.
 Dependency shard paths use stable ordinals; module identity lives in the
 descriptor and each member manifest. The root manifest records the selected
-module instead of the checkout-local generated driver path, so otherwise
+module rather than a checkout-local source path, so otherwise
 identical module sets are byte-for-byte reproducible across build directories.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all

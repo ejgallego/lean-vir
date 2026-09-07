@@ -104,7 +104,7 @@ unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Clo
   let env ← snapshotEnvironment importedHelperTargetSource.toString
     (← IO.FS.readFile importedHelperTargetSource)
   let target : Vir.GeneratePackage.Target := {
-    source := importedHelperTargetSource
+    origin := .source importedHelperTargetSource.toString
     mode := .explicit #[root]
   }
   let index := Vir.GeneratePackage.declIndexFromEnvironment importedHelperTargetSource.toString env
@@ -134,7 +134,7 @@ unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
     "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ " ++
     s!"{Lean.Json.compress (.str suffix)}\n"
   let env ← snapshotEnvironment source contents
-  let target : Vir.GeneratePackage.Target := { source, mode := .explicit #[`snapshotValue] }
+  let target : Vir.GeneratePackage.Target := { origin := .source source, mode := .explicit #[`snapshotValue] }
   let index := Vir.GeneratePackage.declIndexFromEnvironment source env
   let closure := Vir.GeneratePackage.collectClosure #[target] index
   expect "module snapshot resolves opaque imports" closure.missingDecls.isEmpty

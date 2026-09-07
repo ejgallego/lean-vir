@@ -62,14 +62,14 @@ def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
         !isPrivateName n &&
         !isGeneratedAuxName n &&
         match env.find? n with
-        | some info => isInterfaceDeclInfo info
+        | some info => isInterfaceDeclInfo info || index.hasCompiledDefinition n
         | none => false
 
 def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .packageOnly _ => #[]
   | .all => publicSourceDeclsFor index target
-  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .marked => markedDeclNamesFor index target
   | .explicit roots =>
     roots.foldl (fun acc root =>
       let n := (boxedBaseName? root).getD root

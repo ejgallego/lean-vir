@@ -73,8 +73,13 @@ export function validatePackageTargets(
     if (target.mode === PACKAGE_TARGET_MODE.MARKED_MODULE && !hasModule) {
       throw new Error(`${targetLabel}.mode markedModule requires a module`);
     }
-    if (target.mode !== PACKAGE_TARGET_MODE.MARKED_MODULE && hasModule) {
-      throw new Error(`${targetLabel}.module requires mode markedModule`);
+    if (
+      hasModule &&
+      (target.mode === PACKAGE_TARGET_MODE.MARKED || legacyMarkedModule)
+    ) {
+      throw new Error(
+        `${targetLabel}.module requires mode markedModule for marked selection`,
+      );
     }
     const roots = requireNameArray(target.roots, `${targetLabel}.roots`);
     requireNameArray(target.resolvedRoots, `${targetLabel}.resolvedRoots`);

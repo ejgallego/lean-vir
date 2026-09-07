@@ -1,6 +1,7 @@
 # Module-Only Package Inputs
 
-Status: code-backed plan; implementation not started. Baseline: PR #166,
+Status: first input-model and compiled-module adapter slice implemented locally;
+consumer migration and removal remain TODO. Baseline: PR #166,
 landed as `57c95a21895a8ddde5098a00ccd47b634fce1b64`.
 
 ## Objective
@@ -16,7 +17,7 @@ Both adapters feed the same declaration indexing, dependency closure,
 interface validation and package emission. This is a deliberately breaking
 authoring/producer change; it does not require changing interpreter behavior.
 
-## Established Facts
+## Starting Point At PR #166
 
 - `Target` in `Vir/GeneratePackage/Basic.lean` always carries a source path.
   Only `TargetMode.markedModule` carries a module name. Input identity is
@@ -35,9 +36,22 @@ authoring/producer change; it does not require changing interpreter behavior.
   temporary driver paths. Removing physical CLI drivers is a different task
   from changing that existing public metadata contract.
 
-These are the current contracts, not claims that the proposed changes below
-are implemented. See [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and
+These describe the starting point. See [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and
 [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for today's supported workflow.
+
+## First Implementation Slice
+
+`Target` now pairs `PackageTargetOrigin` with four-case `TargetMode`.
+`DeclIndex` remains the shared prepared representation, avoiding a second
+package pipeline. Direct compiled-module CLI inputs support all four selections,
+and Lake no longer generates driver files. Imported-module enumeration merges
+loaded runtime IR with ordinary module entries, preferring runtime bodies over
+opaque entries; all-public selection excludes private/generated declarations.
+Wire marked-module metadata remains unchanged.
+
+Source flags, source elaboration and Lake's non-module fallback intentionally
+remain until consumers migrate. The infoview change in this slice is only the
+mechanical source-origin constructor update; it still consumes `snap.env`.
 
 ## Design Decisions
 
@@ -67,10 +81,9 @@ are implemented. See [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and
   module acquisition and artifact writes at the edges; use typed alternatives
   rather than another combination of selection booleans.
 
-Exact Lean type and CLI names should be settled in the first implementation
-slice, with the two adapters expressed against one shared API. No compatibility
-aliases should survive the completed migration merely to preserve old CLI
-spellings.
+The first slice's Lean types and CLI names are documented in
+[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md). No compatibility aliases should
+survive the completed migration merely to preserve old CLI spellings.
 
 ## Consumer Inventory
 
@@ -96,12 +109,15 @@ One follow-up PR, split into behavioral commits. Temporary migration bridges
 may exist between commits; the final tree must not retain both old and new
 production input systems.
 
-1. [ ] Separate input identity from selection and define the common prepared
-   package input. Add focused tests for module-owned versus imported roots and
-   snapshot-local declarations before moving callers.
-2. [ ] Implement the compiled-module adapter and migrate the Lake facet. Remove
-   generated driver files and reject unsupported non-module inputs clearly.
-   Prove that package generation does not re-elaborate source bodies.
+1. [x] Separate input identity from selection and reuse the common prepared
+   `DeclIndex`. Add focused tests for module-owned versus imported roots and
+   preserve snapshot-local declarations when moving constructors.
+2. [ ] Complete the compiled-module-only boundary:
+
+   - [x] Implement the compiled-module adapter and migrate Lake's module path.
+   - [x] Remove generated driver files and test no source-body re-elaboration.
+   - [ ] Reject non-module inputs after the consumers below have migrated.
+
 3. [ ] Migrate shared producer/config helpers, repository examples and fixture
    modules. Preserve multi-module bundled output; module-only inputs do not
    imply a universal change to output partitioning.

@@ -80,7 +80,7 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .all =>
       index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
-  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .marked => markedDeclNamesFor index target
   | .explicit roots | .packageOnly roots => roots
 
 def boxedBaseName? : Name -> Option Name
@@ -163,7 +163,7 @@ def Closure.moduleInitializationOrder
     (fun (modules : NameSet) moduleName => modules.insert moduleName) ({} : NameSet)
   let reachedModules := reachedModules.insert rootModule
   let some importedOrder := index.moduleInitializationOrderForTarget? target
-    | throw s!"no Lean module order is available for package-set target `{target.source}`"
+    | throw s!"no Lean module order is available for package-set target `{target.publicSource}`"
   let ordered := importedOrder.filter reachedModules.contains
   let ordered := if ordered.contains rootModule then ordered else ordered.push rootModule
   let missing := ownedModules.filter fun moduleName => !ordered.contains moduleName

@@ -14,24 +14,33 @@ inductive TargetFlag where
   | packageOnly
   | all
   | marked
-  | markedModule
+
+inductive TargetInputKind where
+  | source
+  | module
 
 namespace TargetFlag
 
-def option : TargetFlag → String
-  | .explicit => "--target"
-  | .packageOnly => "--package-target"
-  | .all => "--target-all"
-  | .marked => "--target-marked"
-  | .markedModule => "--target-marked-module"
+def option : TargetFlag → TargetInputKind → String
+  | .explicit, .source => "--target"
+  | .packageOnly, .source => "--package-target"
+  | .all, .source => "--target-all"
+  | .marked, .source => "--target-marked"
+  | .explicit, .module => "--target-module"
+  | .packageOnly, .module => "--package-module"
+  | .all, .module => "--target-all-module"
+  | .marked, .module => "--target-marked-module"
 
-def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked, .markedModule]
+def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked]
 
-def parse? (text : String) : Option TargetFlag :=
-  values.find? fun flag => flag.option == text
+def options : Array (TargetFlag × TargetInputKind) :=
+  #[TargetInputKind.source, .module].flatMap fun kind => values.map (·, kind)
+
+def parse? (text : String) : Option (TargetFlag × TargetInputKind) :=
+  options.find? fun (flag, kind) => flag.option kind == text
 
 def alternatives : String :=
-  ", ".intercalate (values.map (fun flag => s!"`{flag.option}`")).toList
+  ", ".intercalate (options.map (fun (flag, kind) => s!"`{flag.option kind}`")).toList
 
 end TargetFlag
 
@@ -47,53 +56,28 @@ partial def parseTargets.go
     (args : List String) (targets : Array Vir.GeneratePackage.Target) :
     Except String (Array Vir.GeneratePackage.Target) := do
   let flagText :: rest := args | return targets
-  let some flag := TargetFlag.parse? flagText
+  let some (flag, kind) := TargetFlag.parse? flagText
     | throw s!"expected {TargetFlag.alternatives}, got `{flagText}`"
-  match flag, rest with
-  | .explicit, source :: rest =>
-      let (roots, remaining) := takeTargetRoots rest []
-      if roots.isEmpty then
-        throw s!"target `{source}` has no roots"
-      let roots ← roots.toArray.mapM Vir.parseDottedName
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .explicit roots
-        }
-      go remaining (targets.push target)
-  | .packageOnly, source :: rest =>
-      let (roots, remaining) := takeTargetRoots rest []
-      if roots.isEmpty then
-        throw s!"package target `{source}` has no roots"
-      let roots ← roots.toArray.mapM Vir.parseDottedName
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .packageOnly roots
-        }
-      go remaining (targets.push target)
-  | .all, source :: remaining =>
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .all
-        }
-      go remaining (targets.push target)
-  | .marked, source :: remaining =>
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .marked
-        }
-      go remaining (targets.push target)
-  | .markedModule, source :: moduleName :: remaining =>
-      let moduleName ← Vir.parseDottedName moduleName
-      let target : Vir.GeneratePackage.Target := {
-        source := source
-        mode := .markedModule moduleName
-      }
-      go remaining (targets.push target)
-  | _, _ => throw s!"{flag.option} is missing its source or module argument"
+  let input :: rest := rest
+    | throw s!"{flag.option kind} is missing its source or module argument"
+  if input.startsWith "--" then
+    throw s!"{flag.option kind} is missing its source or module argument"
+  let origin ← match kind with
+    | .source => pure (PackageTargetOrigin.source input)
+    | .module => do pure (PackageTargetOrigin.module (← Vir.parseDottedName input))
+  let (mode, remaining) ← match flag with
+    | .all => pure (TargetMode.all, rest)
+    | .marked => pure (TargetMode.marked, rest)
+    | .explicit | .packageOnly => do
+        let (roots, remaining) := takeTargetRoots rest []
+        if roots.isEmpty then
+          throw s!"target `{input}` has no roots"
+        let roots ← roots.toArray.mapM Vir.parseDottedName
+        let mode := match flag with
+          | .packageOnly => TargetMode.packageOnly roots
+          | _ => TargetMode.explicit roots
+        pure (mode, remaining)
+  go remaining (targets.push { origin, mode })
 
 def parseTargets (args : List String) : Except String (Array Vir.GeneratePackage.Target) :=
   parseTargets.go args #[]
@@ -120,5 +104,5 @@ unsafe def main (args : List String) : IO UInt32 := do
               IO.eprintln err
               return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean> | --target-marked-module <driver.lean> <module>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module> | --target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean>]"
       return 2

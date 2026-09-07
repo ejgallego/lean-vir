@@ -19,7 +19,7 @@ open Lean.IR
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
   {
-    origin := target.publicOrigin
+    origin := target.origin
     mode := target.mode
     resolvedRoots := resolvedRootsForTarget index target
   }
