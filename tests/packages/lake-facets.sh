@@ -9,6 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 repo="$(pwd -P)"
+node tests/packages/infoview-bundle-downstream.mjs
 sdk_version="$(node -p 'require("./package.json").version')"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT

@@ -6,14 +6,14 @@ Author: Emilio J. Gallego Arias
 
 module
 
-import InfoviewFixtures.ImportedHelper.Internal
+namespace InfoviewFixtures.ImportedHelper.Internal
 
-namespace InfoviewFixtures.ImportedHelper
+private initialize beforeText : String ← pure "imported helper before"
 
 @[noinline] public def labelBefore (_ : Unit) : String :=
-  Internal.labelBefore ()
+  beforeText
 
 @[noinline] public def labelAfter (_ : Unit) : String :=
-  Internal.labelAfter ()
+  "imported helper after"
 
-end InfoviewFixtures.ImportedHelper
+end InfoviewFixtures.ImportedHelper.Internal

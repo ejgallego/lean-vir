@@ -24,7 +24,10 @@ const PACKAGE_TARGET_MODE_LABEL = Object.freeze({
 });
 
 export function packageTargetModeLabel(mode) {
-  return PACKAGE_TARGET_MODE_LABEL[mode] ?? null;
+  return typeof mode === "string" &&
+    Object.hasOwn(PACKAGE_TARGET_MODE_LABEL, mode)
+    ? PACKAGE_TARGET_MODE_LABEL[mode]
+    : null;
 }
 
 export function validatePackageTargets(
@@ -49,7 +52,10 @@ export function validatePackageTargets(
       manifestVersion !== null &&
       manifestVersion < 8 &&
       target.mode === "markedModules";
-    if (packageTargetModeLabel(target.mode) === null && !legacyMarkedModule) {
+    if (
+      !Object.values(PACKAGE_TARGET_MODE).includes(target.mode) &&
+      !legacyMarkedModule
+    ) {
       throw new Error(
         `${targetLabel}.mode must be one of ${Object.values(PACKAGE_TARGET_MODE).join(", ")}`,
       );

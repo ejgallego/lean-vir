@@ -141,6 +141,15 @@ export const invalidManifestCases = [
     },
     pattern: /metadata\.targets\[0\]\.resolvedRoots must be an array/,
   },
+  ...["markedModules", "toString", "constructor", "__proto__", ["all"]].map(
+    (mode) => ({
+      name: `obsolete or non-enumerated package target mode ${JSON.stringify(mode)}`,
+      mutate: (manifest) => {
+        manifest.metadata.targets = [packageTarget({ mode })];
+      },
+      pattern: /metadata\.targets\[0\]\.mode must be one of/,
+    }),
+  ),
   {
     name: "package target with both origins",
     mutate: (manifest) => {

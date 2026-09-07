@@ -287,7 +287,11 @@ async function resolvePackageSetInput(factory, input) {
       );
     }
     return {
-      bytes: validateIrPackageSetMembers(input).bytes,
+      bytes: validateIrPackageSetMembers(
+        input.map((bytes, index) =>
+          Uint8Array.from(asBytes(bytes, `IR package-set member ${index + 1}`)),
+        ),
+      ).bytes,
       info: null,
     };
   }
@@ -425,7 +429,11 @@ async function packageSetMemberBytes(packageSet, { verify = true } = {}) {
       ) {
         throw new TypeError(`irPackageSet member ${index + 1} has no bytes`);
       }
-      const bytes = asBytes(member.bytes, `irPackageSet member ${index + 1}`);
+      // Own the bytes before hashing: caller-visible typed arrays remain mutable
+      // while verification and Wasm acquisition await asynchronous work.
+      const bytes = Uint8Array.from(
+        asBytes(member.bytes, `irPackageSet member ${index + 1}`),
+      );
       if (bytes.byteLength !== member.byteLength) {
         throw new Error(
           `irPackageSet member ${index + 1} no longer matches its integrity metadata`,

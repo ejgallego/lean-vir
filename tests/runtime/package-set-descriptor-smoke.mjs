@@ -13,6 +13,15 @@ import {
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime.js";
+import {
+  readIrPackageInfo,
+  replaceIrPackageManifest,
+} from "../../web/src/runtime/ir-package.js";
+import {
+  packageTargetModeLabel,
+  validatePackageTargets,
+} from "../../web/src/runtime/package-targets.js";
+import { readRuntimeArtifacts } from "./shared.mjs";
 
 const encoder = new TextEncoder();
 const descriptorUrl = new URL(
@@ -237,6 +246,113 @@ try {
   );
 } finally {
   globalThis.fetch = originalFetch;
+}
+
+for (const mode of ["toString", "constructor", "__proto__", ["all"]]) {
+  assert.equal(packageTargetModeLabel(mode), null);
+}
+const legacyTarget = {
+  source: "Example.lean",
+  mode: "markedModules",
+  roots: [],
+  resolvedRoots: [],
+};
+for (const manifestVersion of [6, 7]) {
+  assert.doesNotThrow(() =>
+    validatePackageTargets([legacyTarget], "targets", { manifestVersion }),
+  );
+}
+assert.throws(
+  () =>
+    validatePackageTargets([legacyTarget], "targets", { manifestVersion: 8 }),
+  /mode must be one of/,
+);
+
+// Fetched members and raw byte inputs remain caller-owned. Changing them while
+// the real Wasm is acquired must not change the validated installation snapshot.
+const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
+const manifest = readIrPackageInfo(defaultPackageBytes).manifest;
+manifest.metadata.packageSetMember = { module: "Example.Root", role: "root" };
+manifest.metadata.targets = [
+  {
+    module: "Example.Root",
+    mode: "markedModule",
+    roots: [],
+    resolvedRoots: manifest.metadata.targets.flatMap(
+      (target) => target.resolvedRoots,
+    ),
+  },
+];
+const rootBytes = replaceIrPackageManifest(defaultPackageBytes, manifest);
+const rootEntry = {
+  module: "Example.Root",
+  role: "root",
+  path: "Root.irpkg",
+  byteLength: rootBytes.byteLength,
+  sha256: createHash("sha256").update(rootBytes).digest("hex"),
+};
+for (const inputKind of ["fetched", "bytes"]) {
+  let releaseWasm;
+  let reachedWasm;
+  const waitForWasm = new Promise((resolve) => {
+    releaseWasm = resolve;
+  });
+  const wasmRequested = new Promise((resolve) => {
+    reachedWasm = resolve;
+  });
+  const delayedFactory = createVirRuntimeFactory({
+    wasmUrl: "https://example.test/vir.wasm",
+    defaultHostBindings: {},
+    fetchBytes: async (url) => {
+      if (String(url).endsWith("vir.wasm")) {
+        reachedWasm();
+        await waitForWasm;
+        return wasmBytes;
+      }
+      return String(url) === descriptorUrl.href
+        ? encodeDescriptor({ ...validDescriptor, packages: [rootEntry] })
+        : rootBytes;
+    },
+  });
+  const input =
+    inputKind === "fetched"
+      ? await delayedFactory.fetchIrPackageSet(descriptorUrl)
+      : [Uint8Array.from(rootBytes)];
+  const callerBytes =
+    inputKind === "fetched" ? input.members[0].bytes : input[0];
+  const pendingRuntime = delayedFactory.createRuntime({ irPackageSet: input });
+  await Promise.race([
+    wasmRequested,
+    pendingRuntime.then(() =>
+      assert.fail("runtime completed before Wasm was released"),
+    ),
+  ]);
+  const changedManifest = readIrPackageInfo(callerBytes).manifest;
+  changedManifest.metadata.generator = `X${manifest.metadata.generator.slice(1)}`;
+  const changedBytes = replaceIrPackageManifest(callerBytes, changedManifest);
+  assert.equal(changedBytes.byteLength, callerBytes.byteLength);
+  callerBytes.set(changedBytes);
+  assert.notEqual(
+    createHash("sha256").update(callerBytes).digest("hex"),
+    rootEntry.sha256,
+  );
+  releaseWasm();
+  const runtime = await pendingRuntime;
+  try {
+    assert.equal(
+      runtime.packageMetadata.generator,
+      manifest.metadata.generator,
+    );
+    assert.equal(runtime.call("fib", 12), "144");
+    if (inputKind === "fetched") {
+      assert.equal(
+        runtime.packageInfo.packageSet.members[0].sha256,
+        rootEntry.sha256,
+      );
+    }
+  } finally {
+    runtime.dispose();
+  }
 }
 
 console.log("IR package-set descriptor smoke ok");

@@ -41,6 +41,12 @@ Every target mode follows opaque declaration ownership and loads the reached
 module IR before validating the final closure. The module-marked mode also
 retains declaration ownership for composable package-set emission.
 
+Infoview packages use the editor's current environment rather than reloading
+the source file. Declaration lookup prefers Lean's already-loaded server IR
+over opaque imported entries, including private dependency bodies. Revision
+calculation and emission use the same snapshot environment; RPC tasks do not run a
+second frontend or enable global initializer execution.
+
 ## Module Map
 
 The public shim and every library module in the package-generation pipeline use

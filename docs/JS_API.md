@@ -225,6 +225,9 @@ provide filesystem, cache, or authenticated transport semantics.
 The runtime validates or fetches `irPackageSet` before instantiating Wasm. An
 invalid descriptor object, empty byte array, or failed member integrity check
 therefore cannot allocate a throwaway interpreter instance.
+Runtime creation snapshots caller-provided member bytes before asynchronous
+verification and Wasm acquisition. Later mutations to the supplied arrays do
+not change the package being installed.
 
 The browser and Node runtime entry points also export
 `IR_PACKAGE_SET_FORMAT`, `IR_PACKAGE_SET_VERSION`, `PACKAGE_TARGET_MODE`, and
@@ -687,8 +690,10 @@ const vir = await createVirRuntime({
 The browser loads descriptor-ordered sets of format-11 `.irpkg` members. A
 focused package is represented as a one-member set. It does not load `.olean` or
 Lean's raw `.ir` format in the browser. Unsupported requested
-exports fail during package generation instead of being omitted silently, and a
-failed package load clears the runtime's package metadata instead of leaving
-stale declarations callable. JavaScript host imports are sync-only and limited
+exports fail during package generation instead of being omitted silently.
+A failed replacement leaves the active runtime and its metadata intact; failed
+initial installation exposes no package. If old-runtime cleanup fails during
+handover, the wrapper becomes disposed, as described above.
+JavaScript host imports are sync-only and limited
 to 128 imported declarations with IR arity at most 6; async host calls will need
 a later Promise/JSPI-shaped boundary.

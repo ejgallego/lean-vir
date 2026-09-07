@@ -7,10 +7,11 @@ package lean_vir where
 def npmCmd : String :=
   if System.Platform.isWindows then "npm.cmd" else "npm"
 
-def runNpmScript (scriptName : String) : LogIO Unit :=
+def runNpmScript (cwd : System.FilePath) (scriptName : String) : LogIO Unit :=
   proc {
     cmd := npmCmd
     args := #["run", "--silent", scriptName]
+    cwd := some cwd
   }
 
 input_dir infoviewBundleSources where
@@ -18,15 +19,17 @@ input_dir infoviewBundleSources where
   filter := .extension <| .mem #["js"]
   text := true
 
-target infoviewBundle : System.FilePath := do
+target infoviewBundle (pkg) : System.FilePath := do
   let sources ← infoviewBundleSources.fetch
-  let output := (← getRootPackage).dir / "build/generated/infoview/vir-infoview-widget.js"
+  let root := pkg.dir
+  let output := root / "build/generated/infoview/vir-infoview-widget.js"
   buildFileAfterDep (text := true) output sources (extraDepTrace := do
-    let scriptTrace ← computeTrace (System.FilePath.mk "scripts/build-infoview-widget.mjs")
-    let packageTrace ← computeTrace (System.FilePath.mk "package.json")
-    let lockTrace ← computeTrace (System.FilePath.mk "package-lock.json")
-    return mixTrace scriptTrace (mixTrace packageTrace lockTrace)) fun _ =>
-    runNpmScript "build:infoview"
+    let entryTrace ← computeTrace (root / "web/app/vir-infoview-widget.js")
+    let scriptTrace ← computeTrace (root / "scripts/build-infoview-widget.mjs")
+    let packageTrace ← computeTrace (root / "package.json")
+    let lockTrace ← computeTrace (root / "package-lock.json")
+    return mixTrace entryTrace (mixTrace scriptTrace (mixTrace packageTrace lockTrace))) fun _ =>
+    runNpmScript root "build:infoview"
 
 @[default_target]
 lean_lib Vir where
