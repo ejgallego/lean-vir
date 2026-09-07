@@ -43,6 +43,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/runtime/object-abi-exports.js",
   "web/src/runtime/object-abi.js",
   "web/src/runtime/object-values.js",
+  "web/src/runtime/package-contract.js",
   "web/src/runtime/package-targets.js",
   "web/src/runtime/vir-codec.js",
   "web/src/runtime/vir-value-normalizers.js",
