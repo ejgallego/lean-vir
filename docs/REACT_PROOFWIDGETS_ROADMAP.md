@@ -219,18 +219,13 @@ A realistic path has three layers:
    continuations and generic property access keep requests, responses, and
    nested reference objects in their ordinary JavaScript representation; VIR
    does not add an RPC scheduler or decoded response model.
-   The earlier `Vir.ProofWidgets.Rpc` slice provides `RpcRef`, `WithRpcRef α`,
-   `ExprWithCtx.save`, and a host-dispatched `resolveRef` action. It remains a
-   provisional compatibility path, not the final RPC architecture.
-   `Vir.Infoview.Surface` now carries a live server-owned
-   `WithRpcRef ExprWithCtx` prop backed by a typed `Js ServerRef` host
-   resource. `Vir.Infoview.ProofWidgetsRpc` builds that prop from Lean's
-   current interactive goal at the cursor and still resolves descriptor
-   fallbacks through the active Lean server snapshot. Once a real direct
-   session fixture covers that client, the duplicate resolver, descriptor
-   normalizer, and reference store should be removed. Native request options,
-   cancellation, broader ExprWithCtx construction, and structured edit and
-   tactic commands remain future work.
+   The real-server Chromium fixture now covers native request options,
+   cancellation, rejection, rerendering, package replacement and genuine
+   `Server.WithRpcRef` round trips. It also resolves the existing current-goal
+   method in a real hypothesis context. The provisional descriptor resolver,
+   normalizer and global reference store are removed. Broader expression/context
+   construction, upstream serialized HTML, and structured edit/tactic commands
+   remain future work.
 
 ## Porting Targets
 
@@ -240,8 +235,8 @@ enough to prevent us from designing an API in a vacuum:
 
 1. `ProofWidgets/Demos/Jsx.lean`: verifies JSX-like Lean syntax, lowercase HTML
    tags, string/JSON attributes, children interpolation, and uppercase component
-   embedding. The current native-JSX fixture also includes the first
-   `InteractiveExpr`-shaped `WithRpcRef`/`resolveRef` case.
+   embedding. The independent `RpcReferenceWidget` example tests real RPC data
+   rendering without a synthetic reference demonstration.
 2. `ProofWidgets/Component/HtmlDisplay.lean` and
    `ProofWidgets/Data/Html.lean`: verify the core `Html` and component-node
    encoding.

@@ -233,7 +233,6 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/Js.bindings.json`
 - `Vir/React.bindings.json`
 - `Vir/Infoview/Surface.bindings.json`
-- `Vir/ProofWidgets/Rpc.bindings.json`
 
 Selected upstream declarations may be pinned as small provenance-bearing
 extracts when installing the full package is unnecessary:
@@ -244,7 +243,6 @@ extracts when installing the full package is unnecessary:
 Local host protocols use declaration syntax too:
 
 - `Vir/Infoview/Surface.contract.d.ts`
-- `Vir/ProofWidgets/Rpc.contract.d.ts`
 
 Every local protocol operation names the exact declaration member it
 implements. The generator rejects missing members, while the explorer verifies

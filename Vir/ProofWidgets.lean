@@ -8,4 +8,3 @@ module
 
 public import Vir.ProofWidgets.Html
 public import Vir.ProofWidgets.Jsx
-public import Vir.ProofWidgets.Rpc

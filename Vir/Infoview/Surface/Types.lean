@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.ProofWidgets.Rpc.Types
+public import Vir.Js.Types
 
 public section
 
@@ -60,6 +60,5 @@ structure Surface where
   selectedLocations : Array String
   selections : Array SelectedLocation
   rpcSession : Lean.Vir.Js RpcSession
-  proofWidgetsExpr : Option (Lean.Vir.ProofWidgets.WithRpcRef Lean.Vir.ProofWidgets.ExprWithCtx)
 
 end Lean.Vir.Infoview

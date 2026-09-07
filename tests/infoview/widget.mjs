@@ -46,15 +46,11 @@ await writeFile(
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
-  createProofWidgetsExprWithCtxAtPos,
-  createProofWidgetsExprWithCtxRef,
   disposeRuntimeServiceForTests,
   loadAssetBytes,
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
-  proofWidgetsExprFromSavedRef,
-  resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
   statIRPackage,
   statAsset,
@@ -80,10 +76,6 @@ let assetStatCount = 0;
 let irPackageBuildCount = 0;
 let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
-const resolvedRpcRefRequests = [];
-const createdExprWithCtxRefRequests = [];
-const createdExprWithCtxAtPosRequests = [];
-const resolvedExprWithCtxRefRequests = [];
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
   ["web/public/demo-host.irpkg", "package-v1"],
@@ -107,71 +99,6 @@ const rpcSession = {
         revision: irPackageRevision,
         dataBase64: packageBytes.toString("base64"),
         report: "IR package report",
-      };
-    }
-    if (method === "Lean.Vir.Infoview.resolveProofWidgetsRpcRef") {
-      resolvedRpcRefRequests.push(params);
-      return {
-        ...params.ref,
-        source: "examples/ReactProofWidget.lean",
-        position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
-        packageRevision: params.packageRevision,
-        storeKey: `${params.packageRevision}:${params.ref.id}`,
-        knownConstant: params.ref.id === "ReactProofWidget.mount",
-      };
-    }
-    if (method === "Lean.Vir.Infoview.createProofWidgetsExprWithCtxRef") {
-      createdExprWithCtxRefRequests.push(params);
-      return {
-        ref: { __rpcref: 17 },
-        info: {
-          ...params.ref,
-          source: "examples/ReactProofWidget.lean",
-          position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
-          packageRevision: params.packageRevision,
-          storeKey: `${params.packageRevision}:${params.ref.id}`,
-          knownConstant: params.ref.id === "ReactProofWidget.mount",
-        },
-      };
-    }
-    if (method === "Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos") {
-      createdExprWithCtxAtPosRequests.push(params);
-      if (params.pos.line === 99) {
-        return null;
-      }
-      return {
-        ref: { __rpcref: 19 },
-        info: {
-          id: "m.1",
-          label: "case main",
-          typeName: "ExprWithCtx",
-          summary: `goal 1 target at ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
-          expression: "xs.reverse.reverse = xs",
-          typeText: "Prop",
-          context: "xs : List Nat",
-          source: "examples/ReactProofWidget.lean",
-          position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
-          packageRevision: params.packageRevision,
-          storeKey: `${params.packageRevision}:m.1`,
-          knownConstant: false,
-        },
-      };
-    }
-    if (method === "Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef") {
-      resolvedExprWithCtxRefRequests.push(params);
-      return {
-        id: "ReactProofWidget.mount",
-        label: "mount",
-        typeName: "Const",
-        summary: "server-owned resolve smoke",
-        expression: "ReactProofWidget.mount",
-        typeText: "Root -> Component -> Surface -> DomM Unit",
-        context: "",
-        source: "examples/ReactProofWidget.lean",
-        position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
-        packageRevision: "server-package-v1",
-        storeKey: "server-package-v1:ReactProofWidget.mount",
-        knownConstant: true,
       };
     }
     const bytes = await readFile(new URL(params.path, repoRoot));
@@ -265,7 +192,6 @@ const infoviewPropsFixture = {
 };
 const surfaceFixture = surfaceFromInfoviewProps(
   infoviewPropsFixture,
-  null,
   rpcSession,
 );
 assert.deepEqual(surfaceFixture, {
@@ -307,13 +233,12 @@ assert.deepEqual(surfaceFixture, {
     },
   ],
   rpcSession,
-  proofWidgetsExpr: null,
 });
 assert.equal(surfaceFixture.goals[0].target, "xs.reverse.reverse = xs");
 assert.equal(
   surfaceCacheKey(surfaceFixture),
   surfaceCacheKey(
-    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture), null, {
+    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture), {
       call: rpcSession.call,
     }),
   ),
@@ -340,154 +265,6 @@ assert.equal(
     )
   ).revision,
   "ir-package-v1",
-);
-assert.deepEqual(
-  await createProofWidgetsExprWithCtxRef(
-    rpcSession,
-    {
-      id: "ReactProofWidget.mount",
-      label: "mount",
-      typeName: "Const",
-      summary: "create server ref smoke",
-      expression: "ReactProofWidget.mount",
-      typeText: "Root -> Component -> Surface -> DomM Unit",
-      context: "",
-    },
-    { line: 2, character: 4 },
-    "server-package-v1",
-  ),
-  {
-    ref: { __rpcref: 17 },
-    info: {
-      id: "ReactProofWidget.mount",
-      label: "mount",
-      typeName: "Const",
-      summary: "create server ref smoke",
-      expression: "ReactProofWidget.mount",
-      typeText: "Root -> Component -> Surface -> DomM Unit",
-      context: "",
-      source: "examples/ReactProofWidget.lean",
-      position: "ReactProofWidget.lean:3:5",
-      packageRevision: "server-package-v1",
-      storeKey: "server-package-v1:ReactProofWidget.mount",
-      knownConstant: true,
-    },
-  },
-);
-assert.deepEqual(createdExprWithCtxRefRequests.at(-1), {
-  ref: {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "create server ref smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-  },
-  pos: { line: 2, character: 4 },
-  packageRevision: "server-package-v1",
-});
-assert.deepEqual(
-  await createProofWidgetsExprWithCtxAtPos(
-    rpcSession,
-    { line: 6, character: 2 },
-    "server-package-v2",
-  ),
-  {
-    ref: { __rpcref: 19 },
-    info: {
-      id: "m.1",
-      label: "case main",
-      typeName: "ExprWithCtx",
-      summary: "goal 1 target at ReactProofWidget.lean:7:3",
-      expression: "xs.reverse.reverse = xs",
-      typeText: "Prop",
-      context: "xs : List Nat",
-      source: "examples/ReactProofWidget.lean",
-      position: "ReactProofWidget.lean:7:3",
-      packageRevision: "server-package-v2",
-      storeKey: "server-package-v2:m.1",
-      knownConstant: false,
-    },
-  },
-);
-assert.deepEqual(createdExprWithCtxAtPosRequests.at(-1), {
-  pos: { line: 6, character: 2 },
-  packageRevision: "server-package-v2",
-});
-assert.equal(
-  await createProofWidgetsExprWithCtxAtPos(
-    rpcSession,
-    { line: 99, character: 0 },
-    "server-package-v2",
-  ),
-  null,
-);
-assert.deepEqual(
-  await resolveProofWidgetsRpcRef(
-    rpcSession,
-    {
-      id: "ReactProofWidget.mount",
-      label: "mount",
-      typeName: "Const",
-      summary: "server-owned resolve smoke",
-      expression: "",
-      typeText: "",
-      context: "",
-      serverRef: { __rpcref: 17 },
-    },
-    { line: 7, character: 1 },
-    "ignored-client-revision",
-  ),
-  {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "server-owned resolve smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-    source: "examples/ReactProofWidget.lean",
-    position: "ReactProofWidget.lean:8:2",
-    packageRevision: "server-package-v1",
-    storeKey: "server-package-v1:ReactProofWidget.mount",
-    knownConstant: true,
-  },
-);
-assert.deepEqual(resolvedExprWithCtxRefRequests.at(-1), {
-  ref: { __rpcref: 17 },
-  pos: { line: 7, character: 1 },
-  packageRevision: "ignored-client-revision",
-});
-assert.deepEqual(
-  await resolveProofWidgetsRpcRef(
-    rpcSession,
-    {
-      id: "ReactProofWidget.mount",
-      label: "mount",
-      typeName: "Const",
-      summary: "resolve smoke",
-      expression: "ReactProofWidget.mount",
-      typeText: "Root -> Component -> Surface -> DomM Unit",
-      context: "",
-    },
-    { line: 4, character: 2 },
-    "package-smoke",
-  ),
-  {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "resolve smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-    source: "examples/ReactProofWidget.lean",
-    position: "ReactProofWidget.lean:5:3",
-    packageRevision: "package-smoke",
-    storeKey: "package-smoke:ReactProofWidget.mount",
-    knownConstant: true,
-  },
 );
 await assert.rejects(
   () =>
@@ -584,8 +361,6 @@ const irPackageFirstService = await loadRuntimeService({
   hostContext: irPackageHostContext,
   config: irPackageServiceConfig,
 });
-const jsBoolValue = (_service, value) => value;
-const rpcRefResource = (_service, ref) => ref;
 assert.equal(
   typeof irPackageFirstService.runtime.hostState.defaultBindings[
     "react.root.create"
@@ -604,200 +379,6 @@ assert.equal(
   ],
   "function",
 );
-const serverOwnedExpr = proofWidgetsExprFromSavedRef({
-  ref: { __rpcref: 18 },
-  info: {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "ExprWithCtx",
-    summary: "server-owned prop smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-  },
-});
-assert.deepEqual(
-  surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr, rpcSession)
-    .proofWidgetsExpr.value,
-  {
-    code: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-  },
-);
-const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
-assert.equal(
-  jsBoolValue(
-    irPackageFirstService,
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "proofwidgets.rpc.inspectRef"
-    ](
-      rpcRefResource(irPackageFirstService, {
-        id: "ReactProofWidget.mount",
-        label: "mount",
-        typeName: "Const",
-        summary: "host binding smoke",
-        expression: "ReactProofWidget.mount",
-        typeText: "Root -> Component -> Surface -> DomM Unit",
-        context: "",
-      }),
-    ),
-  ),
-  true,
-);
-await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(resolvedRpcRefRequests.length, resolvedBeforeHostInspect + 1);
-assert.deepEqual(resolvedRpcRefRequests.at(-1), {
-  ref: {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "host binding smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-  },
-  pos: { line: 0, character: 0 },
-  packageRevision: "ir-package-v1",
-});
-let resolvedCallbackInfo = null;
-const resolvedCallback = (info) => {
-  resolvedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "js.value.proofwidgets.resolvedRef.value"
-    ](info);
-};
-assert.equal(Object.hasOwn(resolvedCallback, "release"), false);
-const resolvedBeforeHostResolve = resolvedRpcRefRequests.length;
-assert.equal(
-  jsBoolValue(
-    irPackageFirstService,
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "proofwidgets.rpc.resolveRef"
-    ](
-      rpcRefResource(irPackageFirstService, {
-        id: "ReactProofWidget.mount",
-        label: "mount",
-        typeName: "Const",
-        summary: "host resolve smoke",
-        expression: "ReactProofWidget.mount",
-        typeText: "Root -> Component -> Surface -> DomM Unit",
-        context: "",
-      }),
-      resolvedCallback,
-    ),
-  ),
-  true,
-);
-await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(resolvedRpcRefRequests.length, resolvedBeforeHostResolve + 1);
-assert.deepEqual(resolvedRpcRefRequests.at(-1), {
-  ref: {
-    id: "ReactProofWidget.mount",
-    label: "mount",
-    typeName: "Const",
-    summary: "host resolve smoke",
-    expression: "ReactProofWidget.mount",
-    typeText: "Root -> Component -> Surface -> DomM Unit",
-    context: "",
-  },
-  pos: { line: 0, character: 0 },
-  packageRevision: "ir-package-v1",
-});
-assert.deepEqual(resolvedCallbackInfo, {
-  id: "ReactProofWidget.mount",
-  label: "mount",
-  typeName: "Const",
-  summary: "host resolve smoke",
-  expression: "ReactProofWidget.mount",
-  typeText: "Root -> Component -> Surface -> DomM Unit",
-  context: "",
-  source: "examples/ReactProofWidget.lean",
-  position: "ReactProofWidget.lean:1:1",
-  packageRevision: "ir-package-v1",
-  storeKey: "ir-package-v1:ReactProofWidget.mount",
-  knownConstant: true,
-});
-let serverOwnedCallbackInfo = null;
-const serverOwnedCallback = (info) => {
-  serverOwnedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "js.value.proofwidgets.resolvedRef.value"
-    ](info);
-};
-assert.equal(Object.hasOwn(serverOwnedCallback, "release"), false);
-const serverOwnedBeforeHostResolve = resolvedExprWithCtxRefRequests.length;
-assert.equal(
-  jsBoolValue(
-    irPackageFirstService,
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "proofwidgets.rpc.resolveRef"
-    ](
-      rpcRefResource(irPackageFirstService, serverOwnedExpr.ref),
-      serverOwnedCallback,
-    ),
-  ),
-  true,
-);
-await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(
-  resolvedExprWithCtxRefRequests.length,
-  serverOwnedBeforeHostResolve + 1,
-);
-assert.deepEqual(resolvedExprWithCtxRefRequests.at(-1), {
-  ref: { __rpcref: 18 },
-  pos: { line: 0, character: 0 },
-  packageRevision: "ir-package-v1",
-});
-assert.deepEqual(serverOwnedCallbackInfo, {
-  id: "ReactProofWidget.mount",
-  label: "mount",
-  typeName: "Const",
-  summary: "server-owned resolve smoke",
-  expression: "ReactProofWidget.mount",
-  typeText: "Root -> Component -> Surface -> DomM Unit",
-  context: "",
-  source: "examples/ReactProofWidget.lean",
-  position: "ReactProofWidget.lean:1:1",
-  packageRevision: "server-package-v1",
-  storeKey: "server-package-v1:ReactProofWidget.mount",
-  knownConstant: true,
-});
-let movedSessionCalls = 0;
-irPackageHostContext.rpcSession = {
-  async call(method, params) {
-    movedSessionCalls += 1;
-    return rpcSession.call(method, params);
-  },
-};
-irPackageHostContext.position = { line: 87, character: 3 };
-const resolvedBeforeMove = resolvedRpcRefRequests.length;
-assert.equal(
-  jsBoolValue(
-    irPackageFirstService,
-    irPackageFirstService.runtime.hostState.defaultBindings[
-      "proofwidgets.rpc.inspectRef"
-    ](
-      rpcRefResource(irPackageFirstService, {
-        id: "ReactProofWidget.mount",
-        label: "mount",
-        typeName: "Const",
-        summary: "moved host context smoke",
-        expression: "ReactProofWidget.mount",
-        typeText: "Root -> Component -> Surface -> DomM Unit",
-        context: "",
-      }),
-    ),
-  ),
-  true,
-);
-await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(movedSessionCalls, 1);
-assert.equal(resolvedRpcRefRequests.length, resolvedBeforeMove + 1);
-assert.deepEqual(resolvedRpcRefRequests.at(-1).pos, {
-  line: 87,
-  character: 3,
-});
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({

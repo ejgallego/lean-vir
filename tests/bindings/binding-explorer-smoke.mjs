@@ -595,17 +595,6 @@ assert.ok(localCommands?.generatedOperations.every((operation) =>
   operation.protocol.upstreamRelation.kind === "local-contract" &&
   typeof operation.protocol.upstreamRelation.member === "string"));
 
-const localRpcReferences = roots.find((root) =>
-  root.library === "proofwidgets" && root.id === "rpc-references");
-assert.deepEqual(localRpcReferences?.analysis, {
-  status: "complete",
-  scope: "complete-upstream-surface",
-});
-assert.equal(localRpcReferences?.coverage.summary["contract-linked"], 5);
-assert.equal(localRpcReferences?.coverage.summary.compatible, 0);
-assert.equal(localRpcReferences?.coverage.summary.missing, 0);
-assert.equal(localRpcReferences?.workItems.length, 0);
-
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
   status: "complete",

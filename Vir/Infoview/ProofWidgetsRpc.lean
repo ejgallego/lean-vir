@@ -17,23 +17,7 @@ namespace Lean.Vir.Infoview
 
 open Lean Server
 
-meta structure ProofWidgetsRpcRef where
-  id : String
-  label : String
-  typeName : String
-  summary : String
-  expression : String
-  typeText : String
-  context : String
-  deriving Server.RpcEncodable
-
-meta structure ProofWidgetsRpcRefRequest where
-  ref : ProofWidgetsRpcRef
-  pos : Lsp.Position
-  packageRevision : String
-  deriving Server.RpcEncodable
-
-meta structure ProofWidgetsExprWithCtxAtPosRequest where
+structure ProofWidgetsExprWithCtxAtPosRequest where
   pos : Lsp.Position
   packageRevision : String
   deriving Server.RpcEncodable
@@ -49,12 +33,10 @@ meta structure ProofWidgetsRpcRefInfo where
   source : String
   position : String
   packageRevision : String
-  storeKey : String
   knownConstant : Bool
   deriving Server.RpcEncodable
 
-meta structure StoredExprWithCtx where
-  storeKey : String
+structure StoredExprWithCtx where
   id : String
   label : String
   typeName : String
@@ -79,11 +61,7 @@ meta structure StoredExprWithCtxRefRequest where
   packageRevision : String
   deriving Server.RpcEncodable
 
-/-- Compatibility metadata only; reference ownership belongs to the RPC session. -/
-meta def proofWidgetsRpcRefKey (packageRevision id : String) : String :=
-  packageRevision ++ ":" ++ id
-
-meta def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefInfo :=
+def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpcRefInfo :=
   {
     id := stored.id
     label := stored.label
@@ -95,31 +73,10 @@ meta def StoredExprWithCtx.toInfo (stored : StoredExprWithCtx) : ProofWidgetsRpc
     source := stored.source
     position := stored.position
     packageRevision := stored.packageRevision
-    storeKey := stored.storeKey
     knownConstant := stored.knownConstant
   }
 
-meta def mkStoredExprWithCtx
-    (ref : ProofWidgetsRpcRef)
-    (source position packageRevision : String)
-    (knownConstant : Bool) :
-    StoredExprWithCtx :=
-  {
-    storeKey := proofWidgetsRpcRefKey packageRevision ref.id
-    id := ref.id
-    label := ref.label
-    typeName := ref.typeName
-    summary := ref.summary
-    expression := ref.expression
-    typeText := ref.typeText
-    context := ref.context
-    source
-    position
-    packageRevision
-    knownConstant
-  }
-
-meta def StoredExprWithCtx.refresh
+def StoredExprWithCtx.refresh
     (stored : StoredExprWithCtx)
     (source position : String)
     (knownConstant : Bool) :
@@ -154,7 +111,6 @@ meta def interactiveGoalStoredExprWithCtx
   let label := interactiveGoalLabel goal index
   let expression := goal.type.stripTags
   {
-    storeKey := proofWidgetsRpcRefKey packageRevision id
     id
     label
     typeName := "ExprWithCtx"
@@ -172,54 +128,13 @@ meta def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExpr
   let ref ← Server.WithRpcRef.mk stored
   return { ref, info := stored.toInfo }
 
-meta def rpcRefName? (ref : ProofWidgetsRpcRef) : Option Name :=
-  match Vir.parseDottedName ref.id with
-  | .ok name => some name
-  | .error _ => none
-
-meta def rpcRefKnownConstant (env : Environment) (ref : ProofWidgetsRpcRef) : Bool :=
-  match rpcRefName? ref with
-  | none => false
-  | some name => env.contains name
-
-meta def rpcRefIdKnownConstant (env : Environment) (id : String) : Bool :=
-  match Vir.parseDottedName id with
+def rpcRefIdKnownConstant (env : Environment) (id : String) : Bool :=
+  match nameFromDotted id with
   | .ok name => env.contains name
   | .error _ => false
 
 @[server_rpc_method]
-meta def resolveProofWidgetsRpcRef
-    (params : ProofWidgetsRpcRefRequest) :
-    RequestM (RequestTask ProofWidgetsRpcRefInfo) := do
-  RequestM.withWaitFindSnapAtPos params.pos fun snap => do
-    let doc ← RequestM.readDoc
-    let source := documentSourceName doc
-    let stored := mkStoredExprWithCtx
-      params.ref
-      source
-      (lspPositionLabel source params.pos)
-      params.packageRevision
-      (rpcRefKnownConstant snap.env params.ref)
-    return stored.toInfo
-
-@[server_rpc_method]
-meta def createProofWidgetsExprWithCtxRef
-    (params : ProofWidgetsRpcRefRequest) :
-    RequestM (RequestTask SavedExprWithCtxRef) := do
-  RequestM.withWaitFindSnapAtPos params.pos fun snap => do
-    let doc ← RequestM.readDoc
-    let source := documentSourceName doc
-    let stored := mkStoredExprWithCtx
-      params.ref
-      source
-      (lspPositionLabel source params.pos)
-      params.packageRevision
-      (rpcRefKnownConstant snap.env params.ref)
-    let ref ← Server.WithRpcRef.mk stored
-    return { ref, info := stored.toInfo }
-
-@[server_rpc_method]
-meta def createProofWidgetsExprWithCtxAtPos
+def createProofWidgetsExprWithCtxAtPos
     (params : ProofWidgetsExprWithCtxAtPosRequest) :
     RequestM (RequestTask (Option SavedExprWithCtxRef)) := do
   let doc ← RequestM.readDoc

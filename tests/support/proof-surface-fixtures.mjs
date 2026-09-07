@@ -71,7 +71,6 @@ export function createProofSurfaceFixture({
       { id: "location-main-0", kind: "location", label: "main" },
     ],
     rpcSession,
-    proofWidgetsExpr: null,
   };
 }
 

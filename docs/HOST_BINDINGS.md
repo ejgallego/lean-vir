@@ -181,7 +181,7 @@ The built-in groups closely follow their browser APIs:
 - `browser.canvas2d.*` forwards to the actual 2D context;
 - `browser.timer.*` and `browser.animation.*` return the exact native scheduling
   tokens. VIR keeps only private cancellation records for interpreter teardown;
-- `infoview.*` and `proofwidgets.rpc.*` connect the widget host.
+- `infoview.*` connects the widget host, including its exact native RPC session.
 
 Convenience conversions have separate Lean names. For example,
 `Document.querySelector` accepts exact `Js Document` and `Js String` values,

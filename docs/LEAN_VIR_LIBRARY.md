@@ -471,27 +471,10 @@ aliases and is included in the host package as a compatibility regression.
 `fixtures/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
 with explicit combinators, including child-bearing `Html.ofComponent`, image
 attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
-component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
-`RpcRef`, `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and
-`Rpc.resolveRef` are enough for the JSX-subset fixture to include an
-`InteractiveExpr`-shaped component whose click handler dispatches a
-host-inspectable reference descriptor and updates component-owned React state
-from the callback. The public RPC helpers keep accepting `RpcRef`, but their
-low-level host targets receive `Js RpcRef` resources built by the
-`proofwidgets.rpc.ref` host targets. Resolve callbacks receive
-`Js ResolvedRef` resources and decode them through
-`js.value.proofwidgets.resolvedRef.value` before running user callbacks. In live
-infoview widgets,
-`Vir.Infoview.ProofWidgetsRpc`
-can resolve that expression-shaped descriptor as a fallback, and the live
-infoview shell asks the Lean server to create a standard
-`Lean.Server.WithRpcRef` handle for the current interactive goal at the cursor.
-`Vir.Infoview.Surface` carries the live
-`proofWidgetsExpr : Option (WithRpcRef ExprWithCtx)` prop, and the infoview
-shell stores the server RPC handle as a typed `Js ServerRef` host resource
-instead of serializing the handle through a string field.
+component. Real RPC rendering is demonstrated separately in
+`examples/RpcReferenceWidget.lean`, without a descriptor resolver or synthetic
+reference type.
 
-The preferred direct RPC lane is separate from that provisional resolver.
 `Vir.Infoview.Surface.rpcSession` carries the exact position-specific
 `RpcSessionAtPos` object returned by the official infoview hook.
 `Vir.Infoview.RpcSession.call` invokes its native `call` method with exact

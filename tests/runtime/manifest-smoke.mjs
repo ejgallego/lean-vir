@@ -334,7 +334,6 @@ for (const target of [
   "js.bool",
   "js.bool.value",
   "js.float.value",
-  "js.value.proofwidgets.resolvedRef.value",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
@@ -475,50 +474,6 @@ for (const arg of infoviewDocumentPositionImport?.args ?? []) {
   assert.equal(arg.type?.type, "Js");
 }
 assert.equal(infoviewDocumentPositionImport?.result?.type, "Js");
-const proofwidgetsResolveRefImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "proofwidgets.rpc.resolveRef",
-  );
-assert.equal(proofwidgetsResolveRefImport?.args[0]?.type?.type, "Js");
-assert.equal(proofwidgetsResolveRefImport?.args[1]?.type?.kind, "function");
-assert.equal(
-  proofwidgetsResolveRefImport?.args[1]?.type?.args[0]?.type?.type,
-  "Js",
-);
-assert.equal(proofwidgetsResolveRefImport?.result?.type, "Js");
-const proofwidgetsResolvedRefValueImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "js.value.proofwidgets.resolvedRef.value",
-  );
-assert.equal(proofwidgetsResolvedRefValueImport?.effect, "runtime");
-assert.equal(proofwidgetsResolvedRefValueImport?.args[0]?.type?.type, "Js");
-assert.equal(
-  proofwidgetsResolvedRefValueImport?.result?.name,
-  "Lean.Vir.ProofWidgets.ResolvedRef",
-);
-const proofwidgetsRpcRefImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "proofwidgets.rpc.ref",
-);
-assert.equal(proofwidgetsRpcRefImport?.effect, "runtime");
-assert.equal(proofwidgetsRpcRefImport?.args.length, 5);
-for (const arg of proofwidgetsRpcRefImport?.args ?? []) {
-  assert.equal(arg.type?.type, "Js");
-}
-assert.equal(proofwidgetsRpcRefImport?.result?.type, "Js");
-const proofwidgetsRpcRefFinishImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "proofwidgets.rpc.ref.finish",
-  );
-assert.equal(proofwidgetsRpcRefFinishImport?.effect, "runtime");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[0]?.type?.type, "Js");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[1]?.type?.type, "Js");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[2]?.type?.type, "Js");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[3]?.type?.kind, "resource");
-assert.equal(
-  proofwidgetsRpcRefFinishImport?.args[3]?.type?.name,
-  "Lean.Vir.Js",
-);
-assert.equal(proofwidgetsRpcRefFinishImport?.result?.type, "Js");
 const testCallNatCallbackImport =
   hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.callNatCallback",

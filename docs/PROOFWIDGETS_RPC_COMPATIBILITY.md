@@ -47,11 +47,11 @@ Those pieces have distinct ownership:
 | RPC session | `useRpcSession(): RpcSessionAtPos` | `Surface.rpcSession` carries that exact object into VIR | Keep the position-specific session raw; do not add a session registry. |
 | RPC call | `session.call(method, params, options)` | Direct `RpcSession.call` and `callWithOptions` bindings | Keep the session, request, options and Promise exact. |
 | Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations over exact `Js.Function1` values | Preserve the Promise and callback objects; do not make the synchronous host dispatcher await either one. |
-| Server references | Exact response objects registered by `RpcSessionAtPos` | Direct response/reference round trip; older descriptor API remains for the JSX demo | The duplicate global store has been removed; migrate the remaining descriptor consumer before deleting that API. |
+| Server references | Exact response objects registered by `RpcSessionAtPos` | Genuine `Server.WithRpcRef` response/reference round trip | Keep references exact; no descriptor resolver or separate retention store. |
 | Request cancellation | Native `AbortController` passed through call options | Exact options forwarded to the official client; real LSP cancellation tested | Cancellation does not guarantee local rejection; callers must still suppress stale results. |
 | Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Lean values retained in JSL for browser-side rendering | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
 | Returned HTML | Serialized upstream `ProofWidgets.Html` rendered by `HtmlDisplay` | `ProofWidgets.Html` is a direct `ReactM (Js React.Node)` action | Do not silently equate these types. Either use upstream `HtmlDisplay` for wire compatibility or return data and render it with the VIR-native API. |
-| Error display | Promise rejection plus upstream `mapRpcError` | Host command logs or callback failure | Preserve the rejection value first; presentation can be an explicit component helper. |
+| Error display | Promise rejection plus upstream `mapRpcError` | Exact native Promise rejection, including the server error | Preserve the rejection value first; presentation can be an explicit component helper. |
 
 ## Exact Promise boundary
 
@@ -138,14 +138,14 @@ A later compatibility fixture may return upstream serialized
 `ProofWidgets.Html` and delegate to upstream `HtmlDisplay`; it should not add a
 second VIR-owned HTML tree.
 
-## Retirement target
+## Retired provisional path
 
-The write-only global reference store and all retention through it are removed.
-Real reference resolution uses `Server.WithRpcRef.val` directly.
+The descriptor resolver, normalizer, synthetic JSX reference demonstration,
+unused infoview reference prefetch, and global reference store are removed.
+The standalone JSX fixture retains its static component, props, keys, children,
+and callback coverage. `RpcReferenceWidget` supplies the real reference example;
+the browser test covers the current-goal methods that remain in
+`Vir.Infoview.ProofWidgetsRpc`.
 
-The remaining provisional `ProofWidgets.RpcRef`, `ResolvedRef`, descriptor
-normalization, and custom resolve command still serve `InteractiveExpr` in the
-standalone JSX subset demo. Retiring those requires migrating that consumer;
-the native `RpcReferenceWidget` example is the replacement reference path.
-The legacy `storeKey` response field is compatibility metadata, not a store or
-an ownership key.
+Real reference resolution uses `Server.WithRpcRef.val` directly. No client
+wrapper or copied wire token substitutes for the session-owned object.

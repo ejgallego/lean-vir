@@ -37,53 +37,33 @@ demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, `Handler`,
 and native JSX in an upstream-recognizable shape.
 
 `ProofWidgetsJsxSubset.lean` now ports the static surface of upstream
-`ProofWidgets/Demos/Jsx.lean` through `Vir.ProofWidgets.Jsx`, plus the first
-narrow reference-shaped interactive case:
+`ProofWidgets/Demos/Jsx.lean` through `Vir.ProofWidgets.Jsx`:
 
 - lowercase HTML tags such as `b`, `img`, `span`, and `hr`;
 - string and interpolated attributes such as `src`, `alt`, and `style`;
 - child array spread and string interpolation;
 - uppercase components, typed props, component keys, and child spreads;
-- a small callback to keep handler coverage in the same fixture;
-- an `InteractiveExpr`-shaped component whose props carry
-  `WithRpcRef ExprWithCtx` and whose click handler calls
-  `ProofWidgets.Rpc.resolve`.
+- a small callback to keep handler coverage in the same fixture.
 
-The preferred RPC foundation now exposes the exact position-specific
-`RpcSessionAtPos` object as `Surface.rpcSession`. `RpcSession.call` receives an
-exact JavaScript request value and returns its native `Js.Promise`; direct
-Promise continuations and object-property access do not decode or copy the
-response graph. The runtime boundary fixture proves session transport through
-the infoview surface, request identity, native Promise identity, fulfillment
-and rejection continuations, and exact response-property transport through
-real Wasm. It does not yet exercise a live Lean server method, cancellation,
-or a genuine server-owned reference.
+The RPC foundation exposes the exact position-specific `RpcSessionAtPos`
+object as `Surface.rpcSession`. `RpcSession.call` receives an exact JavaScript
+request value and returns its native `Js.Promise`; `callWithOptions` also
+forwards native request options. Direct Promise continuations and property
+access do not decode or copy the response graph.
 
-The older RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
-`WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
-public Lean helpers convert `RpcRef` to a `Js RpcRef` resource through
-`proofwidgets.rpc.ref` before calling `proofwidgets.rpc.resolveRef`; the
-browser host normalizes that resource behind the low-level target.
-Resolve callbacks receive a `Js ResolvedRef` resource, and the public Lean
-wrapper calls `js.value.proofwidgets.resolvedRef.value` before invoking the
-user callback. In the infoview, `Surface.proofWidgetsExpr` now carries a live
-`WithRpcRef ExprWithCtx` prop backed by the preferred server-owned
-`Lean.Server.WithRpcRef` path. The infoview shell asks
-`Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos` to build that prop from
-Lean's current interactive goal at the cursor, then resolves it through
-`Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef`. The browser stores the
-opaque RPC handle as a typed `Js ServerRef` host resource, so the callback path
-does not serialize or parse RPC refs through a string field. Descriptor refs
-still resolve through `Lean.Vir.Infoview.resolveProofWidgetsRpcRef` as a
-fallback for tests and static examples. The `InteractiveExpr`-shaped demos use
-ordinary React state to render the async result from the callback, keeping the
-component behavior close to a JavaScript React component. This proves the
-typed prop, host-dispatch, component-state, current-goal construction, and
-infoview RPC round trip needed by an `InteractiveExpr`-style port. It is not
-yet proof-script editing or the full ProofWidgets RPC request model. Once the
-direct session fixture covers this client, the older resolver, normalized
-descriptor, and global reference store should be retired rather than
-maintained as a second RPC architecture.
+`examples/RpcReferenceWidget.lean` renders real server data and sends an exact
+nested reference back to a `@[server_rpc_method]`. The browser acceptance
+uses official React, the official RPC client, and a real Lean server to cover
+position changes, cancellation, rejection, rerendering and package teardown.
+Its JavaScript parent owns asynchronous effects; the Lean child owns its native
+React hook state. See [the RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md) for
+the tested boundary and remaining limits.
+
+The provisional descriptor resolver and synthetic JSX reference demonstration
+are removed. Genuine `Lean.Server.WithRpcRef` values remain under the official
+session's reachability rules. The current-goal server methods in
+`Vir.Infoview.ProofWidgetsRpc` are called directly and tested with a real goal;
+the infoview shell no longer prefetches an unused reference prop.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 
