@@ -4,6 +4,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   symlink,
   writeFile,
@@ -29,6 +30,8 @@ const packageEntry = "Illuminate.Animation.Vir.replayTraceTyped";
 const sourceFile = "fixtures/illuminate/VirIlluminateAcceptance/Exports.lean";
 const packageFile = "module-set/Vir.irpkg";
 const descriptorFile = "module-set/Vir.irpkg-set.json";
+const shardDirectory = "module-set/Vir.parts";
+const rootModule = "VirIlluminateAcceptance.Exports";
 
 const usage = `Usage: node scripts/packages/illuminate/export-browser-package.mjs [options]
 
@@ -123,6 +126,7 @@ async function main() {
     });
 
     await mkdir(join(output, "module-set"), { recursive: true });
+    await mkdir(join(output, shardDirectory), { recursive: true });
     const reportFile = join(output, "module-set/Vir.report.md");
     runSync(
       "lake",
@@ -131,6 +135,12 @@ async function main() {
         join(producer, ".lake/build/bin/vir_irpkg"),
         join(output, packageFile),
         reportFile,
+        "--module-set-output",
+        join(output, descriptorFile),
+        join(output, shardDirectory),
+        rootModule,
+        "Vir.irpkg",
+        "Vir.parts",
         "--target",
         join(producer, sourceFile),
         packageEntry,
@@ -138,20 +148,22 @@ async function main() {
       { cwd: sourceView.sourceView },
     );
     await rm(reportFile);
-    await writeFile(
-      join(output, descriptorFile),
-      `${JSON.stringify({
-        format: "lean-vir-ir-package-set",
-        version: 1,
-        packages: [
-          {
-            module: "VirIlluminateAcceptance.Exports",
-            role: "root",
-            path: "Vir.irpkg",
-          },
-        ],
-      })}\n`,
+    const descriptor = JSON.parse(
+      await readFile(join(output, descriptorFile), "utf8"),
     );
+    const packagePaths = descriptor.packages.map(
+      ({ path }) => `module-set/${path}`,
+    );
+    const pathsAreCanonical = packagePaths.every((path, index) =>
+      index + 1 === packagePaths.length
+        ? path === packageFile
+        : path === `module-set/Vir.parts/${index}.irpkg`,
+    );
+    if (packagePaths.length === 0 || !pathsAreCanonical) {
+      throw new Error(
+        `unexpected Illuminate VIR package members: ${packagePaths.join(", ")}`,
+      );
+    }
 
     await copyFile(
       join(workload, workloadBuild.workload.semanticInputs),
@@ -169,8 +181,8 @@ async function main() {
     const payloadPaths = [
       "lean-vir/js/vir-runtime.js",
       "lean-vir/wasm/vir-upstream.wasm",
-      packageFile,
       descriptorFile,
+      ...packagePaths,
       "smoke.examples.json",
       "smoke.vir-player-trace.mjs",
       "smoke.mjs",

@@ -73,7 +73,7 @@ const packageBytes = await readFile(
 );
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [packageBytes],
+  irPackageSet: [packageBytes],
 });
 let assetReadCount = 0;
 let assetStatCount = 0;
@@ -512,8 +512,8 @@ const runtimeOptions = await loadRuntimeOptions({
   position: { line: 0, character: 0 },
 });
 assert.ok(runtimeOptions.wasmModule instanceof WebAssembly.Module);
-assert.equal(runtimeOptions.irPackageSetBytes.length, 1);
-assert.equal(runtimeOptions.irPackageSetBytes[0].length, packageBytes.length);
+assert.equal(runtimeOptions.irPackageSet.length, 1);
+assert.equal(runtimeOptions.irPackageSet[0].length, packageBytes.length);
 assert.equal(
   await loadWasmModule(rpcSession, {
     kind: "path",

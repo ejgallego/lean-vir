@@ -1,32 +1,38 @@
 # IR Package Format
 
 `.irpkg` files are the local binary packages loaded by the WASM shim. The
-format is internal to this repository and is versioned by
-`packageFormatVersion` in the embedded manifest metadata.
+format is internal to this repository. The binary header is authoritative for
+its package format version; the embedded manifest's `packageFormatVersion`
+must match it.
 
 A composable module build does not introduce another binary format. Its
-`lean-vir-ir-package-set` version-1 JSON descriptor lists dependency `.irpkg`
-members in Lean's canonical module-initialization order and the public root
-member last. Every listed member independently owns its declarations and
-initializer metadata and uses the format documented below; the root's embedded
-interface manifest is the public manifest for the aggregate runtime.
+`lean-vir-ir-package-set` version-2 JSON descriptor lists dependency `.irpkg`
+members in the dependency-first order reconstructed from Lean's loaded module
+graphs and the public root member last. Every listed member independently owns
+its declarations and initializer metadata and uses the format documented
+below; the root's embedded interface manifest is the public manifest for the
+aggregate runtime.
 
-The version-1 descriptor has this shape:
+The version-2 descriptor has this shape:
 
 ```json
 {
   "format": "lean-vir-ir-package-set",
-  "version": 1,
+  "version": 2,
   "packages": [
     {
       "module": "MySlides.Support",
       "role": "dependency",
-      "path": "Runtime.parts/MySlides.Support.irpkg"
+      "path": "Runtime.parts/0.irpkg",
+      "byteLength": 12345,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     {
       "module": "MySlides.Runtime",
       "role": "root",
-      "path": "Runtime.irpkg"
+      "path": "Runtime.irpkg",
+      "byteLength": 67890,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
     }
   ]
 }
@@ -34,24 +40,46 @@ The version-1 descriptor has this shape:
 
 `packages` must be non-empty. Every entry has a non-empty, unique `module` and
 `path`; every entry except the last has role `dependency`, and the last has
-role `root`. Paths are resolved relative to the descriptor URL. The loader
-validates this structure before starting any member fetch.
+role `root`. Each positive `byteLength` and lowercase `sha256` binds that entry
+to its exact package bytes. Paths are normalized, same-directory-relative
+paths: absolute URLs, parent traversal, query strings, fragments, backslashes,
+and percent escapes are rejected. The loader validates the complete structure
+before fetching members, then verifies every length and digest before loading
+the set. Before Wasm instantiation, it also parses each member and requires the
+embedded `metadata.packageSetMember` module and role to match the corresponding
+descriptor entry. Raw byte-array loads enforce the same embedded identity and
+dependency-first/root-last order.
+
+JavaScript treats `module` as an opaque identity emitted by Lean's
+`Name.toString`; it does not attempt to duplicate Lean's Unicode and quoted-name
+parser. Module identities are never converted into package paths.
+
+Dependency shard filenames are ordinal identities (`0.irpkg`, `1.irpkg`, ...),
+while the descriptor carries the Lean module identity. This keeps filesystem
+escaping out of module names and makes bytes reproducible across checkout
+locations. Each member manifest also records `metadata.packageSetMember` with
+its module and `dependency` or `root` role. Dependency members have no public
+targets. A compiled-module root has the stable target `{ "module": ..., "mode":
+"markedModule" }` rather than the generated driver's local path; the legacy
+source fallback has one `marked` source target. Other target modes are rejected
+for package-set roots. All members in a set must record the same
+package/manifest versions and exact Lean version, toolchain, and git hash.
 
 See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
 module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)
 for loading one.
 
-Package format 10 has a fixed header followed by a section directory. All
+Package format 11 has a fixed header followed by a section directory. All
 multi-byte integers are unsigned little-endian 32-bit values.
 
 ## Header
 
-| Field | Encoding | Meaning |
-| --- | --- | --- |
-| magic | string | Must be `lean-vir-ir-package`. |
-| package format | u32 | Currently `10`. |
-| declaration count | u32 | Number of declaration entries in the declarations section. |
-| section count | u32 | Number of section directory entries. |
+| Field             | Encoding | Meaning                                                    |
+| ----------------- | -------- | ---------------------------------------------------------- |
+| magic             | string   | Must be `lean-vir-ir-package`.                             |
+| package format    | u32      | Currently `11`.                                            |
+| declaration count | u32      | Number of declaration entries in the declarations section. |
+| section count     | u32      | Number of section directory entries.                       |
 
 Strings are encoded as `u32 byteLength` followed by UTF-8 bytes. They are
 length-delimited rather than NUL-terminated, so embedded zero bytes are
@@ -61,31 +89,48 @@ preserved.
 
 Each section directory entry is:
 
-| Field | Encoding | Meaning |
-| --- | --- | --- |
-| kind | u32 | Stable section kind. |
-| offset | u32 | Absolute byte offset from the start of the package. |
-| byte length | u32 | Payload byte length. |
+| Field       | Encoding | Meaning                                             |
+| ----------- | -------- | --------------------------------------------------- |
+| kind        | u32      | Stable section kind.                                |
+| offset      | u32      | Absolute byte offset from the start of the package. |
+| byte length | u32      | Payload byte length.                                |
 
 The loader requires exactly one of each current section kind:
 
-| Kind | Name | Payload |
-| ---: | --- | --- |
-| 1 | `declarations` | Encoded Lean IR declaration entries. The count lives in the header. |
-| 2 | `initGlobals` | Encoded array of initializer global mappings. |
-| 3 | `hostImports` | Encoded array of package-owned host import metadata. |
-| 4 | `exportSummaries` | Encoded array of direct export call summaries. |
-| 5 | `interfaceManifest` | Embedded JSON interface manifest as an encoded string. |
+| Kind | Name                | Payload                                                             |
+| ---: | ------------------- | ------------------------------------------------------------------- |
+|    1 | `declarations`      | Encoded Lean IR declaration entries. The count lives in the header. |
+|    2 | `initGlobals`       | Encoded array of initializer global mappings.                       |
+|    3 | `hostImports`       | Encoded array of package-owned host import metadata.                |
+|    4 | `exportSummaries`   | Encoded array of direct export call summaries.                      |
+|    5 | `interfaceManifest` | FNV-1a-64 checksum followed by the encoded JSON interface manifest. |
+
+The manifest payload starts with the checksum's low and high halves as two
+little-endian `u32` values, followed by the usual length-prefixed UTF-8 string.
 
 The section payload encodings are the same payloads that the pre-v10 linear
-stream used. Format 10 makes the envelope self-describing; it does not add
-deeper semantic validation beyond required sections, bounds, duplicate-section
-checks, and section-local trailing-byte checks.
+stream used, except that format 11 prefixes the manifest with a checksum of its
+exact UTF-8 bytes. The directory requires known, unique section kinds whose
+bounded, non-overlapping payloads begin after the complete header and directory.
+Each section decoder also rejects trailing bytes. The runtime separately validates
+the manifest checksum, embedded schema, and package-set identities. The checksum
+detects corruption of the manifest bytes, not agreement with other sections;
+it is not an authenticity boundary because an IR package already contains
+executable code.
 
 The export-summary array order is also the structural call identity used by
 `vir_resolve_call_export`. JavaScript resolves all public keys for a manifest
 export to that export's array index, so escaped dots and string-versus-numeric
-name components are never recovered by parsing `Name.toString` output.
+name components are never recovered by parsing `Name.toString` output. The
+runtime also calls `vir_validate_package_contract` between prepare and finish:
+one transient binary projection of the validated manifest is compared with the
+decoded call tables. It checks ordered export names, argument counts, IO and
+boxed-boundary flags, and ordered host-import names, targets, symbols, arities,
+erased-prefix counts and IO flags. Names are rendered structurally with the
+pinned Lean printing rules, not parsed from text. Recomputing a manifest checksum
+cannot bypass this comparison. Detailed interface types and effect labels are
+not independently stored in those tables and remain producer-owned metadata;
+this check does not authenticate a package or prove its IR implements its types.
 
 Decoded Lean objects are runtime-owned, not views into the package bytes.
 Package IR constructor helpers consume owned child references, and the decoded
@@ -99,7 +144,7 @@ Package `Name` tags and IR declaration payload tag values live in
 declaration, initializer-global, host-import, and export-summary sections; the
 other generated tag groups are specific to IR declarations.
 
-These assignments are part of the format-10 wire contract. Do not renumber or
+These assignments are part of the format-11 wire contract. Do not renumber or
 reuse them without reviewing whether `packageFormatVersion` must change. IR
 type tags `10` and `11` remain reserved for the currently unsupported
 `Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases. After editing the

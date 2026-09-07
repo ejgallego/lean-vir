@@ -66,7 +66,7 @@ test("the prettyM catalog selects the complete source and component graph", asyn
   const config = artifactSetConfig(database, "prettyM");
   assert.equal(config.schemaVersion, 2);
   assert.deepEqual(config.example, { id: "prettyM", variant: "default" });
-  assert.equal(config.setId, "prettyM-bounded-set-0002");
+  assert.equal(config.setId, "prettyM-bounded-set-0003");
   assert.equal(
     config.components.vir.runtime.repository,
     "https://github.com/ejgallego/lean-vir",
@@ -75,6 +75,8 @@ test("the prettyM catalog selects the complete source and component graph", asyn
     config.components.vir.runtime.sourceCommit,
     sources.vir.revision,
   );
+  assert.equal(config.components.vir.workload.packageFormat, 10);
+  assert.equal(config.components.vir.workload.manifestVersion, 8);
   assert.deepEqual(config.components.vir.workload.source, {
     repository: "https://github.com/leanprover/verso-slides",
     commit: sources.workload.revision,
@@ -138,10 +140,18 @@ test("Illuminate assembles workload, VIR, and FIR selection packages", async () 
 
   const config = artifactSetConfig(database, "illuminate");
   assert.deepEqual(config.example, { id: "illuminate", variant: "default" });
-  assert.equal(config.setId, "illuminate-player-set-0001");
+  assert.equal(config.setId, "illuminate-player-set-0002");
   assert.equal(
     config.benchmarkContract.id,
     "illuminate/player-trace/v1",
+  );
+  assert.deepEqual(
+    Object.keys(config.components.vir.files).filter((path) =>
+      path.startsWith("module-set/Vir.parts/"),
+    ),
+    Array.from({ length: 14 }, (_, index) =>
+      `module-set/Vir.parts/${index}.irpkg`,
+    ),
   );
 });
 
@@ -555,7 +565,11 @@ test("stages a verified example namespace without replacing siblings", async () 
     "illuminate/vir/sdk/js/vir-runtime.js",
     "illuminate/vir/sdk/wasm/vir-upstream.wasm",
     "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
-    "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/Player.irpkg",
+    ...Array.from(
+      { length: 14 },
+      (_, index) =>
+        `illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/${index}.irpkg`,
+    ),
     "illuminate/native/BUILD.json",
     "illuminate/native/illuminate-player-browser-adapter.mjs",
     "illuminate/native/illuminate-player.wasm",

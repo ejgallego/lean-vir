@@ -5,8 +5,12 @@ Author: Emilio J. Gallego Arias
 */
 
 import { formatInterfaceEffectSuffix } from "../../web/src/runtime/interface-effects.js";
-import { formatInterfaceType, manifestDiagnostics } from "../../web/src/runtime/interface-manifest.js";
+import {
+  formatInterfaceType,
+  manifestDiagnostics,
+} from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { formatPackageTarget } from "../../web/src/runtime/package-targets.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {
@@ -42,7 +46,9 @@ try {
     printText(info);
   }
 } catch (error) {
-  console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `error: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 }
 
@@ -57,18 +63,18 @@ function printText(info) {
   console.log(`declarations: ${info.package.declarationCount}`);
   console.log(`sections: ${info.package.sections.length}`);
   for (const section of info.package.sections) {
-    console.log(`  - ${section.name} kind=${section.kind} offset=${section.offset} bytes=${section.byteLength}`);
+    console.log(
+      `  - ${section.name} kind=${section.kind} offset=${section.offset} bytes=${section.byteLength}`,
+    );
   }
   console.log(`manifest: ${info.manifest.version}`);
   console.log(`generator: ${metadata.generator ?? "unknown"}`);
-  console.log(`toolchain: ${metadata.leanToolchain ?? metadata.leanVersion ?? "unknown"}`);
-  console.log(`generated: ${metadata.generatedAt ?? "unknown"}`);
+  console.log(
+    `toolchain: ${metadata.leanToolchain ?? metadata.leanVersion ?? "unknown"}`,
+  );
   console.log(`targets: ${targets.length}`);
   for (const target of targets) {
-    const roots = Array.isArray(target.resolvedRoots) && target.resolvedRoots.length > 0
-      ? target.resolvedRoots.join(", ")
-      : "(none)";
-    console.log(`  - ${target.source ?? "unknown"} [${target.mode ?? "?"}] roots: ${roots}`);
+    console.log(`  - ${formatPackageTarget(target)}`);
   }
   console.log(`exports: ${info.manifest.exports.length}`);
   for (const entry of info.manifest.exports) {
@@ -76,24 +82,34 @@ function printText(info) {
       .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
       .join(", ");
     const effect = formatInterfaceEffectSuffix(entry.effect);
-    console.log(`  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`);
+    console.log(
+      `  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`,
+    );
     printDescriptorDetails(entry.args ?? [], entry.result);
   }
-  const hostImports = Array.isArray(info.manifest.hostImports) ? info.manifest.hostImports : [];
+  const hostImports = Array.isArray(info.manifest.hostImports)
+    ? info.manifest.hostImports
+    : [];
   console.log(`host imports: ${hostImports.length}`);
   for (const entry of hostImports) {
     const args = (entry.args ?? [])
       .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
       .join(", ");
     const effect = formatInterfaceEffectSuffix(entry.effect);
-    const erased = entry.erasedPrefixArgs ? ` erasedPrefixArgs=${entry.erasedPrefixArgs}` : "";
+    const erased = entry.erasedPrefixArgs
+      ? ` erasedPrefixArgs=${entry.erasedPrefixArgs}`
+      : "";
     const boundary = entry.boundary;
-    console.log(`  - #${entry.slot} ${entry.name} boundary=${boundary} arity=${entry.arity ?? "?"}${erased} (${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
+    console.log(
+      `  - #${entry.slot} ${entry.name} boundary=${boundary} arity=${entry.arity ?? "?"}${erased} (${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`,
+    );
     printDescriptorDetails(entry.args ?? [], entry.result);
   }
   console.log(`diagnostics: ${diagnostics.length}`);
   for (const diagnostic of diagnostics) {
-    console.log(`  - ${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`);
+    console.log(
+      `  - ${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`,
+    );
   }
 }
 
@@ -116,8 +132,9 @@ function descriptorSummary(type) {
       return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
     case INTERFACE_TAG.STRUCTURE:
       if (!containsRecursiveSelf(type)) return null;
-      return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? []).map((field) =>
-        `${field.name}: ${descriptorLabel(field.type)}`).join(", ")} }`;
+      return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? [])
+        .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
+        .join(", ")} }`;
     default:
       return containsRecursiveSelf(type) ? descriptorLabel(type) : null;
   }
@@ -127,8 +144,9 @@ function customInductiveConstructors(type) {
   return (type.constructors ?? []).map((ctor) => {
     const fields = ctor.fields ?? [];
     if (fields.length === 0) return `${ctor.jsName ?? ctor.name}()`;
-    return `${ctor.jsName ?? ctor.name}(${fields.map((field) =>
-      `${field.name}: ${descriptorLabel(field.type)}`).join(", ")})`;
+    return `${ctor.jsName ?? ctor.name}(${fields
+      .map((field) => `${field.name}: ${descriptorLabel(field.type)}`)
+      .join(", ")})`;
   });
 }
 
@@ -166,15 +184,22 @@ function containsRecursiveSelf(type) {
     case INTERFACE_TAG.PROD:
       return containsRecursiveSelf(type.fst) || containsRecursiveSelf(type.snd);
     case INTERFACE_TAG.STRUCTURE:
-      return (type.fields ?? []).some((field) => containsRecursiveSelf(field.type));
+      return (type.fields ?? []).some((field) =>
+        containsRecursiveSelf(field.type),
+      );
     case INTERFACE_TAG.TAGGED_UNION:
-      return (type.constructors ?? []).some((ctor) => containsRecursiveSelf(ctor.type));
+      return (type.constructors ?? []).some((ctor) =>
+        containsRecursiveSelf(ctor.type),
+      );
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return (type.constructors ?? []).some((ctor) =>
-        (ctor.fields ?? []).some((field) => containsRecursiveSelf(field.type)));
+        (ctor.fields ?? []).some((field) => containsRecursiveSelf(field.type)),
+      );
     case INTERFACE_TAG.FUNCTION:
-      return (type.args ?? []).some((arg) => containsRecursiveSelf(arg.type)) ||
-        containsRecursiveSelf(type.result);
+      return (
+        (type.args ?? []).some((arg) => containsRecursiveSelf(arg.type)) ||
+        containsRecursiveSelf(type.result)
+      );
     default:
       return false;
   }

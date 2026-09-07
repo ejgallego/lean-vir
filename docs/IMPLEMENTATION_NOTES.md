@@ -40,8 +40,8 @@ recorded in
 
 For module-system clients, the `:vir` facet uses Lean's owning-module
 index to resolve opaque imported dependencies on demand. It partitions the
-reached closure into format-10 dependency shards and one root package, then
-filters Lean's canonical module-initialization order into a dependency-first
+reached closure into format-11 dependency shards and one root package, then
+reconstructs a dependency-first order from the loaded module graphs for the
 JSON descriptor. Each shard retains its owning module's initializer metadata.
 The JavaScript runtime stages the complete set in a fresh instance, rejects
 identity conflicts, installs the root manifest last, and runs initializer
@@ -53,7 +53,7 @@ utility accepts explicit roots, or it can package the public source definitions
 from a single Lean file. The `/dev.html` Vite entry point loads a served or
 uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through `vir_call_resolved_objects`; package format 10 stores direct
+go through `vir_call_resolved_objects`; package format 11 stores direct
 package-call summaries in a sectioned `.irpkg`, while
 `web/src/runtime/object-values.js` lowers JavaScript values to owned Lean
 objects before the core runtime calls the upstream interpreter through a

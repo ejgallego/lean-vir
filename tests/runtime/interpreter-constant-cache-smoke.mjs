@@ -66,7 +66,7 @@ try {
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   const packageBytes = await readFile(packagePath);
   runtime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
-    irPackageSetBytes: [packageBytes],
+    irPackageSet: [packageBytes],
   });
 
   const first = runtime.callTimed(

@@ -4,8 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Browser
-import Vir.ProofWidgets.Rpc.Generated
+module
+
+public import Vir.Browser
+public import Vir.ProofWidgets.Rpc.Generated
+
+public section
 
 namespace Lean.Vir.ProofWidgets
 

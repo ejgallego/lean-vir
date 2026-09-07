@@ -15,7 +15,7 @@ assert.equal(typeof globalThis.gc, "function", "GC smoke requires --expose-gc");
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [defaultPackageBytes],
+  irPackageSet: [defaultPackageBytes],
 });
 
 let object = makeObjectString(runtime, "self-owning JSL");

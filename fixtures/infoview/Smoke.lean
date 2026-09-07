@@ -90,12 +90,24 @@ def smokeHostDecl (marker : Vir.HostMetadata.HostImportMarker) : Lean.IR.Decl :=
 def importedHelperTargetSource : System.FilePath :=
   "fixtures/infoview/ImportedHelperTarget.lean"
 
+/-- Only the serial batch test creates a frontend; production RPC uses the
+environment already prepared by the file worker. -/
+unsafe def snapshotEnvironment (source contents : String) : IO Lean.Environment := do
+  Lean.enableInitializersExecution
+  let some env ← Lean.Elab.runFrontend contents
+      (Lean.Elab.inServer.set (Lean.Elab.async.set ({} : Lean.Options) false) true)
+      source `InfoviewSnapshotTest
+    | throw <| IO.userError "snapshot frontend failed"
+  return env
+
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
+  let env ← snapshotEnvironment importedHelperTargetSource.toString
+    (← IO.FS.readFile importedHelperTargetSource)
   let target : Vir.GeneratePackage.Target := {
     source := importedHelperTargetSource
-    roots := #[root]
+    mode := .explicit #[root]
   }
-  let index ← Vir.GeneratePackage.loadDeclIndex #[target]
+  let index := Vir.GeneratePackage.declIndexFromEnvironment importedHelperTargetSource.toString env
   return Vir.GeneratePackage.collectClosure #[target] index
 
 def loadedDecl? (closure : Vir.GeneratePackage.Closure) (name : Lean.Name) :
@@ -111,8 +123,32 @@ def expectImportedDecl
       throw <| IO.userError s!"infoview smoke failed: missing imported helper `{name}`"
   | some loaded =>
       expect s!"{label} is loaded through an imported module" <|
-        loaded.source.startsWith s!"imported by {importedHelperTargetSource}"
+        loaded.module? == some `InfoviewFixtures.ImportedHelper
       return loaded.decl
+
+/-- Exercise the same environment adapter as the RPC handler, without a disk
+source to fall back to. Local edits must survive imported-owner resolution. -/
+unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
+  let source := "unsaved/ModuleSnapshot.lean"
+  let contents := "module\npublic import InfoviewFixtures.ImportedHelper\n" ++
+    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ " ++
+    s!"{Lean.Json.compress (.str suffix)}\n"
+  let env ← snapshotEnvironment source contents
+  let target : Vir.GeneratePackage.Target := { source, mode := .explicit #[`snapshotValue] }
+  let index := Vir.GeneratePackage.declIndexFromEnvironment source env
+  let closure := Vir.GeneratePackage.collectClosure #[target] index
+  expect "module snapshot resolves opaque imports" closure.missingDecls.isEmpty
+  expect "module snapshot resolves externs" closure.missingExterns.isEmpty
+  expect s!"module snapshot resolves initializer globals: {closure.unsupportedInitGlobals.map Vir.GeneratePackage.ClosureDependency.name}"
+    closure.unsupportedInitGlobals.isEmpty
+  expect "module snapshot includes private transitive owner" <|
+    closure.decls.any (fun loaded => loaded.module? ==
+      some `InfoviewFixtures.ImportedHelper.Internal)
+  match ← Vir.GeneratePackage.buildPackageFromIndex "snapshot regression" #[target] index with
+  | .error message => throw <| IO.userError message
+  | .ok pkg =>
+      IO.FS.writeBinFile s!"build/infoview-smoke/snapshot-{suffix}.irpkg" pkg.bytes
+  return Lean.Vir.Infoview.closureIRHash closure
 
 #eval do
   let generatedWidget ←
@@ -179,5 +215,10 @@ def expectImportedDecl
   expect "real imported helper closure hash participates in reload token" <|
     Lean.Vir.Infoview.closureIRHash beforeClosure !=
       Lean.Vir.Infoview.closureIRHash afterClosure
+  IO.FS.createDirAll "build/infoview-smoke"
+  let firstSnapshot ← snapshotPackage "first"
+  let editedSnapshot ← snapshotPackage "edited"
+  expect "unsaved module edits change the package revision's closure hash" <|
+    firstSnapshot != editedSnapshot
 
 end SmokeInfoviewLean

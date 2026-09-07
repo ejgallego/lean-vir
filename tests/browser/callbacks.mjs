@@ -549,13 +549,13 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
     text: "callback:reload-idle",
   });
 
-  const runtimeAsset = await distAssetPathContaining("irPackageSetUrl");
+  const runtimeAsset = await distAssetPathContaining("irPackageSet");
   const disposed = await evaluate(cdp, `new Promise(async (resolve, reject) => {
     try {
       const runtimeModule = await import(${JSON.stringify(`${origin}${basePath}${runtimeAsset}`)});
       const createVirRuntime = runtimeModule.createVirRuntime ??
         Object.values(runtimeModule).find((value) =>
-          typeof value === "function" && String(value).includes("irPackageSetUrl"));
+          typeof value === "function" && String(value).includes("irPackageSet"));
       if (typeof createVirRuntime !== "function") {
         throw new Error("built runtime asset does not expose createVirRuntime");
       }
@@ -570,7 +570,7 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
       }
       const runtime = await createVirRuntime({
         wasmUrl: ${JSON.stringify(`${origin}${basePath}${wasmPublicFile}`)},
-        irPackageSetBytes: [
+        irPackageSet: [
           new Uint8Array(await packageResponse.arrayBuffer()),
         ],
       });

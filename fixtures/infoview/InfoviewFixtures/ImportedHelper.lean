@@ -4,12 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
+module
+
+import InfoviewFixtures.ImportedHelper.Internal
+
 namespace InfoviewFixtures.ImportedHelper
 
-@[noinline] def labelBefore (_ : Unit) : String :=
-  "imported helper before"
+@[noinline] public def labelBefore (_ : Unit) : String :=
+  Internal.labelBefore ()
 
-@[noinline] def labelAfter (_ : Unit) : String :=
-  "imported helper after"
+@[noinline] public def labelAfter (_ : Unit) : String :=
+  Internal.labelAfter ()
 
 end InfoviewFixtures.ImportedHelper

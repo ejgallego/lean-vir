@@ -22,7 +22,7 @@ const [wasmBytes, packageBytes, input, expected] = await Promise.all([
 ]);
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [packageBytes],
+  irPackageSet: [packageBytes],
 });
 try {
   assert.deepEqual(

@@ -98,7 +98,7 @@ export async function runIrPackageLifecycleSmoke({
         [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
       };
     },
-  }).createRuntime({ irPackageSetBytes: [await readFile(firstPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(firstPackage)] });
   const firstGenerationLifecycle = bindingGenerations[0];
   const ordinaryValue = { generation: "first" };
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
@@ -173,7 +173,7 @@ export async function runIrPackageLifecycleSmoke({
 
   const initializerRuntime = await createVirRuntimeFactory({
     wasmBytes,
-  }).createRuntime({ irPackageSetBytes: [leanPackageBytes] });
+  }).createRuntime({ irPackageSet: [leanPackageBytes] });
   assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
   initializerRuntime.loadIrPackageSetBytes([leanPackageBytes]);
   assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
@@ -210,7 +210,7 @@ export async function runIrPackageLifecycleSmoke({
   );
   const fallbackRuntime = await createVirRuntimeFactory({
     wasmBytes,
-  }).createRuntime({ irPackageSetBytes: [await readFile(fallbackPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(fallbackPackage)] });
   assert.equal(fallbackRuntime.call("callExternIncrement", 41), "42");
   const fallbackBytes = new Uint8Array([0, 1, 2, 255]);
   assert.deepEqual(

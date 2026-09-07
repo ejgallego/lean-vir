@@ -4,10 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean.Widget
-import Vir.Infoview.Package
-import Vir.Infoview.Surface
-import Vir.React
+module
+
+public import Lean.Widget
+public meta import Lean.Widget
+public import Vir.Infoview.Package
+public meta import Vir.Infoview.Package
+public import Vir.Infoview.Surface
+public import Vir.React
+
+public section
 
 namespace Lean.Vir.Infoview
 
@@ -78,7 +84,7 @@ def props (widget : ReactWidget) : WidgetProps where
 
 end ReactWidget
 
-private def expandReactWidgetCommand
+private meta def expandReactWidgetCommand
     (component : TSyntax `term)
     (mountId : TSyntax `str) : MacroM (TSyntax `command) := do
   let ns ← Macro.getCurrNamespace

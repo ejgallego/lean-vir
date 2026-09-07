@@ -20,12 +20,20 @@ open Lean.IR
 open Vir.Interface
 
 def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
-  index.envs.findSome? fun (candidate, env) =>
-    if candidate == source then some env else none
+  index.sources.findSome? fun candidate =>
+    if candidate.key == source then some candidate.env else none
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
   | .opaqueInfo _ => true
+  | _ => false
+
+private def DeclIndex.hasCompiledDefinition (index : DeclIndex) (name : Name) : Bool :=
+  match index.find? name with
+  | some loaded =>
+      match loaded.decl with
+      | .fdecl .. => true
+      | _ => false
   | _ => false
 
 def isGeneratedAuxName (n : Name) : Bool :=
@@ -44,11 +52,10 @@ def isGeneratedAuxName (n : Name) : Bool :=
         text.endsWith ".noConfusionType"
 
 def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
-  index.sourceDecls.findSome? (fun (source, names) =>
-    if source == target.source.toString then some names else none) |>.getD #[]
+  index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
 
 def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
-  match index.envForSource? target.source.toString with
+  match index.envForSource? (index.sourceKeyFor target) with
   | none => #[]
   | some env =>
       sourceDeclNamesFor index target |>.filter fun n =>
@@ -59,14 +66,12 @@ def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
         | none => false
 
 def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
-  if target.packageOnly then
-    #[]
-  else if target.includeAll then
-    publicSourceDeclsFor index target
-  else if target.includeMarked then
-    markedDeclNamesFor index target
-  else
-    target.roots.foldl (fun acc root =>
+  match target.mode with
+  | .packageOnly _ => #[]
+  | .all => publicSourceDeclsFor index target
+  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .explicit roots =>
+    roots.foldl (fun acc root =>
       let n := (boxedBaseName? root).getD root
       if acc.contains n then acc else acc.push n) #[]
 
@@ -111,7 +116,7 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     match env.find? name with
     | none => return .error { name, source, reason := "missing elaborated Lean declaration" }
     | some info =>
-        if !isInterfaceDeclInfo info then
+        if !isInterfaceDeclInfo info && !index.hasCompiledDefinition name then
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           let startup := index.virStartups.contains name
@@ -153,9 +158,9 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           | .error diagnostic => return .error diagnostic
 
 def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
-  index.envs.findSome? fun (source, env) =>
-    match env.find? name with
-    | some info => some (source, env, info)
+  index.sources.findSome? fun source =>
+    match source.env.find? name with
+    | some info => some (source.display, source.env, info)
     | none => none
 
 def hostImportSymbol (slot arity : Nat) : String :=

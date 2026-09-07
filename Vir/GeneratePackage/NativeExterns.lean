@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Lean.Compiler.IR.CompilerM
+public import Vir.LeanName
 
 public section
 
@@ -26,14 +27,6 @@ structure NativeExtern extends NativeExternSpec where
   params : Array Param
   resultType : IRType
   symbol : String
-
-def parseDottedName (text : String) : Except String Name := do
-  if text.isEmpty then
-    throw "dotted Lean name must be non-empty"
-  let parts := text.splitOn "."
-  if parts.any (·.isEmpty) then
-    throw s!"dotted Lean name `{text}` must not contain empty components"
-  return parts.foldl (fun name part => .str name part) .anonymous
 
 def nativeIRTypeLabel : IRType → String
   | .float => "float"

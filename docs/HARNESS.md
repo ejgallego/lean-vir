@@ -104,7 +104,7 @@ Commands that reuse generated runtime artifacts expect
 exist. SDK/local artifact packaging and SDK import smokes also expect the
 optimized debug companion `web/public/vir-upstream.dev.wasm`. Run
 `npm run build:demo` first when `npm run test:runtime`,
-`npm run test:runtime:pure`, `npm run test:runtime:lean`,
+`npm run test:runtime:pure`, `npm run test:runtime:lean`, `npm run test:infoview`,
 `npm run test:upstream:no-build`, or `npm run test:fixtures:no-build` reports a
 missing `web/public/...` artifact.
 
@@ -266,7 +266,8 @@ changes; `package.json` remains the exact command-order source of truth.
   `npm run test:runtime:unit`
 - Runtime package generation or SDK artifact import checks:
   `npm run test:runtime:lean`
-- Lake module/package facets, marked-module selection, or SDK installer changes:
+- Lake module/package facets, downstream bundle input tracing and output
+  ownership, marked-module selection, or SDK installer changes:
   `npm run test:lake`
 - Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
   `npm run test:wasm-extensions`
@@ -274,8 +275,8 @@ changes; `package.json` remains the exact command-order source of truth.
   `npm run test:runtime -- <substring>`
 - An explicit runtime smoke group:
   `npm run test:runtime -- --group pure`
-- Lean infoview bundle freshness, shell loading, local asset RPC, or widget-entry
-  signature checks:
+- Lean infoview bundle freshness, shell loading, local asset RPC, widget-entry
+  signatures, or server-mode module snapshots with opaque imports and unsaved edits:
   `npm run test:infoview`
 - React proof-widget demo iteration after `npm run build:demo`:
   open `examples/ReactProofWidget.lean` in VS Code; the widget package is built

@@ -14,7 +14,7 @@ const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
 let retainedCallback = null;
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       retainedCallback = callback;
@@ -47,7 +47,7 @@ assert.throws(
 let failedCallback = null;
 const failedRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       failedCallback = callback;
@@ -71,7 +71,7 @@ failedRuntime.dispose();
 let wrongArityCallback = null;
 const wrongArityRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       wrongArityCallback = callback;

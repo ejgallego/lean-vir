@@ -15,6 +15,11 @@ Without the manifest, package generation uses that Lean body. With the manifest,
 the same declaration is packaged as a native extern and the runtime contains a
 compiler-generated boxed adapter plus the client provider.
 
+Under Lean's module system, declare a cross-module extern `public` as usual.
+`vir_extern_fallback` exports its reserved-name compiler artifact so the
+separate `import all` package driver can recover the reference body; that
+generated name is an implementation detail, not a source-level API.
+
 The provider implements the raw C ABI named by `@[extern]`; VIR generates only
 the boxed adapter used by the interpreter. For this scalar example, the provider
 can be an ordinary C file:

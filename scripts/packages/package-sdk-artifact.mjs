@@ -140,7 +140,7 @@ Minimal browser usage:
 
   const vir = await createVirRuntime({
     wasmUrl: "./wasm/vir-upstream.wasm",
-    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
+    irPackageSet: "./MyApp/Runtime.irpkg-set.json",
   });
 
   vir.runStartupEntries();
@@ -152,7 +152,7 @@ Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
   const debugVir = await createVirRuntime({
     wasmUrl: "./wasm/vir-upstream.wasm",
     debugWasm: true,
-    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
+    irPackageSet: "./MyApp/Runtime.irpkg-set.json",
   });
 
 Browser React root usage:

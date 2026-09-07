@@ -36,7 +36,7 @@ function parseValues(text) {
 
 function loadRuntime() {
   runtimePromise ??= fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`)
-    .then((bytes) => runtimeFactory.createRuntime({ irPackageSetBytes: [bytes] }));
+    .then((bytes) => runtimeFactory.createRuntime({ irPackageSet: [bytes] }));
   return runtimePromise;
 }
 

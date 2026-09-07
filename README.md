@@ -32,7 +32,12 @@ require lean_vir from git
 Then mark exports directly in Lean and build the containing module:
 
 ```lean
-import Vir
+module
+
+public import Vir.Browser
+meta import Vir.Attributes
+
+public section
 
 @[vir_export]
 def answer : Nat := 42
@@ -71,8 +76,9 @@ VIR_SDK_COMMIT=<same-commit> lake build :virSdk
 ```
 
 The module facet writes a package-set descriptor, root member, reached
-dependency members, and report under `.lake/build/vir/module-sets/`; the package
-facet installs the versioned browser SDK. `vir.runStartupEntries()`
+dependency members, and report under `.lake/build/vir/module-sets/`. Descriptor
+v2 records every member's byte length and SHA-256; the package facet installs
+the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
@@ -150,7 +156,7 @@ import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "/vir-upstream.wasm" });
 const bytes = await fetchBytes("/local-quickstart.irpkg");
-const runtime = await factory.createRuntime({ irPackageSetBytes: [bytes] });
+const runtime = await factory.createRuntime({ irPackageSet: [bytes] });
 
 const result = runtime.call("Quickstart.double", 21);
 ```

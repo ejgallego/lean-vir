@@ -17,6 +17,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/callbacks.js", "web/src/runtime/callbacks.js"],
   ["js/runtime/cleanup.js", "web/src/runtime/cleanup.js"],
   ["js/runtime/core.js", "web/src/runtime/core.js"],
+  ["js/runtime/package-contract.js", "web/src/runtime/package-contract.js"],
   ["js/runtime/object-values.js", "web/src/runtime/object-values.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
   ["js/runtime/host-state.js", "web/src/runtime/host-state.js"],
@@ -28,7 +29,10 @@ export const SDK_PAYLOADS = [
   ],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
+  ["js/runtime/ir-package.js", "web/src/runtime/ir-package.js"],
+  ["js/runtime/module-name.js", "web/src/runtime/module-name.js"],
   ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
+  ["js/runtime/package-targets.js", "web/src/runtime/package-targets.js"],
   [
     "js/host/vir-active-host-bindings.js",
     "web/src/host/vir-active-host-bindings.js",

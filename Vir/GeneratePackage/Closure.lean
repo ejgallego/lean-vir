@@ -26,7 +26,7 @@ def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
       initGlobals := state.initGlobals.push { name, initName } }
 
 def DeclIndex.resolveNativeExtern? (index : DeclIndex) (spec : NativeExternSpec) : Option NativeExtern :=
-  index.envs.findSome? fun (_, env) => spec.resolve env |>.toOption
+  index.sources.findSome? fun source => spec.resolve source.env |>.toOption
 
 private def DeclIndex.selectedNativeExternSpec?
     (index : DeclIndex) (name : Name) : Option NativeExternSpec :=
@@ -77,13 +77,11 @@ partial def collectName
                 (fun state dep => collectName index dep (path.push dep) state) state
 
 def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
-  if target.includeAll then
-    index.sourceDecls.findSome? (fun (source, names) =>
-      if source == target.source.toString then some names else none) |>.getD #[]
-  else if target.includeMarked then
-    markedDeclNamesFor index target
-  else
-    target.roots
+  match target.mode with
+  | .all =>
+      index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
+  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .explicit roots | .packageOnly roots => roots
 
 def boxedBaseName? : Name -> Option Name
   | .str pre "_boxed" => some pre
@@ -109,14 +107,28 @@ def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
     (resolvedRootsForTarget index target).foldl
       (fun state root => collectName index root #[root] state) state) {}
 
+private def DeclIndex.opaqueImportedModuleForDecl?
+    (index : DeclIndex) (name : Name) : Option Name :=
+  index.sources.findSome? fun source => do
+    let env := source.env
+    let decl ← findEnvDecl env name
+    if isOpaqueExternDecl decl then
+      environmentModuleForDecl? env name
+    else
+      none
+
+/--
+Complete a package closure by loading compiled IR from each newly discovered
+opaque declaration owner. This belongs to the IO generation pipeline, not to a
+target-selection mode: every target kind has the same ownership semantics.
+-/
 unsafe def resolveImportedModuleClosure
     (targets : Array Target)
     (index : DeclIndex) : IO DeclIndex := do
-  if !targets.any (·.resolveImportedModules) then
-    return index
   let closure := collectClosure targets index
-  let modules := closure.missingDecls.foldl (init := #[]) fun modules dependency =>
-    match index.moduleForDecl? dependency.name with
+  let deferred := closure.missingDecls ++ closure.missingExterns
+  let modules := deferred.foldl (init := #[]) fun modules dependency =>
+    match index.opaqueImportedModuleForDecl? dependency.name with
     | some moduleName =>
         if index.loadedModules.contains moduleName || modules.contains moduleName then
           modules
@@ -125,9 +137,7 @@ unsafe def resolveImportedModuleClosure
     | none => modules
   if modules.isEmpty then
     return index
-  let mut next := index
-  for moduleName in modules do
-    next ← next.loadImportedModule moduleName
+  let next ← modules.foldlM (fun index moduleName => index.loadImportedModule moduleName) index
   resolveImportedModuleClosure targets next
 
 def Closure.moduleNames (closure : Closure) : Array Name :=
@@ -138,9 +148,10 @@ def Closure.moduleNames (closure : Closure) : Array Name :=
     | none => modules
 
 /--
-Filter Lean's canonical dependency-first module order to the modules reached by
-the package closure. The root is appended only for the legacy source path,
-where its declarations do not carry imported-module ownership.
+Filter the dependency-first order reconstructed from Lean's loaded module
+graphs to the modules reached by the package closure. The root is appended only
+for the legacy source path, where its declarations do not carry imported-module
+ownership.
 -/
 def Closure.moduleInitializationOrder
     (closure : Closure)

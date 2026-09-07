@@ -55,12 +55,12 @@
     "vir-illuminate": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "c416498225e7be53a090c79eac6f0befa8f55fd3"
+      "revision": "ab4245189a5877412f52e549261c12b9f1733a5e"
     },
     "vir-prettyM": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-vir",
-      "revision": "267fb65dc7a020e77ca60c2a020c1cf3bc3faf65"
+      "revision": "b519d5adf48c6f208939819b556671007271ec11"
     }
   },
   "builds": {
@@ -70,7 +70,7 @@
         "variant": "default"
       },
       "artifactSet": {
-        "setId": "prettyM-bounded-set-0002",
+        "setId": "prettyM-bounded-set-0003",
         "benchmarkContract": {
           "id": "prettyM/artifacts/v1",
           "input": "prettyM-compact-format/v1",
@@ -102,7 +102,7 @@
               "file": "prettyM-vir.irpkg",
               "packageRef": "prettyM",
               "packageFormat": 10,
-              "manifestVersion": 7,
+              "manifestVersion": 8,
               "source": {
                 "sourceRef": "prettyM-workload",
                 "dirty": false
@@ -371,7 +371,7 @@
         "variant": "default"
       },
       "artifactSet": {
-        "setId": "illuminate-player-set-0001",
+        "setId": "illuminate-player-set-0002",
         "benchmarkContract": {
           "id": "illuminate/player-trace/v1",
           "input": "player-animation-and-event-trace/v1",
@@ -448,6 +448,20 @@
               "lean-vir/wasm/vir-upstream.wasm": "illuminate/vir/sdk/wasm/vir-upstream.wasm",
               "module-set/Vir.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg",
               "module-set/Vir.irpkg-set.json": "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
+              "module-set/Vir.parts/0.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/0.irpkg",
+              "module-set/Vir.parts/1.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/1.irpkg",
+              "module-set/Vir.parts/2.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/2.irpkg",
+              "module-set/Vir.parts/3.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/3.irpkg",
+              "module-set/Vir.parts/4.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/4.irpkg",
+              "module-set/Vir.parts/5.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/5.irpkg",
+              "module-set/Vir.parts/6.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/6.irpkg",
+              "module-set/Vir.parts/7.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/7.irpkg",
+              "module-set/Vir.parts/8.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/8.irpkg",
+              "module-set/Vir.parts/9.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/9.irpkg",
+              "module-set/Vir.parts/10.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/10.irpkg",
+              "module-set/Vir.parts/11.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/11.irpkg",
+              "module-set/Vir.parts/12.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/12.irpkg",
+              "module-set/Vir.parts/13.irpkg": "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/13.irpkg",
               "smoke.examples.json": "illuminate/vir/smoke.examples.json",
               "smoke.mjs": "illuminate/vir/smoke.mjs",
               "smoke.vir-player-trace.mjs": "illuminate/vir/smoke.vir-player-trace.mjs"

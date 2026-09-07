@@ -4,9 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import {
-  createVirRuntimeFactory,
-} from "../../web/src/vir-runtime-node.js";
+  readIrPackageInfo,
+  replaceIrPackageManifest,
+} from "../../scripts/packages/irpkg-format.mjs";
 import {
   assert,
   generateIrPackage,
@@ -55,9 +57,80 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.runtime.value": () => 9n,
     },
   });
+  const hostPackageBytes = await readFile(hostPackage);
+  const mismatchedHostManifest = structuredClone(
+    readIrPackageInfo(hostPackageBytes).manifest,
+  );
+  mismatchedHostManifest.hostImports[0].target += ".mismatch";
+  await assert.rejects(
+    () =>
+      hostFactory.createRuntime({
+        irPackageSet: [
+          replaceIrPackageManifest(hostPackageBytes, mismatchedHostManifest),
+        ],
+      }),
+    /manifest\/binary contract mismatch:.*host.*target/,
+  );
   const hostRuntime = await hostFactory.createRuntime({
-    irPackageSetBytes: [await readFile(hostPackage)],
+    irPackageSet: [hostPackageBytes],
   });
+  for (const [field, mutate] of [
+    ["count", (m) => m.hostImports.pop()],
+    [
+      "name",
+      (m) => {
+        m.hostImports[0].name += ".mismatch";
+      },
+    ],
+    [
+      "symbol",
+      (m) => {
+        m.hostImports[0].symbol += "_mismatch";
+      },
+    ],
+    [
+      "arity",
+      (m) => {
+        const entry = m.hostImports[0];
+        entry.arity += 1;
+        entry.args.push({
+          name: "extra",
+          type: { type: "Nat", interfaceTag: 0 },
+        });
+      },
+    ],
+    [
+      "erased prefix arguments",
+      (m) => {
+        const entry = m.hostImports.find((entry) => entry.args.length > 0);
+        entry.erasedPrefixArgs += 1;
+        entry.args.pop();
+      },
+    ],
+    [
+      "effect",
+      (m) => {
+        const entry = m.hostImports[0];
+        entry.effect = "pure";
+        entry.args.push({
+          name: "world",
+          type: { type: "Nat", interfaceTag: 0 },
+        });
+      },
+    ],
+  ]) {
+    const manifest = structuredClone(
+      readIrPackageInfo(hostPackageBytes).manifest,
+    );
+    mutate(manifest);
+    assert.throws(
+      () =>
+        hostRuntime.loadIrPackageSetBytes([
+          replaceIrPackageManifest(hostPackageBytes, manifest),
+        ]),
+      new RegExp(`manifest/binary contract mismatch:.*host.*${field}`),
+    );
+  }
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 18);
   assert.equal(
     hostRuntime.interfaceManifest.exports.find(
@@ -170,7 +243,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.js.id": (value) => value,
       "test.js.length": (value) => BigInt(value.length),
     },
-  }).createRuntime({ irPackageSetBytes: [await readFile(jsObjectPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(jsObjectPackage)] });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.js.id",
   );
@@ -202,7 +275,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   generateIrPackage(leanRefSource, leanRefPackage);
   const leanRefRuntime = await createVirRuntimeFactory({
     wasmBytes,
-  }).createRuntime({ irPackageSetBytes: [await readFile(leanRefPackage)] });
+  }).createRuntime({ irPackageSet: [await readFile(leanRefPackage)] });
   const leanRefToJsImport = leanRefRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "js.leanRef",
   );
@@ -252,7 +325,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.payload": (payload) => ({ ...payload, name: `${payload.name}!` }),
     },
   }).createRuntime({
-    irPackageSetBytes: [await readFile(customJsValuePackage)],
+    irPackageSet: [await readFile(customJsValuePackage)],
   });
   const customPayloadImport =
     customJsValueRuntime.interfaceManifest.hostImports.find(
@@ -280,7 +353,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.react.externalBadge": () => externalBadge,
     },
   }).createRuntime({
-    irPackageSetBytes: [await readFile(reactExternalPackage)],
+    irPackageSet: [await readFile(reactExternalPackage)],
   });
   const externalBadgeImport =
     reactExternalRuntime.interfaceManifest.hostImports.find(

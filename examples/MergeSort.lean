@@ -4,6 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
+module
+
+public section
+
 /- A small merge sort used by the browser quickstart and runtime tests. -/
 
 namespace SortDemo

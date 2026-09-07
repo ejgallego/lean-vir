@@ -5,7 +5,11 @@ Authors: Emilio J. Gallego Arias, Wojciech Nawrocki, Sebastian Ullrich,
   Eric Wieser
 -/
 
-import Vir.ProofWidgets.Html
+module
+
+public import Vir.ProofWidgets.Html
+
+public section
 
 /-!
 JSX syntax for VIR's native, client-executed ProofWidgets HTML facade.
@@ -91,7 +95,7 @@ declare_syntax_cat virProofWidgetsJsxAttr
 declare_syntax_cat virProofWidgetsJsxAttrVal
 declare_syntax_cat virProofWidgetsJsxTag
 
-def jsxTag : Parser :=
+meta def jsxTag : Parser :=
   withAntiquot (mkAntiquot "jsxTag" `Lean.Vir.ProofWidgets.Jsx.jsxTag) {
     fn := fun c s =>
       let startPos := s.pos
@@ -100,15 +104,15 @@ def jsxTag : Parser :=
         "expected JSX tag" c s
       mkNodeToken `Lean.Vir.ProofWidgets.Jsx.jsxTag startPos true c s }
 
-def getJsxTag : TSyntax ``jsxTag → String
+meta def getJsxTag : TSyntax ``jsxTag → String
   | stx => stx.raw[0].getAtomVal
 
 @[combinator_formatter Lean.Vir.ProofWidgets.Jsx.jsxTag]
-def jsxTag.formatter : Formatter :=
+meta def jsxTag.formatter : Formatter :=
   Formatter.visitAtom ``jsxTag
 
 @[combinator_parenthesizer Lean.Vir.ProofWidgets.Jsx.jsxTag]
-def jsxTag.parenthesizer : Parenthesizer :=
+meta def jsxTag.parenthesizer : Parenthesizer :=
   Parenthesizer.visitToken
 
 scoped syntax jsxTag : virProofWidgetsJsxTag
@@ -121,10 +125,10 @@ scoped syntax ident "=" virProofWidgetsJsxAttrVal : virProofWidgetsJsxAttr
 scoped syntax group(" {..." term "}") : virProofWidgetsJsxAttr
 
 /-- Characters not allowed inside JSX plain text. -/
-def jsxTextForbidden : String := "{<>}$"
+meta def jsxTextForbidden : String := "{<>}$"
 
 /-- A plain text literal lowered to `Html.text`. -/
-def jsxText : Parser :=
+meta def jsxText : Parser :=
   withAntiquot (mkAntiquot "jsxText" `Lean.Vir.ProofWidgets.Jsx.jsxText) {
     fn := fun c s =>
       let startPos := s.pos
@@ -132,15 +136,15 @@ def jsxText : Parser :=
         "expected JSX text" c s
       mkNodeToken `Lean.Vir.ProofWidgets.Jsx.jsxText startPos true c s }
 
-def getJsxText : TSyntax ``jsxText → String
+meta def getJsxText : TSyntax ``jsxText → String
   | stx => stx.raw[0].getAtomVal
 
 @[combinator_formatter Lean.Vir.ProofWidgets.Jsx.jsxText]
-def jsxText.formatter : Formatter :=
+meta def jsxText.formatter : Formatter :=
   Formatter.visitAtom ``jsxText
 
 @[combinator_parenthesizer Lean.Vir.ProofWidgets.Jsx.jsxText]
-def jsxText.parenthesizer : Parenthesizer :=
+meta def jsxText.parenthesizer : Parenthesizer :=
   Parenthesizer.visitToken
 
 scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* "/>" : virProofWidgetsJsxElement
@@ -157,20 +161,20 @@ scoped syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
 
 scoped syntax:max virProofWidgetsJsxElement : term
 
-private def joinArrays (parts : Array Term) : MacroM Term := do
+private meta def joinArrays (parts : Array Term) : MacroM Term := do
   if parts.isEmpty then
     return ← `(term| #[])
   if parts.size == 1 then
     return parts[0]!
   return ← `(term| Array.flatten #[$parts,*])
 
-private def isEventName (name : String) : Bool :=
+private meta def isEventName (name : String) : Bool :=
   name.startsWith "on" && name.length > 2
 
-private def unitEventName (name : String) : Bool :=
+private meta def unitEventName (name : String) : Bool :=
   name == "onClick" || name == "onDoubleClick" || name == "onSubmit"
 
-private def transformNativeAttr (attr : Ident) (value : Term) : MacroM Term := do
+private meta def transformNativeAttr (attr : Ident) (value : Term) : MacroM Term := do
   let name := attr.getId.eraseMacroScopes.toString
   if name == "key" then
     `(Jsx.key $value)
@@ -192,28 +196,28 @@ private def transformNativeAttr (attr : Ident) (value : Term) : MacroM Term := d
   else
     `(Jsx.property $(quote name) $value)
 
-private def trailingWhitespace (stx : Syntax) : String :=
+private meta def trailingWhitespace (stx : Syntax) : String :=
   if let .original _ _ trailing _ := stx.getTailInfo then
     trailing.toString
   else
     ""
 
-private def tagName (tag : TSyntax `virProofWidgetsJsxTag) : MacroM String :=
+private meta def tagName (tag : TSyntax `virProofWidgetsJsxTag) : MacroM String :=
   match tag with
   | `(virProofWidgetsJsxTag| $name:jsxTag) => return getJsxTag name
   | stx => Macro.throwErrorAt stx "unknown JSX tag syntax"
 
-private def nameFromDotted (text : String) : Name :=
+private meta def nameFromDotted (text : String) : Name :=
   text.splitOn "." |>.foldl (fun name part =>
     if part.isEmpty then name else .str name part) .anonymous
 
-private def componentIdent (tag : TSyntax `virProofWidgetsJsxTag) : MacroM Ident := do
+private meta def componentIdent (tag : TSyntax `virProofWidgetsJsxTag) : MacroM Ident := do
   let name ← tagName tag
   if name.contains '-' || name.contains ':' then
     Macro.throwErrorAt tag "expected a Lean component identifier"
   return mkIdentFrom tag.raw (nameFromDotted name)
 
-private def transformTag
+private meta def transformTag
     (tk : Syntax)
     (opening closing : TSyntax `virProofWidgetsJsxTag)
     (attrs : Array (TSyntax `virProofWidgetsJsxAttr))

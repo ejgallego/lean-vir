@@ -4,7 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.ProofWidgets.Rpc.Types
+module
+
+public import Vir.ProofWidgets.Rpc.Types
+
+public section
 
 namespace Lean.Vir.Infoview
 

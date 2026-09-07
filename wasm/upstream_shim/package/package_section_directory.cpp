@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 #include "package_section_directory.h"
 
+#include <algorithm>
 #include <string>
 
 namespace lean::vir {
@@ -31,6 +32,36 @@ static bool find_required_section(
     if (!found) {
         error = std::string("missing IR package section `") + package_section_label(kind) + "`";
         return false;
+    }
+    return true;
+}
+
+static bool supported_section_kind(uint32_t kind) {
+    return kind >= package_section_declarations && kind <= package_section_interface_manifest;
+}
+
+static bool validate_section_layout(
+    std::vector<package_section_span> const & sections,
+    size_t directory_end,
+    std::string & error) {
+    std::vector<package_section_span> ordered = sections;
+    std::sort(ordered.begin(), ordered.end(), [](auto const & left, auto const & right) {
+        return left.offset < right.offset ||
+            (left.offset == right.offset && left.kind < right.kind);
+    });
+    package_section_span const * previous = nullptr;
+    for (package_section_span const & section : ordered) {
+        if (section.offset < directory_end) {
+            error = std::string("section `") + package_section_label(section.kind) +
+                "` starts inside the package header or section directory";
+            return false;
+        }
+        if (previous != nullptr && section.offset < previous->offset + previous->byte_length) {
+            error = std::string("sections `") + package_section_label(previous->kind) + "` and `" +
+                package_section_label(section.kind) + "` overlap";
+            return false;
+        }
+        previous = &section;
     }
     return true;
 }
@@ -68,11 +99,19 @@ bool read_package_section_directory(
             error = r.error();
             return false;
         }
+        if (!supported_section_kind(kind)) {
+            error = "unknown IR package section kind " + std::to_string(kind);
+            return false;
+        }
         if (offset > package_size || byte_length > package_size - offset) {
             error = "section " + std::to_string(kind) + " exceeds package byte length";
             return false;
         }
         out.sections.push_back({ kind, offset, byte_length });
+    }
+
+    if (!validate_section_layout(out.sections, r.pos(), error)) {
+        return false;
     }
 
     return

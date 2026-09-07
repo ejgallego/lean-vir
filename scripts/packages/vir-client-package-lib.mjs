@@ -147,7 +147,6 @@ export async function writeChecksums(output, paths) {
     ),
   );
   await writeFile(join(output, "SHA256SUMS"), `${checksums.join("\n")}\n`);
-  runSync("sha256sum", ["--check", "SHA256SUMS"], { cwd: output });
 }
 
 export async function buildVirBrowserRuntime({
@@ -177,9 +176,13 @@ export async function buildVirBrowserRuntime({
   const packageLock = JSON.parse(
     await readFile(join(producer, "package-lock.json"), "utf8"),
   );
-  const expectedEsbuild = packageLock.packages?.["node_modules/esbuild"]?.version;
+  const expectedEsbuild =
+    packageLock.packages?.["node_modules/esbuild"]?.version;
   const actualEsbuild = runSync(esbuild, ["--version"], { capture: true });
-  if (typeof expectedEsbuild !== "string" || actualEsbuild !== expectedEsbuild) {
+  if (
+    typeof expectedEsbuild !== "string" ||
+    actualEsbuild !== expectedEsbuild
+  ) {
     throw new Error(
       `VIR esbuild version mismatch: expected ${expectedEsbuild}, got ${actualEsbuild}`,
     );

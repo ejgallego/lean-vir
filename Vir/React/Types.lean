@@ -4,12 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Browser
+module
+
+public import Vir.Browser
+
+public section
 
 namespace Lean.Vir.React
 
 /-- Effect used by Lean-authored React render construction. -/
-@[irreducible] def ReactM (α : Type) : Type :=
+@[expose, irreducible] def ReactM (α : Type) : Type :=
   Lean.Vir.RuntimeM α
 
 namespace ReactM

@@ -97,7 +97,7 @@
           wasmUrl: wasmUrl,
           wasmDebugUrl: config.wasmDebugUrl,
           debugWasm: config.debugWasm === true,
-          irPackageSetBytes: [irPackageBytes],
+          irPackageSet: [irPackageBytes],
           fetchBytes: fetchBytes,
         });
       });

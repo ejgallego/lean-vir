@@ -91,7 +91,7 @@ import { createVirRuntime, fetchBytes } from "./src/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
-  irPackageSetBytes: [
+  irPackageSet: [
     await fetchBytes(`${import.meta.env.BASE_URL}my-app.irpkg`),
   ],
 });
@@ -262,7 +262,7 @@ import { createVirRuntime, fetchBytes } from "lean-vir";
 
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("/assets/my-app.irpkg")],
+  irPackageSet: [await fetchBytes("/assets/my-app.irpkg")],
 });
 ```
 
@@ -339,7 +339,7 @@ JavaScript:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("/assets/my-app.irpkg")],
+  irPackageSet: [await fetchBytes("/assets/my-app.irpkg")],
   hostBindings: {
     "demo.bumpNat": (n) => n + 1n,
   },

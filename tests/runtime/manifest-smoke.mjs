@@ -58,13 +58,13 @@ assert.throws(
 
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [defaultPackageBytes],
+  irPackageSet: [defaultPackageBytes],
 });
 const callbackRecords = [];
 const testDocument = { title: "" };
 const hostRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
   hostBindings: {
     "browser.document.current": () => testDocument,
     "browser.document.getTitle": (documentValue) => documentValue.title,
@@ -81,11 +81,11 @@ const hostRuntime = await createVirRuntime({
 });
 const prettyRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [prettyPackageBytes],
+  irPackageSet: [prettyPackageBytes],
 });
 const leanRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [leanPackageBytes],
+  irPackageSet: [leanPackageBytes],
 });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
@@ -233,7 +233,6 @@ assert.equal(
   INTERFACE_MANIFEST_VERSION,
 );
 assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
-assert.ok(runtime.packageMetadata.generatedAt.length > 0);
 assert.ok(
   runtime.packageMetadata.targets.some(
     (target) => target.source === "examples/Fib.lean",
@@ -247,9 +246,9 @@ assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(prettyRuntime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assertValidManifestShape();
-for (const { name, mutate, pattern } of invalidManifestCases) {
+for (const { name, mutate, pattern, options } of invalidManifestCases) {
   try {
-    assertInvalidManifest(mutate, pattern);
+    assertInvalidManifest(mutate, pattern, options);
   } catch (error) {
     if (error instanceof Error) {
       error.message = `${name}: ${error.message}`;
@@ -596,7 +595,7 @@ assert.equal(reactFragmentImport?.args[0]?.type?.type, "Js");
 assert.equal(reactFragmentImport?.args[1]?.type?.type, "Js");
 const browserRuntime = await createBrowserVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [hostPackageBytes],
+  irPackageSet: [hostPackageBytes],
 });
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),
@@ -605,6 +604,35 @@ assert.throws(
 const fibEntry = runtime.findManifestEntry("fib");
 assert.notEqual(fibEntry, null);
 assert.equal(runtime.call("fib", 12), "144");
+// Installed metadata is an owned, deeply frozen JSON tree. In particular,
+// mutating a descriptor after the first call cannot stale a cached call plan.
+for (const manifest of [
+  runtime.interfaceManifest,
+  hostRuntime.interfaceManifest,
+]) {
+  const pending = [manifest];
+  while (pending.length !== 0) {
+    const value = pending.pop();
+    if (value === null || typeof value !== "object") continue;
+    assert.ok(Object.isFrozen(value));
+    for (const child of Object.values(value)) pending.push(child);
+  }
+}
+assert.throws(() => {
+  fibEntry.args[0].type.interfaceTag = 1;
+}, TypeError);
+assert.throws(() => {
+  runtime.interfaceManifest.exports.reverse();
+}, TypeError);
+assert.throws(() => {
+  runtime.packageMetadata.targets[0].resolvedRoots.push("unknown");
+}, TypeError);
+assert.throws(() => {
+  hostRuntime.interfaceManifest.hostImports[0].target = "unknown";
+}, TypeError);
+assert.equal(runtime.call("fib", 12), "144");
+// Freezing metadata must not freeze the real objects passed through host calls.
+assert.equal(Object.isFrozen(testDocument), false);
 assert.ok(
   (runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0,
   "expected fib call slot to be cached",

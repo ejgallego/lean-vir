@@ -946,7 +946,7 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
       "VIR IR package changed while loading; retrying with the latest Lean snapshot",
     );
   }
-  options.irPackageSetBytes = [decodeBase64Bytes(irPackage.dataBase64)];
+  options.irPackageSet = [decodeBase64Bytes(irPackage.dataBase64)];
   return options;
 }
 

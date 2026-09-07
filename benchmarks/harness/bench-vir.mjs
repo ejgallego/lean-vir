@@ -10,6 +10,7 @@ import { performance } from "node:perf_hooks";
 
 import { prepareBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
+import { createBenchmarkHostBindings } from "./bench-host-bindings.mjs";
 import {
   benchmarkArtifactPaths,
   defaultPackageFile,
@@ -178,14 +179,17 @@ async function instantiateRuntimes() {
     readPublicArtifact(hostPackageFile),
     readPublicArtifact(prettyPackageFile),
   ]);
-  const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
+  const runtime = await createBrowserVirRuntime({
+    wasmBytes: wasm,
+    irPackageSet: [irPackage],
+  });
   const prettyRuntime = await createBrowserVirRuntime({
     wasmBytes: wasm,
-    irPackageSetBytes: [prettyPackage],
+    irPackageSet: [prettyPackage],
   });
   const hostRuntime = await createNodeVirRuntime({
     wasmBytes: wasm,
-    irPackageSetBytes: [hostPackage],
+    irPackageSet: [hostPackage],
     hostBindings: createBenchmarkHostBindings(),
   });
   return {
@@ -203,20 +207,6 @@ async function instantiateRuntimes() {
 
 function readPublicArtifact(file) {
   return readFile(new URL(`../../${publicArtifactPath(file)}`, import.meta.url));
-}
-
-function createBenchmarkHostBindings() {
-  const documentValue = { title: "" };
-  return {
-    "browser.document.current": () => documentValue,
-    "browser.document.getTitle": (document) => document.title,
-    "browser.document.setTitle": (document, title) => {
-      document.title = title;
-      return undefined;
-    },
-    "test.callNatCallback": (input, callback) => callback(input),
-    "test.recordNat": () => undefined,
-  };
 }
 
 function benchRepeated(label, iterations, fn) {

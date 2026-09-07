@@ -250,7 +250,7 @@ Then bind the exact JavaScript operation:
 ```js
 const vir = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [packageBytes],
+  irPackageSet: [packageBytes],
   hostBindings: {
     "demo.bumpNat": (n) => n + 1n,
   },

@@ -13,7 +13,7 @@ import { readRuntimeArtifacts } from "./shared.mjs";
 const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({
   wasmBytes,
-  irPackageSetBytes: [defaultPackageBytes],
+  irPackageSet: [defaultPackageBytes],
 });
 
 const resourceType = {

@@ -28,10 +28,10 @@ partial def parseOptions
   match args with
   | [] => return options
   | "--module" :: moduleName :: rest =>
-      let name ← parseDottedName moduleName
+      let name ← Vir.parseDottedName moduleName
       parseOptions rest { options with modules := options.modules.push name }
   | "--root" :: declarationName :: rest =>
-      let name ← parseDottedName declarationName
+      let name ← Vir.parseDottedName declarationName
       if options.roots.contains name then
         throw s!"duplicate --root `{name}`"
       parseOptions rest { options with roots := options.roots.push name }
@@ -42,10 +42,10 @@ partial def parseOptions
   | "--source-module" :: moduleName :: rest =>
       if options.sourceModule?.isSome then
         throw "duplicate --source-module"
-      let name ← parseDottedName moduleName
+      let name ← Vir.parseDottedName moduleName
       parseOptions rest { options with sourceModule? := some name }
   | "--native-extern" :: externName :: rest =>
-      let name ← parseDottedName externName
+      let name ← Vir.parseDottedName externName
       if options.extraNativeExterns.contains name then
         throw s!"duplicate --native-extern `{name}`"
       parseOptions rest { options with extraNativeExterns := options.extraNativeExterns.push name }

@@ -4,7 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir
+module
+
+public import Vir.Browser
+meta import Vir.Attributes
+
+public section
 
 open Lean.Vir.Browser
 

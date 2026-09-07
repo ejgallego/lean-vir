@@ -450,14 +450,34 @@ The provider can stage a complete package set in one fresh instance. Generated
 descriptors use Lean's dependency-first module-initialization order, while each
 member retains its owning initializer metadata. `vir_begin_ir_package_set`
 clears the candidate,
-`vir_append_ir_package` transactionally decodes each ordinary format-10 member,
-and `vir_finish_ir_package_set` runs the aggregate initializer table once after
-all declarations are available. The final root member supplies the interface
-manifest and export summaries. Duplicate declarations, initializer globals,
-host imports, and export summaries are rejected before a member is appended.
-JavaScript adopts the candidate only after the whole set and root manifest are
-valid, so a partial dependency graph is never exposed through the public
-runtime wrapper.
+`vir_append_ir_package` transactionally decodes each ordinary format-11 member,
+`vir_prepare_ir_package_set` builds the aggregate indices without running user
+initializers, and `vir_finish_ir_package_set` runs the initializer table once.
+The final root member supplies the interface manifest and export summaries.
+Each format-11 member protects its manifest bytes against corruption with a
+non-cryptographic 64-bit checksum, which both decoders verify; this does not
+establish agreement with the binary call tables.
+JavaScript then validates the manifest's binary-header format version and
+member/target invariants between prepare and finish. Before installing host
+bindings or running initializers, `vir_validate_package_contract` compares one
+manifest projection against the ordered binary export and host-import fields
+listed in `docs/IRPKG_FORMAT.md`. Any decode, prepare, or
+manifest failure calls `vir_abort_ir_package_set`, releasing all staged state.
+Duplicate declarations, initializer globals, host imports, and export summaries
+are rejected before a member is appended. JavaScript adopts the candidate only
+after the whole set is valid and initialized, so neither a partial dependency
+graph nor initialization under an invalid host contract is exposed through the
+public runtime wrapper.
+
+The JavaScript runtime and Wasm must come from the same revision. A Wasm without
+`vir_validate_package_contract` is rejected rather than silently skipping the
+check; this ABI requirement does not change the format-11 package encoding.
+
+This transaction protects provider state and public-runtime handover. It cannot
+undo arbitrary externally observable work—such as console output or unmanaged
+DOM mutation—from an initializer that succeeds before a later initializer
+fails. Browser lifecycle work should use reached `@[vir_startup]` entries and
+managed host resources so candidate disposal can release it.
 
 Manifest export indices remain scoped to the root package manifest rather than
 becoming global package identities. Individual package unload, version solving,
@@ -482,7 +502,7 @@ declaration when present. The returned call slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
-In package format 10, the package has an explicit section directory and a direct
+In package format 11, the package has an explicit section directory and a direct
 export call-summary section. `vir_call_resolved_objects` uses that table to
 validate object argument counts, effect handling, and boxed wasm32 boundary
 requirements. Resolved calls without a package-owned summary fail.

@@ -447,6 +447,12 @@
           id: backend.id,
           label: backend.label,
           status: backendStatus(backend),
+          error:
+            backend.error instanceof Error
+              ? backend.error.name + ": " + backend.error.message
+              : backend.error == null
+                ? null
+                : String(backend.error),
         };
       });
     },

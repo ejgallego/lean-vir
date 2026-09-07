@@ -4,7 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Examples.Tamagotchi
+module
+
+public import Vir.Examples.Tamagotchi
+public meta import Vir.Examples.Tamagotchi
+
+public section
 
 #eval Tamagotchi.trace .happy Tamagotchi.demoScript
 #eval Tamagotchi.run .happy Tamagotchi.demoScript

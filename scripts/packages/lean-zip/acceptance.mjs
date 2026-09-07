@@ -211,7 +211,7 @@ async function runAcceptance() {
   const packageBytes = await readFile(packagePath);
   const runtime = await createVirRuntime({
     wasmBytes,
-    irPackageSetBytes: [packageBytes],
+    irPackageSet: [packageBytes],
   });
   const wasmPages = () => runtime.exports.memory.buffer.byteLength / 65536;
   const initialPages = wasmPages();

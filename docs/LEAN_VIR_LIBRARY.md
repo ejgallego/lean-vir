@@ -121,7 +121,7 @@ No extra `createVirRuntime` option is needed for the built-in browser imports:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("my-demo.irpkg")],
+  irPackageSet: [await fetchBytes("my-demo.irpkg")],
 });
 
 vir.call("titleHandshake", "browser handshake");
@@ -192,7 +192,7 @@ Then provide the matching JavaScript binding when creating the runtime:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
+  irPackageSet: [await fetchBytes("custom.irpkg")],
   hostBindings: {
     "demo.bumpNat": (n) => n + 1n,
   },
@@ -577,7 +577,7 @@ The JavaScript runtime binds targets through `hostBindings`:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
+  irPackageSet: [await fetchBytes("custom.irpkg")],
   hostBindings: {
     "demo.bumpNat": (n) => n + 1n,
   },

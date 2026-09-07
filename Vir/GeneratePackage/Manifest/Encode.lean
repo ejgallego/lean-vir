@@ -67,24 +67,36 @@ def PackageDiagnostic.toJson (diagnostic : PackageDiagnostic) : String :=
   ]
 
 def PackageTargetMetadata.toJson (target : PackageTargetMetadata) : String :=
+  let origin := match target.origin with
+    | .source path => ("source", jsonString path)
+    | .module name => ("module", jsonName name)
   jsonObject #[
-    ("source", jsonString target.source),
-    ("mode", jsonString target.mode),
-    ("roots", jsonArray (target.roots.map jsonName)),
+    origin,
+    ("mode", jsonString target.mode.metadataName),
+    ("roots", jsonArray (target.mode.roots.map jsonName)),
     ("resolvedRoots", jsonArray (target.resolvedRoots.map jsonName))
   ]
 
-def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
+def PackageSetMemberMetadata.toJson (member : PackageSetMemberMetadata) : String :=
   jsonObject #[
+    ("module", jsonName member.moduleName),
+    ("role", jsonString member.role.label)
+  ]
+
+def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
+  let fields := #[
     ("generator", jsonString metadata.generator),
     ("packageFormatVersion", jsonNat metadata.packageFormatVersion),
     ("manifestVersion", jsonNat metadata.manifestVersion),
     ("leanVersion", jsonString metadata.leanVersion),
     ("leanToolchain", jsonString metadata.leanToolchain),
     ("leanGithash", jsonString metadata.leanGithash),
-    ("generatedAt", jsonString metadata.generatedAt),
     ("targets", jsonArray (metadata.targets.map PackageTargetMetadata.toJson))
   ]
+  let fields := match metadata.packageSetMember? with
+    | some member => fields.push ("packageSetMember", member.toJson)
+    | none => fields
+  jsonObject fields
 
 def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
   jsonObject #[

@@ -11,10 +11,14 @@ import {
   serveDist,
 } from "./harness.mjs";
 import { browserRunnerCaseSpecs, browserRunnerFailureSpecs } from "./cases.mjs";
-import { smokeBrowserCallbackCleanup, smokeBrowserCallbacks } from "./callbacks.mjs";
+import {
+  smokeBrowserCallbackCleanup,
+  smokeBrowserCallbacks,
+} from "./callbacks.mjs";
 import {
   prepareNegativePackages,
   runnerCaseFromManifest,
+  smokeAtomicPackageLoads,
   smokeManifestDrivenEntryList,
   smokeRunner,
   smokeRunnerFailure,
@@ -56,10 +60,12 @@ try {
   }
   await smokeBrowserCallbacks(cdp, server.origin);
   await smokeBrowserCallbackCleanup(cdp, server.origin);
+  await smokeAtomicPackageLoads(cdp, server.origin);
 
   const runnerCases = await Promise.all(
     browserRunnerCaseSpecs.map(({ packageFile, entryName, expected }) =>
-      runnerCaseFromManifest(packageFile, entryName, expected)),
+      runnerCaseFromManifest(packageFile, entryName, expected),
+    ),
   );
 
   for (const { url, expected } of runnerCases) {
@@ -70,7 +76,9 @@ try {
   }
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, minimal runtime example, runtime diagnostics, React Tamagotchi, React proof goal transitions, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log(
+    "pages browser smoke ok: landing, minimal runtime example, runtime diagnostics, React Tamagotchi, React proof goal transitions, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, atomic package loads, retained runtimes after load failure, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths",
+  );
 } catch (error) {
   const details = chromium?.stderr() ?? "";
   if (details) {

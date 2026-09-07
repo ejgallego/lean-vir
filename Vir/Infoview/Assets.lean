@@ -4,18 +4,23 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean.Widget
-import Init.System.Uri
+module
+
+public import Lean.Widget
+public meta import Lean.Widget
+public import Init.System.Uri
+
+public section
 
 namespace Lean.Vir.Infoview
 
 open Lean Server
 
-structure AssetRequest where
+meta structure AssetRequest where
   path : String
   deriving Server.RpcEncodable
 
-structure AssetInfo where
+meta structure AssetInfo where
   path : String
   mime : String
   byteSize : String
@@ -23,11 +28,11 @@ structure AssetInfo where
   revision : String
   deriving Server.RpcEncodable
 
-structure AssetResponse extends AssetInfo where
+meta structure AssetResponse extends AssetInfo where
   dataBase64 : String
   deriving Server.RpcEncodable
 
-def base64Char (n : Nat) : Char :=
+meta def base64Char (n : Nat) : Char :=
   if n < 26 then
     Char.ofNat ('A'.toNat + n)
   else if n < 52 then
@@ -39,7 +44,7 @@ def base64Char (n : Nat) : Char :=
   else
     '/'
 
-def base64Encode (bytes : ByteArray) : String := Id.run do
+meta def base64Encode (bytes : ByteArray) : String := Id.run do
   let mut out := ""
   let mut i := 0
   while i + 2 < bytes.size do
@@ -65,7 +70,7 @@ def base64Encode (bytes : ByteArray) : String := Id.run do
       out := out.push '='
   return out
 
-def validateAssetPath (path : String) : Except String System.FilePath := do
+meta def validateAssetPath (path : String) : Except String System.FilePath := do
   if path.isEmpty then
     throw "asset path must be non-empty"
   let filePath := System.FilePath.mk path
@@ -76,20 +81,20 @@ def validateAssetPath (path : String) : Except String System.FilePath := do
     throw "asset path must not contain empty, '.', or '..' components"
   return filePath.normalize
 
-def mimeForPath (path : System.FilePath) : String :=
+meta def mimeForPath (path : System.FilePath) : String :=
   match path.extension with
   | some "wasm" => "application/wasm"
   | some "irpkg" => "application/octet-stream"
   | some "js" => "text/javascript"
   | _ => "application/octet-stream"
 
-def systemTimeToken (time : IO.FS.SystemTime) : String :=
+meta def systemTimeToken (time : IO.FS.SystemTime) : String :=
   s!"{time.sec}.{time.nsec}"
 
-def metadataRevision (metadata : IO.FS.Metadata) : String :=
+meta def metadataRevision (metadata : IO.FS.Metadata) : String :=
   s!"{systemTimeToken metadata.modified}:{metadata.byteSize}"
 
-partial def findLakeRoot? (dir : System.FilePath) : IO (Option System.FilePath) := do
+meta partial def findLakeRoot? (dir : System.FilePath) : IO (Option System.FilePath) := do
   if (← System.FilePath.pathExists (dir / "lakefile.lean")) ||
       (← System.FilePath.pathExists (dir / "lakefile.toml")) then
     return some dir
@@ -102,7 +107,7 @@ partial def findLakeRoot? (dir : System.FilePath) : IO (Option System.FilePath) 
         else
           findLakeRoot? parent
 
-def assetRoot : RequestM System.FilePath := do
+meta def assetRoot : RequestM System.FilePath := do
   let doc ← RequestM.readDoc
   let sourceRoot? ← do
     match System.Uri.fileUriToPath? doc.meta.uri with
@@ -115,12 +120,12 @@ def assetRoot : RequestM System.FilePath := do
   | some root => pure root
   | none => IO.currentDir
 
-structure ResolvedAsset where
+meta structure ResolvedAsset where
   requestPath : String
   relPath : System.FilePath
   path : System.FilePath
 
-def resolveAssetPath (requestPath : String) : RequestM ResolvedAsset := do
+meta def resolveAssetPath (requestPath : String) : RequestM ResolvedAsset := do
   let relPath ←
     match validateAssetPath requestPath with
     | .ok path => pure path
@@ -133,7 +138,7 @@ def resolveAssetPath (requestPath : String) : RequestM ResolvedAsset := do
     path := root / relPath
   }
 
-def assetInfo (asset : ResolvedAsset) : IO AssetInfo := do
+meta def assetInfo (asset : ResolvedAsset) : IO AssetInfo := do
   let metadata ← System.FilePath.metadata asset.path
   return {
     path := asset.requestPath
@@ -144,12 +149,12 @@ def assetInfo (asset : ResolvedAsset) : IO AssetInfo := do
   }
 
 @[server_rpc_method]
-def statAsset (params : AssetRequest) : RequestM (RequestTask AssetInfo) := do
+meta def statAsset (params : AssetRequest) : RequestM (RequestTask AssetInfo) := do
   RequestM.asTask do
     assetInfo (← resolveAssetPath params.path)
 
 @[server_rpc_method]
-def readAsset (params : AssetRequest) : RequestM (RequestTask AssetResponse) := do
+meta def readAsset (params : AssetRequest) : RequestM (RequestTask AssetResponse) := do
   RequestM.asTask do
     let asset ← resolveAssetPath params.path
     let info ← assetInfo asset
