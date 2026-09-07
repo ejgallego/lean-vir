@@ -472,7 +472,7 @@ aliases and is included in the host package as a compatibility regression.
 with explicit combinators, including child-bearing `Html.ofComponent`, image
 attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
 component. Real RPC rendering is demonstrated separately in
-`examples/RpcReferenceWidget.lean`, without a descriptor resolver or synthetic
+`examples/tutorials/RpcReferenceWidget.lean`, without a descriptor resolver or synthetic
 reference type.
 
 `Vir.Infoview.Surface.rpcSession` carries the exact position-specific
@@ -491,9 +491,12 @@ official RPC session's reachability rules.
 `RpcSession.callWithOptions` forwards exact `Js ClientRequestOptions`, including
 its native AbortSignal. Its request argument is `Js.Any` to stay within the
 interpreter import arity limit; use the pure `Js.erase` on a typed request.
-`examples/RpcReferenceWidget.lean` and `test:infoview:browser` demonstrate a
+`examples/tutorials/RpcReferenceWidget.lean` and `test:infoview:browser` demonstrate a
 native React parent retaining real server responses and a Lean component
-rendering them, including a genuine `Server.WithRpcRef` round trip.
+rendering them, including a genuine `Server.WithRpcRef` round trip. The sibling
+`rpc-reference-widget.js` implements ordinary loading/error UI and stale-result
+suppression; [the tutorial](../examples/tutorials/RpcReferenceWidget.md) explains
+how the two files fit together.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
@@ -505,7 +508,6 @@ provides the first infoview-facing shell:
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`
 - `Lean.Vir.Infoview.RpcSession`
-- `Lean.Vir.Infoview.ProofWidgetsRpc`
 - `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
 - `Lean.Vir.Infoview.IRPackage`
@@ -519,9 +521,9 @@ helper, but its low-level host target receives an explicit
 `Lean.Vir.Js String` resource via `JsValue.ofString` and returns an explicit
 `Lean.Vir.Js Bool` resource. This is the local synchronous
 `InfoviewClipboardHost` capability, not a binding that claims the asynchronous
-browser `Clipboard.writeText` contract. The infoview command and proof-widget RPC command
-helpers follow the same `Js Bool` result convention at the low-level host
-boundary. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
+browser `Clipboard.writeText` contract. The infoview editor-command helpers
+follow the same `Js Bool` result convention at the low-level host boundary;
+RPC calls instead return the exact native Promise. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
 `DocumentPosition -> DomM Bool` shape, but first builds a `Js DocumentPosition`
 with the `infoview.documentPosition` conversion target from explicit
 `Js String` and `Js Nat` fields.

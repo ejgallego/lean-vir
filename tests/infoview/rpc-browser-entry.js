@@ -5,9 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { RpcSessions } from "@leanprover/infoview-api";
+import { RpcReferenceWidget } from "../../examples/tutorials/rpc-reference-widget.js";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
@@ -27,14 +27,13 @@ async function post(path, body) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
   for (let i = 0; i < 2000; i++) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await sleep(10);
   }
-  throw new Error(
-    `RPC browser condition timed out: ${JSON.stringify(globalThis.rpcObservations)}`,
-  );
+  throw new Error("RPC browser condition timed out");
 }
 
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.rpcAcceptance = run().then(
   (value) => ({ ok: true, value }),
   (error) => ({
@@ -45,31 +44,54 @@ globalThis.rpcAcceptance = run().then(
 
 async function run() {
   const config = await (await fetch("/config")).json();
+  const requests = [];
+  const unexpected = [];
+  const notifications = new Set();
+  const onUnhandled = (event) => unexpected.push(event.reason);
+  const onError = (event) => unexpected.push(event.error ?? event.message);
+  globalThis.addEventListener("unhandledrejection", onUnhandled);
+  globalThis.addEventListener("error", onError);
+  // Keep test-transport failures visible, including session cleanup notifications.
+  const notify = (path, body) => {
+    const task = post(path, body).catch((error) => unexpected.push(error));
+    notifications.add(task);
+    void task.then(() => notifications.delete(task));
+  };
   let nextId = 0;
-  let cancellations = 0;
   const sessions = new RpcSessions({
     async createRpcSession() {
       return (await post("/connect", {})).sessionId;
     },
     closeRpcSession(sessionId) {
-      void post("/close", { sessionId });
+      notify("/close", { sessionId });
     },
     release(params) {
-      void post("/release", params);
+      notify("/release", params);
     },
     async call(params, options) {
       const id = ++nextId;
+      const record = {
+        message: params.params?.message,
+        cancelled: false,
+        settled: false,
+      };
+      requests.push(record);
       const promise = post("/call", { id, params });
-      // ClientRequestOptions cancels LSP work, not the transport Promise.
       const cancel = () => {
-        cancellations++;
-        void post("/cancel", { id });
+        record.cancelled = true;
+        notify("/cancel", { id });
       };
       options?.abortSignal?.addEventListener("abort", cancel, { once: true });
       if (options?.abortSignal?.aborted) cancel();
       try {
-        return await promise;
+        record.value = await promise;
+        return record.value;
+      } catch (error) {
+        // Observe every rejection, even if the application's effect is inactive.
+        record.error = error;
+        throw error;
       } finally {
+        record.settled = true;
         options?.abortSignal?.removeEventListener("abort", cancel);
       }
     },
@@ -105,99 +127,95 @@ async function run() {
   let rootUnmounted = false;
   const unmount = () => {
     if (!rootUnmounted) {
-      flushSync(() => root.unmount());
+      React.act(() => root.unmount());
       rootUnmounted = true;
     }
   };
-  const observations = {
-    effects: 0,
-    cleanups: 0,
-    commits: [],
-    errors: [],
-    settled: 0,
-  };
-  globalThis.rpcObservations = observations;
-  let currentReply;
-
-  // Ordinary application effect: sessions, AbortController and React own the
-  // asynchronous work. No pending Promise ever captures a Lean callback.
-  function App({ session, query, activeRuntime, view }) {
-    const [reply, setReply] = React.useState({ message: "loading" });
-    React.useEffect(() => {
-      observations.effects++;
-      const abort = new AbortController();
-      let active = true;
-      const promise = activeRuntime.call(
-        "RpcReferenceWidget.request",
-        session,
-        "RpcBrowserServer.create",
-        query,
-        { abortSignal: abort.signal },
-      );
-      promise
-        .then(
-          (value) => {
-            if (active) {
-              currentReply = value;
-              observations.commits.push(value.message);
-              setReply(value);
-            }
-          },
-          (error) => {
-            if (active) observations.errors.push(error);
-          },
-        )
-        .finally(() => {
-          observations.settled++;
-        });
-      return () => {
-        active = false;
-        observations.cleanups++;
-        abort.abort();
-      };
-    }, [session, query, activeRuntime]);
-    return activeRuntime.call("RpcReferenceWidget.render", view, reply);
-  }
-  const render = (session, query) =>
-    flushSync(() =>
+  const query = (message, extra = {}) => ({
+    message,
+    fail: false,
+    waitForCancellation: false,
+    ...extra,
+  });
+  const render = (session, params) =>
+    React.act(() =>
       root.render(
-        React.createElement(App, {
+        React.createElement(RpcReferenceWidget, {
           session,
-          query: { delayMs: 0, fail: false, ...query },
-          activeRuntime: runtime,
+          query: params,
+          runtime,
           view: component,
         }),
       ),
     );
+  const request = (message) =>
+    requests.find((record) => record.message === message);
+  const settle = (message) =>
+    React.act(async () => {
+      await until(() => request(message)?.settled);
+    });
+  const gate = (action, message) => post("/gate", { action, message });
+  const ready = (message) => until(() => gate("status", message));
+  const release = (message) =>
+    React.act(async () => {
+      await gate("open", message);
+      await until(() => request(message)?.settled);
+    });
+  const text = () => document.body.textContent;
+  const status = () =>
+    document.querySelector("[data-rpc-status]")?.dataset.rpcStatus;
+  let goal;
   try {
-    render(a, { message: "first" });
-    await until(() => document.body.textContent.includes("first / local 0"));
+    // Also exercise loading before the first genuine reply: no placeholder Reply.
+    await gate("arm", "first");
+    render(a, query("first"));
+    await ready("first");
     check(
-      runtime.call("RpcReferenceWidget.reference", currentReply) ===
-        currentReply.ref,
+      status() === "loading" && !document.getElementById("rpc-reference-view"),
+      "initial loading has no fabricated RPC response",
+    );
+    await release("first");
+    check(
+      text().includes("first / local 0") && status() === "ready",
+      "first response",
+    );
+    const reply = request("first").value;
+    check(
+      runtime.call("RpcReferenceWidget.reference", reply) === reply.ref,
       "nested RPC reference identity",
     );
     check(
-      (await runtime.call(
-        "RpcReferenceWidget.readReference",
-        a,
-        currentReply,
-      )) === "first",
+      (await runtime.call("RpcReferenceWidget.readReference", a, reply)) ===
+        "first",
       "real server WithRpcRef round trip through Lean",
     );
-    flushSync(() => document.getElementById("rpc-reference-view").click());
+    React.act(() => document.getElementById("rpc-reference-view").click());
+    check(text().includes("local 1"), "Lean hook state update");
+
+    await gate("arm", "superseded");
+    render(a, query("superseded"));
+    await ready("superseded");
     check(
-      document.body.textContent.includes("local 1"),
-      "Lean hook state update",
+      status() === "loading" &&
+        text().includes("previous response") &&
+        text().includes("first / local 1"),
+      "refresh labels retained response",
     );
-    render(a, { message: "superseded", delayMs: 600 });
-    await sleep(80);
-    render(b, { message: "second" });
-    await until(() => document.body.textContent.includes("second / local 1"));
-    await until(() => observations.settled >= 3);
+    render(b, query("second"));
+    await settle("second");
     check(
-      !observations.commits.includes("superseded"),
-      "superseded response must not replace the current position",
+      text().includes("second / local 1"),
+      "position rerender preserves hook state",
+    );
+    await release("superseded");
+    check(
+      request("superseded").value?.message === "superseded" &&
+        request("superseded").cancelled,
+      "late success really arrives after cancellation",
+    );
+    check(
+      text().includes("second / local 1") && !text().includes("superseded"),
+      "successful stale response cannot replace the current position",
     );
 
     const abort = new AbortController();
@@ -206,18 +224,18 @@ async function run() {
         "RpcReferenceWidget.request",
         b,
         "RpcBrowserServer.create",
-        { message: "cancel", delayMs: 1000, fail: false },
+        query("cancel", { waitForCancellation: true }),
         { abortSignal: abort.signal },
       )
       .then(
         () => null,
         (error) => error,
       );
-    await sleep(80);
+    await until(() => post("/started", { message: "cancel" }));
     abort.abort();
     check(
       (await cancelled)?.code === -32800,
-      "native request options reach Lean cancellation token",
+      "native options reach Lean cancellation token",
     );
     const alreadyAborted = new AbortController();
     alreadyAborted.abort();
@@ -226,7 +244,7 @@ async function run() {
         "RpcReferenceWidget.request",
         b,
         "RpcBrowserServer.create",
-        { message: "already cancelled", delayMs: 1000, fail: false },
+        query("already cancelled", { waitForCancellation: true }),
         { abortSignal: alreadyAborted.signal },
       )
       .then(
@@ -235,90 +253,107 @@ async function run() {
       );
     check(
       preCancelled?.code === -32800,
-      "an already-aborted signal must cancel even before bridge registration",
-    );
-    const rejection = await runtime
-      .call(
-        "RpcReferenceWidget.request",
-        b,
-        "RpcBrowserServer.create",
-        { message: "error", delayMs: 0, fail: true },
-        {},
-      )
-      .then(
-        () => null,
-        (error) => error,
-      );
-    check(
-      rejection?.message.includes("RPC example rejection"),
-      "server rejection remains a Promise rejection",
+      "pre-aborted signal cancels before registration",
     );
 
-    // Existing expression reference consumer, using the same official session.
-    const saved = await b.call(
-      "Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos",
-      { pos: config.b, packageRevision: "rpc-browser" },
-    );
-    check(saved?.ref !== undefined, "real goal produces a WithRpcRef");
-    const info = await b.call(
-      "Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef",
-      { ref: saved.ref, pos: config.b, packageRevision: "rpc-browser" },
-    );
+    render(b, query("visible error", { fail: true }));
+    await settle("visible error");
     check(
-      info.expression.includes("p") && info.context.includes("h"),
-      "existing goal reference resolves in real context",
+      status() === "error" &&
+        text().includes("RPC example rejection") &&
+        text().includes("second / local 1"),
+      "failure is visible without destroying last reply",
     );
 
-    render(b, { message: "old package", delayMs: 500 });
-    await sleep(80);
+    // Real goal snapshots belong to the test server, not a public VIR protocol.
+    const ref = await b.call("RpcBrowserServer.goalAt", { pos: config.b });
+    check(ref !== undefined && ref !== null, "real goal produces a WithRpcRef");
+    goal = await b.call("RpcBrowserServer.readGoal", { ref });
+    check(
+      goal.target === "p" && goal.hypotheses.includes("h : p"),
+      "goal snapshot resolves in real context",
+    );
+
+    await gate("arm", "old package");
+    render(b, query("old package"));
+    await ready("old package");
     const old = runtime;
-    // React cleanup precedes package disposal, as it must in an ordinary host.
-    flushSync(() => root.render(null));
+    React.act(() => root.render(null));
     old.dispose();
     check(
       old.liveCallbacks.size === 0,
-      "replacement releases every old Lean closure root",
+      "replacement releases old Lean closure roots",
     );
     runtime = await makeRuntime();
     component = runtime.call("RpcReferenceWidget.View");
-    render(a, { message: "replacement" });
-    await until(() =>
-      document.body.textContent.includes("replacement / local 0"),
-    );
-    await until(() => observations.settled >= 5);
+    render(a, query("replacement"));
+    await settle("replacement");
+    await release("old package");
     check(
-      !observations.commits.includes("old package"),
-      "disposed generation cannot publish a stale reply",
+      request("old package").value?.message === "old package",
+      "disposed generation's request actually succeeds",
     );
-    render(a, { message: "after unmount", delayMs: 500 });
-    await sleep(80);
+    check(
+      text().includes("replacement / local 0") &&
+        !text().includes("old package"),
+      "disposed generation cannot publish a late success",
+    );
+
+    await gate("arm", "after unmount");
+    render(a, query("after unmount"));
+    await ready("after unmount");
     unmount();
     runtime.dispose();
     check(
       runtime.liveCallbacks.size === 0,
-      "unmount/disposal releases every Lean closure root",
+      "unmount releases every Lean closure root",
     );
-    await until(() => observations.settled >= 6);
+    await release("after unmount");
     check(
-      observations.errors.length === 0,
-      "no disposed Lean callback or spurious cancellation error",
+      request("after unmount").value?.message === "after unmount" &&
+        !text().includes("after unmount"),
+      "late success after unmount is inert",
+    );
+
+    const failures = requests.filter(
+      (record) =>
+        record.error &&
+        !(record.cancelled && record.error.code === -32800) &&
+        !(
+          record.message === "visible error" &&
+          record.error.message.includes("RPC example rejection")
+        ),
     );
     check(
-      observations.cleanups === observations.effects,
-      "every application effect is cleaned up",
+      failures.length === 0,
+      `unexpected RPC failures: ${JSON.stringify(failures)}`,
     );
-    return {
-      commits: observations.commits,
-      cancellations,
-      realReference: info.expression,
-      effects: observations.effects,
-    };
   } finally {
     try {
       unmount();
     } finally {
       runtime.dispose();
       sessions.dispose();
+      // RpcSessions schedules closeRpcSession via the session-id Promise.
+      await Promise.resolve();
+      while (notifications.size > 0) await Promise.all(notifications);
+      // Allow detached Promise/error events to report before asserting success.
+      await sleep(0);
+      globalThis.removeEventListener("unhandledrejection", onUnhandled);
+      globalThis.removeEventListener("error", onError);
     }
   }
+  check(
+    unexpected.length === 0,
+    `unhandled browser/transport errors: ${JSON.stringify(unexpected)}`,
+  );
+  return {
+    lateSuccesses: requests
+      .filter((record) => record.cancelled && record.value)
+      .map((r) => r.message),
+    cancellations: requests.filter((record) => record.error?.code === -32800)
+      .length,
+    realReference: goal.target,
+    requests: requests.length,
+  };
 }

@@ -32,8 +32,11 @@ not a gallery of applications.
 - `examples/tutorials/ReactCounter.lean` introduces state and callbacks.
 - `examples/tutorials/ReactProofWidgetHello.lean` introduces a live infoview
   component without the proof-action tool's behavior.
+- [RpcReferenceWidget](../examples/tutorials/RpcReferenceWidget.md) pairs a Lean
+  renderer with a small JavaScript React parent for native RPC, loading/error
+  UI and cancellation. The real-server browser acceptance exercises both files.
 
-`npm run test:tutorials` elaborates both tutorial sources. The ProofWidget
+`npm run test:tutorials` elaborates all three tutorial sources. The ProofWidget
 tutorial is additionally exercised through the existing browser package.
 
 ## Fixtures
@@ -52,8 +55,9 @@ are exercised by automated tests and are not deployed as examples.
   chain, and JSON-shaped cases remain only while each catches a distinct
   encoding path.
 - `fixtures/Boundary.lean` covers numeric and runtime boundaries.
-- `fixtures/infoview/` contains the Lean-only infoview smoke driver and its
-  imported-module fixture; these are test inputs, not public `Vir` modules.
+- `fixtures/infoview/` contains the infoview smoke driver, imported-module
+  fixture, and real RPC acceptance server. Goal snapshots and cancellation-only
+  methods are test inputs, not public `Vir` modules.
 
 `fixtures/manifest.json` is the executable test catalog. It may be large, but
 the landing page and example pages must not render it. Use `demo.html` or the

@@ -51,19 +51,20 @@ request value and returns its native `Js.Promise`; `callWithOptions` also
 forwards native request options. Direct Promise continuations and property
 access do not decode or copy the response graph.
 
-`examples/RpcReferenceWidget.lean` renders real server data and sends an exact
+`examples/tutorials/RpcReferenceWidget.lean` renders real server data and sends an exact
 nested reference back to a `@[server_rpc_method]`. The browser acceptance
 uses official React, the official RPC client, and a real Lean server to cover
 position changes, cancellation, rejection, rerendering and package teardown.
-Its JavaScript parent owns asynchronous effects; the Lean child owns its native
-React hook state. See [the RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md) for
+Its tutorial JavaScript parent owns asynchronous effects and loading/error UI;
+the Lean child owns its native React hook state. See [the RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md) for
 the tested boundary and remaining limits.
 
 The provisional descriptor resolver and synthetic JSX reference demonstration
 are removed. Genuine `Lean.Server.WithRpcRef` values remain under the official
-session's reachability rules. The current-goal server methods in
-`Vir.Infoview.ProofWidgetsRpc` are called directly and tested with a real goal;
-the infoview shell no longer prefetches an unused reference prop.
+session's reachability rules. Current-goal snapshot methods now belong only to
+`fixtures/infoview/RpcBrowserServer.lean`; they do not pretend to implement
+elaborator-owned expression/context objects. The infoview shell no longer
+prefetches an unused reference prop.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

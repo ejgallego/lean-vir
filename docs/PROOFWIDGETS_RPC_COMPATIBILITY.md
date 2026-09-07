@@ -49,7 +49,7 @@ Those pieces have distinct ownership:
 | Async result | Native `Promise<S>` | Exact `Js.Promise S` with direct native `then` and `catch` operations over exact `Js.Function1` values | Preserve the Promise and callback objects; do not make the synchronous host dispatcher await either one. |
 | Server references | Exact response objects registered by `RpcSessionAtPos` | Genuine `Server.WithRpcRef` response/reference round trip | Keep references exact; no descriptor resolver or separate retention store. |
 | Request cancellation | Native `AbortController` passed through call options | Exact options forwarded to the official client; real LSP cancellation tested | Cancellation does not guarantee local rejection; callers must still suppress stale results. |
-| Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Lean values retained in JSL for browser-side rendering | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
+| Props encoding | `RpcEncodable` JSON object supplied to the JavaScript component | Exact JavaScript request/response objects; JSL is only for non-wire Lean values | Construct the exact JavaScript request object explicitly; do not treat JSL as JSON. |
 | Returned HTML | Serialized upstream `ProofWidgets.Html` rendered by `HtmlDisplay` | `ProofWidgets.Html` is a direct `ReactM (Js React.Node)` action | Do not silently equate these types. Either use upstream `HtmlDisplay` for wire compatibility or return data and render it with the VIR-native API. |
 | Error display | Promise rejection plus upstream `mapRpcError` | Exact native Promise rejection, including the server error | Preserve the rejection value first; presentation can be an explicit component helper. |
 
@@ -105,22 +105,27 @@ response. The native-function regression settles after runtime disposal and
 therefore also proves that the Promise path adds no VIR callback lifetime to
 native functions.
 
-`npm run test:infoview:browser` now runs `examples/RpcReferenceWidget.lean`
+`npm run test:infoview:browser` now runs `examples/tutorials/RpcReferenceWidget.lean`
 against real `@[server_rpc_method]` declarations in
 `fixtures/infoview/RpcBrowserServer.lean`. Official React keeps the response in
 state; the Lean-authored child renders it and keeps its own hook state across
 position changes. The example projects the exact nested reference and sends it
-back through Lean to the server. The acceptance also resolves the existing
-goal-reference method in a real `h : p` context.
+back through Lean to the server. The acceptance also resolves a fixture-owned
+goal snapshot in a real `h : p` context. That snapshot is display data, not an
+elaborator expression/context.
 
-The test-only JavaScript parent demonstrates ordinary application effects:
-it passes a native AbortSignal, suppresses stale results, and unmounts React
-before disposing a VIR generation. Pending Promise continuations are native
+The tutorial's `examples/tutorials/rpc-reference-widget.js` parent demonstrates
+ordinary application effects: it passes a native AbortSignal and suppresses
+stale results. Its owner unmounts React before disposing a VIR generation.
+Pending Promise continuations are native
 JavaScript functions, so they cannot reenter a disposed Lean runtime. This is
 coverage of that composition, not a claim about Lean-authored asynchronous
 effects or a new library request manager. Successful replies, rejection,
-cancellation (including already-aborted signals), rerender, replacement, and
-unmount are executable checks.
+cancellation (including already-aborted signals), loading/error UI, rerender,
+replacement, and unmount are executable checks. The test transport holds actual
+successful replies until after cancellation, then releases them to test stale
+success independently. It records every rejection, including inactive requests,
+and fails on unexpected browser or transport errors.
 
 The runner reuses the Chromium harness, the official `RpcSessions` class, and
 `vscode-jsonrpc` for LSP framing/cancellation. Its localhost HTTP relay and
@@ -143,9 +148,9 @@ second VIR-owned HTML tree.
 The descriptor resolver, normalizer, synthetic JSX reference demonstration,
 unused infoview reference prefetch, and global reference store are removed.
 The standalone JSX fixture retains its static component, props, keys, children,
-and callback coverage. `RpcReferenceWidget` supplies the real reference example;
-the browser test covers the current-goal methods that remain in
-`Vir.Infoview.ProofWidgetsRpc`.
+and callback coverage. The two-file `RpcReferenceWidget` tutorial supplies the
+real reference example. Goal snapshot methods belong only to the test server;
+there is no public VIR-specific expression-reference protocol.
 
 Real reference resolution uses `Server.WithRpcRef.val` directly. No client
 wrapper or copied wire token substitutes for the session-owned object.

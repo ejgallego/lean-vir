@@ -41,6 +41,7 @@ let child, connection, server, chrome, cdp;
 const keepalives = new Map();
 const pending = new Map();
 const cancelledIds = new Set();
+const gates = new Map();
 const calls = [];
 const diagnostics = [];
 let stderr = "";
@@ -68,7 +69,7 @@ try {
       packagePath,
       join(temp, "rpc.report.md"),
       "--target",
-      "examples/RpcReferenceWidget.lean",
+      "examples/tutorials/RpcReferenceWidget.lean",
       ...[
         "request",
         "reference",
@@ -182,6 +183,17 @@ try {
       } else if (req.url === "/cancel") {
         if (pending.has(body.id)) pending.get(body.id).cancel();
         else cancelledIds.add(body.id);
+      } else if (req.url === "/started") {
+        result = calls.some((call) => call.params?.message === body.message);
+      } else if (req.url === "/gate") {
+        if (body.action === "arm") {
+          assert.ok(!gates.has(body.message), "duplicate response gate");
+          gates.set(body.message, { ...Promise.withResolvers(), ready: false });
+        }
+        const gate = gates.get(body.message);
+        assert.ok(gate, "unknown response gate");
+        if (body.action === "open") gate.resolve();
+        result = gate.ready;
       } else if (req.url === "/call") {
         const token = new CancellationTokenSource();
         pending.set(body.id, token);
@@ -193,6 +205,13 @@ try {
             body.params,
             token.token,
           );
+          // Hold an actual successful response, not a simulated RPC result.
+          // Cancellation after this point cannot retract the server's success.
+          const gate = gates.get(body.params.params?.message);
+          if (gate) {
+            gate.ready = true;
+            await gate.promise;
+          }
         } finally {
           pending.delete(body.id);
           token.dispose();
@@ -240,6 +259,7 @@ try {
   clearTimeout(deadline);
   for (const interval of keepalives.values()) clearInterval(interval);
   for (const token of pending.values()) token.cancel();
+  for (const gate of gates.values()) gate.resolve();
   cdp?.close();
   await chrome?.close();
   if (server) {

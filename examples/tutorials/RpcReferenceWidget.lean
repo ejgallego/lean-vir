@@ -11,8 +11,9 @@ import Vir.React
 A native RPC response can remain in React state and be rendered by Lean without
 decoding its server references. The browser acceptance example supplies the
 official position-specific session and handles cancellation/stale results in its
-ordinary React effect. All asynchronous continuations are native JS functions;
-only the synchronous render enters Lean.
+ordinary React effect in `rpc-reference-widget.js`. Asynchronous continuations
+are native JS functions; rendering, requests and click handlers enter Lean
+synchronously. See `RpcReferenceWidget.md` for the two-file tutorial.
 -/
 
 namespace RpcReferenceWidget

@@ -221,8 +221,9 @@ A realistic path has three layers:
    does not add an RPC scheduler or decoded response model.
    The real-server Chromium fixture now covers native request options,
    cancellation, rejection, rerendering, package replacement and genuine
-   `Server.WithRpcRef` round trips. It also resolves the existing current-goal
-   method in a real hypothesis context. The provisional descriptor resolver,
+   `Server.WithRpcRef` round trips, including successful replies arriving after
+   cancellation. It also resolves a fixture-owned goal snapshot in a real
+   hypothesis context. The provisional descriptor resolver,
    normalizer and global reference store are removed. Broader expression/context
    construction, upstream serialized HTML, and structured edit/tactic commands
    remain future work.
