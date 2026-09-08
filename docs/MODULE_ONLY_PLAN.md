@@ -88,7 +88,10 @@ rebuilding, not through VIR-specific persistent removal metadata. See
 [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md). The client-native contract check now
 uses its existing Lake fixture project as a compiled module and checks both
 native-over-fallback selection and fallback without the manifest.
-External/type-anchor adapters remain pending.
+Illuminate's producer likewise builds the adapter inside its existing isolated
+client source view, preserving the client's Lake configuration and dependency
+pins. It uses marked-module selection for package-set emission. Type anchors,
+live snapshot ownership and the lean-zip producer remain pending.
 
 ## Design Decisions
 
@@ -132,7 +135,9 @@ survive the completed migration merely to preserve old CLI spellings.
 | Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
 | Client-native test producer (migrated) | `tests/native/client-native-extern.mjs`, `fixtures/client-native-extern/` | Build the existing fixture module before packaging; retain wrapper/registry diagnostics and check native versus fallback selection. Client-specific Wasm execution is separate acceptance. |
 | Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
-| External package producers | `scripts/packages/lean-zip/`, `scripts/packages/illuminate/`, `benchmarks/browser/scripts/build-artifacts.mjs` | Resolve/build workload modules in their owning project environment. Preserve registries and artifact provenance; do not repin downstream projects as part of this plan. |
+| Illuminate producer (migrated) | `scripts/packages/illuminate/`, `fixtures/illuminate/` | Build the adapter module in the isolated client project and emit its marked module package set; preserve dependency pins and source provenance. |
+| Lean-zip producer (dependency migration needed) | `scripts/packages/lean-zip/`, `fixtures/lean-zip/` | The catalogued client at `273d0d6` still has non-module dependencies. Require a module-capable downstream checkpoint or an explicit decision to retire current-client support; do not rewrite or repin the dependency in this lane. |
+| Historical benchmark producer | `benchmarks/browser/scripts/build-artifacts.mjs` | Its `--target` invokes the catalogued old VIR revision (prettyM: `b519d5a`), not this checkout's generator. Preserve historical build reproducibility; adopting a module-only producer is a new catalog/workload migration, not a prerequisite for deleting VIR's current source loader. |
 | Browser source display | `web/app/pages/browser-package-config.js`, fixture catalog/source helpers | Distinguish display/filter paths from compilation identity; preserve source navigation and package coverage checks. |
 | Live infoview | `Vir/Infoview/Package.lean` | Retain the environment adapter and revision/build consistency. Coordinate its API migration with the RPC owner after #169 adaptation. |
 

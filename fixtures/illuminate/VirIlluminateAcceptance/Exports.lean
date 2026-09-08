@@ -3,8 +3,12 @@ Copyright (c) 2026 Lean FRO LLC. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
-import Illuminate.Animation.Player
-import Vir.Attributes
+module
+
+public import Illuminate.Animation.Player
+public meta import Vir.Attributes
+
+public section
 
 namespace Illuminate.Animation.Vir
 
