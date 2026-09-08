@@ -20,6 +20,10 @@ live under ignored `build/type-descriptors/` paths.
 Anchors select the two descriptors to compare; they do not transform either
 shape through authored receiver, effect, representation, or lifetime policy.
 Those binding decisions belong exclusively to the generated binding operation.
+An optional explicit `id` supplies a stable report fragment. Otherwise the ID
+is derived from both the Lean and TypeScript names. Validation rejects duplicate
+IDs, including collisions after name sanitization; give colliding anchors
+distinct explicit IDs.
 
 Run the complete fixture check with:
 

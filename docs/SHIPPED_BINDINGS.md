@@ -96,7 +96,9 @@ Each upstream member has a generation record with three independent facts:
   exists. `unreviewed` dominates mixed coverage, followed by `adapter-only` if
   any operation changes upstream semantics. A member is `preserving` only when
   all of its classified upstream operations preserve semantics. The explorer
-  displays this classification without reinterpreting it.
+  displays this classification without reinterpreting it. The historical
+  `adapter-only` key is labeled **includes semantic adapters**, since the same
+  member may also have preserving operations.
 - **provenance** records whether upstream-correspondence evidence comes from
   direct TypeScript lowering, a reviewed protocol, an automatic candidate, an
   annotation, or no implementation. This is distinct from declaration
@@ -265,6 +267,12 @@ and a reason, plus an explicit `symbol` or `surface` scope. Surface scope also
 classifies members expanded from the named interface or alias. The generated
 binding operation is the sole record of derived type, modality, and semantic
 policy.
+
+An API group may mix direct mappings and reviewed protocols during migration.
+Both contribute to the same upstream correspondence index and remain visible
+in member coverage and the reverse target inventory; adding a direct mapping
+does not hide the group's remaining protocol links. External groups count
+VIR-owned targets separately (`noParityTargets`), not as upstream-mapped targets.
 
 Generation rejects an unowned module, a target assigned to zero or multiple
 groups, a stale selector, a mapping that disagrees with its generated

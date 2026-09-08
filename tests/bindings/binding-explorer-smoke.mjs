@@ -49,6 +49,18 @@ const generatedOperations = roots.flatMap((root) => root.generatedOperations ?? 
 const semanticRelationCounts = countBy(generatedOperations.map((operation) =>
   operation.semantics.relation));
 
+for (const root of roots) {
+  for (const operation of root.generatedOperations ?? []) {
+    const relation = operation.protocol?.upstreamRelation;
+    if (relation?.kind !== "upstream-adapter") continue;
+    const member = root.coverage.members.find((entry) => entry.id === relation.member);
+    assert.ok(member?.generation.targets.includes(operation.host.target),
+      `${operation.id} must remain visible under its upstream member`);
+    assert.ok(root.coverage.targetMappings.some((mapping) =>
+      mapping.target === operation.host.target && mapping.typescript === relation.member));
+  }
+}
+
 assert.equal(report.format, "lean-vir-binding-explorer");
 assert.equal(report.version, 3);
 assert.deepEqual(report.boundaryAnalysis, {
@@ -255,7 +267,10 @@ assert.deepEqual(documentRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 267,
-  mappedTargets: 6,
+  mappedTargets: 5,
+  ambiguousTargets: 0,
+  unmatchedTargets: 0,
+  noParityTargets: 1,
 });
 const documentTitle = documentRoot?.coverage.members.find((member) => member.id === "Document.title");
 assert.equal(documentTitle?.status, "derived");
@@ -329,7 +344,10 @@ assert.deepEqual(elementRoot?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 728,
-  mappedTargets: 22,
+  mappedTargets: 20,
+  ambiguousTargets: 0,
+  unmatchedTargets: 0,
+  noParityTargets: 2,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
@@ -534,7 +552,10 @@ assert.deepEqual(canvasElement?.coverage.summary, {
   suggested: 0,
   ambiguous: 0,
   missing: 330,
-  mappedTargets: 6,
+  mappedTargets: 5,
+  ambiguousTargets: 0,
+  unmatchedTargets: 0,
+  noParityTargets: 1,
 });
 assert.ok(canvasElement?.generatedOperations.some((operation) =>
   operation.id === "browser.htmlCanvasElement.getContext2D" &&
@@ -635,6 +656,10 @@ assert.match(html, /<h1>Binding reference<\/h1>/u);
 assert.match(html, /id="preserving-metric"/u);
 assert.match(html, /upstream entries with preserving contracts/u);
 assert.match(html, /id="adapter-metric"/u);
+assert.match(html, /entries including semantic adapters/u);
+assert.match(app, /includes semantic adapters/u);
+assert.doesNotMatch(app, /adapter only/iu);
+assert.doesNotMatch(style, /\.(?:modality-contract|advisory-semantics)\b/u);
 assert.match(html, /id="coverage" aria-label="Filter upstream semantic coverage"/u);
 assert.match(html, /id="search" type="search"/u);
 assert.match(html, /id="semantics" aria-label="Filter semantic relation"/u);

@@ -89,6 +89,21 @@ const descriptor = {
 };
 const descriptors = new Map([["widget", descriptor]]);
 
+test("generation requires complete descriptors and rejects stale exceptions", () => {
+  assert.throws(
+    () => buildGeneratedOperations(config, generation, new Map()),
+    /generated member Widget\.getAttribute has no TypeScript descriptor/u,
+  );
+  const stale = {
+    ...generation,
+    exceptions: { stale: { reason: "No corresponding operation.", result: { ownership: "owned" } } },
+  };
+  assert.throws(
+    () => buildGeneratedOperations(config, stale, descriptors),
+    /generation exception stale matches no generated operation/u,
+  );
+});
+
 test("TypeScript property shapes and an ABI profile determine Lean declarations", () => {
   const output = renderLeanBindings(config, generation, descriptors);
 
@@ -268,6 +283,18 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   assert.throws(
     () => buildGeneratedOperations(config, missingMember, descriptors),
     /adapts missing TypeScript member Widget\.missing/u,
+  );
+  assert.throws(
+    () => buildGeneratedOperations(config, protocolGeneration, new Map()),
+    /adapts missing TypeScript member Widget\.getAttribute/u,
+  );
+  const localConfig = structuredClone(config);
+  localConfig.roots[0].upstream.kind = "local";
+  const localProtocol = structuredClone(protocolGeneration);
+  localProtocol.protocolOperations[0].upstreamRelation.kind = "local-contract";
+  assert.throws(
+    () => buildGeneratedOperations(localConfig, localProtocol, new Map()),
+    /references missing local contract member Widget\.getAttribute/u,
   );
 });
 

@@ -12,7 +12,7 @@ import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG as WIRE } from "../../web/src/runtime/interface-tags.js";
-import { validateTypeScriptAnchors } from "./typescript-descriptors.mjs";
+import { typeScriptAnchorId, validateTypeScriptAnchors } from "./type-anchor-format.mjs";
 
 const statusRank = {
   exact: 0,
@@ -514,7 +514,7 @@ function anchorResult(anchor, status, diagnostics, leanDescriptor, tsSymbol) {
     severity: item.severity ?? diagnosticSeverity(status, relation),
   }));
   return {
-    id: anchor.id ?? anchorId(anchor),
+    id: typeScriptAnchorId(anchor),
     lean: anchor.lean,
     ts: anchor.ts,
     status,
@@ -543,10 +543,6 @@ function comparison(status, diagnostics = []) {
     diagnostics,
     notes: diagnostics.map((item) => item.message),
   };
-}
-
-function anchorId(anchor) {
-  return anchor.lean.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function compareShapes(lean, tsShape, tsSymbols, seen) {

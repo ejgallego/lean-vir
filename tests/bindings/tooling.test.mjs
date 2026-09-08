@@ -96,11 +96,16 @@ function demoGeneration(protocolOperations) {
   };
 }
 
-async function buildAutomaticDemoReport(targets, {
+function buildDemoReport(targets, {
   unsupported = [],
   protocolOperations = [],
+  mappings,
+  surface = demoTypeScriptSurface,
+  publicEntries = [],
 } = {}) {
   const generation = demoGeneration(protocolOperations);
+  generation.resources = { Widget: "Widget" };
+  generation.members = (mappings ?? []).map((mapping) => mapping.typescript);
   return buildBindingExplorerReport(
     {
       format: "lean-vir-shipped-bindings-coverage",
@@ -112,9 +117,10 @@ async function buildAutomaticDemoReport(targets, {
         provided: targets.length,
         missingProvider: 0,
         runtimeOnly: 0,
-        publicEntries: 0,
-        publicTargetEdges: 0,
-        targetsReachedByPublicEntries: 0,
+        publicEntries: publicEntries.length,
+        publicTargetEdges: publicEntries.reduce((sum, entry) => sum + entry.targets.length, 0),
+        targetsReachedByPublicEntries: new Set(publicEntries.flatMap((entry) =>
+          entry.targets.map(({ target }) => target))).size,
       },
       bindings: targets.map((target) => ({
         target,
@@ -122,7 +128,7 @@ async function buildAutomaticDemoReport(targets, {
         declarations: [{ module: "Vir.Demo", source: { path: generation.output } }],
         providers: ["demo"],
       })),
-      publicEntries: [],
+      publicEntries,
     },
     [{
       id: "demo",
@@ -138,16 +144,17 @@ async function buildAutomaticDemoReport(targets, {
         lean: { public: ["Lean.Vir.Demo.Widget"] },
         upstream: { kind: "typescript", roots: ["Widget"] },
         unsupported,
+        ...(mappings === undefined ? {} : { mappings }),
       }],
     }],
-    new Map([["demo/widget", demoTypeScriptSurface]]),
+    new Map([["demo/widget", surface]]),
     repositoryPath("build", "bindings", "demo.coverage.json"),
   );
 }
 
-test("unsupported members are excluded from automatic correspondence", async () => {
+test("unsupported members are excluded from automatic correspondence", () => {
   const target = "demo.widget.render";
-  const report = await buildAutomaticDemoReport([target], {
+  const report = buildDemoReport([target], {
     unsupported: [{
       typescript: "Widget.render",
       scope: "symbol",
@@ -171,9 +178,9 @@ test("unsupported members are excluded from automatic correspondence", async () 
     item.code === "upstream-identity-missing" && item.target === target));
 });
 
-test("changing operations conservatively determine mixed member coverage", async () => {
+test("changing operations conservatively determine mixed member coverage", () => {
   const targets = ["demo.widget.render", "demo.widget.renderAdapted"];
-  const report = await buildAutomaticDemoReport(targets, {
+  const report = buildDemoReport(targets, {
     protocolOperations: [
       demoProtocolOperation(targets[0], "preserving"),
       demoProtocolOperation(targets[1], "changing"),
@@ -190,7 +197,45 @@ test("changing operations conservatively determine mixed member coverage", async
   assert.equal(report.summary.generation.semanticCoverage["adapter-only"], 1);
 });
 
-test("reviewed method mappings require their named public declaration to reach the target", async () => {
+test("protocol links survive empty, sibling, and same-member direct mappings", () => {
+  const protocol = demoProtocolOperation("demo.widget.renderAdapted", "changing");
+  const { surfaceRoot, ...render } = demoTypeScriptSurface.symbols[0];
+  const surface = { symbols: [render, { ...render, id: "Widget.mount" }] };
+  for (const directMember of [undefined, null, "Widget.mount", "Widget.render"]) {
+    const directTarget = "demo.widget.direct";
+    const mappings = directMember === undefined ? undefined : directMember === null ? [] : [{
+      typescript: directMember,
+      targets: [directTarget],
+      lean: ["Lean.Vir.Demo.Widget.direct"],
+    }];
+    const targets = [protocol.target, ...(directMember ? [directTarget] : [])];
+    const publicEntries = targets.map((target) => {
+      const declaration = `Lean.Vir.Demo.Widget.${target.split(".").at(-1)}`;
+      return {
+        declaration,
+        module: "Vir.Demo",
+        type: "Unit",
+        source: { path: "Vir/Demo/Generated.lean", startLine: 1 },
+        targets: [{ target, path: [declaration] }],
+      };
+    });
+    const report = buildDemoReport(targets, { mappings, surface, publicEntries, protocolOperations: [protocol] });
+    const group = report.libraries[0].apiGroups[0];
+    const member = group.coverage.members.find((entry) => entry.id === "Widget.render");
+    assert.ok(member, `protocol member disappeared with ${directMember} direct mapping`);
+    assert.deepEqual(member.generation.targets,
+      directMember === "Widget.render" ? [directTarget, protocol.target] : [protocol.target]);
+    assert.equal(member.generation.disposition, directMember === "Widget.render" ? "generated" : "adapted");
+    assert.equal(member.generation.semanticCoverage.status, "adapter-only");
+    assert.equal(group.coverage.targetMappings.find((mapping) =>
+      mapping.target === protocol.target)?.typescript, "Widget.render");
+    assert.equal(group.coverage.summary.mappedTargets, targets.length);
+    assert.deepEqual(group.workItems, []);
+    assert.deepEqual(report.issues, []);
+  }
+});
+
+test("reviewed method mappings require their named public declaration to reach the target", () => {
   const target = "demo.widget.render";
   const coverage = {
     format: "lean-vir-shipped-bindings-coverage",
@@ -271,7 +316,7 @@ test("reviewed method mappings require their named public declaration to reach t
     }],
   };
 
-  const report = await buildBindingExplorerReport(
+  const report = buildBindingExplorerReport(
     coverage,
     [config],
     new Map([["demo/widget", typeScript]]),

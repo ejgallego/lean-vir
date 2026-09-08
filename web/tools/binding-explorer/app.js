@@ -139,9 +139,9 @@ const semanticCoverageDefinitions = new Map([
     summary: "with preserving contracts",
   }],
   ["adapter-only", {
-    filter: "Adapter only",
-    badge: "explicit adapter only",
-    summary: "adapter only",
+    filter: "Includes semantic adapters",
+    badge: "includes semantic adapters",
+    summary: "with semantic adapters",
   }],
   ["unreviewed", {
     filter: "Semantic review required",
@@ -960,7 +960,7 @@ function renderGenerationPolicy(group, symbol) {
 function leanPaneTitle(semanticCoverage) {
   return ({
     preserving: "Preserving Lean boundary",
-    "adapter-only": "Explicit Lean semantic adapter",
+    "adapter-only": "Lean bindings including semantic adapters",
     unreviewed: "Lean boundary — semantic review required",
     "local-contract": "Repository-local Lean contract",
   })[semanticCoverage?.status] ?? "Lean boundary";

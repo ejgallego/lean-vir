@@ -11,6 +11,7 @@ import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { loadBindingConfig } from "./binding-config.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
+import { validateTypeScriptAnchors } from "./type-anchor-format.mjs";
 
 function usage() {
   console.log(`usage: node scripts/bindings/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
@@ -848,48 +849,6 @@ function propertyNameText(name) {
 function parameterName(name, fallback) {
   if (ts.isIdentifier(name)) return name.text;
   return `arg${fallback}`;
-}
-
-export function validateTypeScriptAnchors(anchors, symbolIds) {
-  if (!Array.isArray(anchors)) throw new Error("anchors must be an array");
-  const anchorFields = new Set([
-    "id",
-    "lean",
-    "ts",
-    "relation",
-    "note",
-  ]);
-  const ids = new Set();
-  for (const [index, anchor] of anchors.entries()) {
-    if (anchor === null || typeof anchor !== "object" || Array.isArray(anchor)) {
-      throw new Error(`anchors[${index}] must be an object`);
-    }
-    const unknown = Object.keys(anchor).find((field) => !anchorFields.has(field));
-    if (unknown !== undefined) {
-      throw new Error(`anchors[${index}].${unknown} is not a structural anchor field`);
-    }
-    if (typeof anchor.lean !== "string" || anchor.lean.length === 0) {
-      throw new Error(`anchors[${index}].lean must be a non-empty string`);
-    }
-    if (typeof anchor.ts !== "string" || anchor.ts.length === 0) {
-      throw new Error(`anchors[${index}].ts must be a non-empty string`);
-    }
-    if (!symbolIds.has(anchor.ts)) {
-      throw new Error(`anchors[${index}].ts references missing TypeScript symbol ${anchor.ts}`);
-    }
-    if (anchor.relation !== undefined && !["audit", "coverageGap"].includes(anchor.relation)) {
-      throw new Error(`anchors[${index}].relation must be audit or coverageGap`);
-    }
-    for (const field of ["id", "note"]) {
-      if (anchor[field] !== undefined &&
-          (typeof anchor[field] !== "string" || anchor[field].length === 0)) {
-        throw new Error(`anchors[${index}].${field} must be a non-empty string`);
-      }
-    }
-    const id = anchor.id ?? `${anchor.lean} -> ${anchor.ts}`;
-    if (ids.has(id)) throw new Error(`duplicate anchor id ${id}`);
-    ids.add(id);
-  }
 }
 
 function validateAnchors(anchorData, symbolIds) {

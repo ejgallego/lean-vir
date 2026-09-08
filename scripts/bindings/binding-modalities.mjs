@@ -1030,9 +1030,7 @@ function functionOperation(config, root, mapping, symbol, generation, profile) {
   };
 }
 
-export function buildGeneratedOperations(config, generation, descriptorsByRoot, {
-  validateExceptions = true,
-} = {}) {
+export function buildGeneratedOperations(config, generation, descriptorsByRoot) {
   const profile = validateGenerationProfile(generation, `${config.id} generation`);
   const generatedMembers = new Set(generation.members);
   const mappings = new Map();
@@ -1055,8 +1053,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     if (entry === undefined) throw new Error(`generated member ${member} has no reviewed mapping`);
     const descriptor = descriptorsByRoot.get(entry.root.id);
     if (descriptor === undefined) {
-      if (validateExceptions) throw new Error(`generated member ${member} has no TypeScript descriptor`);
-      continue;
+      throw new Error(`generated member ${member} has no TypeScript descriptor`);
     }
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (entry.mapping.accessors === undefined) {
@@ -1109,15 +1106,12 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
       ));
     }
   }
-  if (validateExceptions) {
-    const operationIds = new Set(operations.map((operation) => operation.id));
-    for (const id of Object.keys(generation.exceptions ?? {})) {
-      if (!operationIds.has(id)) throw new Error(`generation exception ${id} matches no generated operation`);
-    }
+  const operationIds = new Set(operations.map((operation) => operation.id));
+  for (const id of Object.keys(generation.exceptions ?? {})) {
+    if (!operationIds.has(id)) throw new Error(`generation exception ${id} matches no generated operation`);
   }
   const groups = new Set(config.roots.map((root) => root.id));
   const rootsById = new Map(config.roots.map((root) => [root.id, root]));
-  const operationIds = new Set(operations.map((operation) => operation.id));
   const targets = new Set(operations.map((operation) => operation.host.target));
   for (const protocol of generation.protocolOperations ?? []) {
     if (!groups.has(protocol.group)) {
@@ -1141,10 +1135,8 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     if (relation.kind === "local-contract") {
       const symbols = symbolsByRoot.get(protocol.group);
-      if (symbols !== undefined || validateExceptions) {
-        if (!symbols?.has(relation.member)) {
-          throw new Error(`generated protocol ${protocol.id} references missing local contract member ${relation.member}`);
-        }
+      if (!symbols?.has(relation.member)) {
+        throw new Error(`generated protocol ${protocol.id} references missing local contract member ${relation.member}`);
       }
     }
     if (relation.kind === "upstream-adapter") {
@@ -1158,19 +1150,15 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
         throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);
       }
       const symbols = symbolsByRoot.get(protocol.group);
-      // Descriptor generation materializes one API group at a time. Full
-      // generation and the explorer always validate every named adapter.
-      if (symbols !== undefined || validateExceptions) {
-        if (!symbols?.has(relation.member)) {
-          throw new Error(`generated protocol ${protocol.id} adapts missing TypeScript member ${relation.member}`);
-        }
-        const symbol = symbols.get(relation.member);
-        if (relation.accessor !== undefined && symbol.kind !== "property") {
-          throw new Error(`generated protocol ${protocol.id} classifies an accessor for non-property ${relation.member}`);
-        }
-        if (relation.accessor !== undefined && symbol.accessors?.[relation.accessor] === undefined) {
-          throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
-        }
+      if (!symbols?.has(relation.member)) {
+        throw new Error(`generated protocol ${protocol.id} adapts missing TypeScript member ${relation.member}`);
+      }
+      const symbol = symbols.get(relation.member);
+      if (relation.accessor !== undefined && symbol.kind !== "property") {
+        throw new Error(`generated protocol ${protocol.id} classifies an accessor for non-property ${relation.member}`);
+      }
+      if (relation.accessor !== undefined && symbol.accessors?.[relation.accessor] === undefined) {
+        throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
       }
     }
     const typeParameters = protocol.typeParameters ?? [];

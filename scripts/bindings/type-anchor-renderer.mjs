@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
+import { typeAnchorFragment } from "./type-anchor-format.mjs";
 
 function usage() {
   console.log(`usage: node scripts/bindings/render-type-anchors.mjs --report FILE [options]
@@ -299,7 +300,7 @@ function renderHtmlAnchor(result) {
     : escapeHtml(JSON.stringify(result.tsSymbol?.shape ?? {}, null, 2));
   const leanDisplay = escapeHtml(formatLeanDescriptor(result.leanDescriptor));
   const diagnostics = renderHtmlDiagnostics(result.diagnostics ?? []);
-  return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
+  return `      <article class="anchor" id="${escapeAttr(`type-anchor-${typeAnchorFragment(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
         <div class="anchor-head">
           <div class="name">
             <h2 class="ts-name"><a href="${escapeAttr(href)}" title="${escapeAttr(hoverText(result))}">${escapeHtml(result.ts)}</a></h2>
@@ -336,7 +337,7 @@ function renderHtmlDiagnostics(diagnostics) {
 }
 
 function renderAnchor(result) {
-  const label = `vir_type_anchor_${slug(result.id)}`;
+  const label = `vir_type_anchor_${typeAnchorFragment(result.id)}`;
   const lean = result.leanDescriptor?.kind === "type" || result.leanDescriptor?.kind === "export"
     ? ` (lean := "${escapeAttr(result.lean)}")`
     : "";
@@ -486,10 +487,6 @@ function formatInlineShape(shape) {
     default:
       return formatShape(shape, 0).replace(/\s+/g, " ").trim();
   }
-}
-
-function slug(text) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "anchor";
 }
 
 function escapeHtml(text) {
