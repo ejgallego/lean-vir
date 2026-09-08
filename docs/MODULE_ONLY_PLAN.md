@@ -85,8 +85,10 @@ compiled imports restore the recorded additions. Tests assert both local
 removal during elaboration and restored export/startup selection during
 packaging. Published interfaces change by editing the original annotations and
 rebuilding, not through VIR-specific persistent removal metadata. See
-[LAKE_INTEGRATION.md](LAKE_INTEGRATION.md). External/type-anchor and native-test
-adapters remain pending.
+[LAKE_INTEGRATION.md](LAKE_INTEGRATION.md). The client-native contract check now
+uses its existing Lake fixture project as a compiled module and checks both
+native-over-fallback selection and fallback without the manifest.
+External/type-anchor adapters remain pending.
 
 ## Design Decisions
 
@@ -128,7 +130,7 @@ survive the completed migration merely to preserve old CLI spellings.
 | Generator preparation | `scripts/packages/irpkg-generator.mjs` | Build actual input modules and supply their project search environment, not only the VIR generator and optional prerequisites. |
 | Browser package assembly (migrated) | `generate-browser-package.mjs`, `fixtures/browser-packages.json` | Explicit modules preserve multi-input root unions and package-only roots; implicit Lean demo defaults removed. |
 | Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
-| Client-native test producer | `tests/native/client-native-extern.mjs` | Compile its generated fixture module before invoking the package generator; preserve registry/provider and native/Wasm acceptance. |
+| Client-native test producer (migrated) | `tests/native/client-native-extern.mjs`, `fixtures/client-native-extern/` | Build the existing fixture module before packaging; retain wrapper/registry diagnostics and check native versus fallback selection. Client-specific Wasm execution is separate acceptance. |
 | Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
 | External package producers | `scripts/packages/lean-zip/`, `scripts/packages/illuminate/`, `benchmarks/browser/scripts/build-artifacts.mjs` | Resolve/build workload modules in their owning project environment. Preserve registries and artifact provenance; do not repin downstream projects as part of this plan. |
 | Browser source display | `web/app/pages/browser-package-config.js`, fixture catalog/source helpers | Distinguish display/filter paths from compilation identity; preserve source navigation and package coverage checks. |
@@ -161,7 +163,7 @@ production input systems.
    - [x] Migrate public npm CLI/configs and register their example modules.
    - [x] Migrate browser package assembly and authored browser fixture modules.
    - [ ] Migrate generated/runtime fixture inputs and remaining adapters.
-4. [ ] Migrate test generation and host oracles through a shared module-project
+4. [x] Migrate test generation and host oracles through a shared module-project
    helper. Keep tests intended to fail Lean elaboration separate from tests
    intended to fail VIR package validation. Preserve the oracle's
    `interpreter.prefer_native false` setting and unsafe-entry handling so the
@@ -171,7 +173,7 @@ production input systems.
      and six successful all-public runtime fixtures.
    - [x] Migrate runtime direct-generator and negative tests, checking both
      live and compiled marker-removal semantics.
-   - [ ] Migrate the generated client-native acceptance input.
+   - [x] Migrate the existing client-native fixture project and package checks.
 5. [ ] Migrate infoview, type-anchor and external-producer adapters after
    coordinating the affected boundaries. Do not silently rebuild an external
    workload under VIR's unrelated project environment.
