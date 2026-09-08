@@ -97,8 +97,12 @@ uses its existing Lake fixture project as a compiled module and checks both
 native-over-fallback selection and fallback without the manifest.
 Illuminate's producer likewise builds the adapter inside its existing isolated
 client source view, preserving the client's Lake configuration and dependency
-pins. It uses marked-module selection for package-set emission. Type anchors,
-the final live snapshot input API and the lean-zip producer remain pending.
+pins. It uses marked-module selection for package-set emission. Lean-zip's
+VIR-owned adapters now build compiled modules in a shared dependent Lake
+project, including the native oracle, without copying client configuration or
+assembling search paths. A real Lake smoke checks inherited native linking;
+full compression acceptance awaits the upstream module port. Type anchors and
+the final live snapshot input API remain pending.
 
 The snapshot declaration index now assigns current-module ownership to local
 IR, including private helpers, and marks the live module as already loaded.
@@ -150,7 +154,7 @@ survive the completed migration merely to preserve old CLI spellings.
 | Client-native test producer (migrated) | `tests/native/client-native-extern.mjs`, `fixtures/client-native-extern/` | Build the existing fixture module before packaging; retain wrapper/registry diagnostics and check native versus fallback selection. Client-specific Wasm execution is separate acceptance. |
 | Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
 | Illuminate producer (migrated) | `scripts/packages/illuminate/`, `fixtures/illuminate/` | Build the adapter module in the isolated client project and emit its marked module package set; preserve dependency pins and source provenance. |
-| Lean-zip producer (external acceptance deferred) | `scripts/packages/lean-zip/`, `fixtures/lean-zip/` | Migrate VIR's adapters without retaining non-module compatibility. The maintainer owns upstream module support; acceptance needs a matching module-capable checkpoint. Do not rewrite or repin the dependency here. |
+| Lean-zip producer (migrated; external acceptance deferred) | `scripts/packages/lean-zip/`, `fixtures/lean-zip/` | Compiled adapters share a dependent Lake project with native linking. The maintainer owns upstream module support; actual adapter compilation and compression acceptance need a matching module-capable checkpoint. Do not rewrite or repin the dependency here. |
 | Historical benchmark producer | `benchmarks/browser/scripts/build-artifacts.mjs` | Its `--target` invokes the catalogued old VIR revision (prettyM: `b519d5a`), not this checkout's generator. Preserve historical build reproducibility; adopting a module-only producer is a new catalog/workload migration, not a prerequisite for deleting VIR's current source loader. |
 | Browser source display | `web/app/pages/browser-package-config.js`, fixture catalog/source helpers | Distinguish display/filter paths from compilation identity; preserve source navigation and package coverage checks. |
 | Live infoview | `Vir/Infoview/Package.lean` | Retain the environment adapter and revision/build consistency. Coordinate its API migration with the RPC owner after #169 adaptation. |

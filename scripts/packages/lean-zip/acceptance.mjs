@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
@@ -20,9 +20,11 @@ import {
   acceptanceProfileContract,
   parseAcceptanceManifest,
 } from "./acceptance-manifest.mjs";
-
-const fixtureRoot = join(repositoryRoot, "fixtures", "lean-zip");
-const exportsSource = join(fixtureRoot, "VirLeanZipAcceptance", "Exports.lean");
+import {
+  createLeanZipModuleProject,
+  exportsModule,
+  oracleTarget,
+} from "./module-project.mjs";
 
 function usage() {
   return `usage: npm run accept:lean-zip -- /path/to/lean-zip [options]
@@ -124,84 +126,39 @@ for (const [path, message] of [
   if (!(await pathExists(path))) throw new Error(message);
 }
 
-runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repositoryRoot });
-const virLeanVersion = runSync("lean", ["--short-version"], {
-  cwd: repositoryRoot,
-  capture: true,
-});
-const leanZipLeanVersion = runSync("lake", ["env", "lean", "--short-version"], {
-  cwd: leanZipRoot,
-  capture: true,
-});
-if (virLeanVersion !== leanZipLeanVersion) {
-  throw new Error(
-    `Lean toolchain mismatch: VIR uses ${virLeanVersion}, lean-zip uses ${leanZipLeanVersion}`,
-  );
-}
-
 const workDir = await mkdtemp(join(tmpdir(), "vir-lean-zip-acceptance-"));
 const oracleOutput = join(workDir, "oracle");
 const packagePath = join(workDir, "lean-zip-acceptance.irpkg");
 const reportPath = join(workDir, "lean-zip-acceptance.report.md");
-const overlayLakefile = join(workDir, "lakefile.lean");
 
-async function writeOracleLakefile() {
-  const source = await readFile(lakefile, "utf8");
-  await writeFile(
-    overlayLakefile,
-    `${source.trimEnd()}\n\n` +
-      "lean_exe virLeanZipAcceptanceOracle where\n" +
-      "  root := `VirLeanZipAcceptance.NativeOracle\n" +
-      `  srcDir := ${JSON.stringify(fixtureRoot)}\n`,
-  );
-}
-
-async function generateNativeOracle() {
+async function generateNativeOracle(project) {
   await mkdir(oracleOutput);
-  await writeOracleLakefile();
-  const oracleArgs = [
-    "-d",
-    leanZipRoot,
-    "-f",
-    overlayLakefile,
-    "exe",
-    "virLeanZipAcceptanceOracle",
-    oracleOutput,
-  ];
+  const oracleArgs = ["exe", oracleTarget, oracleOutput];
   if (values.profile) oracleArgs.push("--profile");
-  runSync("lake", oracleArgs, { cwd: repositoryRoot });
+  project.lake(oracleArgs);
 }
 
-function externalLeanEnv() {
-  return {
-    ...process.env,
-    LEAN_PATH: [
-      join(repositoryRoot, ".lake", "build", "lib", "lean"),
-      process.env.LEAN_PATH,
-    ]
-      .filter(Boolean)
-      .join(delimiter),
-  };
-}
-
-function generateVirPackage() {
-  runSync(
-    "lake",
-    [
-      "env",
-      virIrpkgPath,
-      packagePath,
-      reportPath,
-      "--target-marked",
-      exportsSource,
-    ],
-    { cwd: leanZipRoot, env: externalLeanEnv() },
-  );
+function generateVirPackage(project) {
+  project.lake(["build", `+${exportsModule}`]);
+  project.lake([
+    "env",
+    virIrpkgPath,
+    packagePath,
+    reportPath,
+    "--target-marked-module",
+    exportsModule,
+  ]);
 }
 
 async function runAcceptance() {
-  await generateNativeOracle();
-  generateVirPackage();
+  const project = await createLeanZipModuleProject({
+    directory: join(workDir, "project"),
+    client: leanZipRoot,
+    producer: repositoryRoot,
+  });
+  runSync("lake", virIrpkgLakeBuildArgs(), { cwd: repositoryRoot });
+  await generateNativeOracle(project);
+  generateVirPackage(project);
 
   const manifest = parseAcceptanceManifest(
     await readFile(join(oracleOutput, "manifest.tsv"), "utf8"),
