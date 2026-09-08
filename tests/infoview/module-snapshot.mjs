@@ -33,7 +33,7 @@ for (const suffix of ["first", "edited"]) {
     assert.equal(manifest.exports[0].source, "untitled:ModuleSnapshot.lean");
     assert.equal(
       runtime.call("snapshotValue"),
-      `imported helper before${suffix}`,
+      `imported helper beforesnapshot:${suffix}`,
     );
   } finally {
     runtime.dispose();

@@ -67,12 +67,12 @@ def collectInterfaceManifest
   }
   for target in targets do
     let source := target.publicSource
-    match index.envForSource? (index.sourceKeyFor target) with
+    match index.envForTarget? target with
     | none =>
         manifest := { manifest with diagnostics := manifest.diagnostics.push {
           name := .anonymous,
           source,
-          reason := "source environment was not loaded"
+          reason := "target environment was not loaded"
         } }
     | some env =>
         let candidates := exportCandidatesFor index target

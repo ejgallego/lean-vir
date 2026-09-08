@@ -60,8 +60,7 @@ escaping out of module names and makes bytes reproducible across checkout
 locations. Each member manifest also records `metadata.packageSetMember` with
 its module and `dependency` or `root` role. Dependency members have no public
 targets. A compiled-module root has the stable target `{ "module": ..., "mode":
-"markedModule" }` rather than the generated driver's local path; the legacy
-source fallback has one `marked` source target. Other target modes are rejected
+"markedModule" }`. No source-loader fallback is supported. Other target modes are rejected
 for package-set roots. All members in a set must record the same
 package/manifest versions and exact Lean version, toolchain, and git hash.
 

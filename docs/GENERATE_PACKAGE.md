@@ -41,21 +41,15 @@ would bypass module restrictions. Non-module inputs and missing artifacts fail
 with Lean's import error. No frontend-only lint warnings are produced for this
 internal import context.
 
-Source-file adapters remain during the migration described in
-[MODULE_ONLY_PLAN.md](MODULE_ONLY_PLAN.md):
+Source-file flags (`--target`, `--package-target`, `--target-all`,
+`--target-marked`) are rejected, with no compatibility aliases. Use explicit
+module names and build their artifacts first. There is no package source
+frontend, filesystem canonicalization or source-path alias cache.
 
-- `--target <source.lean> <root>...`: package explicit roots and export them.
-- `--package-target <source.lean> <root>...`: include roots in the package
-  closure without making them JavaScript-callable exports.
-- `--target-all <source.lean>`: auto-discover public source definitions as
-  roots and exports.
-- `--target-marked <source.lean>`: package declarations marked with
-  `@[vir_export]` or `@[vir_startup]` in a source file.
-The corresponding manifest `mode` values are `explicit`, `packageOnly`,
-`all`, `marked`, and `markedModule`. Internally `Target` carries an independent
+The manifest retains its existing mode vocabulary. Internally `Target` carries an independent
 `PackageTargetOrigin` and four-case `TargetMode`. Only the wire encoder maps
 module origin plus marked selection to the existing `markedModule` spelling.
-The shared `DeclIndex` is the prepared input used by both filesystem/module
+The shared `DeclIndex` is the prepared input used by both compiled-module
 loading and the server environment adapter; there is no parallel emitter.
 
 Every target mode follows opaque declaration ownership and loads the reached
@@ -118,7 +112,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.ExternFallback`: the explicit `vir_extern_fallback` command, transparent
   extern-body cloning, and direct-recursion rejection used by portable package
   sources.
-- `Vir.GeneratePackage.Frontend`: transitional source elaboration, `DeclIndex` construction,
+- `Vir.GeneratePackage.Frontend`: compiled-module acquisition, validated live snapshots, `DeclIndex` construction,
   marker collection, extern-fallback ownership adapters,
   declaration-to-module ownership, on-demand `import all` environments, module
   filtering, and declaration-name collision diagnostics.
@@ -161,15 +155,15 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 ## Data Flow
 
 1. The CLI turns each target argument into a `Target` with origin and selection.
-2. Source adapters use `Frontend.frontendEnv` to elaborate sources unchanged
-   with async elaboration disabled. Module adapters use
+2. Compiled module inputs use
    `importModuleEnv` to acquire already-compiled declarations without a frontend.
-   Source commands such as `#eval` execute during source elaboration, not when
-   generating a package from compiled modules.
+   Source commands such as `#eval` execute during Lake compilation, not package
+   generation. Live module inputs use `prepareSnapshotInput` on the existing
+   server environment without invoking either a frontend or the disk loader.
 3. `Frontend.loadDeclIndex` records each input environment, input-owned IR
    declaration names, `@[vir_export]` and `@[vir_startup]` marker sets, and a
    name-to-declaration index. Module targets filter those sets to
-   declarations owned by the requested module. If two different source targets
+   declarations owned by the requested module. If two different module targets
    define the same Lean declaration name, the index records a diagnostic instead
    of silently letting the later target overwrite the first.
 4. `Closure.collectClosure` resolves explicit roots, auto-discovered roots, and
@@ -229,23 +223,22 @@ for the full matrix.
   change.
 - Lean library packaging or import layout: `bash scripts/build-lean-lib.sh`.
 
-## Source And Target Rules
+## Input And Target Rules
 
-Declaration names must be unique across different source targets in one
+Declaration names must be unique across different module targets in one
 package generation run. This is stricter than Lean's module system because the
 current `.irpkg` format stores declarations by Lean name and the closure lookup
-must not depend on source order.
+must not depend on target order.
 
-The same canonical source file may appear in more than one target mode, even
-through different lexical paths or symlinks. The frontend resolves each input
-with `realPath`, elaborates the file exactly once, then applies each target
-selection to the shared environment. This is useful when a package needs a
-public export target plus a package-only support target without repeating
-`#eval`, `run_cmd`, macro, or initializer elaboration effects.
+The same module may appear in more than one target mode. The loader acquires
+each module once, then applies each selection to the shared environment. This
+supports public export targets plus package-only support targets without
+repeated acquisition. Input lookup uses typed module/snapshot identity, not
+the human-readable source label.
 
-The generator does not rewrite source commands. A target containing `#eval`,
-`run_cmd`, macros, or initializers is responsible for their normal elaboration
-behavior and any resulting output.
+VIR's independent source-analysis tools may still elaborate analysis inputs;
+they do not provide a fallback into the package producer. Historical benchmark
+catalogs invoke their pinned old producers, not this CLI.
 
 Closure selection is declaration-driven. An otherwise-unreferenced imported
 module is not included solely because it has an initializer; browser-visible
@@ -348,7 +341,7 @@ resolved package root after `via`. The command-line diagnostic prints the same
 path.
 
 - `Missing IR Declarations`: a requested root or closure dependency was not
-  present in the loaded source environments. Check the target source path,
+  present in the loaded environments. Check the target module identity,
   imports, explicit root names, and whether a package-only support target is
   needed. For a module-system export, generation normally loads the owning
   module automatically; a remaining failure means that ownership could not be
@@ -368,9 +361,8 @@ path.
   trivial wrappers over them require a generated `_boxed` declaration for the
   wasm32 interpreter call boundary. The generator auto-includes the boxed
   declaration when it exists, and reports this diagnostic when it does not.
-- Noisy frontend output: source commands such as `#eval` run with normal Lean
-  semantics during generation. Keep executable examples out of API modules if
-  their output is not wanted in package builds.
+- Compilation output: source commands such as `#eval` run with normal Lean
+  semantics during Lake compilation, never again during package generation.
 
 ## Focused Checks
 

@@ -163,15 +163,14 @@ MySlides/Runtime.parts/0.irpkg
 MySlides/Runtime.report.md
 ```
 
-For legacy Lean source files that do not produce compiled module IR, the
-generator still re-elaborates the source during the module-only migration.
-For module-system files, the facet depends on Lake's `.ir` artifact and passes
+The facet requires a `module` source and Lake's compiled `.ir` artifact. It passes
 the module name directly to the generator. No driver file is generated and no
 module body is re-elaborated during packaging.
 
-The compiled-module root records one `markedModule` target. The legacy fallback
-records one `marked` source target; package-set generation rejects all other
-target modes.
+The root records one `markedModule` target; package-set generation rejects
+other target modes. Non-module inputs fail explicitly, including replacement
+of a previously successful module: stale package/descriptor outputs are
+invalidated, not reused or regenerated through a source fallback.
 
 Every member is an ordinary format-11 `.irpkg` that owns its module's
 declarations and initializer metadata. The descriptor reconstructs a

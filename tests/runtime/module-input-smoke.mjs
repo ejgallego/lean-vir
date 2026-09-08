@@ -136,6 +136,12 @@ try {
     ["--target-marked-module"],
     ["--target-marked-module", "--target-all-module", moduleName],
     ["--target-marked-module", "invalid..module"],
+    ["--target-module", "fixtures/Basic.lean", selected],
+    ["--target-module", "fixtures\\Basic.lean", selected],
+    ["--target-all-module", "Basic.lean"],
+    ...["--target", "--package-target", "--target-all", "--target-marked"].map(
+      (flag) => [flag, "fixtures/Basic.lean", selected],
+    ),
   ]) {
     const result = lake([
       "env",
@@ -145,6 +151,8 @@ try {
       ...args,
     ]);
     assert.equal(result.status, 2, `${result.stdout}\n${result.stderr}`);
+    await assert.rejects(readFile(join(scratch, "invalid.irpkg")), { code: "ENOENT" });
+    await assert.rejects(readFile(join(scratch, "invalid.report.md")), { code: "ENOENT" });
   }
   // Direct Lean import defaults to legacy visibility unless the caller opts
   // into the module system. A compiled .olean alone must not be sufficient.

@@ -128,9 +128,10 @@ source to fall back to. Local edits must survive imported-owner resolution. -/
 unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   let source := "untitled:ModuleSnapshot.lean"
   let contents := "module\npublic import InfoviewFixtures.ImportedHelper\n" ++
+    "private initialize snapshotPrefix : String ← pure \"snapshot:\"\n" ++
     "@[noinline] private def snapshotSuffix (_ : Unit) : String := " ++
     s!"{Lean.Json.compress (.str suffix)}\n" ++
-    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ snapshotSuffix ()\n"
+    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ snapshotPrefix ++ snapshotSuffix ()\n"
   let env ← snapshotEnvironment source contents
   let roots := #[`snapshotValue]
   let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
@@ -159,6 +160,27 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   expect "module snapshot includes private transitive owner" <|
     closure.decls.any (fun loaded => loaded.module? ==
       some `InfoviewFixtures.ImportedHelper.Internal)
+  let order ← IO.ofExcept <| closure.moduleInitializationOrder index target env.mainModule
+  expect "live module root is last in its explicit dependency graph" <|
+    order.back? == some env.mainModule
+  expect "live module order includes private imported owner" <|
+    order.contains `InfoviewFixtures.ImportedHelper.Internal
+  expect "every closure declaration has a module owner" <|
+    closure.decls.all (·.module?.isSome)
+  let partitioned := order.flatMap fun name =>
+    (closure.forModule name env.mainModule).decls.map (·.decl.name)
+  expect "module partitioning preserves every declaration exactly once" <|
+    Lean.Vir.Infoview.sortedNames partitioned ==
+      Lean.Vir.Infoview.sortedNames (closure.decls.map (·.decl.name))
+  expect "every initializer global has a declaration owner" <|
+    closure.initGlobals.all fun entry =>
+      closure.decls.any (fun loaded => loaded.decl.name == entry.name && loaded.module?.isSome)
+  expect "live root owns a private initialized global" <|
+    (closure.forModule env.mainModule env.mainModule).initGlobals.any fun entry =>
+      Lean.isPrivateName entry.name
+  expect "module partitioning preserves exactly the owned initializer globals" <|
+    (order.foldl (fun count name => count + (closure.forModule name env.mainModule).initGlobals.size) 0)
+      == closure.initGlobals.size
   let text := Lean.FileMap.ofString contents
   let token ← Lean.Vir.Infoview.packageClosureToken text source input env
   let revision := Lean.Vir.Infoview.irPackageRevision roots token

@@ -206,12 +206,12 @@ unsafe def runModuleSet
   match target.mode with
   | .marked => pure ()
   | _ =>
-      IO.eprintln "module package-set generation requires a marked source or marked module target"
+      IO.eprintln "module package-set generation requires a marked module target"
       return 1
-  if let some targetModule := target.origin.module? then
-    if targetModule != rootModule then
-      IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
-      return 1
+  let targetModule := target.origin.moduleName
+  if targetModule != rootModule then
+    IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
+    return 1
 
   let index ← loadRunDeclIndex targets
   let analysis ← analyzePackage (← generatedAtUtc) targets index

@@ -228,6 +228,13 @@ private def buildVirPackageSetFacet
   generatorJob.bindM fun generator =>
     moduleJob.bindM fun artifacts =>
       importArtsJob.mapM fun _ => do
+        unless artifacts.ir?.isSome do
+          -- Rejection must also invalidate an older successful source package.
+          removeFileIfExists descriptorPath
+          removeFileIfExists packagePath
+          removeFileIfExists reportPath
+          removeDirAllIfExists shardDir
+          error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
         addLeanTrace
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
@@ -248,11 +255,6 @@ private def buildVirPackageSetFacet
           createParentDirs reportPath
           createParentDirs descriptorPath
           IO.FS.createDirAll shardDir
-          let targetArgs :=
-            if artifacts.ir?.isSome then
-              #["--target-marked-module", moduleName]
-            else
-              #["--target-marked", mod.leanFile.toString]
           proc {
             cmd := generator.toString
             args := #[
@@ -261,7 +263,7 @@ private def buildVirPackageSetFacet
             ] ++ #[
               "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
               rootRelativePath, shardRelativeDir
-            ] ++ targetArgs
+            ] ++ #["--target-marked-module", moduleName]
             env := ← getAugmentedEnv
           }
         return descriptorPath

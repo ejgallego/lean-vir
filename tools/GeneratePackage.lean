@@ -15,32 +15,21 @@ inductive TargetFlag where
   | all
   | marked
 
-inductive TargetInputKind where
-  | source
-  | module
-
 namespace TargetFlag
 
-def option : TargetFlag → TargetInputKind → String
-  | .explicit, .source => "--target"
-  | .packageOnly, .source => "--package-target"
-  | .all, .source => "--target-all"
-  | .marked, .source => "--target-marked"
-  | .explicit, .module => "--target-module"
-  | .packageOnly, .module => "--package-module"
-  | .all, .module => "--target-all-module"
-  | .marked, .module => "--target-marked-module"
+def option : TargetFlag → String
+  | .explicit => "--target-module"
+  | .packageOnly => "--package-module"
+  | .all => "--target-all-module"
+  | .marked => "--target-marked-module"
 
 def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked]
 
-def options : Array (TargetFlag × TargetInputKind) :=
-  #[TargetInputKind.source, .module].flatMap fun kind => values.map (·, kind)
-
-def parse? (text : String) : Option (TargetFlag × TargetInputKind) :=
-  options.find? fun (flag, kind) => flag.option kind == text
+def parse? (text : String) : Option TargetFlag :=
+  values.find? fun flag => flag.option == text
 
 def alternatives : String :=
-  ", ".intercalate (options.map (fun (flag, kind) => s!"`{flag.option kind}`")).toList
+  ", ".intercalate (values.map (fun flag => s!"`{flag.option}`")).toList
 
 end TargetFlag
 
@@ -56,15 +45,15 @@ partial def parseTargets.go
     (args : List String) (targets : Array Vir.GeneratePackage.Target) :
     Except String (Array Vir.GeneratePackage.Target) := do
   let flagText :: rest := args | return targets
-  let some (flag, kind) := TargetFlag.parse? flagText
+  let some flag := TargetFlag.parse? flagText
     | throw s!"expected {TargetFlag.alternatives}, got `{flagText}`"
   let input :: rest := rest
-    | throw s!"{flag.option kind} is missing its source or module argument"
+    | throw s!"{flag.option} is missing its module argument"
   if input.startsWith "--" then
-    throw s!"{flag.option kind} is missing its source or module argument"
-  let origin ← match kind with
-    | .source => pure (PackageTargetOrigin.source input)
-    | .module => do pure (PackageTargetOrigin.module (← Vir.parseDottedName input))
+    throw s!"{flag.option} is missing its module argument"
+  if input.endsWith ".lean" || input.contains '/' || input.contains '\\' then
+    throw s!"expected a module identity, not source path `{input}`"
+  let origin := PackageTargetOrigin.module (← Vir.parseDottedName input)
   let (mode, remaining) ← match flag with
     | .all => pure (TargetMode.all, rest)
     | .marked => pure (TargetMode.marked, rest)
@@ -105,5 +94,5 @@ unsafe def main (args : List String) : IO UInt32 := do
               IO.eprintln err
               return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module> | --target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
       return 2

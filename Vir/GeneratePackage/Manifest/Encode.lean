@@ -68,7 +68,6 @@ def PackageDiagnostic.toJson (diagnostic : PackageDiagnostic) : String :=
 
 def PackageTargetMetadata.toJson (target : PackageTargetMetadata) : String :=
   let origin := match target.origin with
-    | .source path => ("source", jsonString path)
     | .snapshot document _ => ("source", jsonString document)
     | .module name => ("module", jsonName name)
   jsonObject #[

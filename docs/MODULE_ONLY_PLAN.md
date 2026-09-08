@@ -1,7 +1,8 @@
 # Module-Only Package Inputs
 
-Status: input model, compiled-module adapter, browser and runtime-test producers
-migrated locally; remaining adapters and source-loader removal are TODO. Baseline: PR #166,
+Status: both module adapters and in-branch consumers migrated and validated locally;
+package source-loader/alias/fallback removal is complete. External acceptance and
+cross-lane combination remain separately scoped below. Baseline: PR #166,
 landed as `57c95a21895a8ddde5098a00ccd47b634fce1b64`.
 
 ## Objective
@@ -56,15 +57,14 @@ loaded runtime IR with ordinary module entries, preferring runtime bodies over
 opaque entries; all-public selection excludes private/generated declarations.
 Wire marked-module metadata remains unchanged.
 
-Source flags, source elaboration and Lake's non-module fallback intentionally
-remain until consumers migrate. The infoview change in this slice is only the
-mechanical source-origin constructor update; it still consumes `snap.env`.
+The first slice temporarily retained source flags and Lake's non-module fallback
+while consumers migrated. They are now removed; snapshots have their own typed
+origin and never enter compiled-module acquisition.
 
 Compiled acquisition now calls Lean's direct import API instead of parsing an
 internal `import all` program. Explicit exported-level imports preserve private
 target IR and module-system restrictions; regression checks reject compiled
-non-module inputs and missing modules. The remaining source frontend is only
-the transitional source adapter, not part of compiled-module acquisition.
+non-module inputs and missing modules. The package source frontend has been deleted.
 
 The public npm CLI and version-2 package configs now use explicit module names.
 A shared pure normalizer owns validation, selection and
@@ -186,19 +186,19 @@ production input systems.
 1. [x] Separate input identity from selection and reuse the common prepared
    `DeclIndex`. Add focused tests for module-owned versus imported roots and
    preserve snapshot-local declarations when moving constructors.
-2. [ ] Complete the compiled-module-only boundary:
+2. [x] Complete the compiled-module-only boundary:
 
    - [x] Implement the compiled-module adapter and migrate Lake's module path.
    - [x] Remove generated driver files and test no source-body re-elaboration.
-   - [ ] Reject non-module inputs after the consumers below have migrated.
+   - [x] Reject non-module inputs after the consumers below have migrated.
 
-3. [ ] Migrate shared producer/config helpers, repository examples and fixture
+3. [x] Migrate shared producer/config helpers, repository examples and fixture
    modules. Preserve multi-module bundled output; module-only inputs do not
    imply a universal change to output partitioning.
 
    - [x] Migrate public npm CLI/configs and register their example modules.
    - [x] Migrate browser package assembly and authored browser fixture modules.
-   - [ ] Migrate generated/runtime fixture inputs and remaining adapters.
+   - [x] Migrate generated/runtime fixture inputs and remaining adapters.
 4. [x] Migrate test generation and host oracles through a shared module-project
    helper. Keep tests intended to fail Lean elaboration separate from tests
    intended to fail VIR package validation. Preserve the oracle's
@@ -210,16 +210,35 @@ production input systems.
    - [x] Migrate runtime direct-generator and negative tests, checking both
      live and compiled marker-removal semantics.
    - [x] Migrate the existing client-native fixture project and package checks.
-5. [ ] Migrate infoview, type-anchor and external-producer adapters after
+5. [x] Migrate infoview, type-anchor and external-producer adapters after
    coordinating the affected boundaries. Do not silently rebuild an external
    workload under VIR's unrelated project environment.
-6. [ ] Remove dead source loaders, path aliases/caches, legacy ownership and
+6. [x] Remove dead source loaders, path aliases/caches, legacy ownership and
    initialization-order special cases once both adapters express ownership
    correctly. Update CLI/config validation and error messages.
-7. [ ] Update user guides and examples, run the acceptance checks below, and
+7. [x] Update user guides and examples, run the focused in-branch acceptance checks below, and
    review the final diff specifically for leftover migration bridges.
 
 ## Acceptance And Corner Cases
+
+External compression acceptance at lean-zip module-port checkpoint
+`d11d66c56ed114a7feab9ffda43b1b66ed50a7c7` is blocked by its pinned
+`4.33.0-rc1` versus VIR's `4.33.0`; the adapter rejects that mismatch before
+building. Await a matching maintainer-owned checkpoint, without rewriting
+dependency pins. This does not block removal of VIR's source loader.
+
+Local acceptance includes a clean generator/infoview dependency build, package
+tooling tests, downstream Lake/facet/cache tests (fresh non-module rejection and
+module-to-nonmodule invalidation), module/CLI/project and package-generation
+runtime checks, and unsaved snapshot execution. Snapshot partition checks
+preserve every declaration/initializer exactly once, including a private
+initialized global owned by the live root. This is focused local evidence, not
+a claim that a combined RPC/lifetime stack or the full CI matrix has run.
+
+RPC/lifetime fixtures on other branches have separate owner-coordinated
+combination plans. Their old acceptance does not validate the new live-header
+policy. Independent analysis-only source frontends and historical benchmark
+producers are outside this package-input migration.
 
 | Concern | Required evidence |
 | --- | --- |
