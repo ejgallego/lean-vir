@@ -60,6 +60,12 @@ Source flags, source elaboration and Lake's non-module fallback intentionally
 remain until consumers migrate. The infoview change in this slice is only the
 mechanical source-origin constructor update; it still consumes `snap.env`.
 
+Compiled acquisition now calls Lean's direct import API instead of parsing an
+internal `import all` program. Explicit exported-level imports preserve private
+target IR and module-system restrictions; regression checks reject compiled
+non-module inputs and missing modules. The remaining source frontend is only
+the transitional source adapter, not part of compiled-module acquisition.
+
 The public npm CLI and version-2 package configs now use explicit module names.
 A shared pure normalizer owns validation, selection and
 output defaults; Lake builds the selected modules and supplies their search

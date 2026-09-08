@@ -33,15 +33,19 @@ unsafe def frontendEnv (source : System.FilePath) : IO Environment := do
   | some env => return env
   | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
 
-unsafe def frontendImportedModuleEnv (moduleName : Name) : IO Environment := do
+unsafe def importModuleEnv (moduleName : Name) : IO Environment := do
+  -- Match `module; import all M` without parsing or elaborating a driver.
+  -- Init's runtime and meta imports are implicit in a non-prelude Lean header.
+  -- The exported level is essential: the default private level disables the
+  -- module system and would silently accept legacy inputs.
   enableInitializersExecution
-  let contents := s!"module\nimport all {moduleName}\n"
   let opts := Elab.async.set ({} : Options) false
-  let fileName := s!"<VIR imported module {moduleName}>"
-  let driverModule := .str (.str `VirIRInput moduleName.toString) "Generated"
-  match ← Elab.runFrontend contents opts fileName driverModule with
-  | some env => return env
-  | none => throw <| IO.userError s!"Lean frontend failed while importing all IR for `{moduleName}`"
+  let env ← importModules #[
+    { module := `Init },
+    { module := `Init, isMeta := true },
+    { module := moduleName, importAll := true, isExported := false }
+  ] opts (loadExts := true) (level := .exported)
+  return env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated")
 
 def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name := do
   let moduleIdx ← env.getModuleIdxFor? name
@@ -155,7 +159,7 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     let display := origin.display
     let env ← match origin with
       | .source path => frontendEnv path
-      | .module name => frontendImportedModuleEnv name
+      | .module name => importModuleEnv name
     let mut names : Array Name := #[]
     for decl in declarationsForOrigin origin env do
       if !sourceTargets.any (fun target => targetOwnsDecl target env decl.name) then
@@ -314,7 +318,7 @@ def DeclIndex.moduleInitializationOrderForTarget?
 unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) : IO DeclIndex := do
   if index.loadedModules.contains moduleName then
     return index
-  let env ← frontendImportedModuleEnv moduleName
+  let env ← importModuleEnv moduleName
   let source := s!"module {moduleName}"
   let mut index := {
     index with

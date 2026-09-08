@@ -13,6 +13,8 @@ import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 import { readIrPackageInfo } from "../../web/src/runtime/ir-package.js";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { createTestModuleProject } from "../support/module-project.mjs";
+import { virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
 
 const moduleName = "ModuleSetFixture.InputSelection";
 const selected = `${moduleName}.selected`;
@@ -144,8 +146,30 @@ try {
     ]);
     assert.equal(result.status, 2, `${result.stdout}\n${result.stderr}`);
   }
+  // Direct Lean import defaults to legacy visibility unless the caller opts
+  // into the module system. A compiled .olean alone must not be sufficient.
+  const legacy = await createTestModuleProject({
+    directory: join(scratch, "legacy-project"),
+    modules: { LegacyInput: "def legacyAnswer : Nat := 42\n" },
+  });
+  success(legacy.build());
+  for (const [name, diagnostic] of [
+    ["LegacyInput", /cannot import non-`module` LegacyInput from `module`/],
+    ["MissingInput", /unknown module prefix 'MissingInput'/],
+  ]) {
+    const output = join(scratch, `${name}.irpkg`);
+    const result = spawnSync(
+      virIrpkgPath,
+      [output, join(scratch, `${name}.report.md`), "--target-all-module", name],
+      { cwd: legacy.directory, env: legacy.env(), encoding: "utf8" },
+    );
+    assert.notEqual(result.status, 0);
+    assert.ifError(result.error);
+    assert.match(result.stdout + result.stderr, diagnostic);
+    await assert.rejects(readFile(output), { code: "ENOENT" });
+  }
   console.log(
-    "module input smoke ok: selection, provenance, reuse, no source re-elaboration",
+    "module input smoke ok: selection, provenance, reuse, no source re-elaboration, non-module and missing-module rejection",
   );
 } finally {
   await rm(scratch, { recursive: true, force: true });

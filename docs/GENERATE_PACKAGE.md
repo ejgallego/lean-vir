@@ -30,10 +30,16 @@ inputs are built by Lake before invoking the generator:
   excluding markers owned by dependencies. The internal `--module-set-output`
   arguments provide descriptor and shard destinations to the Lake `:vir` facet.
 
-Module inputs load compiled IR directly through an internal import environment;
-they take no driver source path and do not re-elaborate module bodies. Explicit
+Module inputs load compiled IR through Lean's direct `importModules` API;
+they neither parse a generated driver nor re-elaborate module bodies. Explicit
 roots may intentionally name imported declarations. Each module is acquired
 once per generator invocation even when multiple selections refer to it.
+The loader preserves `module; import all M` semantics: ordinary/meta `Init`
+imports, private target IR, persistent extensions and module-system visibility.
+It explicitly requests the exported import level; Lean's default private level
+would bypass module restrictions. Non-module inputs and missing artifacts fail
+with Lean's import error. No frontend-only lint warnings are produced for this
+internal import context.
 
 Source-file adapters remain during the migration described in
 [MODULE_ONLY_PLAN.md](MODULE_ONLY_PLAN.md):
@@ -106,7 +112,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.ExternFallback`: the explicit `vir_extern_fallback` command, transparent
   extern-body cloning, and direct-recursion rejection used by portable package
   sources.
-- `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
+- `Vir.GeneratePackage.Frontend`: transitional source elaboration, `DeclIndex` construction,
   marker collection, extern-fallback ownership adapters,
   declaration-to-module ownership, on-demand `import all` environments, module
   filtering, and declaration-name collision diagnostics.
@@ -151,7 +157,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 1. The CLI turns each target argument into a `Target` with origin and selection.
 2. Source adapters use `Frontend.frontendEnv` to elaborate sources unchanged
    with async elaboration disabled. Module adapters use
-   `frontendImportedModuleEnv` to acquire already-compiled declarations.
+   `importModuleEnv` to acquire already-compiled declarations without a frontend.
    Source commands such as `#eval` execute during source elaboration, not when
    generating a package from compiled modules.
 3. `Frontend.loadDeclIndex` records each input environment, input-owned IR
