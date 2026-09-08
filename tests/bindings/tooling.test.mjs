@@ -154,7 +154,7 @@ test("binding entry points own help and error exit status", () => {
     ["generate-binding-explorer.mjs", /Generate the consolidated Lean VIR upstream reference, shipped inventory, and author actions/u],
     ["generate-shipped-bindings-report.mjs", /Reconcile compiler-derived JavaScript bindings/u],
     ["generate-lean-bindings.mjs", /Generate faithful Lean host declarations/u],
-    ["generate-lean-type-anchor-manifest.mjs", /Generate a checked-in interface manifest fixture/u],
+    ["generate-lean-type-anchor-manifest.mjs", /Generate an interface manifest fixture from a compiled Lean module/u],
     ["generate-ts-descriptors.mjs", /Generate Lean VIR TypeScript descriptor JSON/u],
     ["render-type-anchors.mjs", /Render a Verso\/Blueprint-friendly Markdown fragment/u],
     ["check-type-anchors.mjs", /Compare TypeScript descriptor JSON with Lean VIR interface descriptors/u],

@@ -98,10 +98,19 @@ inventory carries the compiler-derived function interface used for comparison;
 unsupported generic entries remain inventoried with `interface: null`.
 
 The local `build/type-descriptors/vir-v1.manifest.json` fixture is generated
-from `vir-v1.fixture.lean` through the real package generator. It now supplies
+from the Lake module `TypeAnchorFixture` in
+`fixtures/type-anchors/TypeAnchorFixture.lean` through the real package generator. It now supplies
 only reviewed shapes that do not have a directly classifiable shipped public
 declaration. The manifest, inventory, intermediate `.irpkg`, and generator
 report all stay under ignored `build/` paths.
+
+The standalone producer takes `--module TypeAnchorFixture`, builds that module
+with Lake, and packages the explicit names in `vir-v1.roots.txt`. It does not
+accept source-file inputs or re-elaborate the fixture during packaging. Export
+and host-import provenance names the module; the reviewed alias retains an
+authored-file path for source navigation. `--check` verifies repeatable manifest
+output without rewriting it. Module provenance and aliases are retained as-is,
+without a synthetic timestamp or filesystem normalization of module labels.
 
 Anchors classify each relation as either `audit` or `coverageGap`. They may
 also carry a reviewed `portIntent` object. The first React DOM API-group intent
@@ -162,7 +171,7 @@ outputs directly.
 | Slice | Authored inputs | Generated outputs |
 | --- | --- | --- |
 | Shipped generated DOM bindings | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | checked-in `Vir/Browser/Generated.lean`; ignored `build/bindings/browser.generated-operations.json` |
-| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`; explicit renderer commands may also produce `vir-v1.anchors.md` and `vir-v1.anchors.html` |
+| Core fixture | `fixtures/type-anchors/vir-v1.types.d.ts`, `vir-v1.anchors.json`, `TypeAnchorFixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `build/type-descriptors/vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`; explicit renderer commands may also produce `vir-v1.anchors.md` and `vir-v1.anchors.html` |
 | Shipped public Lean surface | Compiled `Vir` and `Vir.Infoview` modules | `build/type-descriptors/vir-js-shipped-v1.lean.json` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/document-v1.json`, `document-v1.report.json` |
 | DOM Element | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts`, shipped public inventory | `build/type-descriptors/element-v1.json`, `element-v1.report.json` |

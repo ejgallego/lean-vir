@@ -6,24 +6,28 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
 } from "../packages/irpkg-generator.mjs";
+import {
+  assertDistinctModulePackageOutputs,
+  normalizeModulePackageConfig,
+} from "../packages/module-package-config.mjs";
 import { readIrPackageFile } from "../packages/irpkg-format.mjs";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
 
 function usage() {
-  console.log(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --source FILE --roots FILE --out FILE [options]
+  console.log(`usage: node scripts/bindings/generate-lean-type-anchor-manifest.mjs --module NAME --roots FILE --out FILE [options]
 
-Generate a checked-in interface manifest fixture through the real VIR package
-generator. Generated .irpkg and report files stay under build/.
+Generate an interface manifest fixture from a compiled Lean module through
+the real VIR package generator. Generated artifacts normally stay under build/.
 
 Options:
-  --source FILE   Lean source containing descriptor-forcing wrappers.
+  --module NAME   Lake module containing descriptor-forcing wrappers.
   --roots FILE    Root declaration names, one per line.
   --aliases FILE  Reviewed Lean type aliases to add to manifest metadata.
   --out FILE      Write normalized manifest JSON to FILE.
@@ -35,7 +39,7 @@ Options:
 }
 
 function parseArgs(argv) {
-  let source = null;
+  let module = null;
   let roots = null;
   let aliases = null;
   let out = null;
@@ -49,8 +53,8 @@ function parseArgs(argv) {
       case "--help":
         usage();
         return null;
-      case "--source":
-        source = resolve(root, requiredValue(argv, ++index, "--source"));
+      case "--module":
+        module = requiredValue(argv, ++index, "--module");
         break;
       case "--roots":
         roots = resolve(root, requiredValue(argv, ++index, "--roots"));
@@ -74,13 +78,12 @@ function parseArgs(argv) {
         throw new Error(`unknown option ${arg}`);
     }
   }
-  if (source === null) throw new Error("--source is required");
+  if (module === null) throw new Error("--module is required");
   if (roots === null) throw new Error("--roots is required");
   if (out === null) throw new Error("--out is required");
   const stem = basename(out).replace(/\.manifest\.json$/u, "");
   packagePath ??= resolve(root, "build/type-descriptors", `${stem}.irpkg`);
-  report ??= packagePath.replace(/\.irpkg$/u, ".report.md");
-  return { source, roots, aliases, out, packagePath, report, check };
+  return { module, roots, aliases, out, packagePath, report, check };
 }
 
 export async function runTypeAnchorManifestCli(argv) {
@@ -91,21 +94,33 @@ export async function runTypeAnchorManifestCli(argv) {
     throw new Error(`${relative(root, cli.roots)} has no roots`);
   }
   const aliases = cli.aliases === null ? [] : await readAliases(cli.aliases);
+  const config = normalizeModulePackageConfig({
+    version: 2,
+    module: cli.module,
+    roots,
+    package: cli.packagePath,
+    ...(cli.report === null ? {} : { report: cli.report }),
+  });
+  assertDistinctModulePackageOutputs([config], root);
+  const { packagePath, reportPath, targetArgs } = config;
+  if (
+    [packagePath, reportPath].some((path) => resolve(root, path) === cli.out)
+  ) {
+    throw new Error(
+      "manifest output must differ from package and report paths",
+    );
+  }
 
-  const generator = prepareVirIrpkgSync(root);
+  const generator = prepareVirIrpkgSync(root, {
+    lakeTargets: [`+${config.module}`],
+  });
   if (!generator.ok) throw new Error(irpkgGeneratorFailureMessage(generator));
 
-  await mkdir(dirname(cli.packagePath), { recursive: true });
-  await mkdir(dirname(cli.report), { recursive: true });
+  await mkdir(dirname(packagePath), { recursive: true });
+  await mkdir(dirname(reportPath), { recursive: true });
   const result = spawnSync(
     generator.path,
-    [
-      cli.packagePath,
-      cli.report,
-      "--target",
-      repoRelativePath(cli.source),
-      ...roots,
-    ],
+    [packagePath, reportPath, ...targetArgs],
     {
       cwd: root,
       env: generator.env,
@@ -117,11 +132,11 @@ export async function runTypeAnchorManifestCli(argv) {
     process.stderr.write(result.stderr);
     process.stdout.write(result.stdout);
     throw new Error(
-      `Lean anchor package generation failed; see ${relative(root, cli.report)}`,
+      `Lean anchor package generation failed; see ${relative(root, reportPath)}`,
     );
   }
 
-  const info = await readIrPackageFile(cli.packagePath);
+  const info = await readIrPackageFile(packagePath);
   const manifest = normalizeTypeAnchorManifest(info.manifest, aliases);
   const text = `${JSON.stringify(manifest, null, 2)}\n`;
   const action = await emitGeneratedFile(cli.out, text, {
@@ -151,33 +166,13 @@ async function readAliases(path) {
 }
 
 export function normalizeTypeAnchorManifest(manifest, aliases) {
-  const metadata = { ...manifest.metadata };
-  if (Array.isArray(metadata.targets)) {
-    metadata.targets = metadata.targets.map((target) => ({
-      ...target,
-      ...(typeof target.source === "string"
-        ? { source: repoRelativePath(target.source) }
-        : {}),
-    }));
-  }
-  if (aliases.length !== 0) metadata.typeAnchorAliases = aliases;
+  // Compiled provenance is already location-independent. It names modules,
+  // not filesystem paths to canonicalize or reinterpret as source links.
   return {
     ...manifest,
-    metadata,
-    exports: (manifest.exports ?? []).map(normalizeSourceField),
-    hostImports: (manifest.hostImports ?? []).map(normalizeSourceField),
+    metadata: {
+      ...manifest.metadata,
+      ...(aliases.length === 0 ? {} : { typeAnchorAliases: aliases }),
+    },
   };
-}
-
-function normalizeSourceField(entry) {
-  return {
-    ...entry,
-    ...(typeof entry.source === "string"
-      ? { source: repoRelativePath(entry.source) }
-      : {}),
-  };
-}
-
-function repoRelativePath(path) {
-  return relative(root, isAbsolute(path) ? path : resolve(root, path));
 }

@@ -64,6 +64,11 @@ lean_lib VirInfoviewFixtures where
   srcDir := "fixtures/infoview"
   roots := #[`InfoviewFixtures.ImportedHelper]
 
+/-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
+lean_lib VirTypeAnchorFixtures where
+  srcDir := "fixtures/type-anchors"
+  roots := #[`TypeAnchorFixture]
+
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage
   supportInterpreter := true
