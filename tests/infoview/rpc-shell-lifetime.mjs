@@ -38,9 +38,8 @@ function replaceOnce(source, before, after) {
 async function main() {
   // No copied Lean program or simulated package: the server imports these exact
   // existing fixtures and the real shell invokes statIRPackage/buildIRPackage.
-  run(["build", "VirInfoview"]);
+  run(["build", "VirInfoview", "+ShellLifetime"]);
   for (const fixture of [
-    "fixtures/runtime/ShellLifetime",
     "fixtures/infoview/RpcBrowserServer",
   ]) {
     const output = join(root, ".lake/build/lib/lean", `${fixture}.olean`);

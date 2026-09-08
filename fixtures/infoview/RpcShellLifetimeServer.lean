@@ -4,8 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import fixtures.infoview.RpcBrowserServer
-import fixtures.runtime.ShellLifetime
+module
+
+meta import fixtures.infoview.RpcBrowserServer
+import ShellLifetime
 
 -- Reuse the actual RPC methods and Lean stale-guard component unchanged.
 -- The browser asks the server to package these roots from this live snapshot.

@@ -4,29 +4,35 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Infoview
+module
+
+public import Vir.Infoview
+public meta import Vir.Infoview
+public meta import Lean.Server.FileWorker.RequestHandling
+
+public section
 
 namespace RpcBrowserServer
 
 open Lean Server
 
-structure Payload where
+meta structure Payload where
   message : String
   deriving TypeName
 
-structure Query where
+meta structure Query where
   message : String
   waitForCancellation : Bool
   fail : Bool
   deriving RpcEncodable
 
-structure Reply where
+meta structure Reply where
   message : String
   ref : WithRpcRef Payload
   deriving RpcEncodable
 
 @[server_rpc_method]
-def create (query : Query) : RequestM (RequestTask Reply) := RequestM.asTask do
+meta def create (query : Query) : RequestM (RequestTask Reply) := RequestM.asTask do
   -- This test mode cannot finish before cancellation, regardless of scheduling.
   while query.waitForCancellation do
     RequestM.checkCancelled
@@ -35,26 +41,26 @@ def create (query : Query) : RequestM (RequestTask Reply) := RequestM.asTask do
     throw (RequestError.invalidParams "RPC example rejection")
   return { message := query.message, ref := ← WithRpcRef.mk { message := query.message } }
 
-structure RefQuery where
+meta structure RefQuery where
   ref : WithRpcRef Payload
   deriving RpcEncodable
 
 @[server_rpc_method]
-def read (query : RefQuery) : RequestM (RequestTask String) :=
+meta def read (query : RefQuery) : RequestM (RequestTask String) :=
   RequestM.pureTask (pure query.ref.val.message)
 
 /-- A display snapshot, not an elaborator-owned expression/context pair. -/
-structure GoalSnapshot where
+meta structure GoalSnapshot where
   target : String
   hypotheses : Array String
   deriving RpcEncodable, TypeName
 
-structure GoalQuery where
+meta structure GoalQuery where
   pos : Lsp.Position
   deriving RpcEncodable
 
 @[server_rpc_method]
-def goalAt (query : GoalQuery) : RequestM (RequestTask (Option (WithRpcRef GoalSnapshot))) := do
+meta def goalAt (query : GoalQuery) : RequestM (RequestTask (Option (WithRpcRef GoalSnapshot))) := do
   let doc ← RequestM.readDoc
   let task ← Server.FileWorker.getInteractiveGoals {
     textDocument := { uri := doc.meta.uri }, position := query.pos }
@@ -68,12 +74,12 @@ def goalAt (query : GoalQuery) : RequestM (RequestTask (Option (WithRpcRef GoalS
           s!"{String.intercalate " " hyp.names.toList} : {hyp.type.stripTags}"
       : GoalSnapshot })
 
-structure GoalRefQuery where
+meta structure GoalRefQuery where
   ref : WithRpcRef GoalSnapshot
   deriving RpcEncodable
 
 @[server_rpc_method]
-def readGoal (query : GoalRefQuery) : RequestM (RequestTask GoalSnapshot) :=
+meta def readGoal (query : GoalRefQuery) : RequestM (RequestTask GoalSnapshot) :=
   RequestM.pureTask (pure query.ref.val)
 
 -- rpc-position-a

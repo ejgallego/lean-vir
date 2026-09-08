@@ -275,8 +275,8 @@ changes; `package.json` remains the exact command-order source of truth.
   assert automatic lease-counter cleanup or a Wasm memory-capacity plateau.
 - Infoview shell normal unmount/refresh and failure teardown with actual React,
   real Lean continuation bodies/stale guards and mocked asset/package RPC:
-  `lake build VirInfoview vir_irpkg`, then
-  `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target fixtures/runtime/ShellLifetime.lean Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
+  `lake build VirInfoview vir_irpkg +ShellLifetime`, then
+  `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target-module ShellLifetime Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
   then `CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs`.
   The focused probe needs the matching `web/public/vir-upstream.wasm` and npm
   dependencies, but no site build. It checks G1/G2 isolation, delayed success/
@@ -476,7 +476,9 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
 `npm run test:infoview:browser` is the focused real-server RPC acceptance check.
-It builds the current infoview imports and the small RPC example package, then
+It builds the current infoview imports and registered `tutorials.RpcReferenceWidget`
+module, selecting its six unchanged `RpcReferenceWidget` exports (`request`,
+`reference`, `readReference`, `message`, `View`, `render`) into a bundled package, then
 uses `web/public/vir-upstream.wasm`, official React, the pinned infoview RPC
 client, and a real `lake serve` process in Chromium. It does not need a site
 build. If the Wasm artifact is missing or its producer changed, first build the
@@ -484,7 +486,13 @@ matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
 
 `CHROMIUM=/path/to/chromium node tests/infoview/rpc-shell-lifetime.mjs`
 checks the actual infoview shell against a real Lean server. It builds infoview
-imports and two existing test modules in the checkout's private Lake output;
+imports and the registered `ShellLifetime` module through Lake, then compiles
+native `RpcBrowserServer` support with all generated artifact siblings into
+the checkout's private Lake output. Both live server documents use `module`;
+the shell document imports the public/meta RPC support via `meta import` and
+the runtime component via ordinary `import ShellLifetime`. RPC method bodies,
+goal positions and live document provenance are unchanged. Native support stays
+available to the server without contributing handlers to the selected runtime closure;
 the shell obtains Wasm and generated packages through the real asset/package
 RPC methods. A matching `web/public/vir-upstream.wasm` is required. No site build
 or tutorial migration is needed.
