@@ -1,4 +1,8 @@
-import Vir.Infoview
+module
+
+public import Vir.Infoview
+
+public section
 
 namespace Vir.Fixtures.InfoviewRpcPromise
 

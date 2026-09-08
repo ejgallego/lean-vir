@@ -16,17 +16,24 @@ import {
   readFile,
   readRuntimeArtifacts,
   runVirIrpkg,
+  spawnSync,
 } from "./shared.mjs";
 
 const tempDir = await mkdtemp(join(tmpdir(), "lean-vir-infoview-rpc-"));
 
 try {
+  const built = spawnSync("lake", ["build", "+InfoviewRpcPromise"], {
+    cwd: new URL("../../", import.meta.url),
+    encoding: "utf8",
+  });
+  assert.equal(built.status, 0, built.stderr || built.stdout);
+
   const packagePath = join(tempDir, "infoview-rpc-promise.irpkg");
   const generated = runVirIrpkg([
     packagePath,
     join(tempDir, "infoview-rpc-promise.report.md"),
-    "--target",
-    "fixtures/runtime/InfoviewRpcPromise.lean",
+    "--target-module",
+    "InfoviewRpcPromise",
     "Vir.Fixtures.InfoviewRpcPromise.callExact",
     "Vir.Fixtures.InfoviewRpcPromise.callSurfaceExact",
     "Vir.Fixtures.InfoviewRpcPromise.callMessage",
