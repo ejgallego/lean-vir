@@ -25,7 +25,12 @@ import {
   evaluate,
 } from "../browser/harness.mjs";
 import { prepareVirIrpkgSync } from "../../scripts/packages/irpkg-generator.mjs";
-import { describeError, withCleanup } from "./rpc-test-support.js";
+import {
+  describeError,
+  fixturePosition,
+  withCleanup,
+} from "./rpc-test-support.js";
+import { finishLeanProcess } from "./rpc-process-test-support.mjs";
 
 // Test-only transport. The official RpcSessions implementation lives in the
 // browser; vscode-jsonrpc owns framing and cancellation over the real Lean LSP.
@@ -33,10 +38,10 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const sourcePath = join(root, "fixtures/infoview/RpcBrowserServer.lean");
 const uri = pathToFileURL(sourcePath).href;
 const source = await readFile(sourcePath, "utf8");
-const position = (marker) => ({
-  line: source.split("\n").findIndex((line) => line.includes(marker)) + 2,
-  character: 2,
-});
+const positions = {
+  a: fixturePosition(source, "rpc-position-a"),
+  b: fixturePosition(source, "rpc-position-b"),
+};
 const temp = await mkdtemp(join(tmpdir(), "vir-rpc-browser-"));
 let child, connection, server, chrome, cdp;
 const keepalives = new Map();
@@ -136,8 +141,7 @@ await withCleanup(async () => {
   const config = {
     uri,
     capabilities: initialized.capabilities,
-    a: position("rpc-position-a"),
-    b: position("rpc-position-b"),
+    ...positions,
   };
   const assets = new Map([
     [
@@ -257,7 +261,7 @@ await withCleanup(async () => {
     ),
     JSON.stringify(diagnostics),
   );
-  console.log("real infoview RPC browser acceptance ok", result.value);
+  return result.value;
 }, [
   ["deadline", () => clearTimeout(deadline)],
   [
@@ -314,22 +318,14 @@ await withCleanup(async () => {
     },
   ],
   ["Lean stdin", () => child?.stdin.end()],
-  [
-    "Lean process",
-    async () => {
-      if (child && child.exitCode === null && child.signalCode === null) {
-        await Promise.race([
-          new Promise((resolve) => child.once("exit", resolve)),
-          new Promise((resolve) => setTimeout(resolve, 2000)),
-        ]);
-        if (child.exitCode === null && child.signalCode === null)
-          child.kill("SIGTERM");
-      }
-    },
-  ],
+  ["Lean process", () => finishLeanProcess(child)],
   ["LSP connection", () => connection?.dispose()],
   ["temporary files", () => rm(temp, { recursive: true, force: true })],
-]).catch((error) => {
-  console.error(JSON.stringify(describeError(error), null, 2));
-  process.exitCode = 1;
-});
+])
+  .then((result) => {
+    console.log("real infoview RPC browser acceptance ok", result);
+  })
+  .catch((error) => {
+    console.error(JSON.stringify(describeError(error), null, 2));
+    process.exitCode = 1;
+  });

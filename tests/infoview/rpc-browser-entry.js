@@ -41,6 +41,9 @@ async function run() {
   const requests = [];
   const unexpected = [];
   const notifications = new Set();
+  // Hold the first replay's actual transport outcome until its successor renders.
+  const replayGate = Promise.withResolvers();
+  let replayRequestId;
   const onUnhandled = (event) => unexpected.push(event.reason);
   const onError = (event) => unexpected.push(event.error ?? event.message);
   globalThis.addEventListener("unhandledrejection", onUnhandled);
@@ -74,11 +77,14 @@ async function run() {
       async call(params, options) {
         const id = ++nextId;
         const record = {
+          id,
           message: params.params?.message,
           cancelled: false,
           settled: false,
         };
         requests.push(record);
+        if (record.message === "strict replay" && replayRequestId === undefined)
+          replayRequestId = id;
         const promise = post("/call", { id, params });
         const cancel = () => {
           record.cancelled = true;
@@ -94,6 +100,8 @@ async function run() {
           record.error = error;
           throw error;
         } finally {
+          record.received = true;
+          if (id === replayRequestId) await replayGate.promise;
           record.settled = true;
           options?.abortSignal?.removeEventListener("abort", cancel);
         }
@@ -167,6 +175,67 @@ async function run() {
     const text = () => document.body.textContent;
     const status = () =>
       document.querySelector("[data-rpc-status]")?.dataset.rpcStatus;
+    // Exercise the actual tutorial effect under official Strict Mode. Repeated
+    // setups have identical query text but distinct request and response objects.
+    let renderedReply;
+    const observedRuntime = {
+      call(entry, ...args) {
+        if (entry === "RpcReferenceWidget.render") renderedReply = args[1];
+        return runtime.call(entry, ...args);
+      },
+    };
+    React.act(() =>
+      root.render(
+        React.createElement(
+          React.StrictMode,
+          null,
+          React.createElement(RpcReferenceWidget, {
+            runtime: observedRuntime,
+            view: component,
+            session: a,
+            query: query("strict replay"),
+          }),
+        ),
+      ),
+    );
+    await React.act(async () => {
+      await until("Strict Mode successor settled", () => {
+        const replayed = requests.filter(
+          (record) => record.message === "strict replay",
+        );
+        return (
+          replayed.length === 2 && replayed[0].received && replayed[1].settled
+        );
+      });
+    });
+    const [abandoned, successor] = requests.filter(
+      (record) => record.message === "strict replay",
+    );
+    check(
+      abandoned.id !== successor.id &&
+        abandoned.cancelled &&
+        !abandoned.settled,
+      "Strict Mode cleanup aborts its own outstanding request",
+    );
+    check(
+      status() === "ready" && renderedReply === successor.value,
+      "Strict Mode successor publishes its exact response",
+    );
+    React.act(() => document.getElementById("rpc-reference-view").click());
+    await React.act(async () => {
+      replayGate.resolve();
+      await until(
+        "abandoned Strict Mode outcome delivered",
+        () => abandoned.settled,
+      );
+    });
+    check(
+      status() === "ready" &&
+        renderedReply === successor.value &&
+        text().includes("local 1"),
+      "abandoned replay cannot publish a response or error over its successor",
+    );
+    React.act(() => root.render(null));
     let goal;
     // Also exercise loading before the first genuine reply: no placeholder Reply.
     await gate("arm", "first");
@@ -339,9 +408,11 @@ async function run() {
       cancellations: requests.filter((record) => record.error?.code === -32800)
         .length,
       realReference: goal.target,
+      strictReplayRequests: [abandoned.id, successor.id],
       requests: requests.length,
     };
   }, [
+    ["replay response gate", () => replayGate.resolve()],
     ["React root", unmount],
     ["VIR runtime", () => runtime?.dispose()],
     ["RPC sessions", () => sessions?.dispose()],

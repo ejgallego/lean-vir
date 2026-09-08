@@ -4,6 +4,24 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+// Positions are zero-based LSP coordinates at the tactic below each marker.
+export function fixturePosition(source, marker) {
+  const lines = source.split("\n");
+  const matches = lines.flatMap((line, index) =>
+    line.trim() === `-- ${marker}` ? [index] : [],
+  );
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected one fixture marker ${marker}; found ${matches.length}`,
+    );
+  }
+  const line = matches[0] + 2;
+  if (!lines[line]?.trim()) {
+    throw new Error(`Missing tactic below fixture marker ${marker}`);
+  }
+  return { line, character: 2 };
+}
+
 // Test-only: preserve the acceptance failure and attempt every teardown step.
 export async function withCleanup(run, steps) {
   const errors = [];

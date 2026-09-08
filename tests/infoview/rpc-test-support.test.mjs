@@ -5,8 +5,117 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { EventEmitter, once } from "node:events";
 import { test } from "node:test";
-import { describeError, until, withCleanup } from "./rpc-test-support.js";
+import {
+  describeError,
+  fixturePosition,
+  until,
+  withCleanup,
+} from "./rpc-test-support.js";
+import { finishLeanProcess } from "./rpc-process-test-support.mjs";
+import { waitForChildExit } from "../browser/harness.mjs";
+
+test("Lean process cleanup awaits graceful exit and both signal fallbacks", async (t) => {
+  await finishLeanProcess(undefined);
+  for (const mode of ["graceful", "SIGTERM", "SIGKILL"]) {
+    await t.test(mode, async () => {
+      const child = spawn(
+        process.execPath,
+        [
+          "-e",
+          `
+        if (${JSON.stringify(mode)} === "SIGKILL") process.on("SIGTERM", () => {});
+        process.stdin.on("data", () => process.exit(0));
+        setInterval(() => {}, 1000);
+        process.stdout.write("ready");
+      `,
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      try {
+        await once(child.stdout, "data");
+        if (mode === "graceful") child.stdin.write("exit");
+        await finishLeanProcess(child, 100);
+        if (mode === "graceful") assert.equal(child.exitCode, 0);
+        else assert.equal(child.signalCode, mode);
+        assert.equal(child.listenerCount("exit"), 0);
+        await finishLeanProcess(child, 100);
+      } finally {
+        child.kill("SIGKILL");
+        assert.equal(await waitForChildExit(child, 2000), true);
+      }
+    });
+  }
+});
+
+test("Lean process cleanup fails if neither signal produces an exit", async () => {
+  const child = Object.assign(new EventEmitter(), {
+    pid: 123,
+    exitCode: null,
+    signalCode: null,
+  });
+  const signals = [];
+  child.kill = (signal) => signals.push(signal);
+  await assert.rejects(
+    finishLeanProcess(child, 1),
+    /did not exit after SIGKILL/,
+  );
+  assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
+  assert.equal(child.listenerCount("exit"), 0);
+});
+
+test("fixture positions require a unique marker and a following tactic", () => {
+  const source = "namespace Test\n-- target\nexample : True := by\n  trivial\n";
+  assert.deepEqual(fixturePosition(source, "target"), {
+    line: 3,
+    character: 2,
+  });
+  assert.throws(() => fixturePosition(source, "missing"), /missing; found 0/);
+  assert.throws(
+    () => fixturePosition(source + source, "target"),
+    /target; found 2/,
+  );
+  assert.throws(
+    () => fixturePosition("-- target\nexample : True := by\n", "target"),
+    /Missing tactic/,
+  );
+});
+
+test("success is published only after successful teardown", async () => {
+  const events = [];
+  const run = () =>
+    withCleanup(
+      () => "accepted",
+      [
+        [
+          "close",
+          async () => {
+            await Promise.resolve();
+            events.push("closed");
+          },
+        ],
+      ],
+    ).then((value) => events.push(value));
+  await run();
+  assert.deepEqual(events, ["closed", "accepted"]);
+  await assert.rejects(
+    withCleanup(
+      () => "accepted",
+      [
+        [
+          "close",
+          () => {
+            throw new Error("teardown failed");
+          },
+        ],
+      ],
+    ).then((value) => events.push(value)),
+    /Cleanup failed: close/,
+  );
+  assert.deepEqual(events, ["closed", "accepted"]);
+});
 
 test("cleanup attempts every step and preserves original and teardown failures", async () => {
   const original = new Error("acceptance failed");

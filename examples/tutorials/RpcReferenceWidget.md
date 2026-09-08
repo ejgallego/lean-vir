@@ -7,6 +7,14 @@ This two-file tutorial separates application effects from the Lean renderer:
 - [RpcReferenceWidget.lean](RpcReferenceWidget.lean) calls the session, projects
   exact response properties, and renders a child with ordinary React hook state.
 
+The JavaScript parent is a choice for this boundary-focused example, not a
+requirement that each VIR widget ship a handwritten JavaScript companion.
+It keeps pending continuations native, so they cannot enter Lean after runtime
+disposal. If an effect uses Lean-authored continuations, those must not enter a
+disposed runtime; aborting the server request alone is not that guarantee.
+Lean can also pass native functions directly to Promise operations. This tutorial
+does not yet demonstrate the fully Lean-authored asynchronous parent.
+
 The executable server example is [RpcBrowserServer.lean](../../fixtures/infoview/RpcBrowserServer.lean).
 Its `create` method returns a message and a genuine `Server.WithRpcRef` object;
 `read` accepts that exact reference back. The cancellation-only query mode and

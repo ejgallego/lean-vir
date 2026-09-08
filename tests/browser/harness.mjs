@@ -247,7 +247,7 @@ function childHasExited(child) {
   return child.pid === undefined || child.exitCode !== null || child.signalCode !== null;
 }
 
-async function waitForChildExit(child, timeoutMs) {
+export async function waitForChildExit(child, timeoutMs) {
   if (childHasExited(child)) return true;
   return new Promise((resolveExit) => {
     let settled = false;
