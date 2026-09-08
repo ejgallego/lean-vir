@@ -450,6 +450,27 @@ client, and a real `lake serve` process in Chromium. It does not need a site
 build. If the Wasm artifact is missing or its producer changed, first build the
 matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
 
+`CHROMIUM=/path/to/chromium node tests/infoview/rpc-shell-lifetime.mjs`
+checks the actual infoview shell against a real Lean server. It builds infoview
+imports and two existing test modules in the checkout's private Lake output;
+the shell obtains Wasm and generated packages through the real asset/package
+RPC methods. A matching `web/public/vir-upstream.wasm` is required. No site build
+or tutorial migration is needed.
+
+The test delays genuine server success and rejection until after owning-UI
+unmount or configuration replacement. Both enter the unchanged Lean fixture's
+stale guard; explicit runtime disposal instead rejects before body entry.
+An exact `WithRpcRef` round trip and live-generation mutation controls distinguish
+these cases. The infoview context accessor is injected with official
+position-specific sessions; transport, package generation, React, shell and
+Lean callbacks are real. This is not automatic polling-refresh or GC acceptance.
+The runner reports package/source/artifact hashes only after awaited cleanup.
+
+Both real-server runners share `tests/infoview/rpc-browser-harness.mjs` for LSP,
+cancellation, response gating, Chromium and teardown. Its focused success/error
+gate checks run with
+`node --test tests/infoview/rpc-browser-harness.test.mjs`.
+
 `CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs`
 is a separate manual characterization probe for the pinned upstream infoview
 async hooks. It requires neither Lean nor Wasm and prints controlled request,
