@@ -38,7 +38,10 @@ For a Lean-to-JavaScript host import:
 6. Successful lowering commits the transaction; failure rolls back any newly
    created active resource.
 
-Host imports are synchronous. A Promise result is rejected before commit.
+Host imports execute synchronously. A binding may return a native `Promise`
+only when the declared result is an exact `Js` resource: the Promise object is
+rooted and returned without awaiting it. Returning a Promise where VIR must
+lower a structural or immediate result is rejected before commit.
 
 ## JavaScript Values And Ownership
 
@@ -60,6 +63,21 @@ state:
 WeakMaps hide that association. Finalizers are a best-effort GC backstop;
 runtime disposal is the deterministic release boundary. Neither value exposes
 public retain/release methods.
+
+A live callback or JSL object strongly retains its original runtime. The global
+finalization registries hold only weak references to cleanup records; the
+runtime's callback set and host state's JSL set keep those records available
+while that generation remains owned. Weakening the entire JSL cell also avoids
+an indirect global anchor through its `onRelease` closure. This permits an
+otherwise unreachable whole generation, including table-to-target cycles, to
+be collected without weakening live values or exact externref slots.
+
+This is not a cross-heap cycle collector: an externally owned generation can
+still retain mixed Lean/JavaScript cycles through its table. Platform activities
+and binding maps that retain values can deliberately keep a generation alive.
+Collection timing, foreign-root release, and Wasm memory/table capacity are
+separate observations. See [HOST_BINDINGS.md](HOST_BINDINGS.md) for shared-map
+cleanup limitations.
 
 Explicit `HostLifecycle` state is only for schedules, animation frames, and
 React roots. Native event listeners follow the DOM's receiver/type/function
@@ -84,6 +102,13 @@ The Node wrapper deliberately provides no DOM or React implementation. Add
 browser and React semantic tests to the official Chromium suite; focused Node
 tests may inject only the individual host operations they exercise.
 
+The infoview shell's normal cleanup unmounts its owned React root while Lean
+cleanup callbacks remain usable and detaches its loaded reference before
+unmount. Surviving values retain that original runtime; normal refresh installs
+a distinct service with fresh factory/bindings. Failure cleanup remains a
+separate root-unmount plus hard-dispose path. Shell polling is owned by its own
+effect, while application activity remains the application's responsibility.
+
 ## Adding A Host Import
 
 1. Choose the narrowest Lean effect and an explicit `Js`/`Nullable` boundary.
@@ -107,6 +132,13 @@ tests may inject only the individual host operations they exercise.
 - Can failure after acquisition roll back without touching caller-owned input?
 - Are we claiming a property that TypeScript/JavaScript does not provide?
 - Is a Node test accidentally becoming a browser or React emulator?
+
+Before adding bridge bookkeeping, identify the concrete failure introduced by
+crossing the Lean/JavaScript boundary, check whether a simpler representation
+removes it, and supply a regression for any remaining mechanism. Do not turn
+upstream programmer responsibilities into new VIR guarantees. In compatibility
+reviews, distinguish missing support or semantic bugs from unavoidable foreign
+heap obligations and responsibilities shared with TypeScript clients.
 
 ## Validation
 

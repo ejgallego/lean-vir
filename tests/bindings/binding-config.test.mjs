@@ -23,7 +23,7 @@ test("the shared loader validates a complete binding library", async () => {
   assert.equal(loaded.version, 2);
   assert.equal(loaded.id, "browser");
   assert.equal(loaded.path, "Vir/Browser.bindings.json");
-  assert.equal(loaded.generation.members.length, 52);
+  assert.equal(loaded.generation.members.length, 54);
   assert.deepEqual(
     loaded.generation.members,
     [...loaded.generation.members].sort(),
@@ -161,7 +161,7 @@ test("binding configuration rejects duplicate API group ids", async () => {
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
-    /repeats root id animation/u,
+    (error) => error.message.endsWith(`repeats root id ${invalid.roots[0].id}`),
   );
 });
 

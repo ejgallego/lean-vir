@@ -220,9 +220,12 @@ export class VirHostState {
       const transaction = beginHostCallTransaction();
       try {
         const value = binding(...args);
-        if (isPromiseLike(value)) {
+        if (
+          !isGenericJsResourceDescriptor(entry.result) &&
+          isPromiseLike(value)
+        ) {
           throw new Error(
-            `Vir host import ${entry.target} returned a Promise; host imports must be synchronous`,
+            `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,
           );
         }
         const resultLabel = `${entry.target} result`;

@@ -81,54 +81,6 @@ def Badge : RuntimeM (Component BadgeProps) := Component.ofLean fun ctx =>
     {Html.text ctx.props.label}{...ctx.children}
   </span>
 
-def sampleExpr : WithRpcRef ExprWithCtx :=
-  ExprWithCtx.save
-    "jsx-demo.expr.successor"
-    "fun x => x + 1"
-    "Nat -> Nat"
-    "A sample expression reference from the JSX subset demo."
-
-structure InteractiveExprProps where
-  expr : WithRpcRef ExprWithCtx
-
-def InteractiveExpr : RuntimeM (Component InteractiveExprProps) :=
-  Component.ofLean fun ctx => do
-  let initialStatus ← JsValue.ofString "ready"
-  let status ← Lean.Vir.React.StateTuple.toState
-    (← Lean.Vir.React.Hooks.useState initialStatus)
-  let statusText ← JsValue.toString status.value
-  Html.buttonWith
-    #[
-      Attr.id "proofwidgets-jsx-interactive-expr",
-      Attr.className "pw-jsx-interactive-expr",
-      Attr.title ctx.props.expr.ref.summary,
-      Attr.data "component" "InteractiveExpr",
-      Attr.data "rpc-ref" ctx.props.expr.ref.id,
-      Attr.data "type" ctx.props.expr.value.typeText
-    ]
-    #[Handler.onClick do
-      let loading ← JsValue.ofString "resolving..."
-      Lean.Vir.React.State.set status loading
-      let ok ← Rpc.resolve ctx.props.expr fun info => do
-        let resolved ← JsValue.ofString info.statusText
-        Lean.Vir.React.State.set status resolved
-      if !ok then
-        let failed ← JsValue.ofString "RPC unavailable"
-        Lean.Vir.React.State.set status failed]
-    #[
-      Html.spanWith #[Attr.className "pw-jsx-interactive-label"] #[
-        Html.text "InteractiveExpr "
-      ],
-      Html.element "code" #[Attr.className "pw-jsx-interactive-code"] #[
-        Html.text ctx.props.expr.value.code
-      ],
-      Html.spanWith
-        #[Attr.id "proofwidgets-jsx-interactive-status", Attr.className "pw-jsx-interactive-status"]
-        #[
-          Html.text (" " ++ statusText)
-        ]
-    ]
-
 def row (key label value : String) : Html :=
   <li key={key} className="pw-jsx-row">
     <strong className="pw-jsx-row-label">{Html.text label}</strong>
@@ -142,7 +94,6 @@ def View : RuntimeM (Component Unit) := do
   let Card ← Card
   let MarkdownDisplay ← MarkdownDisplay
   let Badge ← Badge
-  let InteractiveExpr ← InteractiveExpr
   Component.ofLean fun _ => do
     let renderedRows := 3
     let surfaceProps : Array PropEntry := #[
@@ -154,7 +105,6 @@ def View : RuntimeM (Component Unit) := do
       <Card title="JSX-shaped combinators">
         {htmlHeadline}{parrotImage}{spreadInterpolation}{markdownExample MarkdownDisplay}
         <Badge key="info-badge" tone="info" label="component"> children</Badge>
-        <InteractiveExpr expr={sampleExpr} />
         <button id="proofwidgets-jsx-action" className="pw-jsx-action"
             onClick={do
               let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
@@ -164,7 +114,7 @@ def View : RuntimeM (Component Unit) := do
         </button>
         <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
           {row "tags" "lowercase tags" "b, img, span, hr"}
-          {row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr"}
+          {row "components" "uppercase components" "Card, MarkdownDisplay, Badge"}
           {row "interpolation" "interpolation" s!"{renderedRows} rendered rows"}
         </ul>
       </Card>

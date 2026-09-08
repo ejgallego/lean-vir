@@ -259,6 +259,14 @@ their Lean representation.
   element view `Js α` and return `Array (Js α)`. Each resulting handle has an
   independent lifetime, so it remains usable after the source collection is
   no longer reachable.
+- `Js.erase` forgets a phantom shape and preserves the exact value as
+  `Js.Any`. `Js.cast` selects a checked narrowing through a `Js.Cast` instance;
+  failure is `Except Js.TypeConvError (Js target)`. The browser `Element`
+  instance is the first such checked brand cast.
+- `Js.Function1 argument result` describes an exact native unary function.
+  `Js.Function.call` and `callVoid` invoke it directly. `ofLean` and
+  `ofLeanVoid` are explicit conversions for the separate case where a Lean
+  closure must become an ordinary JavaScript function.
 
 `Lean.Vir.LeanRef.toJSL` and `Lean.Vir.LeanRef.fromJSL` are the generic handle
 lane for Lean-owned values that JavaScript should store or route without
@@ -330,6 +338,9 @@ inventory:
   capability without changing identity. Its generated `style` getter returns
   the exact `CSSStyleDeclaration`; `CSSStyleDeclaration.setProperty` preserves
   the upstream `string | null` value.
+- `AbortController.create`, `getSignal`, and `abort` expose the native controller,
+  its exact signal, and the no-reason abort operation. Dropping its Lean handle
+  or disposing VIR does not abort it implicitly.
 - `Event` exposes exact `EventTarget | null` properties and propagation
   operations. `EventTarget.asElement` and `KeyboardEvent.fromEvent` perform
   checked identity-preserving narrowing; form helpers likewise make narrowing
@@ -469,25 +480,36 @@ aliases and is included in the host package as a compatibility regression.
 `fixtures/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
 with explicit combinators, including child-bearing `Html.ofComponent`, image
 attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
-component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
-`RpcRef`, `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and
-`Rpc.resolveRef` are enough for the JSX-subset fixture to include an
-`InteractiveExpr`-shaped component whose click handler dispatches a
-host-inspectable reference descriptor and updates component-owned React state
-from the callback. The public RPC helpers keep accepting `RpcRef`, but their
-low-level host targets receive `Js RpcRef` resources built by the
-`proofwidgets.rpc.ref` host targets. Resolve callbacks receive
-`Js ResolvedRef` resources and decode them through
-`js.value.proofwidgets.resolvedRef.value` before running user callbacks. In live
-infoview widgets,
-`Vir.Infoview.ProofWidgetsRpc`
-can resolve that expression-shaped descriptor as a fallback, and the live
-infoview shell asks the Lean server to create a standard
-`Lean.Server.WithRpcRef` handle for the current interactive goal at the cursor.
-`Vir.Infoview.Surface` carries the live
-`proofWidgetsExpr : Option (WithRpcRef ExprWithCtx)` prop, and the infoview
-shell stores the server RPC handle as a typed `Js ServerRef` host resource
-instead of serializing the handle through a string field.
+component. Real RPC rendering is demonstrated separately in
+`examples/tutorials/RpcReferenceWidget.lean`, without a descriptor resolver or synthetic
+reference type.
+
+`Vir.Infoview.Surface.rpcSession` carries the exact position-specific
+`RpcSessionAtPos` object returned by the official infoview hook.
+`Vir.Infoview.RpcSession.call` invokes its native `call` method with exact
+JavaScript method and request values and returns `Js.Promise response` without
+awaiting or decoding it. `Js.Promise.thenValueWithRejection` and
+`thenVoidWithRejection` pass both handlers directly to native `Promise.then`.
+The first selects a common non-Promise result shape; the second returns
+`undefined`. Errors thrown by the success handler are not caught by its sibling
+rejection handler. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
+`catchValue` accept exact `Js.Function1` values and expose direct-value,
+Promise-assimilating, and void result shapes separately. `Js.Function.ofLean`
+is the separately named Lean-closure conversion; native functions such as
+React state setters require no conversion. Promise continuations and the
+generic `Js.Object.get` operation therefore continue on exact native values.
+This keeps server-reference objects inside the response graph under the
+official RPC session's reachability rules.
+
+`RpcSession.callWithOptions` forwards exact `Js ClientRequestOptions`, including
+its native AbortSignal. Its request argument is `Js.Any` to stay within the
+interpreter import arity limit; use the pure `Js.erase` on a typed request.
+`examples/tutorials/RpcReferenceWidget.lean` and `test:infoview:browser` demonstrate a
+native React parent retaining real server responses and a Lean component
+rendering them, including a genuine `Server.WithRpcRef` round trip. The sibling
+`rpc-reference-widget.js` implements ordinary loading/error UI and stale-result
+suppression; [the tutorial](../examples/tutorials/RpcReferenceWidget.md) explains
+how the two files fit together.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
@@ -498,7 +520,7 @@ provides the first infoview-facing shell:
 
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`
-- `Lean.Vir.Infoview.ProofWidgetsRpc`
+- `Lean.Vir.Infoview.RpcSession`
 - `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
 - `Lean.Vir.Infoview.IRPackage`
@@ -512,9 +534,9 @@ helper, but its low-level host target receives an explicit
 `Lean.Vir.Js String` resource via `JsValue.ofString` and returns an explicit
 `Lean.Vir.Js Bool` resource. This is the local synchronous
 `InfoviewClipboardHost` capability, not a binding that claims the asynchronous
-browser `Clipboard.writeText` contract. The infoview command and proof-widget RPC command
-helpers follow the same `Js Bool` result convention at the low-level host
-boundary. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
+browser `Clipboard.writeText` contract. The infoview editor-command helpers
+follow the same `Js Bool` result convention at the low-level host boundary;
+RPC calls instead return the exact native Promise. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
 `DocumentPosition -> DomM Bool` shape, but first builds a `Js DocumentPosition`
 with the `infoview.documentPosition` conversion target from explicit
 `Js String` and `Js Nat` fields.
@@ -646,8 +668,8 @@ are narrower than exports: low-level host declarations should expose
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
 `Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The current
 host boundary rejects raw Lean scalar, structure, array, list, option, and
-product imports and is synchronous; returning a JavaScript `Promise` is an
-error. The
+product imports and executes synchronously. A JavaScript `Promise` may be
+returned only as an exact `Js` resource; VIR does not await it. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
@@ -674,5 +696,7 @@ If package generation fails, inspect the generated report:
   the normal Lean IR closure reached an unsupported native runtime primitive.
 
 If a host import is missing at runtime, check that the manifest target string
-matches the key in `hostBindings`. If a binding returns a `Promise`, the
-runtime rejects the call because host imports are synchronous.
+matches the key in `hostBindings`. If a binding returns a `Promise`, its result
+must be declared as an exact `Js` resource. Structural and immediate Promise
+results are rejected because lowering them would require suspending the Lean
+call.

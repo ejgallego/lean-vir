@@ -790,9 +790,9 @@ Useful WebAssembly features to track before widening the ABI:
   manifest. The current `Lean.Vir.Js α` marker model is intentionally
   compatible with that direction without committing to WIT today.
 - JS Promise Integration and Stack Switching are the relevant future mechanisms
-  for Promise-shaped or coroutine-shaped host calls. The current API avoids that
-  problem by keeping host imports synchronous and modeling browser async APIs as
-  callback registration plus cancellation handles.
+  for suspending Lean on Promise-shaped or coroutine-shaped host calls. Native
+  Promise objects can already cross synchronously as exact `Js` values and use
+  ordinary continuations; the interpreter does not await them.
 - Wasm GC and typed function references are useful platform work to watch, but
   Lean closures are currently objects in Lean's own heap. They do not replace
   the refcounted root/release bridge in this phase.

@@ -14,6 +14,35 @@ namespace Lean.Vir
 
 namespace Js
 
+/-- Expected JavaScript shape rejected by a checked cast. -/
+structure TypeConvError where
+  expected : String
+deriving BEq, Repr
+
+/--
+Checked narrowing from an erased JavaScript value to a target phantom type.
+
+Instances own the relevant JavaScript predicate. A successful check preserves
+the exact JavaScript value; it does not decode, copy, or wrap it.
+-/
+class Cast (m : Type → Type) (target : Type) where
+  expected : String
+  check : @& Lean.Vir.Js.Any → m (Option (Lean.Vir.Js target))
+
+/-- Returns a checked JavaScript narrowing as an `Option`. -/
+def cast? [Cast m target]
+    (value : @& Lean.Vir.Js.Any) : m (Option (Lean.Vir.Js target)) :=
+  Cast.check value
+
+/--
+Narrows an erased JavaScript value with the predicate selected by `Cast`.
+-/
+def cast [Monad m] [Cast m target]
+    (value : @& Lean.Vir.Js.Any) : m (Except TypeConvError (Lean.Vir.Js target)) := do
+  match ← cast? value with
+  | some result => pure (.ok result)
+  | none => pure (.error { expected := Cast.expected (m := m) (target := target) })
+
 namespace Nullable
 
 def isNull {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM Bool := do

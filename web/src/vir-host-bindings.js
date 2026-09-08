@@ -30,10 +30,7 @@ export {
   createBrowserEventHostBindings,
   createBrowserHtmlInputElementHostBindings,
 } from "./host/vir-dom-host-bindings.js";
-export {
-  createInfoviewHostBindings,
-  normalizeProofWidgetsRpcRef,
-} from "./host/vir-infoview-host-bindings.js";
+export { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
 
 export function createCommonHostBindings() {
   return {

@@ -531,7 +531,9 @@ value matching the manifest host boundary mode. `Js.Nullable` is the actual
 value or `null`; it is not a wrapper. Explicit conversion imports receive or
 return decoded scalar values for that named converter. Host imports are
 synchronous; returning a
-`Promise` is an error. Object-style `imports` factory options are treated as
+`Promise` is an error unless the declared result is an exact `Js` resource, in
+which case the native Promise object crosses synchronously without being
+awaited. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
@@ -612,7 +614,7 @@ Wasm import boundary and consumed by the owning call. This applies equally to
 top-level exports and callback calls: the original host error is thrown once
 before any placeholder interpreter result can be treated as success.
 
-Cleanup is terminal and comprehensive: all binding hooks, active resources,
+Runtime disposal is terminal and comprehensive: all binding hooks, active resources,
 Lean object handles, JSL cells, and callbacks are attempted even if one throws.
 One cleanup failure is rethrown directly; multiple failures are reported as an
 `AggregateError` in cleanup order. The runtime remains disposed, and a later
@@ -624,6 +626,23 @@ successfully. See [host bindings](HOST_BINDINGS.md) for the complete boundary
 contract and the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for callback-specific
 follow-up work.
+
+### Infoview UI ownership
+
+Normal infoview shell unmount and mounted-generation refresh release the owned
+React root and shell references while surviving callback/JSL values retain the
+original runtime. Unmount stops shell polling; ordinary auto-refresh keeps its
+polling effect. Obsolete loads cannot install UI. The shell does not cancel all
+application work or add a retired runtime state. Callers
+clean up their own listeners, timers and independent roots. They can still use
+ordinary APIs from retained callbacks after UI cleanup.
+
+`dispose()` remains explicit hard shutdown. Core in-place package replacement
+also invalidates old callback/JSL values. Shell setup/render failures and
+obsolete never-installed candidates retain hard teardown. Distinct refreshed
+shell services use fresh factories and binding lifecycles, so they do not move
+old numeric roots into new exports. This does not promise automatic disposal
+for arbitrary retained factories or intentionally shared binding maps.
 
 ## Trust Boundary
 
@@ -694,6 +713,9 @@ exports fail during package generation instead of being omitted silently.
 A failed replacement leaves the active runtime and its metadata intact; failed
 initial installation exposes no package. If old-runtime cleanup fails during
 handover, the wrapper becomes disposed, as described above.
-JavaScript host imports are sync-only and limited
-to 128 imported declarations with IR arity at most 6; async host calls will need
-a later Promise/JSPI-shaped boundary.
+JavaScript host imports execute synchronously and
+are limited to 128 imported declarations with IR arity at most 6. Native
+Promises may cross as exact `Js` values and be observed with ordinary Promise
+continuations. Those operations accept exact `Js.Function1` values; turning a
+Lean closure into one is an explicit `Js.Function.ofLean` conversion.
+Suspending a Lean call on a Promise still needs a later JSPI-shaped boundary.

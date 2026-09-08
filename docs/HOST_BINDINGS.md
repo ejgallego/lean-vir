@@ -46,7 +46,8 @@ Ordinary host imports use a deliberately narrow type surface:
 | `Lean.Vir.Js α`          | The exact JavaScript value                                      | Phantom-typed JavaScript value.           |
 | `Lean.Vir.Js.Nullable α` | The exact value or `null`                                       | Native nullable result or argument.       |
 | `Lean.Vir.JSL α`         | An ordinary JavaScript object backed by one Lean root           | Store an opaque Lean value in JavaScript. |
-| Function argument        | An ordinary JavaScript function backed by one Lean closure root | JavaScript callback into Lean.            |
+| `Lean.Vir.Js.Function1 α β` | An exact ordinary JavaScript function                         | Native unary function with a phantom call shape. |
+| Lean function argument   | An ordinary JavaScript function backed by one Lean closure root | Explicit callback conversion into Lean.   |
 | `Unit`                   | `undefined`                                                     | No result.                                |
 
 Raw Lean scalars and structures are rejected on an ordinary host-import
@@ -54,6 +55,20 @@ boundary. Named declarations marked `@[vir_js_explicit_conversion "..."]`
 are the explicit exception used by conversions such as `js.string.value`.
 Exported Lean functions called from JavaScript use the separate structural
 interface codec.
+
+`Js.Function1 argument result` does not wrap a function and VIR does not
+dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
+`Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native
+functions such as React state setters already cross as `Js.Function1` values
+and need no conversion. `Js.erase` similarly forgets only a phantom type and
+returns the exact same JavaScript value as `Js.Any`.
+
+Unknown values narrow through the polymorphic `Js.cast` operation. Its
+`Js.Cast` instance selects a type-specific predicate and returns
+`Except Js.TypeConvError (Js target)` in the instance's effect. The initial
+browser `Element` instance delegates to one brand check that returns the exact
+input on success. `Js.Object` is not the universal source type: JavaScript
+primitives, `null`, and `undefined` erase to `Js.Any` as well.
 
 The package manifest currently calls the raw JavaScript-value lane
 `hostResource`. That is a legacy ABI classification name, not a JavaScript
@@ -114,6 +129,34 @@ callbacks and releases their roots.
 deterministic cleanup dispose the VIR runtime. A callback invoked after its
 runtime is disposed fails instead of entering freed Lean state.
 
+A still-live callback or JSL object strongly owns the original generation,
+including its Wasm exports and host state. Global registries hold only
+`WeakRef`s to the cleanup records; generation-owned tracking sets keep records
+available for finalization and explicit shutdown. In particular, global JSL
+cleanup metadata does not strongly capture the cell's `onRelease` closure.
+Thus a wholly unreachable generation can be collected even when its externref
+table points back to callback/JSL targets. Finalizers need not run when the
+whole foreign heap is itself collected.
+
+An externally owned runtime still strongly roots its table values. Mixed cycles
+inside that live generation are not collected by this correction. A reachable
+native interval, listener, Promise reaction or shared binding-map entry may
+also retain its callback/JSL and original generation. Their owners remain
+responsible for cancellation, removal and reference release. Core in-place
+package replacement still invalidates old callback/JSL roots before adopting
+new exports. Normal infoview shell UI cleanup unmounts the owned React root
+and detaches shell references without hard-disposing the generation. Failed
+setup/rendering and obsolete never-installed candidates retain hard teardown.
+Application-owned active work keeps its ordinary cleanup obligations.
+
+Collection is not deterministic active-resource cleanup. In particular, the
+existing shared binding lease counter is decremented by explicit teardown,
+not by collection of an undisposed runtime. A retained factory/shared map can
+therefore retain an outstanding lease count and defer its last-owner disposer.
+Use explicit runtime disposal when deterministic shared-resource cleanup is
+needed. Neither zero foreign-root counts nor a collected facade establishes
+that Wasm allocator capacity or a shared map's resources were released.
+
 ## Active Resources
 
 Explicit lifecycle bookkeeping is reserved for activities with a real
@@ -140,9 +183,10 @@ Host calls are failure-atomic. Immediately before invoking a binding, the
 runtime opens a private transaction. An active resource created by that call
 registers an undo operation. The transaction commits only after the returned
 JavaScript value has been completely lowered to Lean. If the binding throws,
-returns a Promise, or result lowering fails, rollback terminates the newly
-created activity. This transaction is out of band and does not alter the
-returned value.
+returns a Promise for a non-resource result, or result lowering fails, rollback
+terminates the newly created activity. A Promise declared as an exact `Js`
+result is simply rooted and commits like any other JavaScript object. This
+transaction is out of band and does not alter the returned value.
 
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
 resources. Runtime teardown attempts every cleanup and reports multiple
@@ -165,7 +209,7 @@ The built-in groups closely follow their browser APIs:
 - `browser.canvas2d.*` forwards to the actual 2D context;
 - `browser.timer.*` and `browser.animation.*` return the exact native scheduling
   tokens. VIR keeps only private cancellation records for interpreter teardown;
-- `infoview.*` and `proofwidgets.rpc.*` connect the widget host.
+- `infoview.*` connects the widget host, including its exact native RPC session.
 
 Convenience conversions have separate Lean names. For example,
 `Document.querySelector` accepts exact `Js Document` and `Js String` values,
@@ -257,10 +301,12 @@ const vir = await createVirRuntime({
 });
 ```
 
-Bindings are synchronous. Returning a Promise is an error. User bindings
-override built-ins with the same target name. Do not manually encode handles,
-wrap values, or perform conversions that belong in an explicitly named Lean
-adapter.
+Bindings execute synchronously. Returning a Promise is allowed only as an
+exact `Js` resource result; VIR roots the Promise object without awaiting it.
+Returning a Promise for a structurally lowered or immediate result is an
+error. User bindings override built-ins with the same target name. Do not
+manually encode handles, wrap values, or perform conversions that belong in an
+explicitly named Lean adapter.
 
 ## Validation
 

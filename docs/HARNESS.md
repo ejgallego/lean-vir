@@ -261,6 +261,29 @@ changes; `package.json` remains the exact command-order source of truth.
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
   without Lean-dependent package generation:
   `npm run test:runtime:pure`
+- Callback/JSL finalizer ownership and whole-generation collection, using
+  existing demo artifacts without Lean regeneration:
+  `node --expose-gc tests/runtime/generation-gc-smoke.mjs`
+  and `CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs`.
+  The browser command bundles the current source and runs real Wasm with
+  official React development Strict Mode/Suspense; it needs npm dependencies
+  and demo packages, but no site build. Controlled-GC observation budgets are
+  test diagnostics, not a promised finalization latency. Cases distinguish
+  acyclic root release, retained-value/interval/shared-map controls, whole
+  table-to-target generation collection, owner isolation, hard replacement,
+  cleanup failures and explicit shutdown. Shared-map collection checks do not
+  assert automatic lease-counter cleanup or a Wasm memory-capacity plateau.
+- Infoview shell normal unmount/refresh and failure teardown with actual React,
+  real Lean continuation bodies/stale guards and mocked asset/package RPC:
+  `lake build VirInfoview vir_irpkg`, then
+  `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target fixtures/runtime/ShellLifetime.lean Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
+  then `CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs`.
+  The focused probe needs the matching `web/public/vir-upstream.wasm` and npm
+  dependencies, but no site build. It checks G1/G2 isolation, delayed success/
+  rejection, application listener retention, late scheduling, polling/obsolete
+  load suppression, explicit shutdown, injected cleanup/setup/render failures,
+  and controlled-GC collection after owners release references. The transport
+  is mocked; this does not replace real-server RPC integration acceptance.
 - Runtime runner catalog, filtering, configuration, or scheduling policy without
   generated Lean or Wasm artifacts:
   `npm run test:runtime:unit`
@@ -451,6 +474,42 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 ```
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
+
+`npm run test:infoview:browser` is the focused real-server RPC acceptance check.
+It builds the current infoview imports and the small RPC example package, then
+uses `web/public/vir-upstream.wasm`, official React, the pinned infoview RPC
+client, and a real `lake serve` process in Chromium. It does not need a site
+build. If the Wasm artifact is missing or its producer changed, first build the
+matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
+
+`CHROMIUM=/path/to/chromium node tests/infoview/rpc-shell-lifetime.mjs`
+checks the actual infoview shell against a real Lean server. It builds infoview
+imports and two existing test modules in the checkout's private Lake output;
+the shell obtains Wasm and generated packages through the real asset/package
+RPC methods. A matching `web/public/vir-upstream.wasm` is required. No site build
+or tutorial migration is needed.
+
+The test delays genuine server success and rejection until after owning-UI
+unmount or configuration replacement. Both enter the unchanged Lean fixture's
+stale guard; explicit runtime disposal instead rejects before body entry.
+An exact `WithRpcRef` round trip and live-generation mutation controls distinguish
+these cases. The infoview context accessor is injected with official
+position-specific sessions; transport, package generation, React, shell and
+Lean callbacks are real. This is not automatic polling-refresh or GC acceptance.
+The runner reports package/source/artifact hashes only after awaited cleanup.
+
+Both real-server runners share `tests/infoview/rpc-browser-harness.mjs` for LSP,
+cancellation, response gating, Chromium and teardown. Its focused success/error
+gate checks run with
+`node --test tests/infoview/rpc-browser-harness.test.mjs`.
+
+`CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs`
+is a separate manual characterization probe for the pinned upstream infoview
+async hooks. It requires neither Lean nor Wasm and prints controlled request,
+Strict Mode, cancellation, and stale-result traces. It imports the published
+hooks unchanged; their current limitations are observations, not assertions
+that VIR should preserve those bugs. See
+[the compatibility note](PROOFWIDGETS_RPC_COMPATIBILITY.md#component-unmount-is-not-interpreter-disposal).
 
 ## Performance Comparisons
 

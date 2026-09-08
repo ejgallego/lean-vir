@@ -13,73 +13,10 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
       dispatchInfoviewCommand(commandDispatcher, "revealPosition", position),
     "infoview.command.insertText": (position, text) =>
       dispatchInfoviewCommand(commandDispatcher, "insertText", position, text),
-    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => ({
-      id,
-      label,
-      typeName,
-      summary,
-      expression,
-      typeText: "",
-      context: "",
-    }),
-    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => ({
-      ...ref,
-      typeText,
-      context,
-      ...nullableField(serverRef, "serverRef"),
-    }),
-    "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(ref),
-    "proofwidgets.rpc.inspectRef": (ref) =>
-      dispatchInfoviewCommand(
-        commandDispatcher,
-        "proofwidgetsRpcInspectRef",
-        ref,
-      ),
-    "proofwidgets.rpc.resolveRef": (ref, callback) =>
-      resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
-  };
-}
-
-export function normalizeProofWidgetsRpcRef(ref) {
-  if (ref === null || typeof ref !== "object") {
-    return null;
-  }
-  const id = stringField(ref.id);
-  if (id.length === 0) {
-    return null;
-  }
-  const normalized = {
-    id,
-    label: stringField(ref.label),
-    typeName: stringField(ref.typeName),
-    summary: stringField(ref.summary),
-    expression: stringField(ref.expression),
-    typeText: stringField(ref.typeText),
-    context: stringField(ref.context),
-  };
-  const serverRef = proofWidgetsServerRpcRef(ref);
-  if (serverRef !== null) {
-    normalized.serverRef = serverRef;
-  }
-  return normalized;
-}
-
-function normalizeProofWidgetsResolvedRef(ref) {
-  const value = ref !== null && typeof ref === "object" ? ref : {};
-  return {
-    id: stringField(value.id),
-    label: stringField(value.label),
-    typeName: stringField(value.typeName),
-    summary: stringField(value.summary),
-    expression: stringField(value.expression),
-    typeText: stringField(value.typeText),
-    context: stringField(value.context),
-    source: stringField(value.source),
-    position: stringField(value.position),
-    packageRevision: stringField(value.packageRevision),
-    storeKey: stringField(value.storeKey),
-    knownConstant: value.knownConstant === true,
+    "infoview.rpcSession.call": (session, method, params) =>
+      session.call(method, params),
+    "infoview.rpcSession.callWithOptions": (session, method, params, options) =>
+      session.call(method, params, options),
   };
 }
 
@@ -105,42 +42,6 @@ function writeTextToHostClipboard(text) {
     }
   }
   return false;
-}
-
-function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
-  const handler = infoviewCommandHandler(
-    commandDispatcher,
-    "proofwidgetsRpcResolveRef",
-  );
-  if (handler === null) {
-    return false;
-  }
-  let result;
-  try {
-    result = handler(ref);
-  } catch (error) {
-    reportInfoviewHostError(error);
-    return false;
-  }
-  if (result === false) {
-    return false;
-  }
-  if (
-    result !== null &&
-    typeof result === "object" &&
-    typeof result.then === "function"
-  ) {
-    result
-      .then((info) => {
-        callHostCallback(callback, info);
-      })
-      .catch((error) => {
-        reportInfoviewHostError(error);
-      });
-  } else {
-    callHostCallback(callback, result);
-  }
-  return true;
 }
 
 function dispatchInfoviewCommand(commandDispatcher, name, ...payload) {
@@ -176,14 +77,6 @@ function infoviewCommandHandler(commandDispatcher, name) {
     return (...payload) => commandDispatcher[name](...payload);
   }
   return null;
-}
-
-function callHostCallback(callback, value) {
-  try {
-    callback(value);
-  } catch (error) {
-    reportInfoviewHostError(error);
-  }
 }
 
 function reportInfoviewHostError(error) {
@@ -222,10 +115,6 @@ function copyTextWithExecCommand(text) {
   }
 }
 
-function nullableField(value, name) {
-  return value === null ? {} : { [name]: value };
-}
-
 function documentPosition(uri, fileName, line, character, label) {
   const lineNumber = nonNegativeInteger(line);
   const characterNumber = nonNegativeInteger(character);
@@ -253,21 +142,4 @@ function nonNegativeInteger(value) {
     return Number.isSafeInteger(value) && value >= 0 ? value : null;
   }
   return null;
-}
-
-function stringField(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function proofWidgetsServerRpcRef(ref) {
-  return isRpcRefObject(ref.serverRef) ? ref.serverRef : null;
-}
-
-function isRpcRefObject(value) {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    (typeof value.__rpcref === "number" || typeof value.p === "number")
-  );
 }

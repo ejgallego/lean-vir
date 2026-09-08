@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Browser
-public import Vir.ProofWidgets.Rpc
 public import Vir.Infoview.Surface.Generated
 
 public section

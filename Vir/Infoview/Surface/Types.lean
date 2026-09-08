@@ -6,11 +6,17 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.ProofWidgets.Rpc.Types
+public import Vir.Js.Types
 
 public section
 
 namespace Lean.Vir.Infoview
+
+/-- Phantom marker for the exact position-specific infoview RPC session object. -/
+opaque RpcSession : Type
+
+/-- Exact infoview `ClientRequestOptions`, including its native AbortSignal. -/
+opaque ClientRequestOptions : Type
 
 /-- Cursor position for the current infoview snapshot. -/
 structure DocumentPosition where
@@ -53,6 +59,6 @@ structure Surface where
   goals : Array Goal
   selectedLocations : Array String
   selections : Array SelectedLocation
-  proofWidgetsExpr : Option (Lean.Vir.ProofWidgets.WithRpcRef Lean.Vir.ProofWidgets.ExprWithCtx)
+  rpcSession : Lean.Vir.Js RpcSession
 
 end Lean.Vir.Infoview

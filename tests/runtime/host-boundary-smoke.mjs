@@ -21,6 +21,10 @@ import {
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 import { createBrowserAnimationHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host-bindings.js";
+import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
+import { VirHostState } from "../../web/src/runtime/host-state.js";
+import { HOST_IMPORT_BOUNDARY } from "../../web/src/runtime/interface-manifest.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 {
   const roots = new ExternrefRoots({ initial: 3 });
@@ -96,6 +100,182 @@ import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host
   );
   assert.equal(rejectedCleanup, 1);
   lifecycle.dispose();
+}
+
+{
+  const bindings = createJsCollectionHostBindings();
+  const value = { exact: true };
+  const unary = (item) => item;
+  const unaryVoid = () => undefined;
+  assert.equal(bindings["js.value.function.unary"](unary), unary);
+  assert.equal(bindings["js.value.function.unaryVoid"](unaryVoid), unaryVoid);
+  assert.equal(bindings["js.function.call"](unary, value), value);
+  const promise = Promise.resolve(value);
+  assert.equal(await bindings["js.promise.thenValue"](promise, unary), value);
+  assert.equal(
+    await bindings["js.promise.thenPromise"](promise, (item) =>
+      Promise.resolve(item),
+    ),
+    value,
+  );
+  assert.equal(
+    await bindings["js.promise.thenVoid"](promise, unaryVoid),
+    undefined,
+  );
+  assert.equal(
+    await bindings["js.promise.catchValue"](
+      Promise.reject(new Error("recover")),
+      (error) => error.message,
+    ),
+    "recover",
+  );
+  const object = { value };
+  assert.equal(bindings["js.object.get"](object, "value"), value);
+
+  for (const target of [
+    "js.promise.thenValueWithRejection",
+    "js.promise.thenVoidWithRejection",
+  ]) {
+    const isVoid = target.includes("thenVoid");
+    const expected = isVoid ? undefined : value;
+    const reason = { exactRejection: true };
+    const seen = [];
+    const fulfilled = (input) => {
+      seen.push(["fulfilled", input]);
+      return expected;
+    };
+    const rejected = (input) => {
+      seen.push(["rejected", input]);
+      return expected;
+    };
+    // Prove the receiver, both function objects, arity and result are forwarded.
+    const returned = {};
+    const receiver = {
+      then(...args) {
+        assert.equal(this, receiver);
+        assert.deepEqual(args, [fulfilled, rejected]);
+        return returned;
+      },
+    };
+    assert.equal(bindings[target](receiver, fulfilled, rejected), returned);
+    assert.equal(
+      await bindings[target](Promise.resolve(value), fulfilled, rejected),
+      expected,
+    );
+    assert.deepEqual(seen, [["fulfilled", value]]);
+    assert.equal(
+      await bindings[target](Promise.reject(reason), fulfilled, rejected),
+      expected,
+    );
+    assert.deepEqual(seen, [
+      ["fulfilled", value],
+      ["rejected", reason],
+    ]);
+    const thrown = new Error("fulfillment handler failed");
+    await assert.rejects(
+      bindings[target](
+        promise,
+        () => {
+          throw thrown;
+        },
+        rejected,
+      ),
+      (error) => error === thrown,
+    );
+    assert.equal(
+      seen.length,
+      2,
+      "then(f, g) must not turn into then(f).catch(g)",
+    );
+  }
+}
+
+{
+  const exactPromise = Promise.resolve({ exact: true });
+  let exactValue = exactPromise;
+  const transactionEvents = [];
+  const hostState = new VirHostState({
+    hostBindings: {
+      "test.promise.exact": () => {
+        registerHostCallRollback(() => transactionEvents.push("exact"));
+        return exactValue;
+      },
+      "test.promise.structural": () => {
+        registerHostCallRollback(() => transactionEvents.push("structural"));
+        return exactPromise;
+      },
+    },
+    defaultHostBindings: {},
+  });
+  hostState.attach({ memory: new WebAssembly.Memory({ initial: 1 }) });
+  hostState.attachRuntime({
+    liveCallbacks: new Set(),
+    makeJsObjectValue(_type, value) {
+      return value;
+    },
+    makeObjectValue(_type, value) {
+      return value;
+    },
+  });
+  const resourceResult = {
+    type: "Lean.Vir.Js (Lean.Vir.Js.Promise.Value α)",
+    interfaceTag: INTERFACE_TAG.RESOURCE,
+    kind: "resource",
+    name: "Lean.Vir.Js",
+  };
+  const structuralResult = {
+    type: "Test.Result",
+    interfaceTag: INTERFACE_TAG.STRUCTURE,
+    kind: "structure",
+  };
+  hostState.setManifest({
+    hostImports: [
+      {
+        target: "test.promise.exact",
+        boundary: HOST_IMPORT_BOUNDARY.HOST_IMPORT,
+        args: [],
+        result: resourceResult,
+      },
+      {
+        target: "test.promise.structural",
+        boundary: HOST_IMPORT_BOUNDARY.HOST_IMPORT,
+        args: [],
+        result: structuralResult,
+      },
+    ],
+  });
+  assert.equal(hostState.callObjects(0, 0, 0), exactPromise);
+  let propertyReads = 0;
+  for (const value of [
+    Object.defineProperty({}, "then", {
+      get() {
+        propertyReads++;
+        throw new Error("exact JS values must not be inspected for then");
+      },
+    }),
+    new Proxy(
+      {},
+      {
+        get() {
+          propertyReads++;
+          throw new Error(
+            "exact JS values must not be inspected through a proxy",
+          );
+        },
+      },
+    ),
+  ]) {
+    exactValue = value;
+    assert.equal(hostState.callObjects(0, 0, 0), value);
+  }
+  assert.equal(propertyReads, 0);
+  assert.deepEqual(transactionEvents, []);
+  assert.throws(
+    () => hostState.callObjects(1, 0, 0),
+    /requires a synchronously lowered value/,
+  );
+  assert.deepEqual(transactionEvents, ["structural"]);
+  hostState.dispose();
 }
 
 {

@@ -17,6 +17,9 @@ export function createDOMTokenListHostBindings() {
 
 export function createBrowserEventHostBindings() {
   return {
+    "browser.abortController.create": () => new AbortController(),
+    "browser.abortController.getSignal": (controller) => controller.signal,
+    "browser.abortController.abort": (controller) => controller.abort(),
     "js.value.browser.eventListener": (callback) => callback,
     "browser.keyboardEvent.fromEvent": (event) =>
       isKeyboardEvent(event) ? event : null,
@@ -33,6 +36,7 @@ export function createBrowserEventHostBindings() {
 
 export function createBrowserElementHostBindings() {
   return {
+    "browser.element.fromAny": (value) => (isElement(value) ? value : null),
     "browser.elementCSSInlineStyle.fromElement": (element) =>
       isElementCSSInlineStyle(element) ? element : null,
     "browser.elementCSSInlineStyle.getStyle": (element) => element.style,
@@ -112,10 +116,19 @@ function isKeyboardEvent(value) {
 }
 
 function isElement(value) {
-  return (
-    typeof globalThis.Element === "function" &&
-    value instanceof globalThis.Element
-  );
+  const Element = globalThis.Element;
+  if (typeof Element !== "function") return false;
+  const getTagName = Object.getOwnPropertyDescriptor(
+    Element.prototype,
+    "tagName",
+  )?.get;
+  if (typeof getTagName !== "function") return false;
+  try {
+    Reflect.apply(getTagName, value, []);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isInputElement(value) {

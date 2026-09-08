@@ -5,6 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 
 import { createProofSurfaceFixture } from "../support/proof-surface-fixtures.mjs";
 import { basePath, distAssetPathContaining, evaluate } from "./harness.mjs";
@@ -67,7 +69,93 @@ function inputMountedScript(inputSelector, outputSelector, expectedOutput) {
   })()`;
 }
 
+async function domBindingsProbeBundle() {
+  const bundle = await build({
+    entryPoints: [fileURLToPath(new URL(
+      "../../web/src/host/vir-dom-host-bindings.js", import.meta.url,
+    ))],
+    bundle: true,
+    format: "iife",
+    globalName: "virElementCastProbe",
+    platform: "browser",
+    write: false,
+  });
+  return bundle.outputFiles[0].text;
+}
+
+export async function smokeBrowserAbortController(cdp) {
+  const result = await evaluate(cdp, `${await domBindingsProbeBundle()}
+    (() => {
+      const bindings = virElementCastProbe.createBrowserEventHostBindings();
+      const frame = document.createElement("iframe");
+      document.body.appendChild(frame);
+      try {
+        const local = bindings["browser.abortController.create"]();
+        if (!(local instanceof AbortController)) throw new Error("constructor returned a non-native controller");
+        const foreign = new frame.contentWindow.AbortController();
+        for (const controller of [local, foreign]) {
+          const signal = bindings["browser.abortController.getSignal"](controller);
+          if (signal !== controller.signal || signal.aborted) throw new Error("signal identity or initial state changed");
+          let events = 0;
+          signal.addEventListener("abort", () => events++);
+          if (bindings["browser.abortController.abort"](controller) !== undefined) throw new Error("abort result changed");
+          if (!signal.aborted || events !== 1 || signal.reason.name !== "AbortError") throw new Error("native synchronous abort semantics changed");
+          const reason = signal.reason;
+          bindings["browser.abortController.abort"](controller);
+          if (events !== 1 || signal.reason !== reason || bindings["browser.abortController.getSignal"](controller) !== signal) throw new Error("repeated abort changed signal or reason");
+        }
+        return true;
+      } finally {
+        frame.remove();
+      }
+    })()`);
+  assert.equal(result, true);
+}
+
+export async function smokeBrowserElementCasts(cdp) {
+  const result = await evaluate(cdp, `${await domBindingsProbeBundle()}
+    (() => {
+      const casts = [
+        virElementCastProbe.createBrowserElementHostBindings()["browser.element.fromAny"],
+        virElementCastProbe.createBrowserEventHostBindings()["browser.eventTarget.asElement"],
+      ];
+      const frame = document.createElement("iframe");
+      document.body.appendChild(frame);
+      try {
+        const local = document.createElement("div");
+        const foreign = frame.contentDocument.createElement("div");
+        if (foreign instanceof Element) throw new Error("expected a foreign Element realm");
+        let propertyReads = 0;
+        Object.defineProperty(foreign, "ownerDocument", {
+          get() { propertyReads++; throw new Error("must use the native brand, not ownerDocument"); },
+        });
+        const spoofed = { ownerDocument: { defaultView: { Element: Object } } };
+        const hostile = new Proxy({}, {
+          get() { propertyReads++; throw new Error("unexpected property read"); },
+          getPrototypeOf() { propertyReads++; throw new Error("unexpected prototype read"); },
+        });
+        const invalid = [null, undefined, "text", 42, document, document.createTextNode("text"),
+          spoofed, Object.create(Element.prototype), Object.create(frame.contentWindow.Element.prototype),
+          hostile, new Proxy(local, {})];
+        for (const cast of casts) {
+          if (cast(local) !== local || cast(foreign) !== foreign) {
+            throw new Error("Element narrowing must preserve genuine local and foreign elements");
+          }
+          for (const value of invalid) {
+            if (cast(value) !== null) throw new Error("Element narrowing accepted an unbranded value");
+          }
+        }
+        return { casts: casts.length, propertyReads };
+      } finally {
+        frame.remove();
+      }
+    })()`);
+  assert.deepEqual(result, { casts: 2, propertyReads: 0 });
+}
+
 export async function smokeBrowserCallbacks(cdp, origin) {
+  await smokeBrowserAbortController(cdp);
+  await smokeBrowserElementCasts(cdp);
   await runDemoHostEntry(cdp, origin, "HostInterop.querySelectorAllFirstText", {
     runInputs: [".query-all-smoke"],
     expectedResult: "first browser match",

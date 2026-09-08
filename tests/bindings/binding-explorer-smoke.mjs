@@ -347,7 +347,7 @@ assert.deepEqual(elementRoot?.coverage.summary, {
   mappedTargets: 20,
   ambiguousTargets: 0,
   unmatchedTargets: 0,
-  noParityTargets: 2,
+  noParityTargets: 3,
 });
 const elementClassList = elementRoot?.coverage.members.find(
   (member) => member.id === "Element.classList",
@@ -579,17 +579,6 @@ assert.equal(localCommands?.workItems.length, 0);
 assert.ok(localCommands?.generatedOperations.every((operation) =>
   operation.protocol.upstreamRelation.kind === "local-contract" &&
   typeof operation.protocol.upstreamRelation.member === "string"));
-
-const localRpcReferences = roots.find((root) =>
-  root.library === "proofwidgets" && root.id === "rpc-references");
-assert.deepEqual(localRpcReferences?.analysis, {
-  status: "complete",
-  scope: "complete-upstream-surface",
-});
-assert.equal(localRpcReferences?.coverage.summary["contract-linked"], 5);
-assert.equal(localRpcReferences?.coverage.summary.compatible, undefined);
-assert.equal(localRpcReferences?.coverage.summary.missing, 0);
-assert.equal(localRpcReferences?.workItems.length, 0);
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {
