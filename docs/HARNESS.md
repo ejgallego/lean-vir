@@ -341,10 +341,11 @@ Runtime smoke tests are split into two groups:
 The runtime runner executes pure tests in parallel, but serializes Lean-group
 tests to avoid concurrent writes to shared Lean build outputs on cold CI
 checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
-per test process. Migrated runtime fixtures use the shared temporary Lake-project
-helper in `tests/support/module-project.mjs`; remaining source-fixture tests
-still reuse the prepared low-level generator. The public npm CLI always builds
-its selected modules through Lake's cache.
+per test process. Runtime fixtures use the shared temporary Lake-project helper
+in `tests/support/module-project.mjs`; `createRuntimeModuleProject` pairs it with
+the prepared generator. Successful builds must precede package-negative tests;
+attribute and typechecking negatives instead inspect the build failure. The
+public npm CLI always builds its selected modules through Lake's cache.
 
 The test module-project helper accepts explicit simple module names and source
 text without rewriting headers or visibility. It pins the repository toolchain
@@ -354,6 +355,12 @@ and check compilation before asserting package diagnostics. Do not combine
 independent negative fixtures into an umbrella import. Validate helper changes
 with `npm run test:fixtures:unit`, `npm run test:runtime -- module-project
 package-generation`, and the fixture oracle suite.
+
+Generated tests must declare their module visibility and compile-time imports
+explicitly. In particular, isolated marker imports need `meta import
+Vir.Attributes`, and isolated host-attribute imports need `meta import Vir.Host`.
+Assert `#eval` effects during compilation and their absence during packaging;
+do not confuse Lake's replayed build messages with re-executed source commands.
 
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.

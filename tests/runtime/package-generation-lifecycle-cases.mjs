@@ -4,8 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { fileURLToPath } from "node:url";
-
 import {
   createVirImports,
   createVirRuntimeFactory,
@@ -17,15 +15,14 @@ import {
 } from "../../web/src/vir-host-bindings.js";
 import {
   assert,
+  generateIrPackage,
   join,
   readFile,
   runVirIrpkg,
+  spawnSync,
   writeRuntimeFixture,
 } from "./shared.mjs";
 
-const hostInteropSource = fileURLToPath(
-  new URL("../../examples/HostInterop.lean", import.meta.url),
-);
 const sharedStringImportName = "Lean.Vir.JsValue.ofString";
 const parserScoreEntry =
   "Vir.Fixtures.LeanParser.upstreamParserInputContextScore";
@@ -40,11 +37,14 @@ export async function runIrPackageLifecycleSmoke({
   const secondPackage = join(freshDir, "reload-host-second.irpkg");
   const secondReport = join(freshDir, "reload-host-second.report.md");
 
+  const builtHost = spawnSync("lake", ["build", "+HostInterop"], { encoding: "utf8" });
+  assert.equal(builtHost.status, 0, builtHost.stderr || builtHost.stdout);
+
   const generatedFirst = runVirIrpkg([
     firstPackage,
     firstReport,
-    "--target",
-    hostInteropSource,
+    "--target-module",
+    "HostInterop",
     "HostInterop.titleHandshake",
   ]);
   assert.equal(
@@ -55,8 +55,8 @@ export async function runIrPackageLifecycleSmoke({
   const generatedSecond = runVirIrpkg([
     secondPackage,
     secondReport,
-    "--target",
-    hostInteropSource,
+    "--target-module",
+    "HostInterop",
     "HostInterop.callbackRoundTrip",
     "HostInterop.titleHandshake",
   ]);
@@ -195,19 +195,8 @@ export async function runIrPackageLifecycleSmoke({
 
   const fallbackSource = join(freshDir, "ExternFallback.lean");
   const fallbackPackage = join(freshDir, "extern-fallback-runtime.irpkg");
-  const fallbackReport = join(freshDir, "extern-fallback-runtime.report.md");
   await writeRuntimeFixture(fallbackSource, "ExternFallback.lean");
-  const generatedFallback = runVirIrpkg([
-    fallbackPackage,
-    fallbackReport,
-    "--target-marked",
-    fallbackSource,
-  ]);
-  assert.equal(
-    generatedFallback.status,
-    0,
-    generatedFallback.stderr || generatedFallback.stdout,
-  );
+  await generateIrPackage("ExternFallback", fallbackSource, fallbackPackage, "marked");
   const fallbackRuntime = await createVirRuntimeFactory({
     wasmBytes,
   }).createRuntime({ irPackageSet: [await readFile(fallbackPackage)] });

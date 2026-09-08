@@ -4,8 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir
-import Vir.Js
+module
+
+public import Vir
+public import Vir.Js
+
+public section
 
 namespace Vir.Fixtures.InterpreterConstantCache
 

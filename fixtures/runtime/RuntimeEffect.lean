@@ -1,4 +1,8 @@
-import Vir.Js
+module
+
+public import Vir.Js
+
+public section
 
 @[vir_js "test.runtime.value"]
 private opaque runtimeValueHost : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)

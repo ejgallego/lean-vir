@@ -1,3 +1,8 @@
+module
+
+
+public section
+
 structure RecursiveBase where
   label : String
 

@@ -91,6 +91,14 @@ declarations are not implicitly re-exported. A marked build with no matching
 declarations fails with a diagnostic instead of silently producing an empty
 package.
 
+The markers follow Lean's label-attribute semantics: `attribute [-vir_export]`
+and `attribute [-vir_startup]` remove labels only from the local elaboration
+environment. Compiled imports restore the recorded additions, so these commands
+do not retract exports or startup hooks from a compiled `:vir` package. To
+change that published interface, remove the original annotation or attribute
+addition and rebuild. A live editor snapshot sees the local state at its
+position; it can therefore differ from the compiled module after local removal.
+
 Lean module-system files can import the marker definitions without pulling in
 the full browser-facing `Vir` library:
 

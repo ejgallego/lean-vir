@@ -17,7 +17,6 @@ import {
   join,
   manifestEntry,
   readFile,
-  runVirIrpkg,
   spawnSync,
   writeRuntimeFixture,
 } from "./shared.mjs";
@@ -115,19 +114,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const aliasSource = join(freshDir, "AliasEdges.lean");
   const aliasPackage = join(freshDir, "alias-edges.irpkg");
-  const aliasReport = join(freshDir, "alias-edges.report.md");
   await writeRuntimeFixture(aliasSource, "AliasEdges.lean");
-  const aliasGenerated = runVirIrpkg([
-    aliasPackage,
-    aliasReport,
-    "--target-all",
-    aliasSource,
-  ]);
-  assert.equal(
-    aliasGenerated.status,
-    0,
-    aliasGenerated.stderr || aliasGenerated.stdout,
-  );
+  await generateIrPackage("AliasEdges", aliasSource, aliasPackage);
   const aliasInspect = spawnSync(
     "node",
     ["scripts/packages/inspect-irpkg.mjs", "--json", aliasPackage],
@@ -155,19 +143,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const escapedSource = join(freshDir, "EscapedCallNames.lean");
   const escapedPackage = join(freshDir, "escaped-call-names.irpkg");
-  const escapedReport = join(freshDir, "escaped-call-names.report.md");
   await writeRuntimeFixture(escapedSource, "EscapedCallNames.lean");
-  const escapedGenerated = runVirIrpkg([
-    escapedPackage,
-    escapedReport,
-    "--target-marked",
-    escapedSource,
-  ]);
-  assert.equal(
-    escapedGenerated.status,
-    0,
-    escapedGenerated.stderr || escapedGenerated.stdout,
-  );
+  await generateIrPackage("EscapedCallNames", escapedSource, escapedPackage, "marked");
   const escapedRuntime = await factory.createRuntime({
     irPackageSet: [await readFile(escapedPackage)],
   });

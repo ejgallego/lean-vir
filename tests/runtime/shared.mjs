@@ -219,38 +219,51 @@ export function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function generateIrPackage(module, source, packagePath) {
+export async function createRuntimeModuleProject(directory, modules) {
   const generator = preparedVirIrpkg();
-  const project = await createTestModuleProject({
-    directory: `${packagePath}.modules`,
-    modules: { [module]: await readFile(source, "utf8") },
+  const project = await createTestModuleProject({ directory, modules });
+  let env;
+  return Object.freeze({
+    ...project,
+    runVirIrpkg(args) {
+      env ??= project.env();
+      return spawnSync(generator.path, args, {
+        cwd: project.directory,
+        env,
+        encoding: "utf8",
+      });
+    },
+  });
+}
+
+export async function generateIrPackage(
+  module,
+  source,
+  packagePath,
+  mode = "all",
+) {
+  assert.ok(["all", "marked"].includes(mode), `unknown selection: ${mode}`);
+  const project = await createRuntimeModuleProject(`${packagePath}.modules`, {
+    [module]: await readFile(source, "utf8"),
   });
   const built = project.build();
-  assert.equal(built.status, 0, `fixture compilation failed: ${built.error ?? ""}\n${built.stdout}\n${built.stderr}`);
+  assert.equal(
+    built.status,
+    0,
+    `fixture compilation failed: ${built.error ?? ""}\n${built.stdout}\n${built.stderr}`,
+  );
   const reportPath = packagePath.replace(/\.irpkg$/, "") + ".report.md";
-  const generated = spawnSync(generator.path,
-    [packagePath, reportPath, "--target-all-module", module], {
-      cwd: project.directory, env: project.env(), encoding: "utf8",
-    });
+  const generated = project.runVirIrpkg([
+    packagePath,
+    reportPath,
+    `--target-${mode}-module`,
+    module,
+  ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   return generated;
 }
 
 let cachedVirIrpkg = null;
-let virJsBuilt = false;
-
-export function virIrpkgEnv() {
-  return preparedVirIrpkg().env;
-}
-
-export function ensureVirJsBuilt() {
-  if (virJsBuilt) return;
-  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], {
-    encoding: "utf8",
-  });
-  assert.equal(builtVirJs.status, 0, builtVirJs.stderr || builtVirJs.stdout);
-  virJsBuilt = true;
-}
 
 export function ensureVirIrpkgBuilt() {
   preparedVirIrpkg();
@@ -292,6 +305,7 @@ export async function assertUnsupportedInterfaceSource(
   const reportPath = join(dir, `${stem}.report.md`);
   await writeFile(source, lines.join("\n"));
   await assertUnsupportedInterfaceFile(
+    stem,
     source,
     packagePath,
     reportPath,
@@ -312,6 +326,7 @@ export async function assertUnsupportedInterfaceFixture(
   const reportPath = join(dir, `${stem}.report.md`);
   await writeRuntimeFixture(source, fixtureName);
   await assertUnsupportedInterfaceFile(
+    stem,
     source,
     packagePath,
     reportPath,
@@ -321,18 +336,28 @@ export async function assertUnsupportedInterfaceFixture(
 }
 
 async function assertUnsupportedInterfaceFile(
+  module,
   source,
   packagePath,
   reportPath,
   patterns,
   roots,
 ) {
-  const generated = runVirIrpkg([
+  const project = await createRuntimeModuleProject(`${packagePath}.modules`, {
+    [module]: await readFile(source, "utf8"),
+  });
+  const built = project.build();
+  assert.equal(
+    built.status,
+    0,
+    `package-negative fixture must compile: ${built.stdout}\n${built.stderr}`,
+  );
+  const generated = project.runVirIrpkg([
     packagePath,
     reportPath,
     ...(roots === null || roots.length === 0
-      ? ["--target-all", source]
-      : ["--target", source, ...roots]),
+      ? ["--target-all-module", module]
+      : ["--target-module", module, ...roots]),
   ]);
   assert.notEqual(
     generated.status,

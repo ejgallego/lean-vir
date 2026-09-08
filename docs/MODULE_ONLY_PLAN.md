@@ -1,7 +1,7 @@
 # Module-Only Package Inputs
 
-Status: first input-model and compiled-module adapter slice implemented locally;
-consumer migration and removal remain TODO. Baseline: PR #166,
+Status: input model, compiled-module adapter, browser and runtime-test producers
+migrated locally; remaining adapters and source-loader removal are TODO. Baseline: PR #166,
 landed as `57c95a21895a8ddde5098a00ccd47b634fce1b64`.
 
 ## Objective
@@ -56,9 +56,9 @@ mechanical source-origin constructor update; it still consumes `snap.env`.
 The public npm CLI and version-2 package configs now use explicit module names.
 A shared pure normalizer owns validation, selection and
 output defaults; Lake builds the selected modules and supplies their search
-path. Fib, Quickstart and MergeSort are registered as example modules. Remaining
-runtime source-fixture helpers temporarily call the low-level generator
-directly rather than depending on the removed public source-path CLI.
+path. Fib, Quickstart and MergeSort are registered as example modules. Runtime
+fixture helpers likewise build explicit modules before calling the low-level
+generator in their temporary project's environment.
 
 Browser package assembly now plans explicit module inputs from the version-2
 catalog, retaining source paths only for fixture coverage and navigation.
@@ -73,8 +73,20 @@ IR using separate public and `import all` imports, preserving
 fixture bodies. One temporary Lake-project helper serves these drivers and the
 six all-public fresh runtime fixtures. It keeps each input separate, pins the
 dependency toolchain, and pairs Lake's search environment with its project cwd.
-Remaining direct-generator/negative tests and external/type-anchor adapters are
-still pending; their phase-specific coverage must survive migration.
+Runtime direct-generator and negative-test callers now use explicit modules,
+including marker attributes, raw marker/extern bypasses, extern fallbacks and
+declaration collisions. Attribute/type errors remain compilation checks;
+postponed compilation is checked at elaboration time because it intentionally
+produces no IR artifact. Package-negative inputs must compile first.
+
+The accepted marker contract follows Lean's local label-removal semantics:
+`attribute [-vir_export]` and `[-vir_startup]` change the live environment, but
+compiled imports restore the recorded additions. Tests assert both local
+removal during elaboration and restored export/startup selection during
+packaging. Published interfaces change by editing the original annotations and
+rebuilding, not through VIR-specific persistent removal metadata. See
+[LAKE_INTEGRATION.md](LAKE_INTEGRATION.md). External/type-anchor and native-test
+adapters remain pending.
 
 ## Design Decisions
 
@@ -116,6 +128,7 @@ survive the completed migration merely to preserve old CLI spellings.
 | Generator preparation | `scripts/packages/irpkg-generator.mjs` | Build actual input modules and supply their project search environment, not only the VIR generator and optional prerequisites. |
 | Browser package assembly (migrated) | `generate-browser-package.mjs`, `fixtures/browser-packages.json` | Explicit modules preserve multi-input root unions and package-only roots; implicit Lean demo defaults removed. |
 | Fixtures and runtime tests | `tests/support/fixture-runner-context.mjs`, `tests/runtime/shared.mjs`, fixture catalog and generated Lean strings | Introduce one shared temporary module-project helper; build fixtures before parallel execution. Preserve host/Wasm oracle comparison and negative-test phases. |
+| Client-native test producer | `tests/native/client-native-extern.mjs` | Compile its generated fixture module before invoking the package generator; preserve registry/provider and native/Wasm acceptance. |
 | Type anchors | `scripts/bindings/type-anchor-manifest.mjs`, `fixtures/type-anchors/vir-v1.fixture.lean` | Give the fixture an importable module arrangement; preserve reviewed export inventory, aliases and deterministic manifest output. Coordinate edits with the bindings owner. |
 | External package producers | `scripts/packages/lean-zip/`, `scripts/packages/illuminate/`, `benchmarks/browser/scripts/build-artifacts.mjs` | Resolve/build workload modules in their owning project environment. Preserve registries and artifact provenance; do not repin downstream projects as part of this plan. |
 | Browser source display | `web/app/pages/browser-package-config.js`, fixture catalog/source helpers | Distinguish display/filter paths from compilation identity; preserve source navigation and package coverage checks. |
@@ -156,8 +169,9 @@ production input systems.
 
    - [x] Shared temporary Lake projects, authored fixture host/package inputs,
      and six successful all-public runtime fixtures.
-   - [ ] Remaining direct-generator inputs, raw marker/extern bypasses, and
-     elaboration-negative tests (keep compilation and package rejection separate).
+   - [x] Migrate runtime direct-generator and negative tests, checking both
+     live and compiled marker-removal semantics.
+   - [ ] Migrate the generated client-native acceptance input.
 5. [ ] Migrate infoview, type-anchor and external-producer adapters after
    coordinating the affected boundaries. Do not silently rebuild an external
    workload under VIR's unrelated project environment.

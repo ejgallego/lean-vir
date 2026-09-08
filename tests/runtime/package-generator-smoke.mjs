@@ -4,86 +4,85 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import {
   assert,
-  ensureVirIrpkgBuilt,
+  createRuntimeModuleProject,
   join,
   manifestEntry,
   readFile,
-  runVirIrpkg,
   spawnSync,
-  virIrpkgEnv,
-  writeFile,
-  writeRuntimeFixture,
 } from "./shared.mjs";
-
-function checkLeanSource(source) {
-  return spawnSync("lean", [source], {
-    encoding: "utf8",
-    env: virIrpkgEnv(),
-  });
-}
 
 function combinedOutput(result) {
   return `${result.stderr}${result.stdout}`;
 }
 
+function assertCompiled(result) {
+  assert.equal(
+    result.status,
+    0,
+    `module compilation failed: ${result.error ?? ""}\n${combinedOutput(result)}`,
+  );
+  return result;
+}
+
+function readFixture(name) {
+  return readFile(
+    new URL(`../../fixtures/runtime/${name}.lean`, import.meta.url),
+    "utf8",
+  );
+}
+
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
 
-async function assertExternFallbackRejected(fileName, lines, message, pattern) {
-  const source = join(freshDir, fileName);
-  await writeFile(source, lines.join("\n"));
-  const checked = checkLeanSource(source);
+async function assertExternFallbackRejected(module, lines, message, pattern) {
+  const project = await createRuntimeModuleProject(join(freshDir, module), {
+    [module]: lines.join("\n"),
+  });
+  const checked = project.build();
   assert.notEqual(checked.status, 0, message);
   assert.match(combinedOutput(checked), pattern);
 }
 
 try {
-  ensureVirIrpkgBuilt();
-
-  const jsonProbeSource = join(freshDir, "JsonControls.lean");
-  await writeFile(
-    jsonProbeSource,
-    [
-      "import Vir.GeneratePackage.Json",
+  const jsonOutput = join(freshDir, "json-controls.json");
+  const jsonProject = await createRuntimeModuleProject(join(freshDir, "json"), {
+    JsonControls: [
+      "module",
+      "public meta import Vir.GeneratePackage.Json",
+      "public meta import Lean.CoreM",
       "",
       "open Vir.GeneratePackage",
       "",
       "def allJsonControlChars : String :=",
       "  String.ofList ((List.range 32).map Char.ofNat)",
       "",
-      "#eval IO.println (jsonString allJsonControlChars)",
+      `#eval IO.FS.writeFile ${JSON.stringify(jsonOutput)} (jsonString allJsonControlChars)`,
       "",
     ].join("\n"),
-  );
-
-  const encodedControls = spawnSync("lake", ["env", "lean", jsonProbeSource], {
-    encoding: "utf8",
   });
-  assert.equal(
-    encodedControls.status,
-    0,
-    encodedControls.stderr || encodedControls.stdout,
-  );
+  assertCompiled(jsonProject.build());
   const controlChars = Array.from({ length: 32 }, (_, codePoint) =>
     String.fromCodePoint(codePoint),
   ).join("");
-  assert.equal(JSON.parse(encodedControls.stdout), controlChars);
+  assert.equal(JSON.parse(await readFile(jsonOutput, "utf8")), controlChars);
 
-  const evalSource = join(freshDir, "EvalSourceHandling.lean");
   const evalPackage = join(freshDir, "eval-source-handling.irpkg");
   const evalReport = join(freshDir, "eval-source-handling.report.md");
   const evalSentinel = "VIR_GENERATOR_EVAL";
-  await writeRuntimeFixture(evalSource, "EvalSourceHandling.lean");
+  const evalProject = await createRuntimeModuleProject(join(freshDir, "eval"), {
+    EvalSourceHandling: await readFixture("EvalSourceHandling"),
+  });
+  const compiledEval = assertCompiled(evalProject.build());
 
-  const generatedEvalSource = runVirIrpkg([
+  const generatedEvalSource = evalProject.runVirIrpkg([
     evalPackage,
     evalReport,
-    "--target-all",
-    evalSource,
+    "--target-all-module",
+    "EvalSourceHandling",
   ]);
   assert.equal(
     generatedEvalSource.status,
@@ -92,13 +91,17 @@ try {
   );
   for (const suffix of ["SINGLE", "BANG", "MULTILINE", "NESTED"]) {
     assert.match(
-      generatedEvalSource.stdout,
+      combinedOutput(compiledEval),
       new RegExp(`${evalSentinel}_${suffix}`),
     );
   }
   assert.doesNotMatch(
-    generatedEvalSource.stdout,
+    combinedOutput(compiledEval),
     new RegExp(`${evalSentinel}_(COMMENT|STRING)`),
+  );
+  assert.doesNotMatch(
+    combinedOutput(generatedEvalSource),
+    new RegExp(evalSentinel),
   );
 
   const inspectedEvalSource = spawnSync(
@@ -114,66 +117,81 @@ try {
   const evalSourceManifest = JSON.parse(inspectedEvalSource.stdout).manifest;
   manifestEntry(evalSourceManifest, "evalSourceValue");
 
-  const markedSource = join(freshDir, "MarkedExports.lean");
-  const markedSourceAlias = join(freshDir, "MarkedExportsAlias.lean");
   const markedPackage = join(freshDir, "marked-exports.irpkg");
   const markedReport = join(freshDir, "marked-exports.report.md");
-  const sourceElaborationSentinel = "VIR_SOURCE_ELABORATED_ONCE";
-  await writeFile(
-    markedSource,
-    [
-      "import Vir",
-      "",
-      `#eval IO.println "${sourceElaborationSentinel}"`,
-      "",
-      "example : Lean.LabelExtension := vir_export",
-      "example : Lean.LabelExtension := vir_startup",
-      "",
-      "@[vir_export]",
-      "def markedValue (n : Nat) : Nat := n + 1",
-      "",
-      "@[vir_export]",
-      "opaque markedOpaque : Nat := 40",
-      "",
-      "def markedLater : Nat := 41",
-      "attribute [vir_export] markedLater",
-      "",
-      "def removedMark : Nat := 42",
-      "attribute [vir_export] removedMark",
-      "attribute [-vir_export] removedMark",
-      "",
-      "@[vir_startup]",
-      "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
-      "",
-      "abbrev StartupResult := Unit",
-      "abbrev StartupAction := IO StartupResult",
-      "",
-      "@[vir_startup]",
-      "def markedAliasStartup : StartupAction := pure ()",
-      "",
-      "@[vir_startup]",
-      "def markedRuntimeStartup : Lean.Vir.RuntimeM Unit := pure ()",
-      "",
-      "@[vir_startup]",
-      "def markedReactStartup : Lean.Vir.React.ReactM Unit := pure ()",
-      "",
-      "def markedLaterStartup : Unit := ()",
-      "attribute [vir_startup] markedLaterStartup",
-      "",
-      "def removedStartup : Unit := ()",
-      "attribute [vir_startup] removedStartup",
-      "attribute [-vir_startup] removedStartup",
-      "",
-      "def notMarked : Nat := 37",
-      "",
-    ].join("\n"),
+  const sourceElaborationSentinel = "VIR_MODULE_COMPILED_ONCE";
+  const markedProject = await createRuntimeModuleProject(
+    join(freshDir, "marked"),
+    {
+      MarkedExports: [
+        "module",
+        "public import Vir",
+        "public meta import Lean.CoreM",
+        "public section",
+        "",
+        `#eval IO.println "${sourceElaborationSentinel}"`,
+        "",
+        "example : Lean.LabelExtension := vir_export",
+        "example : Lean.LabelExtension := vir_startup",
+        "",
+        "@[vir_export]",
+        "def markedValue (n : Nat) : Nat := n + 1",
+        "",
+        "@[vir_export]",
+        "opaque markedOpaque : Nat := 40",
+        "",
+        "def markedLater : Nat := 41",
+        "attribute [vir_export] markedLater",
+        "",
+        "def removedMark : Nat := 42",
+        "attribute [vir_export] removedMark",
+        "attribute [-vir_export] removedMark",
+        "run_meta do",
+        "  if (vir_export.getState (← Lean.getEnv)).contains `removedMark then",
+        '    throwError "local export label removal did not take effect"',
+        "",
+        "@[vir_startup]",
+        "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
+        "",
+        "abbrev StartupResult := Unit",
+        "abbrev StartupAction := IO StartupResult",
+        "",
+        "@[vir_startup]",
+        "def markedAliasStartup : StartupAction := pure ()",
+        "",
+        "@[vir_startup]",
+        "def markedRuntimeStartup : Lean.Vir.RuntimeM Unit := pure ()",
+        "",
+        "@[vir_startup]",
+        "def markedReactStartup : Lean.Vir.React.ReactM Unit := pure ()",
+        "",
+        "def markedLaterStartup : Unit := ()",
+        "attribute [vir_startup] markedLaterStartup",
+        "",
+        "def removedStartup : Unit := ()",
+        "attribute [vir_startup] removedStartup",
+        "attribute [-vir_startup] removedStartup",
+        "run_meta do",
+        "  if (vir_startup.getState (← Lean.getEnv)).contains `removedStartup then",
+        '    throwError "local startup label removal did not take effect"',
+        "",
+        "def notMarked : Nat := 37",
+        "",
+      ].join("\n"),
+    },
   );
-  await symlink(markedSource, markedSourceAlias);
-  const generatedMarked = runVirIrpkg([
+  const compiledMarked = assertCompiled(markedProject.build());
+  assert.equal(
+    combinedOutput(compiledMarked).match(
+      new RegExp(sourceElaborationSentinel, "g"),
+    )?.length,
+    1,
+  );
+  const generatedMarked = markedProject.runVirIrpkg([
     markedPackage,
     markedReport,
-    "--target-marked",
-    markedSource,
+    "--target-marked-module",
+    "MarkedExports",
   ]);
   assert.equal(
     generatedMarked.status,
@@ -191,7 +209,12 @@ try {
     inspectedMarked.stderr || inspectedMarked.stdout,
   );
   const markedManifest = JSON.parse(inspectedMarked.stdout).manifest;
-  assert.equal(markedManifest.metadata.targets[0].mode, "marked");
+  assert.equal(markedManifest.metadata.targets[0].mode, "markedModule");
+  assert.equal(markedManifest.metadata.targets[0].module, "MarkedExports");
+  assert.doesNotMatch(
+    combinedOutput(generatedMarked),
+    new RegExp(sourceElaborationSentinel),
+  );
   assert.deepEqual(markedManifest.exports.map((entry) => entry.entry).sort(), [
     "markedAliasStartup",
     "markedLater",
@@ -201,9 +224,14 @@ try {
     "markedRuntimeStartup",
     "markedStartup",
     "markedValue",
+    "removedMark",
+    "removedStartup",
   ]);
+  // Lean label erasure changes local state, not the additions saved in the
+  // compiled module. The run_meta checks above cover the local side.
+  assert.equal(manifestEntry(markedManifest, "removedMark").startup, false);
   assert.equal(
-    markedManifest.exports.some((entry) => entry.entry === "removedMark"),
+    markedManifest.exports.some((entry) => entry.entry === "notMarked"),
     false,
   );
   assert.equal(manifestEntry(markedManifest, "markedValue").startup, false);
@@ -215,26 +243,23 @@ try {
     ["markedReactStartup", "react"],
     ["markedRuntimeStartup", "runtime"],
     ["markedStartup", "dom"],
+    ["removedStartup", "pure"],
   ]) {
     const entry = manifestEntry(markedManifest, entryName);
     assert.equal(entry.startup, true);
     assert.equal(entry.effect, effect);
   }
-  assert.equal(
-    markedManifest.exports.some((entry) => entry.entry === "removedStartup"),
-    false,
-  );
 
   const selectionModesPackage = join(freshDir, "selection-modes.irpkg");
   const selectionModesReport = join(freshDir, "selection-modes.report.md");
-  const generatedSelectionModes = runVirIrpkg([
+  const generatedSelectionModes = markedProject.runVirIrpkg([
     selectionModesPackage,
     selectionModesReport,
-    "--target",
-    markedSource,
+    "--target-module",
+    "MarkedExports",
     "markedValue",
-    "--package-target",
-    markedSourceAlias,
+    "--package-module",
+    "MarkedExports",
     "notMarked",
   ]);
   assert.equal(
@@ -242,12 +267,10 @@ try {
     0,
     generatedSelectionModes.stderr || generatedSelectionModes.stdout,
   );
-  assert.equal(
-    generatedSelectionModes.stdout.match(
-      new RegExp(sourceElaborationSentinel, "g"),
-    )?.length,
-    1,
-    "a source shared by multiple target modes must be elaborated exactly once",
+  assert.doesNotMatch(
+    combinedOutput(generatedSelectionModes),
+    new RegExp(sourceElaborationSentinel),
+    "reusing a module across selection modes must not elaborate it again",
   );
   const inspectedSelectionModes = spawnSync(
     "node",
@@ -277,36 +300,41 @@ try {
     ["markedValue"],
   );
 
-  const malformedRoot = runVirIrpkg([
+  const malformedRoot = markedProject.runVirIrpkg([
     join(freshDir, "malformed-root.irpkg"),
     join(freshDir, "malformed-root.report.md"),
-    "--target",
-    markedSource,
+    "--target-module",
+    "MarkedExports",
     "markedValue.",
   ]);
   assert.equal(malformedRoot.status, 2);
   assert.match(malformedRoot.stderr, /is not a valid Lean name/);
 
-  const unknownTargetOption = runVirIrpkg([
+  const unknownTargetOption = markedProject.runVirIrpkg([
     join(freshDir, "unknown-target-option.irpkg"),
     join(freshDir, "unknown-target-option.report.md"),
-    "--target",
-    markedSource,
+    "--target-module",
+    "MarkedExports",
     "markedValue",
     "--typo",
   ]);
   assert.equal(unknownTargetOption.status, 2);
   assert.match(unknownTargetOption.stderr, /got `--typo`/);
 
-  const externFallbackSource = join(freshDir, "ExternFallback.lean");
   const externFallbackPackage = join(freshDir, "extern-fallback.irpkg");
   const externFallbackReport = join(freshDir, "extern-fallback.report.md");
-  await writeRuntimeFixture(externFallbackSource, "ExternFallback.lean");
-  const generatedExternFallback = runVirIrpkg([
+  const externProject = await createRuntimeModuleProject(
+    join(freshDir, "extern"),
+    {
+      ExternFallback: await readFixture("ExternFallback"),
+    },
+  );
+  assertCompiled(externProject.build());
+  const generatedExternFallback = externProject.runVirIrpkg([
     externFallbackPackage,
     externFallbackReport,
-    "--target-marked",
-    externFallbackSource,
+    "--target-marked-module",
+    "ExternFallback",
   ]);
   assert.equal(
     generatedExternFallback.status,
@@ -335,9 +363,11 @@ try {
   }
 
   await assertExternFallbackRejected(
-    "BodylessExternFallback.lean",
+    "BodylessExternFallback",
     [
-      "import Vir",
+      "module",
+      "public import Vir",
+      "public section",
       "",
       '@[extern "vir_test_bodyless"]',
       "opaque bodylessExtern (n : Nat) : Nat",
@@ -349,9 +379,11 @@ try {
     /extern `bodylessExtern` has no transparent Lean definition body/,
   );
   await assertExternFallbackRejected(
-    "OrdinaryExternFallback.lean",
+    "OrdinaryExternFallback",
     [
-      "import Vir",
+      "module",
+      "public import Vir",
+      "public section",
       "",
       "def ordinaryDefinition (n : Nat) : Nat := n + 1",
       "",
@@ -362,9 +394,11 @@ try {
     /`ordinaryDefinition` is not an `@\[extern\]` declaration/,
   );
   await assertExternFallbackRejected(
-    "DuplicateExternFallback.lean",
+    "DuplicateExternFallback",
     [
-      "import Vir",
+      "module",
+      "public import Vir",
+      "public section",
       "",
       '@[extern "vir_test_duplicate"]',
       "def duplicateExtern (n : Nat) : Nat := n + 1",
@@ -377,9 +411,11 @@ try {
     /extern `duplicateExtern` already has a VIR reference-body fallback/,
   );
   await assertExternFallbackRejected(
-    "RecursiveExternFallback.lean",
+    "RecursiveExternFallback",
     [
-      "import Vir",
+      "module",
+      "public import Vir",
+      "public section",
       "",
       '@[extern "vir_test_recursive"]',
       "unsafe def recursiveExtern (n : Nat) : Nat := recursiveExtern n",
@@ -391,10 +427,6 @@ try {
     /extern `recursiveExtern` has a recursive reference body/,
   );
 
-  const spoofedExternFallbackSource = join(
-    freshDir,
-    "SpoofedExternFallback.lean",
-  );
   const spoofedExternFallbackPackage = join(
     freshDir,
     "spoofed-extern-fallback.irpkg",
@@ -403,28 +435,33 @@ try {
     freshDir,
     "spoofed-extern-fallback.report.md",
   );
-  await writeFile(
-    spoofedExternFallbackSource,
-    [
-      "import Vir",
-      "",
-      "namespace _virExternFallback",
-      "def spoofedExtern (input : String) : String := input",
-      "end _virExternFallback",
-      "",
-      '@[extern "vir_test_spoofed"]',
-      "def spoofedExtern (n : Nat) : Nat := n + 1",
-      "",
-      "@[vir_export]",
-      "def callSpoofedExtern (n : Nat) : Nat := spoofedExtern n",
-      "",
-    ].join("\n"),
+  const spoofedProject = await createRuntimeModuleProject(
+    join(freshDir, "spoofed"),
+    {
+      SpoofedExternFallback: [
+        "module",
+        "public import Vir",
+        "public section",
+        "",
+        "namespace _virExternFallback",
+        "def spoofedExtern (input : String) : String := input",
+        "end _virExternFallback",
+        "",
+        '@[extern "vir_test_spoofed"]',
+        "def spoofedExtern (n : Nat) : Nat := n + 1",
+        "",
+        "@[vir_export]",
+        "def callSpoofedExtern (n : Nat) : Nat := spoofedExtern n",
+        "",
+      ].join("\n"),
+    },
   );
-  const generatedSpoofedExternFallback = runVirIrpkg([
+  assertCompiled(spoofedProject.build());
+  const generatedSpoofedExternFallback = spoofedProject.runVirIrpkg([
     spoofedExternFallbackPackage,
     spoofedExternFallbackReport,
-    "--target-marked",
-    spoofedExternFallbackSource,
+    "--target-marked-module",
+    "SpoofedExternFallback",
   ]);
   assert.equal(
     generatedSpoofedExternFallback.status,
@@ -437,39 +474,37 @@ try {
     /- `spoofedExtern` from/,
   );
 
-  const markedUnsupportedSignatureSource = join(
-    freshDir,
-    "MarkedUnsupportedSignature.lean",
+  const signatureProject = await createRuntimeModuleProject(
+    join(freshDir, "signature"),
+    {
+      MarkedUnsupportedSignature: [
+        "module",
+        "public import Vir",
+        "public section",
+        "",
+        "namespace MarkedUnsupportedSignature",
+        "",
+        "@[vir_export]",
+        "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
+        "",
+        "@[vir_export]",
+        "def polymorphicIdentity {α : Type} (value : α) : α := value",
+        "",
+        "@[vir_export]",
+        "theorem proofIsNotExecutable : True := trivial",
+        "",
+        "@[vir_export]",
+        "axiom axiomIsNotExecutable : Nat",
+        "",
+        "@[vir_export]",
+        "private def hidden : Nat := 42",
+        "",
+        "end MarkedUnsupportedSignature",
+        "",
+      ].join("\n"),
+    },
   );
-  await writeFile(
-    markedUnsupportedSignatureSource,
-    [
-      "import Vir",
-      "",
-      "namespace MarkedUnsupportedSignature",
-      "",
-      "@[vir_export]",
-      "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
-      "",
-      "@[vir_export]",
-      "def polymorphicIdentity {α : Type} (value : α) : α := value",
-      "",
-      "@[vir_export]",
-      "theorem proofIsNotExecutable : True := trivial",
-      "",
-      "@[vir_export]",
-      "axiom axiomIsNotExecutable : Nat",
-      "",
-      "@[vir_export]",
-      "private def hidden : Nat := 42",
-      "",
-      "end MarkedUnsupportedSignature",
-      "",
-    ].join("\n"),
-  );
-  const checkedMarkedUnsupportedSignature = checkLeanSource(
-    markedUnsupportedSignatureSource,
-  );
+  const checkedMarkedUnsupportedSignature = signatureProject.build();
   assert.notEqual(
     checkedMarkedUnsupportedSignature.status,
     0,
@@ -499,30 +534,28 @@ try {
     /private declarations cannot be VIR exports; remove `private` or export a public wrapper/,
   );
 
-  const markedUnsupportedDependencySource = join(
-    freshDir,
-    "MarkedUnsupportedDependency.lean",
+  const dependencyProject = await createRuntimeModuleProject(
+    join(freshDir, "dependency"),
+    {
+      MarkedUnsupportedDependency: [
+        "module",
+        "public import Vir",
+        "public section",
+        "",
+        "namespace MarkedUnsupportedDependency",
+        "",
+        "def environmentHome : IO String := do",
+        '  return (← IO.getEnv "HOME").getD ""',
+        "",
+        "@[vir_export]",
+        "def home : IO String := environmentHome",
+        "",
+        "end MarkedUnsupportedDependency",
+        "",
+      ].join("\n"),
+    },
   );
-  await writeFile(
-    markedUnsupportedDependencySource,
-    [
-      "import Vir",
-      "",
-      "namespace MarkedUnsupportedDependency",
-      "",
-      "def environmentHome : IO String := do",
-      '  return (← IO.getEnv "HOME").getD ""',
-      "",
-      "@[vir_export]",
-      "def home : IO String := environmentHome",
-      "",
-      "end MarkedUnsupportedDependency",
-      "",
-    ].join("\n"),
-  );
-  const checkedMarkedUnsupportedDependency = checkLeanSource(
-    markedUnsupportedDependencySource,
-  );
+  const checkedMarkedUnsupportedDependency = dependencyProject.build();
   assert.notEqual(
     checkedMarkedUnsupportedDependency.status,
     0,
@@ -536,50 +569,64 @@ try {
     /invalid `@\[vir_export\]` declaration `MarkedUnsupportedDependency\.home`: compiled closure reaches unsupported runtime dependency `IO\.getEnv`: no native extern implementation is registered \(via MarkedUnsupportedDependency\.home[^\n]* -> MarkedUnsupportedDependency\.environmentHome[^\n]* -> IO\.getEnv\)/,
   );
 
-  const markedPostponedSource = join(freshDir, "MarkedPostponed.lean");
-  await writeFile(
-    markedPostponedSource,
-    [
-      "module",
-      "",
-      "public meta import Vir.Attributes",
-      "",
-      "set_option compiler.postponeCompile true",
-      "",
-      "@[vir_export]",
-      "public def MarkedPostponed.value : Nat := 42",
-      "",
-    ].join("\n"),
+  const postponedProject = await createRuntimeModuleProject(
+    join(freshDir, "postponed"),
+    {
+      MarkedPostponed: [
+        "module",
+        "",
+        "public meta import Vir.Attributes",
+        "",
+        "set_option compiler.postponeCompile true",
+        "",
+        "@[vir_export]",
+        "public def MarkedPostponed.value : Nat := 42",
+        "",
+      ].join("\n"),
+    },
   );
-  const checkedMarkedPostponed = checkLeanSource(markedPostponedSource);
+  // This deliberately disables IR production, so only check elaboration. A
+  // Lake artifact build would fail looking for the intentionally absent .ir.
+  const checkedMarkedPostponed = spawnSync(
+    "lean",
+    [postponedProject.sourcePath("MarkedPostponed")],
+    {
+      cwd: postponedProject.directory,
+      env: postponedProject.env(),
+      encoding: "utf8",
+    },
+  );
   assert.equal(
     checkedMarkedPostponed.status,
     0,
-    checkedMarkedPostponed.stderr || checkedMarkedPostponed.stdout,
+    combinedOutput(checkedMarkedPostponed),
   );
   assert.match(
     combinedOutput(checkedMarkedPostponed),
     /could not validate `MarkedPostponed\.value` because `compiler\.postponeCompile` is enabled; disable it for modules built with `:vir`/,
   );
 
-  const startupDependencySource = join(freshDir, "StartupDependency.lean");
-  await writeFile(
-    startupDependencySource,
-    [
-      "import Vir",
-      "",
-      "namespace StartupDependency",
-      "",
-      "@[vir_startup]",
-      "def home : IO Unit := do",
-      '  let _ ← IO.getEnv "HOME"',
-      "  pure ()",
-      "",
-      "end StartupDependency",
-      "",
-    ].join("\n"),
+  const startupProject = await createRuntimeModuleProject(
+    join(freshDir, "startup"),
+    {
+      StartupDependency: [
+        "module",
+        "public import Vir",
+        "public section",
+        "",
+        "namespace StartupDependency",
+        "",
+        "@[vir_startup]",
+        "def home : IO Unit := do",
+        '  let _ ← IO.getEnv "HOME"',
+        "  pure ()",
+        "",
+        "end StartupDependency",
+        "",
+      ].join("\n"),
+    },
   );
-  const checkedStartupDependency = checkLeanSource(startupDependencySource);
+  const checkedStartupDependency = startupProject.build();
   assert.notEqual(
     checkedStartupDependency.status,
     0,
@@ -592,11 +639,18 @@ try {
   );
 
   const slidesPackage = join(freshDir, "slides-canvas.irpkg");
-  const generatedSlides = runVirIrpkg([
+  const slidesProject = await createRuntimeModuleProject(
+    join(freshDir, "slides"),
+    {
+      SlidesInput: "module\npublic import SlidesCanvas\n",
+    },
+  );
+  assertCompiled(slidesProject.build());
+  const generatedSlides = slidesProject.runVirIrpkg([
     slidesPackage,
     join(freshDir, "slides-canvas.report.md"),
-    "--target-marked",
-    "examples/SlidesCanvas.lean",
+    "--target-marked-module",
+    "SlidesCanvas",
   ]);
   assert.equal(
     generatedSlides.status,
@@ -632,13 +686,18 @@ try {
     );
   }
 
-  const noMarkedSource = join(freshDir, "NoMarkedExports.lean");
-  await writeFile(noMarkedSource, "def ordinaryValue : Nat := 1\n");
-  const generatedWithoutMarks = runVirIrpkg([
+  const noMarkedProject = await createRuntimeModuleProject(
+    join(freshDir, "no-marked"),
+    {
+      NoMarkedExports: "module\npublic def ordinaryValue : Nat := 1\n",
+    },
+  );
+  assertCompiled(noMarkedProject.build());
+  const generatedWithoutMarks = noMarkedProject.runVirIrpkg([
     join(freshDir, "no-marked-exports.irpkg"),
     join(freshDir, "no-marked-exports.report.md"),
-    "--target-marked",
-    noMarkedSource,
+    "--target-marked-module",
+    "NoMarkedExports",
   ]);
   assert.notEqual(generatedWithoutMarks.status, 0);
   assert.match(
@@ -646,33 +705,36 @@ try {
     /no declarations are marked with `@\[vir_export\]` or `@\[vir_startup\]`/,
   );
 
-  const badStartupSource = join(freshDir, "BadStartup.lean");
-  await writeFile(
-    badStartupSource,
-    [
-      "import Vir",
-      "",
-      "@[vir_startup]",
-      "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
-      "",
-      "@[vir_startup]",
-      "def badStartupResult : IO Nat := pure 1",
-      "",
-      "@[vir_startup]",
-      "def badPureStartupResult : Nat := 1",
-      "",
-      "@[vir_startup]",
-      "def unsupportedStartupEffect : Option Unit := some ()",
-      "",
-      "@[vir_startup]",
-      "theorem startupProof : True := trivial",
-      "",
-      "@[vir_startup]",
-      "private def privateStartup : Unit := ()",
-      "",
-    ].join("\n"),
+  const badStartupProject = await createRuntimeModuleProject(
+    join(freshDir, "bad-startup"),
+    {
+      BadStartup: [
+        "module",
+        "public import Vir",
+        "public section",
+        "",
+        "@[vir_startup]",
+        "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
+        "",
+        "@[vir_startup]",
+        "def badStartupResult : IO Nat := pure 1",
+        "",
+        "@[vir_startup]",
+        "def badPureStartupResult : Nat := 1",
+        "",
+        "@[vir_startup]",
+        "def unsupportedStartupEffect : Option Unit := some ()",
+        "",
+        "@[vir_startup]",
+        "theorem startupProof : True := trivial",
+        "",
+        "@[vir_startup]",
+        "private def privateStartup : Unit := ()",
+        "",
+      ].join("\n"),
+    },
   );
-  const checkedBadStartup = checkLeanSource(badStartupSource);
+  const checkedBadStartup = badStartupProject.build();
   assert.notEqual(checkedBadStartup.status, 0);
   const badStartupOutput = combinedOutput(checkedBadStartup);
   assert.match(
@@ -700,16 +762,21 @@ try {
     /private declarations cannot be VIR startup hooks; remove `private` or use a public wrapper/,
   );
 
-  const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");
   const runtimeReport = join(freshDir, "runtime-effect.report.md");
-  await writeRuntimeFixture(runtimeSource, "RuntimeEffect.lean");
+  const runtimeProject = await createRuntimeModuleProject(
+    join(freshDir, "runtime"),
+    {
+      RuntimeEffect: await readFixture("RuntimeEffect"),
+    },
+  );
+  assertCompiled(runtimeProject.build());
 
-  const generated = runVirIrpkg([
+  const generated = runtimeProject.runVirIrpkg([
     runtimePackage,
     runtimeReport,
-    "--target-all",
-    runtimeSource,
+    "--target-all-module",
+    "RuntimeEffect",
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
@@ -742,7 +809,6 @@ try {
   assert.match(report, /runtimeValue/);
   assert.match(report, /test\.runtime\.value/);
 
-  const hostSlotSource = join(freshDir, "HostImportSlots.lean");
   const hostSlotPackage = join(freshDir, "host-import-slots.irpkg");
   const hostSlotReport = join(freshDir, "host-import-slots.report.md");
   const hostSlotNames = Array.from(
@@ -754,25 +820,30 @@ try {
     `private opaque ${name} : Lean.Vir.RuntimeM (Lean.Vir.Js Unit)`,
     "",
   ]);
-  await writeFile(
-    hostSlotSource,
-    [
-      "import Vir.Js",
-      "set_option maxRecDepth 1024",
-      "",
-      ...hostSlotLines,
-      "def hostSlotTotal : Lean.Vir.RuntimeM (Lean.Vir.Js Unit) := do",
-      ...hostSlotNames.slice(0, -1).map((name) => `  let _ ← ${name}`),
-      `  ${hostSlotNames.at(-1)}`,
-      "",
-    ].join("\n"),
+  const hostSlotProject = await createRuntimeModuleProject(
+    join(freshDir, "slots"),
+    {
+      HostImportSlots: [
+        "module",
+        "public import Vir.Js",
+        "public section",
+        "set_option maxRecDepth 1024",
+        "",
+        ...hostSlotLines,
+        "def hostSlotTotal : Lean.Vir.RuntimeM (Lean.Vir.Js Unit) := do",
+        ...hostSlotNames.slice(0, -1).map((name) => `  let _ ← ${name}`),
+        `  ${hostSlotNames.at(-1)}`,
+        "",
+      ].join("\n"),
+    },
   );
+  assertCompiled(hostSlotProject.build());
 
-  const generatedHostSlots = runVirIrpkg([
+  const generatedHostSlots = hostSlotProject.runVirIrpkg([
     hostSlotPackage,
     hostSlotReport,
-    "--target-all",
-    hostSlotSource,
+    "--target-all-module",
+    "HostImportSlots",
   ]);
   assert.equal(
     generatedHostSlots.status,
