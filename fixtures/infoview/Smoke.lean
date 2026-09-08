@@ -178,9 +178,19 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   expect "live root owns a private initialized global" <|
     (closure.forModule env.mainModule env.mainModule).initGlobals.any fun entry =>
       Lean.isPrivateName entry.name
-  expect "module partitioning preserves exactly the owned initializer globals" <|
-    (order.foldl (fun count name => count + (closure.forModule name env.mainModule).initGlobals.size) 0)
-      == closure.initGlobals.size
+  let initializerPartitions := order.map fun name =>
+    (name, (closure.forModule name env.mainModule).initGlobals)
+  let initializerPairs := fun (entries : Array Vir.GeneratePackage.InitGlobal) =>
+    (entries.map fun entry => (entry.name, entry.initName)).qsort fun a b =>
+      if a.1 == b.1 then Lean.Name.quickLt a.2 b.2 else Lean.Name.quickLt a.1 b.1
+  expect "module partitioning preserves initializer pairs with exact multiplicity" <|
+    initializerPairs (initializerPartitions.flatMap (·.2)) ==
+      initializerPairs closure.initGlobals
+  expect "each initializer is in its original declaration owner's partition" <|
+    initializerPartitions.all fun (moduleName, entries) =>
+      entries.all fun entry =>
+        closure.decls.any fun loaded =>
+          loaded.decl.name == entry.name && loaded.module? == some moduleName
   let text := Lean.FileMap.ofString contents
   let token ← Lean.Vir.Infoview.packageClosureToken text source input env
   let revision := Lean.Vir.Infoview.irPackageRevision roots token
