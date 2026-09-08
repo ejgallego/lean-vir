@@ -131,12 +131,24 @@ source to fall back to. Local edits must survive imported-owner resolution. -/
 unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
   let source := "unsaved/ModuleSnapshot.lean"
   let contents := "module\npublic import InfoviewFixtures.ImportedHelper\n" ++
-    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ " ++
-    s!"{Lean.Json.compress (.str suffix)}\n"
+    "@[noinline] private def snapshotSuffix (_ : Unit) : String := " ++
+    s!"{Lean.Json.compress (.str suffix)}\n" ++
+    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ snapshotSuffix ()\n"
   let env ← snapshotEnvironment source contents
   let target : Vir.GeneratePackage.Target := { origin := .source source, mode := .explicit #[`snapshotValue] }
   let index := Vir.GeneratePackage.declIndexFromEnvironment source env
   let closure := Vir.GeneratePackage.collectClosure #[target] index
+  expect "snapshot root records its current module" <|
+    (index.find? `snapshotValue).bind (·.module?) == some env.mainModule
+  expect "snapshot locals retain document provenance and module ownership" <|
+    index.localDecls.all fun _ loaded =>
+      loaded.source == source && loaded.module? == some env.mainModule
+  expect "snapshot closure includes a private current-module helper" <|
+    closure.decls.any fun loaded =>
+      Lean.isPrivateName loaded.decl.name && loaded.module? == some env.mainModule
+  let retained ← index.loadImportedModule env.mainModule
+  expect "snapshot current module is already loaded without disk artifacts" <|
+    retained.sources.size == index.sources.size
   expect "module snapshot resolves opaque imports" closure.missingDecls.isEmpty
   expect "module snapshot resolves externs" closure.missingExterns.isEmpty
   expect s!"module snapshot resolves initializer globals: {closure.unsupportedInitGlobals.map Vir.GeneratePackage.ClosureDependency.name}"

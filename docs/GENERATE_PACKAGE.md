@@ -62,6 +62,12 @@ over opaque imported entries, including private dependency bodies. Revision
 calculation and emission use the same snapshot environment; RPC tasks do not run a
 second frontend or enable global initializer execution.
 
+The environment adapter assigns snapshot-local IR (including private/generated
+helpers) to `env.mainModule` for module-system documents. It also records that
+module as already loaded, so owner resolution cannot reopen its on-disk artifact
+over unsaved edits. Imported declarations retain Lean's imported-module owners;
+document paths remain available for diagnostics and revision source ranges.
+
 ## Module Map
 
 The public shim and every library module in the package-generation pipeline use

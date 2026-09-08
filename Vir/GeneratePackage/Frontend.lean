@@ -203,9 +203,15 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     } }
   return index
 
+/-- Index the live environment without reopening its document or compiled root.
+Local IR belongs to the current module, including private/generated declarations;
+imported owners still come from Lean's module table. The source is provenance. -/
 def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex := Id.run do
+  let localModule? := if env.header.isModule then some env.mainModule else none
   let mut names : Array Name := #[]
   let mut index : DeclIndex := {
+    -- Never replace unsaved local IR with the current module's disk artifacts.
+    loadedModules := localModule?.map (fun name => ({} : NameSet).insert name) |>.getD {}
     sources := #[{
       key := source
       display := source
@@ -220,7 +226,7 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
       index with
       localDecls := index.localDecls.insert decl.name {
         source
-        module? := environmentModuleForDecl? env decl.name
+        module? := environmentModuleForDecl? env decl.name <|> localModule?
         decl
       }
     }

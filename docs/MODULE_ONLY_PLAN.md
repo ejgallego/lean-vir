@@ -91,7 +91,14 @@ native-over-fallback selection and fallback without the manifest.
 Illuminate's producer likewise builds the adapter inside its existing isolated
 client source view, preserving the client's Lake configuration and dependency
 pins. It uses marked-module selection for package-set emission. Type anchors,
-live snapshot ownership and the lean-zip producer remain pending.
+the final live snapshot input API and the lean-zip producer remain pending.
+
+The snapshot declaration index now assigns current-module ownership to local
+IR, including private helpers, and marks the live module as already loaded.
+Imported ownership remains distinct; owner resolution cannot replace unsaved
+local IR with disk artifacts. The RPC-facing target still uses the transitional
+source-origin constructor; its final API migration remains coordinated with
+the RPC owner.
 
 ## Design Decisions
 
