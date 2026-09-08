@@ -188,8 +188,10 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
   let buildToken ← Lean.Vir.Infoview.packageClosureToken text source buildInput env
   expect "stat/build preparation gives the same revision for the same snapshot" <|
     revision == Lean.Vir.Infoview.irPackageRevision roots buildToken
-  expect "snapshot revision includes actual source ranges" <|
-    (token.splitOn "source-ranges:none").length == 1
+  let some rangeToken ← Lean.Vir.Infoview.packageRangeToken? text source closure env
+    | throw <| IO.userError "infoview smoke failed: snapshot has no source range token"
+  expect "snapshot revision includes the computed source range token" <|
+    token.endsWith s!":{rangeToken}"
   match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with
   | .error message => throw <| IO.userError message
   | .ok pkg =>

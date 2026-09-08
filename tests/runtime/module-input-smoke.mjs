@@ -139,9 +139,10 @@ try {
     ["--target-module", "fixtures/Basic.lean", selected],
     ["--target-module", "fixtures\\Basic.lean", selected],
     ["--target-all-module", "Basic.lean"],
-    ...["--target", "--package-target", "--target-all", "--target-marked"].map(
-      (flag) => [flag, "fixtures/Basic.lean", selected],
-    ),
+    ["--target", "fixtures/Basic.lean", selected],
+    ["--package-target", "fixtures/Basic.lean", selected],
+    ["--target-all", "fixtures/Basic.lean"],
+    ["--target-marked", "fixtures/Basic.lean"],
   ]) {
     const result = lake([
       "env",
