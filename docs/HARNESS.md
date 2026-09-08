@@ -427,6 +427,14 @@ client, and a real `lake serve` process in Chromium. It does not need a site
 build. If the Wasm artifact is missing or its producer changed, first build the
 matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
 
+`CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs`
+is a separate manual characterization probe for the pinned upstream infoview
+async hooks. It requires neither Lean nor Wasm and prints controlled request,
+Strict Mode, cancellation, and stale-result traces. It imports the published
+hooks unchanged; their current limitations are observations, not assertions
+that VIR should preserve those bugs. See
+[the compatibility note](PROOFWIDGETS_RPC_COMPATIBILITY.md#component-unmount-is-not-interpreter-disposal).
+
 ## Performance Comparisons
 
 Benchmark commands, artifact-cache behavior, and before/after comparison

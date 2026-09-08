@@ -133,6 +133,28 @@ handwritten per-widget JS and could avoid pending Lean continuations in this
 example. It remains an unimplemented acceptance target, not a reason to change
 ordinary callback-disposal semantics or introduce a VIR request manager.
 
+The manual [upstream async probe](../tests/infoview/upstream-async-probe.mjs)
+executes the published `@leanprover/infoview` 0.13.0 hooks unchanged against
+React 19.2.7 in Chromium, without VIR or a Lean server. It exposes two obstacles
+to using this version as a drop-in replacement for the tutorial:
+
+- Both `useAsync` and `useAsyncPersistent` start one request on initial Strict
+  Mode rendering. Effect replay aborts it without starting a replacement. A
+  cancellation-aware request leaves the hook rejected.
+- With `useAsyncPersistent`, start B, replace it with C, resolve C, then resolve
+  the cancelled B successfully. C remains visible initially, but starting D
+  displays B from the persistent cache. Plain `useAsync` has no such cache.
+
+The persistent hook also returns a rejection without the previous value. That
+is an API/UI difference, distinct from the stale-result problem; keeping the
+previous reply visible on error is the tutorial's application policy.
+
+These are upstream observations, not failures introduced by the Lean boundary
+or requirements for a new VIR ownership layer. The experiment has not yet
+tested a Lean-authored parent using these hooks. The current tutorial and its
+real-server acceptance remain unchanged pending a choice of upstream correction
+or explicitly different application behavior.
+
 ## Server-reference invariant
 
 RPC responses containing `RpcPtr` values must remain exact JavaScript object
