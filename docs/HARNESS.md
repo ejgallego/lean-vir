@@ -285,11 +285,14 @@ changes; `package.json` remains the exact command-order source of truth.
 - An explicit runtime smoke group:
   `npm run test:runtime -- --group pure`
 - Lean infoview bundle freshness, shell loading, local asset RPC, widget-entry
-  signatures, or server-mode module snapshots with opaque imports and unsaved edits:
+  signatures, or server-mode module snapshots with opaque imports and unsaved edits,
+  non-module rejection, document provenance and revision/byte consistency:
   `npm run test:infoview`
 - React proof-widget demo iteration after `npm run build:demo`:
   open `examples/ReactProofWidget.lean` in VS Code; the widget package is built
-  from the active Lean server snapshot. If the file was already open before the
+  from the active Lean server snapshot. Live documents must use `module`, but
+  do not need to be saved; private helpers and unsaved edits remain available.
+  If the file was already open before the
   build, restart the Lean server or reopen the file so the editor sees the
   rebuilt `Vir.Infoview` widget module.
 - Shared Tamagotchi widget demo iteration after `npm run build:demo`:

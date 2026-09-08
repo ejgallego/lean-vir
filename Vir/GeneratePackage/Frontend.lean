@@ -60,7 +60,7 @@ def targetOwnsDecl (target : Target) (env : Environment) (name : Name) : Bool :=
 declarations. Loaded runtime IR takes precedence over opaque module entries. -/
 def declarationsForOrigin (origin : PackageTargetOrigin) (env : Environment) : Array Decl := Id.run do
   match origin with
-  | .source _ => return (getDecls env).toArray
+  | .source _ | .snapshot _ _ => return (getDecls env).toArray
   | .module moduleName =>
       let some moduleIdx := env.header.moduleNames.findIdx? (· == moduleName)
         | return #[]
@@ -160,6 +160,8 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     let env ← match origin with
       | .source path => frontendEnv path
       | .module name => importModuleEnv name
+      | .snapshot _ _ =>
+          throw <| IO.userError "live snapshots require prepareSnapshotInput, not filesystem acquisition"
     let mut names : Array Name := #[]
     for decl in declarationsForOrigin origin env do
       if !sourceTargets.any (fun target => targetOwnsDecl target env decl.name) then
@@ -210,12 +212,11 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
 /-- Index the live environment without reopening its document or compiled root.
 Local IR belongs to the current module, including private/generated declarations;
 imported owners still come from Lean's module table. The source is provenance. -/
-def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex := Id.run do
-  let localModule? := if env.header.isModule then some env.mainModule else none
+private def snapshotDeclIndex (source : String) (env : Environment) : DeclIndex := Id.run do
   let mut names : Array Name := #[]
   let mut index : DeclIndex := {
     -- Never replace unsaved local IR with the current module's disk artifacts.
-    loadedModules := localModule?.map (fun name => ({} : NameSet).insert name) |>.getD {}
+    loadedModules := ({} : NameSet).insert env.mainModule
     sources := #[{
       key := source
       display := source
@@ -230,7 +231,7 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
       index with
       localDecls := index.localDecls.insert decl.name {
         source
-        module? := environmentModuleForDecl? env decl.name <|> localModule?
+        module? := environmentModuleForDecl? env decl.name <|> some env.mainModule
         decl
       }
     }
@@ -241,6 +242,22 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
     env
     decls := names
   }] }
+
+/-- A validated live module target and its authoritative, already prepared IR. -/
+structure SnapshotInput where
+  target : Target
+  index : DeclIndex
+
+/-- No frontend, disk lookup or initializer execution. Even imported-only roots
+require a module document; the target and local ownership come from this env. -/
+def prepareSnapshotInput (document : String) (env : Environment) (roots : Array Name) :
+    Except String SnapshotInput := do
+  unless env.header.isModule do
+    throw "VIR live packages require a `module` header; add `module` to the document (no save is required)"
+  return {
+    target := { origin := .snapshot document env.mainModule, mode := .explicit roots }
+    index := snapshotDeclIndex document env
+  }
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
   match index.sources.findSome? fun source =>

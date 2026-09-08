@@ -51,16 +51,20 @@ end TargetMode
 inductive PackageTargetOrigin where
   | source (path : String)
   | module (name : Name)
+  /-- An already elaborated module; the document is provenance, not a path to load. -/
+  | snapshot (document : String) (name : Name)
 
 namespace PackageTargetOrigin
 
 def display : PackageTargetOrigin → String
   | .source path => path
   | .module name => s!"module {name}"
+  | .snapshot document _ => document
 
 def module? : PackageTargetOrigin → Option Name
   | .source _ => none
   | .module name => some name
+  | .snapshot _ name => some name
 
 end PackageTargetOrigin
 
@@ -78,6 +82,7 @@ def Target.canonicalSourceKey (target : Target) : IO String := do
   match target.origin with
   | .source path => return (← IO.FS.realPath path).normalize.toString
   | .module _ => return target.publicSource
+  | .snapshot _ _ => return target.publicSource
 
 /-- Preserve the existing wire spelling for marked module targets without
 coupling the internal selection type to module identity. -/

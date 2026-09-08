@@ -110,15 +110,19 @@ assembling search paths. A real Lake smoke checks inherited native linking;
 full compression acceptance awaits the upstream module port. Type anchors now
 build the registered `TypeAnchorFixture` module and retain their six explicit
 exports and reviewed Root alias. Only provenance changes; the standalone tool
-has no source fallback or path-normalization layer. The final live snapshot
-input API remains pending.
+has no source fallback or path-normalization layer.
 
 The snapshot declaration index now assigns current-module ownership to local
 IR, including private helpers, and marks the live module as already loaded.
 Imported ownership remains distinct; owner resolution cannot replace unsaved
-local IR with disk artifacts. The RPC-facing target still uses the transitional
-source-origin constructor; its final API migration remains coordinated with
-the RPC owner.
+local IR with disk artifacts. Following explicit maintainer approval, live
+inputs also require `module`. `prepareSnapshotInput` validates that policy and
+pairs a snapshot target with the current environment's index. Stat and build
+share this adapter and reject non-module documents (including imported-only
+root requests) with `invalidParams`, without requiring a save or changing wire
+fields. Revision helpers consume unsaved text directly; focused tests cover
+same-snapshot stat/build tokens, deterministic bytes, edited revision/bytes,
+private/transitive ownership and execution in real Wasm.
 
 ## Design Decisions
 
