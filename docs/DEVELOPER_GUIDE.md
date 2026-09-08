@@ -102,6 +102,13 @@ The Node wrapper deliberately provides no DOM or React implementation. Add
 browser and React semantic tests to the official Chromium suite; focused Node
 tests may inject only the individual host operations they exercise.
 
+The infoview shell's normal cleanup unmounts its owned React root while Lean
+cleanup callbacks remain usable and detaches its loaded reference before
+unmount. Surviving values retain that original runtime; normal refresh installs
+a distinct service with fresh factory/bindings. Failure cleanup remains a
+separate root-unmount plus hard-dispose path. Shell polling is owned by its own
+effect, while application activity remains the application's responsibility.
+
 ## Adding A Host Import
 
 1. Choose the narrowest Lean effect and an explicit `Js`/`Nullable` boundary.

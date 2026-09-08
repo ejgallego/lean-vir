@@ -273,6 +273,17 @@ changes; `package.json` remains the exact command-order source of truth.
   table-to-target generation collection, owner isolation, hard replacement,
   cleanup failures and explicit shutdown. Shared-map collection checks do not
   assert automatic lease-counter cleanup or a Wasm memory-capacity plateau.
+- Infoview shell normal unmount/refresh and failure teardown with actual React,
+  real Lean continuation bodies/stale guards and mocked asset/package RPC:
+  `lake build VirInfoview vir_irpkg`, then
+  `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target fixtures/runtime/ShellLifetime.lean Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
+  then `CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs`.
+  The focused probe needs the matching `web/public/vir-upstream.wasm` and npm
+  dependencies, but no site build. It checks G1/G2 isolation, delayed success/
+  rejection, application listener retention, late scheduling, polling/obsolete
+  load suppression, explicit shutdown, injected cleanup/setup/render failures,
+  and controlled-GC collection after owners release references. The transport
+  is mocked; this does not replace real-server RPC integration acceptance.
 - Runtime runner catalog, filtering, configuration, or scheduling policy without
   generated Lean or Wasm artifacts:
   `npm run test:runtime:unit`

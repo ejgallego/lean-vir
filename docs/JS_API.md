@@ -614,7 +614,7 @@ Wasm import boundary and consumed by the owning call. This applies equally to
 top-level exports and callback calls: the original host error is thrown once
 before any placeholder interpreter result can be treated as success.
 
-Cleanup is terminal and comprehensive: all binding hooks, active resources,
+Runtime disposal is terminal and comprehensive: all binding hooks, active resources,
 Lean object handles, JSL cells, and callbacks are attempted even if one throws.
 One cleanup failure is rethrown directly; multiple failures are reported as an
 `AggregateError` in cleanup order. The runtime remains disposed, and a later
@@ -626,6 +626,23 @@ successfully. See [host bindings](HOST_BINDINGS.md) for the complete boundary
 contract and the
 [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for callback-specific
 follow-up work.
+
+### Infoview UI ownership
+
+Normal infoview shell unmount and mounted-generation refresh release the owned
+React root and shell references while surviving callback/JSL values retain the
+original runtime. Unmount stops shell polling; ordinary auto-refresh keeps its
+polling effect. Obsolete loads cannot install UI. The shell does not cancel all
+application work or add a retired runtime state. Callers
+clean up their own listeners, timers and independent roots. They can still use
+ordinary APIs from retained callbacks after UI cleanup.
+
+`dispose()` remains explicit hard shutdown. Core in-place package replacement
+also invalidates old callback/JSL values. Shell setup/render failures and
+obsolete never-installed candidates retain hard teardown. Distinct refreshed
+shell services use fresh factories and binding lifecycles, so they do not move
+old numeric roots into new exports. This does not promise automatic disposal
+for arbitrary retained factories or intentionally shared binding maps.
 
 ## Trust Boundary
 

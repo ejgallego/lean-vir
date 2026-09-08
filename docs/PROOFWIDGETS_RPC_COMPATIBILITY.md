@@ -114,6 +114,32 @@ in the JavaScript callback bridge before its Lean body can inspect that flag.
 Aborting the request does not remove an already-attached Promise handler;
 even a cancellation rejection can trigger it after disposal.
 
+The VIR infoview shell now follows ordinary owned-UI cleanup: normal unmount
+or mounted-generation refresh unmounts its React root while the runtime is
+usable, then relinquishes shell ownership. Unmount stops shell polling;
+ordinary auto-refresh keeps its polling effect. Obsolete load results cannot
+install UI. It does not shut down an operational generation merely
+because that UI disappeared. Retained Lean callbacks/JSL keep their original
+instance; callbacks can run application stale guards or create otherwise-valid
+active work after cleanup. Cleanup errors are surfaced and shell references
+are detached even when unmount throws.
+
+Application-owned timers, listeners, subscriptions and independent roots still
+need application cleanup. Normal unmount introduces no admission restriction or
+quiescence guarantee. Explicit runtime disposal and core in-place package
+replacement remain hard invalidation boundaries. Failed setup/rendering and
+obsolete candidates that were never installed retain their explicit teardown;
+callback survival is not promised across those failure paths.
+
+Each shell service creates a fresh runtime factory and default browser/React
+binding lifecycle, reusing the compiled Wasm module and the existing mutable
+editor host context. This narrow ownership path
+does not repair the shared-factory lease-counter limitation documented in
+[HOST_BINDINGS.md](HOST_BINDINGS.md), or freeze the mutable editor host context.
+The standalone shell browser test uses mocked asset/package transport and real
+Lean callbacks/guards. Real-server RPC continuation acceptance remains a
+separate integration gate for the all-Lean tutorial migration.
+
 Ordinary ProofWidgets browser components do not dispose a separate interpreter
 on unmount. Their pending JavaScript closures remain callable through normal JS
 reachability. The pinned upstream

@@ -144,7 +144,10 @@ native interval, listener, Promise reaction or shared binding-map entry may
 also retain its callback/JSL and original generation. Their owners remain
 responsible for cancellation, removal and reference release. Core in-place
 package replacement still invalidates old callback/JSL roots before adopting
-new exports; this does not change the infoview shell's shutdown policy.
+new exports. Normal infoview shell UI cleanup unmounts the owned React root
+and detaches shell references without hard-disposing the generation. Failed
+setup/rendering and obsolete never-installed candidates retain hard teardown.
+Application-owned active work keeps its ordinary cleanup obligations.
 
 Collection is not deterministic active-resource cleanup. In particular, the
 existing shared binding lease counter is decremented by explicit teardown,

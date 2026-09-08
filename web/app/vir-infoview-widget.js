@@ -110,7 +110,7 @@ export default function VirInfoviewWidget(props) {
       const current = loadedRef.current;
       loadedRef.current = null;
       if (current !== null) {
-        releaseLoadedWidget(current);
+        current.root.unmount();
       }
       if (mountElementRef.current === null) {
         throw new Error("VIR widget mount element is unavailable");
@@ -126,11 +126,15 @@ export default function VirInfoviewWidget(props) {
       setReloadToken(0);
       setRuntimeToken((token) => token + 1);
     } catch (error) {
+      const errors = [error];
       if (service !== null) {
-        disposeRuntimeService(service);
+        collectCleanupError(errors, () => disposeRuntimeService(service));
       }
+      const failure = widgetCleanupError(errors, "VIR widget loading failed");
       if (!isDisposed()) {
-        setStatus({ kind: "error", message: errorMessage(error, setupHint) });
+        setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
+      } else {
+        console.error(failure);
       }
     }
   }
@@ -145,10 +149,11 @@ export default function VirInfoviewWidget(props) {
       disposed = true;
       const loaded = loadedRef.current;
       if (loaded !== null) {
-        releaseLoadedWidget(loaded);
-        if (loadedRef.current === loaded) {
-          loadedRef.current = null;
-        }
+        // Detach shell ownership even when application effect cleanup throws.
+        // Surviving values still own this generation; only explicit shutdown
+        // and the separate failure paths below dispose it.
+        loadedRef.current = null;
+        loaded.root.unmount();
       }
     };
   }, [
@@ -250,10 +255,14 @@ export default function VirInfoviewWidget(props) {
       if (loadedRef.current === loaded) {
         loadedRef.current = null;
       }
-      releaseLoadedWidget(loaded);
+      const errors = [error];
+      collectCleanupError(errors, () => disposeLoadedWidget(loaded));
       setStatus({
         kind: "error",
-        message: errorMessage(error, setupHintRef.current),
+        message: errorMessage(
+          widgetCleanupError(errors, "VIR widget render failed"),
+          setupHintRef.current,
+        ),
       });
     }
   }, [runtimeToken, surfaceKey, mountId, rpcSession]);
@@ -340,7 +349,8 @@ function requireWidgetManifestEntry(runtime, entryName, label) {
   return entry;
 }
 
-function releaseLoadedWidget(loaded) {
+// Failed rendering remains an explicit shutdown boundary.
+function disposeLoadedWidget(loaded) {
   const errors = [];
   collectCleanupError(errors, () => loaded.root.unmount());
   collectCleanupError(errors, () => disposeRuntimeService(loaded.service));
@@ -976,8 +986,17 @@ function freshMountId(value) {
   return `${prefix}-${nextMountId}`;
 }
 
+function widgetCleanupError(errors, message) {
+  return errors.length === 1 ? errors[0] : new AggregateError(errors, message);
+}
+
 function errorMessage(error, setupHint) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    error instanceof AggregateError
+      ? `${error.message}\n${error.errors.map((cause) => errorMessage(cause, "")).join("\n")}`
+      : error instanceof Error
+        ? error.message
+        : String(error);
   const hint = typeof setupHint === "string" ? setupHint.trim() : "";
   return hint.length === 0 ? message : `${message}\n\n${hint}`;
 }
