@@ -407,6 +407,45 @@ opaque thenVoid
     RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value)
 
 /--
+Generated binding for reviewed VIR protocol `javascript.promise.then-value-with-rejection`.
+
+Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenValueWithRejection"]
+opaque thenValueWithRejection
+    {α : Type}
+    {β : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Promise β)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-void-with-rejection`.
+
+Calls native Promise.then with both exact handlers returning undefined and returns its exact chained Promise. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler; no callback conversion or error swallowing is added.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenVoidWithRejection"]
+opaque thenVoidWithRejection
+    {α : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit)
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit) :
+    RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.promise.catch-value`.
 
 Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.

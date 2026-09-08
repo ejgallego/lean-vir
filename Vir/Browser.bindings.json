@@ -31,6 +31,8 @@
       }
     },
     "resources": {
+      "AbortController": "AbortController",
+      "AbortSignal": "AbortSignal",
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
       "Console": "Console",
       "CSSStyleDeclaration": "CSSStyleDeclaration",
@@ -45,8 +47,14 @@
       "KeyboardEvent": "KeyboardEvent",
       "TextMetrics": "TextMetrics"
     },
-    "members": ["cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "ElementCSSInlineStyle.style", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
+    "members": ["AbortController.abort", "AbortController.signal", "cancelAnimationFrame", "CanvasRenderingContext2D.arc", "CanvasRenderingContext2D.beginPath", "CanvasRenderingContext2D.clearRect", "CanvasRenderingContext2D.closePath", "CanvasRenderingContext2D.fill", "CanvasRenderingContext2D.fillRect", "CanvasRenderingContext2D.fillStyle", "CanvasRenderingContext2D.lineTo", "CanvasRenderingContext2D.lineWidth", "CanvasRenderingContext2D.measureText", "CanvasRenderingContext2D.moveTo", "CanvasRenderingContext2D.restore", "CanvasRenderingContext2D.rotate", "CanvasRenderingContext2D.save", "CanvasRenderingContext2D.stroke", "CanvasRenderingContext2D.strokeRect", "CanvasRenderingContext2D.strokeStyle", "CanvasRenderingContext2D.translate", "Console.log", "CSSStyleDeclaration.setProperty", "Document.createElement", "Document.querySelector", "Document.querySelectorAll", "Document.title", "DOMTokenList.add", "DOMTokenList.remove", "DOMTokenList.toggle", "Element.addEventListener", "Element.appendChild", "Element.classList", "Element.getAttribute", "Element.innerHTML", "Element.querySelector", "Element.querySelectorAll", "Element.remove", "Element.removeEventListener", "Element.setAttribute", "Element.textContent", "ElementCSSInlineStyle.style", "Event.currentTarget", "Event.preventDefault", "Event.stopPropagation", "Event.target", "HTMLCanvasElement.getContext", "HTMLCanvasElement.height", "HTMLCanvasElement.width", "HTMLInputElement.checked", "HTMLInputElement.value", "KeyboardEvent.key", "requestAnimationFrame", "TextMetrics.width"],
     "methodPolicies": {
+      "AbortController.abort": {
+        "signature": "only",
+        "omittedOptionalParameters": ["reason"],
+        "semantics": "preserving",
+        "reason": "Omitting the optional reason selects native AbortController.abort() and its default AbortError; custom reasons remain a coverage gap."
+      },
       "cancelAnimationFrame": { "signature": "only" },
       "CanvasRenderingContext2D.arc": {
         "signature": "only",
@@ -345,6 +353,15 @@
     },
     "protocolOperations": [
       {
+        "id": "browser.abortController.create", "group": "abort-controller", "target": "browser.abortController.create",
+        "lean": "Lean.Vir.Browser.AbortController.create", "marker": "vir_js",
+        "reason": "Calls new AbortController() and returns the exact controller. The generator derives methods and properties but does not lower TypeScript construct signatures, so only construction is declared explicitly.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "AbortController", "semantics": "preserving" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js AbortController", "representation": "js-resource", "resourceInner": "AbortController" } }
+      },
+      {
         "id": "browser.console.current", "group": "console", "target": "browser.console.current",
         "lean": "Lean.Vir.Browser.Console.current", "marker": "vir_js",
         "reason": "Returns the host-global Console as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.",
@@ -569,6 +586,19 @@
     ]
   },
   "roots": [
+    {
+      "id": "abort-controller",
+      "title": "Abort controller",
+      "targets": ["browser.abortController.*"],
+      "lean": { "public": ["Lean.Vir.Browser.AbortController", "Lean.Vir.Browser.AbortSignal"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["AbortController", "AbortSignal"] },
+      "mappings": [
+        { "typescript": "AbortController.abort", "targets": ["browser.abortController.abort"], "lean": ["Lean.Vir.Browser.AbortController.abort"], "receiverName": "controller" },
+        { "typescript": "AbortController.signal", "accessors": {
+          "get": { "target": "browser.abortController.getSignal", "lean": "Lean.Vir.Browser.AbortController.getSignal" }
+        } }
+      ]
+    },
     {
       "id": "animation",
       "title": "Animation frames",

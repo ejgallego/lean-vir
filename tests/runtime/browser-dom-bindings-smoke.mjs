@@ -10,9 +10,36 @@ import {
   createBrowserDocumentHostBindings,
   createBrowserElementHostBindings,
   createBrowserEventHostBindings,
+  createBrowserHostBindings,
   createConsoleHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-bindings.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
+
+// Node supplies its own native AbortController: no simulated cancellation host.
+{
+  const bindings = createBrowserHostBindings();
+  const controller = bindings["browser.abortController.create"]();
+  assert.ok(controller instanceof AbortController);
+  const signal = bindings["browser.abortController.getSignal"](controller);
+  assert.equal(signal, controller.signal);
+  let aborted = 0;
+  signal.addEventListener("abort", () => aborted++);
+  assert.equal(bindings["browser.abortController.abort"](controller), undefined);
+  assert.equal(signal.aborted, true);
+  assert.equal(signal.reason.name, "AbortError");
+  const reason = signal.reason;
+  bindings["browser.abortController.abort"](controller);
+  assert.equal(signal.reason, reason);
+  assert.equal(aborted, 1);
+  assert.equal(bindings["browser.abortController.getSignal"](controller), signal);
+
+  const passive = bindings["browser.abortController.create"]();
+  bindings[VIR_HOST_DISPOSE]();
+  assert.equal(passive.signal.aborted, false, "disposal must not cancel native controllers");
+  passive.abort();
+  assert.equal(passive.signal.aborted, true);
+}
 
 const calls = [];
 const consoleCalls = [];

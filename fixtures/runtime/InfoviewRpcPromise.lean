@@ -77,4 +77,29 @@ def thenPromiseExact
     Lean.Vir.RuntimeM (Lean.Vir.Js.Promise String) :=
   Lean.Vir.Js.Promise.thenPromise pending next
 
+def thenBothValue
+    (pending : Lean.Vir.Js.Promise Response)
+    (onFulfilled : Lean.Vir.Js.Function1 (Lean.Vir.Js Response) (Lean.Vir.Js Response))
+    (onRejected : Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js Response)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Response) :=
+  Lean.Vir.Js.Promise.thenValueWithRejection pending onFulfilled onRejected
+
+def thenBothVoid
+    (pending : Lean.Vir.Js.Promise Response)
+    (onFulfilled : Lean.Vir.Js.Function1 (Lean.Vir.Js Response) Unit)
+    (onRejected : Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value) :=
+  Lean.Vir.Js.Promise.thenVoidWithRejection pending onFulfilled onRejected
+
+def createAbortController : Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AbortController) :=
+  Lean.Vir.Browser.AbortController.create
+
+def abortSignal (controller : Lean.Vir.Js Lean.Vir.Browser.AbortController) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AbortSignal) :=
+  Lean.Vir.Browser.AbortController.getSignal controller
+
+def abort (controller : Lean.Vir.Js Lean.Vir.Browser.AbortController) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.Browser.AbortController.abort controller
+
 end Vir.Fixtures.InfoviewRpcPromise

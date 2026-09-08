@@ -22,6 +22,10 @@ export function createJsCollectionHostBindings() {
     "js.promise.thenValue": (promise, onFulfilled) => promise.then(onFulfilled),
     "js.promise.thenPromise": (promise, onFulfilled) => promise.then(onFulfilled),
     "js.promise.thenVoid": (promise, onFulfilled) => promise.then(onFulfilled),
+    "js.promise.thenValueWithRejection": (promise, onFulfilled, onRejected) =>
+      promise.then(onFulfilled, onRejected),
+    "js.promise.thenVoidWithRejection": (promise, onFulfilled, onRejected) =>
+      promise.then(onFulfilled, onRejected),
     "js.promise.catchValue": (promise, onRejected) => promise.catch(onRejected),
     "js.array.empty": () => [],
     "js.array.push": (array, value) => array.push(value),

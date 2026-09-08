@@ -113,9 +113,8 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   const promise = Promise.resolve(value);
   assert.equal(await bindings["js.promise.thenValue"](promise, unary), value);
   assert.equal(
-    await bindings["js.promise.thenPromise"](
-      promise,
-      (item) => Promise.resolve(item),
+    await bindings["js.promise.thenPromise"](promise, (item) =>
+      Promise.resolve(item),
     ),
     value,
   );
@@ -132,6 +131,63 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   );
   const object = { value };
   assert.equal(bindings["js.object.get"](object, "value"), value);
+
+  for (const target of [
+    "js.promise.thenValueWithRejection",
+    "js.promise.thenVoidWithRejection",
+  ]) {
+    const isVoid = target.includes("thenVoid");
+    const expected = isVoid ? undefined : value;
+    const reason = { exactRejection: true };
+    const seen = [];
+    const fulfilled = (input) => {
+      seen.push(["fulfilled", input]);
+      return expected;
+    };
+    const rejected = (input) => {
+      seen.push(["rejected", input]);
+      return expected;
+    };
+    // Prove the receiver, both function objects, arity and result are forwarded.
+    const returned = {};
+    const receiver = {
+      then(...args) {
+        assert.equal(this, receiver);
+        assert.deepEqual(args, [fulfilled, rejected]);
+        return returned;
+      },
+    };
+    assert.equal(bindings[target](receiver, fulfilled, rejected), returned);
+    assert.equal(
+      await bindings[target](Promise.resolve(value), fulfilled, rejected),
+      expected,
+    );
+    assert.deepEqual(seen, [["fulfilled", value]]);
+    assert.equal(
+      await bindings[target](Promise.reject(reason), fulfilled, rejected),
+      expected,
+    );
+    assert.deepEqual(seen, [
+      ["fulfilled", value],
+      ["rejected", reason],
+    ]);
+    const thrown = new Error("fulfillment handler failed");
+    await assert.rejects(
+      bindings[target](
+        promise,
+        () => {
+          throw thrown;
+        },
+        rejected,
+      ),
+      (error) => error === thrown,
+    );
+    assert.equal(
+      seen.length,
+      2,
+      "then(f, g) must not turn into then(f).catch(g)",
+    );
+  }
 }
 
 {
@@ -197,12 +253,17 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
         throw new Error("exact JS values must not be inspected for then");
       },
     }),
-    new Proxy({}, {
-      get() {
-        propertyReads++;
-        throw new Error("exact JS values must not be inspected through a proxy");
+    new Proxy(
+      {},
+      {
+        get() {
+          propertyReads++;
+          throw new Error(
+            "exact JS values must not be inspected through a proxy",
+          );
+        },
       },
-    }),
+    ),
   ]) {
     exactValue = value;
     assert.equal(hostState.callObjects(0, 0, 0), value);

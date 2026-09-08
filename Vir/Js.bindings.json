@@ -251,6 +251,32 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value Lean.Vir.Js.Undefined.Value" } }
       },
       {
+        "id": "javascript.promise.then-value-with-rejection", "group": "promise", "target": "js.promise.thenValueWithRejection",
+        "lean": "Lean.Vir.Js.Promise.thenValueWithRejection", "marker": "vir_js",
+        "reason": "Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
+          { "name": "onFulfilled", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js β)" } },
+          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value β" } }
+      },
+      {
+        "id": "javascript.promise.then-void-with-rejection", "group": "promise", "target": "js.promise.thenVoidWithRejection",
+        "lean": "Lean.Vir.Js.Promise.thenVoidWithRejection", "marker": "vir_js",
+        "reason": "Calls native Promise.then with both exact handlers returning undefined and returns its exact chained Promise. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler; no callback conversion or error swallowing is added.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
+          { "name": "onFulfilled", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) Unit" } },
+          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Unit" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value Lean.Vir.Js.Undefined.Value" } }
+      },
+      {
         "id": "javascript.promise.catch-value", "group": "promise", "target": "js.promise.catchValue",
         "lean": "Lean.Vir.Js.Promise.catchValue", "marker": "vir_js",
         "reason": "Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.",

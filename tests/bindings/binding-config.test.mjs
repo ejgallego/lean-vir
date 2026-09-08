@@ -72,7 +72,7 @@ test("binding configuration rejects duplicate API group ids", async () => {
 
   await assert.rejects(
     validateBindingConfig(invalid, browserPath),
-    /repeats root id animation/u,
+    (error) => error.message.endsWith(`repeats root id ${invalid.roots[0].id}`),
   );
 });
 

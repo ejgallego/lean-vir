@@ -97,6 +97,42 @@ teardown.
 JSPI would only be needed for a different API that suspends the running Lean
 call until the Promise settles.
 
+`thenValueWithRejection` and `thenVoidWithRejection` expose native
+`promise.then(onFulfilled, onRejected)` with both function objects unchanged.
+The value form selects a common non-Promise output shape for both handlers;
+the void form selects `undefined`. Neither is `then(onFulfilled).catch(onRejected)`:
+an exception thrown by the fulfillment handler rejects the chained Promise,
+without calling the sibling rejection handler.
+
+## Component unmount is not interpreter disposal
+
+A pending Promise can still invoke its handlers after effect cleanup. While
+the VIR runtime is live, a Lean callback can check an application-owned stale
+flag just like a TypeScript callback. If the owner then calls `runtime.dispose()`,
+however, VIR releases the callback's Lean closure root. A later invocation fails
+in the JavaScript callback bridge before its Lean body can inspect that flag.
+Aborting the request does not remove an already-attached Promise handler;
+even a cancellation rejection can trigger it after disposal.
+
+Ordinary ProofWidgets browser components do not dispose a separate interpreter
+on unmount. Their pending JavaScript closures remain callable through normal JS
+reachability. The pinned upstream
+[InteractiveExpr](https://github.com/leanprover-community/ProofWidgets4/blob/a8acbfd87375ff4abe14ce09db5b7664d383bc7f/widget/src/interactiveExpr.tsx)
+uses the shared infoview `useAsyncPersistent` hook. The optional
+[ofRpcMethod renderer](https://github.com/leanprover-community/ProofWidgets4/blob/a8acbfd87375ff4abe14ce09db5b7664d383bc7f/widget/src/ofRpcMethod.tsx)
+also uses that hook and explicitly cancels its request on replacement/unmount.
+The shared [async hooks](https://github.com/leanprover/vscode-lean4/blob/5a25e6abb2e973b4c89a053acc74c479c0bb2e9f/lean4-infoview/src/infoview/util.ts)
+own native Promise continuations and use request IDs to select the current
+request state. This is library/application behavior, not an automatic guarantee
+for every ProofWidgets component.
+
+A candidate all-Lean authoring path is to bind these upstream hooks: a Lean
+function starts the RPC synchronously and returns its exact Promise, while the
+existing upstream hook handles settlement in JavaScript. This would require no
+handwritten per-widget JS and could avoid pending Lean continuations in this
+example. It remains an unimplemented acceptance target, not a reason to change
+ordinary callback-disposal semantics or introduce a VIR request manager.
+
 ## Server-reference invariant
 
 RPC responses containing `RpcPtr` values must remain exact JavaScript object

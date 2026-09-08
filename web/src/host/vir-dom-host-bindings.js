@@ -17,6 +17,9 @@ export function createDOMTokenListHostBindings() {
 
 export function createBrowserEventHostBindings() {
   return {
+    "browser.abortController.create": () => new AbortController(),
+    "browser.abortController.getSignal": (controller) => controller.signal,
+    "browser.abortController.abort": (controller) => controller.abort(),
     "js.value.browser.eventListener": (callback) => callback,
     "browser.keyboardEvent.fromEvent": (event) =>
       isKeyboardEvent(event) ? event : null,

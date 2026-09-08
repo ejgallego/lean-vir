@@ -332,6 +332,9 @@ inventory:
   capability without changing identity. Its generated `style` getter returns
   the exact `CSSStyleDeclaration`; `CSSStyleDeclaration.setProperty` preserves
   the upstream `string | null` value.
+- `AbortController.create`, `getSignal`, and `abort` expose the native controller,
+  its exact signal, and the no-reason abort operation. Dropping its Lean handle
+  or disposing VIR does not abort it implicitly.
 - `Event` exposes exact `EventTarget | null` properties and propagation
   operations. `EventTarget.asElement` and `KeyboardEvent.fromEvent` perform
   checked identity-preserving narrowing; form helpers likewise make narrowing
@@ -479,7 +482,11 @@ reference type.
 `RpcSessionAtPos` object returned by the official infoview hook.
 `Vir.Infoview.RpcSession.call` invokes its native `call` method with exact
 JavaScript method and request values and returns `Js.Promise response` without
-awaiting or decoding it. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
+awaiting or decoding it. `Js.Promise.thenValueWithRejection` and
+`thenVoidWithRejection` pass both handlers directly to native `Promise.then`.
+The first selects a common non-Promise result shape; the second returns
+`undefined`. Errors thrown by the success handler are not caught by its sibling
+rejection handler. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
 `catchValue` accept exact `Js.Function1` values and expose direct-value,
 Promise-assimilating, and void result shapes separately. `Js.Function.ofLean`
 is the separately named Lean-closure conversion; native functions such as

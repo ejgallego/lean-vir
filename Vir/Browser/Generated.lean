@@ -14,6 +14,62 @@ public section
 
 namespace Lean.Vir.Browser
 
+namespace AbortController
+
+/--
+Generated reviewed method call policy for TypeScript `AbortController.abort`.
+
+The **`abort()`** method of the AbortController interface aborts an asynchronous operation before it has completed. This is able to abort fetch requests, the consumption of any response bodies, or streams.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortController/abort)
+
+Call policy: Omitting the optional reason selects native AbortController.abort() and its default AbortError; custom reasons remain a coverage gap.
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L3364
+
+ABI profile `browser-dom-faithful-v1`: controller js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.abortController.abort"]
+opaque abort
+    (controller : @& Lean.Vir.Js AbortController) :
+    DomM Unit
+
+/--
+Faithful generated getter binding for TypeScript `AbortController.signal`.
+
+The **`signal`** read-only property of the AbortController interface returns an AbortSignal object instance, which can be used to communicate with/abort an asynchronous operation as desired.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortController/signal)
+
+Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L3358
+
+ABI profile `browser-dom-faithful-v1`: abortController js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.abortController.getSignal"]
+opaque getSignal
+    (abortController : @& Lean.Vir.Js AbortController) :
+    DomM (Lean.Vir.Js AbortSignal)
+
+/--
+Generated binding for reviewed VIR protocol `browser.abortController.create`.
+
+Calls new AbortController() and returns the exact controller. The generator derives methods and properties but does not lower TypeScript construct signatures, so only construction is declared explicitly.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "browser.abortController.create"]
+opaque create : DomM (Lean.Vir.Js AbortController)
+
+end AbortController
+
 namespace Animation
 
 /--
