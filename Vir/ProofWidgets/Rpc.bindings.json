@@ -7,7 +7,6 @@
   "lean": { "modules": ["Vir.ProofWidgets.Rpc", "Vir.ProofWidgets.Rpc.Generated"] },
   "generation": {
     "output": "Vir/ProofWidgets/Rpc/Generated.lean",
-    "irOutput": "build/bindings/proofwidgets.generated-operations.json",
     "imports": ["Vir.Browser.Types", "Vir.ProofWidgets.Rpc.Types"],
     "namespace": "Lean.Vir",
     "abiProfile": {
@@ -22,7 +21,6 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "proofwidgets.rpc.ref-base", "group": "rpc-references", "target": "proofwidgets.rpc.ref",
