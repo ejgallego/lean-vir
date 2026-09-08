@@ -316,7 +316,7 @@ async function waitForDevToolsPort(profileDir, child, launchError, stderr) {
   );
 }
 
-export async function launchChromium() {
+export async function launchChromium({ exposeGc = false } = {}) {
   const executable = await requireChromiumExecutable();
   const profileDir = await mkdtemp(`${tmpdir()}/lean-vir-chromium-`);
   const child = spawn(executable, [
@@ -324,6 +324,7 @@ export async function launchChromium() {
     "--disable-dev-shm-usage",
     "--disable-gpu",
     "--no-first-run",
+    ...(exposeGc ? ["--js-flags=--expose-gc"] : []),
     "--no-sandbox",
     // Let Chromium reserve and publish its port instead of racing another process for a probed port.
     "--remote-debugging-port=0",

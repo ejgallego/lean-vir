@@ -54,7 +54,9 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 const leanObjectHandleStates = new WeakMap();
 const leanObjectHandleFinalizer =
   typeof FinalizationRegistry === "function"
-    ? new FinalizationRegistry((cell) => {
+    ? new FinalizationRegistry((weakCell) => {
+        const cell = weakCell.deref();
+        if (cell === undefined) return;
         try {
           releaseLeanObjectHandleCell(cell, true);
         } catch (error) {
@@ -130,7 +132,9 @@ function createLeanObjectHandle(cell) {
   }
   const handle = {};
   leanObjectHandleStates.set(handle, cell);
-  leanObjectHandleFinalizer?.register(handle, cell, cell);
+  // Weakening the entire cleanup record also avoids rooting the generation
+  // through cell.onRelease. The live handle and host tracking set still own it.
+  leanObjectHandleFinalizer?.register(handle, new WeakRef(cell), cell);
   return handle;
 }
 

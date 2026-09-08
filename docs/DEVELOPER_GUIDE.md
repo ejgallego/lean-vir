@@ -64,6 +64,21 @@ WeakMaps hide that association. Finalizers are a best-effort GC backstop;
 runtime disposal is the deterministic release boundary. Neither value exposes
 public retain/release methods.
 
+A live callback or JSL object strongly retains its original runtime. The global
+finalization registries hold only weak references to cleanup records; the
+runtime's callback set and host state's JSL set keep those records available
+while that generation remains owned. Weakening the entire JSL cell also avoids
+an indirect global anchor through its `onRelease` closure. This permits an
+otherwise unreachable whole generation, including table-to-target cycles, to
+be collected without weakening live values or exact externref slots.
+
+This is not a cross-heap cycle collector: an externally owned generation can
+still retain mixed Lean/JavaScript cycles through its table. Platform activities
+and binding maps that retain values can deliberately keep a generation alive.
+Collection timing, foreign-root release, and Wasm memory/table capacity are
+separate observations. See [HOST_BINDINGS.md](HOST_BINDINGS.md) for shared-map
+cleanup limitations.
+
 Explicit `HostLifecycle` state is only for schedules, animation frames, and
 React roots. Native event listeners follow the DOM's receiver/type/function
 identity protocol and remain caller-managed. If a new lifecycle-managed value

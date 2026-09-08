@@ -129,6 +129,31 @@ callbacks and releases their roots.
 deterministic cleanup dispose the VIR runtime. A callback invoked after its
 runtime is disposed fails instead of entering freed Lean state.
 
+A still-live callback or JSL object strongly owns the original generation,
+including its Wasm exports and host state. Global registries hold only
+`WeakRef`s to the cleanup records; generation-owned tracking sets keep records
+available for finalization and explicit shutdown. In particular, global JSL
+cleanup metadata does not strongly capture the cell's `onRelease` closure.
+Thus a wholly unreachable generation can be collected even when its externref
+table points back to callback/JSL targets. Finalizers need not run when the
+whole foreign heap is itself collected.
+
+An externally owned runtime still strongly roots its table values. Mixed cycles
+inside that live generation are not collected by this correction. A reachable
+native interval, listener, Promise reaction or shared binding-map entry may
+also retain its callback/JSL and original generation. Their owners remain
+responsible for cancellation, removal and reference release. Core in-place
+package replacement still invalidates old callback/JSL roots before adopting
+new exports; this does not change the infoview shell's shutdown policy.
+
+Collection is not deterministic active-resource cleanup. In particular, the
+existing shared binding lease counter is decremented by explicit teardown,
+not by collection of an undisposed runtime. A retained factory/shared map can
+therefore retain an outstanding lease count and defer its last-owner disposer.
+Use explicit runtime disposal when deterministic shared-resource cleanup is
+needed. Neither zero foreign-root counts nor a collected facade establishes
+that Wasm allocator capacity or a shared map's resources were released.
+
 ## Active Resources
 
 Explicit lifecycle bookkeeping is reserved for activities with a real

@@ -261,6 +261,18 @@ changes; `package.json` remains the exact command-order source of truth.
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
   without Lean-dependent package generation:
   `npm run test:runtime:pure`
+- Callback/JSL finalizer ownership and whole-generation collection, using
+  existing demo artifacts without Lean regeneration:
+  `node --expose-gc tests/runtime/generation-gc-smoke.mjs`
+  and `CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs`.
+  The browser command bundles the current source and runs real Wasm with
+  official React development Strict Mode/Suspense; it needs npm dependencies
+  and demo packages, but no site build. Controlled-GC observation budgets are
+  test diagnostics, not a promised finalization latency. Cases distinguish
+  acyclic root release, retained-value/interval/shared-map controls, whole
+  table-to-target generation collection, owner isolation, hard replacement,
+  cleanup failures and explicit shutdown. Shared-map collection checks do not
+  assert automatic lease-counter cleanup or a Wasm memory-capacity plateau.
 - Runtime runner catalog, filtering, configuration, or scheduling policy without
   generated Lean or Wasm artifacts:
   `npm run test:runtime:unit`
