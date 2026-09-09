@@ -96,14 +96,25 @@ abbrev Nullable (α : Type) : Type :=
 
 namespace Array
 
-/-- Phantom shape for a JavaScript `Array` whose entries have Lean view `α`. -/
+/-- Phantom shape for a JavaScript `Array` whose entries have JavaScript shape `α`. -/
 opaque Value (α : Type) : Type
 
 end Array
 
-/-- JavaScript-owned array. The parameter describes the Lean view returned by indexing. -/
+/-- JavaScript-owned array. Insertion and indexing use `Js α`, never a raw Lean `α`. -/
 abbrev Array (α : Type) : Type :=
   Lean.Vir.Js (Array.Value α)
+
+namespace Tuple2
+
+/-- Phantom shape for an exact native tuple with two independently typed positions. -/
+opaque Value (α β : Type) : Type
+
+end Tuple2
+
+/-- Exact JavaScript two-element tuple; parameters describe each position's Lean view. -/
+abbrev Tuple2 (α β : Type) : Type :=
+  Lean.Vir.Js (Tuple2.Value α β)
 
 namespace NodeList
 

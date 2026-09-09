@@ -99,17 +99,10 @@ private def nullableCollectionResourceItem? {α : Type}
 
 namespace Array
 
-/-- Reads one array slot with an explicitly selected JavaScript phantom type. -/
-def getJs {α : Type}
-    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
-    (index : @& Lean.Vir.Js Float) :
-    RuntimeM (Lean.Vir.Js α) :=
-  getAs array index
-
 /-- Builds a native JavaScript array from JavaScript-owned values. -/
 def ofArray {α : Type}
     (values : _root_.Array (Lean.Vir.Js α)) :
-    RuntimeM (Lean.Vir.Js.Array (Lean.Vir.Js α)) := do
+    RuntimeM (Lean.Vir.Js.Array α) := do
   let array ← empty
   for value in values do
     let _ ← push array value
@@ -119,16 +112,19 @@ def ofArray {α : Type}
 def length {α : Type} (array : @& Lean.Vir.Js.Array α) : RuntimeM Nat := do
   return (← Lean.Vir.JsValue.toFloat (← lengthJs array)).toUInt64.toNat
 
-/-- Returns the resource at `index`, or `none` when the index is out of bounds. -/
+/--
+Returns the value at `index`, or `none` when the index is out of bounds.
+An in-bounds sparse slot still has the native unchecked-index value `undefined`.
+-/
 def item {α : Type}
-    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    (array : @& Lean.Vir.Js.Array α)
     (index : Nat) :
     RuntimeM (Option (Lean.Vir.Js α)) := do
   arrayResourceItem? (← length array) (getJs array) index
 
-/-- Materializes independent Lean resource handles for the entries of a JavaScript array. -/
+/-- Collects Lean views of the entries, preserving native values and unchecked-index semantics. -/
 def toLeanArray {α : Type}
-    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α)) :
+    (array : @& Lean.Vir.Js.Array α) :
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size ← length array
   collectResourceItems

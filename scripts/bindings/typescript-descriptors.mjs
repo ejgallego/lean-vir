@@ -422,11 +422,15 @@ function collectStatements(statements, sourceFile, prefix, symbols, symbolsById)
 function mergeDeclarationSymbols(left, right) {
   if (left.kind === "interface" && right.kind === "interface" &&
       left.shape.kind === "record" && right.shape.kind === "record") {
+    if (JSON.stringify(left.typeParameters) !== JSON.stringify(right.typeParameters)) {
+      throw new Error(`conflicting TypeScript type parameters for ${left.id}`);
+    }
     return {
       ...left,
       display: `${left.display}\n${right.display}`,
       hover: left.hover || right.hover,
       shape: { ...left.shape, fields: { ...left.shape.fields, ...right.shape.fields } },
+      indexSignatures: [...left.indexSignatures, ...right.indexSignatures],
     };
   }
   if (["function", "method"].includes(left.kind) && left.kind === right.kind) {
@@ -475,6 +479,9 @@ function symbolForStatement(statement, sourceFile, prefix) {
       ...declarationSymbol(statement, sourceFile, prefix, statement.name.text, "interface",
         interfaceShape(statement, sourceFile, prefix)),
       extends: interfaceHeritage(statement, sourceFile, prefix),
+      typeParameters: typeParameters(statement, sourceFile, prefix),
+      indexSignatures: statement.members.filter(ts.isIndexSignatureDeclaration).map((member) =>
+        functionShape(member.parameters, member.type, sourceFile, prefix)),
     };
   }
   if (ts.isTypeAliasDeclaration(statement)) {
@@ -505,6 +512,18 @@ function declarationSymbol(node, sourceFile, prefix, name, kind, shape) {
   };
 }
 
+function typeParameters(node, sourceFile, prefix) {
+  return (node.typeParameters ?? []).map((parameter) => ({
+    name: parameter.name.text,
+    ...(parameter.constraint === undefined ? {} : {
+      constraint: normalizeTypeNode(parameter.constraint, sourceFile, prefix),
+    }),
+    ...(parameter.default === undefined ? {} : {
+      default: normalizeTypeNode(parameter.default, sourceFile, prefix),
+    }),
+  }));
+}
+
 function interfaceMemberSymbols(node, sourceFile, prefix) {
   const owner = [...prefix, node.name.text].join(".");
   const symbols = [];
@@ -520,6 +539,7 @@ function interfaceMemberSymbols(node, sourceFile, prefix) {
         member,
         sourceFile,
         functionShape(member.parameters, member.type, sourceFile, prefix),
+        { typeParameters: typeParameters(member, sourceFile, prefix) },
       ));
     } else if (ts.isPropertySignature(member) && member.type !== undefined) {
       const shape = normalizeTypeNode(member.type, sourceFile, prefix);

@@ -379,7 +379,7 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
   returned by `Component.ofLean`
 - `Lean.Vir.React.ElementType.ofTag : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> @& Lean.Vir.Js Lean.Vir.React.Props -> @& Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> @& Lean.Vir.Js Lean.Vir.React.Props -> @& Lean.Vir.Js.Array Lean.Vir.React.Node -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElementTag` is the explicit tag-string convenience over that exact binding
 - `Lean.Vir.React.Props.key : String -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Props.ref : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)) -> Lean.Vir.React.Props.Entry`

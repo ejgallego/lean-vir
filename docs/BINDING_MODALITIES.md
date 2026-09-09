@@ -40,6 +40,63 @@ it does not occupy the upstream operation's faithful documentation lane or
 count as semantics-preserving coverage. Unsupported or ambiguous semantics
 fail closed until they have an explicit representation or reviewed policy.
 
+### Type Parameter Fidelity
+
+Preserving upstream type relationships is a correctness requirement. A binding
+must not invent polymorphism, erase a meaningful type parameter, or replace a
+constraint with a caller-selected result type. For example, TypeScript's
+`Array<T>` index signature returns `T`, and `push` accepts `T` elements. A Lean
+binding with an independent result or inserted-element parameter does not
+preserve that contract. Heterogeneous arrays can use a represented union or
+explicit `Js.Any`; they do not justify an implicit conversion to an unrelated
+concrete type. Absence and out-of-bounds behavior remain separate obligations.
+
+The same rule applies to tuple positions, generic callbacks and state/action
+relationships. A coarse `Js`-resource classification is not evidence that these
+relationships were preserved. Unsupported generic translation must fail closed
+or remain an explicitly reported gap, not silently widen the declaration.
+
+Validation must use the upstream TypeScript type as an independent authority.
+Agreement between a handwritten protocol configuration and its generated Lean
+declaration proves consistency only; a reviewed `semantics: preserving` label
+does not itself prove type conformance. Regression tests for generic bindings
+must include rejected cross-type calls as well as accepted same-type calls.
+Runtime payload checks are a separate boundary defense, never a reason to
+accept an incorrectly typed binding.
+
+The current independent relationship check is deliberately small:
+`js-value-type-relationships.mjs` reads the descriptor's upstream `Array<T>`
+binder, numeric index signature and `push(...items: T[]): number` shape, then
+checks the configured receiver, item and result types before Lean emission.
+Missing provenance or an unsupported upstream relationship is an error for
+these operations, even with a `preserving` label. Mutation tests change both
+the configured Lean types and the upstream descriptor relationships.
+
+`Js.Array α` describes a native array of JavaScript shape `α`: insertion takes
+`Js α`, and indexing returns `Js α`. It cannot store a raw Lean `α`; Lean-owned
+payloads require explicit `JSL` boxing. There is no redundant inner `Js` in the
+array type. `Js.Array.push` selects the one-item arity of TypeScript's variadic method.
+`Js.Array.getJs` follows TypeScript's **unchecked** `[n: number]: T` declaration:
+holes and missing entries remain exact JavaScript `undefined`. It does not
+implement `noUncheckedIndexedAccess` or turn `undefined` into `null`.
+The separate `item` helper checks numeric bounds, not sparse-array membership.
+
+Native two-position tuples use `Js.Tuple2`, with typed `first` and `second`
+projections instead of an unconstrained array getter. React's `StateTuple` and
+`ReducerTuple` aliases retain their position types. These VIR-owned projections
+have a checked position contract and compile-time cross-type regressions; the
+React aliases are still authored, not inferred from React's TypeScript overloads.
+Other reviewed protocol operations do not yet receive an independent generic
+relationship check. This focused check is not proof of all TypeScript semantics,
+dynamic property access, callback invocation, or provider behavior.
+
+For VIR-owned dynamic `Object.get`, the same checker enforces an erased `Js.Any`
+result, not a caller-chosen result parameter. The closed `Js.String.fromAny`
+predicate has no type parameters and can return only `Js String`. These are
+explicit checked contracts with negative compile/configuration tests and native
+predicate tests, not derived evidence for arbitrary TypeScript indexed access.
+No generic narrowing from `Js.Any` to a `Js α` or `JSL α` is supplied.
+
 Each generated binding operation records this separately from provider and
 reachability evidence:
 

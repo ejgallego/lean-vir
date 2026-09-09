@@ -269,7 +269,7 @@
         "arguments": [
           { "name": "elementType", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.ElementType", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ElementType" } },
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js Lean.Vir.React.Node)" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
@@ -308,7 +308,7 @@
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js Lean.Vir.React.Node)" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       }

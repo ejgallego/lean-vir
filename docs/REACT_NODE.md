@@ -12,7 +12,7 @@ values:
 - `Js Node` is an actual React node or element;
 - `Js ElementType` is the tag, component, symbol, or React type object;
 - `Js Props` is a JavaScript object;
-- `Js.Array (Js Node)` and `Js DependencyList` are JavaScript arrays;
+- `Js.Array Node` and `Js DependencyList` are JavaScript arrays;
 - `Js ReactRef` is React's `{ current }` object;
 - state values, actions, setters, and dispatchers are the values returned or
   stored by React.

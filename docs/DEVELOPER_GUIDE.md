@@ -4,6 +4,13 @@ This is the implementation map for Lean VIR contributors. User setup lives in
 [README.md](../README.md), command details in [HARNESS.md](HARNESS.md), and the
 JavaScript boundary contract in [HOST_BINDINGS.md](HOST_BINDINGS.md).
 
+TypeScript faithfulness is a correctness requirement, not an optional binding
+policy. Preserve the relationships between upstream type parameters, including
+collection elements, tuple positions, callback arguments and results. Unsupported
+translation must remain an explicit gap; it must not become an unconstrained
+Lean type parameter or an implicit cast. Runtime checks cannot justify an
+incorrect static declaration. See [BINDING_MODALITIES.md](BINDING_MODALITIES.md#type-parameter-fidelity).
+
 ## Implementation Map
 
 | Area                  | Main files                                                                   | Responsibility                                                                              |
@@ -132,6 +139,10 @@ application activity remains the application's responsibility.
   requires explicit teardown?
 - Can failure after acquisition roll back without touching caller-owned input?
 - Are we claiming a property that TypeScript/JavaScript does not provide?
+- Can a caller choose an unrelated result or inserted-element type where the
+  TypeScript declaration fixes it from the receiver or another argument?
+- Does the check compare against an independently obtained TypeScript type, or
+  only confirm that generated Lean repeats a handwritten configuration?
 - Is a Node test accidentally becoming a browser or React emulator?
 
 Before adding bridge bookkeeping, identify the concrete failure introduced by

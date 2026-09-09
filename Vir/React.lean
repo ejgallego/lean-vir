@@ -670,12 +670,12 @@ namespace StateTuple
 def value {α : Type}
     (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
     Lean.Vir.RuntimeM (Lean.Vir.Js α) := do
-  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 0)
+  Lean.Vir.Js.Tuple2.first result
 
 def setter {α : Type}
     (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
     Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) := do
-  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 1)
+  Lean.Vir.Js.Tuple2.second result
 
 /-- Explicitly projects React's native `useState` result array into a Lean structure. -/
 def toState {α : Type}
@@ -692,12 +692,12 @@ namespace ReducerTuple
 def value {state action : Type}
     (result : @& Lean.Vir.Js (ReducerTuple state action)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js state) := do
-  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 0)
+  Lean.Vir.Js.Tuple2.first result
 
 def dispatch {state action : Type}
     (result : @& Lean.Vir.Js (ReducerTuple state action)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action)) := do
-  Lean.Vir.Js.Array.getAs result (← Lean.Vir.JsValue.ofFloat 1)
+  Lean.Vir.Js.Tuple2.second result
 
 /-- Explicitly projects React's native `useReducer` result array into a Lean structure. -/
 def toState {state action : Type}
@@ -719,7 +719,7 @@ def empty : ReactM (Lean.Vir.Js DependencyList) := do
 def push
     (deps : @& Lean.Vir.Js DependencyList)
     (value : @& Lean.Vir.Js α) : ReactM Unit := do
-  let _ ← Lean.Vir.Js.Array.push deps value
+  let _ ← Lean.Vir.Js.Array.push deps (Lean.Vir.Js.erase value)
   pure ()
 
 def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
@@ -820,7 +820,7 @@ def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
 def createElementTag
     (tag : @& String)
     (props : @& Lean.Vir.Js Props)
-    (children : @& Lean.Vir.Js.Array (Lean.Vir.Js Node)) :
+    (children : @& Lean.Vir.Js.Array Node) :
     ReactM (Lean.Vir.Js Node) := do
   let elementType ← ElementType.ofTag tag
   createElement elementType props children

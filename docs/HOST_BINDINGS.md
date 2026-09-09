@@ -70,6 +70,16 @@ browser `Element` instance delegates to one brand check that returns the exact
 input on success. `Js.Object` is not the universal source type: JavaScript
 primitives, `null`, and `undefined` erase to `Js.Any` as well.
 
+Dynamic `Js.Object.get` reads a property once and returns `Js.Any`, including
+native `undefined` for a missing property. A string key does not authorize an
+arbitrary result phantom. Use a generated getter with an actual field contract,
+or a narrow check before typed use. `Js.String.fromAny` accepts only primitive
+strings and preserves the exact value; all other kinds, including boxed strings,
+fail with `TypeError`. It does not coerce or decode/re-encode. In a native Promise
+fulfillment callback, this check's failure rejects the resulting chain. This
+intentionally rejects malformed message fields earlier than the old unchecked
+RPC projections; successful replies and reference transport are unchanged.
+
 The package manifest currently calls the raw JavaScript-value lane
 `hostResource`. That is a legacy ABI classification name, not a JavaScript
 wrapper or public lifetime model. At runtime the lane transports the value

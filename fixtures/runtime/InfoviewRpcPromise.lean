@@ -42,8 +42,9 @@ def callSurfaceExact
 
 /--
 Call a position-specific infoview RPC session and project one response field
-through native Promise and object operations. No request or response object is
-decoded into a parallel Lean representation.
+through native Promise and object operations. The projected message must be a
+primitive string; malformed fields reject the chained Promise without coercion.
+No request or response object is decoded into a parallel Lean representation.
 -/
 def callMessage
     (session : Lean.Vir.Js Lean.Vir.Infoview.RpcSession)
@@ -52,7 +53,7 @@ def callMessage
   let pending ← callExact session request
   let projectMessage ← Lean.Vir.Js.Function.ofLean fun response => do
     let key ← Lean.Vir.JsValue.ofString "message"
-    Lean.Vir.Js.Object.get response key
+    Lean.Vir.Js.String.fromAny (← Lean.Vir.Js.Object.get response key)
   Lean.Vir.Js.Promise.thenValue pending projectMessage
 
 /-- Recover a rejected native Promise with an exact caller-supplied object. -/
