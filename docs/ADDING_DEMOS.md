@@ -1,15 +1,18 @@
 # Adding Demos
 
-The browser packages are intentionally small: Lean examples are elaborated
-locally, their typed `Lean.IR.Decl` closures are written to focused
+The browser packages are intentionally small: Lean modules are built by Lake,
+their compiled `Lean.IR.Decl` closures are written to focused
 `build/generated/*.irpkg` files, and the browser loads those packages without
 rebuilding the upstream interpreter.
 
 ## Workflow
 
-1. Add or edit a Lean source under `examples/`.
-2. Add exported roots to the appropriate package in
-   `fixtures/browser-packages.json`. List additional Lake build prerequisites in
+1. Add or edit a Lean module under `examples/` and register its module identity
+   in the appropriate `lean_lib` roots/globs. Keep entrypoints and interface
+   types public; private implementation helpers may stay private.
+2. Add `{ "module": "MyModule", "roots": ["MyModule.entry"] }` to the
+   appropriate package's `targets` in `fixtures/browser-packages.json`.
+   Selected modules are built automatically. List any extra build prerequisites in
    that package's `lakeTargets`; use `packageOnly` only for internal roots that
    are needed by the demo but should not become JS interface exports.
 3. Run `npm run check:package`.
@@ -28,18 +31,26 @@ Most example-only edits should only regenerate the relevant
 `web/public/*.irpkg`. They should not recompile or relink
 `ir_interpreter.cpp`.
 
+The version-2 browser catalog uses `fixtureInputs: [{ "source":
+"fixtures/Basic.lean", "module": "fixtures.Basic" }]` for fixture-derived
+roots. `source` remains a navigation/coverage key; `module` is the explicit
+Lake identity. The build does not infer one from the other. Repeated selections
+of a module union roots in first-seen order, separately for exported and
+package-only roots. One `.irpkg` may still bundle several modules; this path
+does not force the per-module sharding used by Lake's `:vir` facet.
+
 ## Local Package Runner
 
-For a narrower developer loop, generate a package from a single Lean file:
+For a narrower developer loop, generate a package from a registered Lean module:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
 ```
 
-When no roots are supplied, the utility packages public source definitions:
+When no roots are supplied, the utility packages public module definitions:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg
 ```
 
 Run `npm run dev` and open `/dev.html` to load a served package URL or upload the

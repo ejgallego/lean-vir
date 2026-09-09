@@ -17,7 +17,6 @@ import {
   join,
   manifestEntry,
   readFile,
-  runVirIrpkg,
   spawnSync,
   writeRuntimeFixture,
 } from "./shared.mjs";
@@ -28,9 +27,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const freshPackage = join(freshDir, "fresh.irpkg");
   await writeRuntimeFixture(freshSource, "FreshUser.lean");
 
-  const generated = generateIrPackage(freshSource, freshPackage);
-  assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
-  assert.match(generated.stdout, /local package ready/);
+  const generated = await generateIrPackage("FreshUser", freshSource, freshPackage);
+  assert.match(generated.stdout, /\[all\]/);
 
   const freshRuntime = await factory.createRuntime({
     irPackageSet: [await readFile(freshPackage)],
@@ -46,7 +44,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
   assert.equal(freshManifest.metadata.targets.length, 1);
-  assert.equal(freshManifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshManifest.metadata.targets[0].module, "FreshUser");
+  assert.equal(freshManifest.metadata.targets[0].source, undefined);
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
   assert.ok(
@@ -107,7 +106,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     freshInspect.stderr || freshInspect.stdout,
   );
   const freshInfo = JSON.parse(freshInspect.stdout);
-  assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshInfo.manifest.metadata.targets[0].module, "FreshUser");
   assert.deepEqual(
     freshInfo.manifest.exports.map((entry) => entry.entry).sort(),
     freshEntries,
@@ -115,19 +114,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const aliasSource = join(freshDir, "AliasEdges.lean");
   const aliasPackage = join(freshDir, "alias-edges.irpkg");
-  const aliasReport = join(freshDir, "alias-edges.report.md");
   await writeRuntimeFixture(aliasSource, "AliasEdges.lean");
-  const aliasGenerated = runVirIrpkg([
-    aliasPackage,
-    aliasReport,
-    "--target-all",
-    aliasSource,
-  ]);
-  assert.equal(
-    aliasGenerated.status,
-    0,
-    aliasGenerated.stderr || aliasGenerated.stdout,
-  );
+  await generateIrPackage("AliasEdges", aliasSource, aliasPackage);
   const aliasInspect = spawnSync(
     "node",
     ["scripts/packages/inspect-irpkg.mjs", "--json", aliasPackage],
@@ -155,19 +143,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const escapedSource = join(freshDir, "EscapedCallNames.lean");
   const escapedPackage = join(freshDir, "escaped-call-names.irpkg");
-  const escapedReport = join(freshDir, "escaped-call-names.report.md");
   await writeRuntimeFixture(escapedSource, "EscapedCallNames.lean");
-  const escapedGenerated = runVirIrpkg([
-    escapedPackage,
-    escapedReport,
-    "--target-marked",
-    escapedSource,
-  ]);
-  assert.equal(
-    escapedGenerated.status,
-    0,
-    escapedGenerated.stderr || escapedGenerated.stdout,
-  );
+  await generateIrPackage("EscapedCallNames", escapedSource, escapedPackage, "marked");
   const escapedRuntime = await factory.createRuntime({
     irPackageSet: [await readFile(escapedPackage)],
   });

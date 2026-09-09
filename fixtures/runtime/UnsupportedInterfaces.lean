@@ -1,4 +1,8 @@
-import Vir.React
+module
+
+public import Vir.React
+
+public section
 
 inductive IndexedPair : Nat → Type where
   | mk (left : Nat) (right : Nat) : IndexedPair 0

@@ -1,4 +1,8 @@
-import Vir
+module
+
+public import Vir
+
+public section
 
 @[extern "vir_test_increment"]
 def externIncrement (n : Nat) : Nat := n + 1

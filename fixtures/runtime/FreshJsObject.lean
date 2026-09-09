@@ -1,5 +1,9 @@
-import Vir.Browser
-import Vir.Js
+module
+
+public import Vir.Browser
+public import Vir.Js
+
+public section
 
 @[vir_js "test.js.id"]
 private opaque jsId {α : Type} (value : @& Lean.Vir.Js α) : Lean.Vir.RuntimeM (Lean.Vir.Js α)

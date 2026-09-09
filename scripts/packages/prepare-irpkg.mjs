@@ -6,10 +6,17 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import {
+  irpkgGeneratorFailureMessage,
+  prepareVirIrpkgSync,
+} from "./irpkg-generator.mjs";
 import { repositoryRoot } from "../repository-paths.mjs";
 import { runSync } from "../process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "../timing-utils.mjs";
+import {
+  assertDistinctModulePackageOutputs,
+  normalizeModulePackageConfig,
+} from "./module-package-config.mjs";
 
 const configPaths = process.argv.slice(2);
 const scriptStart = timerStart();
@@ -32,10 +39,28 @@ if (configPaths.length === 0) {
 
 const packages = [];
 for (const configPath of configPaths) {
-  packages.push(await readPackageConfig(configPath));
+  try {
+    packages.push(
+      normalizeModulePackageConfig(
+        JSON.parse(await readFile(configPath, "utf8")),
+      ),
+    );
+  } catch (error) {
+    console.error(`error: ${configPath}: ${error.message}`);
+    process.exit(2);
+  }
 }
 
-const generator = prepareVirIrpkgSync(repositoryRoot);
+try {
+  assertDistinctModulePackageOutputs(packages, repositoryRoot);
+} catch (error) {
+  console.error(`error: ${error.message}`);
+  process.exit(2);
+}
+
+const generator = prepareVirIrpkgSync({
+  lakeTargets: [...new Set(packages.map((config) => `+${config.module}`))],
+});
 if (!generator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(generator)}`);
   process.exit(generator.status);
@@ -47,25 +72,37 @@ for (const packageConfig of packages) {
   try {
     runSync(
       generator.path,
-      [packageConfig.packagePath, packageConfig.reportPath, ...packageConfig.targetArgs],
+      [
+        packageConfig.packagePath,
+        packageConfig.reportPath,
+        ...packageConfig.targetArgs,
+      ],
       { cwd: repositoryRoot, env: generator.env },
     );
   } catch (error) {
-    console.error(`error: package generation failed for ${packageConfig.source}`);
+    console.error(
+      `error: package generation failed for ${packageConfig.module}`,
+    );
     console.error(`report: ${packageConfig.reportPath}`);
     process.exit(error.status ?? 1);
   }
   const packageSeconds = elapsedSeconds(packageStart);
-  packageTimings.push({ path: packageConfig.packagePath, seconds: packageSeconds });
+  packageTimings.push({
+    path: packageConfig.packagePath,
+    seconds: packageSeconds,
+  });
   printPackage(packageConfig);
 }
 
-const packagesSeconds = packageTimings.reduce((sum, timing) => sum + timing.seconds, 0);
+const packagesSeconds = packageTimings.reduce(
+  (sum, timing) => sum + timing.seconds,
+  0,
+);
 console.log(
-  `irpkg timing: lean-lib=${formatSeconds(generator.libSeconds)}s `
-  + `generator=${formatSeconds(generator.generatorSeconds)}s `
-  + `${packages.length === 1 ? "package" : "packages"}=${formatSeconds(packagesSeconds)}s `
-  + `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+  `irpkg timing: lean-lib=${formatSeconds(generator.libSeconds)}s ` +
+    `generator=${formatSeconds(generator.generatorSeconds)}s ` +
+    `${packages.length === 1 ? "package" : "packages"}=${formatSeconds(packagesSeconds)}s ` +
+    `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
 );
 if (packages.length > 1) {
   const packageSummary = packageTimings
@@ -74,42 +111,15 @@ if (packages.length > 1) {
   console.log(`irpkg package files: ${packageSummary}`);
 }
 
-async function readPackageConfig(configPath) {
-  const config = JSON.parse(await readFile(configPath, "utf8"));
-  const source = requiredString(config.source, "source");
-  const packagePath = config.package ?? defaultPackagePath(source);
-  const reportPath = config.report ?? reportPathFor(packagePath);
-  const roots = Array.isArray(config.roots) ? config.roots : [];
-  const includeAll = config.includeAll === true || roots.length === 0;
-  const targetArgs = includeAll ? ["--target-all", source] : ["--target", source, ...roots];
-  return { source, packagePath, reportPath, roots, includeAll, targetArgs };
-}
-
 function printPackage(packageConfig) {
   console.log(`package: ${packageConfig.packagePath}`);
   console.log(`report:  ${packageConfig.reportPath}`);
   console.log("interface: embedded in package");
-  if (packageConfig.includeAll) {
-    console.log(`mode:    public source definitions from ${packageConfig.source}`);
+  if (packageConfig.roots.length === 0) {
+    console.log(
+      `mode:    public module definitions from ${packageConfig.module}`,
+    );
   } else {
     console.log(`roots:   ${packageConfig.roots.join(", ")}`);
   }
-}
-
-function requiredString(value, field) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`config field \`${field}\` must be a non-empty string`);
-  }
-  return value;
-}
-
-function defaultPackagePath(sourcePath) {
-  const stem = sourcePath.split("/").at(-1)?.replace(/\.lean$/, "") ?? "local";
-  return `build/generated/${stem}.irpkg`;
-}
-
-function reportPathFor(packagePath) {
-  return packagePath.endsWith(".irpkg")
-    ? `${packagePath.slice(0, -".irpkg".length)}.report.md`
-    : `${packagePath}.report.md`;
 }

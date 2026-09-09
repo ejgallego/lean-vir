@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Frontend
+public import Vir.GeneratePackage.Inputs
 public import Vir.GeneratePackage.NativeExterns
 
 public section
@@ -80,7 +80,7 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .all =>
       index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
-  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .marked => markedDeclNamesFor index target
   | .explicit roots | .packageOnly roots => roots
 
 def boxedBaseName? : Name -> Option Name
@@ -149,9 +149,8 @@ def Closure.moduleNames (closure : Closure) : Array Name :=
 
 /--
 Filter the dependency-first order reconstructed from Lean's loaded module
-graphs to the modules reached by the package closure. The root is appended only
-for the legacy source path, where its declarations do not carry imported-module
-ownership.
+graphs to the modules reached by the package closure. Both compiled and live
+module roots have explicit ownership and are present in the graph.
 -/
 def Closure.moduleInitializationOrder
     (closure : Closure)
@@ -163,9 +162,8 @@ def Closure.moduleInitializationOrder
     (fun (modules : NameSet) moduleName => modules.insert moduleName) ({} : NameSet)
   let reachedModules := reachedModules.insert rootModule
   let some importedOrder := index.moduleInitializationOrderForTarget? target
-    | throw s!"no Lean module order is available for package-set target `{target.source}`"
+    | throw s!"no Lean module order is available for package-set target `{target.publicSource}`"
   let ordered := importedOrder.filter reachedModules.contains
-  let ordered := if ordered.contains rootModule then ordered else ordered.push rootModule
   let missing := ownedModules.filter fun moduleName => !ordered.contains moduleName
   if !missing.isEmpty then
     let names := ", ".intercalate (missing.map (·.toString)).toList
@@ -176,19 +174,13 @@ def Closure.moduleInitializationOrder
 
 def Closure.forModule (closure : Closure) (moduleName rootModule : Name) : Closure :=
   let isRoot := moduleName == rootModule
-  let owns (loaded : LoadedDecl) :=
-    loaded.module? == some moduleName || (isRoot && loaded.module?.isNone)
-  let decls := closure.decls.filter owns
+  let decls := closure.decls.filter (fun loaded => loaded.module? == some moduleName)
   let ownedDeclNames : NameSet := decls.foldl
     (fun names loaded => names.insert loaded.decl.name) {}
-  let allDeclNames : NameSet := closure.decls.foldl
-    (fun names loaded => names.insert loaded.decl.name) {}
-  let initOwned (entry : InitGlobal) :=
-    ownedDeclNames.contains entry.name || (isRoot && !allDeclNames.contains entry.name)
   {
     decls
     externs := if isRoot then closure.externs else #[]
-    initGlobals := closure.initGlobals.filter initOwned
+    initGlobals := closure.initGlobals.filter (fun entry => ownedDeclNames.contains entry.name)
   }
 
 end Vir.GeneratePackage

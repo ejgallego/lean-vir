@@ -5,8 +5,12 @@ adding those declarations to VIR's built-in native catalog. The client keeps a
 normal Lean reference body and an explicit fallback:
 
 ```lean
+module
+
+public import Vir
+
 @[extern "my_project_increment"]
-def MyProject.increment (value : UInt32) : UInt32 := value + 1
+public def MyProject.increment (value : UInt32) : UInt32 := value + 1
 
 vir_extern_fallback MyProject.increment
 ```
@@ -76,11 +80,14 @@ When invoking the repository's package tool from the client Lake environment:
 
 ```bash
 VIR_NATIVE_EXTERN_MANIFEST=/path/to/client/lean-vir-native-externs.json \
-LEAN_PATH=/path/to/lean-vir/.lake/build/lib/lean \
   lake -d /path/to/client env \
   /path/to/lean-vir/.lake/build/bin/vir_irpkg \
-  output.irpkg output.report.md --target-marked ClientExports.lean
+  output.irpkg output.report.md --target-marked-module ClientExports
 ```
+
+The client Lake project must depend on VIR and build `ClientExports` as a Lean
+module. Lake supplies its dependency search paths; package generation imports
+the compiled module without elaborating the source again.
 
 The manifest must be visible to both commands. This is intentional: it makes
 native-over-fallback package selection and runtime provider selection one
@@ -125,4 +132,8 @@ Run the focused contract check with:
 npm run check:client-native-externs
 ```
 
-The checked-in example is under `fixtures/client-native-extern/`.
+The checked-in example is under `fixtures/client-native-extern/`. The check
+builds that module, validates wrapper/registry and manifest diagnostics, and
+checks compiled package selection both with the client native manifest and
+without it (the Lean reference-body fallback). It does not compile or execute
+a client-specific Wasm runtime.

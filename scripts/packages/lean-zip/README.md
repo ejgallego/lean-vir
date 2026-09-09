@@ -6,6 +6,10 @@ This directory owns VIR's Lean-zip-specific package workflows:
   checkout through the stable `npm run accept:lean-zip` command.
 - `acceptance-manifest.mjs` validates the generated native-oracle manifest
   before the runner reads any referenced artifacts.
+- `module-project.mjs` creates the shared dependent Lake project for the
+  compiled adapter and native oracle. Lake supplies dependency search paths
+  and native libraries; neither command copies the client's Lake configuration
+  nor constructs `LEAN_PATH` manually.
 - `export-browser-package.mjs` implements the browser benchmark catalog's
   repository-owned `package-command` producer contract for the current
   checkout. Catalog entry points remain relative to their pinned producer
@@ -17,14 +21,36 @@ Authored Lean sources remain under `fixtures/lean-zip/`. Generated packages,
 reports, runtime bundles, and smoke inputs remain caller-owned or ignored
 artifacts and are not committed.
 
+Both commands require module-capable lean-zip sources and the exact toolchain
+named in VIR's `lean-toolchain`. The temporary project depends on the supplied
+client and producer by local path and reads the adapter sources from VIR.
+It does not edit their sources, configuration or dependency pins; ordinary Lake
+builds may populate their build caches. The acceptance command removes its
+temporary project unless `--keep` is requested; the browser exporter always
+removes its temporary project.
+
+The upstream module port is maintainer-owned. Full external acceptance of this
+adapter migration is deferred until a matching module-capable checkpoint is
+available. That run must compile the actual adapter, including the transparent
+Lean bodies required by `vir_extern_fallback`, and exercise the compression
+matrix below. The `lean-zip-module-project` runtime smoke checks real module
+compilation and inherited native linking with a small test dependency; it does
+not claim compression equivalence. Historical browser catalogs continue to
+invoke their pinned producers and are not repinned by this migration.
+
 ## Acceptance boundary
 
-The acceptance command builds two views of the exact checkout supplied by the
-maintainer. `VirLeanZipAcceptance.NativeOracle` executes Lean-zip natively and
+The acceptance command builds two compiled modules against the checkout supplied
+by the maintainer. `VirLeanZipAcceptance.NativeOracle` executes Lean-zip natively and
 writes deterministic inputs, expected results, and `manifest.tsv`. The VIR
 package generator separately selects the exports in
 `VirLeanZipAcceptance.Exports`, and the shared Wasm runtime executes those
 exports over the oracle inputs.
+
+Package selection uses `--target-marked-module` for the acceptance matrix and
+`--target-module` for the browser workload's explicit compression entry. The
+browser exporter supplies the same client native-extern manifest to runtime
+construction and package generation.
 
 The runner requires native and VIR compression bytes and prescan decisions to
 match and independently inflates every compressed result. When two or more

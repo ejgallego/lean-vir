@@ -1,3 +1,8 @@
+module
+
+
+public section
+
 namespace Duplicate
 def entry (n : Nat) : Nat := n + 1
 end Duplicate

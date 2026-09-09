@@ -25,6 +25,12 @@ is derived from both the Lean and TypeScript names. Validation rejects duplicate
 IDs, including collisions after name sanitization; give colliding anchors
 distinct explicit IDs.
 
+The Lean fixture is the registered `TypeAnchorFixture` module. Its manifest
+producer builds compiled artifacts through Lake and selects the six explicit
+roots in `fixtures/type-anchors/vir-v1.roots.txt`; it never reloads a source
+file. Module provenance is preserved, and reviewed aliases from
+`vir-v1.aliases.json` are added without rewriting types or timestamps.
+
 Run the complete fixture check with:
 
 ```bash

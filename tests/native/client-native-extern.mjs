@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { virIrpkgLakeBuildArgs, virIrpkgPath } from "../../scripts/packages/irpkg-generator.mjs";
+import { readIrPackageFile } from "../../scripts/packages/irpkg-format.mjs";
 import {
   repositoryPath,
   repositoryRoot as repoRoot,
@@ -88,33 +89,44 @@ try {
     "ClientNativeFixture.increment\tvir_client_native_increment",
   );
 
-  const packagePath = join(tempRoot, "fixture.irpkg");
-  const reportPath = join(tempRoot, "fixture.report.md");
-  run(
-    "lake",
-    [
-      "-d",
-      fixtureRoot,
-      "env",
-      virIrpkgPath,
-      packagePath,
-      reportPath,
-      "--target-marked",
-      join(fixtureRoot, "ClientNativeFixture.lean"),
-    ],
-    {
-      env: { ...process.env, VIR_NATIVE_EXTERN_MANIFEST: manifestPath },
-    },
-  );
-  const report = await readFile(reportPath, "utf8");
-  assert.match(
-    report,
-    /`ClientNativeFixture\.increment` -> `vir_client_native_increment`/,
-  );
-  assert.doesNotMatch(
-    report,
-    /Lean reference body for `ClientNativeFixture\.increment`/,
-  );
+  // Exercise both selections against the same compiled module, without
+  // inheriting a native profile from the shell running this contract test.
+  const profileEnv = { ...process.env };
+  delete profileEnv.VIR_NATIVE_EXTERN_MANIFEST;
+  delete profileEnv.VIR_NATIVE_EXTERN_EXTRAS_FILE;
+  for (const native of [true, false]) {
+    const profile = native ? "native" : "fallback";
+    const packagePath = join(tempRoot, `${profile}.irpkg`);
+    const reportPath = join(tempRoot, `${profile}.report.md`);
+    run(
+      "lake",
+      [
+        "env",
+        virIrpkgPath,
+        packagePath,
+        reportPath,
+        "--target-marked-module",
+        "ClientNativeFixture",
+      ],
+      {
+        cwd: fixtureRoot,
+        env: native
+          ? { ...profileEnv, VIR_NATIVE_EXTERN_MANIFEST: manifestPath }
+          : profileEnv,
+      },
+    );
+    const { manifest } = await readIrPackageFile(packagePath);
+    assert.equal(manifest.metadata.targets[0].mode, "markedModule");
+    assert.equal(manifest.metadata.targets[0].module, "ClientNativeFixture");
+    assert.deepEqual(manifest.exports.map((entry) => entry.entry), [
+      "ClientNativeFixture.exportedIncrement",
+    ]);
+    const report = await readFile(reportPath, "utf8");
+    const nativeBoundary = /`ClientNativeFixture\.increment` -> `vir_client_native_increment`/;
+    const referenceBody = /Lean reference body for `ClientNativeFixture\.increment`/;
+    assert.match(report, native ? nativeBoundary : referenceBody);
+    assert.doesNotMatch(report, native ? referenceBody : nativeBoundary);
+  }
 
   await copyFile(
     join(fixtureRoot, "client_native_fixture.c"),

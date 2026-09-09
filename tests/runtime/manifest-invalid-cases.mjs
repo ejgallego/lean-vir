@@ -165,14 +165,37 @@ export const invalidManifestCases = [
     pattern: /mode markedModule requires a module/,
   },
   {
-    name: "module origin with source mode",
+    name: "module origin with noncanonical marked mode",
     mutate: (manifest) => {
       manifest.metadata.targets = [
-        packageTarget({ source: undefined, module: "Example", mode: "all" }),
+        packageTarget({ source: undefined, module: "Example", mode: "marked" }),
       ];
     },
     pattern: /module requires mode markedModule/,
   },
+  ...["explicit", "packageOnly"].map((mode) => ({
+    name: `module ${mode} target without roots`,
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({ source: undefined, module: "Example", mode }),
+      ];
+    },
+    pattern: new RegExp(`roots must be non-empty for ${mode}`),
+  })),
+  ...["all", "markedModule"].map((mode) => ({
+    name: `module ${mode} target with explicit roots`,
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({
+          source: undefined,
+          module: "Example",
+          mode,
+          roots: ["Example.value"],
+        }),
+      ];
+    },
+    pattern: new RegExp(`roots must be empty for ${mode}`),
+  })),
   {
     name: "explicit target without roots",
     mutate: (manifest) => {
@@ -281,6 +304,25 @@ export const invalidManifestCases = [
     },
     pattern: /root member target must use markedModule or marked mode/,
   },
+  ...["explicit", "packageOnly", "all"].map((mode) => ({
+    name: `root package-set member with module ${mode} target`,
+    mutate: (manifest) => {
+      manifest.metadata.targets = [
+        packageTarget({
+          source: undefined,
+          module: "Example.Root",
+          mode,
+          roots: mode === "all" ? [] : ["Example.Root.value"],
+          resolvedRoots: ["Example.Root.value"],
+        }),
+      ];
+      manifest.metadata.packageSetMember = {
+        module: "Example.Root",
+        role: "root",
+      };
+    },
+    pattern: /root member target must use markedModule or marked mode/,
+  })),
   {
     name: "root package-set member with multiple targets",
     mutate: (manifest) => {

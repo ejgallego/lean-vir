@@ -18,6 +18,7 @@ import {
   readFile,
   readRuntimeArtifacts,
   runVirIrpkg,
+  spawnSync,
 } from "./shared.mjs";
 
 const tempDir = await mkdtemp(join(tmpdir(), "lean-vir-slides-canvas-"));
@@ -140,11 +141,13 @@ try {
   console.error = (...args) => hostErrors.push(args);
 
   const packagePath = join(tempDir, "slides-canvas.irpkg");
+  const built = spawnSync("lake", ["build", "+SlidesCanvas"], { encoding: "utf8" });
+  assert.equal(built.status, 0, built.stderr || built.stdout);
   const generated = runVirIrpkg([
     packagePath,
     join(tempDir, "slides-canvas.report.md"),
-    "--target-marked",
-    "examples/SlidesCanvas.lean",
+    "--target-marked-module",
+    "SlidesCanvas",
   ]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 

@@ -3,16 +3,15 @@
 import {
   copyFile,
   mkdir,
-  mkdtemp,
   readFile,
   rm,
-  symlink,
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
+import { createSourceView, rootModule } from "./source-project.mjs";
 import {
   buildVirBrowserRuntime,
   checkoutRoot,
@@ -27,11 +26,9 @@ import {
 
 const defaultProducer = repositoryRoot;
 const packageEntry = "Illuminate.Animation.Vir.replayTraceTyped";
-const sourceFile = "fixtures/illuminate/VirIlluminateAcceptance/Exports.lean";
 const packageFile = "module-set/Vir.irpkg";
 const descriptorFile = "module-set/Vir.irpkg-set.json";
 const shardDirectory = "module-set/Vir.parts";
-const rootModule = "VirIlluminateAcceptance.Exports";
 
 const usage = `Usage: node scripts/packages/illuminate/export-browser-package.mjs [options]
 
@@ -43,29 +40,6 @@ package in a fresh caller-owned directory.
   --checkout runtime=PATH       exact Lean source checkout
   --checkout client=PATH        exact Illuminate checkout
   --package workload=PATH       Illuminate source/oracle package`;
-
-async function createSourceView(client, producer, parent) {
-  const workspace = await mkdtemp(join(parent, ".illuminate-source-view-"));
-  try {
-    const sourceView = join(workspace, "source");
-    const archive = join(workspace, "source.tar");
-    await mkdir(sourceView);
-    runSync("git", [
-      "-C",
-      client,
-      "archive",
-      "--format=tar",
-      `--output=${archive}`,
-      "HEAD",
-    ]);
-    runSync("tar", ["-xf", archive, "-C", sourceView]);
-    await symlink(producer, join(sourceView, "vir"), "dir");
-    return { workspace, sourceView };
-  } catch (error) {
-    await rm(workspace, { recursive: true, force: true });
-    throw error;
-  }
-}
 
 async function main() {
   const options = parseProducerArguments(process.argv.slice(2), {
@@ -121,7 +95,7 @@ async function main() {
       dirname(output),
     );
     workspace = sourceView.workspace;
-    runSync("lake", ["build", "Illuminate.Animation.Player"], {
+    runSync("lake", ["build", `+${rootModule}`], {
       cwd: sourceView.sourceView,
     });
 
@@ -141,9 +115,8 @@ async function main() {
         rootModule,
         "Vir.irpkg",
         "Vir.parts",
-        "--target",
-        join(producer, sourceFile),
-        packageEntry,
+        "--target-marked-module",
+        rootModule,
       ],
       { cwd: sourceView.sourceView },
     );

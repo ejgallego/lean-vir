@@ -103,12 +103,9 @@ unsafe def snapshotEnvironment (source contents : String) : IO Lean.Environment 
 unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
   let env ← snapshotEnvironment importedHelperTargetSource.toString
     (← IO.FS.readFile importedHelperTargetSource)
-  let target : Vir.GeneratePackage.Target := {
-    source := importedHelperTargetSource
-    mode := .explicit #[root]
-  }
-  let index := Vir.GeneratePackage.declIndexFromEnvironment importedHelperTargetSource.toString env
-  return Vir.GeneratePackage.collectClosure #[target] index
+  let input ← IO.ofExcept <|
+    Vir.GeneratePackage.prepareSnapshotInput importedHelperTargetSource.toString env #[root]
+  return Lean.Vir.Infoview.packageClosure input
 
 def loadedDecl? (closure : Vir.GeneratePackage.Closure) (name : Lean.Name) :
     Option Vir.GeneratePackage.LoadedDecl :=
@@ -128,15 +125,34 @@ def expectImportedDecl
 
 /-- Exercise the same environment adapter as the RPC handler, without a disk
 source to fall back to. Local edits must survive imported-owner resolution. -/
-unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
-  let source := "unsaved/ModuleSnapshot.lean"
+unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
+  let source := "untitled:ModuleSnapshot.lean"
   let contents := "module\npublic import InfoviewFixtures.ImportedHelper\n" ++
-    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ " ++
-    s!"{Lean.Json.compress (.str suffix)}\n"
+    "private initialize snapshotPrefix : String ← pure \"snapshot:\"\n" ++
+    "@[noinline] private def snapshotSuffix (_ : Unit) : String := " ++
+    s!"{Lean.Json.compress (.str suffix)}\n" ++
+    "public def snapshotValue : String := InfoviewFixtures.ImportedHelper.labelBefore () ++ snapshotPrefix ++ snapshotSuffix ()\n"
   let env ← snapshotEnvironment source contents
-  let target : Vir.GeneratePackage.Target := { source, mode := .explicit #[`snapshotValue] }
-  let index := Vir.GeneratePackage.declIndexFromEnvironment source env
-  let closure := Vir.GeneratePackage.collectClosure #[target] index
+  let roots := #[`snapshotValue]
+  let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
+  let target := input.target
+  let index := input.index
+  let closure := Lean.Vir.Infoview.packageClosure input
+  expect "snapshot target preserves document provenance and module identity" <|
+    match target.origin with
+    | .snapshot document name => document == source && name == env.mainModule
+    | _ => false
+  expect "snapshot root records its current module" <|
+    (index.find? `snapshotValue).bind (·.module?) == some env.mainModule
+  expect "snapshot locals retain document provenance and module ownership" <|
+    index.localDecls.all fun _ loaded =>
+      loaded.source == source && loaded.module? == some env.mainModule
+  expect "snapshot closure includes a private current-module helper" <|
+    closure.decls.any fun loaded =>
+      Lean.isPrivateName loaded.decl.name && loaded.module? == some env.mainModule
+  let retained ← index.loadImportedModule env.mainModule
+  expect "snapshot current module is already loaded without disk artifacts" <|
+    retained.sources.size == index.sources.size
   expect "module snapshot resolves opaque imports" closure.missingDecls.isEmpty
   expect "module snapshot resolves externs" closure.missingExterns.isEmpty
   expect s!"module snapshot resolves initializer globals: {closure.unsupportedInitGlobals.map Vir.GeneratePackage.ClosureDependency.name}"
@@ -144,11 +160,68 @@ unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
   expect "module snapshot includes private transitive owner" <|
     closure.decls.any (fun loaded => loaded.module? ==
       some `InfoviewFixtures.ImportedHelper.Internal)
-  match ← Vir.GeneratePackage.buildPackageFromIndex "snapshot regression" #[target] index with
+  let order ← IO.ofExcept <| closure.moduleInitializationOrder index target env.mainModule
+  expect "live module root is last in its explicit dependency graph" <|
+    order.back? == some env.mainModule
+  expect "live module order includes private imported owner" <|
+    order.contains `InfoviewFixtures.ImportedHelper.Internal
+  expect "every closure declaration has a module owner" <|
+    closure.decls.all (·.module?.isSome)
+  let partitioned := order.flatMap fun name =>
+    (closure.forModule name env.mainModule).decls.map (·.decl.name)
+  expect "module partitioning preserves every declaration exactly once" <|
+    Lean.Vir.Infoview.sortedNames partitioned ==
+      Lean.Vir.Infoview.sortedNames (closure.decls.map (·.decl.name))
+  expect "every initializer global has a declaration owner" <|
+    closure.initGlobals.all fun entry =>
+      closure.decls.any (fun loaded => loaded.decl.name == entry.name && loaded.module?.isSome)
+  expect "live root owns a private initialized global" <|
+    (closure.forModule env.mainModule env.mainModule).initGlobals.any fun entry =>
+      Lean.isPrivateName entry.name
+  let initializerPartitions := order.map fun name =>
+    (name, (closure.forModule name env.mainModule).initGlobals)
+  let initializerPairs := fun (entries : Array Vir.GeneratePackage.InitGlobal) =>
+    (entries.map fun entry => (entry.name, entry.initName)).qsort fun a b =>
+      if a.1 == b.1 then Lean.Name.quickLt a.2 b.2 else Lean.Name.quickLt a.1 b.1
+  expect "module partitioning preserves initializer pairs with exact multiplicity" <|
+    initializerPairs (initializerPartitions.flatMap (·.2)) ==
+      initializerPairs closure.initGlobals
+  expect "each initializer is in its original declaration owner's partition" <|
+    initializerPartitions.all fun (moduleName, entries) =>
+      entries.all fun entry =>
+        closure.decls.any fun loaded =>
+          loaded.decl.name == entry.name && loaded.module? == some moduleName
+  let text := Lean.FileMap.ofString contents
+  let token ← Lean.Vir.Infoview.packageClosureToken text source input env
+  let revision := Lean.Vir.Infoview.irPackageRevision roots token
+  let buildInput ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env roots
+  let buildToken ← Lean.Vir.Infoview.packageClosureToken text source buildInput env
+  expect "stat/build preparation gives the same revision for the same snapshot" <|
+    revision == Lean.Vir.Infoview.irPackageRevision roots buildToken
+  let some rangeToken ← Lean.Vir.Infoview.packageRangeToken? text source closure env
+    | throw <| IO.userError "infoview smoke failed: snapshot has no source range token"
+  expect "snapshot revision includes the computed source range token" <|
+    token.endsWith s!":{rangeToken}"
+  match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with
   | .error message => throw <| IO.userError message
   | .ok pkg =>
+      let repeated ← IO.ofExcept <| ← Vir.GeneratePackage.buildPackageFromIndex revision
+        #[buildInput.target] buildInput.index
+      expect "same snapshot and revision emit identical bytes" (pkg.bytes == repeated.bytes)
       IO.FS.writeBinFile s!"build/infoview-smoke/snapshot-{suffix}.irpkg" pkg.bytes
-  return Lean.Vir.Infoview.closureIRHash closure
+      return (revision, pkg.bytes)
+
+unsafe def rejectNonModuleSnapshot : IO Unit := do
+  let source := "untitled:PlainSnapshot.lean"
+  let env ← snapshotEnvironment source
+    "import InfoviewFixtures.ImportedHelper\ndef localValue : String := \"plain\"\n"
+  for roots in #[#[`localValue], #[`InfoviewFixtures.ImportedHelper.labelBefore]] do
+    match Lean.Vir.Infoview.prepareIRPackageInput source roots env with
+    | .ok _ => throw <| IO.userError "non-module live snapshot was accepted"
+    | .error error =>
+        expect "non-module snapshot has invalidParams RPC error" (error.code == .invalidParams)
+        expect "non-module snapshot explains required header and no-save policy" <|
+          error.message == "VIR IR package failed:\nVIR live packages require a `module` header; add `module` to the document (no save is required)"
 
 #eval do
   let generatedWidget ←
@@ -216,9 +289,12 @@ unsafe def snapshotPackage (suffix : String) : IO UInt64 := do
     Lean.Vir.Infoview.closureIRHash beforeClosure !=
       Lean.Vir.Infoview.closureIRHash afterClosure
   IO.FS.createDirAll "build/infoview-smoke"
+  rejectNonModuleSnapshot
   let firstSnapshot ← snapshotPackage "first"
   let editedSnapshot ← snapshotPackage "edited"
-  expect "unsaved module edits change the package revision's closure hash" <|
-    firstSnapshot != editedSnapshot
+  expect "unsaved module edits change the package revision" <|
+    firstSnapshot.1 != editedSnapshot.1
+  expect "unsaved module edits change the package bytes" <|
+    firstSnapshot.2 != editedSnapshot.2
 
 end SmokeInfoviewLean

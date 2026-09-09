@@ -648,16 +648,16 @@ worker context.
 
 ## Generate A Local Package
 
-Generate a package from one Lean file and one or more root declarations:
+Generate a package from one Lake-registered Lean module and one or more root declarations:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
 ```
 
-Omit roots to auto-discover public source definitions:
+Omit roots to auto-discover public definitions owned by that module:
 
 ```bash
-npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
+npm run generate:irpkg -- Fib build/generated/fib.irpkg
 ```
 
 The command prints the package path, report path, package format, toolchain,

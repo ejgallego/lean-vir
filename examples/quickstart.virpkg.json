@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "source": "examples/Quickstart.lean",
+  "version": 2,
+  "module": "Quickstart",
   "package": "web/public/local-quickstart.irpkg",
   "report": "build/generated/local-quickstart.report.md",
   "roots": [

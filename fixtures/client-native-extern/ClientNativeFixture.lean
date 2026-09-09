@@ -1,4 +1,8 @@
-import Vir
+module
+
+public import Vir
+
+public section
 
 namespace ClientNativeFixture
 

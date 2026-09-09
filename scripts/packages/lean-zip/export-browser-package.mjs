@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
-import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
-import { delimiter, join } from "node:path";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { runSync } from "../../process-utils.mjs";
 import { repositoryRoot } from "../../repository-paths.mjs";
+import {
+  createLeanZipModuleProject,
+  exportsModule,
+} from "./module-project.mjs";
 import {
   buildVirBrowserRuntime,
   checkoutRoot,
@@ -66,44 +71,38 @@ async function main() {
   ]) {
     await requireToolchain(root, label, "leanprover/lean4:v4.33.0");
   }
+  const workspace = await mkdtemp(join(tmpdir(), "vir-lean-zip-export-"));
   try {
+    const project = await createLeanZipModuleProject({
+      directory: join(workspace, "project"),
+      client,
+      producer,
+    });
+    project.lake(["build", "+Zip.Wasm.Entry", `+${exportsModule}`]);
+    const environment = {
+      VIR_NATIVE_EXTERN_MANIFEST: join(client, "lean-vir-native-externs.json"),
+    };
     const runtimeBuild = await buildVirBrowserRuntime({
       producer,
       runtime,
       output,
-      environment: {
-        VIR_NATIVE_EXTERN_MANIFEST: join(
-          client,
-          "lean-vir-native-externs.json",
-        ),
-      },
+      environment,
     });
-    runSync("lake", ["build", "Zip.Wasm.Entry"], { cwd: client });
 
     const packageFile = "lean-zip.irpkg";
     const reportFile = "lean-zip.report.md";
-    runSync(
-      "lake",
+    project.lake(
       [
         "env",
         join(producer, ".lake/build/bin/vir_irpkg"),
         join(output, packageFile),
         join(output, reportFile),
-        "--target",
-        join(producer, "fixtures/lean-zip/VirLeanZipAcceptance/Exports.lean"),
+        "--target-module",
+        exportsModule,
         packageEntry,
       ],
       {
-        cwd: client,
-        env: {
-          ...process.env,
-          LEAN_PATH: [
-            join(producer, ".lake/build/lib/lean"),
-            process.env.LEAN_PATH,
-          ]
-            .filter(Boolean)
-            .join(delimiter),
-        },
+        env: { ...process.env, ...environment },
       },
     );
     await rm(join(output, reportFile));
@@ -179,6 +178,8 @@ async function main() {
   } catch (error) {
     await rm(output, { recursive: true, force: true });
     throw error;
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
   }
 }
 

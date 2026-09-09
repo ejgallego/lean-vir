@@ -9,6 +9,7 @@ import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { validateFixtureManifest } from "../../fixtures/fixture-manifest.mjs";
+import { packageSpecs } from "../../scripts/packages/browser-package-config.mjs";
 import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
@@ -27,6 +28,8 @@ import {
 } from "../support/fixture-runner-config.mjs";
 import { createFixtureRunnerContext } from "../support/fixture-runner-context.mjs";
 import { fixtureSummary } from "../support/fixture-summary.mjs";
+import { fixtureHostModule, fixtureModuleMap } from "../support/fixture-modules.mjs";
+import { createTestModuleProject } from "../support/module-project.mjs";
 
 const manifestPath = new URL("fixtures/manifest.json", root);
 const buildDir = new URL("build/fixtures/", root);
@@ -45,7 +48,7 @@ function usage() {
 Run Lean fixture host-oracle checks against the WASI upstream interpreter.
 
 Options:
-  --no-build       Reuse web/public/vir-upstream.wasm and generated browser packages.
+  --no-build       Reuse existing Wasm; still build selected Lean modules and fixture packages.
   -h, --help       Show this help.
 
 Environment:
@@ -76,7 +79,7 @@ if (skipBuild) {
   } catch {
     throw new Error("VIR fixture no-build mode requires web/public/vir-upstream.wasm; run npm run build:demo first");
   }
-  console.log("fixture build: skipped (--no-build)");
+  console.log("demo/Wasm build: skipped (--no-build); fixture modules and packages still build");
 } else {
   const buildStart = timerStart();
   requireSuccessfulProcess(
@@ -86,13 +89,32 @@ if (skipBuild) {
   buildSeconds = elapsedSeconds(buildStart);
 }
 const generatorStart = timerStart();
-const irpkgGenerator = prepareVirIrpkgSync(root);
-const generatorSeconds = elapsedSeconds(generatorStart);
+const moduleBySource = fixtureModuleMap(packageSpecs, fixtures);
+const irpkgGenerator = prepareVirIrpkgSync({
+  lakeTargets: [...new Set(moduleBySource.values())].map((name) => `+${name}`),
+});
 if (!irpkgGenerator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(irpkgGenerator)}`);
   process.exit(irpkgGenerator.status);
 }
-const fixtureRunner = createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator });
+// Stable identities let filtered runs reuse the same compiled host wrappers.
+const hostModuleById = new Map(manifestFixtures.map((fixture, index) =>
+  [fixture.id, `Oracle.Case${index}`]));
+const hostProject = await createTestModuleProject({
+  directory: fileURLToPath(new URL("host-modules/", buildDir)),
+  modules: Object.fromEntries(fixtures.map((fixture) => [
+    hostModuleById.get(fixture.id),
+    fixtureHostModule(fixture, moduleBySource.get(fixture.source)),
+  ])),
+});
+const hostBuild = hostProject.build();
+if (hostBuild.status !== 0) {
+  throw new Error(`host module build failed: ${hostBuild.error ?? ""}\n${hostBuild.stdout}\n${hostBuild.stderr}`);
+}
+const hostEnv = hostProject.env();
+const generatorSeconds = elapsedSeconds(generatorStart);
+const fixtureRunner = createFixtureRunnerContext({ root, buildDir, wasmPath, irpkgGenerator,
+  moduleBySource, hostProject, hostModuleById, hostEnv });
 
 const jobs = fixtureJobCount(fixtures.length, config);
 if (fixtureFilter !== "") {

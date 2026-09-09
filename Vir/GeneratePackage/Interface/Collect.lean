@@ -19,10 +19,6 @@ namespace Vir.GeneratePackage
 open Lean.IR
 open Vir.Interface
 
-def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
-  index.sources.findSome? fun candidate =>
-    if candidate.key == source then some candidate.env else none
-
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
   | .opaqueInfo _ => true
@@ -55,21 +51,21 @@ def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
   index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
 
 def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
-  match index.envForSource? (index.sourceKeyFor target) with
+  match index.envForTarget? target with
   | none => #[]
   | some env =>
       sourceDeclNamesFor index target |>.filter fun n =>
         !isPrivateName n &&
         !isGeneratedAuxName n &&
         match env.find? n with
-        | some info => isInterfaceDeclInfo info
+        | some info => isInterfaceDeclInfo info || index.hasCompiledDefinition n
         | none => false
 
 def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
   match target.mode with
   | .packageOnly _ => #[]
   | .all => publicSourceDeclsFor index target
-  | .marked | .markedModule _ => markedDeclNamesFor index target
+  | .marked => markedDeclNamesFor index target
   | .explicit roots =>
     roots.foldl (fun acc root =>
       let n := (boxedBaseName? root).getD root

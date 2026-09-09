@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "source": "examples/Fib.lean",
+  "version": 2,
+  "module": "Fib",
   "package": "web/public/local-fib.irpkg",
   "report": "build/generated/local-fib.report.md",
   "roots": ["fib"]

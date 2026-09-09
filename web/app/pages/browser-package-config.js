@@ -4,7 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export const browserPackageConfigVersion = 1;
+import { requireModuleIdentity } from "../../src/runtime/module-name.js";
+
+export const browserPackageConfigVersion = 2;
 
 const configKeys = new Set(["version", "defaultPackage", "hostPackage", "packages", "localPackages"]);
 const packageKeys = new Set([
@@ -14,9 +16,10 @@ const packageKeys = new Set([
   "report",
   "lakeTargets",
   "targets",
-  "fixtureSources",
+  "fixtureInputs",
 ]);
-const targetKeys = new Set(["source", "roots", "packageOnly"]);
+const targetKeys = new Set(["module", "roots", "packageOnly"]);
+const fixtureInputKeys = new Set(["source", "module"]);
 const localPackageKeys = new Set(["file", "label"]);
 
 function requireObject(value, label) {
@@ -49,12 +52,23 @@ function validateOptionalString(value, label) {
   if (value !== undefined) requireNonEmptyString(value, label);
 }
 
+function requireName(value, label) {
+  // Lean owns escaped-name syntax; only validate the transport boundary here.
+  requireModuleIdentity(value, label);
+  if (value.startsWith("--")) throw new Error(`${label} must not be an option`);
+}
+
 function validateTarget(target, packageId, index) {
   const label = `${packageId}: target at index ${index}`;
   requireObject(target, label);
   rejectUnknownFields(target, targetKeys, label);
-  requireNonEmptyString(target.source, `${label} source`);
-  validateStringArray(target.roots, `${label} roots`);
+  requireName(target.module, label);
+  if (!Array.isArray(target.roots) || target.roots.length === 0) {
+    throw new Error(`${label} roots must be a non-empty array`);
+  }
+  for (const [rootIndex, root] of target.roots.entries()) {
+    requireName(root, `${label} roots[${rootIndex}]`);
+  }
   if (target.packageOnly !== undefined && typeof target.packageOnly !== "boolean") {
     throw new Error(`${label} packageOnly must be a boolean`);
   }
@@ -68,7 +82,16 @@ function validatePackageSpec(spec, index) {
   requireNonEmptyString(spec.file, `${label} file`);
   validateOptionalString(spec.label, `${spec.id}: label`);
   validateOptionalString(spec.report, `${spec.id}: report`);
-  validateStringArray(spec.fixtureSources, `${spec.id}: fixtureSources`);
+  if (spec.fixtureInputs !== undefined && !Array.isArray(spec.fixtureInputs)) {
+    throw new Error(`${spec.id}: fixtureInputs must be an array`);
+  }
+  for (const [inputIndex, input] of (spec.fixtureInputs ?? []).entries()) {
+    const inputLabel = `${spec.id}: fixture input at index ${inputIndex}`;
+    requireObject(input, inputLabel);
+    rejectUnknownFields(input, fixtureInputKeys, inputLabel);
+    requireNonEmptyString(input.source, `${inputLabel} source`);
+    requireName(input.module, inputLabel);
+  }
   validateStringArray(spec.lakeTargets, `${spec.id}: lakeTargets`);
   if (spec.targets !== undefined && !Array.isArray(spec.targets)) {
     throw new Error(`${spec.id}: targets must be an array`);
@@ -110,6 +133,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const packageFileById = new Map();
   const artifactFiles = new Set();
   const packageFileByFixtureSource = new Map();
+  const fixtureSourceByModule = new Map();
 
   for (const [index, spec] of packageSpecs.entries()) {
     validatePackageSpec(spec, index);
@@ -121,13 +145,20 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     }
     packageFileById.set(spec.id, spec.file);
     artifactFiles.add(spec.file);
-    for (const source of spec.fixtureSources ?? []) {
+    for (const { source, module } of spec.fixtureInputs ?? []) {
       const existing = packageFileByFixtureSource.get(source);
       if (existing !== undefined) {
         throw new Error(
           `${source}: fixture source is assigned to both ${existing} and ${spec.file}`,
         );
       }
+      const existingSource = fixtureSourceByModule.get(module);
+      if (existingSource !== undefined && existingSource !== source) {
+        throw new Error(
+          `${module}: fixture module is assigned to both ${existingSource} and ${source}`,
+        );
+      }
+      fixtureSourceByModule.set(module, source);
       packageFileByFixtureSource.set(source, spec.file);
     }
   }

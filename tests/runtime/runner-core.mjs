@@ -84,6 +84,22 @@ export const runtimeTests = Object.freeze(
       group: "lean",
     },
     {
+      id: "module-input",
+      file: "module-input-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "module-cli",
+      file: "module-cli-smoke.mjs",
+      group: "lean",
+    },
+    { id: "module-project", file: "module-project-smoke.mjs", group: "lean" },
+    {
+      id: "lean-zip-module-project",
+      file: "lean-zip-module-project-smoke.mjs",
+      group: "lean",
+    },
+    {
       id: "slides-canvas",
       file: "slides-canvas-runtime-smoke.mjs",
       group: "lean",

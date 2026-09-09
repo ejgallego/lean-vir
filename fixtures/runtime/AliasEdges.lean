@@ -1,3 +1,8 @@
+module
+
+
+public section
+
 abbrev AliasUserId := Nat
 abbrev AliasNatArray := Array AliasUserId
 abbrev AliasCallback := AliasUserId -> AliasUserId

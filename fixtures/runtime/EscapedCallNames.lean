@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Attributes
-import Lean.Elab.Command
-import Lean.AddDecl
+module
+
+public meta import Vir.Attributes
+public meta import Lean.Elab.Command
+public meta import Lean.AddDecl
+
+public section
 
 @[vir_export] def «foo.bar» (n : Nat) : Nat :=
   n + 1

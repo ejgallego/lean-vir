@@ -106,6 +106,8 @@ ownership diagrams.
   provider key reconciliation.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
+- [MODULE_INPUTS.md](MODULE_INPUTS.md): module-only design decisions, migration
+  boundaries, and the focused review checklist.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary
   and native externs.
 - [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md): current architecture and

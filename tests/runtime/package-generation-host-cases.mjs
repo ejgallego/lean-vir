@@ -22,7 +22,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostPackage = join(freshDir, "host.irpkg");
   await writeRuntimeFixture(hostSource, "FreshHost.lean");
 
-  generateIrPackage(hostSource, hostPackage);
+  await generateIrPackage("FreshHost", hostSource, hostPackage);
   const freshElement = {
     attributes: new Map(),
     textContent: "",
@@ -236,7 +236,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsObjectSource = join(freshDir, "FreshJsObject.lean");
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
   await writeRuntimeFixture(jsObjectSource, "FreshJsObject.lean");
-  generateIrPackage(jsObjectSource, jsObjectPackage);
+  await generateIrPackage("FreshJsObject", jsObjectSource, jsObjectPackage);
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
@@ -272,7 +272,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const leanRefSource = join(freshDir, "FreshLeanRef.lean");
   const leanRefPackage = join(freshDir, "lean-ref.irpkg");
   await writeRuntimeFixture(leanRefSource, "FreshLeanRef.lean");
-  generateIrPackage(leanRefSource, leanRefPackage);
+  await generateIrPackage("FreshLeanRef", leanRefSource, leanRefPackage);
   const leanRefRuntime = await createVirRuntimeFactory({
     wasmBytes,
   }).createRuntime({ irPackageSet: [await readFile(leanRefPackage)] });
@@ -318,7 +318,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const customJsValueSource = join(freshDir, "CustomJsValue.lean");
   const customJsValuePackage = join(freshDir, "custom-js-value.irpkg");
   await writeRuntimeFixture(customJsValueSource, "CustomJsValue.lean");
-  generateIrPackage(customJsValueSource, customJsValuePackage);
+  await generateIrPackage("CustomJsValue", customJsValueSource, customJsValuePackage);
   const customJsValueRuntime = await createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
@@ -345,7 +345,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const reactExternalSource = join(freshDir, "ReactExternalComponent.lean");
   const reactExternalPackage = join(freshDir, "react-external-component.irpkg");
   await writeRuntimeFixture(reactExternalSource, "ReactExternalComponent.lean");
-  generateIrPackage(reactExternalSource, reactExternalPackage);
+  await generateIrPackage("ReactExternalComponent", reactExternalSource, reactExternalPackage);
   const externalBadge = createExternalBadgeComponent();
   const reactExternalRuntime = await createVirRuntimeFactory({
     wasmBytes,

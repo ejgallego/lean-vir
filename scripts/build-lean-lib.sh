@@ -99,7 +99,7 @@ build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
 build_module Vir/GeneratePackage/PackageIRTags.lean
-build_module Vir/GeneratePackage/Frontend.lean
+build_module Vir/GeneratePackage/Inputs.lean
 build_module Vir/GeneratePackage/Closure.lean
 build_module Vir/GeneratePackage/Interface/Collect.lean
 build_module Vir/GeneratePackage/Manifest.lean

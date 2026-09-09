@@ -1,5 +1,9 @@
-import Vir.Browser
-import Vir.React
+module
+
+public import Vir.Browser
+public import Vir.React
+
+public section
 
 def freshEchoBang (s : String) : Lean.Vir.RuntimeM String := do
   Lean.Vir.Common.echoString (s ++ "!")

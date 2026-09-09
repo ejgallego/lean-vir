@@ -8,11 +8,9 @@ import {
   assert,
   assertUnsupportedInterfaceFixture,
   assertUnsupportedInterfaceSource,
-  ensureVirJsBuilt,
+  createRuntimeModuleProject,
   join,
   readFile,
-  runVirIrpkg,
-  spawnSync,
   writeFile,
   writeRuntimeFixture,
 } from "./shared.mjs";
@@ -39,10 +37,10 @@ const nakedElementReason =
   /unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/;
 
 async function assertInvalidAttributeSource(freshDir, stem, lines, patterns) {
-  ensureVirJsBuilt();
-  const source = join(freshDir, `${stem}.lean`);
-  await writeFile(source, lines.join("\n"));
-  const checked = spawnSync("lake", ["env", "lean", source], { encoding: "utf8" });
+  const project = await createRuntimeModuleProject(join(freshDir, `${stem}.modules`), {
+    [stem]: lines.join("\n"),
+  });
+  const checked = project.build();
   assert.notEqual(checked.status, 0, `${stem} unexpectedly elaborated successfully`);
   const output = `${checked.stderr}${checked.stdout}`;
   for (const pattern of patterns) assert.match(output, pattern);
@@ -54,7 +52,10 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     freshDir,
     "InvalidIndexedExportAttribute",
     [
-      "import Vir.Attributes",
+      "module",
+      "public meta import Vir.Attributes",
+      "",
+      "public section",
       "",
       "inductive IndexedPair : Nat → Type where",
       "  | mk (left right : Nat) : IndexedPair 0",
@@ -73,8 +74,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.doesNotMatch(indexedAttributeOutput, indexedPairElaborationEvidence);
 
   await assertInvalidAttributeSource(freshDir, "InvalidNakedResourceExportAttribute", [
-    "import Vir.Attributes",
-    "import Vir.Browser",
+    "module",
+    "public meta import Vir.Attributes",
+    "public import Vir.Browser",
+    "",
+    "public section",
     "",
     "@[vir_export]",
     "def nakedElementIdentity (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
@@ -85,8 +89,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidImplicitHostAttribute", [
-    "import Vir.Host",
-    "import Vir.Js",
+    "module",
+    "public import Vir.Host",
+    "public import Vir.Js",
+    "",
+    "public section",
     "",
     "@[vir_js \"test.implicitValue\"]",
     "opaque jsImplicitValue {value : Lean.Vir.Js Nat} : Lean.Vir.RuntimeM Unit",
@@ -97,7 +104,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidHostBoundaryAttribute", [
-    "import Vir.Host",
+    "module",
+    "public import Vir.Host",
+    "public meta import Vir.Host",
+    "",
+    "public section",
     "",
     "@[vir_js \"test.bumpNat\"]",
     "opaque jsBumpNat (n : Nat) : Nat",
@@ -108,7 +119,10 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidHostResultAttribute", [
-    "import Vir.Js",
+    "module",
+    "public import Vir.Js",
+    "",
+    "public section",
     "",
     "@[vir_js \"test.callbackResult\"]",
     "opaque jsCallbackResult : Lean.Vir.RuntimeM (Unit → Lean.Vir.RuntimeM Unit)",
@@ -119,8 +133,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ]);
 
   await assertInvalidAttributeSource(freshDir, "InvalidExplicitConversionAttribute", [
-    "import Vir.Host",
-    "import Vir.Js",
+    "module",
+    "public import Vir.Host",
+    "public import Vir.Js",
+    "",
+    "public section",
     "",
     "@[vir_js_explicit_conversion \"js.value.bad.action\"]",
     "opaque actionToString (action : String) : Lean.Vir.RuntimeM String",
@@ -199,8 +216,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ]);
 
   await assertUnsupportedInterfaceSource(freshDir, "ImplicitHostImport", [
-    "import Vir.Host",
-    "import Vir.Js",
+    "module",
+    "public import Vir.Host",
+    "public import Vir.Js",
+    "",
+    "public section",
     "",
     "-- Bypass `@[vir_js]` so package generation still exercises its final fallback.",
     "@[extern \"__vir_js:test.implicitValue\"]",
@@ -230,10 +250,10 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   const badJslStringSource = join(freshDir, "BadJSLString.lean");
   await writeRuntimeFixture(badJslStringSource, "BadJSLString.lean");
-  ensureVirJsBuilt();
-  const checkedBadJslString = spawnSync("lake", ["env", "lean", badJslStringSource], {
-    encoding: "utf8",
+  const badJslProject = await createRuntimeModuleProject(join(freshDir, "BadJSLString.modules"), {
+    BadJSLString: await readFile(badJslStringSource, "utf8"),
   });
+  const checkedBadJslString = badJslProject.build();
   assert.notEqual(checkedBadJslString.status, 0, "LeanRef-wrapped String unexpectedly typechecked as Js String");
   const badJslStringOutput = `${checkedBadJslString.stderr}${checkedBadJslString.stdout}`;
   assert.match(badJslStringOutput, /Application type mismatch/);
@@ -255,8 +275,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   await writeRuntimeFixture(rightSource, "CollisionRight.lean");
   // Bypass the attribute callbacks to exercise the final package-time contract guards.
   await writeFile(packageFallbackMarkerSource, [
-    "import Vir.Attributes",
-    "import Vir.Browser",
+    "module",
+    "public meta import Vir.Attributes",
+    "public import Vir.Browser",
+    "",
+    "public section",
     "",
     "namespace PackageFallbackMarkers",
     "",
@@ -290,17 +313,24 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "end PackageFallbackMarkers",
     "",
   ].join("\n"));
-  const generated = runVirIrpkg([
+  const project = await createRuntimeModuleProject(join(freshDir, "PackageDiagnostics.modules"), {
+    CollisionLeft: await readFile(leftSource, "utf8"),
+    CollisionRight: await readFile(rightSource, "utf8"),
+    PackageFallbackMarkers: await readFile(packageFallbackMarkerSource, "utf8"),
+  });
+  const built = project.build();
+  assert.equal(built.status, 0, `package diagnostic inputs must compile independently: ${built.stdout}\n${built.stderr}`);
+  const generated = project.runVirIrpkg([
     packagePath,
     reportPath,
-    "--target",
-    leftSource,
+    "--target-module",
+    "CollisionLeft",
     "collisionBump",
-    "--target",
-    rightSource,
+    "--target-module",
+    "CollisionRight",
     "collisionBump",
-    "--target-marked",
-    packageFallbackMarkerSource,
+    "--target-marked-module",
+    "PackageFallbackMarkers",
   ]);
   assert.notEqual(generated.status, 0, "unsupported package targets unexpectedly generated successfully");
   assert.match(generated.stderr, /package diagnostics/);
