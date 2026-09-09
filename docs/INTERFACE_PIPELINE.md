@@ -106,8 +106,8 @@ The generator also accepts compiled-module inputs independently of selection:
 [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) for argument forms. Module-origin
 metadata uses `module` instead of `source`; explicit, package-only and all-public
 selection retain their mode names, while marked module selection retains the
-canonical `markedModule` wire spelling. Source-file adapters remain supported
-during the staged module-only migration.
+canonical `markedModule` wire spelling. Source-file flags and non-module inputs
+are rejected; live editor packages use their already elaborated module environment.
 
 To inspect a generated package without starting the browser, run:
 

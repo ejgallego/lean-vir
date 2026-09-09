@@ -1,6 +1,6 @@
 module
 
-public import Vir.GeneratePackage.Frontend
+public import Vir.GeneratePackage.Inputs
 public meta import Lean.CoreM
 
 public section

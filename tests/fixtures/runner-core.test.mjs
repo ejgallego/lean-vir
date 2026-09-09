@@ -5,6 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { requireSuccessfulProcess } from "../../scripts/process-utils.mjs";
@@ -147,6 +149,14 @@ test("package failure classification retains stderr fallbacks", () => {
     kind: "package-generation-failed",
     detail: "unknown failure",
   });
+});
+
+test("fixture runner help distinguishes Wasm reuse from module preparation", () => {
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./runner.mjs", import.meta.url)), "--help",
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /--no-build\s+Reuse existing Wasm; still build selected Lean modules and fixture packages/);
 });
 
 test("fixture runner configuration is immutable and preserves CLI behavior", () => {
