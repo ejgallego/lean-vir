@@ -90,7 +90,7 @@ if (skipBuild) {
 }
 const generatorStart = timerStart();
 const moduleBySource = fixtureModuleMap(packageSpecs, fixtures);
-const irpkgGenerator = prepareVirIrpkgSync(root, {
+const irpkgGenerator = prepareVirIrpkgSync({
   lakeTargets: [...new Set(moduleBySource.values())].map((name) => `+${name}`),
 });
 if (!irpkgGenerator.ok) {

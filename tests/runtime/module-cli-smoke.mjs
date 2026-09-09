@@ -75,7 +75,9 @@ try {
     await writeFile(path, JSON.stringify(config));
     configPaths.push(path);
   }
-  run("scripts/packages/prepare-irpkg.mjs", configPaths);
+  const prepared = run("scripts/packages/prepare-irpkg.mjs", configPaths);
+  assert.match(prepared.stdout, /mode:\s+public module definitions from Fib/);
+  assert.match(prepared.stdout, /roots:\s+Quickstart.double/);
   assert.deepEqual(
     await readFile(configs[0].package),
     cliBytes,

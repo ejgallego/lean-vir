@@ -111,7 +111,7 @@ export async function runTypeAnchorManifestCli(argv) {
     );
   }
 
-  const generator = prepareVirIrpkgSync(root, {
+  const generator = prepareVirIrpkgSync({
     lakeTargets: [`+${config.module}`],
   });
   if (!generator.ok) throw new Error(irpkgGeneratorFailureMessage(generator));

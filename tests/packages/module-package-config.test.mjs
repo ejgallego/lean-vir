@@ -22,22 +22,18 @@ test("module package defaults select all public definitions", () => {
     packagePath: "build/generated/Fib.irpkg",
     reportPath: "build/generated/Fib.report.md",
     roots: [],
-    includeAll: true,
     targetArgs: ["--target-all-module", "Examples.Fib"],
   });
-  for (const overrides of [{ roots: [] }, { includeAll: false }]) {
-    assert.equal(
-      normalizeModulePackageConfig(config(overrides)).includeAll,
-      true,
-    );
-  }
+  assert.deepEqual(
+    normalizeModulePackageConfig(config({ roots: [] })),
+    normalizeModulePackageConfig(config()),
+  );
 });
 
 test("module package explicit roots preserve order and do not mutate input", () => {
   const roots = Object.freeze(["Examples.Fib.fib", "Examples.Fib.demo"]);
   const input = Object.freeze(config({ roots }));
   const normalized = normalizeModulePackageConfig(input);
-  assert.equal(normalized.includeAll, false);
   assert.deepEqual(normalized.roots, roots);
   assert.notEqual(normalized.roots, roots);
   assert.deepEqual(normalized.targetArgs, [
@@ -47,19 +43,15 @@ test("module package explicit roots preserve order and do not mutate input", () 
   ]);
 });
 
-test("includeAll preserves configured roots but uses all-module selection", () => {
-  const normalized = normalizeModulePackageConfig(
-    config({
-      roots: ["Examples.Fib.fib"],
-      includeAll: true,
-    }),
-  );
-  assert.equal(normalized.includeAll, true);
-  assert.deepEqual(normalized.roots, ["Examples.Fib.fib"]);
-  assert.deepEqual(normalized.targetArgs, [
-    "--target-all-module",
-    "Examples.Fib",
-  ]);
+test("removed includeAll cannot override root selection", () => {
+  for (const includeAll of [true, false, null, 0, "true", [], {}]) {
+    for (const roots of [undefined, [], ["Examples.Fib.fib"]]) {
+      assert.throws(
+        () => normalizeModulePackageConfig(config({ includeAll, roots })),
+        /unknown field includeAll/,
+      );
+    }
+  }
 });
 
 test("module package output paths share the existing report suffix convention", () => {
@@ -158,7 +150,7 @@ test("module identities reject malformed values and source or Lake-target syntax
   }
 });
 
-test("module package selections reject malformed roots and includeAll", () => {
+test("module package selections reject malformed roots", () => {
   for (const roots of [null, "Examples.Fib.fib", 3, true, {}]) {
     assert.throws(
       () => normalizeModulePackageConfig(config({ roots })),
@@ -179,15 +171,6 @@ test("module package selections reject malformed roots and includeAll", () => {
   ]) {
     assert.throws(() =>
       normalizeModulePackageConfig(config({ roots: [root] })),
-    );
-    assert.throws(() =>
-      normalizeModulePackageConfig(config({ roots: [root], includeAll: true })),
-    );
-  }
-  for (const includeAll of [null, 0, "true", [], {}]) {
-    assert.throws(
-      () => normalizeModulePackageConfig(config({ includeAll })),
-      /`includeAll` must be a boolean/,
     );
   }
 });

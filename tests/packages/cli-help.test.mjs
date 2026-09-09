@@ -84,8 +84,8 @@ test("module package CLIs reject invalid inputs before invoking build tools", ()
       [{ version: 1, source: "examples/Fib.lean" }, /unknown field source/],
       [{ version: 2, module: "Fib", roots: "fib" }, /roots.*must be an array/],
       [
-        { version: 2, module: "Fib", includeAll: "true" },
-        /includeAll.*must be a boolean/,
+        { version: 2, module: "Fib", roots: ["fib"], includeAll: true },
+        /unknown field includeAll/,
       ],
       [
         {
