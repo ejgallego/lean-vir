@@ -86,7 +86,7 @@ const lakeTargets = [
     ]),
   ),
 ];
-const generator = prepareVirIrpkgSync(root, { lakeTargets });
+const generator = prepareVirIrpkgSync({ lakeTargets });
 if (!generator.ok) {
   process.exit(generator.status);
 }

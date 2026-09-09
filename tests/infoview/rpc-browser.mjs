@@ -20,7 +20,7 @@ const temp = await mkdtemp(join(tmpdir(), "vir-rpc-browser-"));
 
 await withCleanup(async () => {
   const packagePath = join(temp, "rpc.irpkg");
-  const generator = prepareVirIrpkgSync(root, {
+  const generator = prepareVirIrpkgSync({
     lakeTargets: ["VirInfoview", "+tutorials.RpcReferenceWidget"],
   });
   assert.equal(

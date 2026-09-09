@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 
-import { repositoryPath } from "../repository-paths.mjs";
+import { repositoryPath, repositoryRoot } from "../repository-paths.mjs";
 import { elapsedSeconds, timerStart } from "../timing-utils.mjs";
 
 export const virIrpkgPath = repositoryPath(
@@ -20,10 +20,11 @@ export function virIrpkgLakeBuildArgs(lakeTargets = []) {
   return ["build", "Vir", "vir_irpkg", ...lakeTargets];
 }
 
-export function prepareVirIrpkgSync(root, { lakeTargets = [] } = {}) {
+/** Build this repository's generator and resolve its matching Lake environment. */
+export function prepareVirIrpkgSync({ lakeTargets = [] } = {}) {
   const libStart = timerStart();
   const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
-    cwd: root,
+    cwd: repositoryRoot,
     stdio: "inherit",
   });
   const libSeconds = elapsedSeconds(libStart);
@@ -36,7 +37,7 @@ export function prepareVirIrpkgSync(root, { lakeTargets = [] } = {}) {
   const generatorResult = spawnSync(
     "lake",
     virIrpkgLakeBuildArgs(lakeTargets),
-    { cwd: root, stdio: "inherit" },
+    { cwd: repositoryRoot, stdio: "inherit" },
   );
   const generatorSeconds = elapsedSeconds(generatorStart);
 
@@ -57,7 +58,7 @@ export function prepareVirIrpkgSync(root, { lakeTargets = [] } = {}) {
       "process.stdout.write(process.env.LEAN_PATH ?? '')",
     ],
     {
-      cwd: root,
+      cwd: repositoryRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "inherit"],
     },

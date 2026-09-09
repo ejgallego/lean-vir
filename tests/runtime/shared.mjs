@@ -21,7 +21,6 @@ import {
   irpkgGeneratorFailureMessage,
   prepareVirIrpkgSync,
 } from "../../scripts/packages/irpkg-generator.mjs";
-import { repositoryRootUrl } from "../../scripts/repository-paths.mjs";
 import { createTestModuleProject } from "../support/module-project.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
@@ -279,7 +278,7 @@ export function runVirIrpkg(args) {
 
 function preparedVirIrpkg() {
   if (cachedVirIrpkg !== null) return cachedVirIrpkg;
-  const generator = prepareVirIrpkgSync(repositoryRootUrl);
+  const generator = prepareVirIrpkgSync();
   assert.equal(generator.ok, true, irpkgGeneratorFailureMessage(generator));
   cachedVirIrpkg = generator;
   return cachedVirIrpkg;

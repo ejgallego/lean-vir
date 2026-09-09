@@ -14,7 +14,6 @@ const configFields = new Set([
   "package",
   "report",
   "roots",
-  "includeAll",
 ]);
 
 /**
@@ -48,13 +47,6 @@ export function normalizeModulePackageConfig(config) {
   const roots = Array.from(config.roots ?? [], (root, index) =>
     requireName(root, `roots[${index}]`),
   );
-  if (
-    config.includeAll !== undefined &&
-    typeof config.includeAll !== "boolean"
-  ) {
-    throw new Error("config field `includeAll` must be a boolean");
-  }
-  const includeAll = config.includeAll === true || roots.length === 0;
   const packagePath = requirePath(
     config.package === undefined ? defaultPackagePath(module) : config.package,
     "package",
@@ -63,10 +55,10 @@ export function normalizeModulePackageConfig(config) {
     config.report === undefined ? reportPathFor(packagePath) : config.report,
     "report",
   );
-  const targetArgs = includeAll
+  const targetArgs = roots.length === 0
     ? ["--target-all-module", module]
     : ["--target-module", module, ...roots];
-  return { module, packagePath, reportPath, roots, includeAll, targetArgs };
+  return { module, packagePath, reportPath, roots, targetArgs };
 }
 
 /** Check normalized outputs lexically; this does not resolve filesystem links. */

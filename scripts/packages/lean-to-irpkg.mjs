@@ -69,7 +69,7 @@ console.log(`package: ${packagePath}`);
 console.log(`report:  ${reportPath}`);
 console.log(`mode:    ${mode}`);
 
-const generator = prepareVirIrpkgSync(root, {
+const generator = prepareVirIrpkgSync({
   lakeTargets: [`+${module}`],
 });
 if (!generator.ok) {

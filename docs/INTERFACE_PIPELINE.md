@@ -77,10 +77,11 @@ interface exports. Unsupported public exports fail loudly with diagnostics in
 the report. Explicit roots are preferred for stable demos and size-sensitive
 experiments.
 
-`includeAll: true` also selects all public definitions, even if `roots` is
-nonempty. Otherwise `roots` selects explicit exports. Configuration is validated
-before building: unknown fields, wrong types, and version-1 source configs are
-rejected. Migrate `source` to the module's actual Lake identity; do not derive it
+`roots` is the only selection setting: a nonempty array selects exactly those
+exports. `includeAll` is no longer accepted; omit `roots` (or use `[]`) for all
+public definitions. Configuration is validated before building: unknown fields,
+wrong types, and version-1 source configs are rejected.
+Migrate `source` to the module's actual Lake identity; do not derive it
 by mechanically replacing path separators. The config version is independent
 of the embedded manifest and binary format versions.
 
@@ -106,8 +107,8 @@ The generator also accepts compiled-module inputs independently of selection:
 [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) for argument forms. Module-origin
 metadata uses `module` instead of `source`; explicit, package-only and all-public
 selection retain their mode names, while marked module selection retains the
-canonical `markedModule` wire spelling. Source-file adapters remain supported
-during the staged module-only migration.
+canonical `markedModule` wire spelling. Source-file flags and non-module inputs
+are rejected; live editor packages use their already elaborated module environment.
 
 To inspect a generated package without starting the browser, run:
 

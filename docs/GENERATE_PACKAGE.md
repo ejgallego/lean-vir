@@ -112,7 +112,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.ExternFallback`: the explicit `vir_extern_fallback` command, transparent
   extern-body cloning, and direct-recursion rejection used by portable package
   sources.
-- `Vir.GeneratePackage.Frontend`: compiled-module acquisition, validated live snapshots, `DeclIndex` construction,
+- `Vir.GeneratePackage.Inputs`: compiled-module acquisition, validated live snapshots, `DeclIndex` construction,
   marker collection, extern-fallback ownership adapters,
   declaration-to-module ownership, on-demand `import all` environments, module
   filtering, and declaration-name collision diagnostics.
@@ -160,7 +160,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
    Source commands such as `#eval` execute during Lake compilation, not package
    generation. Live module inputs use `prepareSnapshotInput` on the existing
    server environment without invoking either a frontend or the disk loader.
-3. `Frontend.loadDeclIndex` records each input environment, input-owned IR
+3. `Inputs.loadDeclIndex` records each input environment, input-owned IR
    declaration names, `@[vir_export]` and `@[vir_startup]` marker sets, and a
    name-to-declaration index. Module targets filter those sets to
    declarations owned by the requested module. If two different module targets
@@ -171,7 +171,7 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
    package. Module-set generation repeats this walk while newly missing
    declarations identify unloaded owning modules, stopping when the closure is
    complete or no additional module IR is available. When a source explicitly
-   selected an extern reference-body fallback, frontend lookup supplies an
+   selected an extern reference-body fallback, declaration lookup supplies an
    adapter at the original extern name and the closure follows its internal
    compiled body.
 5. `Interface.collectHostImports` repeats the typed `Vir.HostValidation`

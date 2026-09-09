@@ -58,7 +58,7 @@ try {
   process.exit(2);
 }
 
-const generator = prepareVirIrpkgSync(repositoryRoot, {
+const generator = prepareVirIrpkgSync({
   lakeTargets: [...new Set(packages.map((config) => `+${config.module}`))],
 });
 if (!generator.ok) {
@@ -115,7 +115,7 @@ function printPackage(packageConfig) {
   console.log(`package: ${packageConfig.packagePath}`);
   console.log(`report:  ${packageConfig.reportPath}`);
   console.log("interface: embedded in package");
-  if (packageConfig.includeAll) {
+  if (packageConfig.roots.length === 0) {
     console.log(
       `mode:    public module definitions from ${packageConfig.module}`,
     );

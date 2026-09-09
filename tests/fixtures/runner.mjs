@@ -48,7 +48,7 @@ function usage() {
 Run Lean fixture host-oracle checks against the WASI upstream interpreter.
 
 Options:
-  --no-build       Reuse web/public/vir-upstream.wasm and generated browser packages.
+  --no-build       Reuse existing Wasm; still build selected Lean modules and fixture packages.
   -h, --help       Show this help.
 
 Environment:
@@ -79,7 +79,7 @@ if (skipBuild) {
   } catch {
     throw new Error("VIR fixture no-build mode requires web/public/vir-upstream.wasm; run npm run build:demo first");
   }
-  console.log("fixture build: skipped (--no-build)");
+  console.log("demo/Wasm build: skipped (--no-build); fixture modules and packages still build");
 } else {
   const buildStart = timerStart();
   requireSuccessfulProcess(
@@ -90,7 +90,7 @@ if (skipBuild) {
 }
 const generatorStart = timerStart();
 const moduleBySource = fixtureModuleMap(packageSpecs, fixtures);
-const irpkgGenerator = prepareVirIrpkgSync(root, {
+const irpkgGenerator = prepareVirIrpkgSync({
   lakeTargets: [...new Set(moduleBySource.values())].map((name) => `+${name}`),
 });
 if (!irpkgGenerator.ok) {

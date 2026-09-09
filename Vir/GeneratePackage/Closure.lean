@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Frontend
+public import Vir.GeneratePackage.Inputs
 public import Vir.GeneratePackage.NativeExterns
 
 public section
