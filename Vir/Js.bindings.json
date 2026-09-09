@@ -224,7 +224,7 @@
       {
         "id": "javascript.promise.then-value", "group": "promise", "target": "js.promise.thenValue",
         "lean": "Lean.Vir.Js.Promise.thenValue", "marker": "vir_js",
-        "reason": "Calls native Promise.then with an exact callback returning a direct non-Promise JavaScript value and returns the exact chained Promise.",
+        "reason": "Selects Promise.then<B>'s B callback-return alternative and returns the exact native chain. B is not constrained to exclude promises or thenables: native resolution recursively assimilates them. This selected TypeScript relationship does not compute Awaited<B> or prove runtime settlement shape.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -236,7 +236,7 @@
       {
         "id": "javascript.promise.then-promise", "group": "promise", "target": "js.promise.thenPromise",
         "lean": "Lean.Vir.Js.Promise.thenPromise", "marker": "vir_js",
-        "reason": "Calls native Promise.then with an exact callback returning a native Promise and exposes JavaScript's assimilated chained Promise type.",
+        "reason": "Selects Promise.then<B>'s PromiseLike<B> callback-return alternative with a native Promise<B>. Returns the exact native chain, with recursive thenable assimilation and no VIR scheduling or payload validation. This is a selected TypeScript relationship, not a computed Awaited type.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -260,7 +260,7 @@
       {
         "id": "javascript.promise.then-value-with-rejection", "group": "promise", "target": "js.promise.thenValueWithRejection",
         "lean": "Lean.Vir.Js.Promise.thenValueWithRejection", "marker": "vir_js",
-        "reason": "Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.",
+        "reason": "Selects Promise.then<B, B> with both handlers returning the same B shape, so B | B remains B. Rejection input is Js.Any; B does not exclude thenables, which native resolution recursively assimilates. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler. No full overload inference or settlement-shape proof is supplied.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -286,12 +286,12 @@
       {
         "id": "javascript.promise.catch-value", "group": "promise", "target": "js.promise.catchValue",
         "lean": "Lean.Vir.Js.Promise.catchValue", "marker": "vir_js",
-        "reason": "Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.",
+        "reason": "Selects Promise<T>.catch<T> with a Js.Any rejection input and recovery to the same T, so T | T remains T. Returns the exact native chain. Rejection reasons are passed unchanged; returned promises and thenables are recursively assimilated. The generic result is a selected TypeScript relationship, not runtime payload validation.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.catch", "semantics": "preserving" },
-        "typeParameters": ["α", "error"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
-          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js error) (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js error) (Lean.Vir.Js α)" } }
+          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any (Lean.Vir.Js α)" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } }
       },

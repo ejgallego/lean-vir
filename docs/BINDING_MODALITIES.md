@@ -86,9 +86,10 @@ projections instead of an unconstrained array getter. React's `StateTuple` and
 `ReducerTuple` aliases retain their position types. These VIR-owned projections
 have a checked position contract and compile-time cross-type regressions; the
 React aliases are still authored, not inferred from React's TypeScript overloads.
-Other reviewed protocol operations do not yet receive an independent generic
-relationship check. This focused check is not proof of all TypeScript semantics,
-dynamic property access, callback invocation, or provider behavior.
+The selected Promise relationships below also have a bounded check. Other
+reviewed protocol operations do not yet receive an independent generic
+relationship check. These checks are not proof of all TypeScript semantics,
+callback invocation, or provider behavior.
 
 For VIR-owned dynamic `Object.get`, the same checker enforces an erased `Js.Any`
 result, not a caller-chosen result parameter. The closed `Js.String.fromAny`
@@ -96,6 +97,46 @@ predicate has no type parameters and can return only `Js String`. These are
 explicit checked contracts with negative compile/configuration tests and native
 predicate tests, not derived evidence for arbitrary TypeScript indexed access.
 No generic narrowing from `Js.Any` to a `Js α` or `JSL α` is supplied.
+
+### Selected Promise Relationships
+
+The Promise bindings select explicit subsets of the pinned TypeScript
+declarations, keeping their generic results:
+
+| Lean operation | Selected TypeScript relationship |
+| --- | --- |
+| `thenValue` | `Promise<A>.then<B>` with a callback returning `B` |
+| `thenPromise` | `Promise<A>.then<B>` with a callback returning native `Promise<B>`, a `PromiseLike<B>` |
+| `thenValueWithRejection` | `then<B, B>` with both handlers returning `B`; `B \| B` is `B` |
+| `catchValue` | `Promise<A>.catch<A>` with recovery returning `A`; `A \| A` is `A` |
+| `thenVoid`, `thenVoidWithRejection` | handlers returning `undefined`, represented by `Unit` |
+
+Every rejection handler receives `Js.Any`: TypeScript's rejection `any` supplies
+no evidence for an arbitrary concrete error or Lean payload type. This boundary
+exposes it as an unknown JavaScript value requiring explicit narrowing.
+
+The generator verifies the upstream Promise binder, method parameters/defaults,
+handler inputs and `R | PromiseLike<R>` alternatives, and result union before
+checking the configured Lean types. Tests compile generic wrappers against the
+pinned TS library (including native Promise/PromiseLike compatibility), mutate
+upstream and configured relationships, and compile positive/negative Lean calls.
+These are selected-relationship checks, not a general TS subtype checker.
+
+These methods call native `.then`/`.catch` unchanged. **`thenValue` does not
+exclude promises or thenables.** Native resolution recursively assimilates
+returned thenables, including a previously ordinary object whose `then` changes.
+Explicit TS generic instantiation admits approximations too: a value wrapper can
+have static result `Promise<Promise<string>>` while native resolution settles to
+a string. VIR preserves that selected TS relationship rather than erasing every
+result or claiming to repair all upstream approximations.
+
+Full overload inference, optional-handler breadth, distinct branch unions and
+general PromiseLike/Awaited translation remain unsupported. A preserved TS
+relationship is not proof of actual settlement shape, foreign callback behavior
+or safe Lean heap recovery. Those payload obligations remain separate from
+binding fidelity; these checks do not authorize unchecked `JSL` recovery.
+
+### Reported Contract Claims
 
 Each generated binding operation records this separately from provider and
 reachability evidence:

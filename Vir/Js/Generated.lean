@@ -350,7 +350,7 @@ namespace Js.Promise
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-value`.
 
-Calls native Promise.then with an exact callback returning a direct non-Promise JavaScript value and returns the exact chained Promise.
+Selects Promise.then<B>'s B callback-return alternative and returns the exact native chain. B is not constrained to exclude promises or thenables: native resolution recursively assimilates them. This selected TypeScript relationship does not compute Awaited<B> or prove runtime settlement shape.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -369,7 +369,7 @@ opaque thenValue
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-promise`.
 
-Calls native Promise.then with an exact callback returning a native Promise and exposes JavaScript's assimilated chained Promise type.
+Selects Promise.then<B>'s PromiseLike<B> callback-return alternative with a native Promise<B>. Returns the exact native chain, with recursive thenable assimilation and no VIR scheduling or payload validation. This is a selected TypeScript relationship, not a computed Awaited type.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -406,7 +406,7 @@ opaque thenVoid
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-value-with-rejection`.
 
-Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.
+Selects Promise.then<B, B> with both handlers returning the same B shape, so B | B remains B. Rejection input is Js.Any; B does not exclude thenables, which native resolution recursively assimilates. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler. No full overload inference or settlement-shape proof is supplied.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -445,7 +445,7 @@ opaque thenVoidWithRejection
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.catch-value`.
 
-Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.
+Selects Promise<T>.catch<T> with a Js.Any rejection input and recovery to the same T, so T | T remains T. Returns the exact native chain. Rejection reasons are passed unchanged; returned promises and thenables are recursively assimilated. The generic result is a selected TypeScript relationship, not runtime payload validation.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -456,9 +456,8 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.promise.catchValue"]
 opaque catchValue
     {α : Type}
-    {error : Type}
     (promise : @& Lean.Vir.Js.Promise α)
-    (onRejected : @& Lean.Vir.Js.Function1 (Lean.Vir.Js error) (Lean.Vir.Js α)) :
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js α)) :
     RuntimeM (Lean.Vir.Js.Promise α)
 
 end Js.Promise

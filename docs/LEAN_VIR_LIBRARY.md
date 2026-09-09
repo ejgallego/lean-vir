@@ -490,11 +490,16 @@ reference type.
 JavaScript method and request values and returns `Js.Promise response` without
 awaiting or decoding it. `Js.Promise.thenValueWithRejection` and
 `thenVoidWithRejection` pass both handlers directly to native `Promise.then`.
-The first selects a common non-Promise result shape; the second returns
+The first selects a common generic result shape; the second returns
 `undefined`. Errors thrown by the success handler are not caught by its sibling
 rejection handler. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
-`catchValue` accept exact `Js.Function1` values and expose direct-value,
-Promise-assimilating, and void result shapes separately. `Js.Function.ofLean`
+`catchValue` accept exact `Js.Function1` values and select value-return,
+native-Promise-return, and void subsets of the TS signatures. Every rejection
+input, including `catchValue`, is `Js.Any`. Value-return types do not exclude
+thenables: native resolution recursively assimilates them. These are selected
+generic relationships, not full overload inference or a settlement-shape proof;
+see [Selected Promise Relationships](BINDING_MODALITIES.md#selected-promise-relationships).
+`Js.Function.ofLean`
 is the separately named Lean-closure conversion; native functions such as
 React state setters require no conversion. Promise continuations and the
 generic `Js.Object.get` operation therefore continue on exact native values.

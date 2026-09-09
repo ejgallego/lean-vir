@@ -129,7 +129,8 @@ abbrev NodeList (α : Type) : Type :=
 
 namespace Promise
 
-/-- Phantom shape for a native JavaScript `Promise` whose fulfillment value has Lean view `α`. -/
+/-- Phantom shape for a native JavaScript `Promise<T>` with selected JavaScript shape `α`.
+This annotation is not a runtime settlement check or a computed `Awaited` type. -/
 opaque Value (α : Type) : Type
 
 end Promise

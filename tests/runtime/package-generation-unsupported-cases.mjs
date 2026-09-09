@@ -53,6 +53,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
       new URL("../../fixtures/runtime/CollectionTypeFidelity.lean", import.meta.url), "utf8"),
     ObjectTypeFidelity: await readFile(
       new URL("../../fixtures/runtime/ObjectTypeFidelity.lean", import.meta.url), "utf8"),
+    PromiseTypeFidelity: await readFile(
+      new URL("../../fixtures/runtime/PromiseTypeFidelity.lean", import.meta.url), "utf8"),
   });
   const collectionChecked = collectionTypes.build();
   assert.equal(collectionChecked.status, 0,

@@ -5,7 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 // Deliberately bounded: Array relationships, native pair projections, dynamic
-// object results and closed String narrowing, not arbitrary TS generic subtyping.
+// object results, closed String narrowing and selected Promise signatures,
+// not arbitrary TS generic subtyping or runtime payload validation.
 // Check the upstream binder and its occurrences before checking the configured
 // Lean types. A reviewed "preserving" label is not evidence of this relationship.
 export function validateJsValueTypeRelationships(protocol, symbols) {
@@ -16,13 +17,23 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     ["js.array.item", "Array"],
   ]).get(protocol.target);
   const tuplePosition = { "js.tuple2.first": 0, "js.tuple2.second": 1 }[protocol.target];
+  const promiseOperation = {
+    "js.promise.thenValue": "value",
+    "js.promise.thenPromise": "promise",
+    "js.promise.thenVoid": "void",
+    "js.promise.thenValueWithRejection": "both-value",
+    "js.promise.thenVoidWithRejection": "both-void",
+    "js.promise.catchValue": "catch",
+  }[protocol.target];
   const dynamicContract = {
     "js.object.get": "dynamic property result",
     "js.string.fromAny": "closed String narrowing",
   }[protocol.target];
-  if (arrayOperation === undefined && tuplePosition === undefined && dynamicContract === undefined) return;
+  if (arrayOperation === undefined && tuplePosition === undefined && dynamicContract === undefined &&
+      promiseOperation === undefined) return;
 
-  const label = dynamicContract ?? (arrayOperation === undefined ? "tuple [A, B] position" : "TypeScript Array<T> element");
+  const label = dynamicContract ?? (promiseOperation !== undefined ? "TypeScript Promise<T> selected subset" :
+    arrayOperation === undefined ? "tuple [A, B] position" : "TypeScript Array<T> element");
   const require = (condition, detail) => {
     if (!condition) throw new Error(`${protocol.id}: ${label} relationship violated: ${detail}`);
   };
@@ -45,6 +56,36 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     if (receiver && args.length > 0) require(protocol.arguments[0].role === "receiver", "argument 0 must be the receiver");
     checkType(protocol.result.type, result, "result");
   };
+
+  if (promiseOperation !== undefined) {
+    const catching = promiseOperation === "catch";
+    const voidResult = promiseOperation.endsWith("void");
+    const both = promiseOperation.startsWith("both-");
+    const member = catching ? "Promise.catch" : "Promise.then";
+    require(protocol.upstreamRelation.kind === "upstream-adapter" &&
+      protocol.upstreamRelation.member === member, `must reference ${member}`);
+    checkPromiseDeclaration(symbols, member, require);
+    require(parameters.length === (catching || voidResult ? 1 : 2),
+      "receiver and selected result need correlated parameters; rejection input is always Any");
+    const [input, output] = parameters;
+    const promise = (inner) => ({
+      lean: `Lean.Vir.Js.Promise ${inner}`, representation: "js-resource",
+      resourceInner: `Lean.Vir.Js.Promise.Value ${inner}`,
+    });
+    const result = promise(voidResult ? "Lean.Vir.Js.Undefined.Value" : catching ? input : output);
+    const callbackResult = voidResult ? "Unit" : promiseOperation === "promise" ?
+      promise(output).lean : jsType(catching ? input : output).lean;
+    const callback = (argument) => {
+      const group = (type) => type.includes(" ") ? `(${type})` : type;
+      const args = `${group(argument)} ${group(callbackResult)}`;
+      return { lean: `Lean.Vir.Js.Function1 ${args}`, representation: "js-resource",
+        resourceInner: `Lean.Vir.Js.Function.Unary ${args}` };
+    };
+    const args = [promise(input), callback(catching ? "Lean.Vir.Js.Any" : jsType(input).lean)];
+    if (both) args.push(callback("Lean.Vir.Js.Any"));
+    checkSignature(args, result);
+    return;
+  }
 
   if (dynamicContract !== undefined) {
     require(protocol.upstreamRelation.kind === "vir-owned", "must remain a VIR-owned dynamic operation");
@@ -117,4 +158,55 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       checkSignature([receiver], jsNumber);
       break;
   }
+}
+
+// Recognize the pinned declaration's relationships before checking Lean policy.
+// Binder/argument spelling is irrelevant; unsupported overloads, defaults and
+// constraints fail closed. This is not a general TS assignability algorithm.
+function checkPromiseDeclaration(symbols, member, require) {
+  const isRef = (shape, name) => shape?.kind === "ref" && shape.id === name &&
+    (shape.args ?? []).length === 0;
+  const opaque = (shape, name) => shape?.kind === "opaque" && shape.name === name;
+  const applied = (shape, name, element) => shape?.kind === "ref" && shape.id === name &&
+    shape.args?.length === 1 && element(shape.args[0]);
+  const union = (shape, left, right) => shape?.kind === "union" && shape.options.length === 2 &&
+    ((left(shape.options[0]) && right(shape.options[1])) ||
+     (right(shape.options[0]) && left(shape.options[1])));
+  const promise = symbols?.get("Promise");
+  require(promise?.kind === "interface" && promise.typeParameters?.length === 1,
+    "upstream Promise must have one type parameter");
+  const parameter = promise.typeParameters[0];
+  require(parameter.constraint === undefined && parameter.default === undefined,
+    "upstream Promise parameter must be unconstrained and have no default");
+  const method = symbols.get(member);
+  const catching = member === "Promise.catch";
+  const parameters = method?.typeParameters;
+  require(method?.kind === "method" && parameters?.length === (catching ? 1 : 2),
+    "unexpected upstream method type parameters");
+  require(parameters.every((p) => p.constraint === undefined) &&
+    new Set([parameter.name, ...parameters.map((p) => p.name)]).size === parameters.length + 1,
+  "upstream method parameters must be unconstrained and must not shadow the receiver");
+  require(catching ? opaque(parameters[0].default, "never") :
+    isRef(parameters[0].default, parameter.name) && opaque(parameters[1].default, "never"),
+  "unsupported upstream method defaults");
+  const shape = method.shape;
+  require(shape?.kind === "function" && shape.effect === "pure" &&
+    shape.args.length === (catching ? 1 : 2), "unexpected upstream method arity or overloads");
+  const handler = (argument, input, output) => {
+    const fn = argument?.type?.element;
+    return argument?.optional && !argument.rest && argument.type.kind === "option" &&
+      argument.type.absence === "nullish" && fn?.kind === "function" && fn.effect === "pure" &&
+      fn.args.length === 1 && !fn.args[0].optional && !fn.args[0].rest && input(fn.args[0].type) &&
+      union(fn.result, (s) => isRef(s, output),
+        (s) => applied(s, "PromiseLike", (t) => isRef(t, output)));
+  };
+  const output = parameters[0].name;
+  require(handler(shape.args[0], (s) => catching ? opaque(s, "any") : isRef(s, parameter.name), output),
+    "upstream handler must preserve its input and R | PromiseLike<R> result");
+  if (!catching) require(handler(shape.args[1], (s) => opaque(s, "any"), parameters[1].name),
+    "upstream rejection handler must accept any and preserve its own result parameter");
+  require(applied(shape.result, "Promise", (s) => union(s,
+    (t) => isRef(t, catching ? parameter.name : output),
+    (t) => isRef(t, catching ? output : parameters[1].name))),
+  "upstream result must be Promise<T | R> for catch or Promise<R1 | R2> for then");
 }
