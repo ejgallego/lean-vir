@@ -7,7 +7,6 @@
   "lean": { "modules": ["Vir.Common", "Vir.Common.Generated"] },
   "generation": {
     "output": "Vir/Common/Generated.lean",
-    "irOutput": "build/bindings/common.generated-operations.json",
     "imports": ["Vir.Js"],
     "namespace": "Lean.Vir",
     "abiProfile": {
@@ -22,7 +21,6 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {},
-    "members": [],
     "protocolOperations": [
       {
         "id": "common.echo-string", "group": "common", "target": "common.echoString",

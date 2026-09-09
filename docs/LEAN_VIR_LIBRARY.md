@@ -13,7 +13,7 @@ operation, a local contract, or outstanding classification work. Generated
 files live under `Vir/**/Generated.lean`; authored modules
 contain reusable types and higher-level Lean APIs, but no host declarations.
 The generator derives or records representation, passing, retention, result
-ownership, and effect in a canonical operation IR; see
+ownership, and effect in a generated binding-operation record; see
 [BINDING_MODALITIES.md](BINDING_MODALITIES.md). Run
 `npm run check:lean-bindings` to reject drift. These generated boundaries
 preserve JavaScript resources; conversion to Lean-owned values is an explicit

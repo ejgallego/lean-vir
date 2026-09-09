@@ -9,13 +9,6 @@ import {
   validateLeanIdentifier,
 } from "./lean-syntax.mjs";
 
-const derivedPortIntentFields = [
-  "effect",
-  "receiver",
-  "resourceArguments",
-  "resultRepresentation",
-];
-
 function nonemptyString(value) {
   return typeof value === "string" && value.length !== 0;
 }
@@ -230,9 +223,9 @@ export function validateGenerationProfile(generation, context = "generation") {
       ],
       `${context} method policy ${member}`,
     );
-    if (policy.signature !== "only" &&
+    if (policy.signature !== undefined &&
         (!Number.isInteger(policy.signature) || policy.signature < 0)) {
-      throw new Error(`${context} method policy ${member} requires signature "only" or an overload index`);
+      throw new Error(`${context} method policy ${member} requires an overload index`);
     }
     const omitted = policy.omittedOptionalParameters ?? [];
     if (!Array.isArray(omitted) || !omitted.every(nonemptyString) ||
@@ -396,7 +389,7 @@ function exceptionFor(generation, operationId) {
 }
 
 function methodPolicyChangesCall(policy) {
-  return policy.signature !== "only" ||
+  return policy.signature !== undefined ||
     (policy.omittedOptionalParameters?.length ?? 0) !== 0 ||
     (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
     (policy.omittedRestParameters?.length ?? 0) !== 0 ||
@@ -475,7 +468,7 @@ function derivedSemantics(exception, methodPolicy = null, policyFacts = []) {
     primary = {
       relation: "preserving",
       evidence: "typescript-derived",
-      detail: "The canonical operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
+      detail: "The generated operation is derived from the TypeScript declaration and ABI profile without an operation exception.",
     };
   } else if (exception.semantics === undefined) {
     primary = {
@@ -679,29 +672,6 @@ function operationName(operation, namespace) {
   };
 }
 
-function anchorFor(anchorsById, operation, member, accessor) {
-  if (operation.anchor === undefined) {
-    return {
-      id: operation.target,
-      ts: member,
-      target: operation.target,
-      relation: "audit",
-      portIntent: { disposition: "bind", accessor },
-    };
-  }
-  const anchor = anchorsById.get(operation.anchor);
-  if (anchor === undefined) {
-    throw new Error(`${member} ${accessor} references missing anchor ${operation.anchor}`);
-  }
-  const intent = anchor.portIntent;
-  if (anchor.ts !== member || anchor.target !== operation.target ||
-      anchor.relation !== "audit" || intent?.disposition !== "bind" ||
-      intent.accessor !== accessor) {
-    throw new Error(`${operation.anchor} is not a matching audited ${member} ${accessor}`);
-  }
-  return anchor;
-}
-
 function propertyOperation(
   config,
   root,
@@ -711,11 +681,10 @@ function propertyOperation(
   operation,
   generation,
   profile,
-  anchorsById,
 ) {
   const member = mapping.typescript;
-  const anchor = anchorFor(anchorsById, operation, member, accessor);
-  const exception = exceptionFor(generation, anchor.id);
+  const identity = { id: operation.target };
+  const exception = exceptionFor(generation, identity.id);
   const shape = symbol.accessors?.[accessor];
   const leanName = operationName(operation, generation.namespace);
   if (accessor === "get" && operation.parameterName !== undefined) {
@@ -723,7 +692,7 @@ function propertyOperation(
   }
   const receiver = receiverFor(
     member,
-    anchor,
+    identity,
     generation,
     profile,
     exception,
@@ -776,7 +745,7 @@ function propertyOperation(
   const knownArgumentNames = new Set(accessor === "set" ? [propertyParameterName] : []);
   for (const name of Object.keys(exception?.arguments ?? {})) {
     if (!knownArgumentNames.has(name)) {
-      throw new Error(`${anchor.id} exception references missing argument ${name}`);
+      throw new Error(`${identity.id} exception references missing argument ${name}`);
     }
   }
   const semanticFacts = [
@@ -784,7 +753,7 @@ function propertyOperation(
     ...typePolicyFacts(shape, generation, `${member} ${accessor}`),
   ];
   return {
-    id: anchor.id,
+    id: identity.id,
     library: config.id,
     group: root.id,
     typescript: {
@@ -819,15 +788,15 @@ function propertyOperation(
 }
 
 function selectedMethodShape(member, symbol, policy) {
-  if (policy === undefined) {
-    throw new Error(`${member} requires an explicit generation.methodPolicies entry`);
-  }
-  const signature = policy.signature;
-  if (signature === "only") {
+  const signature = policy?.signature;
+  if (signature === undefined) {
     if (symbol.shape?.kind !== "function") {
-      throw new Error(`${member} policy requires exactly one TypeScript signature`);
+      throw new Error(`${member} is overloaded and requires an explicit generation.methodPolicies signature`);
     }
-    return { shape: symbol.shape, provenance: "generation.methodPolicies.signature=only" };
+    return {
+      shape: symbol.shape,
+      provenance: "unique TypeScript signature",
+    };
   }
   if (!Number.isInteger(signature) || signature < 0 || symbol.shape?.kind !== "union") {
     throw new Error(`${member} policy selects overload ${signature}, but the descriptor is not overloaded`);
@@ -846,7 +815,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   }
   const target = mapping.targets[0];
   const operationId = target;
-  const policy = generation.methodPolicies?.[member];
+  const policy = generation.methodPolicies?.[member] ?? {};
   const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
   const omitted = new Set(policy.omittedOptionalParameters ?? []);
   const omittedRequired = new Set(policy.omittedRequiredParameters ?? []);
@@ -1013,7 +982,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       display: symbol.display,
       documentation: symbol.hover,
       signaturePolicy: {
-        selection: policy.signature,
+        selection: policy.signature ?? "unique",
         omittedOptionalParameters: [...omitted],
         omittedRequiredParameters: [...omittedRequired],
         omittedRestParameters: [...omittedRest],
@@ -1061,20 +1030,17 @@ function functionOperation(config, root, mapping, symbol, generation, profile) {
   };
 }
 
-export function buildGeneratedOperations(config, generation, descriptorsByRoot, {
-  validateExceptions = true,
-} = {}) {
+export function buildGeneratedOperations(config, generation, descriptorsByRoot) {
   const profile = validateGenerationProfile(generation, `${config.id} generation`);
   const generatedMembers = new Set(generation.members);
   const mappings = new Map();
   for (const root of config.roots) {
-    const anchorsById = new Map((root.anchors ?? []).map((anchor) => [anchor.id, anchor]));
     for (const mapping of root.mappings ?? []) {
       if (!generatedMembers.has(mapping.typescript)) continue;
       if (mappings.has(mapping.typescript)) {
         throw new Error(`generated member ${mapping.typescript} is mapped by more than one API group`);
       }
-      mappings.set(mapping.typescript, { root, mapping, anchorsById });
+      mappings.set(mapping.typescript, { root, mapping });
     }
   }
   const symbolsByRoot = new Map([...descriptorsByRoot].map(([id, descriptor]) => [
@@ -1087,8 +1053,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     if (entry === undefined) throw new Error(`generated member ${member} has no reviewed mapping`);
     const descriptor = descriptorsByRoot.get(entry.root.id);
     if (descriptor === undefined) {
-      if (validateExceptions) throw new Error(`generated member ${member} has no TypeScript descriptor`);
-      continue;
+      throw new Error(`generated member ${member} has no TypeScript descriptor`);
     }
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (entry.mapping.accessors === undefined) {
@@ -1138,19 +1103,15 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
         operation,
         generation,
         profile,
-        entry.anchorsById,
       ));
     }
   }
-  if (validateExceptions) {
-    const operationIds = new Set(operations.map((operation) => operation.id));
-    for (const id of Object.keys(generation.exceptions ?? {})) {
-      if (!operationIds.has(id)) throw new Error(`generation exception ${id} matches no generated operation`);
-    }
+  const operationIds = new Set(operations.map((operation) => operation.id));
+  for (const id of Object.keys(generation.exceptions ?? {})) {
+    if (!operationIds.has(id)) throw new Error(`generation exception ${id} matches no generated operation`);
   }
   const groups = new Set(config.roots.map((root) => root.id));
   const rootsById = new Map(config.roots.map((root) => [root.id, root]));
-  const operationIds = new Set(operations.map((operation) => operation.id));
   const targets = new Set(operations.map((operation) => operation.host.target));
   for (const protocol of generation.protocolOperations ?? []) {
     if (!groups.has(protocol.group)) {
@@ -1174,10 +1135,8 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     }
     if (relation.kind === "local-contract") {
       const symbols = symbolsByRoot.get(protocol.group);
-      if (symbols !== undefined || validateExceptions) {
-        if (!symbols?.has(relation.member)) {
-          throw new Error(`generated protocol ${protocol.id} references missing local contract member ${relation.member}`);
-        }
+      if (!symbols?.has(relation.member)) {
+        throw new Error(`generated protocol ${protocol.id} references missing local contract member ${relation.member}`);
       }
     }
     if (relation.kind === "upstream-adapter") {
@@ -1191,19 +1150,15 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
         throw new Error(`generated protocol ${protocol.id} can only adapt a TypeScript upstream member`);
       }
       const symbols = symbolsByRoot.get(protocol.group);
-      // Descriptor generation materializes one API group at a time. Full
-      // generation and the explorer always validate every named adapter.
-      if (symbols !== undefined || validateExceptions) {
-        if (!symbols?.has(relation.member)) {
-          throw new Error(`generated protocol ${protocol.id} adapts missing TypeScript member ${relation.member}`);
-        }
-        const symbol = symbols.get(relation.member);
-        if (relation.accessor !== undefined && symbol.kind !== "property") {
-          throw new Error(`generated protocol ${protocol.id} classifies an accessor for non-property ${relation.member}`);
-        }
-        if (relation.accessor !== undefined && symbol.accessors?.[relation.accessor] === undefined) {
-          throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
-        }
+      if (!symbols?.has(relation.member)) {
+        throw new Error(`generated protocol ${protocol.id} adapts missing TypeScript member ${relation.member}`);
+      }
+      const symbol = symbols.get(relation.member);
+      if (relation.accessor !== undefined && symbol.kind !== "property") {
+        throw new Error(`generated protocol ${protocol.id} classifies an accessor for non-property ${relation.member}`);
+      }
+      if (relation.accessor !== undefined && symbol.accessors?.[relation.accessor] === undefined) {
+        throw new Error(`generated protocol ${protocol.id} classifies missing ${relation.accessor} accessor ${relation.member}`);
       }
     }
     const typeParameters = protocol.typeParameters ?? [];
@@ -1289,88 +1244,4 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot, 
     targets.add(protocol.target);
   }
   return operations;
-}
-
-function projectedPortIntent(anchor, operation) {
-  for (const field of derivedPortIntentFields) {
-    if (anchor.portIntent?.[field] !== undefined) {
-      throw new Error(`${anchor.id} authors derived modality field portIntent.${field}`);
-    }
-  }
-  const protocolReceiver = operation.arguments.find((argument) => argument.role === "receiver");
-  const resourceArguments = operation.arguments.flatMap((argument, index) =>
-    argument.role !== "receiver" && argument.modalities.representation === "js-resource"
-      ? [index]
-      : []);
-  return {
-    ...anchor.portIntent,
-    effect: operation.effect.id,
-    ...(operation.receiver.kind === "argument"
-      ? { receiver: operation.receiver.argument.modalities.passing }
-      : protocolReceiver === undefined
-        ? {}
-        : { receiver: protocolReceiver.modalities.passing }),
-    ...(resourceArguments.length === 0 ? {} : { resourceArguments }),
-    ...(operation.result.modalities.representation === "js-resource"
-      ? { resultRepresentation: "hostResource" }
-      : {}),
-  };
-}
-
-function modalityContract(operation, profile) {
-  return {
-    source: "generated-operation-ir",
-    profile: profile.id,
-    operation: operation.id,
-    effect: operation.effect,
-    receiver: operation.receiver,
-    arguments: operation.arguments,
-    result: operation.result,
-    semantics: operation.semantics,
-    ...(operation.activeEffect === undefined ? {} : { activeEffect: operation.activeEffect }),
-    ...(operation.protocol === undefined ? {} : { protocol: operation.protocol }),
-    ...(operation.exception === undefined ? {} : { exception: operation.exception }),
-  };
-}
-
-export function materializeGeneratedAnchors(config, root, descriptor, anchorData) {
-  if (config.generation === undefined) return anchorData;
-  const operations = buildGeneratedOperations(
-    config,
-    config.generation,
-    new Map([[root.id, descriptor]]),
-    { validateExceptions: false },
-  );
-  const byAnchor = new Map(operations.map((operation) => [operation.id, operation]));
-  const byCorrespondence = new Map(operations
-    .filter((operation) => operation.typescript.kind !== "protocol")
-    .map((operation) => [
-      `${operation.typescript.member}\u0000${operation.host.target}`,
-      operation,
-    ]));
-  const byTarget = new Map(operations.map((operation) => [operation.host.target, operation]));
-  return {
-    ...anchorData,
-    anchors: (anchorData.anchors ?? []).map((anchor) => {
-      const operation = byAnchor.get(anchor.id) ??
-        byCorrespondence.get(`${anchor.ts}\u0000${anchor.target}`) ??
-        byTarget.get(anchor.target);
-      if (operation === undefined) return anchor;
-      return {
-        ...anchor,
-        portIntent: projectedPortIntent(anchor, operation),
-        modalityContract: modalityContract(operation, config.generation.abiProfile),
-      };
-    }),
-  };
-}
-
-export function generatedOperationDocument(config, generation, operations) {
-  return {
-    format: "lean-vir-binding-operation-ir",
-    version: 2,
-    library: config.id,
-    profile: generation.abiProfile,
-    operations,
-  };
 }

@@ -10,8 +10,8 @@ import { relative, resolve } from "node:path";
 import ts from "typescript";
 import { repositoryRoot as root } from "../repository-paths.mjs";
 import { loadBindingConfig } from "./binding-config.mjs";
-import { materializeGeneratedAnchors } from "./binding-modalities.mjs";
 import { emitGeneratedFile, requiredValue } from "./tool-utils.mjs";
+import { validateTypeScriptAnchors } from "./type-anchor-format.mjs";
 
 function usage() {
   console.log(`usage: node scripts/bindings/generate-ts-descriptors.mjs [options] <file.ts|file.d.ts>...
@@ -20,7 +20,7 @@ Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
 Options:
   --api-group FILE#ID
-                  Load entry points, policy, and anchors from a configured API group.
+                  Load declarations and entry points from a configured API group.
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
   --symbols FILE  Keep TypeScript symbol ids listed in FILE.
@@ -97,7 +97,7 @@ function parseArgs(argv) {
   if (bindingRoot !== null &&
       (files.length !== 0 || anchors !== null || symbols.size !== 0 || symbolFiles.length !== 0 ||
        sourceUrl !== null || dependencyDepth !== 0 || dependencyPolicy !== null)) {
-    throw new Error("--api-group supplies declarations, entry points, policy, and anchors; do not pass those options separately");
+    throw new Error("--api-group supplies declarations and entry points; do not pass those options separately");
   }
   if (check && out === null) throw new Error("--check requires --out");
   if (sourceUrl !== null && files.length !== 1) {
@@ -116,7 +116,6 @@ function parseArgs(argv) {
     dependencyDepth,
     dependencyPolicy,
     dependencyPolicyData: null,
-    bindingContext: null,
   };
 }
 
@@ -150,7 +149,6 @@ export async function generateDescriptorFile({
   dependencyDepth,
   dependencyPolicy,
   dependencyPolicyData,
-  bindingContext = null,
 }) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
@@ -197,16 +195,8 @@ export async function generateDescriptorFile({
   const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
-  const rawAnchorData = anchorsData ??
+  const anchorData = anchorsData ??
     (anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8")));
-  const anchorData = bindingContext === null
-    ? rawAnchorData
-    : materializeGeneratedAnchors(
-      bindingContext.config,
-      bindingContext.root,
-      { symbols: selectedSymbols },
-      rawAnchorData,
-    );
   validateAnchors(anchorData, selectedSymbolIds);
   const descriptor = {
     version: 1,
@@ -250,12 +240,11 @@ async function resolveBindingRoot(options) {
   return {
     ...options,
     files: upstream.declarations.map((file) => resolve(root, file)),
-    anchorsData: { version: 1, anchors: binding.anchors ?? [] },
+    anchorsData: { version: 1, anchors: [] },
     symbols: new Set(upstream.roots),
     sourceUrl: upstream.sourceUrl ?? null,
     dependencyDepth: upstream.dependencyDepth ?? 0,
     dependencyPolicyData: upstream.dependencyPolicy ?? null,
-    bindingContext: { config, root: binding },
   };
 }
 
@@ -863,29 +852,14 @@ function parameterName(name, fallback) {
 }
 
 function validateAnchors(anchorData, symbolIds) {
-  if (anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
+  if (anchorData === null || typeof anchorData !== "object" || Array.isArray(anchorData) ||
+      anchorData.version !== 1 || !Array.isArray(anchorData.anchors)) {
     throw new Error("anchor file must be { version: 1, anchors: [...] }");
   }
-  const ids = new Set();
-  for (const [index, anchor] of anchorData.anchors.entries()) {
-    if (typeof anchor.lean !== "string" || anchor.lean.length === 0) {
-      throw new Error(`anchors[${index}].lean must be a non-empty string`);
-    }
-    if (typeof anchor.ts !== "string" || anchor.ts.length === 0) {
-      throw new Error(`anchors[${index}].ts must be a non-empty string`);
-    }
-    if (!symbolIds.has(anchor.ts)) {
-      throw new Error(`anchors[${index}].ts references missing TypeScript symbol ${anchor.ts}`);
-    }
-    if (anchor.relation !== undefined && !["audit", "coverageGap"].includes(anchor.relation)) {
-      throw new Error(`anchors[${index}].relation must be audit or coverageGap`);
-    }
-    if (anchor.portIntent !== undefined &&
-        (anchor.portIntent === null || typeof anchor.portIntent !== "object" || Array.isArray(anchor.portIntent))) {
-      throw new Error(`anchors[${index}].portIntent must be an object`);
-    }
-    const id = anchor.id ?? `${anchor.lean} -> ${anchor.ts}`;
-    if (ids.has(id)) throw new Error(`duplicate anchor id ${id}`);
-    ids.add(id);
+  const unknownDocumentField = Object.keys(anchorData).find((field) =>
+    !["version", "anchors"].includes(field));
+  if (unknownDocumentField !== undefined) {
+    throw new Error(`${unknownDocumentField} is not an anchor-file field`);
   }
+  validateTypeScriptAnchors(anchorData.anchors, symbolIds);
 }

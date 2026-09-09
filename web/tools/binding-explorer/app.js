@@ -10,8 +10,8 @@ const generation = report.summary.generation;
 document.querySelector("#catalog-metric").textContent = String(
   Object.values(generation.semanticCoverage).reduce((sum, count) => sum + count, 0),
 );
-document.querySelector("#faithful-metric").textContent = String(
-  generation.semanticCoverage.faithful,
+document.querySelector("#preserving-metric").textContent = String(
+  generation.semanticCoverage.preserving,
 );
 document.querySelector("#adapter-metric").textContent = String(
   generation.semanticCoverage["adapter-only"],
@@ -133,15 +133,15 @@ const dispositionLabel = (value) => ({
   "not-selected": "not selected",
 })[value] ?? value;
 const semanticCoverageDefinitions = new Map([
-  ["faithful", {
-    filter: "Has faithful boundary",
-    badge: "faithful boundary available",
-    summary: "with faithful boundary",
+  ["preserving", {
+    filter: "Has preserving contract",
+    badge: "preserving contract recorded",
+    summary: "with preserving contracts",
   }],
   ["adapter-only", {
-    filter: "Adapter only",
-    badge: "explicit adapter only",
-    summary: "adapter only",
+    filter: "Includes semantic adapters",
+    badge: "includes semantic adapters",
+    summary: "with semantic adapters",
   }],
   ["unreviewed", {
     filter: "Semantic review required",
@@ -172,13 +172,10 @@ const semanticCoverageSummary = (coverage) => Object.entries(coverage)
     `${count} ${semanticCoverageDefinitions.get(status)?.summary ?? status}`)
   .join(" · ");
 const evidenceLabel = (value) => ({
-  exact: "exact comparator match",
-  compatible: "comparator-compatible",
   derived: "TypeScript-derived",
   "protocol-linked": "reviewed protocol link",
   "contract-linked": "local contract link",
-  weak: "limited comparison",
-  unreviewed: "not compared",
+  unreviewed: "awaiting classification",
   suggested: "suggested correspondence",
   ambiguous: "ambiguous correspondence",
   missing: "no confirmed binding",
@@ -250,7 +247,6 @@ const targets = groups.flatMap((group) => group.bindings.map((binding) => ({
   operation: group.generatedOperations?.find((operation) =>
     operation.host.target === binding.target) ?? null,
   mapping: group.coverage?.targetMappings?.find((entry) => entry.target === binding.target) ?? null,
-  comparison: group.comparison?.results?.find((entry) => entry.target === binding.target) ?? null,
   publicEntries: publicByTarget.get(binding.target) ?? [],
 })));
 const targetById = new Map(targets.map((target) => [target.target, target]));
@@ -441,7 +437,7 @@ function renderReference() {
         '" data-group="' + escapeHtml(id) + '"><span><span class="name">' +
         escapeHtml(group.library.title + " · " + group.title) +
         '</span><span class="sub">' + escapeHtml(semanticCoverageSummary(coverage)) +
-        '</span></span><span class="pill faithful">upstream API</span></button>';
+        '</span></span><span class="pill preserving">upstream API</span></button>';
     }).join("");
   elements.results.querySelectorAll("[data-group]").forEach((button) =>
     button.addEventListener("click", () => selectGroup(button.dataset.group)));
@@ -540,7 +536,6 @@ function selectorMatches(declaration, selector) {
 function preferredPublicEntries(target) {
   const reviewedNames = [
     ...(target.mapping?.source === "reviewed" ? target.mapping.lean ?? [] : []),
-    target.comparison?.lean,
   ].filter(Boolean);
   const reviewed = target.publicEntries.filter((item) =>
     reviewedNames.includes(item.entry.declaration));
@@ -826,7 +821,7 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
         rows.push(renderTransformationRow(
           formatTypeScriptParameter(argument),
           emitted.name + ": " + displayLeanName(emitted.type),
-          emitted.role === "callback" ? "retained callback policy" : "faithful representation",
+          emitted.role === "callback" ? "retained callback policy" : "preserving representation",
         ));
       }
     }
@@ -963,13 +958,9 @@ function renderGenerationPolicy(group, symbol) {
 }
 
 function leanPaneTitle(semanticCoverage) {
-  if (semanticCoverage?.status === "faithful" &&
-      semanticCoverage.relations?.includes("changing")) {
-    return "Lean boundaries and explicit adapters";
-  }
   return ({
-    faithful: "Faithful Lean boundary",
-    "adapter-only": "Explicit Lean semantic adapter",
+    preserving: "Preserving Lean boundary",
+    "adapter-only": "Lean bindings including semantic adapters",
     unreviewed: "Lean boundary — semantic review required",
     "local-contract": "Repository-local Lean contract",
   })[semanticCoverage?.status] ?? "Lean boundary";
@@ -990,13 +981,22 @@ function renderUpstreamSymbol(group, symbol) {
       escapeHtml(evidenceLabel(member.status)) + "</span>"
     : "";
   const relation = state?.semanticCoverage.status;
+  const unsupportedNote = state?.unsupported === undefined
+    ? ""
+    : '<p class="note">Explicitly unsupported (' + escapeHtml(state.unsupported.scope) +
+      " scope" +
+      (state.unsupported.inherited
+        ? " inherited from <code>" + escapeHtml(state.unsupported.source) + "</code>"
+        : "") + "): " + escapeHtml(state.unsupported.note) + "</p>";
+  const unboundNote = unsupportedNote || (state === undefined
+    ? ""
+    : '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>');
   const lean = state !== undefined && !["candidate", "not-provided"].includes(relation)
     ? '<div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div>' +
       renderCode(symbol.display, "typescript") + '</div><div class="pane"><div class="pane-title">' +
       escapeHtml(leanPaneTitle(state.semanticCoverage)) + '</div>' +
       renderLeanCards(state.targets) + "</div></div>"
-    : renderCode(symbol.display, "typescript") +
-      (state ? '<p class="note">VIR does not currently document a confirmed binding for this entry.</p>' : "");
+    : renderCode(symbol.display, "typescript") + unboundNote;
   return '<details class="binding"><summary><span class="card-title">' + escapeHtml(symbol.id) +
     '</span> <span class="badge">' + escapeHtml(symbol.kind) + "</span> " + inherited + " " +
     coverage + " " + evidence + '</summary><div class="card-head">' +
@@ -1016,7 +1016,7 @@ function renderGroupDetail(group) {
     : "";
   const symbols = primarySymbols(group).filter((symbol) =>
     symbolMatchesReferenceFilters(group, symbol));
-  elements.detail.innerHTML = '<div class="badges"><span class="pill faithful">upstream API</span>' +
+  elements.detail.innerHTML = '<div class="badges"><span class="pill preserving">upstream API</span>' +
     upstream.map((value) => '<span class="badge">' + escapeHtml(value) + "</span>").join("") +
     "</div><h2>" + escapeHtml(group.title) + '</h2><p class="note">' +
     escapeHtml(group.description || group.library.description) + "</p>" + docs +
@@ -1206,13 +1206,6 @@ function renderInventoryDetail(target) {
   bindTypeBrowserOptions();
 }
 
-function comparisonResults(group, member) {
-  const symbol = group.typescript?.symbols.find((entry) => entry.id === member);
-  return (group.comparison?.results ?? []).filter((result) =>
-    result.ts === member ||
-    (result.portIntent?.disposition === "unsupported" && result.ts === symbol?.surfaceRoot));
-}
-
 function renderWorkItem(item) {
   if (item === undefined) {
     elements.detail.innerHTML = '<div class="empty">Select a binding-author action.</div>';
@@ -1227,7 +1220,6 @@ function renderWorkItem(item) {
     ...(item.candidateTargets ?? []),
     ...(item.target ? [item.target] : []),
   ])];
-  const comparisons = item.member ? comparisonResults(group, item.member) : [];
   const evidence = symbol
     ? '<section class="section"><h3>Expected versus current</h3><div class="panes"><div class="pane"><div class="pane-title">Upstream TypeScript</div><article class="anchor"><div class="card-head"><span class="card-title">' +
       escapeHtml(symbol.id) + "</span>" + symbolSource(symbol) + "</div>" +
@@ -1238,14 +1230,6 @@ function renderWorkItem(item) {
       ? '<section class="section"><h3>Current public Lean evidence</h3>' +
         renderLeanCards(targetIds, { showRuntime: true }) + "</section>"
       : "";
-  const comparison = comparisons.length
-    ? '<section class="section"><h3>Existing comparison evidence</h3>' + comparisons.map((result) =>
-      '<article class="anchor"><div class="card-head"><span class="card-title">' +
-      escapeHtml(result.id) + '</span><span class="pill ' + escapeHtml(result.status) + '">' +
-      escapeHtml(result.status) + "</span></div>" +
-      (result.note ? '<p class="note">' + escapeHtml(result.note) + "</p>" : "") +
-      "</article>").join("") + "</section>"
-    : "";
   elements.detail.innerHTML = '<div class="badges"><span class="pill ' +
     escapeHtml(item.disposition) + '">' + escapeHtml(dispositionLabel(item.disposition)) +
     '</span><span class="pill ' + escapeHtml(item.severity) + '">' +
@@ -1256,7 +1240,7 @@ function renderWorkItem(item) {
     '"><div class="card-head"><span class="card-title">' + escapeHtml(item.code) +
     '</span></div><p>' + escapeHtml(item.message) +
     '</p><div class="pane-title">Required action</div><p>' + escapeHtml(item.action) +
-    "</p></article>" + evidence + comparison +
+    "</p></article>" + evidence +
     '<section class="section"><button type="button" class="inline-button" id="open-reference">Open upstream API group</button></section>';
   elements.detail.querySelector("#open-reference")?.addEventListener("click", () =>
     selectGroup(item.library + "/" + item.group));
