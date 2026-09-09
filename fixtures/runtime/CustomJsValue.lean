@@ -1,4 +1,8 @@
-import Vir.Js
+module
+
+public import Vir.Js
+
+public section
 
 namespace Vir.Fixtures.CustomJsValue
 

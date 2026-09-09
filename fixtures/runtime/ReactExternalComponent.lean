@@ -1,4 +1,8 @@
-import Vir.React
+module
+
+public import Vir.React
+
+public section
 
 namespace Vir.Fixtures.ReactExternalComponent
 

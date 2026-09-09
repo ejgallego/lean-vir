@@ -13,7 +13,7 @@ npm run prepare:irpkg -- examples/fib.virpkg.json
 
 That command:
 
-1. elaborates the configured Lean source;
+1. builds the configured Lean module with Lake;
 2. extracts the requested IR declaration closure into an `.irpkg`;
 3. embeds a generated JavaScript interface manifest, JavaScript host import
    table, and package metadata in the package;
@@ -22,7 +22,7 @@ That command:
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
 the UI entries automatically. The manifest metadata records the package format,
-Lean toolchain, source targets, and resolved roots. Wall-clock generation time
+Lean toolchain, module targets, and resolved roots. Wall-clock generation time
 appears only in the adjacent diagnostic report.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
@@ -63,27 +63,51 @@ be a manifest `id`, `jsName`, or Lean declaration name.
 
 ```json
 {
-  "version": 1,
-  "source": "examples/Fib.lean",
+  "version": 2,
+  "module": "Fib",
   "package": "web/public/local-fib.irpkg",
   "report": "build/generated/local-fib.report.md",
   "roots": ["fib"]
 }
 ```
 
-If `roots` is omitted or empty, `prepare:irpkg` uses `--target-all`, packages
-the declarations emitted by the source, and treats public source definitions as
+If `roots` is omitted or empty, `prepare:irpkg` uses `--target-all-module`, packages
+the selected module's closure, and treats its public definitions as
 interface exports. Unsupported public exports fail loudly with diagnostics in
 the report. Explicit roots are preferred for stable demos and size-sensitive
 experiments.
 
-For ad hoc local files, use the direct CLI:
+`includeAll: true` also selects all public definitions, even if `roots` is
+nonempty. Otherwise `roots` selects explicit exports. Configuration is validated
+before building: unknown fields, wrong types, and version-1 source configs are
+rejected. Migrate `source` to the module's actual Lake identity; do not derive it
+by mechanically replacing path separators. The config version is independent
+of the embedded manifest and binary format versions.
+
+`package` defaults to `build/generated/<last module component>.irpkg`; `report`
+defaults to the package path with `.irpkg` replaced by `.report.md` (or that
+suffix appended for another extension). Paths are relative to this repository,
+not the config directory. Quoted module names need an explicit package path.
+Multiple configs share a generator and one deduplicated module build.
+Package and report destinations must be distinct across the batch; normalized
+path collisions are rejected before building or writing outputs.
+
+For a registered local module, use the direct CLI:
 
 ```bash
-npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
+npm run generate:irpkg -- <Module.Name> [package.irpkg] [root ...]
 ```
 
 It prints the same metadata that is embedded in the package.
+
+The generator also accepts compiled-module inputs independently of selection:
+`--target-module`, `--package-module`, `--target-all-module`, and
+`--target-marked-module`. Build the named module with Lake first. See
+[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) for argument forms. Module-origin
+metadata uses `module` instead of `source`; explicit, package-only and all-public
+selection retain their mode names, while marked module selection retains the
+canonical `markedModule` wire spelling. Source-file adapters remain supported
+during the staged module-only migration.
 
 To inspect a generated package without starting the browser, run:
 

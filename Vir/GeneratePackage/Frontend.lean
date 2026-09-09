@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 module
 
 import Lean.Compiler.InitAttr
-import Lean.Elab.Frontend
 import Lean.LabelAttribute
 import Vir.ExportValidation
 public import Vir.GeneratePackage.Basic
@@ -20,37 +19,38 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
-def moduleNameFor (path : System.FilePath) : Name :=
-  .str (.str `VirIRInput (path.fileStem.getD "Input")) "Generated"
-
-unsafe def frontendEnv (source : System.FilePath) : IO Environment := do
-  -- Match Lean's CLI startup path: the frontend imports modules with loaded extensions.
+unsafe def importModuleEnv (moduleName : Name) : IO Environment := do
+  -- Match `module; import all M` without parsing or elaborating a driver.
+  -- Init's runtime and meta imports are implicit in a non-prelude Lean header.
+  -- The exported level is essential: the default private level disables the
+  -- module system and would silently accept legacy inputs.
   enableInitializersExecution
-  let contents <- IO.FS.readFile source
   let opts := Elab.async.set ({} : Options) false
-  let fileName := source.toString
-  match <- Elab.runFrontend contents opts fileName (moduleNameFor source) with
-  | some env => return env
-  | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
-
-unsafe def frontendImportedModuleEnv (moduleName : Name) : IO Environment := do
-  enableInitializersExecution
-  let contents := s!"module\nimport all {moduleName}\n"
-  let opts := Elab.async.set ({} : Options) false
-  let fileName := s!"<VIR imported module {moduleName}>"
-  let driverModule := .str (.str `VirIRInput moduleName.toString) "Generated"
-  match ← Elab.runFrontend contents opts fileName driverModule with
-  | some env => return env
-  | none => throw <| IO.userError s!"Lean frontend failed while importing all IR for `{moduleName}`"
+  let env ← importModules #[
+    { module := `Init },
+    { module := `Init, isMeta := true },
+    { module := moduleName, importAll := true, isExported := false }
+  ] opts (loadExts := true) (level := .exported)
+  return env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated")
 
 def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name := do
   let moduleIdx ← env.getModuleIdxFor? name
   env.header.moduleNames[moduleIdx]?
 
-def targetOwnsDecl (target : Target) (env : Environment) (name : Name) : Bool :=
-  match target.mode.markedModule? with
-  | some moduleName => environmentModuleForDecl? env name == some moduleName
-  | none => true
+/-- Enumerate the selected input, not just the import environment's local
+declarations. Loaded runtime IR takes precedence over opaque module entries. -/
+def moduleDeclarations (moduleName : Name) (env : Environment) : Array Decl := Id.run do
+  let some moduleIdx := env.header.moduleNames.findIdx? (· == moduleName)
+    | return #[]
+  let entries := declMapExt.getModuleIREntries env moduleIdx ++
+    declMapExt.getModuleEntries env moduleIdx
+  let mut seen : NameSet := {}
+  let mut decls := #[]
+  for decl in entries do
+    unless seen.contains decl.name do
+      seen := seen.insert decl.name
+      decls := decls.push decl
+  return decls
 
 def labelledDecls (env : Environment) (attrName : Name) : IO (Array Name) := do
   match (← Lean.labelExtensionMapRef.get)[attrName]? with
@@ -121,39 +121,21 @@ private def importedLoadedDecl?
 unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   initSearchPath (← getBuildDir)
   let mut index : DeclIndex := {}
-  let mut keyedTargets : Array (Target × String) := #[]
   for target in targets do
-    let sourceKey ← target.canonicalSourceKey
-    keyedTargets := keyedTargets.push (target, sourceKey)
-  let sources := keyedTargets.foldl (init := #[]) fun sources (target, sourceKey) =>
-    if sources.any (fun (_, key) => key == sourceKey) then
-      sources
-    else
-      sources.push (target.source, sourceKey)
-  for (source, sourceKey) in sources do
-    let sourceTargets := keyedTargets.foldl (init := #[]) fun selected (target, key) =>
-      if key == sourceKey then selected.push target else selected
-    let aliases := sourceTargets.map (fun target => target.source.toString)
-    let display := sourceTargets.findSome? (fun target =>
-      match target.mode.markedModule? with
-      | some _ => some target.publicSource
-      | none => none) |>.getD source.toString
-    let env <- frontendEnv source
+    let .module moduleName := target.origin
+      | throw <| IO.userError "live snapshots require prepareSnapshotInput, not filesystem acquisition"
+    if index.loadedModules.contains moduleName then
+      continue
+    let env ← importModuleEnv moduleName
     let mut names : Array Name := #[]
-    for decl in getDecls env do
-      if !sourceTargets.any (fun target => targetOwnsDecl target env decl.name) then
+    for decl in moduleDeclarations moduleName env do
+      if environmentModuleForDecl? env decl.name != some moduleName then
         continue
       if !Vir.ExportValidation.isExternFallbackClone env decl.name then
         names := names.push decl.name
-      let module? := environmentModuleForDecl? env decl.name
-      let loadedSource :=
-        if sourceTargets.any (fun target => target.mode.markedModule?.isSome) then
-          module?.map (fun moduleName => s!"module {moduleName}") |>.getD display
-        else
-          display
       let loaded := {
-        source := loadedSource
-        module?
+        source := target.publicSource
+        module? := some moduleName
         decl
       }
       match index.localDecls.find? decl.name with
@@ -172,29 +154,23 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       index with
       virExports := exports.foldl (fun selected name => selected.insert name) index.virExports
       virStartups := startups.foldl (fun selected name => selected.insert name) index.virStartups
-      loadedModules := sourceTargets.foldl (init := index.loadedModules) fun modules target =>
-        match target.mode.markedModule? with
-        | some moduleName => modules.insert moduleName
-        | none => modules
+      loadedModules := index.loadedModules.insert moduleName
     }
     index := { index with sources := index.sources.push {
-      key := sourceKey
-      display
-      aliases
+      origin := target.origin
       env
       decls := names
     } }
   return index
 
-def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex := Id.run do
+/-- Index the live environment without reopening its document or compiled root.
+Local IR belongs to the current module, including private/generated declarations;
+imported owners still come from Lean's module table. The source is provenance. -/
+private def snapshotDeclIndex (source : String) (env : Environment) : DeclIndex := Id.run do
   let mut names : Array Name := #[]
   let mut index : DeclIndex := {
-    sources := #[{
-      key := source
-      display := source
-      aliases := #[source]
-      env
-    }]
+    -- Never replace unsaved local IR with the current module's disk artifacts.
+    loadedModules := ({} : NameSet).insert env.mainModule
   }
   for decl in getDecls env do
     if !Vir.ExportValidation.isExternFallbackClone env decl.name then
@@ -203,17 +179,31 @@ def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex :
       index with
       localDecls := index.localDecls.insert decl.name {
         source
-        module? := environmentModuleForDecl? env decl.name
+        module? := environmentModuleForDecl? env decl.name <|> some env.mainModule
         decl
       }
     }
   return { index with sources := #[{
-    key := source
-    display := source
-    aliases := #[source]
+    origin := .snapshot source env.mainModule
     env
     decls := names
   }] }
+
+/-- A validated live module target and its authoritative, already prepared IR. -/
+structure SnapshotInput where
+  target : Target
+  index : DeclIndex
+
+/-- No frontend, disk lookup or initializer execution. Even imported-only roots
+require a module document; the target and local ownership come from this env. -/
+def prepareSnapshotInput (document : String) (env : Environment) (roots : Array Name) :
+    Except String SnapshotInput := do
+  unless env.header.isModule do
+    throw "VIR live packages require a `module` header; add `module` to the document (no save is required)"
+  return {
+    target := { origin := .snapshot document env.mainModule, mode := .explicit roots }
+    index := snapshotDeclIndex document env
+  }
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
   match index.sources.findSome? fun source =>
@@ -237,6 +227,14 @@ private def DeclIndex.loadedModuleGraph
   let mut importsByModule : NameMap (Array Name) := {}
   for source in index.sources do
     let env := source.env
+    -- A live root is not an imported module. Record its actual import edges,
+    -- rather than appending an ownerless synthetic root after sorting.
+    if let .snapshot _ moduleName := source.origin then
+      if !modules.contains moduleName then
+        modules := modules.push moduleName
+      importsByModule := importsByModule.insert moduleName <|
+        env.header.imports.filterMap fun imported =>
+          if imported.isMeta then none else some imported.module
     for h : moduleIdx in [:env.header.moduleNames.size] do
       let moduleName := env.header.moduleNames[moduleIdx]
       if !modules.contains moduleName then
@@ -265,7 +263,7 @@ for a direct `import all` driver.
 -/
 def DeclIndex.moduleInitializationOrderForTarget?
     (index : DeclIndex) (target : Target) : Option (Array Name) := Id.run do
-  unless index.sources.any (fun source => source.key == index.sourceKeyFor target) do
+  unless (index.sourceForTarget? target).isSome do
     return none
   let (modules, importsByModule) := index.loadedModuleGraph
   let moduleSet := modules.foldl (init := ({} : NameSet)) fun names moduleName =>
@@ -274,11 +272,8 @@ def DeclIndex.moduleInitializationOrderForTarget?
   let mut ordered := #[]
   let mut orderedSet : NameSet := {}
   while !remaining.isEmpty do
-    let preferred := match target.mode.markedModule? with
-      | some rootModule =>
-          let withoutRoot := remaining.filter (· != rootModule)
-          if withoutRoot.isEmpty then remaining else withoutRoot
-      | none => remaining
+    let withoutRoot := remaining.filter (· != target.origin.moduleName)
+    let preferred := if withoutRoot.isEmpty then remaining else withoutRoot
     let some next := preferred.find? fun moduleName =>
         (importsByModule.find? moduleName |>.getD #[]).all fun imported =>
           !moduleSet.contains imported || orderedSet.contains imported
@@ -291,14 +286,12 @@ def DeclIndex.moduleInitializationOrderForTarget?
 unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) : IO DeclIndex := do
   if index.loadedModules.contains moduleName then
     return index
-  let env ← frontendImportedModuleEnv moduleName
+  let env ← importModuleEnv moduleName
   let source := s!"module {moduleName}"
   let mut index := {
     index with
     sources := index.sources.push {
-      key := source
-      display := source
-      aliases := #[source]
+      origin := .module moduleName
       env
     }
     loadedModules := index.loadedModules.insert moduleName
@@ -323,20 +316,12 @@ def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
   index.sources.findSome? fun source => getInitFnNameFor? source.env name
 
 def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
-  match index.sources.findSome? (fun source =>
-      if source.key == index.sourceKeyFor target then some source.env else none) with
+  match index.envForTarget? target with
   | none => #[]
   | some env =>
-      match target.mode.markedModule? with
-      | some moduleName =>
-          (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
-            match env.getModuleIdxFor? name with
-            | some moduleIdx =>
-                if env.header.moduleNames[moduleIdx]? == some moduleName then names.push name else names
-            | none => names
-      | none =>
-          index.sourceForTarget? target |>.map (fun source => source.decls) |>.getD #[]
-          |>.filter fun name =>
-            index.virExports.contains name || index.virStartups.contains name
+      (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
+        if environmentModuleForDecl? env name == some target.origin.moduleName then
+          names.push name
+        else names
 
 end Vir.GeneratePackage

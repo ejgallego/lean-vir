@@ -5,14 +5,14 @@ JavaScript.
 
 The flow is:
 
-1. write a Lean source file;
+1. write and register a Lean module;
 2. generate a `.irpkg` package for the declarations you want to call;
 3. serve `vir-upstream.wasm` and the `.irpkg`;
 4. create a runtime and call the Lean entry by name.
 
 ## 1. Write The Lean Function
 
-Start with an ordinary Lean file. Exported declarations can be pure functions
+Start with a Lean module. Exported declarations can be pure functions
 or recognized synchronous effects, as long as their argument and result types
 are part of the current browser interface surface. Use `Lean.Vir.RuntimeM` for
 JavaScript resource/runtime effects, raw `IO` for ordinary host IO boundaries,
@@ -20,6 +20,10 @@ JavaScript resource/runtime effects, raw `IO` for ordinary host IO boundaries,
 render-construction code.
 
 ```lean
+module
+
+public section
+
 namespace MyApp
 
 def total (values : Array Nat) : Nat :=
@@ -56,11 +60,12 @@ debugging companion to `vir-upstream.wasm`. It is not an `-O0` build. In
 distribution builds, `vir-upstream.wasm` is stripped for release use. Serve both
 files when you want app code to switch between them with `debugWasm: true`.
 
-Then generate a package. Put it under `web/public/` if you want Vite to serve it
-by URL:
+Save the source as `examples/MyApp.lean` and add `MyApp` to `VirExamples.roots`
+in `lakefile.lean`. Then generate a package. Put it under `web/public/` if you
+want Vite to serve it by URL:
 
 ```bash
-npm run generate:irpkg -- MyApp.lean web/public/my-app.irpkg MyApp.total MyApp.greeting MyApp.classify MyApp.validateName
+npm run generate:irpkg -- MyApp web/public/my-app.irpkg MyApp.total MyApp.greeting MyApp.classify MyApp.validateName
 ```
 
 The final arguments are Lean declaration names. You can list one export or many

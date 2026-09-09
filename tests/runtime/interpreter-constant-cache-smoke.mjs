@@ -14,10 +14,9 @@ import {
 } from "../../scripts/packages/browser-package-config.mjs";
 import {
   assert,
-  ensureVirJsBuilt,
+  generateIrPackage,
   join,
   readFile,
-  runVirIrpkg,
   writeRuntimeFixture,
 } from "./shared.mjs";
 
@@ -27,7 +26,6 @@ const wasmBytes = await readFile(
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-constant-cache-"));
 const source = join(freshDir, "InterpreterConstantCache.lean");
 const packagePath = join(freshDir, "interpreter-constant-cache.irpkg");
-const reportPath = join(freshDir, "interpreter-constant-cache.report.md");
 let runtime = null;
 
 function liveObjectCell(resource, label) {
@@ -55,15 +53,8 @@ function assertWarmCache(first, second, label) {
 }
 
 try {
-  ensureVirJsBuilt();
   await writeRuntimeFixture(source, "InterpreterConstantCache.lean");
-  const generated = runVirIrpkg([
-    packagePath,
-    reportPath,
-    "--target-marked",
-    source,
-  ]);
-  assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+  await generateIrPackage("InterpreterConstantCache", source, packagePath, "marked");
   const packageBytes = await readFile(packagePath);
   runtime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
     irPackageSet: [packageBytes],

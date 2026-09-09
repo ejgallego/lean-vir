@@ -130,6 +130,8 @@ ownership diagrams.
 
 ## Roadmaps
 
+- [MODULE_ONLY_PLAN.md](MODULE_ONLY_PLAN.md): compiled-module and live-snapshot
+  input simplification, consumer migration checklist, and acceptance coverage.
 - [roadmap/README.md](roadmap/README.md): scoped maintainer cards for VIR-local
   and upstream Lean follow-up work.
 - [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource

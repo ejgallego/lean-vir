@@ -1,5 +1,9 @@
-import Vir.Host
-import Vir.Js
+module
+
+public import Vir.Host
+public import Vir.Js
+
+public section
 
 structure HostCounter where
   label : String

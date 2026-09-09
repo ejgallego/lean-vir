@@ -14,18 +14,16 @@ inductive TargetFlag where
   | packageOnly
   | all
   | marked
-  | markedModule
 
 namespace TargetFlag
 
 def option : TargetFlag → String
-  | .explicit => "--target"
-  | .packageOnly => "--package-target"
-  | .all => "--target-all"
-  | .marked => "--target-marked"
-  | .markedModule => "--target-marked-module"
+  | .explicit => "--target-module"
+  | .packageOnly => "--package-module"
+  | .all => "--target-all-module"
+  | .marked => "--target-marked-module"
 
-def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked, .markedModule]
+def values : Array TargetFlag := #[.explicit, .packageOnly, .all, .marked]
 
 def parse? (text : String) : Option TargetFlag :=
   values.find? fun flag => flag.option == text
@@ -49,59 +47,35 @@ partial def parseTargets.go
   let flagText :: rest := args | return targets
   let some flag := TargetFlag.parse? flagText
     | throw s!"expected {TargetFlag.alternatives}, got `{flagText}`"
-  match flag, rest with
-  | .explicit, source :: rest =>
-      let (roots, remaining) := takeTargetRoots rest []
-      if roots.isEmpty then
-        throw s!"target `{source}` has no roots"
-      let roots ← roots.toArray.mapM Vir.parseDottedName
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .explicit roots
-        }
-      go remaining (targets.push target)
-  | .packageOnly, source :: rest =>
-      let (roots, remaining) := takeTargetRoots rest []
-      if roots.isEmpty then
-        throw s!"package target `{source}` has no roots"
-      let roots ← roots.toArray.mapM Vir.parseDottedName
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .packageOnly roots
-        }
-      go remaining (targets.push target)
-  | .all, source :: remaining =>
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .all
-        }
-      go remaining (targets.push target)
-  | .marked, source :: remaining =>
-      let target : Vir.GeneratePackage.Target :=
-        {
-          source := source
-          mode := .marked
-        }
-      go remaining (targets.push target)
-  | .markedModule, source :: moduleName :: remaining =>
-      let moduleName ← Vir.parseDottedName moduleName
-      let target : Vir.GeneratePackage.Target := {
-        source := source
-        mode := .markedModule moduleName
-      }
-      go remaining (targets.push target)
-  | _, _ => throw s!"{flag.option} is missing its source or module argument"
+  let input :: rest := rest
+    | throw s!"{flag.option} is missing its module argument"
+  if input.startsWith "--" then
+    throw s!"{flag.option} is missing its module argument"
+  if input.endsWith ".lean" || input.contains '/' || input.contains '\\' then
+    throw s!"expected a module identity, not source path `{input}`"
+  let origin := PackageTargetOrigin.module (← Vir.parseDottedName input)
+  let (mode, remaining) ← match flag with
+    | .all => pure (TargetMode.all, rest)
+    | .marked => pure (TargetMode.marked, rest)
+    | .explicit | .packageOnly => do
+        let (roots, remaining) := takeTargetRoots rest []
+        if roots.isEmpty then
+          throw s!"target `{input}` has no roots"
+        let roots ← roots.toArray.mapM Vir.parseDottedName
+        let mode := match flag with
+          | .packageOnly => TargetMode.packageOnly roots
+          | _ => TargetMode.explicit roots
+        pure (mode, remaining)
+  go remaining (targets.push { origin, mode })
 
 def parseTargets (args : List String) : Except String (Array Vir.GeneratePackage.Target) :=
   parseTargets.go args #[]
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
-  | [packagePath, reportPath] =>
-      Vir.GeneratePackage.run Vir.GeneratePackage.defaultTargets packagePath reportPath
+  | [_, _] =>
+      IO.eprintln "at least one explicit package target is required"
+      return 2
   | packagePath :: reportPath :: targetArgs =>
       match targetArgs with
       | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::
@@ -120,5 +94,5 @@ unsafe def main (args : List String) : IO UInt32 := do
               IO.eprintln err
               return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean> | --target-marked-module <driver.lean> <module>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
       return 2

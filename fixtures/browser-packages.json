@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "defaultPackage": "fixtures-basic",
   "hostPackage": "demo-host",
   "packages": [
@@ -10,11 +10,11 @@
       "report": "build/generated/fixtures-basic.report.md",
       "targets": [
         {
-          "source": "examples/Fib.lean",
+          "module": "Fib",
           "roots": ["fib"]
         },
         {
-          "source": "examples/MergeSort.lean",
+          "module": "MergeSort",
           "roots": [
             "SortDemo.demo",
             "SortDemo.demoFromArray",
@@ -22,14 +22,14 @@
           ]
         },
         {
-          "source": "fixtures/Basic.lean",
+          "module": "fixtures.Basic",
           "roots": [
             "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
             "Vir.Fixtures.Basic.byteArrayInputScore"
           ]
         },
         {
-          "source": "fixtures/RecursiveTypes.lean",
+          "module": "fixtures.RecursiveTypes",
           "roots": [
             "Vir.Fixtures.RecursiveTypes.treeRootScore",
             "Vir.Fixtures.RecursiveTypes.chainRootScore",
@@ -37,11 +37,20 @@
           ]
         }
       ],
-      "fixtureSources": [
-        "fixtures/Basic.lean",
-        "fixtures/ListOption.lean",
-        "fixtures/InterfaceShapes.lean",
-        "fixtures/RecursiveTypes.lean"
+      "fixtureInputs": [
+        { "source": "fixtures/Basic.lean", "module": "fixtures.Basic" },
+        {
+          "source": "fixtures/ListOption.lean",
+          "module": "fixtures.ListOption"
+        },
+        {
+          "source": "fixtures/InterfaceShapes.lean",
+          "module": "fixtures.InterfaceShapes"
+        },
+        {
+          "source": "fixtures/RecursiveTypes.lean",
+          "module": "fixtures.RecursiveTypes"
+        }
       ]
     },
     {
@@ -52,7 +61,7 @@
       "lakeTargets": ["VirInfoview", "Vir.Examples.Tamagotchi"],
       "targets": [
         {
-          "source": "examples/HostInterop.lean",
+          "module": "HostInterop",
           "roots": [
             "HostInterop.titleHandshake",
             "HostInterop.titleHandshakeLoop",
@@ -90,7 +99,7 @@
           ]
         },
         {
-          "source": "examples/Tamagotchi.lean",
+          "module": "Tamagotchi",
           "roots": [
             "Tamagotchi.uiReset",
             "Tamagotchi.uiResetFromDom",
@@ -103,7 +112,7 @@
           ]
         },
         {
-          "source": "fixtures/ReactCounter.lean",
+          "module": "fixtures.ReactCounter",
           "roots": [
             "ReactCounter.mount",
             "ReactCounter.mountDefault",
@@ -122,7 +131,7 @@
           ]
         },
         {
-          "source": "fixtures/ReactInput.lean",
+          "module": "fixtures.ReactInput",
           "roots": [
             "ReactInput.mountInput",
             "ReactInput.mountChangeInput",
@@ -132,25 +141,25 @@
           ]
         },
         {
-          "source": "fixtures/ProofWidgetsHtml.lean",
+          "module": "fixtures.ProofWidgetsHtml",
           "roots": ["ProofWidgetsHtml.mount", "ProofWidgetsHtml.mountDefault"]
         },
         {
-          "source": "fixtures/ProofWidgetsJsxSubset.lean",
+          "module": "fixtures.ProofWidgetsJsxSubset",
           "roots": [
             "ProofWidgetsJsxSubset.mount",
             "ProofWidgetsJsxSubset.mountDefault"
           ]
         },
         {
-          "source": "examples/tutorials/ReactProofWidgetHello.lean",
+          "module": "tutorials.ReactProofWidgetHello",
           "roots": [
             "ReactProofWidgetHello.createComponent",
             "ReactProofWidgetHello.mount"
           ]
         },
         {
-          "source": "examples/ReactProofWidget.lean",
+          "module": "ReactProofWidget",
           "roots": [
             "ReactProofWidget.createComponent",
             "ReactProofWidget.mount",
@@ -158,7 +167,7 @@
           ]
         }
       ],
-      "fixtureSources": []
+      "fixtureInputs": []
     },
     {
       "id": "pretty-printer",
@@ -167,7 +176,7 @@
       "report": "build/generated/pretty-printer.report.md",
       "targets": [
         {
-          "source": "fixtures/FormatPretty.lean",
+          "module": "fixtures.FormatPretty",
           "roots": [
             "Vir.Fixtures.FormatPretty.formatPrettyPreview",
             "Vir.Fixtures.FormatPretty.formatPrettyAtWidth",
@@ -177,7 +186,12 @@
           ]
         }
       ],
-      "fixtureSources": ["fixtures/FormatPretty.lean"]
+      "fixtureInputs": [
+        {
+          "source": "fixtures/FormatPretty.lean",
+          "module": "fixtures.FormatPretty"
+        }
+      ]
     },
     {
       "id": "fixtures-lean",
@@ -186,19 +200,31 @@
       "report": "build/generated/fixtures-lean.report.md",
       "targets": [
         {
-          "source": "fixtures/JsonCompress.lean",
+          "module": "fixtures.JsonCompress",
           "roots": [
             "Vir.Fixtures.JsonCompress.jsonCompressObj",
             "Vir.Fixtures.JsonCompress.jsonCompressWrapperObj"
           ]
         }
       ],
-      "fixtureSources": [
-        "fixtures/ExprPrinter.lean",
-        "fixtures/LeanParser.lean",
-        "fixtures/LeanParserHeader.lean",
-        "fixtures/JsonCompress.lean",
-        "fixtures/Task.lean"
+      "fixtureInputs": [
+        {
+          "source": "fixtures/ExprPrinter.lean",
+          "module": "fixtures.ExprPrinter"
+        },
+        {
+          "source": "fixtures/LeanParser.lean",
+          "module": "fixtures.LeanParser"
+        },
+        {
+          "source": "fixtures/LeanParserHeader.lean",
+          "module": "fixtures.LeanParserHeader"
+        },
+        {
+          "source": "fixtures/JsonCompress.lean",
+          "module": "fixtures.JsonCompress"
+        },
+        { "source": "fixtures/Task.lean", "module": "fixtures.Task" }
       ]
     },
     {
@@ -207,13 +233,15 @@
       "label": "Numeric and runtime boundaries",
       "report": "build/generated/fixtures-boundary.report.md",
       "targets": [],
-      "fixtureSources": ["fixtures/Boundary.lean"]
+      "fixtureInputs": [
+        { "source": "fixtures/Boundary.lean", "module": "fixtures.Boundary" }
+      ]
     }
   ],
   "localPackages": [
     {
       "file": "local-quickstart.irpkg",
-      "label": "Four small exports from one Lean file"
+      "label": "Six small exports from one Lean module"
     },
     {
       "file": "local-fib.irpkg",

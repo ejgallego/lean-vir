@@ -4,17 +4,21 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Init.Data.Nat.Bitwise.Basic
-import Init.Data.Nat.Log2
-import Init.Data.Array.Set
-import Init.Data.ByteArray.Basic
-import Init.Data.Float.Float32
-import Init.Data.SInt.Basic
-import Init.Data.String.Basic
-import Init.Data.String.Modify
-import Init.Data.String.Search
-import Init.Data.String.Substring
-import Init.System.IO
+module
+
+public import Init.Data.Nat.Bitwise.Basic
+public import Init.Data.Nat.Log2
+public import Init.Data.Array.Set
+public import Init.Data.ByteArray.Basic
+public import Init.Data.Float.Float32
+public import Init.Data.SInt.Basic
+public import Init.Data.String.Basic
+public import Init.Data.String.Modify
+public import Init.Data.String.Search
+public import Init.Data.String.Substring
+public import Init.System.IO
+
+public section
 
 namespace Vir.Fixtures.Boundary
 

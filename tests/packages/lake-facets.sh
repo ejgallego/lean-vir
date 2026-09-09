@@ -109,12 +109,11 @@ fi
 
 for repro_dir in "$tmp/repro-a" "$tmp/repro-b"; do
   mkdir -p "$repro_dir/Root.parts"
-  printf '%s\n' 'module' 'import all ModuleSetFixture.Root' > "$repro_dir/Driver.lean"
   lake env .lake/build/bin/vir_irpkg \
     "$repro_dir/Root.irpkg" "$repro_dir/Root.report.md" \
     --module-set-output "$repro_dir/Root.irpkg-set.json" "$repro_dir/Root.parts" \
     ModuleSetFixture.Root Root.irpkg Root.parts \
-    --target-marked-module "$repro_dir/Driver.lean" ModuleSetFixture.Root
+    --target-marked-module ModuleSetFixture.Root
 done
 cmp "$tmp/repro-a/Root.irpkg-set.json" "$tmp/repro-b/Root.irpkg-set.json"
 cmp "$tmp/repro-a/Root.irpkg" "$tmp/repro-b/Root.irpkg"
@@ -124,12 +123,12 @@ if lake env .lake/build/bin/vir_irpkg \
     "$tmp/invalid-root.irpkg" "$tmp/invalid-root.report.md" \
     --module-set-output "$tmp/invalid-root.irpkg-set.json" "$tmp/invalid-root.parts" \
     ModuleSetFixture.Root invalid-root.irpkg invalid-root.parts \
-    --target-all "$tmp/repro-a/Driver.lean" \
+    --target-all-module ModuleSetFixture.Root \
     > "$tmp/invalid-root.stdout" 2> "$tmp/invalid-root.stderr"; then
   echo "module package-set generation accepted a non-marked root target" >&2
   exit 1
 fi
-grep -q 'requires a marked source or marked module target' \
+grep -q 'requires a marked module target' \
   "$tmp/invalid-root.stderr"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
@@ -229,15 +228,20 @@ printf '%s\n' \
 cp lean-toolchain "$tmp/lean-toolchain"
 
 printf '%s\n' \
-  'import Vir' \
+  'module' \
+  'public import Vir' \
   '' \
   'open Lean.Vir.Browser' \
   '' \
   '@[vir_export]' \
-  'def Smoke.Runtime.value : Nat := 42' \
+  'public def Smoke.Runtime.value : Nat := 42' \
   '' \
   '@[vir_startup]' \
-  'def Smoke.Runtime.start : DomM Unit := pure ()' > "$tmp/Smoke/Runtime.lean"
+  'public def Smoke.Runtime.start : DomM Unit := pure ()' > "$tmp/Smoke/Runtime.lean"
+
+printf '%s\n' \
+  'import Vir' \
+  '@[vir_export] def Smoke.NonModule.value : Nat := 42' > "$tmp/Smoke/NonModule.lean"
 
 printf '%s\n' \
   'module' \
@@ -324,9 +328,11 @@ printf '%s\n' \
   '#check Vir.GeneratePackage.TargetMode' \
   '#check Vir.GeneratePackage.TargetMode.explicit' \
   '#check Vir.GeneratePackage.TargetMode.packageOnly' \
-  '#check Vir.GeneratePackage.TargetMode.markedModule' \
+  '#check Vir.GeneratePackage.TargetMode.marked' \
+  '#check Vir.GeneratePackage.PackageTargetOrigin.module' \
   '#check Vir.parseDottedName' \
-  '#check Vir.GeneratePackage.moduleNameFor' \
+  '#check Vir.GeneratePackage.prepareSnapshotInput' \
+  '#check Vir.GeneratePackage.PackageTargetOrigin.snapshot' \
   '#check Vir.GeneratePackage.collectClosure' \
   '#check Vir.GeneratePackage.virJsMetadataFromDecl?' \
   '#check Vir.GeneratePackage.collectHostImports' \
@@ -437,6 +443,14 @@ lake -d "$tmp" build Smoke.PackagePipeline
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
 
+if lake -d "$tmp" build +Smoke.NonModule:vir > "$tmp/nonmodule.log" 2>&1; then
+  echo "non-module Lake input unexpectedly generated a package" >&2
+  exit 1
+fi
+grep -q 'requires a `module` header and compiled IR' "$tmp/nonmodule.log"
+test ! -e "$tmp/.lake/build/vir/module-sets/Smoke/NonModule.irpkg-set.json"
+test ! -e "$tmp/.lake/build/vir/module-sets/Smoke/NonModule.irpkg"
+
 if lake -d "$tmp" build +Smoke.DeferredRuntime:vir \
     > "$tmp/deferred-runtime.stdout" 2> "$tmp/deferred-runtime.stderr"; then
   echo "unsupported environment dependency unexpectedly generated as a module package set" >&2
@@ -476,7 +490,7 @@ module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
 test -f "$module_descriptor"
 test -f "$module_dependency"
-test -f "$module_driver"
+test ! -e "$module_driver"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
 node --input-type=module -e '
@@ -486,6 +500,21 @@ node --input-type=module -e '
   if (entries["Smoke.Runtime.value"]?.startup !== false) process.exit(1);
   if (entries["Smoke.Runtime.start"]?.startup !== true) process.exit(1);
 ' "$tmp/package.json"
+
+# A formerly successful module must not leave a usable cached package when its
+# source is replaced by a non-module development.
+printf '%s\n' \
+  'import Vir' \
+  '@[vir_export] def Smoke.Runtime.value : Nat := 42' > "$tmp/Smoke/Runtime.lean"
+if lake -d "$tmp" build +Smoke.Runtime:vir > "$tmp/nonmodule-replacement.log" 2>&1; then
+  echo "non-module replacement unexpectedly reused a cached package" >&2
+  exit 1
+fi
+grep -q 'requires a `module` header and compiled IR' "$tmp/nonmodule-replacement.log"
+test ! -e "$tmp/.lake/build/vir/module-sets/Smoke/Runtime.irpkg-set.json"
+test ! -e "$package"
+test ! -e "$report"
+test ! -e "$tmp/.lake/build/vir/module-sets/Smoke/Runtime.parts"
 
 node "$repo/scripts/packages/inspect-irpkg.mjs" --json "$module_package" > "$tmp/module-package.json"
 node --input-type=module -e '

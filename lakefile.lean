@@ -43,17 +43,31 @@ lean_lib VirInfoview where
 /-- Non-default, buildable sources used by the public VIR examples. -/
 lean_lib VirExamples where
   srcDir := "examples"
-  roots := #[`SlidesCanvas]
+  roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort, `HostInterop,
+    `Tamagotchi, `ReactProofWidget, `tutorials.ReactProofWidgetHello]
+
+/-- Authored browser fixtures; paths are preserved for source navigation. -/
+lean_lib VirBrowserFixtures where
+  roots := #[`fixtures.Basic, `fixtures.ListOption, `fixtures.InterfaceShapes,
+    `fixtures.RecursiveTypes, `fixtures.Boundary, `fixtures.ExprPrinter,
+    `fixtures.FormatPretty, `fixtures.JsonCompress, `fixtures.LeanParser,
+    `fixtures.LeanParserHeader, `fixtures.Task, `fixtures.ReactCounter,
+    `fixtures.ReactInput, `fixtures.ProofWidgetsHtml, `fixtures.ProofWidgetsJsxSubset]
 
 /-- Module-system fixtures for composable package-set regression tests. -/
 lean_lib VirModuleFixtures where
   srcDir := "fixtures/module-set"
-  globs := #[.andSubmodules `ModuleSetFixture]
+  globs := #[.submodules `ModuleSetFixture]
 
 /-- Infoview-only regression fixtures kept outside the public library. -/
 lean_lib VirInfoviewFixtures where
   srcDir := "fixtures/infoview"
   roots := #[`InfoviewFixtures.ImportedHelper]
+
+/-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
+lean_lib VirTypeAnchorFixtures where
+  srcDir := "fixtures/type-anchors"
+  roots := #[`TypeAnchorFixture]
 
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage
@@ -207,7 +221,6 @@ private def buildVirPackageSetFacet
   let reportPath := virModuleOutput mod "module-sets" "report.md"
   let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
   let shardDir := virModuleOutput mod "module-sets" "parts"
-  let driverPath := virModuleOutput mod "drivers" "lean"
   let moduleName := mod.name.toString
   let rootRelativePath := mod.fileName "irpkg"
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
@@ -215,6 +228,13 @@ private def buildVirPackageSetFacet
   generatorJob.bindM fun generator =>
     moduleJob.bindM fun artifacts =>
       importArtsJob.mapM fun _ => do
+        unless artifacts.ir?.isSome do
+          -- Rejection must also invalidate an older successful source package.
+          removeFileIfExists descriptorPath
+          removeFileIfExists packagePath
+          removeFileIfExists reportPath
+          removeDirAllIfExists shardDir
+          error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
         addLeanTrace
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
@@ -231,22 +251,10 @@ private def buildVirPackageSetFacet
           removeFileIfExists descriptorPath
           removeFileIfExists packagePath
           removeDirAllIfExists shardDir
-          createParentDirs driverPath
           createParentDirs packagePath
           createParentDirs reportPath
           createParentDirs descriptorPath
           IO.FS.createDirAll shardDir
-          let sourcePath ←
-            if artifacts.ir?.isSome then
-              IO.FS.writeFile driverPath s!"module\nimport all {moduleName}\n"
-              pure driverPath
-            else
-              pure mod.leanFile
-          let targetArgs :=
-            if artifacts.ir?.isSome then
-              #["--target-marked-module", sourcePath.toString, moduleName]
-            else
-              #["--target-marked", sourcePath.toString]
           proc {
             cmd := generator.toString
             args := #[
@@ -255,7 +263,7 @@ private def buildVirPackageSetFacet
             ] ++ #[
               "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
               rootRelativePath, shardRelativeDir
-            ] ++ targetArgs
+            ] ++ #["--target-marked-module", moduleName]
             env := ← getAugmentedEnv
           }
         return descriptorPath

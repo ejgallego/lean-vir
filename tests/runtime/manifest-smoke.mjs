@@ -235,7 +235,7 @@ assert.equal(
 assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
 assert.ok(
   runtime.packageMetadata.targets.some(
-    (target) => target.source === "examples/Fib.lean",
+    (target) => target.module === "Fib",
   ),
 );
 assert.ok(

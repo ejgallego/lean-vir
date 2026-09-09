@@ -29,20 +29,15 @@ inductive TargetMode where
   | packageOnly (roots : Array Name)
   | all
   | marked
-  | markedModule (moduleName : Name)
 
 namespace TargetMode
 
 def roots : TargetMode → Array Name
   | .explicit roots | .packageOnly roots => roots
-  | .all | .marked | .markedModule _ => #[]
-
-def markedModule? : TargetMode → Option Name
-  | .markedModule moduleName => some moduleName
-  | _ => none
+  | .all | .marked => #[]
 
 def selectsMarked : TargetMode → Bool
-  | .marked | .markedModule _ => true
+  | .marked => true
   | _ => false
 
 def metadataName : TargetMode → String
@@ -50,43 +45,41 @@ def metadataName : TargetMode → String
   | .packageOnly _ => "packageOnly"
   | .all => "all"
   | .marked => "marked"
-  | .markedModule _ => "markedModule"
 
 end TargetMode
 
-/--
-A package input and its single, explicit selection mode. Keeping the mode as a
-sum type prevents contradictory states such as selecting both all declarations
-and marked declarations, or accidentally changing manifest metadata with an
-unrelated loading flag.
--/
-structure Target where
-  source : System.FilePath
-  mode : TargetMode
-
 inductive PackageTargetOrigin where
-  | source (path : String)
   | module (name : Name)
+  /-- An already elaborated module; the document is provenance, not a path to load. -/
+  | snapshot (document : String) (name : Name)
+  deriving BEq
 
 namespace PackageTargetOrigin
 
 def display : PackageTargetOrigin → String
-  | .source path => path
   | .module name => s!"module {name}"
+  | .snapshot document _ => document
+
+def moduleName : PackageTargetOrigin → Name
+  | .module name | .snapshot _ name => name
 
 end PackageTargetOrigin
 
-def Target.publicOrigin (target : Target) : PackageTargetOrigin :=
-  match target.mode.markedModule? with
-  | some moduleName => .module moduleName
-  | none => .source target.source.toString
+/-- Input identity is independent of selection. Compiled modules and prepared
+live module snapshots share the same package pipeline. -/
+structure Target where
+  origin : PackageTargetOrigin
+  mode : TargetMode
 
 def Target.publicSource (target : Target) : String :=
-  target.publicOrigin.display
+  target.origin.display
 
-/-- Resolve a package input to the file identity used by frontend caches. -/
-def Target.canonicalSourceKey (target : Target) : IO String := do
-  return (← IO.FS.realPath target.source).normalize.toString
+/-- Preserve the existing wire spelling for marked module targets without
+coupling the internal selection type to module identity. -/
+def TargetMode.metadataNameFor (mode : TargetMode) (origin : PackageTargetOrigin) : String :=
+  match mode, origin with
+  | .marked, .module _ => "markedModule"
+  | _, _ => mode.metadataName
 
 structure LoadedDecl where
   source : String
@@ -99,16 +92,15 @@ structure DeclIndexDiagnostic where
   reason : String
 
 /--
-One elaborated source environment together with every caller spelling that
-resolved to it. Keeping these values together prevents canonical cache keys,
-display provenance, environments, and declaration lists from drifting apart.
+One input environment and its owned declarations. Typed identity keeps compiled
+acquisition distinct from live document provenance, without filesystem aliases.
 -/
 structure DeclSource where
-  key : String
-  display : String
-  aliases : Array String
+  origin : PackageTargetOrigin
   env : Environment
   decls : Array Name := #[]
+
+def DeclSource.display (source : DeclSource) : String := source.origin.display
 
 structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
@@ -119,13 +111,11 @@ structure DeclIndex where
   loadedModules : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
 
-def DeclIndex.sourceKeyFor (index : DeclIndex) (target : Target) : String :=
-  index.sources.findSome? (fun source =>
-    if source.aliases.contains target.source.toString then some source.key else none)
-    |>.getD target.source.normalize.toString
-
 def DeclIndex.sourceForTarget? (index : DeclIndex) (target : Target) : Option DeclSource :=
-  index.sources.find? (fun source => source.aliases.contains target.source.toString)
+  index.sources.find? (fun source => source.origin == target.origin)
+
+def DeclIndex.envForTarget? (index : DeclIndex) (target : Target) : Option Environment :=
+  (index.sourceForTarget? target).map (·.env)
 
 structure InitGlobal where
   name : Name
@@ -212,30 +202,5 @@ structure InterfaceManifest where
   exports : Array InterfaceExport := #[]
   hostImports : Array HostImport := #[]
   diagnostics : Array PackageDiagnostic := #[]
-
-def defaultTargets : Array Target := #[
-  {
-    source := "examples/Fib.lean",
-    mode := .explicit #[`fib]
-  },
-  {
-    source := "examples/Tamagotchi.lean",
-    mode := .explicit #[
-      `Tamagotchi.step
-    ]
-  },
-  {
-    source := "examples/Tamagotchi.lean",
-    mode := .packageOnly #[
-      `Tamagotchi.run,
-      `Tamagotchi.trace,
-      `Tamagotchi.demoScript
-    ]
-  },
-  {
-    source := "examples/MergeSort.lean",
-    mode := .explicit #[`SortDemo.demo, `SortDemo.demoFromArray]
-  }
-]
 
 end Vir.GeneratePackage

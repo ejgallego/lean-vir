@@ -113,26 +113,26 @@ Open:
 http://127.0.0.1:5173/dev.html?package=local-quickstart.irpkg
 ```
 
-To package your own file, pass the source file, output package, and any number
+To package a Lake-registered module, pass its module name, output package, and any number
 of Lean declarations to expose:
 
 ```bash
-npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
+npm run generate:irpkg -- Quickstart web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
 ```
 
 The export names are Lean declaration names. Use fully qualified names for
 declarations inside namespaces, such as `Quickstart.total`. If you omit export
-names, the generator packages public definitions from the source file:
+names, the generator packages public definitions owned by the module:
 
 ```bash
-npm run generate:irpkg -- examples/Fib.lean web/public/local-fib.irpkg
+npm run generate:irpkg -- Fib web/public/local-fib.irpkg
 ```
 
 Put packages under `web/public/` when you want to load them by URL from the
 runner. For packages written elsewhere, use the `/dev.html` file picker:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
 ```
 
 The package runner starts a fresh WASM interpreter, reads the manifest embedded

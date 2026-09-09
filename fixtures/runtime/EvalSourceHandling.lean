@@ -1,4 +1,9 @@
-import Vir.GeneratePackage.Frontend
+module
+
+public import Vir.GeneratePackage.Frontend
+public meta import Lean.CoreM
+
+public section
 
 #eval IO.println "VIR_GENERATOR_EVAL_SINGLE"
 #eval! IO.println "VIR_GENERATOR_EVAL_BANG"

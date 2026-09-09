@@ -148,7 +148,7 @@ npm run compare:surface -- control.json candidate.json delta.json delta.md
 Package generation and inspection:
 
 ```bash
-npm run generate:irpkg -- examples/Fib.lean web/public/local-fib.irpkg
+npm run generate:irpkg -- Fib web/public/local-fib.irpkg
 npm run prepare:irpkg -- examples/quickstart.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
@@ -266,6 +266,15 @@ changes; `package.json` remains the exact command-order source of truth.
   `npm run test:runtime:unit`
 - Runtime package generation or SDK artifact import checks:
   `npm run test:runtime:lean`
+- Direct compiled-module input, root selection, provenance, or source
+  re-elaboration regressions:
+  `npm run test:runtime -- module-input`
+- Module-based npm CLI/config validation, selected-module builds and output:
+  `npm run test:packages:unit` and `npm run test:runtime -- module-cli`
+- Browser module catalog, fixture-root unions or package-only selection:
+  `npm run test:packages:unit`, `npm run check:package`, then runtime/browser
+  checks against refreshed packages. Fixture module migration also requires
+  the native/Wasm oracle suite.
 - Lake module/package facets, downstream bundle input tracing and output
   ownership, marked-module selection, or SDK installer changes:
   `npm run test:lake`
@@ -276,11 +285,14 @@ changes; `package.json` remains the exact command-order source of truth.
 - An explicit runtime smoke group:
   `npm run test:runtime -- --group pure`
 - Lean infoview bundle freshness, shell loading, local asset RPC, widget-entry
-  signatures, or server-mode module snapshots with opaque imports and unsaved edits:
+  signatures, or server-mode module snapshots with opaque imports and unsaved edits,
+  non-module rejection, document provenance and revision/byte consistency:
   `npm run test:infoview`
 - React proof-widget demo iteration after `npm run build:demo`:
   open `examples/ReactProofWidget.lean` in VS Code; the widget package is built
-  from the active Lean server snapshot. If the file was already open before the
+  from the active Lean server snapshot. Live documents must use `module`, but
+  do not need to be saved; private helpers and unsaved edits remain available.
+  If the file was already open before the
   build, restart the Lean server or reopen the file so the editor sees the
   rebuilt `Vir.Infoview` widget module.
 - Shared Tamagotchi widget demo iteration after `npm run build:demo`:
@@ -332,9 +344,26 @@ Runtime smoke tests are split into two groups:
 The runtime runner executes pure tests in parallel, but serializes Lean-group
 tests to avoid concurrent writes to shared Lean build outputs on cold CI
 checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
-per test process. Internal helper calls may set `VIR_SKIP_IRPKG_BUILD=1` only
-after that setup has completed; routine manual use should keep using the npm
-commands above.
+per test process. Runtime fixtures use the shared temporary Lake-project helper
+in `tests/support/module-project.mjs`; `createRuntimeModuleProject` pairs it with
+the prepared generator. Successful builds must precede package-negative tests;
+attribute and typechecking negatives instead inspect the build failure. The
+public npm CLI always builds its selected modules through Lake's cache.
+
+The test module-project helper accepts explicit simple module names and source
+text without rewriting headers or visibility. It pins the repository toolchain
+and local dependency; callers own scratch-directory cleanup. Always pair its
+`env()` result with its `directory` as cwd. Build only the intended module roots
+and check compilation before asserting package diagnostics. Do not combine
+independent negative fixtures into an umbrella import. Validate helper changes
+with `npm run test:fixtures:unit`, `npm run test:runtime -- module-project
+package-generation`, and the fixture oracle suite.
+
+Generated tests must declare their module visibility and compile-time imports
+explicitly. In particular, isolated marker imports need `meta import
+Vir.Attributes`, and isolated host-attribute imports need `meta import Vir.Host`.
+Assert `#eval` effects during compilation and their absence during packaging;
+do not confuse Lake's replayed build messages with re-executed source commands.
 
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.
@@ -342,8 +371,11 @@ commands above.
 The local package-generation helper, browser package generator, and fixture
 runner use the `vir_irpkg` Lake executable instead of repeatedly starting
 `lean --run tools/GeneratePackage.lean`. The fixture runner builds that
-executable once, then reuses it for per-fixture packages while continuing to
-run the host oracle for every fixture.
+executable and selected fixture modules before parallel execution. It reuses
+them for per-fixture packages and runs a host driver for every fixture. Drivers
+import compiled runtime bodies (`import all`) instead of copying source text;
+they retain `interpreter.prefer_native false` and unsafe-entry handling. Thus
+`--no-build` skips the demo/Wasm build, not the selected Lean module builds.
 
 The build and test entry points print compact timing summaries that are useful
 when comparing CI runs:

@@ -91,6 +91,14 @@ declarations are not implicitly re-exported. A marked build with no matching
 declarations fails with a diagnostic instead of silently producing an empty
 package.
 
+The markers follow Lean's label-attribute semantics: `attribute [-vir_export]`
+and `attribute [-vir_startup]` remove labels only from the local elaboration
+environment. Compiled imports restore the recorded additions, so these commands
+do not retract exports or startup hooks from a compiled `:vir` package. To
+change that published interface, remove the original annotation or attribute
+addition and rebuild. A live editor snapshot sees the local state at its
+position; it can therefore differ from the compiled module after local removal.
+
 Lean module-system files can import the marker definitions without pulling in
 the full browser-facing `Vir` library:
 
@@ -130,7 +138,7 @@ directly recursive fallbacks. Lean's
 ordinary native compiler continues to use the extern; the command compiles a
 reserved-name reference-body clone only for VIR closure resolution. In a Lean
 module the clone is exported as an internal compiler artifact so the generated
-`import all` driver can load it; it is not a user-facing declaration. Package
+`import all` environment can load it; it is not a user-facing declaration. Package
 generation emits an adapter at the original name and preserves the extern's IR
 parameter ownership while calling the clone. Any dependencies newly exposed by
 the reference body must still have ordinary IR or a registered native provider.
@@ -155,14 +163,14 @@ MySlides/Runtime.parts/0.irpkg
 MySlides/Runtime.report.md
 ```
 
-For legacy Lean source files that do not produce compiled module IR, the
-generator re-elaborates the source. For module-system files, the facet depends
-on Lake's `.ir` artifact and uses a generated
-`import all MySlides.Runtime` driver.
+The facet requires a `module` source and Lake's compiled `.ir` artifact. It passes
+the module name directly to the generator. No driver file is generated and no
+module body is re-elaborated during packaging.
 
-The compiled-module root records one `markedModule` target. The legacy fallback
-records one `marked` source target; package-set generation rejects all other
-target modes.
+The root records one `markedModule` target; package-set generation rejects
+other target modes. Non-module inputs fail explicitly, including replacement
+of a previously successful module: stale package/descriptor outputs are
+invalidated, not reused or regenerated through a source fallback.
 
 Every member is an ordinary format-11 `.irpkg` that owns its module's
 declarations and initializer metadata. The descriptor reconstructs a
@@ -171,7 +179,7 @@ reached runtime modules, ignores meta-only import edges, and puts the root
 last.
 Dependency shard paths use stable ordinals; module identity lives in the
 descriptor and each member manifest. The root manifest records the selected
-module instead of the checkout-local generated driver path, so otherwise
+module rather than a checkout-local source path, so otherwise
 identical module sets are byte-for-byte reproducible across build directories.
 Only the root owns interface exports, export summaries, native extern
 registrations, and the aggregate host-import table. The runtime loads all

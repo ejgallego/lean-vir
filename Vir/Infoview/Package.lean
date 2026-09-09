@@ -261,11 +261,11 @@ meta def closureIRHash (closure : Vir.GeneratePackage.Closure) : UInt64 :=
     mixHash (mixHash (hash loaded.source) (hash loaded.decl.name)) (irDeclHash loaded.decl)
 
 meta def sourceRangeHash
-    (doc : Server.FileWorker.EditableDocument)
+    (text : FileMap)
     (range : DeclarationRange) : UInt64 :=
-  let start := doc.meta.text.ofPosition range.pos
-  let stop := doc.meta.text.ofPosition range.endPos
-  let text := String.Pos.Raw.extract doc.meta.text.source start stop
+  let start := text.ofPosition range.pos
+  let stop := text.ofPosition range.endPos
+  let text := String.Pos.Raw.extract text.source start stop
   let positionToken :=
     s!"{range.pos.line}:{range.pos.column}-{range.endPos.line}:{range.endPos.column}"
   mixHash (hash text) (hash positionToken)
@@ -281,7 +281,7 @@ meta def localClosureDeclNames
   sortedNames (dedupNames names)
 
 meta def packageRangeTokenFrom
-    (doc : Server.FileWorker.EditableDocument)
+    (text : FileMap)
     (ranges : Array (Name × Option DeclarationRanges)) : Option String := Id.run do
   let mut count := 0
   let mut h : UInt64 := 17
@@ -290,26 +290,25 @@ meta def packageRangeTokenFrom
     | none => pure ()
     | some ranges =>
         count := count + 1
-        h := mixHash h (mixHash (hash name) (sourceRangeHash doc ranges.range))
+        h := mixHash h (mixHash (hash name) (sourceRangeHash text ranges.range))
   if count == 0 then
     none
   else
     some s!"source-ranges:{count}:{h}"
 
-meta def packageClosure
+meta def prepareIRPackageInput
     (source : String)
     (roots : Array Name)
-    (snap : Server.Snapshots.Snapshot) :
+    (env : Environment) : Except RequestError Vir.GeneratePackage.SnapshotInput :=
+  (Vir.GeneratePackage.prepareSnapshotInput source env roots).mapError fun message =>
+    { code := .invalidParams, message := s!"VIR IR package failed:\n{message}" }
+
+meta def packageClosure (input : Vir.GeneratePackage.SnapshotInput) :
     Vir.GeneratePackage.Closure :=
-  let target : Vir.GeneratePackage.Target := {
-    source := System.FilePath.mk source
-    mode := .explicit roots
-  }
-  let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
-  Vir.GeneratePackage.collectClosure #[target] index
+  Vir.GeneratePackage.collectClosure #[input.target] input.index
 
 meta def packageRangeToken?
-    (doc : Server.FileWorker.EditableDocument)
+    (text : FileMap)
     (source : String)
     (closure : Vir.GeneratePackage.Closure)
     (env : Environment) : IO (Option String) := do
@@ -321,20 +320,19 @@ meta def packageRangeToken?
     for name in names do
       result := result.push (name, ← findDeclarationRanges? name)
     return result
-  return packageRangeTokenFrom doc ranges
+  return packageRangeTokenFrom text ranges
 
 meta def packageClosureToken
-    (doc : Server.FileWorker.EditableDocument)
+    (text : FileMap)
     (source : String)
-    (roots : Array Name)
-    (snap : Server.Snapshots.Snapshot) : IO String := do
-  let closure := packageClosure source roots snap
-  let rangeToken? ← packageRangeToken? doc source closure snap.env
+    (input : Vir.GeneratePackage.SnapshotInput)
+    (env : Environment) : IO String := do
+  let closure := packageClosure input
+  let rangeToken? ← packageRangeToken? text source closure env
   let rangeToken := rangeToken?.getD "source-ranges:none"
   return s!"closure-ir:{closure.decls.size}:{closureIRHash closure}:{rangeToken}"
 
 meta def irPackageRevision
-    (_doc : Server.FileWorker.EditableDocument)
     (roots : Array Name)
     (token : String) : String :=
   let rootToken := ",".intercalate (roots.map (fun name => name.toString)).toList
@@ -350,11 +348,14 @@ meta def statIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPac
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
     let doc ← RequestM.readDoc
     let source := documentSourceName doc
-    let token ← packageClosureToken doc source roots snap
+    let input ← match prepareIRPackageInput source roots snap.env with
+      | .ok input => pure input
+      | .error error => throwThe RequestError error
+    let token ← packageClosureToken doc.meta.text source input snap.env
     return {
       source := source
       roots := roots.map (fun name => name.toString)
-      revision := irPackageRevision doc roots token
+      revision := irPackageRevision roots token
     }
 
 @[server_rpc_method]
@@ -367,14 +368,12 @@ meta def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPa
   RequestM.withWaitFindSnapAtPos params.pos fun snap => do
     let doc ← RequestM.readDoc
     let source := documentSourceName doc
-    let token ← packageClosureToken doc source roots snap
-    let revision := irPackageRevision doc roots token
-    let target : Vir.GeneratePackage.Target := {
-      source := System.FilePath.mk source
-      mode := .explicit roots
-    }
-    let index := Vir.GeneratePackage.declIndexFromEnvironment source snap.env
-    match ← Vir.GeneratePackage.buildPackageFromIndex revision #[target] index with
+    let input ← match prepareIRPackageInput source roots snap.env with
+      | .ok input => pure input
+      | .error error => throwThe RequestError error
+    let token ← packageClosureToken doc.meta.text source input snap.env
+    let revision := irPackageRevision roots token
+    match ← Vir.GeneratePackage.buildPackageFromIndex revision #[input.target] input.index with
     | .ok pkg =>
         return {
           source := source
