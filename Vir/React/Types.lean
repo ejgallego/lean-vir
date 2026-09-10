@@ -72,12 +72,12 @@ abbrev ReducerDispatch (_state action : Type) : Type :=
   Lean.Vir.Js.Function.Unary (Lean.Vir.Js action) Unit
 
 /-- Exact JavaScript array returned by `React.useState`. -/
-abbrev StateTuple (_α : Type) : Type :=
-  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
+abbrev StateTuple (α : Type) : Type :=
+  Lean.Vir.Js.Tuple2.Value α (Lean.Vir.Js (StateSetter α))
 
 /-- Exact JavaScript array returned by `React.useReducer`. -/
-abbrev ReducerTuple (_state _action : Type) : Type :=
-  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
+abbrev ReducerTuple (state action : Type) : Type :=
+  Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js state) (Lean.Vir.Js (ReducerDispatch state action))
 
 /-- Native JavaScript calculation function accepted by `React.useMemo`. -/
 opaque MemoCalculation (α : Type) : Type
@@ -154,7 +154,7 @@ opaque Node : Type
 
 /-- React dependency lists are ordinary JavaScript arrays. -/
 abbrev DependencyList : Type :=
-  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any
+  Lean.Vir.Js.Array.Value Lean.Vir.Js.Any.Value
 
 /--
 An exact JavaScript React function component whose props originate in Lean.

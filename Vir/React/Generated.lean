@@ -294,7 +294,7 @@ This declaration is generated; edit the binding configuration.
 opaque createElement
     (elementType : @& Lean.Vir.Js Lean.Vir.React.ElementType)
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)) :
+    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
@@ -348,7 +348,7 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "react.node.fragment"]
 opaque fragmentWithKeyJs
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node)) :
+    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 end React.Node

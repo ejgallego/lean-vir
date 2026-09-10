@@ -31,6 +31,8 @@ export function createJsCollectionHostBindings() {
     "js.array.push": (array, value) => array.push(value),
     "js.array.length": (array) => array.length,
     "js.array.item": (array, index) => array[index],
+    "js.tuple2.first": (tuple) => tuple[0],
+    "js.tuple2.second": (tuple) => tuple[1],
     "js.nodeList.length": (nodeList) => nodeList.length,
     "js.nodeList.item": (nodeList, index) => nodeList.item(index),
     "js.nodeList.toArray": (nodeList) => Array.from(nodeList),

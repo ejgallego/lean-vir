@@ -93,6 +93,7 @@ jobs:
         with:
           name: vir-demo-artifacts
           path: web/public
+      - run: npm run test:runtime:unit
       - run: npm run test:runtime:pure
 
   runtime-lean:

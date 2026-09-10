@@ -250,15 +250,19 @@ their Lean representation.
 `Vir.Js` also provides typed JavaScript collection handles:
 
 - `Lean.Vir.Js.Array α` represents a native JavaScript array whose indexed
-  values have Lean-side view `α`.
-- `Lean.Vir.Js.NodeList α` represents a DOM `NodeList` with the same element
-  view convention.
-- `Js.NodeList.toArray : Js.NodeList α -> RuntimeM (Js.Array α)` copies only
-  the JavaScript container; its entries do not cross into a Lean array.
-- `Js.Array.toLeanArray` and `Js.NodeList.toLeanArray` accept collections with
-  element view `Js α` and return `Array (Js α)`. Each resulting handle has an
-  independent lifetime, so it remains usable after the source collection is
-  no longer reachable.
+  values have JavaScript shape `α`: insertion and indexing use `Js α`, not a
+  raw Lean `α`.
+- `Lean.Vir.Js.NodeList α` represents a DOM `NodeList` whose parameter is the
+  full Lean view of an entry. For example, DOM selectors return
+  `Js.NodeList (Js Element)`, while an array of the same elements is
+  `Js.Array Element`.
+- `Js.NodeList.toArray : Js.NodeList (Js α) -> RuntimeM (Js.Array α)` copies
+  only the JavaScript container; its entries do not cross into a Lean array.
+- `Js.Array.toLeanArray` accepts `Js.Array α`, and
+  `Js.NodeList.toLeanArray` accepts `Js.NodeList (Js α)`. Both explicitly
+  materialize a Lean `Array (Js α)`, unlike `Js.NodeList.toArray`. Each
+  resulting handle has an independent lifetime, so it remains usable after
+  the source collection is no longer reachable.
 - `Js.erase` forgets a phantom shape and preserves the exact value as
   `Js.Any`. `Js.cast` selects a checked narrowing through a `Js.Cast` instance;
   failure is `Except Js.TypeConvError (Js target)`. The browser `Element`
@@ -267,6 +271,20 @@ their Lean representation.
   `Js.Function.call` and `callVoid` invoke it directly. `ofLean` and
   `ofLeanVoid` are explicit conversions for the separate case where a Lean
   closure must become an ordinary JavaScript function.
+
+Migration from the older collection, property, and Promise signatures:
+
+- Replace `Js.Array.getAs` with `Js.Array.getJs`; the result shape now comes
+  from the array's element parameter, not an unrelated caller-selected type.
+- Replace `Js.Array (Js α)` with `Js.Array α`. Keep
+  `Js.NodeList (Js α)` and the Lean-owned `Array (Js α)` unchanged.
+- `Js.Object.get` now returns `Js.Any`. For a primitive string field, use
+  `Js.String.fromAny (← Js.Object.get object key)` before typed use. This
+  checks the exact value and throws `TypeError` on a non-string; it does not
+  coerce it. Prefer a generated getter when the field has a known contract.
+- `Js.Promise.catchValue` rejection handlers now receive `Js.Any`, not a
+  caller-selected error shape, and recover to the original promise's result
+  shape. Narrow the rejection value explicitly when needed.
 
 `Lean.Vir.LeanRef.toJSL` and `Lean.Vir.LeanRef.fromJSL` are the generic handle
 lane for Lean-owned values that JavaScript should store or route without
@@ -379,7 +397,7 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
   returned by `Component.ofLean`
 - `Lean.Vir.React.ElementType.ofTag : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> @& Lean.Vir.Js Lean.Vir.React.Props -> @& Lean.Vir.Js.Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> @& Lean.Vir.Js Lean.Vir.React.Props -> @& Lean.Vir.Js.Array Lean.Vir.React.Node -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElementTag` is the explicit tag-string convenience over that exact binding
 - `Lean.Vir.React.Props.key : String -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Props.ref : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)) -> Lean.Vir.React.Props.Entry`
@@ -490,11 +508,16 @@ reference type.
 JavaScript method and request values and returns `Js.Promise response` without
 awaiting or decoding it. `Js.Promise.thenValueWithRejection` and
 `thenVoidWithRejection` pass both handlers directly to native `Promise.then`.
-The first selects a common non-Promise result shape; the second returns
+The first selects a common generic result shape; the second returns
 `undefined`. Errors thrown by the success handler are not caught by its sibling
 rejection handler. `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and
-`catchValue` accept exact `Js.Function1` values and expose direct-value,
-Promise-assimilating, and void result shapes separately. `Js.Function.ofLean`
+`catchValue` accept exact `Js.Function1` values and select value-return,
+native-Promise-return, and void subsets of the TS signatures. Every rejection
+input, including `catchValue`, is `Js.Any`. Value-return types do not exclude
+thenables: native resolution recursively assimilates them. These are selected
+generic relationships, not full overload inference or a settlement-shape proof;
+see [Selected Promise Relationships](BINDING_MODALITIES.md#selected-promise-relationships).
+`Js.Function.ofLean`
 is the separately named Lean-closure conversion; native functions such as
 React state setters require no conversion. Promise continuations and the
 generic `Js.Object.get` operation therefore continue on exact native values.

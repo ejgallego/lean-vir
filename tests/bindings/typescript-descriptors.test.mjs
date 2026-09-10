@@ -9,6 +9,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import ts from "typescript";
 
 import { buildTypeAnchorReport } from "../../scripts/bindings/type-anchor-report.mjs";
 import { generateDescriptorFile } from "../../scripts/bindings/typescript-descriptors.mjs";
@@ -19,6 +20,85 @@ import {
 import { renderTypeAnchorReport } from "../../scripts/bindings/type-anchor-renderer.mjs";
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+
+test("semantic type operators remain opaque while readonly array/tuple views are preserved", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-operators-"));
+  try {
+    const declarations = join(directory, "operators.d.ts");
+    await writeFile(declarations, `
+export type Keys<T> = keyof T;
+export interface Token { readonly value: unique symbol }
+export type Items<T> = readonly T[];
+export type Pair<T> = readonly [T, string];
+export type Nested<T> = readonly (keyof T)[];
+`);
+    assert.deepEqual(ts.getPreEmitDiagnostics(ts.createProgram([declarations], {
+      strict: true, noEmit: true, types: [],
+    })), []);
+    const descriptor = await generateDescriptorFile({
+      files: [declarations], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    const symbols = new Map(descriptor.symbols.map((symbol) => [symbol.id, symbol]));
+    const parameter = { kind: "ref", id: "T" };
+    const keys = { kind: "opaque", name: "keyof T" };
+    assert.deepEqual(symbols.get("Keys").shape, keys);
+    assert.deepEqual(symbols.get("Token.value").shape, { kind: "opaque", name: "unique symbol" });
+    assert.deepEqual(symbols.get("Items").shape, { kind: "array", element: parameter });
+    assert.deepEqual(symbols.get("Pair").shape, {
+      kind: "tuple", elements: [parameter, { kind: "primitive", name: "string" }],
+    });
+    assert.deepEqual(symbols.get("Nested").shape, { kind: "array", element: keys });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("interface merging retains compatible parameter metadata, including unrelated roots", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-merge-"));
+  try {
+    const declarations = join(directory, "merge.d.ts");
+    const generate = (symbols) => generateDescriptorFile({
+      files: [declarations], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(symbols), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    const string = { kind: "primitive", name: "string" };
+    for (const [initial, introduced, expected] of [
+      ["T", "T = string", [{ name: "T", default: string }]],
+      ["T", "T = string, U = number", [
+        { name: "T", default: string }, { name: "U", default: { kind: "primitive", name: "number" } },
+      ]],
+      ["T = string", "T extends string", [{ name: "T", default: string, constraint: string }]],
+    ]) {
+      const parts = [
+        `export interface Box<${initial}> { value: T }`,
+        `export interface Box<${introduced}> { label: string }`,
+      ];
+      for (const declarationsInOrder of [parts, [...parts].reverse()]) {
+        await writeFile(declarations, `${declarationsInOrder.join("\n")}\nexport interface Wanted { x: number }\n`);
+        const program = ts.createProgram([declarations], { strict: true, noEmit: true, types: [] });
+        assert.deepEqual(ts.getPreEmitDiagnostics(program), [], "the merged input is valid TypeScript");
+        const descriptor = await generate(["Box"]);
+        const box = descriptor.symbols.find((symbol) => symbol.id === "Box");
+        assert.deepEqual(box.typeParameters, expected);
+        assert.deepEqual(Object.keys(box.shape.fields).sort(), ["label", "value"]);
+        assert.deepEqual((await generate(["Wanted"])).symbols.map((symbol) => symbol.id), ["Wanted", "Wanted.x"]);
+      }
+    }
+    for (const [initial, conflicting] of [
+      ["T = string", "T = number"], ["T", "U"], ["T", "T, U"],
+      ["T extends string", "T extends number"],
+    ]) {
+      await writeFile(declarations, `export interface Box<${initial}> { label: string }\nexport interface Box<${conflicting}> { extra: string }\n`);
+      assert.ok(ts.getPreEmitDiagnostics(ts.createProgram([declarations], { strict: true, noEmit: true, types: [] })).length > 0);
+      await assert.rejects(generate(["Box"]), /conflicting TypeScript type parameters for Box/u);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("descriptor options preserve null, undefined, and nullish absence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-descriptors-"));

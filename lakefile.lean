@@ -68,7 +68,8 @@ lean_lib VirInfoviewFixtures where
 /-- Non-default runtime fixtures acquired through complete compiled modules. -/
 lean_lib VirRuntimeFixtures where
   srcDir := "fixtures/runtime"
-  roots := #[`ShellLifetime, `InfoviewRpcPromise]
+  roots := #[`ShellLifetime, `InfoviewRpcPromise,
+    `CollectionTypeFidelity, `ObjectTypeFidelity, `PromiseTypeFidelity]
 
 /-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
 lean_lib VirTypeAnchorFixtures where

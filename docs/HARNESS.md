@@ -245,6 +245,10 @@ changes; `package.json` remains the exact command-order source of truth.
   `build/analysis/api-coverage.tsv`
 - Lean `@[vir_js]`, explicit conversion, JavaScript provider, or host-boundary
   policy changes: `npm run check:bindings`
+- Array/Object/Promise type relationships: `npm run test:bindings:unit` for
+  descriptor/configuration mutations and `npm run test:bindings:lean` for
+  same-type acceptance and cross-type rejection. Both are in `check:bindings`;
+  these checks need no Wasm artifact or temporary downstream project.
 - IR package name/declaration tag changes:
   `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
   `npm run test:upstream`

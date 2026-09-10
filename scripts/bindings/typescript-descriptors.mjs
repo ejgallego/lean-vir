@@ -424,9 +424,11 @@ function mergeDeclarationSymbols(left, right) {
       left.shape.kind === "record" && right.shape.kind === "record") {
     return {
       ...left,
+      typeParameters: mergeInterfaceParameters(left, right),
       display: `${left.display}\n${right.display}`,
       hover: left.hover || right.hover,
       shape: { ...left.shape, fields: { ...left.shape.fields, ...right.shape.fields } },
+      indexSignatures: [...left.indexSignatures, ...right.indexSignatures],
     };
   }
   if (["function", "method"].includes(left.kind) && left.kind === right.kind) {
@@ -461,6 +463,28 @@ function mergeDeclarationSymbols(left, right) {
   throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
 }
 
+function mergeInterfaceParameters(left, right) {
+  const fail = () => { throw new Error(`conflicting TypeScript type parameters for ${left.id}`); };
+  const count = Math.max(left.typeParameters.length, right.typeParameters.length);
+  return Array.from({ length: count }, (_, index) => {
+    const parameter = left.typeParameters[index];
+    const other = right.typeParameters[index];
+    if (parameter === undefined || other === undefined) {
+      const introduced = parameter ?? other;
+      if (introduced.default === undefined) fail();
+      return introduced;
+    }
+    if (parameter.name !== other.name ||
+        (parameter.constraint !== undefined && other.constraint !== undefined &&
+         JSON.stringify(parameter.constraint) !== JSON.stringify(other.constraint)) ||
+        (parameter.default !== undefined && other.default !== undefined &&
+         JSON.stringify(parameter.default) !== JSON.stringify(other.default))) fail();
+    // Keep introduced defaults/constraints regardless of declaration order;
+    // conflicting present metadata is still unsupported.
+    return { ...parameter, ...other };
+  });
+}
+
 function symbolsForStatement(statement, sourceFile, prefix) {
   const symbol = symbolForStatement(statement, sourceFile, prefix);
   if (symbol === null) return [];
@@ -475,6 +499,9 @@ function symbolForStatement(statement, sourceFile, prefix) {
       ...declarationSymbol(statement, sourceFile, prefix, statement.name.text, "interface",
         interfaceShape(statement, sourceFile, prefix)),
       extends: interfaceHeritage(statement, sourceFile, prefix),
+      typeParameters: typeParameters(statement, sourceFile, prefix),
+      indexSignatures: statement.members.filter(ts.isIndexSignatureDeclaration).map((member) =>
+        functionShape(member.parameters, member.type, sourceFile, prefix)),
     };
   }
   if (ts.isTypeAliasDeclaration(statement)) {
@@ -505,6 +532,18 @@ function declarationSymbol(node, sourceFile, prefix, name, kind, shape) {
   };
 }
 
+function typeParameters(node, sourceFile, prefix) {
+  return (node.typeParameters ?? []).map((parameter) => ({
+    name: parameter.name.text,
+    ...(parameter.constraint === undefined ? {} : {
+      constraint: normalizeTypeNode(parameter.constraint, sourceFile, prefix),
+    }),
+    ...(parameter.default === undefined ? {} : {
+      default: normalizeTypeNode(parameter.default, sourceFile, prefix),
+    }),
+  }));
+}
+
 function interfaceMemberSymbols(node, sourceFile, prefix) {
   const owner = [...prefix, node.name.text].join(".");
   const symbols = [];
@@ -520,6 +559,10 @@ function interfaceMemberSymbols(node, sourceFile, prefix) {
         member,
         sourceFile,
         functionShape(member.parameters, member.type, sourceFile, prefix),
+        {
+          typeParameters: typeParameters(member, sourceFile, prefix),
+          ...(member.questionToken !== undefined ? { optional: true } : {}),
+        },
       ));
     } else if (ts.isPropertySignature(member) && member.type !== undefined) {
       const shape = normalizeTypeNode(member.type, sourceFile, prefix);
@@ -673,13 +716,23 @@ function normalizeTypeNode(node, sourceFile, prefix) {
     return typeLiteralShape(node, sourceFile, prefix);
   }
   if (ts.isFunctionTypeNode(node)) {
+    // Do not erase callback-local binders into references to outer parameters.
+    // Generic callback translation needs scope-aware types; retain the syntax
+    // as unsupported until that representation exists.
+    if (node.typeParameters?.length) return { kind: "opaque", name: node.getText(sourceFile) };
     return functionShape(node.parameters, node.type, sourceFile, prefix);
   }
   if (ts.isParenthesizedTypeNode(node)) {
     return normalizeTypeNode(node.type, sourceFile, prefix);
   }
   if (ts.isTypeOperatorNode(node)) {
-    return normalizeTypeNode(node.type, sourceFile, prefix);
+    // Only the supported readonly array/tuple view preserves the operand shape.
+    // Semantic operators such as keyof and unique must not masquerade as it.
+    if (node.operator === ts.SyntaxKind.ReadonlyKeyword &&
+        (ts.isArrayTypeNode(node.type) || ts.isTupleTypeNode(node.type))) {
+      return normalizeTypeNode(node.type, sourceFile, prefix);
+    }
+    return { kind: "opaque", name: node.getText(sourceFile) };
   }
   if (ts.isLiteralTypeNode(node)) {
     if (node.literal.kind === ts.SyntaxKind.NullKeyword) return { kind: "primitive", name: "null" };

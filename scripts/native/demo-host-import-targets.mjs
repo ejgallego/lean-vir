@@ -70,6 +70,8 @@ export const demoHostImportTargets = [
   "js.object.set",
   "js.string",
   "js.string.value",
+  "js.tuple2.first",
+  "js.tuple2.second",
   "js.value.browser.eventListener",
   "js.value.react.callback",
   "js.value.react.component",

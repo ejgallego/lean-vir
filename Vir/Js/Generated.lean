@@ -30,12 +30,12 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.array.empty"]
 opaque empty
     {α : Type} :
-    RuntimeM (Lean.Vir.Js.Array (Lean.Vir.Js α))
+    RuntimeM (Lean.Vir.Js.Array α)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.array.push`.
 
-Calls Array.push with the exact native array and item and returns its JavaScript Number result.
+Selects the one-item arity of Array<T>.push(...items: T[]): number. The receiver and item share T; no erasure or conversion occurs.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -46,9 +46,8 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.array.push"]
 opaque push
     {α : Type}
-    {β : Type}
     (array : @& Lean.Vir.Js.Array α)
-    (value : @& Lean.Vir.Js β) :
+    (value : @& Lean.Vir.Js α) :
     RuntimeM (Lean.Vir.Js Float)
 
 /--
@@ -71,7 +70,7 @@ opaque lengthJs
 /--
 Generated binding for reviewed VIR protocol `javascript.array.item`.
 
-Performs the exact JavaScript bracket-property read on the array, including undefined for a hole or missing entry.
+Preserves Array<T>'s [n: number]: T relationship. This is the TypeScript unchecked-index lane: native holes and missing entries remain undefined, without a bounds check or null conversion. It does not implement noUncheckedIndexedAccess.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -80,12 +79,11 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.array.item"]
-opaque getAs
+opaque getJs
     {α : Type}
-    {β : Type}
     (array : @& Lean.Vir.Js.Array α)
     (index : @& Lean.Vir.Js Float) :
-    RuntimeM (Lean.Vir.Js β)
+    RuntimeM (Lean.Vir.Js α)
 
 end Js.Array
 
@@ -216,7 +214,7 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.nodeList.toArray"]
 opaque toArray
     {α : Type}
-    (nodes : @& Lean.Vir.Js.NodeList α) :
+    (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α)) :
     RuntimeM (Lean.Vir.Js.Array α)
 
 end Js.NodeList
@@ -330,7 +328,7 @@ opaque set
 /--
 Generated binding for reviewed VIR protocol `javascript.object.get`.
 
-Reads an exact property value from an ordinary JavaScript object without decoding or copying it.
+Reads an exact property value with an erased static shape, including undefined for missing properties. A dynamic field name provides no evidence for a caller-selected result type; typed reads require a declared field contract or an explicit narrow check.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -341,10 +339,9 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.object.get"]
 opaque get
     {object : Type}
-    {α : Type}
     (object : @& Lean.Vir.Js object)
     (name : @& Lean.Vir.Js String) :
-    RuntimeM (Lean.Vir.Js α)
+    RuntimeM (Lean.Vir.Js.Any)
 
 end Js.Object
 
@@ -353,7 +350,7 @@ namespace Js.Promise
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-value`.
 
-Calls native Promise.then with an exact callback returning a direct non-Promise JavaScript value and returns the exact chained Promise.
+Selects Promise.then<B>'s B callback-return alternative and returns the exact native chain. B is not constrained to exclude promises or thenables: native resolution recursively assimilates them. This selected TypeScript relationship does not compute Awaited<B> or prove runtime settlement shape.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -372,7 +369,7 @@ opaque thenValue
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-promise`.
 
-Calls native Promise.then with an exact callback returning a native Promise and exposes JavaScript's assimilated chained Promise type.
+Selects Promise.then<B>'s PromiseLike<B> callback-return alternative with a native Promise<B>. Returns the exact native chain, with recursive thenable assimilation and no VIR scheduling or payload validation. This is a selected TypeScript relationship, not a computed Awaited type.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -409,7 +406,7 @@ opaque thenVoid
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.then-value-with-rejection`.
 
-Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.
+Selects Promise.then<B, B> with both handlers returning the same B shape, so B | B remains B. Rejection input is Js.Any; B does not exclude thenables, which native resolution recursively assimilates. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler. No full overload inference or settlement-shape proof is supplied.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -448,7 +445,7 @@ opaque thenVoidWithRejection
 /--
 Generated binding for reviewed VIR protocol `javascript.promise.catch-value`.
 
-Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.
+Selects Promise<T>.catch<T> with a Js.Any rejection input and recovery to the same T, so T | T remains T. Returns the exact native chain. Rejection reasons are passed unchanged; returned promises and thenables are recursively assimilated. The generic result is a selected TypeScript relationship, not runtime payload validation.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -459,12 +456,71 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "js.promise.catchValue"]
 opaque catchValue
     {α : Type}
-    {error : Type}
     (promise : @& Lean.Vir.Js.Promise α)
-    (onRejected : @& Lean.Vir.Js.Function1 (Lean.Vir.Js error) (Lean.Vir.Js α)) :
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js α)) :
     RuntimeM (Lean.Vir.Js.Promise α)
 
 end Js.Promise
+
+namespace Js.String
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.from-any`.
+
+Checks for a primitive JavaScript string and returns that exact value. Throws TypeError for undefined, null, boxed strings and every other kind before typed use; never coerces or calls user conversion methods.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.fromAny"]
+opaque fromAny
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js String)
+
+end Js.String
+
+namespace Js.Tuple2
+
+/--
+Generated binding for reviewed VIR protocol `javascript.tuple2.first`.
+
+Projects position 0 of an exact native two-element tuple, preserving the first position's type and value identity.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.tuple2.first"]
+opaque first
+    {α : Type}
+    {β : Type}
+    (tuple : @& Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js α)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.tuple2.second`.
+
+Projects position 1 of an exact native two-element tuple, preserving the second position's type and value identity.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.tuple2.second"]
+opaque second
+    {α : Type}
+    {β : Type}
+    (tuple : @& Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js β)
+
+end Js.Tuple2
 
 namespace JsValue
 

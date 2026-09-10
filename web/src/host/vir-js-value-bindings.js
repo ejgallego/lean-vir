@@ -11,6 +11,12 @@ export function createJsValueHostBindings() {
     bindings[`${target}.value`] = (value) => codec.fromJs(value);
   }
   bindings["js.string.owned"] = jsStringValue;
+  bindings["js.string.fromAny"] = (value) => {
+    if (typeof value !== "string") {
+      throw new TypeError("js.string.fromAny expects a primitive JavaScript string");
+    }
+    return value;
+  };
   bindings["js.float.owned"] = jsFloatValue;
   bindings["js.nullable.null"] = () => null;
   bindings["js.nullable.of"] = (value) => value;

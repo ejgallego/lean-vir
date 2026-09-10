@@ -8,6 +8,7 @@ import {
   leanBinderIdentifier,
   validateLeanIdentifier,
 } from "./lean-syntax.mjs";
+import { validateJsValueTypeRelationships } from "./js-value-type-relationships.mjs";
 
 function nonemptyString(value) {
   return typeof value === "string" && value.length !== 0;
@@ -1058,6 +1059,9 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (entry.mapping.accessors === undefined) {
       if (symbol?.kind === "method") {
+        if (symbol.optional === true) {
+          throw new Error(`${member} is optional; optional method generation is not supported yet`);
+        }
         operations.push(methodOperation(
           config,
           entry.root,
@@ -1168,6 +1172,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
     for (const parameter of typeParameters) {
       validateLeanIdentifier(parameter, `${protocol.id} type parameter`);
     }
+    validateJsValueTypeRelationships(protocol, symbolsByRoot.get(protocol.group));
     const args = protocol.arguments.map((argument) => {
       const type = overriddenType(
         argument.type,

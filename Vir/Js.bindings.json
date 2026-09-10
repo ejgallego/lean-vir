@@ -45,6 +45,15 @@
         "result": { "type": { "lean": "String", "representation": "lean-owned" } }
       },
       {
+        "id": "javascript.string.from-any", "group": "primitive-conversions", "target": "js.string.fromAny",
+        "lean": "Lean.Vir.Js.String.fromAny", "marker": "vir_js",
+        "reason": "Checks for a primitive JavaScript string and returns that exact value. Throws TypeError for undefined, null, boxed strings and every other kind before typed use; never coerces or calls user conversion methods.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
         "id": "javascript.nat.of", "group": "primitive-conversions", "target": "js.nat",
         "lean": "Lean.Vir.JsValue.ofNat", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a Lean Nat into a JavaScript number resource.",
@@ -157,14 +166,14 @@
       {
         "id": "javascript.object.get", "group": "object", "target": "js.object.get",
         "lean": "Lean.Vir.Js.Object.get", "marker": "vir_js",
-        "reason": "Reads an exact property value from an ordinary JavaScript object without decoding or copying it.",
+        "reason": "Reads an exact property value with an erased static shape, including undefined for missing properties. A dynamic field name provides no evidence for a caller-selected result type; typed reads require a declared field contract or an explicit narrow check.",
         "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["object", "α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["object"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "object", "role": "receiver", "type": { "lean": "Lean.Vir.Js object", "representation": "js-resource", "resourceInner": "object" } },
           { "name": "name", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } }
       },
       {
         "id": "javascript.function.of-lean-unary", "group": "function", "target": "js.value.function.unary",
@@ -215,7 +224,7 @@
       {
         "id": "javascript.promise.then-value", "group": "promise", "target": "js.promise.thenValue",
         "lean": "Lean.Vir.Js.Promise.thenValue", "marker": "vir_js",
-        "reason": "Calls native Promise.then with an exact callback returning a direct non-Promise JavaScript value and returns the exact chained Promise.",
+        "reason": "Selects Promise.then<B>'s B callback-return alternative and returns the exact native chain. B is not constrained to exclude promises or thenables: native resolution recursively assimilates them. This selected TypeScript relationship does not compute Awaited<B> or prove runtime settlement shape.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -227,7 +236,7 @@
       {
         "id": "javascript.promise.then-promise", "group": "promise", "target": "js.promise.thenPromise",
         "lean": "Lean.Vir.Js.Promise.thenPromise", "marker": "vir_js",
-        "reason": "Calls native Promise.then with an exact callback returning a native Promise and exposes JavaScript's assimilated chained Promise type.",
+        "reason": "Selects Promise.then<B>'s PromiseLike<B> callback-return alternative with a native Promise<B>. Returns the exact native chain, with recursive thenable assimilation and no VIR scheduling or payload validation. This is a selected TypeScript relationship, not a computed Awaited type.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -251,7 +260,7 @@
       {
         "id": "javascript.promise.then-value-with-rejection", "group": "promise", "target": "js.promise.thenValueWithRejection",
         "lean": "Lean.Vir.Js.Promise.thenValueWithRejection", "marker": "vir_js",
-        "reason": "Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.",
+        "reason": "Selects Promise.then<B, B> with both handlers returning the same B shape, so B | B remains B. Rejection input is Js.Any; B does not exclude thenables, which native resolution recursively assimilates. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler. No full overload inference or settlement-shape proof is supplied.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.then", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
@@ -277,12 +286,12 @@
       {
         "id": "javascript.promise.catch-value", "group": "promise", "target": "js.promise.catchValue",
         "lean": "Lean.Vir.Js.Promise.catchValue", "marker": "vir_js",
-        "reason": "Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.",
+        "reason": "Selects Promise<T>.catch<T> with a Js.Any rejection input and recovery to the same T, so T | T remains T. Returns the exact native chain. Rejection reasons are passed unchanged; returned promises and thenables are recursively assimilated. The generic result is a selected TypeScript relationship, not runtime payload validation.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Promise.catch", "semantics": "preserving" },
-        "typeParameters": ["α", "error"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "promise", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } },
-          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js error) (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js error) (Lean.Vir.Js α)" } }
+          { "name": "onRejected", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any (Lean.Vir.Js α)" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Promise α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Promise.Value α" } }
       },
@@ -292,17 +301,17 @@
         "reason": "Constructs an empty native JavaScript Array.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [],
-        "result": { "type": { "lean": "Lean.Vir.Js.Array (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value (Lean.Vir.Js α)" } }
+        "result": { "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
       },
       {
         "id": "javascript.array.push", "group": "array", "target": "js.array.push",
         "lean": "Lean.Vir.Js.Array.push", "marker": "vir_js",
-        "reason": "Calls Array.push with the exact native array and item and returns its JavaScript Number result.",
+        "reason": "Selects the one-item arity of Array<T>.push(...items: T[]): number. The receiver and item share T; no erasure or conversion occurs.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.push", "semantics": "preserving" },
-        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
-          { "name": "value", "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }
+          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
@@ -317,14 +326,32 @@
       },
       {
         "id": "javascript.array.item", "group": "array", "target": "js.array.item",
-        "lean": "Lean.Vir.Js.Array.getAs", "marker": "vir_js",
-        "reason": "Performs the exact JavaScript bracket-property read on the array, including undefined for a hole or missing entry.",
+        "lean": "Lean.Vir.Js.Array.getJs", "marker": "vir_js",
+        "reason": "Preserves Array<T>'s [n: number]: T relationship. This is the TypeScript unchecked-index lane: native holes and missing entries remain undefined, without a bounds check or null conversion. It does not implement noUncheckedIndexedAccess.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
-        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
           { "name": "index", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.tuple2.first", "group": "tuple2", "target": "js.tuple2.first",
+        "lean": "Lean.Vir.Js.Tuple2.first", "marker": "vir_js",
+        "reason": "Projects position 0 of an exact native two-element tuple, preserving the first position's type and value identity.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js α) (Lean.Vir.Js β)" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
+        "id": "javascript.tuple2.second", "group": "tuple2", "target": "js.tuple2.second",
+        "lean": "Lean.Vir.Js.Tuple2.second", "marker": "vir_js",
+        "reason": "Projects position 1 of an exact native two-element tuple, preserving the second position's type and value identity.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js α) (Lean.Vir.Js β)" } }],
         "result": { "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }
       },
       {
@@ -354,7 +381,7 @@
         "reason": "Copies a NodeList into a JavaScript Array without crossing its entries into Lean.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value α" } }],
+        "arguments": [{ "name": "nodes", "role": "receiver", "type": { "lean": "Lean.Vir.Js.NodeList (Lean.Vir.Js α)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.NodeList.Value (Lean.Vir.Js α)" } }],
         "result": { "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
       },
       {
@@ -407,6 +434,13 @@
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Array"] }
     },
     {
+      "id": "tuple2",
+      "title": "Typed tuple projections",
+      "targets": ["js.tuple2.*"],
+      "lean": { "public": ["Lean.Vir.Js.Tuple2"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
       "id": "node-list",
       "title": "NodeList",
       "targets": ["js.nodeList.*"],
@@ -430,8 +464,8 @@
     {
       "id": "primitive-conversions",
       "title": "Primitive conversions",
-      "targets": ["js.bool", "js.bool.value", "js.float", "js.float.value", "js.nat", "js.nat.value", "js.string", "js.string.value"],
-      "lean": { "public": ["Lean.Vir.JsValue"] },
+      "targets": ["js.bool", "js.bool.value", "js.float", "js.float.value", "js.nat", "js.nat.value", "js.string", "js.string.value", "js.string.fromAny"],
+      "lean": { "public": ["Lean.Vir.JsValue", "Lean.Vir.Js.String"] },
       "upstream": { "kind": "internal" }
     }
   ]

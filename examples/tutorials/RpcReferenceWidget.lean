@@ -36,8 +36,9 @@ def request (session : Js Infoview.RpcSession) (method : Js String)
 def reference (reply : Js Reply) : RuntimeM Js.Any := do
   Js.Object.get reply (← JsValue.ofString "ref")
 
+/-- Checks the projected primitive string; malformed fields fail without coercion. -/
 def message (reply : Js Reply) : RuntimeM (Js String) := do
-  Js.Object.get reply (← JsValue.ofString "message")
+  Js.String.fromAny (← Js.Object.get reply (← JsValue.ofString "message"))
 
 /-- Send the exact registered reference back to its owning RPC session. -/
 def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :

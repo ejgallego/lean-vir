@@ -188,6 +188,34 @@ try {
       assert.equal(call.params, requests[index]);
     }
 
+    // Separate sessions preserve the four-request identity checks above. These
+    // enter the actual compiled Lean fulfillment callback, not a JS projection.
+    const projectMessage = (reply) => runtime.call(
+      "Vir.Fixtures.InfoviewRpcPromise.callMessage",
+      { call: () => Promise.resolve(reply) },
+      {},
+    );
+    assert.equal(await projectMessage({ message: "" }), "");
+    const stringError = {
+      name: "TypeError",
+      message: "js.string.fromAny expects a primitive JavaScript string",
+    };
+    await assert.rejects(projectMessage({}), stringError);
+    let coerced = false;
+    const hostile = {
+      [Symbol.toPrimitive]() { coerced = true; throw new Error("must not coerce"); },
+      toString() { coerced = true; throw new Error("must not format"); },
+    };
+    for (const message of [undefined, null, 42, false, new String("boxed"), hostile, "once"]) {
+      let reads = 0;
+      const chain = projectMessage({ get message() { reads += 1; return message; } });
+      assert.ok(chain instanceof Promise);
+      if (message === "once") assert.equal(await chain, "once");
+      else await assert.rejects(chain, stringError);
+      assert.equal(reads, 1, "the compiled Lean callback reads message exactly once");
+    }
+    assert.equal(coerced, false);
+
     assert.equal(
       await runtime.call(
         "Vir.Fixtures.InfoviewRpcPromise.thenPromiseExact",

@@ -40,6 +40,112 @@ it does not occupy the upstream operation's faithful documentation lane or
 count as semantics-preserving coverage. Unsupported or ambiguous semantics
 fail closed until they have an explicit representation or reviewed policy.
 
+### Type Parameter Fidelity
+
+Preserving upstream type relationships is a correctness requirement. A binding
+must not invent polymorphism, erase a meaningful type parameter, or replace a
+constraint with a caller-selected result type. For example, TypeScript's
+`Array<T>` index signature returns `T`, and `push` accepts `T` elements. A Lean
+binding with an independent result or inserted-element parameter does not
+preserve that contract. Heterogeneous arrays can use a represented union or
+explicit `Js.Any`; they do not justify an implicit conversion to an unrelated
+concrete type. Absence and out-of-bounds behavior remain separate obligations.
+
+The same rule applies to tuple positions, generic callbacks and state/action
+relationships. A coarse `Js`-resource classification is not evidence that these
+relationships were preserved. Unsupported generic translation must fail closed
+or remain an explicitly reported gap, not silently widen the declaration.
+
+Validation must use the upstream TypeScript type as an independent authority.
+Agreement between a handwritten protocol configuration and its generated Lean
+declaration proves consistency only; a reviewed `semantics: preserving` label
+does not itself prove type conformance. Regression tests for generic bindings
+must include rejected cross-type calls as well as accepted same-type calls.
+Runtime payload checks are a separate boundary defense, never a reason to
+accept an incorrectly typed binding.
+
+The current independent relationship check is deliberately small:
+`js-value-type-relationships.mjs` reads the descriptor's upstream `Array<T>`
+binder, numeric index signature and `push(...items: T[]): number` shape, then
+checks the configured receiver, item and result types before Lean emission.
+Missing provenance or an unsupported upstream relationship is an error for
+these operations, even with a `preserving` label. Mutation tests change both
+the configured Lean types and the upstream descriptor relationships.
+
+`Js.Array α` describes a native array of JavaScript shape `α`: insertion takes
+`Js α`, and indexing returns `Js α`. It cannot store a raw Lean `α`; Lean-owned
+payloads require explicit `JSL` boxing. There is no redundant inner `Js` in the
+array type. `Js.Array.push` selects the one-item arity of TypeScript's variadic method.
+`Js.Array.getJs` follows TypeScript's **unchecked** `[n: number]: T` declaration:
+holes and missing entries remain exact JavaScript `undefined`. It does not
+implement `noUncheckedIndexedAccess` or turn `undefined` into `null`.
+The separate `item` helper checks numeric bounds, not sparse-array membership.
+
+Native two-position tuples use `Js.Tuple2`, with typed `first` and `second`
+projections instead of an unconstrained array getter. React's `StateTuple` and
+`ReducerTuple` aliases retain their position types. These VIR-owned projections
+have a checked position contract and compile-time cross-type regressions; the
+React aliases are still authored, not inferred from React's TypeScript overloads.
+`NodeList.toArray` likewise has a checked VIR-owned representation contract:
+its input `Js.NodeList (Js α)` uses a full Lean-view parameter, while its output
+`Js.Array α` uses a JavaScript shape. This is not an upstream-derived NodeList
+generic translation.
+The selected Promise relationships below also have a bounded check. Other
+reviewed protocol operations do not yet receive an independent generic
+relationship check. These checks are not proof of all TypeScript semantics,
+callback invocation, or provider behavior.
+
+For VIR-owned dynamic `Object.get`, the same checker enforces an erased `Js.Any`
+result, not a caller-chosen result parameter. The closed `Js.String.fromAny`
+predicate has no type parameters and can return only `Js String`. These are
+explicit checked contracts with negative compile/configuration tests and native
+predicate tests, not derived evidence for arbitrary TypeScript indexed access.
+No generic narrowing from `Js.Any` to a `Js α` or `JSL α` is supplied.
+
+### Selected Promise Relationships
+
+The Promise bindings select explicit subsets of the pinned TypeScript
+declarations, keeping their generic results:
+
+| Lean operation | Selected TypeScript relationship |
+| --- | --- |
+| `thenValue` | `Promise<A>.then<B>` with a callback returning `B` |
+| `thenPromise` | `Promise<A>.then<B>` with a callback returning native `Promise<B>`, a `PromiseLike<B>` |
+| `thenValueWithRejection` | `then<B, B>` with both handlers returning `B`; `B \| B` is `B` |
+| `catchValue` | `Promise<A>.catch<A>` with recovery returning `A`; `A \| A` is `A` |
+| `thenVoid`, `thenVoidWithRejection` | handlers returning `undefined`, represented by `Unit` |
+
+Every rejection handler receives `Js.Any`: TypeScript's rejection `any` supplies
+no evidence for an arbitrary concrete error or Lean payload type. This boundary
+exposes it as an unknown JavaScript value requiring explicit narrowing.
+
+The generator verifies the upstream Promise binder, method parameters/defaults,
+handler inputs and `R | PromiseLike<R>` alternatives, and result union before
+checking the configured Lean types. Tests compile generic wrappers against the
+pinned TS library (including native Promise/PromiseLike compatibility), mutate
+upstream and configured relationships, and compile positive/negative Lean calls.
+These are selected-relationship checks, not a general TS subtype checker.
+Callback-local generic binders remain unsupported syntax rather than being
+erased into references to outer parameters. The descriptor permits compatible
+interface merging that adds a default, but the selected Array/Promise checks
+still reject defaults or constraints outside their supported relationships.
+
+These methods call native `.then`/`.catch` unchanged. **`thenValue` does not
+exclude promises or thenables.** Native resolution recursively assimilates
+returned thenables, including a previously ordinary object whose `then` changes.
+Explicit TS generic instantiation admits approximations too: a value wrapper can
+have static result `Promise<Promise<string>>` while native resolution settles to
+a string. VIR preserves that selected TS relationship rather than erasing every
+result or claiming to repair all upstream approximations.
+
+Full overload inference, optional-handler breadth, distinct branch unions and
+general PromiseLike/Awaited translation remain unsupported. A preserved TS
+relationship is not proof of actual settlement shape, foreign callback behavior
+or safe Lean heap recovery. Those payload obligations remain separate from
+binding fidelity; these checks do not authorize unchecked `JSL` recovery.
+
+### Reported Contract Claims
+
 Each generated binding operation records this separately from provider and
 reachability evidence:
 

@@ -87,8 +87,13 @@ handle; it does not await, poll, cancel, or translate the Promise.
 
 `Js.Promise.thenValue`, `thenPromise`, `thenVoid`, and `catchValue` call the
 corresponding native methods with exact `Js.Function1` values. The separate
-`then` forms expose direct-value, assimilated-Promise, and `undefined` result
-shapes rather than hiding JavaScript's `Awaited` behavior. They do not convert
+`then` forms select value-return, native-Promise-return, and `undefined` subsets
+of TypeScript's generic signatures. Value-return binders do not exclude
+thenables; native resolution assimilates them recursively. VIR does not compute
+`Awaited` or reproduce full overload inference. All rejection inputs, including
+`catchValue`, are `Js.Any`; recovery retains the input Promise's result type.
+See [Selected Promise Relationships](BINDING_MODALITIES.md#selected-promise-relationships)
+for the checked relationships and their limits. They do not convert
 Lean closures. An application that needs a Lean-authored continuation first
 calls the explicit `Js.Function.ofLean` or `ofLeanVoid` conversion. A native
 React state setter can instead be passed directly to `thenVoid`; the Promise's
@@ -99,7 +104,7 @@ call until the Promise settles.
 
 `thenValueWithRejection` and `thenVoidWithRejection` expose native
 `promise.then(onFulfilled, onRejected)` with both function objects unchanged.
-The value form selects a common non-Promise output shape for both handlers;
+The value form selects a common generic output shape for both handlers;
 the void form selects `undefined`. Neither is `then(onFulfilled).catch(onRejected)`:
 an exception thrown by the fulfillment handler rejects the chained Promise,
 without calling the sibling rejection handler.
