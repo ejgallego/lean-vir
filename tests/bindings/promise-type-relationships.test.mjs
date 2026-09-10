@@ -152,6 +152,47 @@ for (const [label, input, unsupportedPart, syntax] of [
   });
 }
 
+for (const [member, index, name, input, output, target] of [
+  ["Promise.then", 0, "value", "T", "TResult1", "js.promise.thenValue"],
+  ["Promise.then", 1, "reason", "any", "TResult2", "js.promise.thenValueWithRejection"],
+  ["Promise.catch", 0, "reason", "any", "TResult", "js.promise.catchValue"],
+]) {
+  test(`${member} callback ${index} distinguishes this from ordinary argument renaming`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lean-vir-promise-this-"));
+    try {
+      const path = join(directory, "lib.d.ts");
+      const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+      const original = `(${name}: ${input}) => ${output} | PromiseLike<${output}>`;
+      assert.ok(source.includes(original), "mutation must target the pinned callback");
+      const selected = { ...generation,
+        protocolOperations: generation.protocolOperations.filter((op) => op.target === target) };
+      for (const parameter of ["this", "ordinaryInput"]) {
+        const mutated = source.replaceAll(original,
+          `(${parameter}: ${input}) => ${output} | PromiseLike<${output}>`);
+        await writeFile(path, mutated);
+        const upstream = await generateDescriptorFile({
+          files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+          symbols: new Set(["Promise"]), symbolFiles: [], sourceUrl: null,
+          dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+        });
+        const handler = upstream.symbols.find((symbol) => symbol.id === member).shape.args[index].type.element;
+        assert.equal(handler.args[0].name, parameter);
+        const errors = diagnostics(wrappers, mutated);
+        if (parameter === "this") {
+          assert.throws(() => render(selected, upstream), /callback this parameters are not supported/u);
+          assert.ok(errors.some((d) => d.code === 2345 && d.file?.text === wrappers),
+            "TS rejects a required unary callback where this supplies no ordinary argument");
+        } else {
+          assert.equal(render(selected, upstream), render(selected));
+          assert.deepEqual(errors, [], "ordinary argument names do not affect the contract");
+        }
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
+
 test("upstream binder renaming and union ordering do not change the translation", () => {
   const rename = (value) => {
     if (Array.isArray(value)) return value.map(rename);

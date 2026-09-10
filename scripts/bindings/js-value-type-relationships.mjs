@@ -220,6 +220,9 @@ function checkPromiseDeclaration(symbols, member, require) {
     shape.args.length === (catching ? 1 : 2), "unexpected upstream method arity or overloads");
   const handler = (argument, input, output) => {
     const fn = argument?.type?.element;
+    // TypeScript's explicit this describes the receiver, not a runtime argument.
+    require(!fn?.args?.some((arg) => arg.name === "this"),
+      "upstream callback this parameters are not supported");
     return argument?.optional && !argument.rest && argument.type.kind === "option" &&
       argument.type.absence === "nullish" && fn?.kind === "function" && fn.effect === "pure" &&
       fn.args.length === 1 && !fn.args[0].optional && !fn.args[0].rest && input(fn.args[0].type) &&
