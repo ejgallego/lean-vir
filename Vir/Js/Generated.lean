@@ -92,6 +92,60 @@ end Js.Array
 namespace Js.Function
 
 /--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary`.
+
+Explicitly converts a transferred Lean unary callback into an ordinary JavaScript function with the same call shape.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.unary"]
+opaque ofLean
+    {α : Type}
+    {β : Type}
+    (callback : Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary-void`.
+
+Explicitly converts a transferred Lean unary callback with a discarded result into an ordinary JavaScript function.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.unaryVoid"]
+opaque ofLeanVoid
+    {α : Type}
+    (callback : Lean.Vir.Js α → RuntimeM Unit) :
+    RuntimeM (Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call`.
+
+Calls an exact unary JavaScript function with one exact JavaScript argument and returns its exact JavaScript result.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call"]
+opaque call
+    {α : Type}
+    {β : Type}
+    (function : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+    (argument : @& Lean.Vir.Js α) :
+    RuntimeM (Lean.Vir.Js β)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.function.call-void`.
 
 Calls the exact JavaScript function with one exact JavaScript argument and discards its void result.
@@ -104,9 +158,8 @@ This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.function.callVoid"]
 opaque callVoid
-    {fn : Type}
     {α : Type}
-    (function : @& Lean.Vir.Js fn)
+    (function : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit)
     (argument : @& Lean.Vir.Js α) :
     RuntimeM Unit
 
@@ -274,7 +327,144 @@ opaque set
     (value : @& Lean.Vir.Js α) :
     RuntimeM Unit
 
+/--
+Generated binding for reviewed VIR protocol `javascript.object.get`.
+
+Reads an exact property value from an ordinary JavaScript object without decoding or copying it.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.object.get"]
+opaque get
+    {object : Type}
+    {α : Type}
+    (object : @& Lean.Vir.Js object)
+    (name : @& Lean.Vir.Js String) :
+    RuntimeM (Lean.Vir.Js α)
+
 end Js.Object
+
+namespace Js.Promise
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-value`.
+
+Calls native Promise.then with an exact callback returning a direct non-Promise JavaScript value and returns the exact chained Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenValue"]
+opaque thenValue
+    {α : Type}
+    {β : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Promise β)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-promise`.
+
+Calls native Promise.then with an exact callback returning a native Promise and exposes JavaScript's assimilated chained Promise type.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenPromise"]
+opaque thenPromise
+    {α : Type}
+    {β : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js.Promise β)) :
+    RuntimeM (Lean.Vir.Js.Promise β)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-void`.
+
+Calls native Promise.then with an exact JavaScript callback whose result is undefined and returns the exact chained Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenVoid"]
+opaque thenVoid
+    {α : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit) :
+    RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-value-with-rejection`.
+
+Calls native Promise.then with both exact handlers and returns its exact chained Promise. Both handlers return a direct non-Promise value of the same selected shape; rejection values remain unknown JavaScript values. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenValueWithRejection"]
+opaque thenValueWithRejection
+    {α : Type}
+    {β : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Promise β)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.then-void-with-rejection`.
+
+Calls native Promise.then with both exact handlers returning undefined and returns its exact chained Promise. The rejection handler handles the input Promise's rejection, not exceptions thrown by the fulfillment handler; no callback conversion or error swallowing is added.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.thenVoidWithRejection"]
+opaque thenVoidWithRejection
+    {α : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onFulfilled : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) Unit)
+    (onRejected : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit) :
+    RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.promise.catch-value`.
+
+Calls native Promise.catch with an exact callback recovering to the Promise's direct JavaScript value type and returns the exact recovered Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.promise.catchValue"]
+opaque catchValue
+    {α : Type}
+    {error : Type}
+    (promise : @& Lean.Vir.Js.Promise α)
+    (onRejected : @& Lean.Vir.Js.Function1 (Lean.Vir.Js error) (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js.Promise α)
+
+end Js.Promise
 
 namespace JsValue
 

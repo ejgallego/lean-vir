@@ -11,10 +11,22 @@ export function createJsCollectionHostBindings() {
       object[name] = value;
       return undefined;
     },
+    "js.object.get": (object, name) => object[name],
+    "js.value.function.unary": (callback) => callback,
+    "js.value.function.unaryVoid": (callback) => callback,
+    "js.function.call": (fn, argument) => fn(argument),
     "js.function.callVoid": (fn, argument) => {
       fn(argument);
       return undefined;
     },
+    "js.promise.thenValue": (promise, onFulfilled) => promise.then(onFulfilled),
+    "js.promise.thenPromise": (promise, onFulfilled) => promise.then(onFulfilled),
+    "js.promise.thenVoid": (promise, onFulfilled) => promise.then(onFulfilled),
+    "js.promise.thenValueWithRejection": (promise, onFulfilled, onRejected) =>
+      promise.then(onFulfilled, onRejected),
+    "js.promise.thenVoidWithRejection": (promise, onFulfilled, onRejected) =>
+      promise.then(onFulfilled, onRejected),
+    "js.promise.catchValue": (promise, onRejected) => promise.catch(onRejected),
     "js.array.empty": () => [],
     "js.array.push": (array, value) => array.push(value),
     "js.array.length": (array) => array.length,

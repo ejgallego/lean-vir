@@ -1,0 +1,445 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+import * as React from "react";
+import { createRoot } from "react-dom/client";
+import { RpcSessions } from "@leanprover/infoview-api";
+import VirInfoviewWidget from "../../web/app/vir-infoview-widget.js";
+import { describeError, until, withCleanup } from "./rpc-test-support.js";
+
+const prefix = "Vir.Fixtures.ShellLifetime.";
+const states = [];
+const check = (condition, label) => {
+  if (!condition) throw new Error(label);
+};
+async function post(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const value = await response.json();
+  if (value.error) throw value.error;
+  return value.result;
+}
+
+// Test observations only. Stale state, body entry, and the conditional mutation
+// all execute in the unchanged interpreted ShellLifetime Lean fixture.
+globalThis.__rpcShell = {
+  session: null,
+  observe(options) {
+    const state = { label: `G${states.length + 1}`, events: [] };
+    states.push(state);
+    return {
+      state,
+      options: {
+        ...options,
+        defaultHostBindings: () =>
+          Object.assign(options.defaultHostBindings(), {
+            "test.shell.label": () => state.label,
+            "test.shell.record": (event) => {
+              state.events.push(event);
+            },
+            "test.shell.capture": (success, failure, schedule, payload) => {
+              state.captured = { success, failure, schedule, payload };
+            },
+          }),
+      },
+    };
+  },
+  created(runtime, state) {
+    state.runtime = runtime;
+  },
+};
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.rpcAcceptance = run().then(
+  (value) => ({ ok: true, value }),
+  (error) => ({ ok: false, error: describeError(error) }),
+);
+
+async function run() {
+  const config = await (await fetch("/config")).json();
+  const unexpected = [],
+    calls = [],
+    tasks = [],
+    notifications = new Set();
+  const onError = (event) => unexpected.push(event.error ?? event.message);
+  const onUnhandled = (event) => unexpected.push(event.reason);
+  globalThis.addEventListener("error", onError);
+  globalThis.addEventListener("unhandledrejection", onUnhandled);
+  const notify = (path, body) => {
+    const task = post(path, body).catch((error) => unexpected.push(error));
+    notifications.add(task);
+    void task.then(() => notifications.delete(task));
+  };
+  let nextId = 0,
+    sessions,
+    root;
+  const container = document.getElementById("app");
+  const tick = () =>
+    React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  async function waitFor(label, predicate) {
+    await until(label, async () => {
+      await tick();
+      return predicate();
+    });
+  }
+  const gate = (action, message) => post("/gate", { action, message });
+  const unmountUI = () => React.act(async () => root.render(null));
+
+  return withCleanup(async () => {
+    sessions = new RpcSessions({
+      async createRpcSession() {
+        return (await post("/connect", {})).sessionId;
+      },
+      closeRpcSession(sessionId) {
+        notify("/close", { sessionId });
+      },
+      release(params) {
+        notify("/release", params);
+      },
+      async call(params, options) {
+        const id = ++nextId,
+          call = { id, params };
+        calls.push(call);
+        const signal = options?.abortSignal;
+        const cancel = () => {
+          call.cancelled = true;
+          notify("/cancel", { id });
+        };
+        signal?.addEventListener("abort", cancel, { once: true });
+        if (signal?.aborted) cancel();
+        try {
+          call.value = await post("/call", { id, params });
+          return call.value;
+        } catch (error) {
+          call.error = error;
+          throw error;
+        } finally {
+          call.settled = true;
+          signal?.removeEventListener("abort", cancel);
+        }
+      },
+    });
+    const sessionAt = (position) =>
+      sessions.connect(
+        { textDocument: { uri: config.uri }, position },
+        config.capabilities,
+      );
+    const a = sessionAt(config.a),
+      b = sessionAt(config.b);
+    check(
+      a === sessionAt(config.a) && a !== b,
+      "official position-specific sessions",
+    );
+    root = createRoot(container, {
+      onUncaughtError: (error) => unexpected.push(error),
+    });
+    const roots = [prefix + "createComponent", prefix + "mount"];
+    async function mount(session, position, entries = roots) {
+      globalThis.__rpcShell.session = session;
+      const count = states.length;
+      await React.act(async () =>
+        root.render(
+          React.createElement(VirInfoviewWidget, {
+            wasmPath: "web/public/vir-upstream.wasm",
+            irPackage: { roots: entries },
+            componentEntry: prefix + "createComponent",
+            entry: prefix + "mount",
+            pos: { uri: config.uri, ...position },
+            autoReloadMs: 0,
+          }),
+        ),
+      );
+      await waitFor("real-server shell ready", () => {
+        const error = container.querySelector(
+          '[data-vir-infoview-state="error"]',
+        );
+        if (error) throw new Error(error.textContent);
+        return (
+          states.length === count + 1 &&
+          states.at(-1).events.includes(`setup:${states.at(-1).label}`) &&
+          container.querySelector('[data-vir-infoview-state="ready"]')
+        );
+      });
+      return states.at(-1);
+    }
+    async function begin(state, session, kind, suffix, held = true) {
+      const message = `${state.label}:${kind}:${suffix}`;
+      if (held) await gate("arm", message);
+      const abort = new AbortController();
+      const promise = session.call(
+        "RpcBrowserServer.create",
+        {
+          message,
+          fail: kind === "failure",
+          waitForCancellation: false,
+        },
+        { abortSignal: abort.signal },
+      );
+      const task = { message, kind, state, abort, held };
+      tasks.push(task);
+      // Attach the exact Lean functions directly to the real native RPC Promise.
+      // Only the chained outcome observer below is JavaScript-authored.
+      task.done = promise
+        .then(state.captured.success, state.captured.failure)
+        .then(
+          () => {
+            task.completed = true;
+          },
+          (error) => {
+            task.bridgeError = error;
+            task.completed = true;
+          },
+        );
+      if (held) {
+        await until(`actual server outcome held: ${message}`, () =>
+          gate("status", message),
+        );
+        check(
+          !task.completed,
+          "Lean continuation is still pending behind actual server outcome gate",
+        );
+      }
+      return task;
+    }
+    const serverCall = (task) =>
+      calls.find((call) => call.params.params?.message === task.message);
+    async function release(task, stale, hard = false) {
+      const before = task.state.events.length;
+      await React.act(async () => {
+        if (task.held) await gate("open", task.message);
+        await task.done;
+      });
+      const call = serverCall(task);
+      check(call?.settled, "real transport outcome observed");
+      if (task.kind === "success") {
+        check(
+          call.value?.message === task.message && call.value.ref,
+          "genuine WithRpcRef reply",
+        );
+      } else {
+        check(
+          call.error?.code === -32602 &&
+            /RPC example rejection/.test(call.error.message),
+          "genuine server rejection preserved",
+        );
+      }
+      if (hard) {
+        check(
+          /disposed runtime/.test(task.bridgeError?.message),
+          "hard disposal rejects before Lean entry",
+        );
+        check(
+          task.state.events.length === before,
+          "no Lean body entry after hard disposal",
+        );
+      } else {
+        check(
+          !task.bridgeError,
+          JSON.stringify(describeError(task.bridgeError)),
+        );
+        const expected = [
+          `body:${task.kind}:${task.state.label}`,
+          `${stale ? "stale" : "mutation"}:${task.kind}:${task.state.label}`,
+        ];
+        // Ungated controls may settle before this function; still require one
+        // exact body/branch pair for each kind in that generation.
+        check(
+          expected.every(
+            (event) =>
+              task.state.events.filter((value) => value === event).length === 1,
+          ),
+          `original Lean body and branch: ${expected.join(", ")}`,
+        );
+        if (task.held)
+          check(
+            JSON.stringify(task.state.events.slice(before)) ===
+              JSON.stringify(expected),
+            "held outcome enters exactly one body/branch pair after release",
+          );
+        if (stale)
+          check(
+            !task.state.events.some((event) => event.startsWith("mutation:")),
+            "stale generation never takes the mutation branch",
+          );
+      }
+    }
+    async function pendingPair(state, session, suffix) {
+      return [
+        await begin(state, session, "success", suffix),
+        await begin(state, session, "failure", suffix),
+      ];
+    }
+
+    const first = await mount(a, config.a);
+    const unmounted = await pendingPair(first, a, "unmount");
+    await unmountUI();
+    check(
+      !first.runtime.disposed && first.events.includes("cleanup:G1"),
+      "UI cleanup preserves runtime",
+    );
+    for (const task of unmounted) {
+      task.abort.abort();
+      await release(task, true);
+    }
+    const reply = serverCall(unmounted[0]).value;
+    check(
+      (await a.call("RpcBrowserServer.read", { ref: reply.ref })) ===
+        unmounted[0].message,
+      "exact server reference remains usable after original UI cleanup",
+    );
+
+    const previous = await mount(a, config.a);
+    const refreshed = await pendingPair(
+      previous,
+      a,
+      "configuration-replacement",
+    );
+    const current = await mount(b, config.b, [...roots].reverse());
+    check(
+      previous.runtime !== current.runtime &&
+        !previous.runtime.disposed &&
+        previous.events.includes("cleanup:G2"),
+      "configuration replacement keeps distinct original generation",
+    );
+    for (const task of refreshed) {
+      task.abort.abort();
+      await release(task, true);
+    }
+    for (const kind of ["success", "failure"]) {
+      const task = await begin(current, b, kind, "live", false);
+      await release(task, false);
+    }
+
+    const stopped = await pendingPair(current, b, "hard-dispose");
+    await unmountUI();
+    check(
+      !current.runtime.disposed && current.events.includes("cleanup:G3"),
+      "normal cleanup before explicit shutdown",
+    );
+    current.runtime.dispose();
+    check(
+      current.runtime.liveCallbacks.size === 0,
+      "hard disposal releases Lean closure roots",
+    );
+    for (const task of stopped) await release(task, true, true);
+    check(states.length === 3, "three exact shell generations");
+    check(
+      calls.filter(
+        (call) => call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+      ).length === 3,
+      "all three packages came from actual server snapshots",
+    );
+    check(
+      calls.some(
+        (call) => call.params.method === "Lean.Vir.Infoview.readAsset",
+      ),
+      "actual server supplies Wasm asset",
+    );
+
+    const packages = await Promise.all(
+      calls
+        .filter(
+          (call) => call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+        )
+        .map(async (call) => {
+          const bytes = Uint8Array.from(atob(call.value.dataBase64), (char) =>
+            char.charCodeAt(0),
+          );
+          const digest = await crypto.subtle.digest("SHA-256", bytes);
+          return {
+            revision: call.value.revision,
+            byteSize: bytes.length,
+            sha256: [...new Uint8Array(digest)]
+              .map((x) => x.toString(16).padStart(2, "0"))
+              .join(""),
+          };
+        }),
+    );
+    return {
+      generations: states.map((state) => ({
+        label: state.label,
+        events: state.events,
+      })),
+      outcomes: tasks.map((task) => ({
+        message: task.message,
+        rpcCode: serverCall(task).error?.code,
+        cancelled: !!serverCall(task).cancelled,
+        bridgeError: task.bridgeError?.message ?? null,
+      })),
+      packages,
+    };
+  }, [
+    [
+      "held outcomes",
+      async () => {
+        for (const task of tasks)
+          if (task.held) await gate("open", task.message);
+      },
+    ],
+    [
+      "React root",
+      async () => {
+        if (root) await React.act(async () => root.unmount());
+      },
+    ],
+    [
+      "continuations",
+      async () => {
+        await Promise.all(tasks.map((task) => task.done));
+      },
+    ],
+    [
+      "runtimes",
+      () =>
+        withCleanup(
+          async () => {},
+          states.map((state) => [state.label, () => state.runtime?.dispose()]),
+        ),
+    ],
+    ["RPC sessions", () => sessions?.dispose()],
+    [
+      "notifications",
+      async () => {
+        await Promise.resolve();
+        while (notifications.size) await Promise.all(notifications);
+      },
+    ],
+    [
+      "browser errors",
+      async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        globalThis.removeEventListener("error", onError);
+        globalThis.removeEventListener("unhandledrejection", onUnhandled);
+        check(
+          unexpected.length === 0,
+          JSON.stringify(unexpected.map(describeError)),
+        );
+        const deliberateFailures = new Set(
+          tasks
+            .filter((task) => task.kind === "failure")
+            .map((task) => task.message),
+        );
+        const failures = calls.filter(
+          (call) =>
+            call.error &&
+            !(
+              call.params.method === "RpcBrowserServer.create" &&
+              deliberateFailures.has(call.params.params?.message) &&
+              call.error.code === -32602
+            ),
+        );
+        check(
+          failures.length === 0,
+          `unexpected RPC failures: ${JSON.stringify(failures)}`,
+        );
+      },
+    ],
+  ]);
+}

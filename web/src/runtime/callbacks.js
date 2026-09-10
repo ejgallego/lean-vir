@@ -9,7 +9,10 @@ import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 const callbackRoots = new WeakMap();
 const callbackFinalizer =
   typeof FinalizationRegistry === "function"
-    ? new FinalizationRegistry((root) => finalizeCallbackRoot(root))
+    ? new FinalizationRegistry((weakRoot) => {
+        const root = weakRoot.deref();
+        if (root !== undefined) finalizeCallbackRoot(root);
+      })
     : null;
 
 export function createVirCallback(runtime, rootId, type) {
@@ -28,7 +31,10 @@ export function createVirCallback(runtime, rootId, type) {
     return root.runtime.callClosure(root.rootId, root.type, args);
   };
   callbackRoots.set(callback, root);
-  callbackFinalizer?.register(callback, root, root);
+  // The target strongly owns root/runtime; liveCallbacks keeps the cleanup
+  // record while the runtime is owned. Global metadata must not root the
+  // generation through its externref table back to this target.
+  callbackFinalizer?.register(callback, new WeakRef(root), root);
   runtime.trackCallback(root);
   return callback;
 }

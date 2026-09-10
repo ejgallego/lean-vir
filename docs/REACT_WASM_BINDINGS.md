@@ -81,9 +81,11 @@ values, plus explicit root teardown.
 
 ## Future Wasm Features
 
-JS Promise Integration should wait for a concrete asynchronous Lean API.
-Promise-returning host imports do not fit the current synchronous interpreter
-transaction and should eventually use a distinct async call surface.
+Native Promise objects may cross the synchronous boundary as exact `Js`
+resources and use their ordinary `then`/`catch` methods. JS Promise Integration
+should wait for a concrete API that suspends Lean execution; such suspension
+does not fit the current interpreter transaction and should eventually use a
+distinct async call surface.
 
 The Component Model and WIT remain useful long-term directions for typed
 resources and values, but the current core module should not emulate their

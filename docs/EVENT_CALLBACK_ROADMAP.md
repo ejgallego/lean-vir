@@ -17,7 +17,8 @@ reachable. A `FinalizationRegistry` releases the Lean root after collection as
 a best-effort backstop. Runtime disposal releases all still-live closure roots
 deterministically and makes subsequent callback calls fail.
 
-Host imports remain synchronous. Returning a Promise is an error. Asynchronous
+Host imports remain synchronous. A Promise may cross only as an exact `Js`
+resource; VIR never awaits it in the host dispatcher. Asynchronous
 work starts by registering a callback and returning an explicit cancellation
 value or success result.
 
@@ -65,8 +66,9 @@ The runtime suite covers:
 
 ## Remaining Work
 
-- Keep async host imports out of the synchronous dispatcher until there is a
-  concrete JSPI or task-queue design.
+- Keep Lean-suspending async host imports out of the synchronous dispatcher
+  until there is a concrete JSPI or task-queue design. Passing a native Promise
+  as an exact `Js` value does not suspend the dispatcher.
 - Add event conveniences only as explicitly named Lean adapters; do not change
   the underlying event value.
 - Optimize closure-root allocation only if profiling shows it matters.

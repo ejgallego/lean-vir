@@ -173,6 +173,14 @@ end ElementCSSInlineStyle
 
 namespace Element
 
+/-- Checks whether an erased JavaScript value is a browser `Element`. -/
+def fromAny (value : @& Lean.Vir.Js.Any) : DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromAnyNullable value)
+
+instance : Lean.Vir.Js.Cast DomM Element where
+  expected := "Element"
+  check := fromAny
+
 /-- Converts a Lean selector before calling the faithful `Element.querySelector` binding. -/
 def querySelectorString
     (element : @& Lean.Vir.Js Element)

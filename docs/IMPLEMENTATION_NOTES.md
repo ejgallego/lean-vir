@@ -102,9 +102,11 @@ point installs only environment-neutral JavaScript-value and console bindings;
 DOM and React packages require an explicit real host. Root rerender, unmount,
 package reload, and runtime disposal reuse the exact-value and callback
 lifetime model.
-Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
-Lean infoview RPC compatibility remains follow-up work tracked in
-`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
+Current standalone React Node status is tracked in `docs/REACT_NODE.md`. The
+first direct infoview RPC boundary now passes the exact position-specific
+session, native Promise, request, and response objects; real server-method,
+cancellation, and server-reference fixtures remain tracked in
+`docs/PROOFWIDGETS_RPC_COMPATIBILITY.md`.
 
 `Lean.Vir.JSL α` uses an ordinary JavaScript object whose out-of-band state owns
 one retained Lean object pointer. JavaScript reachability, not carrier

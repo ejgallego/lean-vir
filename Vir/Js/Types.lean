@@ -43,6 +43,46 @@ end Any
 abbrev Any : Type :=
   Lean.Vir.Js Any.Value
 
+namespace Undefined
+
+/-- Phantom shape for the exact JavaScript `undefined` value. -/
+opaque Value : Type
+
+end Undefined
+
+/-- JavaScript-owned `undefined` value. -/
+abbrev Undefined : Type :=
+  Lean.Vir.Js Undefined.Value
+
+namespace Function
+
+/--
+Phantom shape for an exact unary JavaScript function.
+
+`argument` and `result` describe the Lean boundary views used when the
+function is called; this marker does not wrap the JavaScript function or make
+its signature dynamically inspectable.
+-/
+opaque Unary (argument result : Type) : Type
+
+end Function
+
+/-- Exact unary JavaScript function with a statically described call shape. -/
+abbrev Function1 (argument result : Type) : Type :=
+  Lean.Vir.Js (Function.Unary argument result)
+
+/-- Runtime implementation of `Js.erase`; public so module importers can compile it. -/
+@[inline] unsafe def eraseImpl {α : Type}
+    (value : Lean.Vir.Js α) : Lean.Vir.Js.Any :=
+  unsafeCast value
+
+/--
+Forgets the phantom shape of a JavaScript value without changing its value,
+identity, root, or lifetime.
+-/
+@[implemented_by eraseImpl]
+axiom erase {α : Type} (value : Lean.Vir.Js α) : Lean.Vir.Js.Any
+
 namespace Nullable
 
 /-- Phantom marker for a JavaScript nullable value. -/
@@ -75,6 +115,17 @@ end NodeList
 /-- JavaScript-owned DOM `NodeList`. The parameter describes the Lean view returned by indexing. -/
 abbrev NodeList (α : Type) : Type :=
   Lean.Vir.Js (NodeList.Value α)
+
+namespace Promise
+
+/-- Phantom shape for a native JavaScript `Promise` whose fulfillment value has Lean view `α`. -/
+opaque Value (α : Type) : Type
+
+end Promise
+
+/-- JavaScript-owned native `Promise`; VIR does not await or schedule it. -/
+abbrev Promise (α : Type) : Type :=
+  Lean.Vir.Js (Promise.Value α)
 
 end Js
 

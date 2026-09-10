@@ -30,6 +30,8 @@
       }
     },
     "resources": {
+      "AbortController": "AbortController",
+      "AbortSignal": "AbortSignal",
       "CanvasRenderingContext2D": "CanvasRenderingContext2D",
       "Console": "Console",
       "CSSStyleDeclaration": "CSSStyleDeclaration",
@@ -45,6 +47,11 @@
       "TextMetrics": "TextMetrics"
     },
     "methodPolicies": {
+      "AbortController.abort": {
+        "omittedOptionalParameters": ["reason"],
+        "semantics": "preserving",
+        "reason": "Omitting the optional reason selects native AbortController.abort() and its default AbortError; custom reasons remain a coverage gap."
+      },
       "CanvasRenderingContext2D.arc": {
         "omittedOptionalParameters": ["counterclockwise"],
         "semantics": "preserving",
@@ -317,6 +324,15 @@
     },
     "protocolOperations": [
       {
+        "id": "browser.abortController.create", "group": "abort-controller", "target": "browser.abortController.create",
+        "lean": "Lean.Vir.Browser.AbortController.create", "marker": "vir_js",
+        "reason": "Calls new AbortController() and returns the exact controller. The generator derives methods and properties but does not lower TypeScript construct signatures, so only construction is declared explicitly.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "AbortController", "semantics": "preserving" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js AbortController", "representation": "js-resource", "resourceInner": "AbortController" } }
+      },
+      {
         "id": "browser.console.current", "group": "console", "target": "browser.console.current",
         "lean": "Lean.Vir.Browser.Console.current", "marker": "vir_js",
         "reason": "Returns the host-global Console as an exact JavaScript value; this is explicit environment access rather than an implicit receiver adapter.",
@@ -333,6 +349,17 @@
         "effect": { "id": "dom", "lean": "DomM" },
         "arguments": [],
         "result": { "type": { "lean": "Lean.Vir.Js Document", "representation": "js-resource", "resourceInner": "Document" } }
+      },
+      {
+        "id": "browser.element.from-any", "group": "element", "target": "browser.element.fromAny",
+        "lean": "Lean.Vir.Browser.Element.fromAnyNullable", "marker": "vir_js",
+        "reason": "Checks an erased JavaScript value with the browser Element brand and preserves the exact JavaScript identity on success.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "dom", "lean": "DomM" },
+        "arguments": [
+          { "name": "value", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Nullable Element", "representation": "js-resource", "resourceInner": "Element" } }
       },
       {
         "id": "browser.event-target.as-element", "group": "event", "target": "browser.eventTarget.asElement",
@@ -530,6 +557,19 @@
     ]
   },
   "roots": [
+    {
+      "id": "abort-controller",
+      "title": "Abort controller",
+      "targets": ["browser.abortController.*"],
+      "lean": { "public": ["Lean.Vir.Browser.AbortController", "Lean.Vir.Browser.AbortSignal"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "version": "6.0.3", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "sourceUrl": "https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts", "roots": ["AbortController", "AbortSignal"] },
+      "mappings": [
+        { "typescript": "AbortController.abort", "targets": ["browser.abortController.abort"], "lean": ["Lean.Vir.Browser.AbortController.abort"], "receiverName": "controller" },
+        { "typescript": "AbortController.signal", "accessors": {
+          "get": { "target": "browser.abortController.getSignal", "lean": "Lean.Vir.Browser.AbortController.getSignal" }
+        } }
+      ]
+    },
     {
       "id": "animation",
       "title": "Animation frames",

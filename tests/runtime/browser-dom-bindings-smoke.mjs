@@ -10,9 +10,36 @@ import {
   createBrowserDocumentHostBindings,
   createBrowserElementHostBindings,
   createBrowserEventHostBindings,
+  createBrowserHostBindings,
   createConsoleHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import { createDOMTokenListHostBindings } from "../../web/src/host/vir-dom-host-bindings.js";
+import { VIR_HOST_DISPOSE } from "../../web/src/host-boundary.js";
+
+// Node supplies its own native AbortController: no simulated cancellation host.
+{
+  const bindings = createBrowserHostBindings();
+  const controller = bindings["browser.abortController.create"]();
+  assert.ok(controller instanceof AbortController);
+  const signal = bindings["browser.abortController.getSignal"](controller);
+  assert.equal(signal, controller.signal);
+  let aborted = 0;
+  signal.addEventListener("abort", () => aborted++);
+  assert.equal(bindings["browser.abortController.abort"](controller), undefined);
+  assert.equal(signal.aborted, true);
+  assert.equal(signal.reason.name, "AbortError");
+  const reason = signal.reason;
+  bindings["browser.abortController.abort"](controller);
+  assert.equal(signal.reason, reason);
+  assert.equal(aborted, 1);
+  assert.equal(bindings["browser.abortController.getSignal"](controller), signal);
+
+  const passive = bindings["browser.abortController.create"]();
+  bindings[VIR_HOST_DISPOSE]();
+  assert.equal(passive.signal.aborted, false, "disposal must not cancel native controllers");
+  passive.abort();
+  assert.equal(passive.signal.aborted, true);
+}
 
 const calls = [];
 const consoleCalls = [];
@@ -131,15 +158,8 @@ const eventBindings = createBrowserEventHostBindings();
 const tokenBindings = createDOMTokenListHostBindings();
 const listener = () => undefined;
 
-const previousElement = Object.getOwnPropertyDescriptor(globalThis, "Element");
-class TestElement {}
-Object.defineProperty(globalThis, "Element", {
-  configurable: true,
-  writable: true,
-  value: TestElement,
-});
-try {
-  const elementTarget = new TestElement();
+{
+  const elementTarget = {};
   const nonElementTarget = {};
   assert.equal(
     eventBindings["browser.event.target"]({ target: elementTarget }),
@@ -151,20 +171,28 @@ try {
     }),
     nonElementTarget,
   );
-  assert.equal(
-    eventBindings["browser.eventTarget.asElement"](elementTarget),
-    elementTarget,
-  );
+  // Node has no native Element brand. Success and cross-realm cases run in Chromium.
   assert.equal(
     eventBindings["browser.eventTarget.asElement"](nonElementTarget),
     null,
   );
-} finally {
-  if (previousElement) {
-    Object.defineProperty(globalThis, "Element", previousElement);
-  } else {
-    delete globalThis.Element;
-  }
+  assert.equal(
+    elementBindings["browser.element.fromAny"](elementTarget),
+    null,
+  );
+  assert.equal(
+    elementBindings["browser.element.fromAny"]("not an element"),
+    null,
+  );
+  const hostileValue = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("hostile property access");
+      },
+    },
+  );
+  assert.equal(elementBindings["browser.element.fromAny"](hostileValue), null);
 }
 
 assert.equal(

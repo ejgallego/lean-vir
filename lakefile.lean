@@ -44,7 +44,8 @@ lean_lib VirInfoview where
 lean_lib VirExamples where
   srcDir := "examples"
   roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort, `HostInterop,
-    `Tamagotchi, `ReactProofWidget, `tutorials.ReactProofWidgetHello]
+    `Tamagotchi, `ReactProofWidget, `tutorials.ReactProofWidgetHello,
+    `tutorials.RpcReferenceWidget]
 
 /-- Authored browser fixtures; paths are preserved for source navigation. -/
 lean_lib VirBrowserFixtures where
@@ -63,6 +64,11 @@ lean_lib VirModuleFixtures where
 lean_lib VirInfoviewFixtures where
   srcDir := "fixtures/infoview"
   roots := #[`InfoviewFixtures.ImportedHelper]
+
+/-- Non-default runtime fixtures acquired through complete compiled modules. -/
+lean_lib VirRuntimeFixtures where
+  srcDir := "fixtures/runtime"
+  roots := #[`ShellLifetime, `InfoviewRpcPromise]
 
 /-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
 lean_lib VirTypeAnchorFixtures where

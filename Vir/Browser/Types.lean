@@ -84,11 +84,18 @@ opaque Event : Type
 /-- Exact browser `EventTarget` value returned by event properties. -/
 opaque EventTarget : Type
 
+/-- Exact native abort controller; cancellation remains caller-managed. -/
+opaque AbortController : Type
+
+/-- Exact native signal returned by an abort controller. -/
+opaque AbortSignal : Type
+
 /-- Exact browser `KeyboardEvent`; VIR adds no callback-local wrapper or lifetime restriction. -/
 opaque KeyboardEvent : Type
 
 /-- Exact JavaScript function value accepted by the DOM event-listener APIs. -/
-opaque EventListener : Type
+abbrev EventListener : Type :=
+  Lean.Vir.Js.Function.Unary (Lean.Vir.Js Event) Unit
 
 /-- Browser `HTMLInputElement` object class. -/
 opaque HTMLInputElement : Type

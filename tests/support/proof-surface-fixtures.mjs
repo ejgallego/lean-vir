@@ -4,7 +4,15 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export function createProofSurfaceFixture() {
+const unavailableRpcSession = Object.freeze({
+  call() {
+    throw new Error("proof-surface fixture RPC session was not configured");
+  },
+});
+
+export function createProofSurfaceFixture({
+  rpcSession = unavailableRpcSession,
+} = {}) {
   return {
     position: "ReactProofWidget.lean:42:7",
     cursor: {
@@ -62,7 +70,7 @@ export function createProofSurfaceFixture() {
     selections: [
       { id: "location-main-0", kind: "location", label: "main" },
     ],
-    proofWidgetsExpr: null,
+    rpcSession,
   };
 }
 

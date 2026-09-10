@@ -25,6 +25,12 @@ export const runtimeTests = Object.freeze(
     { id: "host-bindings", file: "host-bindings-smoke.mjs", group: "pure" },
     { id: "host-boundary", file: "host-boundary-smoke.mjs", group: "pure" },
     {
+      id: "generation-gc",
+      file: "generation-gc-smoke.mjs",
+      group: "pure",
+      nodeArgs: ["--expose-gc"],
+    },
+    {
       id: "js-value-gc",
       file: "js-value-gc-smoke.mjs",
       group: "pure",
@@ -102,6 +108,11 @@ export const runtimeTests = Object.freeze(
     {
       id: "slides-canvas",
       file: "slides-canvas-runtime-smoke.mjs",
+      group: "lean",
+    },
+    {
+      id: "infoview-rpc-promise",
+      file: "infoview-rpc-promise-smoke.mjs",
       group: "lean",
     },
     {
