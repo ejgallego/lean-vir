@@ -559,7 +559,10 @@ function interfaceMemberSymbols(node, sourceFile, prefix) {
         member,
         sourceFile,
         functionShape(member.parameters, member.type, sourceFile, prefix),
-        { typeParameters: typeParameters(member, sourceFile, prefix) },
+        {
+          typeParameters: typeParameters(member, sourceFile, prefix),
+          ...(member.questionToken !== undefined ? { optional: true } : {}),
+        },
       ));
     } else if (ts.isPropertySignature(member) && member.type !== undefined) {
       const shape = normalizeTypeNode(member.type, sourceFile, prefix);

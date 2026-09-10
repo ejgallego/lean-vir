@@ -19,6 +19,14 @@ const generation = {
 const render = (policy = generation) => renderLeanBindings(config, policy, new Map());
 const operation = (policy, target) => policy.protocolOperations.find((entry) => entry.target === target);
 
+test("a receiver type parameter cannot capture the fixed String key type", () => {
+  const policy = structuredClone(generation);
+  const op = operation(policy, "js.object.get");
+  op.typeParameters = ["String"];
+  op.arguments[0].type = { lean: "Lean.Vir.Js String", representation: "js-resource", resourceInner: "String" };
+  assert.throws(() => render(policy), /type parameter String shadows a fixed Lean type/u);
+});
+
 test("dynamic property reads generate only an erased result; String narrowing is closed", async () => {
   const text = render();
   const getter = /opaque get\s+\{object : Type\}\s+\(object : @& Lean\.Vir\.Js object\)\s+\(name : @& Lean\.Vir\.Js String\) :\s+RuntimeM \(Lean\.Vir\.Js\.Any\)/u;

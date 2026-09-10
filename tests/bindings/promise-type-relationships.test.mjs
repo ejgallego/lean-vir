@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
+import { typeScriptDiagnostics as diagnostics } from "../support/typescript-probe.mjs";
 import { loadBindingConfig } from "../../scripts/bindings/binding-config.mjs";
 import { generateDescriptorFile } from "../../scripts/bindings/typescript-descriptors.mjs";
 import { renderLeanBindings } from "../../scripts/bindings/typescript-to-lean.mjs";
@@ -66,6 +67,37 @@ test("rejection callbacks cannot claim a typed error or an unrelated branch resu
   }
 });
 
+test("Lean Promise parameters cannot capture the fixed Unit callback result", () => {
+  const policy = JSON.parse(JSON.stringify(generation).replaceAll("α", "Unit"));
+  assert.throws(() => render(policy), /type parameter Unit shadows a fixed Lean type/u);
+  const renamed = JSON.parse(JSON.stringify(generation).replaceAll("α", "Input"));
+  assert.match(render(renamed), /\{Input : Type\}/u);
+});
+
+for (const [member, original] of [["Promise.then", "then<TResult1"], ["Promise.catch", "catch<TResult"]]) {
+  test(`source-level optional ${member} is rejected before generation`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lean-vir-promise-optional-"));
+    try {
+      const path = join(directory, "lib.d.ts");
+      const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+      assert.ok(source.includes(original), "mutation must target the pinned declaration");
+      const mutated = source.replaceAll(original, original.replace("<", "?<"));
+      await writeFile(path, mutated);
+      const upstream = await generateDescriptorFile({
+        files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+        symbols: new Set(["Promise"]), symbolFiles: [], sourceUrl: null,
+        dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+      });
+      assert.equal(upstream.symbols.find((symbol) => symbol.id === member).optional, true);
+      assert.throws(() => render(generation, upstream), /must not be optional/u);
+      assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2722 && d.file?.text === wrappers),
+        "the independent TS wrappers reject calling an optional method");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
+
 test("missing or changed upstream Promise relationships fail closed", () => {
   for (const member of ["Promise.then", "Promise.catch"]) {
     for (const mutate of [
@@ -112,7 +144,7 @@ for (const [label, input, unsupportedPart, syntax] of [
       assert.equal(unsupported.kind, "opaque");
       assert.match(unsupported.name, syntax, "unsupported syntax must not be erased");
       assert.throws(() => render(generation, upstream), diagnostic);
-      assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2345),
+      assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2345 && d.file?.text === wrappers),
         "the TS compiler independently rejects our callback at the mutated boundary");
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -148,18 +180,6 @@ const nested: Promise<Promise<string>> = value(input, () => Promise.resolve("tex
 const row = { then(resolve: (s: string) => void) { resolve("text"); } };
 const selectedRow: Promise<typeof row> = value(input, () => row);
 `;
-function diagnostics(source, es5Source) {
-  const path = new URL("./promise-subset.virtual.ts", import.meta.url).pathname;
-  const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022, types: [] };
-  const host = ts.createCompilerHost(options);
-  const getSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (file, languageVersion, ...args) => {
-    const replacement = file === path ? source : es5Source !== undefined && file.endsWith("/lib.es5.d.ts") ? es5Source : undefined;
-    return replacement === undefined ? getSourceFile(file, languageVersion, ...args) :
-      ts.createSourceFile(file, replacement, languageVersion, true);
-  };
-  return ts.getPreEmitDiagnostics(ts.createProgram([path], options, host));
-}
 test("selected wrappers compile against pinned TS; an unrelated result does not", () => {
   assert.deepEqual(diagnostics(wrappers).map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")), []);
   assert.ok(diagnostics(wrappers.replace("return p.then<B>(f)", "return p.then<A>(f)")).length > 0);

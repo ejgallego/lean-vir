@@ -41,6 +41,13 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     if (!condition) throw new Error(`${protocol.id}: ${label} relationship violated: ${detail}`);
   };
   const parameters = protocol.typeParameters ?? [];
+  // These bounded contracts spell primitive constants without qualification.
+  // Reject capture before textual comparison; renaming a binder to Float must
+  // not turn Array.push's numeric result into its caller-selected element type.
+  for (const parameter of parameters) {
+    require(!["Float", "String", "Unit"].includes(parameter),
+      `type parameter ${parameter} shadows a fixed Lean type; choose a distinct name`);
+  }
   const jsType = (inner) => ({
     lean: `Lean.Vir.Js ${inner}`, representation: "js-resource", resourceInner: inner,
   });
@@ -158,6 +165,7 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       break;
     case "js.array.push": {
       const push = symbols.get("Array.push");
+      require(push?.optional !== true, "upstream Array.push must not be optional");
       const shape = push?.shape;
       require(push?.typeParameters?.length === 0 && shape?.kind === "function" && shape.effect === "pure" &&
         shape.args.length === 1 && shape.args[0].rest && !shape.args[0].optional &&
@@ -170,6 +178,7 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       checkSignature([receiver, jsNumber], value);
       break;
     case "js.array.length":
+      require(symbols.get("Array.length")?.optional !== true, "upstream Array.length must not be optional");
       require(number(symbols.get("Array.length")?.accessors?.get), "upstream length getter must return number");
       checkSignature([receiver], jsNumber);
       break;
@@ -195,6 +204,7 @@ function checkPromiseDeclaration(symbols, member, require) {
   require(parameter.constraint === undefined && parameter.default === undefined,
     "upstream Promise parameter must be unconstrained and have no default");
   const method = symbols.get(member);
+  require(method?.optional !== true, `upstream ${member} must not be optional`);
   const catching = member === "Promise.catch";
   const parameters = method?.typeParameters;
   require(method?.kind === "method" && parameters?.length === (catching ? 1 : 2),

@@ -142,6 +142,16 @@ test("optional properties fail closed before accessor generation", () => {
   );
 });
 
+test("optional methods fail closed before ordinary method generation", () => {
+  const optionalDescriptors = structuredClone(descriptors);
+  optionalDescriptors.get("widget").symbols.find((symbol) =>
+    symbol.id === "Widget.getAttribute").optional = true;
+  assert.throws(
+    () => buildGeneratedOperations(config, generation, optionalDescriptors),
+    /Widget\.getAttribute is optional; optional method generation is not supported yet/u,
+  );
+});
+
 test("generated binding operations record derived modalities and their provenance", () => {
   const operations = buildGeneratedOperations(config, generation, descriptors);
   const getter = operations.find((operation) => operation.id === "demo.widget.getLabel");

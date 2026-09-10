@@ -9,7 +9,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import ts from "typescript";
+import { typeScriptDiagnostics } from "../support/typescript-probe.mjs";
 import { loadBindingConfig } from "../../scripts/bindings/binding-config.mjs";
 import { generateDescriptorFile } from "../../scripts/bindings/typescript-descriptors.mjs";
 import { renderLeanBindings } from "../../scripts/bindings/typescript-to-lean.mjs";
@@ -89,6 +89,45 @@ test("the relationship follows the upstream binder, not its spelling", () => {
   assert.equal(render(generation, upstream), render());
 });
 
+test("Lean element parameters cannot shadow fixed primitive types", () => {
+  for (const name of ["Float", "String", "Unit"]) {
+    const policy = JSON.parse(JSON.stringify(generation).replaceAll("α", name));
+    assert.throws(() => render(policy), /type parameter .* shadows a fixed Lean type/u);
+  }
+  const renamed = JSON.parse(JSON.stringify(generation).replaceAll("α", "Element"));
+  assert.match(render(renamed), /\{Element : Type\}/u);
+});
+
+for (const [member, original, replacement, wrapper, code] of [
+  ["Array.length", "length: number;", "length?: number;",
+    "export function length<T>(array: Array<T>): number { return array.length; }", 2322],
+  ["Array.push", "push(...items: T[]): number;", "push?(...items: T[]): number;",
+    "export function push<T>(array: Array<T>, item: T): number { return array.push(item); }", 2722],
+]) {
+  test(`source-level optional ${member} is rejected before generation`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lean-vir-array-optional-"));
+    try {
+      const path = join(directory, "lib.d.ts");
+      const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+      assert.ok(source.includes(original), "mutation must target the pinned declaration");
+      const mutated = source.replaceAll(original, replacement);
+      await writeFile(path, mutated);
+      const upstream = await generateDescriptorFile({
+        files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+        symbols: new Set(["Array"]), symbolFiles: [], sourceUrl: null,
+        dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+      });
+      assert.equal(upstream.symbols.find((symbol) => symbol.id === member).optional, true);
+      assert.throws(() => render(generation, upstream), /must not be optional/u);
+      assert.deepEqual(typeScriptDiagnostics(wrapper), []);
+      assert.ok(typeScriptDiagnostics(wrapper, mutated).some((d) => d.code === code && d.file?.text === wrapper),
+        "the independent TS wrapper rejects the optional member");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
+
 test("source-level keyof index results cannot masquerade as the Array element", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-array-operator-"));
   try {
@@ -107,16 +146,9 @@ test("source-level keyof index results cannot masquerade as the Array element", 
       { kind: "opaque", name: "keyof T" });
     assert.throws(() => render(generation, upstream), /TypeScript Array<T> element relationship violated/u);
 
-    const wrapper = join(directory, "wrapper.ts");
-    await writeFile(wrapper, "export function item<T>(array: Array<T>, index: number): T { return array[index]; }\n");
-    const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022, types: [] };
-    const host = ts.createCompilerHost(options);
-    assert.deepEqual(ts.getPreEmitDiagnostics(ts.createProgram([wrapper], options, host)), []);
-    const getSourceFile = host.getSourceFile.bind(host);
-    host.getSourceFile = (file, version, ...args) => file.endsWith("/lib.es5.d.ts") ?
-      ts.createSourceFile(file, mutated, version, true) : getSourceFile(file, version, ...args);
-    assert.ok(ts.getPreEmitDiagnostics(ts.createProgram([wrapper], options, host))
-      .some((d) => d.code === 2322 && d.file?.fileName === wrapper),
+    const wrapper = "export function item<T>(array: Array<T>, index: number): T { return array[index]; }";
+    assert.deepEqual(typeScriptDiagnostics(wrapper), []);
+    assert.ok(typeScriptDiagnostics(wrapper, mutated).some((d) => d.code === 2322 && d.file?.text === wrapper),
     "pinned TS independently rejects the mutated element relationship");
   } finally {
     await rm(directory, { recursive: true, force: true });

@@ -1059,6 +1059,9 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
     const symbol = symbolsByRoot.get(entry.root.id).get(member);
     if (entry.mapping.accessors === undefined) {
       if (symbol?.kind === "method") {
+        if (symbol.optional === true) {
+          throw new Error(`${member} is optional; optional method generation is not supported yet`);
+        }
         operations.push(methodOperation(
           config,
           entry.root,
