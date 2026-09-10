@@ -669,12 +669,12 @@ namespace StateTuple
 
 def value {α : Type}
     (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js α) := do
+    Lean.Vir.RuntimeM (Lean.Vir.Js α) :=
   Lean.Vir.Js.Tuple2.first result
 
 def setter {α : Type}
     (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) := do
+    Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) :=
   Lean.Vir.Js.Tuple2.second result
 
 /-- Explicitly projects React's native `useState` result array into a Lean structure. -/
@@ -691,12 +691,12 @@ namespace ReducerTuple
 
 def value {state action : Type}
     (result : @& Lean.Vir.Js (ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state) := do
+    Lean.Vir.RuntimeM (Lean.Vir.Js state) :=
   Lean.Vir.Js.Tuple2.first result
 
 def dispatch {state action : Type}
     (result : @& Lean.Vir.Js (ReducerTuple state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action)) := do
+    Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action)) :=
   Lean.Vir.Js.Tuple2.second result
 
 /-- Explicitly projects React's native `useReducer` result array into a Lean structure. -/

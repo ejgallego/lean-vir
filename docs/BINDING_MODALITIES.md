@@ -86,6 +86,10 @@ projections instead of an unconstrained array getter. React's `StateTuple` and
 `ReducerTuple` aliases retain their position types. These VIR-owned projections
 have a checked position contract and compile-time cross-type regressions; the
 React aliases are still authored, not inferred from React's TypeScript overloads.
+`NodeList.toArray` likewise has a checked VIR-owned representation contract:
+its input `Js.NodeList (Js α)` uses a full Lean-view parameter, while its output
+`Js.Array α` uses a JavaScript shape. This is not an upstream-derived NodeList
+generic translation.
 The selected Promise relationships below also have a bounded check. Other
 reviewed protocol operations do not yet receive an independent generic
 relationship check. These checks are not proof of all TypeScript semantics,
@@ -121,6 +125,10 @@ checking the configured Lean types. Tests compile generic wrappers against the
 pinned TS library (including native Promise/PromiseLike compatibility), mutate
 upstream and configured relationships, and compile positive/negative Lean calls.
 These are selected-relationship checks, not a general TS subtype checker.
+Callback-local generic binders remain unsupported syntax rather than being
+erased into references to outer parameters. The descriptor permits compatible
+interface merging that adds a default, but the selected Array/Promise checks
+still reject defaults or constraints outside their supported relationships.
 
 These methods call native `.then`/`.catch` unchanged. **`thenValue` does not
 exclude promises or thenables.** Native resolution recursively assimilates

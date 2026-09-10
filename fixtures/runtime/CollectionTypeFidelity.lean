@@ -26,6 +26,21 @@ def sameElement {α : Type} (value : Js α) (index : Js Float) : RuntimeM (Js α
 def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) :=
   sameElement value index
 
+def sameNodeListElement {α : Type} (list : Js.NodeList (Js α)) : RuntimeM (Js.Array α) :=
+  Js.NodeList.toArray list
+
+example {α β : Type} (list : Js.NodeList (Js α)) : True := by
+  fail_if_success
+    have unrelated : RuntimeM (Js.Array β) := Js.NodeList.toArray list
+  fail_if_success
+    have doubleWrapped : RuntimeM (Js.Array (Js α)) := Js.NodeList.toArray list
+  trivial
+
+example {α : Type} (list : Js.NodeList α) : True := by
+  fail_if_success
+    have unwrapped : RuntimeM (Js.Array α) := Js.NodeList.toArray list
+  trivial
+
 def stateValue {α : Type} (tuple : Js (StateTuple (Js α))) : RuntimeM (Js α) :=
   StateTuple.value tuple
 

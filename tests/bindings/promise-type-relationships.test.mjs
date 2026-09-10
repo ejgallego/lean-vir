@@ -5,7 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 import { loadBindingConfig } from "../../scripts/bindings/binding-config.mjs";
@@ -87,6 +89,31 @@ test("missing or changed upstream Promise relationships fail closed", () => {
   assert.throws(() => render(generation, upstream), diagnostic);
 });
 
+test("source-level callback-local generics cannot masquerade as the receiver parameter", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-promise-binders-"));
+  try {
+    const path = join(directory, "lib.d.ts");
+    const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+    const original = "onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>)";
+    assert.ok(source.includes(original), "pinned source mutation must target the fulfillment callback");
+    const mutated = source.replaceAll(original, "onfulfilled?: (<T>(value: T) => TResult1 | PromiseLike<TResult1>)");
+    await writeFile(path, mutated);
+    const upstream = await generateDescriptorFile({
+      files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(["Promise"]), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    const handler = upstream.symbols.find((symbol) => symbol.id === "Promise.then").shape.args[0].type.element;
+    assert.equal(handler.kind, "opaque");
+    assert.match(handler.name, /^<T>/u, "unsupported syntax retains the local binder");
+    assert.throws(() => render(generation, upstream), diagnostic);
+    assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2345),
+      "the TS compiler independently rejects our monomorphic callback at the mutated boundary");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("upstream binder renaming and union ordering do not change the translation", () => {
   const rename = (value) => {
     if (Array.isArray(value)) return value.map(rename);
@@ -115,13 +142,16 @@ const nested: Promise<Promise<string>> = value(input, () => Promise.resolve("tex
 const row = { then(resolve: (s: string) => void) { resolve("text"); } };
 const selectedRow: Promise<typeof row> = value(input, () => row);
 `;
-function diagnostics(source) {
+function diagnostics(source, es5Source) {
   const path = new URL("./promise-subset.virtual.ts", import.meta.url).pathname;
   const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022, types: [] };
   const host = ts.createCompilerHost(options);
   const getSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (file, languageVersion, ...args) => file === path ?
-    ts.createSourceFile(file, source, languageVersion, true) : getSourceFile(file, languageVersion, ...args);
+  host.getSourceFile = (file, languageVersion, ...args) => {
+    const replacement = file === path ? source : es5Source !== undefined && file.endsWith("/lib.es5.d.ts") ? es5Source : undefined;
+    return replacement === undefined ? getSourceFile(file, languageVersion, ...args) :
+      ts.createSourceFile(file, replacement, languageVersion, true);
+  };
   return ts.getPreEmitDiagnostics(ts.createProgram([path], options, host));
 }
 test("selected wrappers compile against pinned TS; an unrelated result does not", () => {

@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// Deliberately bounded: Array relationships, native pair projections, dynamic
-// object results, closed String narrowing and selected Promise signatures,
+// Deliberately bounded: Array relationships, native pair projections, NodeList
+// array conversion, dynamic object results, closed String narrowing and selected
+// Promise signatures,
 // not arbitrary TS generic subtyping or runtime payload validation.
 // Check the upstream binder and its occurrences before checking the configured
 // Lean types. A reviewed "preserving" label is not evidence of this relationship.
@@ -29,10 +30,12 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     "js.object.get": "dynamic property result",
     "js.string.fromAny": "closed String narrowing",
   }[protocol.target];
+  const nodeListConversion = protocol.target === "js.nodeList.toArray";
   if (arrayOperation === undefined && tuplePosition === undefined && dynamicContract === undefined &&
-      promiseOperation === undefined) return;
+      promiseOperation === undefined && !nodeListConversion) return;
 
-  const label = dynamicContract ?? (promiseOperation !== undefined ? "TypeScript Promise<T> selected subset" :
+  const label = dynamicContract ?? (nodeListConversion ? "VIR NodeList-to-Array element" :
+    promiseOperation !== undefined ? "TypeScript Promise<T> selected subset" :
     arrayOperation === undefined ? "tuple [A, B] position" : "TypeScript Array<T> element");
   const require = (condition, detail) => {
     if (!condition) throw new Error(`${protocol.id}: ${label} relationship violated: ${detail}`);
@@ -56,6 +59,19 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     if (receiver && args.length > 0) require(protocol.arguments[0].role === "receiver", "argument 0 must be the receiver");
     checkType(protocol.result.type, result, "result");
   };
+
+  if (nodeListConversion) {
+    require(protocol.upstreamRelation.kind === "vir-owned", "must remain a VIR-owned conversion");
+    require(parameters.length === 1, "input and output must share one element parameter");
+    const [element] = parameters;
+    // NodeList retains its full Lean-view parameter; Array uses a JS shape.
+    // This checks VIR's representation contract, not upstream NodeList<T> derivation.
+    checkSignature([{
+      lean: `Lean.Vir.Js.NodeList (Lean.Vir.Js ${element})`, representation: "js-resource",
+      resourceInner: `Lean.Vir.Js.NodeList.Value (Lean.Vir.Js ${element})`,
+    }], arrayType(element));
+    return;
+  }
 
   if (promiseOperation !== undefined) {
     const catching = promiseOperation === "catch";

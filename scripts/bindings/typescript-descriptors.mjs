@@ -422,11 +422,9 @@ function collectStatements(statements, sourceFile, prefix, symbols, symbolsById)
 function mergeDeclarationSymbols(left, right) {
   if (left.kind === "interface" && right.kind === "interface" &&
       left.shape.kind === "record" && right.shape.kind === "record") {
-    if (JSON.stringify(left.typeParameters) !== JSON.stringify(right.typeParameters)) {
-      throw new Error(`conflicting TypeScript type parameters for ${left.id}`);
-    }
     return {
       ...left,
+      typeParameters: mergeInterfaceParameters(left, right),
       display: `${left.display}\n${right.display}`,
       hover: left.hover || right.hover,
       shape: { ...left.shape, fields: { ...left.shape.fields, ...right.shape.fields } },
@@ -463,6 +461,28 @@ function mergeDeclarationSymbols(left, right) {
     };
   }
   throw new Error(`duplicate TypeScript descriptor id ${left.id}`);
+}
+
+function mergeInterfaceParameters(left, right) {
+  const fail = () => { throw new Error(`conflicting TypeScript type parameters for ${left.id}`); };
+  const count = Math.max(left.typeParameters.length, right.typeParameters.length);
+  return Array.from({ length: count }, (_, index) => {
+    const parameter = left.typeParameters[index];
+    const other = right.typeParameters[index];
+    if (parameter === undefined || other === undefined) {
+      const introduced = parameter ?? other;
+      if (introduced.default === undefined) fail();
+      return introduced;
+    }
+    if (parameter.name !== other.name ||
+        (parameter.constraint !== undefined && other.constraint !== undefined &&
+         JSON.stringify(parameter.constraint) !== JSON.stringify(other.constraint)) ||
+        (parameter.default !== undefined && other.default !== undefined &&
+         JSON.stringify(parameter.default) !== JSON.stringify(other.default))) fail();
+    // Keep introduced defaults/constraints regardless of declaration order;
+    // conflicting present metadata is still unsupported.
+    return { ...parameter, ...other };
+  });
 }
 
 function symbolsForStatement(statement, sourceFile, prefix) {
@@ -693,6 +713,10 @@ function normalizeTypeNode(node, sourceFile, prefix) {
     return typeLiteralShape(node, sourceFile, prefix);
   }
   if (ts.isFunctionTypeNode(node)) {
+    // Do not erase callback-local binders into references to outer parameters.
+    // Generic callback translation needs scope-aware types; retain the syntax
+    // as unsupported until that representation exists.
+    if (node.typeParameters?.length) return { kind: "opaque", name: node.getText(sourceFile) };
     return functionShape(node.parameters, node.type, sourceFile, prefix);
   }
   if (ts.isParenthesizedTypeNode(node)) {

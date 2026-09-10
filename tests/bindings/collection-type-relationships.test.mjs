@@ -15,7 +15,7 @@ const config = await loadBindingConfig(new URL("../../Vir/Js.bindings.json", imp
 const generation = {
   ...config.generation,
   protocolOperations: config.generation.protocolOperations.filter((operation) =>
-    ["array", "tuple2"].includes(operation.group)),
+    ["array", "tuple2"].includes(operation.group) || operation.target === "js.nodeList.toArray"),
 };
 // Authority comes from the installed, pinned TypeScript declarations, not a
 // second handwritten list of what this binding configuration ought to mean.
@@ -99,3 +99,19 @@ for (const target of ["js.tuple2.first", "js.tuple2.second"]) {
     }
   });
 }
+
+test("VIR NodeList conversion preserves the full-view to JS-shape relationship", () => {
+  assert.match(render(), /opaque toArray\s+\{α : Type\}\s+\(nodes : @& Lean\.Vir\.Js\.NodeList \(Lean\.Vir\.Js α\)\) :\s+RuntimeM \(Lean\.Vir\.Js\.Array α\)/u);
+  for (const mutate of [
+    (op) => op.typeParameters.push("β"),
+    (op) => { op.arguments[0].type.lean = "Lean.Vir.Js.NodeList α"; },
+    (op) => { op.arguments[0].type.resourceInner = "Lean.Vir.Js.NodeList.Value α"; },
+    (op) => { op.result.type.lean = "Lean.Vir.Js.Array (Lean.Vir.Js α)"; },
+    (op) => { op.result.type.lean = "Lean.Vir.Js.Array β"; },
+    (op) => { op.result.type.resourceInner = "Lean.Vir.Js.Array.Value β"; },
+  ]) {
+    const policy = structuredClone(generation);
+    mutate(operation(policy, "js.nodeList.toArray"));
+    assert.throws(() => render(policy), /VIR NodeList-to-Array element relationship violated/u);
+  }
+});
