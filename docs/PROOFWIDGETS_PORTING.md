@@ -16,7 +16,7 @@ such as `Jsx.lean`, interactive examples such as `LazyComputation.lean`, and
 library-heavy demos such as `Plot.lean`, `Venn.lean`, `Rubiks.lean`, and
 `RbTree.lean`.
 
-The earlier demo-level candidates remain useful end-to-end exercises:
+Demo-level end-to-end exercises:
 
 1. `ProofWidgets/Demos/Jsx.lean`: validate the shallow HTML/React authoring
    model with ordinary Lean combinators before adding syntax sugar.
@@ -40,7 +40,7 @@ so component children are rendered by ordinary Lean component functions. The
 demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, `Handler`,
 and native JSX in an upstream-recognizable shape.
 
-`ProofWidgetsJsxSubset.lean` now ports the static surface of upstream
+`ProofWidgetsJsxSubset.lean` ports the static surface of upstream
 `ProofWidgets/Demos/Jsx.lean` through `Vir.ProofWidgets.Jsx`:
 
 - lowercase HTML tags such as `b`, `img`, `span`, and `hr`;
@@ -49,27 +49,10 @@ and native JSX in an upstream-recognizable shape.
 - uppercase components, typed props, component keys, and child spreads;
 - a small callback to keep handler coverage in the same fixture.
 
-The RPC foundation exposes the exact position-specific `RpcSessionAtPos`
-object as `Surface.rpcSession`. `RpcSession.call` receives an exact JavaScript
-request value and returns its native `Js.Promise`; `callWithOptions` also
-forwards native request options. Direct Promise continuations and property
-access do not decode or copy the response graph.
-
-`examples/tutorials/RpcReferenceWidget.lean` renders real server data and sends
-an exact nested reference back to a `@[server_rpc_method]`. The browser acceptance
-uses official React, the official RPC client, and a real Lean server to cover
-position changes, cancellation, rejection, rerendering and package teardown.
-Its tutorial JavaScript parent owns asynchronous effects and loading/error UI;
-the Lean child owns its native React hook state. See
-[the RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md) for the tested boundary and
-remaining limits.
-
-The provisional descriptor resolver and synthetic JSX reference demonstration
-are removed. Genuine `Lean.Server.WithRpcRef` values remain under the official
-session's reachability rules. Current-goal snapshot methods now belong only to
-`fixtures/infoview/RpcBrowserServer.lean`; they do not pretend to implement
-elaborator-owned expression/context objects. The infoview shell no longer
-prefetches an unused reference prop.
+The [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md) renders real server
+data and returns a genuine `Server.WithRpcRef` through the official client.
+See the [RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md) for session/Promise/reference
+semantics and [HARNESS.md](HARNESS.md#infoview-rpc-and-lifetime-checks) for acceptance.
 
 When implementing a port:
 
@@ -112,22 +95,11 @@ Current authoring limits include:
 
 ## Responsibilities At The Boundary
 
-Missing component bindings and parity examples are compatibility work. React
-purity, hook rules, effect dependencies, and stale-request handling remain
-application responsibilities in Lean as in TypeScript. Do not introduce extra
-purity or schema-validation guarantees as a condition of porting a component.
-
-The foreign bridge is responsible for exact JS identity and the Lean references
-inside converted functions or JSL values. It must not add another ownership graph
-for native props, nodes, state, or RPC responses. React owns its state; the
-official RPC session owns registration of server-reference objects.
-
-Sharing datatypes between server and client can improve the description of
-request and response shapes. It is distinct from runtime validation and from
-decoding those values into new Lean records. Any such work must preserve exact
-nested server-reference objects. Current unchecked typed property access assumes
-the declared server shape; it provides no stronger validation than the analogous
-TypeScript code. See [the RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md).
+Port missing behavior without adding guarantees that the TypeScript component
+does not provide. The [host contract](HOST_BINDINGS.md#semantic-fidelity) owns
+the shared programmer responsibilities and foreign-heap obligations; the
+[RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md#server-references-and-response-types)
+explains response types, checks and exact server-reference ownership.
 
 ## External JavaScript Libraries
 

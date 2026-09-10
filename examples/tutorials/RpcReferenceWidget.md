@@ -7,13 +7,10 @@ This two-file tutorial separates application effects from the Lean renderer:
 - [RpcReferenceWidget.lean](RpcReferenceWidget.lean) calls the session, projects
   exact response properties, and renders a child with ordinary React hook state.
 
-The JavaScript parent is a choice for this boundary-focused example, not a
-requirement that each VIR widget ship a handwritten JavaScript companion.
-It keeps pending continuations native, so they cannot enter Lean after runtime
-disposal. If an effect uses Lean-authored continuations, those must not enter a
-disposed runtime; aborting the server request alone is not that guarantee.
-Lean can also pass native functions directly to Promise operations. This tutorial
-does not yet demonstrate the fully Lean-authored asynchronous parent.
+This example is not yet an all-Lean async widget: its pending continuations are
+native JavaScript functions and cannot reenter a disposed Lean runtime. See the
+[RPC guide](../../docs/PROOFWIDGETS_RPC_COMPATIBILITY.md) for the direct Promise
+API and the distinction between cancellation, stale results and disposal.
 
 The executable server example is [RpcBrowserServer.lean](../../fixtures/infoview/RpcBrowserServer.lean).
 Its `create` method returns a message and a genuine `Server.WithRpcRef` object;
@@ -70,18 +67,11 @@ root.render(React.createElement(RpcReferenceWidget, {
 The new child's counter starts at zero. Do not pass the old `view` to the new
 runtime: its function closes over the disposed Lean runtime.
 
-Cancellation is best effort: a successful response may already be on its way.
-The effect's `active` flag therefore guards publication independently of aborting.
-React and the native Promise own this behavior; VIR adds no scheduler. Pending
-continuations here are native JavaScript functions and cannot reenter disposed
-Lean closures.
+The effect's `active` flag suppresses stale publication independently of aborting.
+`readReference` sends the original nested reference back through Lean; copying
+its token would not preserve the RPC client's reference lifetime. The message
+reader checks for a primitive string with `Js.String.fromAny`, without coercion;
+it does not validate the whole reply schema.
 
-Do not copy a reference token into a Lean record or JSON string. `Js Reply` and
-the nested `Js.Any` reference retain the exact graph registered by the official
-RPC client. `readReference` demonstrates sending that same object back through
-Lean. The unchecked property projections in this small tutorial assume the
-server's declared response shape; they are not runtime schema validation.
-
-Run `npm run test:infoview:browser` to compile the tutorial package and exercise
-it in Chromium against a real Lean server. It uses the existing matching Wasm
-artifact; no site build is needed. See [HARNESS.md](../../docs/HARNESS.md) for setup.
+For the executable real-server check and prerequisites, see
+[Infoview RPC and lifetime checks](../../docs/HARNESS.md#infoview-rpc-and-lifetime-checks).
