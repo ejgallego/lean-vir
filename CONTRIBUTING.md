@@ -83,6 +83,25 @@ Guidelines:
 - Put questions and extra coordination in PR comments rather than the PR
   description.
 
+## Documentation
+
+Write for someone using or changing the system, not following its development
+diary. Developer-facing guides are documentation too.
+
+- Describe current behavior, contracts, workflows and limitations. Label planned
+  work and historical measurements explicitly; do not present them as guarantees.
+- Use the [documentation map](docs/README.md) to find a contract's owning guide.
+  Link to that guide elsewhere rather than duplicating its explanation; prefer
+  updating it to adding a PR-specific document.
+- Keep concise rationale and reproducible evidence that inform future decisions,
+  including relevant versions and provenance. Omit the sequence of attempts when
+  it adds no lasting explanation.
+- Leave routine checkpoints, command transcripts and test logs in commit/PR
+  history or CI; use the local mailbox for agent coordination. Promote durable
+  decisions into the owning guide rather than leaving them only in local notes.
+- When behavior changes, update that guide and its links, and remove obsolete
+  explanations. Shortening must not erase safety constraints or known limitations.
+
 ## Local Validation
 
 Use the smallest relevant suite first. See [docs/HARNESS.md](docs/HARNESS.md)

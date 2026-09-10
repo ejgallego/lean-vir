@@ -1,7 +1,9 @@
 # Documentation
 
-This directory contains the maintainer and integration notes for Lean VIR. The
-top-level `README.md` remains the user-facing quickstart.
+This directory contains contributor and integration guides, reference material
+and design rationale for Lean VIR. The top-level `README.md` is the user-facing
+quickstart. Follow the [documentation policy](../CONTRIBUTING.md#documentation)
+when changing these guides.
 
 ## Developer Reading Paths
 
