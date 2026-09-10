@@ -1,4 +1,4 @@
-# Native ProofWidgets RPC Review Guide
+# Native ProofWidgets RPC and Runtime Lifetime Review Guide
 
 This change supplies a native RPC boundary for Lean-authored browser components.
 The compatibility target is an ordinary ProofWidgets React component implemented
@@ -17,6 +17,9 @@ semantics. It is not a new widget protocol or React execution model.
 - Remove the provisional reference descriptors, resolver/store, normalization
   and unused reference prefetch. Genuine server references use the official RPC
   client's existing protocol.
+- Remove global finalizer anchors without weakening live callbacks or JSL values.
+- Unmount normal shell UI without disposing its runtime; retain explicit disposal
+  and setup/mount-entry failure teardown.
 - Exercise the boundary with a two-file tutorial and real-server Chromium test.
 
 ## Reading Order
@@ -30,9 +33,15 @@ semantics. It is not a new widget protocol or React execution model.
    generated declarations.
 3. [Host dispatcher](../web/src/runtime/host-state.js): the small shared-boundary
    change allowing native Promises as exact JavaScript results.
-4. [Browser acceptance](../tests/infoview/rpc-browser-entry.js) and
+4. [Callback finalization](../web/src/runtime/callbacks.js),
+   [JSL finalization](../web/src/runtime/object-values.js) and the
+   [infoview shell](../web/app/vir-infoview-widget.js): weak global cleanup records,
+   strong ownership by surviving values, and UI cleanup versus hard disposal.
+5. [Browser acceptance](../tests/infoview/rpc-browser-entry.js) and
    [server fixture](../fixtures/infoview/RpcBrowserServer.lean): observable behavior
-   against official React, `RpcSessions` and Lean server RPC methods.
+   against official React, `RpcSessions` and Lean server RPC methods. The separate
+   [shell lifetime acceptance](../tests/infoview/rpc-shell-lifetime-entry.js)
+   exercises real Lean continuations after UI cleanup and explicit disposal.
 
 ## Correctness Questions
 
@@ -45,6 +54,11 @@ semantics. It is not a new widget protocol or React execution model.
 - **Callback boundary:** Are Lean-closure conversions explicit? Native functions
   must not acquire a foreign lifetime merely because they pass through Lean.
   Conversely, converted Lean callbacks must not enter a disposed runtime.
+- **Runtime lifetime:** Do surviving callbacks/JSL retain their original runtime,
+  without global finalizer metadata anchoring an otherwise unreachable generation?
+  Does normal shell cleanup detach ownership without disposing that generation?
+  Failure tests cover synchronous mount submission errors, not errors thrown
+  later inside React rendering; these must not be conflated.
 - **Application effects:** Does cancellation remain distinct from stale-result
   suppression? The tutorial keeps the last successful child mounted during
   refresh/error, but unmounts before runtime disposal or replacement.
@@ -77,8 +91,9 @@ component/module-loading dependencies.
 
 ## Focused Validation
 
-`npm run test:infoview:browser` builds the tutorial package and runs the real
-server/browser acceptance plus cleanup/diagnostic unit tests. It requires a
+`npm run test:infoview:browser` runs gate/cleanup units, then both real-server
+browser tests sequentially: native RPC and shell runtime lifetime. CI invokes
+this command. It builds the required Lean fixtures and requires a
 matching generated Wasm artifact; see [HARNESS.md](HARNESS.md). The runtime RPC
 smoke separately covers exact Promise/function identity and explicit Lean
 continuations. The module snapshot suite remains in `npm run test:infoview`.

@@ -23,7 +23,9 @@ Props for the minimal VIR infoview shell.
 The component entry must return the exact JavaScript component function. The
 mount entry receives the shell's exact React root, that function, and a
 JavaScript-built surface structure from the real infoview panel props. The
-shell owns and unmounts the root before disposing the VIR runtime.
+shell owns and unmounts the root on normal cleanup without disposing the VIR
+runtime; surviving callbacks and JSL values retain their original generation.
+Explicit disposal and failed setup/mount-entry calls remain hard teardown paths.
 -/
 structure WidgetProps where
   wasmPath : String := ""

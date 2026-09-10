@@ -475,8 +475,12 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
-`npm run test:infoview:browser` is the focused real-server RPC acceptance check.
-It builds the current infoview imports and registered `tutorials.RpcReferenceWidget`
+`npm run test:infoview:browser` runs gate/cleanup units and both real-server
+acceptance checks below sequentially. CI uses this same command; it does not run
+the separate GC or upstream async characterization probes.
+
+The native RPC check (`node tests/infoview/rpc-browser.mjs`) builds the current
+infoview imports and registered `tutorials.RpcReferenceWidget`
 module, selecting its six unchanged `RpcReferenceWidget` exports (`request`,
 `reference`, `readReference`, `message`, `View`, `render`) into a bundled package, then
 uses `web/public/vir-upstream.wasm`, official React, the pinned infoview RPC

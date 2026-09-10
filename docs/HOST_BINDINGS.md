@@ -146,7 +146,8 @@ responsible for cancellation, removal and reference release. Core in-place
 package replacement still invalidates old callback/JSL roots before adopting
 new exports. Normal infoview shell UI cleanup unmounts the owned React root
 and detaches shell references without hard-disposing the generation. Failed
-setup/rendering and obsolete never-installed candidates retain hard teardown.
+setup, synchronous mount-entry calls and obsolete never-installed candidates
+retain hard teardown; later React render errors are not caught by that path.
 Application-owned active work keeps its ordinary cleanup obligations.
 
 Collection is not deterministic active-resource cleanup. In particular, the

@@ -105,9 +105,10 @@ tests may inject only the individual host operations they exercise.
 The infoview shell's normal cleanup unmounts its owned React root while Lean
 cleanup callbacks remain usable and detaches its loaded reference before
 unmount. Surviving values retain that original runtime; normal refresh installs
-a distinct service with fresh factory/bindings. Failure cleanup remains a
-separate root-unmount plus hard-dispose path. Shell polling is owned by its own
-effect, while application activity remains the application's responsibility.
+a distinct service with fresh factory/bindings. A synchronous mount-entry failure
+still unmounts the root and hard-disposes the service. This does not catch errors
+thrown later by React rendering. Shell polling is owned by its own effect, while
+application activity remains the application's responsibility.
 
 ## Adding A Host Import
 

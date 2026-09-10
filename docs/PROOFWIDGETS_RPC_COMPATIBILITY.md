@@ -127,9 +127,10 @@ are detached even when unmount throws.
 Application-owned timers, listeners, subscriptions and independent roots still
 need application cleanup. Normal unmount introduces no admission restriction or
 quiescence guarantee. Explicit runtime disposal and core in-place package
-replacement remain hard invalidation boundaries. Failed setup/rendering and
-obsolete candidates that were never installed retain their explicit teardown;
-callback survival is not promised across those failure paths.
+replacement remain hard invalidation boundaries. Failed setup, synchronous
+mount-entry calls and obsolete candidates that were never installed retain their
+explicit teardown; callback survival is not promised across those failure paths.
+The mount-entry catch does not handle errors thrown later by React rendering.
 
 Each shell service creates a fresh runtime factory and default browser/React
 binding lifecycle, reusing the compiled Wasm module and the existing mutable
