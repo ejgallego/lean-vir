@@ -5,8 +5,11 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import ts from "typescript";
 import { loadBindingConfig } from "../../scripts/bindings/binding-config.mjs";
 import { generateDescriptorFile } from "../../scripts/bindings/typescript-descriptors.mjs";
 import { renderLeanBindings } from "../../scripts/bindings/typescript-to-lean.mjs";
@@ -84,6 +87,40 @@ test("the relationship follows the upstream binder, not its spelling", () => {
   array.indexSignatures[0].result.id = "Item";
   upstream.symbols.find((entry) => entry.id === "Array.push").shape.args[0].type.element.id = "Item";
   assert.equal(render(generation, upstream), render());
+});
+
+test("source-level keyof index results cannot masquerade as the Array element", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-array-operator-"));
+  try {
+    const path = join(directory, "lib.d.ts");
+    const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+    const original = "[n: number]: T;";
+    assert.ok(source.includes(original), "pinned source mutation must target the index signature");
+    const mutated = source.replaceAll(original, "[n: number]: keyof T;");
+    await writeFile(path, mutated);
+    const upstream = await generateDescriptorFile({
+      files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(["Array"]), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    assert.deepEqual(upstream.symbols.find((symbol) => symbol.id === "Array").indexSignatures[0].result,
+      { kind: "opaque", name: "keyof T" });
+    assert.throws(() => render(generation, upstream), /TypeScript Array<T> element relationship violated/u);
+
+    const wrapper = join(directory, "wrapper.ts");
+    await writeFile(wrapper, "export function item<T>(array: Array<T>, index: number): T { return array[index]; }\n");
+    const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022, types: [] };
+    const host = ts.createCompilerHost(options);
+    assert.deepEqual(ts.getPreEmitDiagnostics(ts.createProgram([wrapper], options, host)), []);
+    const getSourceFile = host.getSourceFile.bind(host);
+    host.getSourceFile = (file, version, ...args) => file.endsWith("/lib.es5.d.ts") ?
+      ts.createSourceFile(file, mutated, version, true) : getSourceFile(file, version, ...args);
+    assert.ok(ts.getPreEmitDiagnostics(ts.createProgram([wrapper], options, host))
+      .some((d) => d.code === 2322 && d.file?.fileName === wrapper),
+    "pinned TS independently rejects the mutated element relationship");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 for (const target of ["js.tuple2.first", "js.tuple2.second"]) {

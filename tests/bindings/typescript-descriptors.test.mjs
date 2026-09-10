@@ -21,6 +21,40 @@ import { renderTypeAnchorReport } from "../../scripts/bindings/type-anchor-rende
 import { INTERFACE_MANIFEST_VERSION } from "../../web/src/runtime/interface-manifest.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
+test("semantic type operators remain opaque while readonly array/tuple views are preserved", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-operators-"));
+  try {
+    const declarations = join(directory, "operators.d.ts");
+    await writeFile(declarations, `
+export type Keys<T> = keyof T;
+export interface Token { readonly value: unique symbol }
+export type Items<T> = readonly T[];
+export type Pair<T> = readonly [T, string];
+export type Nested<T> = readonly (keyof T)[];
+`);
+    assert.deepEqual(ts.getPreEmitDiagnostics(ts.createProgram([declarations], {
+      strict: true, noEmit: true, types: [],
+    })), []);
+    const descriptor = await generateDescriptorFile({
+      files: [declarations], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    const symbols = new Map(descriptor.symbols.map((symbol) => [symbol.id, symbol]));
+    const parameter = { kind: "ref", id: "T" };
+    const keys = { kind: "opaque", name: "keyof T" };
+    assert.deepEqual(symbols.get("Keys").shape, keys);
+    assert.deepEqual(symbols.get("Token.value").shape, { kind: "opaque", name: "unique symbol" });
+    assert.deepEqual(symbols.get("Items").shape, { kind: "array", element: parameter });
+    assert.deepEqual(symbols.get("Pair").shape, {
+      kind: "tuple", elements: [parameter, { kind: "primitive", name: "string" }],
+    });
+    assert.deepEqual(symbols.get("Nested").shape, { kind: "array", element: keys });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("interface merging retains compatible parameter metadata, including unrelated roots", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-ts-merge-"));
   try {

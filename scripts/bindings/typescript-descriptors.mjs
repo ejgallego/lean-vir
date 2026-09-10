@@ -723,7 +723,13 @@ function normalizeTypeNode(node, sourceFile, prefix) {
     return normalizeTypeNode(node.type, sourceFile, prefix);
   }
   if (ts.isTypeOperatorNode(node)) {
-    return normalizeTypeNode(node.type, sourceFile, prefix);
+    // Only the supported readonly array/tuple view preserves the operand shape.
+    // Semantic operators such as keyof and unique must not masquerade as it.
+    if (node.operator === ts.SyntaxKind.ReadonlyKeyword &&
+        (ts.isArrayTypeNode(node.type) || ts.isTupleTypeNode(node.type))) {
+      return normalizeTypeNode(node.type, sourceFile, prefix);
+    }
+    return { kind: "opaque", name: node.getText(sourceFile) };
   }
   if (ts.isLiteralTypeNode(node)) {
     if (node.literal.kind === ts.SyntaxKind.NullKeyword) return { kind: "primitive", name: "null" };

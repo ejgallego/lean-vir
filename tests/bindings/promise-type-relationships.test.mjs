@@ -89,30 +89,36 @@ test("missing or changed upstream Promise relationships fail closed", () => {
   assert.throws(() => render(generation, upstream), diagnostic);
 });
 
-test("source-level callback-local generics cannot masquerade as the receiver parameter", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "lean-vir-promise-binders-"));
-  try {
-    const path = join(directory, "lib.d.ts");
-    const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
-    const original = "onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>)";
-    assert.ok(source.includes(original), "pinned source mutation must target the fulfillment callback");
-    const mutated = source.replaceAll(original, "onfulfilled?: (<T>(value: T) => TResult1 | PromiseLike<TResult1>)");
-    await writeFile(path, mutated);
-    const upstream = await generateDescriptorFile({
-      files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
-      symbols: new Set(["Promise"]), symbolFiles: [], sourceUrl: null,
-      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
-    });
-    const handler = upstream.symbols.find((symbol) => symbol.id === "Promise.then").shape.args[0].type.element;
-    assert.equal(handler.kind, "opaque");
-    assert.match(handler.name, /^<T>/u, "unsupported syntax retains the local binder");
-    assert.throws(() => render(generation, upstream), diagnostic);
-    assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2345),
-      "the TS compiler independently rejects our monomorphic callback at the mutated boundary");
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-});
+for (const [label, input, unsupportedPart, syntax] of [
+  ["callback-local generics", "<T>(value: T)", (handler) => handler, /^<T>/u],
+  ["keyof callback inputs", "(value: keyof T)", (handler) => handler.args[0].type, /^keyof T$/u],
+]) {
+  test(`source-level ${label} cannot masquerade as the receiver parameter`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "lean-vir-promise-relationship-"));
+    try {
+      const path = join(directory, "lib.d.ts");
+      const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+      const original = "onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>)";
+      assert.ok(source.includes(original), "pinned source mutation must target the fulfillment callback");
+      const mutated = source.replaceAll(original, `onfulfilled?: (${input} => TResult1 | PromiseLike<TResult1>)`);
+      await writeFile(path, mutated);
+      const upstream = await generateDescriptorFile({
+        files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+        symbols: new Set(["Promise"]), symbolFiles: [], sourceUrl: null,
+        dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+      });
+      const handler = upstream.symbols.find((symbol) => symbol.id === "Promise.then").shape.args[0].type.element;
+      const unsupported = unsupportedPart(handler);
+      assert.equal(unsupported.kind, "opaque");
+      assert.match(unsupported.name, syntax, "unsupported syntax must not be erased");
+      assert.throws(() => render(generation, upstream), diagnostic);
+      assert.ok(diagnostics(wrappers, mutated).some((d) => d.code === 2345),
+        "the TS compiler independently rejects our callback at the mutated boundary");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 test("upstream binder renaming and union ordering do not change the translation", () => {
   const rename = (value) => {
