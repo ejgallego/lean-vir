@@ -62,5 +62,5 @@ Related ownership:
 - `web/tools/binding-explorer/`: maintained static explorer presentation.
 - `build/bindings/` and `build/type-descriptors/`: ignored generated outputs.
 
-See `docs/BINDING_MODALITIES.md` for the inference rules, provenance contract,
+See `docs/reference/BINDING_MODALITIES.md` for the inference rules, provenance contract,
 and fail-closed extension boundary.

@@ -57,4 +57,4 @@ does not guess their absence semantics.
 For shipped binding architecture, guarantees, and the primary interactive
 report, see [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md). For the translation
 rules that create generated binding operations and Lean declarations, see
-[BINDING_MODALITIES.md](BINDING_MODALITIES.md).
+[BINDING_MODALITIES.md](reference/BINDING_MODALITIES.md).

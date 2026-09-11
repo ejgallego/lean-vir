@@ -2,7 +2,7 @@
 
 The focused measurements from 2026-08-05 explain VIR's declaration-name hashes
 and lookup indices. They used fresh interpreter entries; the current benchmark uses a
-package-scoped session, as described in [Performance](PERFORMANCE.md#environment-lookup-workload).
+package-scoped session, as described in [Performance](../development/PERFORMANCE.md#environment-lookup-workload).
 
 ## Outcome
 
@@ -41,7 +41,7 @@ entries without depending on Illuminate:
   installation in a fresh Wasm instance while excluding instantiation and
   disposal.
 
-[Performance](PERFORMANCE.md#environment-lookup-workload) gives the report,
+[Performance](../development/PERFORMANCE.md#environment-lookup-workload) gives the report,
 profile and AB/BA comparison commands, including `--no-build` prerequisites
 and the complete comparison identity. Profiles are diagnostic; the timing
 comparisons below use unprofiled runs with matching artifacts and workloads.
@@ -130,7 +130,7 @@ a replacement baseline.
 
 VIR now retains the complete interpreter session for one package generation,
 including evaluated nullary constants across public calls; see the
-[interpreter lifecycle](UPSTREAM_BOUNDARY.md#package-instance-lifecycle).
+[interpreter lifecycle](../reference/UPSTREAM_BOUNDARY.md#package-instance-lifecycle).
 
 ## Name hashes and indices
 
@@ -163,7 +163,7 @@ persistent hash map for local entries. Its C++ interpreter uses
 The same C++ map measured faster than a sorted side index for VIR's flat
 declaration namespace.
 
-[Boundary fixtures](../fixtures/Boundary.lean) compare string and numeric
+[Boundary fixtures](../../fixtures/Boundary.lean) compare string and numeric
 `Name.hash` values against host Lean, including the largest UInt64 numeral and
 the oversized-numeral rule.
 
@@ -174,7 +174,7 @@ the interpreter. Lean's default lookup expects a valid `Lean.Environment` with
 module ownership and `Lean.IR.declMapExt` state, whereas `.irpkg` currently
 carries decoded declarations rather than an environment.
 
-[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+[ULC-0001](IR_DECLARATION_LOOKUP.md)
 records why constructing a valid environment pulls in a disproportionate
 compiler-initialization closure for declaration-only execution, and describes
 the proposed upstream provider API.

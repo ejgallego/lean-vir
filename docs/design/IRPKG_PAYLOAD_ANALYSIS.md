@@ -92,4 +92,4 @@ already a tiny share of these packages despite its behavioral complexity.
 Native externs are encoded as full extern declarations. A smaller encoding
 would still need to preserve the static registry boundary; package size alone
 does not justify general native lookup. The current binary and metadata
-validation contract is in [IRPKG_FORMAT.md](IRPKG_FORMAT.md).
+validation contract is in [IRPKG_FORMAT.md](../reference/IRPKG_FORMAT.md).

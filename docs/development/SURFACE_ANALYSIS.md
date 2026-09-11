@@ -311,5 +311,5 @@ Removing a primary blocker may expose another boundary. Only the comparison's
 A frontier applies to its captured target and capability policy. Changing
 either requires a new analysis; a capability may introduce further dependencies.
 Execution fidelity requires package generation, linking and host/Wasm
-comparison. [HARNESS.md](HARNESS.md#runtime-browser-and-analysis-work) lists
+comparison. [HARNESS.md](../HARNESS.md#runtime-browser-and-analysis-work) lists
 the analysis and browser-navigation checks.

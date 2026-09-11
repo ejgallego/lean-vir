@@ -2,10 +2,10 @@
 
 This is the implementation map for Lean VIR contributors. User setup lives in
 [README.md](../README.md), command details in [HARNESS.md](HARNESS.md), and the
-JavaScript boundary contract in [HOST_BINDINGS.md](HOST_BINDINGS.md).
+JavaScript boundary contract in [HOST_BINDINGS.md](reference/HOST_BINDINGS.md).
 
 Bindings preserve upstream JavaScript values and TypeScript type relationships.
-The [binding translation reference](BINDING_MODALITIES.md#type-parameter-fidelity)
+The [binding translation reference](reference/BINDING_MODALITIES.md#type-parameter-fidelity)
 describes supported mappings and gaps.
 
 ## Implementation Map
@@ -55,7 +55,7 @@ The boundary has three lifetime mechanisms:
 - JSL objects and converted callbacks retain foreign Lean payloads;
 - `HostLifecycle` tracks timers, frames and React roots that need termination.
 
-[HOST_BINDINGS.md](HOST_BINDINGS.md#lean-backed-javascript-values) owns the
+[HOST_BINDINGS.md](reference/HOST_BINDINGS.md#lean-backed-javascript-values) owns the
 lifetime, finalization, rollback and shared-map limits. Native DOM listeners
 remain caller-managed; ordinary JS object graphs use JavaScript reachability.
 
@@ -63,14 +63,14 @@ remain caller-managed; ordinary JS object graphs use JavaScript reachability.
 
 The browser binding uses official React 19 and ReactDOM with exact JavaScript
 values. React owns hook state and scheduling; component purity, hook ordering
-and effect discipline remain application responsibilities. The [React guide](REACT.md)
+and effect discipline remain application responsibilities. The [React guide](guides/REACT.md)
 describes native calls and the separate Lean conveniences.
 
 The Node wrapper provides no DOM or React implementation. Browser semantics
 are tested in Chromium.
 
 Normal infoview UI cleanup is not interpreter disposal; see the
-[shell ownership contract](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
+[shell ownership contract](reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
 ## Adding A Host Import
 

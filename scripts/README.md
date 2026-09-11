@@ -10,8 +10,8 @@ The documentation owners are:
 - `README.md` for the user-facing quickstart.
 - `docs/HARNESS.md` for setup, validation commands, generated-artifact policy,
   and CI shape.
-- `docs/PERFORMANCE.md` for benchmark capture and comparison workflows.
-- `docs/MAILBOX_PROTOCOL.md` for mailbox commands and message semantics.
+- `docs/development/PERFORMANCE.md` for benchmark capture and comparison workflows.
+- `docs/development/MAILBOX_PROTOCOL.md` for mailbox commands and message semantics.
 - `CONTRIBUTING.md` for branches, commits, pull requests, and
   `scripts/pr-message.sh`.
 

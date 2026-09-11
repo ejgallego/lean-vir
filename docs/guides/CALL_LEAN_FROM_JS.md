@@ -295,7 +295,7 @@ Common Lean values map to JavaScript values like this:
   `{ kind, fields }` depending on field count.
 - `ByteArray` uses `Uint8Array` in both directions.
 
-See `docs/JS_API.md` for the complete type surface, including `Sum`, `Except`,
+See `docs/guides/JS_API.md` for the complete type surface, including `Sum`, `Except`,
 `Lean.Expr`, nested structures, and host imports.
 
 ## Export Types Vs Host Import Types
@@ -365,7 +365,7 @@ Host imports are synchronous in the current prototype.
 Most app code can pass only its custom `hostBindings`; the built-in browser
 bindings stay installed as defaults. Packages that call
 `Lean.Vir.React.Root.*` in a browser also need the separate React host entry.
-See `docs/JS_API.md` for the canonical `defaultHostBindings` composition and
+See `docs/guides/JS_API.md` for the canonical `defaultHostBindings` composition and
 low-level binding factory reference.
 
 ## Troubleshooting

@@ -2,7 +2,7 @@
 
 Proposal based on the 2026-08-09 real-environment experiment. No upstream issue
 or PR is linked. The current implementation is documented in
-[UPSTREAM_BOUNDARY.md](../../../UPSTREAM_BOUNDARY.md).
+[UPSTREAM_BOUNDARY.md](../reference/UPSTREAM_BOUNDARY.md).
 
 ## Summary
 
@@ -29,7 +29,7 @@ decoded IR declarations.
 
 Correct `Name` hashes plus a package-owned `lean::name_hash_map` already made
 fresh entry 6.6x faster and halved sustained Illuminate callback time in the
-[recorded lookup measurements](../../../ENVIRONMENT_LOOKUP_PERFORMANCE.md).
+[recorded lookup measurements](ENVIRONMENT_LOOKUP_PERFORMANCE.md).
 This proposal addresses API interposition, not lookup performance.
 
 ## Why retain the local provider
@@ -184,12 +184,12 @@ boundaries.
 
 ## Evidence
 
-- [Environment lookup measurements and accepted design](../../../ENVIRONMENT_LOOKUP_PERFORMANCE.md)
-- [Current upstream boundary](../../../UPSTREAM_BOUNDARY.md)
-- [VIR interpreter bridge](../../../../wasm/upstream_shim/interpreter/interpreter_bridge.cpp)
-- [Package declaration provider](../../../../wasm/upstream_shim/package/package_decl_provider.cpp)
-- [IR metadata layout regression](../../../../wasm/upstream_shim/package/package_ir_builders_test.cpp)
-- [In-process paired Wasm benchmark](../../../../benchmarks/harness/bench-env-lookup-wasm-pair.mjs)
+- [Environment lookup measurements and accepted design](ENVIRONMENT_LOOKUP_PERFORMANCE.md)
+- [Current upstream boundary](../reference/UPSTREAM_BOUNDARY.md)
+- [VIR interpreter bridge](../../wasm/upstream_shim/interpreter/interpreter_bridge.cpp)
+- [Package declaration provider](../../wasm/upstream_shim/package/package_decl_provider.cpp)
+- [IR metadata layout regression](../../wasm/upstream_shim/package/package_ir_builders_test.cpp)
+- [In-process paired Wasm benchmark](../../benchmarks/harness/bench-env-lookup-wasm-pair.mjs)
 - [VIR PR #104: benchmark, indexed provider, and acceptance record](https://github.com/ejgallego/lean-vir/pull/104)
 
 The independent acceptance run measured 371.4 to 56.2 microseconds for fresh

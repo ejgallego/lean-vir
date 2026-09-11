@@ -7,8 +7,8 @@ npm commands build focused, single-member packages for local development.
 This is a browser-program workflow, not a general Lean-to-Wasm compiler.
 
 For application calls, follow [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md).
-[Generator internals](GENERATE_PACKAGE.md) owns compiled/live input selection;
-[the format reference](IRPKG_FORMAT.md) owns binary and manifest schemas.
+[Generator internals](../reference/GENERATE_PACKAGE.md) owns compiled/live input selection;
+[the format reference](../reference/IRPKG_FORMAT.md) owns binary and manifest schemas.
 
 ## Add the Lake dependency
 
@@ -135,8 +135,8 @@ effects does not include it. Expose browser lifecycle work as a reached
 
 Every member is an ordinary format-11 `.irpkg`. The descriptor binds its module,
 role and bytes; the runtime validates the set before running initializers.
-See the [descriptor schema](IRPKG_FORMAT.md#package-set-descriptor) and
-[load transaction](UPSTREAM_BOUNDARY.md#package-instance-lifecycle) for exact
+See the [descriptor schema](../reference/IRPKG_FORMAT.md#package-set-descriptor) and
+[load transaction](../reference/UPSTREAM_BOUNDARY.md#package-instance-lifecycle) for exact
 ordering, integrity and duplicate-identity rules. Browsers load neither
 `.olean` nor Lean's raw `.ir` files.
 
@@ -212,7 +212,7 @@ replacement resets that state; failed replacement preserves it. The
 [replacement API](JS_API.md#replacing-a-package-set) owns candidate failure,
 old-generation invalidation and cleanup-failure behavior.
 
-The [SlidesCanvas example](../examples/SlidesCanvas.lean) creates its DOM and
+The [SlidesCanvas example](../../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:
 
 ```bash
@@ -304,7 +304,7 @@ npm run inspect:irpkg -- --json build/generated/local.irpkg
 Text output includes the envelope, section directory, metadata, targets,
 exports, host imports, argument/result types and diagnostics. `--json` emits
 the parsed header and full manifest for tooling or bug reports. The
-[format reference](IRPKG_FORMAT.md) defines the fields.
+[format reference](../reference/IRPKG_FORMAT.md) defines the fields.
 
 ## Load the development runner
 
@@ -324,10 +324,10 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 
 `entry` accepts a manifest `id`, `jsName` or Lean declaration name. The Pages
 build's `prepare:pages` step generates URL-loadable samples in one generator
-session; [HARNESS.md](HARNESS.md) owns site build/check commands. Generated
+session; [HARNESS.md](../HARNESS.md) owns site build/check commands. Generated
 packages, reports and `web/dist/` remain ignored local outputs.
 
 The [JS API](JS_API.md#calls-and-manifest) defines caller values, while
-[host bindings](HOST_BINDINGS.md) defines the narrower Lean-to-JavaScript
+[host bindings](../reference/HOST_BINDINGS.md) defines the narrower Lean-to-JavaScript
 boundary. The runner needs the package's embedded manifest, not a separate
 interface sidecar.

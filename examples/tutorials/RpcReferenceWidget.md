@@ -9,7 +9,7 @@ This two-file tutorial separates application effects from the Lean renderer:
 
 This example is not yet an all-Lean async widget: its pending continuations are
 native JavaScript functions and cannot reenter a disposed Lean runtime. See the
-[RPC guide](../../docs/INFOVIEW.md) for the direct Promise
+[RPC guide](../../docs/guides/INFOVIEW.md) for the direct Promise
 API and the distinction between cancellation, stale results and disposal.
 
 The executable server example is [RpcBrowserServer.lean](../../fixtures/infoview/RpcBrowserServer.lean).
@@ -51,7 +51,7 @@ Replacing the runtime starts a new component lifetime. From the owning code,
 outside React rendering, unmount synchronously before disposing the old runtime.
 Then create a fresh runtime, component and root. `replacementOptions` contains
 the new package and the usual browser React providers; see the
-[runtime setup](../../docs/JS_API.md).
+[runtime setup](../../docs/guides/JS_API.md).
 
 ```js
 root.unmount(); // Synchronously runs effect cleanup and detaches Lean callbacks.

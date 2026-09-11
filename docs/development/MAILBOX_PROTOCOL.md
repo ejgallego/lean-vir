@@ -3,7 +3,7 @@
 Repository-local message transport for linked worktrees and dependent projects.
 Messages are ignored by Git; commits, issues and PRs remain the durable public
 record. Contribution and ownership rules are in
-[CONTRIBUTING.md](../CONTRIBUTING.md#agent-coordination).
+[CONTRIBUTING.md](../../CONTRIBUTING.md#agent-coordination).
 
 ## Canonical Mailbox
 

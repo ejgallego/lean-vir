@@ -198,7 +198,7 @@ still useful for the hottest exact scalar signatures because they avoid object
 allocation, but the JavaScript-facing runtime no longer has a value byte
 fallback.
 `VirRuntime.call` lowers and lifts the
-[supported manifest value types](JS_API.md#calls-and-manifest).
+[supported manifest value types](../guides/JS_API.md#calls-and-manifest).
 Constructors may mix object fields, raw `USize` slots and packed scalar fields,
 including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`

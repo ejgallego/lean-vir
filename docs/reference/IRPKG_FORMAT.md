@@ -2,8 +2,8 @@
 
 `.irpkg` files are the local binary packages loaded by the WASM shim. The
 format is internal to this repository. This reference owns the binary envelope,
-embedded manifest and package-set descriptor. [Packages](PACKAGES.md) explains
-generation and loading; [JS_API.md](JS_API.md#calls-and-manifest) owns caller
+embedded manifest and package-set descriptor. [Packages](../guides/PACKAGES.md) explains
+generation and loading; [JS_API.md](../guides/JS_API.md#calls-and-manifest) owns caller
 value shapes and [OBJECT_ABI.md](OBJECT_ABI.md) owns pointer layout/ownership.
 The binary header is authoritative for the package format version; embedded
 `metadata.packageFormatVersion` must match it.
@@ -70,8 +70,8 @@ roots. Live snapshot roots use `marked` with document provenance; neither path
 supports a source-loader fallback. All members in a set must record the same
 package/manifest versions and exact Lean version, toolchain, and git hash.
 
-See [Packages](PACKAGES.md#build-a-module-package-set) for producing/publishing
-a module set and [the JavaScript API](JS_API.md#module-package-sets) for loading
+See [Packages](../guides/PACKAGES.md#build-a-module-package-set) for producing/publishing
+a module set and [the JavaScript API](../guides/JS_API.md#module-package-sets) for loading
 one.
 
 Package format 11 has a fixed header followed by a section directory. All
@@ -158,13 +158,13 @@ for unsupported `Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases.
 After editing the Lean constants or enum mapping, run `npm run generate:ir-codec-tags`, then
 `npm run check:ir-codec-tags`.
 
-See [IRPKG_PAYLOAD_ANALYSIS.md](IRPKG_PAYLOAD_ANALYSIS.md) for a measured section
+See [IRPKG_PAYLOAD_ANALYSIS.md](../design/IRPKG_PAYLOAD_ANALYSIS.md) for a measured section
 snapshot and declaration-codec maintenance analysis.
 
 ## Embedded manifest
 
 The generator embeds the recursive interface type tree in section 5. Its
-[`Manifest.Encode`](../Vir/GeneratePackage/Manifest/Encode.lean) encoder emits:
+[`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean) encoder emits:
 
 | Record | Fields |
 | --- | --- |
@@ -215,8 +215,8 @@ and [host bindings](HOST_BINDINGS.md) for authoring and lifetime rules.
 Every descriptor has `type` (the applied Lean type label) and `interfaceTag`.
 Compound descriptors also have the `kind` and payload below. The numeric tags
 are package ABI, owned by
-[`Interface.Encode`](../Vir/GeneratePackage/Interface/Encode.lean) and checked
-against [`interface-tags.js`](../web/src/runtime/interface-tags.js) by
+[`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean) and checked
+against [`interface-tags.js`](../../web/src/runtime/interface-tags.js) by
 `npm run check:package-abi`. JS constant names in this table have the prefix
 `INTERFACE_TAG.`; unlisted tags are unsupported.
 
@@ -285,7 +285,7 @@ Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them require a
 compiler-generated `_boxed` declaration for wasm32 calls. Generation includes
 that companion or fails with an explicit diagnostic; it does not emit a partial
 package. Large exact integer results use decimal strings at the JS boundary;
-the [JS value reference](JS_API.md#calls-and-manifest) owns concrete shapes.
+the [JS value reference](../guides/JS_API.md#calls-and-manifest) owns concrete shapes.
 
 ### Resources and callbacks
 
@@ -331,12 +331,12 @@ layout validation and general size/depth/execution limits are not provided.
 The current artifact is core `wasm32-wasip1` with embedded JSON and the owned
 object-pointer `vir_call_resolved_objects` ABI. The descriptor-bearing named
 call and resolved value-byte lanes are removed. The checked-in
-[WIT interface](../interfaces/lean-vir.wit) is a proposed byte-payload interface,
+[WIT interface](../../interfaces/lean-vir.wit) is a proposed byte-payload interface,
 not this ABI or an implemented component-model boundary.
 
 ## Inspecting
 
-Follow [package inspection](PACKAGES.md#inspect-a-package). Text output prints
+Follow [package inspection](../guides/PACKAGES.md#inspect-a-package). Text output prints
 byte length, format, declaration count and section directory before the manifest
 summary. JSON exposes section data under `package.sections`, with each section's
 `kind`, `name`, `offset` and `byteLength`.

@@ -9,13 +9,13 @@ owns the object-helper interface.
 ## Boundary and provenance
 
 VIR compiles the unmodified `third_party/lean4-src/src/library/ir_interpreter.cpp`
-against the pinned Lean headers. [The local shim](../wasm/upstream_shim/README.md)
+against the pinned Lean headers. [The local shim](../../wasm/upstream_shim/README.md)
 supplies WASI policy and stubs for unsupported operations.
 
 The build selects upstream runtime, utility and kernel sources plus pinned
 stage0 C modules from
-[`native-support-sources.txt`](../wasm/upstream_shim/native-support-sources.txt).
-The [build script](../scripts/build-upstream-probe.sh) owns that source selection.
+[`native-support-sources.txt`](../../wasm/upstream_shim/native-support-sources.txt).
+The [build script](../../scripts/build-upstream-probe.sh) owns that source selection.
 Its generated `lean/config.h` leaves `LEAN_MIMALLOC` disabled because the pinned
 source checkout lacks vendored mimalloc sources for a WASI rebuild; Lean's
 ordinary allocator is used. The `githash.h` overlay records the source commit,
@@ -37,7 +37,7 @@ same manifest for package native-over-fallback selection and the Wasm build.
 
 ## Native boxed wrappers
 
-[`NativeExternSpec`](../Vir/GeneratePackage/NativeExterns.lean) stores VIR policy:
+[`NativeExternSpec`](../../Vir/GeneratePackage/NativeExterns.lean) stores VIR policy:
 declaration name, wrapper selection, explicit closure dependencies and an optional
 provider-symbol override. Its resolver obtains parameter IR types, borrow bits
 and result IR type from `Lean.IR.findEnvDecl`, and the C symbol from
@@ -57,7 +57,7 @@ materialized by generated adapters without a new shim provider.
 Local behavior belongs in raw providers. The three handwritten boxed ownership
 exceptions are `Array.ugetBorrowed`, `Array.getInternalBorrowed` and
 `Array.get!InternalBorrowed`. In
-[`native_symbols.cpp`](../wasm/upstream_shim/runtime/native_symbols.cpp), they
+[`native_symbols.cpp`](../../wasm/upstream_shim/runtime/native_symbols.cpp), they
 consume temporary input references retained by the interpreter and return the
 raw borrowed result. The calling IR also treats that result as borrowed;
 adding a result retain or substituting an owned getter would leak.
@@ -84,7 +84,7 @@ explicit local/generated symbol set. The final Wasm link remains strict.
 ## Real IR and declaration lookup
 
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
-[`package/decl_provider.h`](../wasm/upstream_shim/package/decl_provider.h).
+[`package/decl_provider.h`](../../wasm/upstream_shim/package/decl_provider.h).
 The provider returns `Option Decl` in Lean's actual constructor layout:
 
 - `Fun`/`Extern` declarations carry the real names, parameters, result type and
@@ -108,7 +108,7 @@ initializer mappings, host imports and export summaries on failure or clear.
 Binary fields are read into named locals before constructor calls, so decoding
 does not depend on C++ argument evaluation order.
 
-[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+[ULC-0001](../design/IR_DECLARATION_LOOKUP.md)
 records why a real compiler-environment prototype was disproportionate for
 declaration-only execution and motivates an upstream provider API. That proposal
 does not change the current package format or interpreter lifetime.
@@ -135,7 +135,7 @@ Successful handover tears down old callbacks, resources, host state and binding
 leases before adopting new exports. Old pointers, closure roots and package-local
 slots never cross the handover. If old-generation cleanup fails, cleanup still
 attempts all resources, disposes the candidate and leaves the public wrapper
-terminally disposed. See [the replacement API](JS_API.md#replacing-a-package-set)
+terminally disposed. See [the replacement API](../guides/JS_API.md#replacing-a-package-set)
 and [cleanup rules](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
 The package-set transaction inside the fresh instance is:
@@ -238,15 +238,15 @@ retain them under the host contract's reachability rules.
 | Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are instead package-backed and aligned with the table run through `lean_run_init`. |
 | Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. Stderr/error-printing helpers are no-ops. |
 | Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; they do not provide ordinary native exception recovery. |
-| Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](EXAMPLES_AND_FIXTURES.md#known-pretty-printer-boundary). |
+| Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](../development/EXAMPLES_AND_FIXTURES.md#known-pretty-printer-boundary). |
 
-Use the resolved native catalog and [fixture coverage](EXAMPLES_AND_FIXTURES.md) for
+Use the resolved native catalog and [fixture coverage](../development/EXAMPLES_AND_FIXTURES.md) for
 the supported surface, not an inferred promise of full Lean runtime support.
 
 ## Validation
 
-[Native tooling](../scripts/native/README.md) owns registry and wrapper checks;
-[HARNESS.md](HARNESS.md) selects checks and prerequisites. `npm run probe:upstream`
+[Native tooling](../../scripts/native/README.md) owns registry and wrapper checks;
+[HARNESS.md](../HARNESS.md) selects checks and prerequisites. `npm run probe:upstream`
 produces the strict-link boundary report at `build/upstream-probe/boundary.md`.
 Use `npm run inspect:native-wrappers` for the generated/handwritten classification
 and `npm run check:native-externs` for compiler-metadata resolution. Generated

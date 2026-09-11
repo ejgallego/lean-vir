@@ -1,8 +1,8 @@
 # Host Bindings
 
 This page documents the JavaScript side of Lean-to-JavaScript host imports.
-The Lean declarations are listed in [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),
-and the runtime facade is documented in [JS_API.md](JS_API.md).
+The Lean declarations are listed in [LEAN_VIR_LIBRARY.md](../guides/LEAN_VIR_LIBRARY.md),
+and the runtime facade is documented in [JS_API.md](../guides/JS_API.md).
 
 Lean calls a synchronous JavaScript function through a declaration marked
 with `@[vir_js "..."]`. Browser builds install the common and browser binding
@@ -160,7 +160,7 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 | --- | --- |
 | Normal infoview unmount or mounted-generation refresh | Unmounts the owned root and detaches shell references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
-| Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](JS_API.md#replacing-a-package-set). |
+| Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](../guides/JS_API.md#replacing-a-package-set). |
 
 Normal shell cleanup detaches its loaded reference before unmount and surfaces
 cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
@@ -260,7 +260,7 @@ framework's own validity rules.
 
 ## React Bindings
 
-The [React guide](REACT.md) owns component conversion, native values, hooks and
+The [React guide](../guides/REACT.md) owns component conversion, native values, hooks and
 supported call shapes. Official React/ReactDOM in Chromium supplies semantics;
 the host does not maintain an alternate hook or ownership model.
 
@@ -306,9 +306,9 @@ error. User bindings override built-ins with the same target name.
 
 ## Validation
 
-[HARNESS.md](HARNESS.md#runtime-browser-and-analysis-work) lists the runtime and
-browser checks. The [generation-lifetime](HARNESS.md#generation-gc-and-mocked-shell-lifetime)
-and [real-server](HARNESS.md#infoview-rpc-and-lifetime-checks) suites cover
+[HARNESS.md](../HARNESS.md#runtime-browser-and-analysis-work) lists the runtime and
+browser checks. The [generation-lifetime](../HARNESS.md#generation-gc-and-mocked-shell-lifetime)
+and [real-server](../HARNESS.md#infoview-rpc-and-lifetime-checks) suites cover
 foreign-value collection, UI cleanup and hard disposal separately.
 
 ## References

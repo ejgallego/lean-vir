@@ -3,12 +3,12 @@
 VIR packages compiled Lean modules or live module snapshots through one
 declaration index, closure collector, interface validator and emitter.
 Non-module developments and source-file package loading are unsupported.
-Use [Packages](PACKAGES.md) for commands, facets and caches, and the
+Use [Packages](../guides/PACKAGES.md) for commands, facets and caches, and the
 [format reference](IRPKG_FORMAT.md) for binary and manifest schemas.
 
 ## Entry points and selection
 
-[`tools/GeneratePackage.lean`](../tools/GeneratePackage.lean) parses CLI targets
+[`tools/GeneratePackage.lean`](../../tools/GeneratePackage.lean) parses CLI targets
 and calls `Vir.GeneratePackage.run`. Lake builds it as `.lake/build/bin/vir_irpkg`,
 used by the npm package scripts and fixture runner. Targets are required; the
 browser catalog, not the generator, owns demo roots and package composition.
@@ -81,7 +81,7 @@ Adding `module` changes default visibility: use `public` or `public section`
 for intended interface declarations rather than exporting all dependencies.
 
 Local label removal does not retract compiled marker additions; see
-[marker visibility](PACKAGES.md#marker-validation-and-visibility). VIR adds no
+[marker visibility](../guides/PACKAGES.md#marker-validation-and-visibility). VIR adds no
 persistent removal metadata. Runtime ABI, manifest compatibility and raw-byte
 or package-set transport remain independent of input acquisition.
 
@@ -94,17 +94,17 @@ adapters require matching module-capable dependencies/toolchains.
 The public shim and pipeline library use Lean's module system. Downstream
 `module` sources may `public import Vir.GeneratePackage` or import a narrower
 module. The map below groups shared policy separately from orchestration;
-[surface analysis](SURFACE_ANALYSIS.md) owns the independent analysis tools.
+[surface analysis](../development/SURFACE_ANALYSIS.md) owns the independent analysis tools.
 
 | Boundary | Source owners |
 | --- | --- |
-| Targets and acquisition | [`Basic`](../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. |
-| Names and dependency closure | [`LeanName`](../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
-| Native and host metadata | [`NativeExterns`](../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../scripts/native/README.md). [`HostMetadata`](../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. |
-| Interface policy | [`Interface.Model`](../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
-| Classification and collection | [`Interface.Classify`](../Vir/Interface/Classify/) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../Vir/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
-| Encoding | [`PackageFormat`](../Vir/GeneratePackage/PackageFormat.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../Vir/GeneratePackage/PackageIRTags.lean) owns Name/IR tags. [`Interface.Encode`](../Vir/GeneratePackage/Interface/Encode.lean), [`Manifest.Encode`](../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../Vir/GeneratePackage/Json.lean) and [`Emit`](../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
-| Output | [`Manifest`](../Vir/GeneratePackage/Manifest.lean) assembles metadata/interface diagnostics, [`Report`](../Vir/GeneratePackage/Report.lean) renders them, and [`Run`](../Vir/GeneratePackage/Run.lean) orchestrates generation and filesystem writes. |
+| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. |
+| Names and dependency closure | [`LeanName`](../../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
+| Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. |
+| Interface policy | [`Interface.Model`](../../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
+| Classification and collection | [`Interface.Classify`](../../Vir/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
+| Encoding | [`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/GeneratePackage/PackageIRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/GeneratePackage/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
+| Output | [`Manifest`](../../Vir/GeneratePackage/Manifest.lean) assembles metadata/interface diagnostics, [`Report`](../../Vir/GeneratePackage/Report.lean) renders them, and [`Run`](../../Vir/GeneratePackage/Run.lean) orchestrates generation and filesystem writes. |
 
 ## Data flow and initialization
 
@@ -139,7 +139,7 @@ module. The map below groups shared policy separately from orchestration;
 Selection is declaration-driven: an otherwise-unreferenced import is not
 included merely because it has an initializer. A reached `@[vir_startup]` hook
 is the appropriate root for browser lifecycle work. Facet output ownership and
-cache invalidation are documented in [Packages](PACKAGES.md#rebuilds-and-output-ownership).
+cache invalidation are documented in [Packages](../guides/PACKAGES.md#rebuilds-and-output-ownership).
 
 ## Shared interface analysis
 
@@ -163,9 +163,9 @@ Supported layouts and descriptor fields are specified in
 
 ## Version changes
 
-[`PackageFormat`](../Vir/GeneratePackage/PackageFormat.lean) owns Lean's binary,
+[`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns Lean's binary,
 manifest and package-set versions and descriptor identity.
-[`package-versions.mjs`](../scripts/packages/package-versions.mjs) owns the
+[`package-versions.mjs`](../../scripts/packages/package-versions.mjs) owns the
 JavaScript expectations for binary, manifest and runtime ABI compatibility.
 `npm run check:package-abi` checks identities, versions and sections across
 Lean/Lake/C++/JS, plus interface tags and host-boundary tables.
@@ -205,4 +205,4 @@ first-discovered root-to-blocker path after `via`; the CLI prints the same path.
 | Boxed boundary diagnostics | Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them need compiler-generated `_boxed` companions at the wasm32 boundary. Generation includes an available companion and fails explicitly when it is missing. |
 
 Validation commands are documented in
-[HARNESS.md](HARNESS.md#package-and-fixture-work).
+[HARNESS.md](../HARNESS.md#package-and-fixture-work).

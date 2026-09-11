@@ -15,7 +15,7 @@ For downstream Lake packages, the preferred workflow is:
 
 See
 [Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
-for the short form and [docs/PACKAGES.md](docs/PACKAGES.md) for
+for the short form and [docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) for
 the complete client workflow. The repository-local package runner remains the
 quickest way to explore one Lean module manually: it reads the embedded interface
 manifest and builds runnable controls automatically.
@@ -81,7 +81,7 @@ v2 records every member's byte length and SHA-256; the package facet installs
 the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
-[docs/PACKAGES.md](docs/PACKAGES.md) and the entirely
+[docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) and the entirely
 Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
 real Lake target in this repository:
 
@@ -165,7 +165,7 @@ The manifest-driven call path supports pure declarations and recognized
 synchronous effects (`RuntimeM`, `IO`, `DomM`, and `ReactM`) over the currently
 supported scalar, array/list, option, product, sum, except, structure, enum,
 `ByteArray`, and `Lean.Expr` shapes. See
-[docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
+[docs/guides/CALL_LEAN_FROM_JS.md](docs/guides/CALL_LEAN_FROM_JS.md) for the full JavaScript
 guide, including `Sum` and `Except` result shapes.
 
 ## Try, Examples, And Reports
@@ -183,10 +183,10 @@ surfaces separate by purpose:
 - **Inspect:** compare browser backends, runnable library coverage, and Wasm
   size.
 
-Public applications live under [examples/](examples/), small teaching sources
-under [examples/tutorials/](examples/tutorials/), and conformance or regression
-coverage under [fixtures/](fixtures/). See
-[Examples, tutorials, and fixtures](docs/EXAMPLES_AND_FIXTURES.md) for the
+Public applications live under [examples/](examples), small teaching sources
+under [examples/tutorials/](examples/tutorials), and conformance or regression
+coverage under [fixtures/](fixtures). See
+[Examples, tutorials, and fixtures](docs/development/EXAMPLES_AND_FIXTURES.md) for the
 ownership rules.
 
 The deployment from `main` follows the same layout:
@@ -204,7 +204,7 @@ runnable-surface report tracks installed declarations with complete VIR
 closures; the size explorer breaks the release and debug Wasm artifacts down by
 section, object, and symbol.
 
-See [docs/SURFACE_ANALYSIS.md](docs/SURFACE_ANALYSIS.md) for local analysis,
+See [docs/development/SURFACE_ANALYSIS.md](docs/development/SURFACE_ANALYSIS.md) for local analysis,
 rendering, and serving commands.
 
 ## Browser Bundles And SDK Artifacts
@@ -263,28 +263,28 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 - [docs/README.md](docs/README.md) for a map of maintainer and integration
   documentation.
-- [docs/EXAMPLES_AND_FIXTURES.md](docs/EXAMPLES_AND_FIXTURES.md) for deciding
+- [docs/development/EXAMPLES_AND_FIXTURES.md](docs/development/EXAMPLES_AND_FIXTURES.md) for deciding
   whether client code is a public example, a tutorial, or a test fixture.
 - [benchmarks/browser/README.md](benchmarks/browser/README.md) for contributing
   a self-contained browser example, differential suite, or artifact build.
 - [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for implementation paths,
   call-flow diagrams, and object ownership.
-- [docs/PACKAGES.md](docs/PACKAGES.md) for module registration, marked exports,
+- [docs/guides/PACKAGES.md](docs/guides/PACKAGES.md) for module registration, marked exports,
   Lake facets, local packages and SDK installation.
-- [docs/CLIENT_NATIVE_EXTERNS.md](docs/CLIENT_NATIVE_EXTERNS.md) for selecting
+- [docs/reference/CLIENT_NATIVE_EXTERNS.md](docs/reference/CLIENT_NATIVE_EXTERNS.md) for selecting
   project-owned native externs and compiling their C/C++ providers into Wasm.
-- [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported
+- [docs/guides/CALL_LEAN_FROM_JS.md](docs/guides/CALL_LEAN_FROM_JS.md) for calling exported
   Lean declarations from app JavaScript.
-- [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
+- [docs/guides/JS_API.md](docs/guides/JS_API.md) for using the runtime wrapper from
   JavaScript.
-- [docs/HOST_BINDINGS.md](docs/HOST_BINDINGS.md) for JavaScript host binding
+- [docs/reference/HOST_BINDINGS.md](docs/reference/HOST_BINDINGS.md) for JavaScript host binding
   targets, external hosts, and resource cleanup.
-- [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
+- [docs/guides/LEAN_VIR_LIBRARY.md](docs/guides/LEAN_VIR_LIBRARY.md) for Lean-side host
   import helpers.
-- [docs/REACT.md](docs/REACT.md) for components, hooks and supported React calls;
-  [docs/INFOVIEW.md](docs/INFOVIEW.md) for editor widgets and RPC.
-- [docs/IRPKG_FORMAT.md](docs/IRPKG_FORMAT.md) and
-  [docs/OBJECT_ABI.md](docs/OBJECT_ABI.md) for package metadata and object transport.
+- [docs/guides/REACT.md](docs/guides/REACT.md) for components, hooks and supported React calls;
+  [docs/guides/INFOVIEW.md](docs/guides/INFOVIEW.md) for editor widgets and RPC.
+- [docs/reference/IRPKG_FORMAT.md](docs/reference/IRPKG_FORMAT.md) and
+  [docs/reference/OBJECT_ABI.md](docs/reference/OBJECT_ABI.md) for package metadata and object transport.
 
 ## Repository Layout
 

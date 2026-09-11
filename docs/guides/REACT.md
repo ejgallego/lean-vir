@@ -2,7 +2,7 @@
 
 VIR binds native React values and operations for Lean-authored components.
 Start here for component authoring; use [Infoview](INFOVIEW.md) to mount a
-widget in the editor or call its Lean server. The [host contract](HOST_BINDINGS.md)
+widget in the editor or call its Lean server. The [host contract](../reference/HOST_BINDINGS.md)
 owns shared JavaScript identity and foreign-heap lifetime rules.
 
 ## Values and construction
@@ -40,8 +40,8 @@ and notation over these operations, not a serializable or alternate node tree.
 `Html.ofComponent` passes `ComponentProps` containing props and child `Html`
 actions to an ordinary Lean component function.
 
-The [HTML fixture](../fixtures/ProofWidgetsHtml.lean) and
-[JSX fixture](../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
+The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
+[JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
 interpolated attributes, text/child spreads, uppercase components, typed props,
 keys and handlers. This native authoring facade is distinct from upstream's
 [serialized `ProofWidgets.Html` protocol](INFOVIEW.md#optional-serialized-html).
@@ -67,7 +67,7 @@ callers must retain and reuse a root for updates. Root registration supports exp
 runtime teardown; failed publication of a newly created root rolls it back.
 `Root.unmount` calls the native method before removing that registration, so a
 failed unmount remains available for runtime cleanup. See
-[active resources](HOST_BINDINGS.md#active-resources) for the lifecycle contract.
+[active resources](../reference/HOST_BINDINGS.md#active-resources) for the lifecycle contract.
 
 ## Hooks, refs and events
 
@@ -93,8 +93,8 @@ VIR keeps no speculative hook slots, action queues or dependency leases.
 ## Supported calls and gaps
 
 This table describes selected call shapes, not full React coverage. The
-[generated declarations](../Vir/React/Generated.lean) and
-[Lean conveniences](../Vir/React.lean) own exact signatures. The comparison
+[generated declarations](../../Vir/React/Generated.lean) and
+[Lean conveniences](../../Vir/React.lean) own exact signatures. The comparison
 baseline is the [React 19.2 public reference](https://react.dev/reference/react).
 
 | React operation | Lean surface and boundary |
@@ -127,10 +127,10 @@ options such as `identifierPrefix`.
 
 `lean-vir/react-host-bindings` installs the official browser React/ReactDOM
 providers separately from the generic runtime. The code in
-[`web/src/react/`](../web/src/react/) calls public React APIs; it contains no
+[`web/src/react/`](../../web/src/react) calls public React APIs; it contains no
 copied reconciler or hook implementation. Its extra JS implements explicit
 Lean-function conversion, `leanProps` placement and browser-root lifecycle.
-The [object ABI](OBJECT_ABI.md#externref-and-foreign-values) explains the Wasm
+The [object ABI](../reference/OBJECT_ABI.md#externref-and-foreign-values) explains the Wasm
 transport; it is not another React API.
 
 Official React 19, ReactDOM and Chromium are the semantic oracle. The Node
@@ -143,5 +143,5 @@ render/unmount and reused versus replaced component functions. The Lean/Wasm
 `useId` fixture checks committed rerender stability, distinct IDs and accessible
 label/input/description links across instances and roots, with and without
 Strict Mode. Use the
-[browser checks](HARNESS.md#browser-smoke); editor/RPC behavior has
-[separate real-server acceptance](HARNESS.md#infoview-rpc-and-lifetime-checks).
+[browser checks](../HARNESS.md#browser-smoke); editor/RPC behavior has
+[separate real-server acceptance](../HARNESS.md#infoview-rpc-and-lifetime-checks).

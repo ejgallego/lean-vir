@@ -1,6 +1,6 @@
 # Performance
 
-For setup and generated-artifact prerequisites, see [HARNESS.md](HARNESS.md).
+For setup and generated-artifact prerequisites, see [HARNESS.md](../HARNESS.md).
 
 `npm run bench` runs the manifest-driven JavaScript runtime benchmark against
 the host Lean IR baseline. It restores or stores built benchmark inputs under
@@ -94,10 +94,10 @@ npm run bench:env-lookup -- \
 
 The profiling path uses the optimized, unstripped debug Wasm companion. Its
 timings are marked diagnostic and are not before/after evidence. See
-[Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
+[Environment Lookup Performance](../design/ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
 baseline and final profiles, measured representation experiments, and accepted
 local design.
-[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+[ULC-0001](../design/IR_DECLARATION_LOOKUP.md)
 owns the remaining environment/provider API decision.
 
 When the intervention is a Wasm build mode rather than a source-checkout
@@ -121,7 +121,7 @@ slower/equal/faster round counts as diagnostics.
 
 The `Std.Format` conversion rows and measured
 manifest-derived normalization-plan cache are documented in
-[Custom Inductive Object Conversion Performance](OBJECT_CONVERSION_PERFORMANCE.md).
+[Custom Inductive Object Conversion Performance](../design/OBJECT_CONVERSION_PERFORMANCE.md).
 
 Compare two saved reports with:
 
@@ -137,7 +137,7 @@ compares five `Std.Format.prettyM` backends. It runs independently of the VIR
 documentation site, Reveal and Verso.
 
 Root commands use the `bench:browser:*` prefix as convenience pointers. See
-[`benchmarks/browser/README.md`](../benchmarks/browser/README.md) for the
+[`benchmarks/browser/README.md`](../../benchmarks/browser/README.md) for the
 command list, ignored artifact layout, example contribution
 format, and measurement cautions.
 
@@ -168,7 +168,7 @@ a small boundary call. They answer different questions.
 The comparison checks common rows for sample names, iteration counts and
 checksums before printing per-call deltas. Rows present in only one report
 are listed separately with their per-call medians. The
-[benchmark sources](../benchmarks/) define the row catalog.
+[benchmark sources](../../benchmarks) define the row catalog.
 
 The `format-tag-transitions` representative row and `format-empty-nodes`
 focused row use `pretty-printer.irpkg` to measure recursive `Std.Format`
@@ -178,8 +178,8 @@ a deep recursive Lean `DomM` loop.
 
 React is absent from this Node benchmark: the Node bindings provide neither
 a DOM nor React implementation. React performance needs the real browser host
-and a browser-catalog workload. [HARNESS.md](HARNESS.md#browser-smoke) covers
-semantic checks; [OBJECT_ABI.md](OBJECT_ABI.md) defines object conversion.
+and a browser-catalog workload. [HARNESS.md](../HARNESS.md#browser-smoke) covers
+semantic checks; [OBJECT_ABI.md](../reference/OBJECT_ABI.md) defines object conversion.
 
 The machine-readable report schema is `lean-vir.bench.v1`, with rows under
 `benchmarks`. Samples named `lower`, `wasm`, `native`, `host`,
