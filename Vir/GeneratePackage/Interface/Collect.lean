@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.GeneratePackage.Closure
+public import Vir.Host
 public import Vir.HostValidation
 public import Vir.InterfaceValidation
 
@@ -153,11 +154,18 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                 }
           | .error diagnostic => return .error diagnostic
 
-def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
-  index.sources.findSome? fun source =>
-    match source.env.find? name with
-    | some info => some (source.display, source.env, info)
-    | none => none
+private def capturedHostImport? (env : Environment) (name : Name)
+    (marker : Vir.HostMetadata.HostImportMarker) : Option Lean.Vir.JsImport :=
+  match marker with
+  | .hostImport => virJsAttr.getParam? env name
+  | .explicitConversion => virJsExplicitConversionAttr.getParam? env name
+
+def DeclIndex.hostImportContext? (index : DeclIndex) (name : Name)
+    (marker : Vir.HostMetadata.HostImportMarker) : Option (String × Environment) := Id.run do
+  let contextFor (accept : Environment → Bool) := index.sources.findSome? fun source =>
+    if accept source.env then some (source.display, source.env) else none
+  return contextFor (fun env => (env.find? name).isSome) <|>
+    contextFor (fun env => (capturedHostImport? env name marker).isSome)
 
 def hostImportSymbol (slot arity : Nat) : String :=
   s!"vir_js_import_{slot}_{arity}"
@@ -177,9 +185,20 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   if arity > maxHostImportArity then
     return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds current limit {maxHostImportArity}" }
   let env ← getEnv
-  let some info := env.find? loaded.decl.name
-    | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
-  match ← Vir.HostValidation.analyzeHostImport hostMetadata.marker target info.type with
+  let captured := capturedHostImport? env loaded.decl.name hostMetadata.marker
+  if captured.any (fun data => data.target != target) then
+    return .error {
+      name := loaded.decl.name
+      source := loaded.source
+      reason := "JavaScript import target differs from its validated attribute"
+    }
+  let analysis? ← match env.find? loaded.decl.name, captured with
+    | some info, _ => some <$> Vir.HostValidation.analyzeHostImport hostMetadata.marker target info.type
+    | none, some data => pure (some (.ok data.analysis))
+    | none, none => pure none
+  let some analysis := analysis?
+    | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration or validated attribute for JavaScript import" }
+  match analysis with
   | .error error =>
       let reason ← renderPackageMessage error.toMessageData
       return .error {
@@ -223,14 +242,15 @@ def collectHostImports (index : DeclIndex) (closure : Closure) : IO (Array HostI
   for loaded in closure.decls do
     if isVirJsDecl loaded.decl && !seen.contains loaded.decl.name then
       seen := seen.insert loaded.decl.name
-      match index.constInfo? loaded.decl.name with
+      let some metadata := virJsMetadataFromDecl? loaded.decl | continue
+      match index.hostImportContext? loaded.decl.name metadata.marker with
       | none =>
           diagnostics := diagnostics.push {
             name := loaded.decl.name,
             source := loaded.source,
             reason := "source environment was not loaded"
           }
-      | some (source, env, _) =>
+      | some (source, env) =>
           match ← runCoreForSource source env (hostImportFor imports.size loaded) with
           | .ok hostImport => imports := imports.push hostImport
           | .error diagnostic => diagnostics := diagnostics.push diagnostic

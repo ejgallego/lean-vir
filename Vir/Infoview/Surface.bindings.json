@@ -24,7 +24,7 @@
     "protocolOperations": [
       {
         "id": "infoview.document-position", "group": "commands", "target": "infoview.documentPosition",
-        "lean": "Lean.Vir.Infoview.documentPositionJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Infoview.documentPosition", "marker": "vir_js",
         "reason": "Constructs the fixed host-side document-position record used by editor commands.",
         "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.documentPosition" },
         "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
@@ -39,7 +39,7 @@
       },
       {
         "id": "infoview.clipboard.write-text", "group": "clipboard", "target": "infoview.clipboard.writeText",
-        "lean": "Lean.Vir.Infoview.Clipboard.writeTextJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Infoview.Clipboard.writeText", "marker": "vir_js",
         "reason": "Implements the local synchronous infoview clipboard capability. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.",
         "upstreamRelation": { "kind": "local-contract", "member": "InfoviewClipboardHost.writeText" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
@@ -48,7 +48,7 @@
       },
       {
         "id": "infoview.command.reveal", "group": "commands", "target": "infoview.command.revealPosition",
-        "lean": "Lean.Vir.Infoview.Command.revealPositionJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Infoview.Command.revealPosition", "marker": "vir_js",
         "reason": "Dispatches the local editor reveal-position capability and reports whether a dispatcher handled it.",
         "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.revealPosition" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },
@@ -57,7 +57,7 @@
       },
       {
         "id": "infoview.command.insert", "group": "commands", "target": "infoview.command.insertText",
-        "lean": "Lean.Vir.Infoview.Command.insertTextJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Infoview.Command.insertText", "marker": "vir_js",
         "reason": "Dispatches the local editor insert-text capability and reports whether it was applied.",
         "upstreamRelation": { "kind": "local-contract", "member": "InfoviewCommandHost.insertText" },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" },

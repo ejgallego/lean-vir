@@ -247,7 +247,6 @@ assert.deepEqual(
   )?.path,
   [
     "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
-    "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
   ],
 );
 

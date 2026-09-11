@@ -28,7 +28,7 @@ def Counter : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
   let count ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toNat count.value
-  let label ← Node.text s!"Count: {value}"
+  let label ← Node.text (← Lean.Vir.JsValue.ofString s!"Count: {value}")
   Node.buttonWith #[
     Props.onClick do
       State.modify count fun previous => do
@@ -38,7 +38,15 @@ def Counter : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
 
 def mount (selector : String) : DomM Bool := do
   let component ← Counter
-  Root.mountFromSelector selector fun root =>
-    Root.renderComponent root component ()
+  let container ← Lean.Vir.Browser.Document.querySelector
+    (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
+  match ← Lean.Vir.Js.Nullable.toOption container with
+  | none => pure false
+  | some container => do
+      let root ← Lean.Vir.React.Root.create container
+      let props ← Lean.Vir.LeanRef.toJSL ()
+      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      Lean.Vir.React.Root.render root node
+      pure true
 
 end ReactCounterTutorial

@@ -38,11 +38,8 @@ function success(result) {
 
 try {
   success(lake(["build", "vir_irpkg", moduleName]));
-  const factory = createVirRuntimeFactory({
-    wasmBytes: await readFile(
-      join(repositoryRoot, "web/public/vir-upstream.wasm"),
-    ),
-  });
+  const wasmBytes = await readFile(join(repositoryRoot, "web/public/vir-upstream.wasm"));
+  const factory = createVirRuntimeFactory({ wasmBytes });
   async function generate(name, args) {
     const output = join(scratch, `${name}.irpkg`);
     const result = lake([
@@ -155,6 +152,56 @@ try {
     await assert.rejects(readFile(join(scratch, "invalid.irpkg")), { code: "ENOENT" });
     await assert.rejects(readFile(join(scratch, "invalid.report.md")), { code: "ENOENT" });
   }
+  // Public wrappers may reach private host declarations in a transitive owner.
+  // The closure needs both their compiled IR and their validated signature metadata,
+  // even when the compiler inlines the wrapper into the consumer.
+  const privateHost = await createTestModuleProject({
+    directory: join(scratch, "private-host-project"),
+    modules: {
+      "PrivateHost.Owner": `module
+public import Vir
+namespace PrivateHost
+@[vir_js "test.private.echo"]
+private opaque echo (value : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js String)
+@[inline] public def run (value : Lean.Vir.Js String) : Lean.Vir.RuntimeM (Lean.Vir.Js String) :=
+  echo value
+end PrivateHost
+`,
+      "PrivateHost.Consumer": `module
+public import PrivateHost.Owner
+@[vir_export]
+public def PrivateHost.answer (value : String) : Lean.Vir.RuntimeM String := do
+  Lean.Vir.JsValue.toString (← run (← Lean.Vir.JsValue.ofString value))
+`,
+    },
+  });
+  success(privateHost.build());
+  const privateOutput = join(scratch, "private-host.irpkg");
+  success(spawnSync(virIrpkgPath, [
+    privateOutput, join(scratch, "private-host.report.md"),
+    "--target-marked-module", "PrivateHost.Consumer",
+  ], { cwd: privateHost.directory, env: privateHost.env(), encoding: "utf8" }));
+  const privateBytes = await readFile(privateOutput);
+  const privateManifest = readIrPackageInfo(privateBytes).manifest;
+  validateInterfaceManifest(privateManifest);
+  assert.deepEqual(privateManifest.exports.map((entry) => entry.entry), ["PrivateHost.answer"]);
+  const privateImport = privateManifest.hostImports.find((entry) => entry.target === "test.private.echo");
+  assert.ok(privateImport);
+  assert.match(privateImport.name, /^_private\.PrivateHost\.Owner\./);
+  let privateCalls = 0;
+  const privateFactory = createVirRuntimeFactory({
+    wasmBytes,
+    hostBindings: { "test.private.echo": (value) => { privateCalls++; return value; } },
+  });
+  const privateRuntime = await privateFactory.createRuntime({ irPackageSet: [privateBytes] });
+  try {
+    assert.equal(privateRuntime.call("PrivateHost.answer", "private value"), "private value");
+    assert.equal(privateCalls, 1);
+  } finally {
+    privateRuntime.dispose();
+  }
+
   // Direct Lean import defaults to legacy visibility unless the caller opts
   // into the module system. A compiled .olean alone must not be sufficient.
   const legacy = await createTestModuleProject({
@@ -178,7 +225,7 @@ try {
     await assert.rejects(readFile(output), { code: "ENOENT" });
   }
   console.log(
-    "module input smoke ok: selection, provenance, reuse, no source re-elaboration, non-module and missing-module rejection",
+    "module input smoke ok: selection, provenance, reuse, private host imports, no source re-elaboration, non-module and missing-module rejection",
   );
 } finally {
   await rm(scratch, { recursive: true, force: true });

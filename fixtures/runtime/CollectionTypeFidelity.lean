@@ -21,7 +21,7 @@ set_option linter.unusedVariables false
 def sameElement {α : Type} (value : Js α) (index : Js Float) : RuntimeM (Js α) := do
   let array ← Js.Array.empty
   let _ ← Js.Array.push array value
-  Js.Array.getJs array index
+  Js.Array.get array index
 
 def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) :=
   sameElement value index
@@ -71,7 +71,7 @@ example (value : JSL String) : True := by
 
 example {α β : Type} (array : Js.Array α) (index : Js Float) : True := by
   fail_if_success
-    have wrong : RuntimeM (Js β) := Js.Array.getJs array index
+    have wrong : RuntimeM (Js β) := Js.Array.get array index
   trivial
 
 example {α β : Type} (array : Js.Array α) (value : Js β) : True := by
@@ -81,7 +81,7 @@ example {α β : Type} (array : Js.Array α) (value : Js β) : True := by
 
 example (array : Js.Array (LeanRef.Handle String)) (index : Js Float) : True := by
   fail_if_success
-    have forged : RuntimeM (JSL Nat) := Js.Array.getJs array index
+    have forged : RuntimeM (JSL Nat) := Js.Array.get array index
   trivial
 
 example (array : Js.Array Nat) (value : Nat) : True := by

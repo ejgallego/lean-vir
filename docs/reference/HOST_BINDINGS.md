@@ -236,15 +236,14 @@ The built-in groups closely follow their browser APIs:
   tokens. VIR keeps only private cancellation records for interpreter teardown;
 - `infoview.*` connects the widget host, including its exact native RPC session.
 
-Convenience conversions have separate Lean names. For example,
-`Document.querySelector` accepts exact `Js Document` and `Js String` values,
-while `querySelectorString` keeps the same explicit receiver and converts only
-the Lean `String`. This keeps both conversion and ambient-global selection out
-of the faithful low-level binding.
+Faithful bindings own the short operation names. For example,
+`Document.querySelector` accepts exact `Js Document` and `Js String` values.
+Callers convert Lean text with `JsValue.ofString` and nullable results with
+`Js.Nullable.toOption` explicitly; there is no parallel call-and-convert API.
 
 Canvas fill and stroke properties use the exact `Js CanvasStyle` union value.
 `CanvasStyle.ofString` is the explicit conversion from Lean-owned text into
-the union's string arm; both convenience setters then call the same faithful
+the union's string arm; callers pass that value directly to the faithful
 generated property setter used for gradients and patterns.
 
 Event-listener registration passes the exact JavaScript listener function to

@@ -46,7 +46,8 @@ def answer : Nat := 42
 @[vir_startup]
 def mount : DomM Unit := do
   let document ← Document.current
-  let some root ← Document.querySelectorString document "#vir-slide-root" | pure ()
+  let selector ← Lean.Vir.JsValue.ofString "#vir-slide-root"
+  let some root ← Lean.Vir.Js.Nullable.toOption (← Document.querySelector document selector) | pure ()
   let text ← Lean.Vir.JsValue.ofString "This DOM was updated from Lean"
   Element.setTextContent root (← Lean.Vir.Js.Nullable.ofJs text)
 

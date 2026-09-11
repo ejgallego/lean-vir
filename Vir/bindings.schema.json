@@ -76,6 +76,7 @@
         "target": { "type": "string", "minLength": 1 },
         "lean": { "type": "string", "minLength": 1 },
         "marker": { "enum": ["vir_js", "vir_js_explicit_conversion"] },
+        "visibility": { "enum": ["public", "private"] },
         "reason": { "type": "string", "minLength": 1 },
         "upstreamRelation": { "$ref": "#/$defs/protocolUpstreamRelation" },
         "activeEffect": { "enum": ["register", "use", "release"] },
@@ -167,6 +168,7 @@
         "reason": ["semantics"]
       },
       "properties": {
+        "visibility": { "enum": ["public", "private"] },
         "signature": { "type": "integer", "minimum": 0 },
         "omittedOptionalParameters": {
           "type": "array",

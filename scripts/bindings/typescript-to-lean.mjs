@@ -183,9 +183,10 @@ function renderOperation(operation, profile) {
   ].filter(Boolean).join("\n\n"));
   const marker = operation.host.marker ?? "vir_js";
   const typeParameters = operation.typeParameters ?? [];
+  const declarationPrefix = operation.lean.visibility === "private" ? "private opaque " : "opaque ";
   return {
     namespace: operation.lean.namespace,
-    text: `/--\n${publicDocumentation}\n\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, "opaque ")}`,
+    text: `/--\n${publicDocumentation}\n\n${operationModalities(operation, profile)}\n\nThis declaration is generated; edit ${operation.typescript.kind === "protocol" ? "the binding configuration" : "the TypeScript source or binding configuration"}.\n-/\n@[${marker} "${operation.host.target}"]\n${renderSignature(operation.lean.name, typeParameters, args, operation.effect.lean, operation.result.lean, declarationPrefix)}`,
   };
 }
 

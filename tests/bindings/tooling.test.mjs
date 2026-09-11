@@ -102,6 +102,7 @@ function buildDemoReport(targets, {
   mappings,
   surface = demoTypeScriptSurface,
   publicEntries = [],
+  declarationsByTarget = new Map(),
 } = {}) {
   const generation = demoGeneration(protocolOperations);
   generation.resources = { Widget: "Widget" };
@@ -125,7 +126,8 @@ function buildDemoReport(targets, {
       bindings: targets.map((target) => ({
         target,
         status: "provided",
-        declarations: [{ module: "Vir.Demo", source: { path: generation.output } }],
+        declarations: declarationsByTarget.get(target) ??
+          [{ module: "Vir.Demo", source: { path: generation.output } }],
         providers: ["demo"],
       })),
       publicEntries,
@@ -135,7 +137,7 @@ function buildDemoReport(targets, {
       title: "Demo",
       description: "Demo bindings.",
       path: "Vir/Demo.bindings.json",
-      lean: { modules: ["Vir.Demo"] },
+      lean: { modules: ["Vir.Demo", "Vir.Demo.Generated"] },
       generation,
       roots: [{
         id: "widget",
@@ -151,6 +153,48 @@ function buildDemoReport(targets, {
     repositoryPath("build", "bindings", "demo.coverage.json"),
   );
 }
+
+test("private generated bindings require exact compiler identity and public reachability", () => {
+  const target = "demo.widget.render";
+  const operation = { ...demoProtocolOperation(target, "preserving"), visibility: "private" };
+  const binding = {
+    declaration: "_private.Vir.Demo.Generated.0.Lean.Vir.Demo.Widget.render",
+    userName: operation.lean,
+    private: true,
+    module: "Vir.Demo.Generated",
+    source: { path: "Vir/Demo/Generated.lean" },
+  };
+  const entry = {
+    declaration: "Lean.Vir.Demo.Widget.renderOptional",
+    targets: [{ target, path: ["Lean.Vir.Demo.Widget.renderOptional", binding.declaration] }],
+  };
+  function report(declarations = [binding], publicEntries = [entry]) {
+    return buildDemoReport([target], {
+      protocolOperations: [operation], mappings: [], publicEntries,
+      declarationsByTarget: new Map([[target, declarations]]),
+    });
+  }
+  assert.deepEqual(report().issues, []);
+  assert.ok(report([binding], []).issues.some((issue) =>
+    issue.kind === "mapped-private-api-unreachable"));
+  assert.ok(report([binding], [{ ...entry, targets: [{ target, path: [entry.declaration] }] }])
+    .issues.some((issue) => issue.kind === "mapped-private-api-unreachable"),
+  "reaching the same target through another declaration is not evidence for this private binding");
+
+  for (const mutation of [
+    { userName: undefined },
+    { userName: "Lean.Vir.Demo.Widget.other" },
+    { private: false },
+    { module: "Vir.Demo" },
+    { source: { path: "Vir/Demo.lean" } },
+  ]) {
+    const changed = report([{ ...binding, ...mutation }]);
+    assert.ok(changed.issues.some((issue) => issue.kind === "mapped-private-binding-mismatch"),
+      JSON.stringify(mutation));
+  }
+  assert.ok(report([binding, binding]).issues.some((issue) =>
+    issue.kind === "mapped-private-binding-mismatch"));
+});
 
 test("unsupported members are excluded from automatic correspondence", () => {
   const target = "demo.widget.render";

@@ -23,15 +23,18 @@ def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
     Lean.Vir.Js.Object.set props
       (← Lean.Vir.JsValue.ofString "className")
       (← Lean.Vir.JsValue.ofString "greeting")
-    let children ← Lean.Vir.Js.Array.ofArray #[← Node.text s!"Hello, {name}"]
-    Node.createElementTag "section" props children
+    let text ← Lean.Vir.JsValue.ofString s!"Hello, {name}"
+    let children ← Lean.Vir.Js.Array.ofArray #[← Node.text text]
+    let tag ← ElementType.tag (← Lean.Vir.JsValue.ofString "section")
+    Node.createElement tag props children
 ```
 
 `Node.createElement` accepts the exact element type, props object and JS child
 array; the host spreads that array into React's variadic child arguments.
-`createElementTag` explicitly converts the Lean tag string first. `Node.text`
-similarly converts Lean text into a native string child. `fragment` and
-`keyedFragment` construct `React.Fragment` elements through the same boundary.
+`ElementType.tag` and `Node.text` take exact JavaScript strings; convert Lean
+strings explicitly with `JsValue.ofString`. `Node.fragment props children`
+constructs a `React.Fragment` element with exact props and a JavaScript child
+array, including an optional key in the props object.
 
 ### Lean HTML and JSX
 
@@ -51,19 +54,20 @@ keys and handlers. This native authoring facade is distinct from upstream's
 `Component.ofLean` converts a Lean render function into one ordinary JavaScript
 function. That returned function is the React component type: reuse it to
 preserve identity; creating a new function asks React to mount a different type.
-`Node.component` places Lean props in a `JSL` object under the native props
-object's `leanProps` field. React owns invocation, hook state, replay and keys.
+Its callback receives `JSL props`; recover the Lean value explicitly with
+`LeanRef.fromJSL`. `Node.component` accepts an explicitly boxed `JSL` props
+object and places it under the native props object's `leanProps` field. Reuse
+that box when props identity should stay stable. React owns invocation, hook
+state, replay and keys.
 
 `Root.create` returns the native `ReactDOMClient.createRoot` object.
-`Root.renderNode` calls its `render` method with the actual node; `Root.render`
-and `Root.renderComponent` are Lean composition that constructs that node first.
+`Root.render` calls its `render` method with the actual node. Construct that
+node explicitly before submitting it.
 Direct submissions need no VIR commit acknowledgement: React's JS graph keeps
 callbacks and JSL values reachable, and superseded graphs can be collected.
 
-`Root.createFromSelector` queries a container and creates a root when it exists,
-returning `none` otherwise. `mountFromSelector` runs an action on that new root
-and returns whether the selector matched. These helpers do not cache roots;
-callers must retain and reuse a root for updates. Root registration supports explicit
+Resolve and check the container explicitly before calling `Root.create`;
+retain and reuse the returned root for updates. Root registration supports explicit
 runtime teardown; failed publication of a newly created root rolls it back.
 `Root.unmount` calls the native method before removing that registration, so a
 failed unmount remains available for runtime cleanup. See
@@ -78,8 +82,11 @@ and reducer dispatchers remain React's functions.
 
 Convert Lean closures explicitly with `Reducer.ofLean`, `MemoCalculation.ofLean`
 or `Callback.ofUnary`. `EffectCallback.ofLean` creates React's setup function
-from Lean setup/cleanup actions; `Hooks.useLeanEffect` merely composes that
-conversion with native `useEffect`. A native function needs no conversion.
+from a `{ setup, cleanup }` record. Pass that function to `Hooks.useEffect`;
+a native function needs no conversion. This single public hook accepts optional
+dependencies: omission calls React without a dependency argument, while
+`some deps` passes the exact array, including an explicitly empty array.
+The two native arity implementations are private.
 
 Refs are the actual callback or `{ current }` object; React can write a DOM node
 or `null` to `current`. Event props store the exact handler function and receive
@@ -94,16 +101,16 @@ VIR keeps no speculative hook slots, action queues or dependency leases.
 
 This table describes selected call shapes, not full React coverage. The
 [generated declarations](../../Vir/React/Generated.lean) and
-[Lean conveniences](../../Vir/React.lean) own exact signatures. The comparison
+[Lean composition and builders](../../Vir/React.lean) own exact signatures. The comparison
 baseline is the [React 19.2 public reference](https://react.dev/reference/react).
 
 | React operation | Lean surface and boundary |
 | --- | --- |
 | `createElement(type, props, ...children)` | `Node.createElement` takes exact type/props and a JS child array. Tag/text/JSX helpers perform explicit construction above it. |
 | Function component | `Component.ofLean` creates the native function once; external component values can be passed as `Js ElementType`. |
-| `Fragment` | `Node.fragment` / `keyedFragment` build the native fragment; their Lean child-array conversion is a convenience. |
+| `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
-| `root.render(node)` / `root.unmount()` | `Root.renderNode` / `Root.unmount` call the native methods. |
+| `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
 | `useState(initial)` | Returns the exact state/setter array; `State.set` and `State.modify` offer value and functional-update conveniences. |
 | `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
 | `dispatch(action)` | `ReducerDispatch.dispatch` passes the exact action. |

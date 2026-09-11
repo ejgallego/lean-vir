@@ -32,8 +32,10 @@ opaque jsBumpNat (n : @& Lean.Vir.Js Nat) :
 The declaration is not implemented by Lean itself. It is callable when the
 declaration is packaged into a `.irpkg` and executed through the VIR JavaScript
 runtime. The attribute validates the declaration's complete interface signature
-and JavaScript host-boundary policy immediately; package generation repeats the
-same typed analysis as a final guard for raw extern metadata.
+and JavaScript host-boundary policy immediately and preserves that analysis in
+its compiled metadata. Package generation repeats typed analysis where the
+declaration is visible and uses the captured analysis for private imports;
+raw extern metadata still requires a visible declaration and typed validation.
 -/
 syntax (name := vir_js) "vir_js " str : attr
 syntax (name := vir_js_explicit_conversion) "vir_js_explicit_conversion " str : attr
@@ -44,7 +46,13 @@ namespace Lean.Vir
 structure JsImport where
   /-- JavaScript host target name, such as `"browser.document.getTitle"`. -/
   target : String
-  deriving Inhabited
+  /-- Analysis captured while the declaration's full type environment is available. -/
+  analysis : Vir.HostValidation.HostImportAnalysis
+
+instance : Inhabited JsImport := ⟨{
+  target := ""
+  analysis := { signature := { args := #[], result := .unit, effect := .pure }, boundary := .hostResource }
+}⟩
 
 private partial def firstStringLiteral? (stx : Syntax) : Option String :=
   match stx.isStrLit? with
@@ -60,17 +68,17 @@ private def parseNonEmptyStringAttr (attrName : Name) (stx : Syntax) : AttrM Str
 
 private def validateVirJsAttr
     (marker : Vir.HostMetadata.HostImportMarker) (declName : Name)
-    (data : JsImport) (stx : Syntax) :
-    AttrM Unit := do
+    (target : String) (stx : Syntax) :
+    AttrM Vir.HostValidation.HostImportAnalysis := do
   let env ← getEnv
   let some info := env.find? declName
     | throwErrorAt stx s!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
         Lean could not find the declaration"
-  match ← Vir.HostValidation.analyzeHostImport marker data.target info.type with
+  match ← Vir.HostValidation.analyzeHostImport marker target info.type with
   | .error error =>
       throwErrorAt stx m!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
         {error.toMessageData}"
-  | .ok _ => pure ()
+  | .ok analysis => pure analysis
 
 private def setVirJsExtern
     (marker : Vir.HostMetadata.HostImportMarker) (declName : Name) (data : JsImport) :
@@ -92,19 +100,22 @@ private def parseVirJsAttr
     (marker : Vir.HostMetadata.HostImportMarker)
     (declName : Name) (stx : Syntax) : AttrM JsImport := do
   let target ← parseNonEmptyStringAttr marker.attributeName stx
-  let data := { target : JsImport }
-  validateVirJsAttr marker declName data stx
+  let analysis ← validateVirJsAttr marker declName target stx
+  let data : JsImport := { target, analysis }
   setVirJsExtern marker declName data
   return data
 
 end Lean.Vir
 
+-- Private imports remain reachable runtime dependencies. Export their validated
+-- attribute data, not their Lean declarations or name-resolution aliases.
 initialize virJsAttr : ParametricAttribute Lean.Vir.JsImport ←
   registerParametricAttribute {
     name := `vir_js
     descr := "mark an opaque declaration as a Lean.Vir JavaScript host import"
     getParam := fun declName stx =>
       Lean.Vir.parseVirJsAttr .hostImport declName stx
+    filterExport := fun _ _ _ => true
   }
 
 initialize virJsExplicitConversionAttr : ParametricAttribute Lean.Vir.JsImport ←
@@ -113,4 +124,5 @@ initialize virJsExplicitConversionAttr : ParametricAttribute Lean.Vir.JsImport �
     descr := "mark a Lean.Vir JavaScript host import as an explicit conversion intrinsic"
     getParam := fun declName stx =>
       Lean.Vir.parseVirJsAttr .explicitConversion declName stx
+    filterExport := fun _ _ _ => true
   }

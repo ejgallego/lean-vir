@@ -24,6 +24,11 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {
+      "React.EffectCallback": {
+        "lean": "Lean.Vir.React.EffectCallback",
+        "semantics": "preserving",
+        "reason": "Lean.Vir.React.EffectCallback is the phantom marker for the exact JavaScript setup function."
+      },
       "React.ReactNode": {
         "lean": "Lean.Vir.React.Node",
         "semantics": "preserving",
@@ -36,6 +41,13 @@
       }
     },
     "methodPolicies": {
+      "React.useEffect": {
+        "visibility": "private",
+        "omittedOptionalParameters": ["deps"],
+        "parameterRenames": { "effect": "setup" },
+        "semantics": "preserving",
+        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument."
+      },
       "createRoot": { "omittedOptionalParameters": ["options"] }
     },
     "exceptions": {
@@ -104,7 +116,7 @@
       },
       {
         "id": "react.effect-callback.of-lean", "group": "value-conversions", "target": "js.value.react.effectCallback",
-        "lean": "Lean.Vir.React.EffectCallback.ofLeanJs", "marker": "vir_js_explicit_conversion",
+        "lean": "Lean.Vir.React.EffectCallback.ofLean", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts separate transferred Lean setup and cleanup callbacks into the ordinary JavaScript setup function shape accepted by React.useEffect.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
@@ -115,7 +127,7 @@
       },
       {
         "id": "react.component.of-lean", "group": "value-conversions", "target": "js.value.react.component",
-        "lean": "Lean.Vir.React.Component.ofLeanJs", "marker": "vir_js_explicit_conversion",
+        "lean": "Lean.Vir.React.Component.ofLean", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a transferred Lean render callback into one reusable JavaScript React function component; that returned function is the React component identity.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["props"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
@@ -167,17 +179,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Ref (Lean.Vir.Js α)" } }
       },
       {
-        "id": "react.hooks.use-effect", "group": "hooks", "target": "react.useEffect",
-        "lean": "Lean.Vir.React.Hooks.useEffectWithoutDeps", "marker": "vir_js",
-        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "setup", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "react.hooks.use-memo", "group": "hooks", "target": "react.useMemo",
         "lean": "Lean.Vir.React.Hooks.useMemo", "marker": "vir_js",
         "reason": "Passes the caller's native calculation function and dependency array unchanged to React.useMemo.",
@@ -215,6 +216,7 @@
       {
         "id": "react.hooks.use-effect-with-deps", "group": "hooks", "target": "react.useEffectWithDeps",
         "lean": "Lean.Vir.React.Hooks.useEffectWithDeps", "marker": "vir_js",
+        "visibility": "private",
         "reason": "Passes the caller's native setup function and dependency array unchanged to React.useEffect.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -247,7 +249,7 @@
       },
       {
         "id": "react.element-type.tag", "group": "element-type", "target": "react.elementType.tag",
-        "lean": "Lean.Vir.React.ElementType.tagJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.ElementType.tag", "marker": "vir_js",
         "reason": "Uses the exact DOM tag string as a React ElementType value.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -256,7 +258,7 @@
       },
       {
         "id": "react.node.text", "group": "nodes", "target": "react.node.text",
-        "lean": "Lean.Vir.React.Node.textJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.text", "marker": "vir_js",
         "reason": "Uses the exact JavaScript string as a React text node.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -278,7 +280,7 @@
       },
       {
         "id": "react.node.component", "group": "nodes", "target": "react.node.component",
-        "lean": "Lean.Vir.React.Node.componentJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.component", "marker": "vir_js",
         "reason": "Calls React.createElement with the exact JavaScript function component and JSL-backed Lean props.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -291,7 +293,7 @@
       },
       {
         "id": "react.node.keyed-component", "group": "nodes", "target": "react.node.keyedComponent",
-        "lean": "Lean.Vir.React.Node.keyedComponentJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.keyedComponent", "marker": "vir_js",
         "reason": "Calls React.createElement with the exact JavaScript function component, JSL-backed Lean props, and key.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -305,7 +307,7 @@
       },
       {
         "id": "react.node.fragment", "group": "nodes", "target": "react.node.fragment",
-        "lean": "Lean.Vir.React.Node.fragmentWithKeyJs", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.fragment", "marker": "vir_js",
         "reason": "Calls React.createElement with React.Fragment, the exact props object, and child array values.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -387,7 +389,7 @@
         {
           "typescript": "Root.render",
           "targets": ["react.root.renderNode"],
-          "lean": ["Lean.Vir.React.Root.renderNode"]
+          "lean": ["Lean.Vir.React.Root.render"]
         },
         {
           "typescript": "Root.unmount",
@@ -408,6 +410,11 @@
       "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.Hooks.DependencyList", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerState", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.State", "Lean.Vir.React.StateSetter", "Lean.Vir.React.StateTuple"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useId", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] },
       "mappings": [
+        {
+          "typescript": "React.useEffect",
+          "targets": ["react.useEffect"],
+          "lean": ["Lean.Vir.React.Hooks.useEffectWithoutDeps"]
+        },
         {
           "typescript": "React.useId",
           "targets": ["react.useId"],

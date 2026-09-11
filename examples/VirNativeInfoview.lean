@@ -198,37 +198,39 @@ def hypothesisNames (hypothesis : Hypothesis) : String :=
     " ".intercalate hypothesis.names.toList
 
 def HypothesisRow : RuntimeM (Lean.Vir.ProofWidgets.Component Hypothesis) :=
-  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Hypothesis) =>
-  let hypothesis := ctx.props
-  let value : Array Html :=
-    match hypothesis.value with
-    | none => #[]
-    | some value => #[
-        Html.elementWithProps "span" #[
-          Lean.Vir.React.Props.className "vir-native-infoview-hyp-value",
-          Style.value
-        ] #[Html.text (" := " ++ value)]
-      ]
-  Html.elementWithProps "li" #[
-    Lean.Vir.React.Props.id ("vir-native-infoview-hyp-" ++ hypothesis.id),
-    Lean.Vir.React.Props.className "vir-native-infoview-hypothesis",
-    Lean.Vir.React.Props.role "listitem",
-    Style.hypothesis
-  ] (#[
-    Html.elementWithProps "span" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-hyp-name",
-      Style.binder
-    ] #[Html.text (hypothesisNames hypothesis)],
-    Html.elementWithProps "span" #[Lean.Vir.React.Props.ariaHidden true] #[Html.text ":"],
-    Html.elementWithProps "code" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-hyp-type",
-      Style.hypothesisType
-    ] #[Html.text hypothesis.type]
-  ] ++ value)
+  Lean.Vir.React.Component.ofLean fun ctx => do
+    let ctx ← LeanRef.fromJSL ctx
+    let hypothesis := ctx.props
+    let value : Array Html :=
+      match hypothesis.value with
+      | none => #[]
+      | some value => #[
+          Html.elementWithProps "span" #[
+            Lean.Vir.React.Props.className "vir-native-infoview-hyp-value",
+            Style.value
+          ] #[Html.text (" := " ++ value)]
+        ]
+    Html.elementWithProps "li" #[
+      Lean.Vir.React.Props.id ("vir-native-infoview-hyp-" ++ hypothesis.id),
+      Lean.Vir.React.Props.className "vir-native-infoview-hypothesis",
+      Lean.Vir.React.Props.role "listitem",
+      Style.hypothesis
+    ] (#[
+      Html.elementWithProps "span" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-hyp-name",
+        Style.binder
+      ] #[Html.text (hypothesisNames hypothesis)],
+      Html.elementWithProps "span" #[Lean.Vir.React.Props.ariaHidden true] #[Html.text ":"],
+      Html.elementWithProps "code" #[
+        Lean.Vir.React.Props.className "vir-native-infoview-hyp-type",
+        Style.hypothesisType
+      ] #[Html.text hypothesis.type]
+    ] ++ value)
 
 def GoalCard : RuntimeM (Lean.Vir.ProofWidgets.Component Goal) := do
   let hypothesisRow ← HypothesisRow
-  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Goal) => do
+  Lean.Vir.React.Component.ofLean fun ctx => do
+    let ctx ← LeanRef.fromJSL ctx
     let goal := ctx.props
     let initialCollapsed ← JsValue.ofBool false
     let collapsedState ← Lean.Vir.React.StateTuple.toState
@@ -302,7 +304,8 @@ def GoalCard : RuntimeM (Lean.Vir.ProofWidgets.Component Goal) := do
 
 def View : RuntimeM (Lean.Vir.ProofWidgets.Component Surface) := do
   let goalCard ← GoalCard
-  Lean.Vir.React.Component.ofLean fun (ctx : ComponentProps Surface) =>
+  Lean.Vir.React.Component.ofLean fun ctx => do
+    let ctx ← LeanRef.fromJSL ctx
     let surface := ctx.props
     let goalCount := surface.goals.size
     let goals : Array Html := surface.goals.map fun goal =>
@@ -344,8 +347,9 @@ def View : RuntimeM (Lean.Vir.ProofWidgets.Component Surface) := do
 /-- Root component factory consumed by the live VIR infoview shell. -/
 def App : RuntimeM (Js (Lean.Vir.React.Component Surface)) := do
   let view ← View
-  Lean.Vir.React.Component.ofLean fun surface =>
-    Lean.Vir.React.Node.component view (componentProps surface)
+  Lean.Vir.React.Component.ofLean fun surface => do
+    let surface ← LeanRef.fromJSL surface
+    Lean.Vir.React.Node.component view (← LeanRef.toJSL (componentProps surface))
 
 vir_proof_widget App with mountId := "vir-native-infoview-widget"
 

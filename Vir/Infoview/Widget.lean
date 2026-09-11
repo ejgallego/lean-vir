@@ -113,7 +113,11 @@ private meta def expandReactWidgetCommand
       def $mountIdent : Lean.Vir.Js Lean.Vir.React.Root →
           Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
           Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Unit :=
-        Lean.Vir.React.Root.renderComponent
+        fun root component surface => do
+          let props ← Lean.Vir.LeanRef.toJSL surface
+          let node ← Lean.Vir.React.ReactM.run
+            (Lean.Vir.React.Node.component component props)
+          Lean.Vir.React.Root.render root node
 
       def $irPackageIdent : Lean.Vir.Infoview.IRPackage :=
         Lean.Vir.Infoview.ReactWidget.irPackage $widgetSpecIdent

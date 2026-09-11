@@ -47,7 +47,8 @@ namespace Component
 def ofLean
     (render : ComponentProps props → ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
     Lean.Vir.RuntimeM (Component props) :=
-  Lean.Vir.React.Component.ofLean render
+  Lean.Vir.React.Component.ofLean fun props => do
+    render (← Lean.Vir.LeanRef.fromJSL props)
 
 end Component
 
@@ -184,8 +185,8 @@ end Handler
 
 namespace Html
 
-def text (value : String) : Html :=
-  Lean.Vir.React.Node.text value
+def text (value : String) : Html := do
+  Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString value)
 
 private def propsFrom (attrs : Array Attr) (handlers : Array Handler) :
     Array Lean.Vir.React.Props.Entry :=
@@ -207,11 +208,14 @@ def elementWithProps
 
 def fragment (children : Array Html := #[]) : Html := do
   let childNodes ← Html.children children
-  Lean.Vir.React.Node.fragment childNodes
+  Lean.Vir.React.Node.fragment (← Lean.Vir.React.Props.empty)
+    (← Lean.Vir.Js.Array.ofArray childNodes)
 
 def keyedFragment (key : String) (children : Array Html := #[]) : Html := do
   let childNodes ← Html.children children
-  Lean.Vir.React.Node.keyedFragment key childNodes
+  Lean.Vir.React.Node.fragment
+    (← Lean.Vir.React.Props.fromEntries #[Lean.Vir.React.Props.key key])
+    (← Lean.Vir.Js.Array.ofArray childNodes)
 
 def elementWith
     (tag : String)
@@ -248,8 +252,9 @@ def ofComponent
     (component : Component props)
     (props : props)
     (children : Array Html := #[]) :
-    Html :=
-  Lean.Vir.React.Node.ofComponent component (componentProps props children)
+    Html := do
+  Lean.Vir.React.Node.component component
+    (← Lean.Vir.LeanRef.toJSL (componentProps props children))
 
 /-- Builds a keyed native React component node without placing `key` in typed props. -/
 def keyedOfComponent
@@ -257,8 +262,10 @@ def keyedOfComponent
     (component : Component props)
     (props : props)
     (children : Array Html := #[]) :
-    Html :=
-  Lean.Vir.React.Node.keyedOfComponent key component (componentProps props children)
+    Html := do
+  Lean.Vir.React.Node.keyedComponent component
+    (← Lean.Vir.LeanRef.toJSL (componentProps props children))
+    (← Lean.Vir.JsValue.ofString key)
 
 def component
     (component : Component props)

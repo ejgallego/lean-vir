@@ -53,8 +53,8 @@ def expectRootsError (roots : Array String) : IO Unit := do
 
 def AuthoringComponent : Lean.Vir.RuntimeM
     (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
-  Lean.Vir.React.Component.ofLean fun _surface =>
-    Lean.Vir.React.Node.text "authoring smoke"
+  Lean.Vir.React.Component.ofLean fun _surface => do
+    Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString "authoring smoke")
 
 vir_proof_widget AuthoringComponent with mountId := "vir-smoke-widget"
 
@@ -211,6 +211,43 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
       IO.FS.writeBinFile s!"build/infoview-smoke/snapshot-{suffix}.irpkg" pkg.bytes
       return (revision, pkg.bytes)
 
+unsafe def privateEffectSnapshot : IO Unit := do
+  let source := "untitled:PrivateEffectSnapshot.lean"
+  let env ← snapshotEnvironment source <|
+    "module\npublic import Vir.React\nopen Lean.Vir Lean.Vir.React\n" ++
+    "public def effectCalls (setup : Js EffectCallback) (deps : Js DependencyList) : Browser.DomM Unit := ReactM.run do\n" ++
+    "  Hooks.useEffect setup\n  Hooks.useEffect setup (some deps)\n"
+  let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env #[`effectCalls]
+  let pkg ← IO.ofExcept <| ← Vir.GeneratePackage.buildPackageFromIndex
+    "private-effects" #[input.target] input.index
+  for target in #["react.useEffect", "react.useEffectWithDeps"] do
+    expect s!"live snapshot retains private effect import {target}" <|
+      pkg.manifest.hostImports.any fun entry =>
+        entry.target == target && Lean.isPrivateName entry.name
+  for loaded in (Lean.Vir.Infoview.packageClosure input).decls do
+    unless Vir.GeneratePackage.isVirJsDecl loaded.decl && Lean.isPrivateName loaded.decl.name do
+      continue
+    expect "private effect uses captured metadata, not a visible ConstantInfo" <|
+      (env.find? loaded.decl.name).isNone
+    let .extern name params result info := loaded.decl
+      | throw <| IO.userError "expected a private host extern"
+    let invalidTarget : Lean.IR.Decl := .extern name params result {
+      entries := [.standard `all "__vir_js:smoke.changedTarget"]
+    }
+    let invalidMarker : Lean.IR.Decl := .extern name params result {
+      entries := [.standard `all "__vir_js_explicit_conversion:react.useEffect"]
+    }
+    for (decl, reason) in #[
+      (invalidTarget, "JavaScript import target differs"),
+      (invalidMarker, "missing elaborated Lean declaration or validated attribute"),
+      (.extern name params.pop result info, "JavaScript import IR arity mismatch")
+    ] do
+      let checked ← Vir.GeneratePackage.runCoreForSource source env <|
+        Vir.GeneratePackage.hostImportFor 0 { loaded with decl }
+      match checked with
+      | .error diagnostic => expect reason (diagnostic.reason.startsWith reason)
+      | .ok _ => throw <| IO.userError s!"private host mutation was accepted: {reason}"
+
 unsafe def rejectNonModuleSnapshot : IO Unit := do
   let source := "untitled:PlainSnapshot.lean"
   let env ← snapshotEnvironment source
@@ -290,6 +327,7 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
       Lean.Vir.Infoview.closureIRHash afterClosure
   IO.FS.createDirAll "build/infoview-smoke"
   rejectNonModuleSnapshot
+  privateEffectSnapshot
   let firstSnapshot ← snapshotPackage "first"
   let editedSnapshot ← snapshotPackage "edited"
   expect "unsaved module edits change the package revision" <|

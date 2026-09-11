@@ -126,7 +126,7 @@
       },
       {
         "id": "javascript.nullable.is-null", "group": "nullable", "target": "js.nullable.isNull",
-        "lean": "Lean.Vir.Js.Nullable.isNullJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Js.Nullable.isNull", "marker": "vir_js",
         "reason": "Tests a JavaScript nullable resource without decoding its payload.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
@@ -317,7 +317,7 @@
       },
       {
         "id": "javascript.array.length", "group": "array", "target": "js.array.length",
-        "lean": "Lean.Vir.Js.Array.lengthJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Js.Array.length", "marker": "vir_js",
         "reason": "Returns the exact native JavaScript Number stored in Array.length.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.length", "accessor": "get", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
@@ -326,7 +326,7 @@
       },
       {
         "id": "javascript.array.item", "group": "array", "target": "js.array.item",
-        "lean": "Lean.Vir.Js.Array.getJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Js.Array.get", "marker": "vir_js",
         "reason": "Preserves Array<T>'s [n: number]: T relationship. This is the TypeScript unchecked-index lane: native holes and missing entries remain undefined, without a bounds check or null conversion. It does not implement noUncheckedIndexedAccess.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
@@ -356,7 +356,7 @@
       },
       {
         "id": "javascript.node-list.length", "group": "node-list", "target": "js.nodeList.length",
-        "lean": "Lean.Vir.Js.NodeList.lengthJs", "marker": "vir_js",
+        "lean": "Lean.Vir.Js.NodeList.length", "marker": "vir_js",
         "reason": "Returns the exact native JavaScript Number stored in NodeList.length.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.length", "accessor": "get", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
@@ -365,7 +365,7 @@
       },
       {
         "id": "javascript.node-list.item", "group": "node-list", "target": "js.nodeList.item",
-        "lean": "Lean.Vir.Js.NodeList.itemNullable", "marker": "vir_js",
+        "lean": "Lean.Vir.Js.NodeList.item", "marker": "vir_js",
         "reason": "Calls NodeList.item and represents a missing entry as JavaScript null.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "NodeList.item", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },

@@ -56,10 +56,11 @@ the configured Lean types and the upstream descriptor relationships.
 `Js α`, and indexing returns `Js α`. It cannot store a raw Lean `α`; Lean-owned
 payloads require explicit `JSL` boxing. There is no redundant inner `Js` in the
 array type. `Js.Array.push` selects the one-item arity of TypeScript's variadic method.
-`Js.Array.getJs` follows TypeScript's **unchecked** `[n: number]: T` declaration:
+`Js.Array.get` follows TypeScript's **unchecked** `[n: number]: T` declaration:
 holes and missing entries remain exact JavaScript `undefined`. It does not
 implement `noUncheckedIndexedAccess` or turn `undefined` into `null`.
-The separate `item` helper checks numeric bounds, not sparse-array membership.
+Callers perform any desired bounds checks explicitly; numeric bounds alone do
+not detect sparse-array holes.
 
 Native two-position tuples use `Js.Tuple2`, with typed `first` and `second`
 projections instead of an unconstrained array getter. React's `StateTuple` and
@@ -269,8 +270,8 @@ Type or modality differences still require a justified
 `generation.exceptions` entry. Canvas `fillStyle` and `strokeStyle`, for
 example, use the opaque JavaScript-owned `CanvasStyle` marker for their faithful
 raw getter/setter pairs. `CanvasStyle.ofString` is a separate explicit
-conversion into the string arm of that union; the convenience setters call the
-faithful generated property setter after that conversion.
+conversion into the string arm of that union; callers pass the converted value
+to the faithful generated property setter.
 
 ## Method Selection
 
@@ -304,7 +305,15 @@ change. Every optional
 parameter must either be represented by a supported translation rule or named
 in `omittedOptionalParameters`; the current generator implements the latter
 path. A rest parameter must be omitted explicitly or projected to one or more
-named fixed-arity Lean binders through `fixedRestParameters`. Parameter names
+named fixed-arity Lean binders through `fixedRestParameters`. A method policy or reviewed protocol can mark an implementation declaration
+`visibility: "private"`; public is the default. Private implementations remain
+in the compiler inventory and must be reachable from a public API. For example,
+React's two effect arities implement the single public `useEffect` without
+adding an optional-value host ABI. The existing `vir_js` attribute preserves its
+validated signature for private imports, so compiled and live-snapshot packages
+can use it without reopening source files. Visible declarations and raw externs
+still receive typed analysis; packaging checks the target and compiled arity.
+Parameter names
 can be preserved or changed explicitly with `parameterRenames`. A literal
 TypeScript parameter that the host supplies internally can be recorded in
 `fixedArguments`; generation verifies both its name and exact literal value and

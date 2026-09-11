@@ -286,14 +286,15 @@ structure ViewProps where
   copyContext : DomM Unit
   revealCursor : DomM Unit
 
-def View : RuntimeM (Js (Component ViewProps)) := Component.ofLean fun props => do
+def View : RuntimeM (Js (Component ViewProps)) := Component.ofLean fun boxed => do
+  let props ← LeanRef.fromJSL boxed
   let title ← Node.h3TextWith #[Props.id "react-proof-selected-title", Style.heading] "Proof actions"
   let summary ← Node.pTextWith #[Props.id "react-proof-summary", Style.summary]
     (goalName props.goal ++ " · " ++ s!"{props.goal.hypotheses.size} " ++
       plural props.goal.hypotheses.size "hypothesis" "hypotheses" ++ " · " ++ props.surface.cursor.label)
   let header ← Node.headerWith #[Style.header] #[title, summary]
   let targetLabel ← Node.pTextWith #[Style.sectionLabel] "Current target"
-  let targetText ← Node.text props.goal.target
+  let targetText ← Node.text (← JsValue.ofString props.goal.target)
   let target ← Node.preWith #[Props.id "react-proof-target-code", Style.target] #[targetText]
   let actionsLabel ← Node.pTextWith #[Style.sectionLabel] "Insert tactic"
   let common ← commonActions props.runTactic
@@ -324,7 +325,8 @@ def View : RuntimeM (Js (Component ViewProps)) := Component.ofLean fun props => 
     status
   ]
 
-def EmptyView : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
+def EmptyView : RuntimeM (Js (Component Surface)) := Component.ofLean fun boxed => do
+  let surface ← LeanRef.fromJSL boxed
   let title ← Node.h3TextWith #[Style.heading] "Proof actions"
   let empty ← Node.pTextWith #[Style.empty]
     ("Move the cursor into a tactic proof to get actions at " ++ surface.cursor.label ++ ".")
@@ -338,35 +340,51 @@ def EmptyView : RuntimeM (Js (Component Surface)) := Component.ofLean fun surfac
 def App : RuntimeM (Js (Component Surface)) := do
   let view ← View
   let emptyView ← EmptyView
-  Component.ofLean fun surface => do
+  Component.ofLean fun boxed => do
+    let surface ← LeanRef.fromJSL boxed
     let state ← useStatus
     match surface.goals[0]? with
-    | none => Node.component emptyView surface
+    | none => Node.component emptyView (← LeanRef.toJSL surface)
     | some goal =>
       let runTactic (tactic : String) : DomM Unit := do
-        let inserted ← Lean.Vir.Infoview.Command.insertAtCursor surface (tactic ++ "\n")
+        let position ← Lean.Vir.Infoview.documentPosition
+          (← JsValue.ofString surface.cursor.uri)
+          (← JsValue.ofString surface.cursor.fileName)
+          (← JsValue.ofNat surface.cursor.line)
+          (← JsValue.ofNat surface.cursor.character)
+          (← JsValue.ofString surface.cursor.label)
+        let inserted ← JsValue.toBool (← Lean.Vir.Infoview.Command.insertText
+          position (← JsValue.ofString (tactic ++ "\n")))
         if inserted then
           setStatus state ("Inserted `" ++ tactic ++ "` at " ++ surface.cursor.label)
         else
-          let copied ← Lean.Vir.Infoview.Clipboard.writeText tactic
+          let copied ← JsValue.toBool (← Lean.Vir.Infoview.Clipboard.writeText
+            (← JsValue.ofString tactic))
           setStatus state <| if copied then
             "Editor unavailable; copied `" ++ tactic ++ "`"
           else
             "Editor and clipboard unavailable"
       let copyContext : DomM Unit := do
-        let copied ← Lean.Vir.Infoview.Clipboard.writeText (contextText surface goal)
+        let copied ← JsValue.toBool (← Lean.Vir.Infoview.Clipboard.writeText
+          (← JsValue.ofString (contextText surface goal)))
         setStatus state <| if copied then "Context copied" else "Clipboard unavailable"
       let revealCursor : DomM Unit := do
-        let revealed ← Lean.Vir.Infoview.Command.revealCursor surface
+        let position ← Lean.Vir.Infoview.documentPosition
+          (← JsValue.ofString surface.cursor.uri)
+          (← JsValue.ofString surface.cursor.fileName)
+          (← JsValue.ofNat surface.cursor.line)
+          (← JsValue.ofNat surface.cursor.character)
+          (← JsValue.ofString surface.cursor.label)
+        let revealed ← JsValue.toBool (← Lean.Vir.Infoview.Command.revealPosition position)
         setStatus state <| if revealed then "Cursor revealed" else "Editor unavailable"
-      Node.component view {
+      Node.component view (← LeanRef.toJSL {
         surface,
         goal,
         state := state.value,
         runTactic,
         copyContext,
         revealCursor
-      }
+      })
 
 vir_proof_widget App with mountId := "vir-react-proof-widget"
 
@@ -378,8 +396,13 @@ uses `createComponent` once per runtime service.
 -/
 def renderSnapshotIntoSelector (selector : String) (surface : Surface) : DomM Bool := do
   let component ← App
-  Root.mountFromSelector selector fun root =>
-    Root.renderComponent root component surface
+  let document ← Browser.Document.current
+  match ← Js.Nullable.toOption (← Browser.Document.querySelector document (← JsValue.ofString selector)) with
+  | none => pure false
+  | some element =>
+    let root ← Root.create element
+    Root.render root (← ReactM.run (Node.component component (← LeanRef.toJSL surface)))
+    pure true
 
 end ReactProofWidget
 

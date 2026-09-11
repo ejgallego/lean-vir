@@ -23,7 +23,7 @@ test("the shared loader validates a complete binding library", async () => {
   assert.equal(loaded.version, 2);
   assert.equal(loaded.id, "browser");
   assert.equal(loaded.path, "Vir/Browser.bindings.json");
-  assert.equal(loaded.generation.members.length, 54);
+  assert.equal(loaded.generation.members.length, 56);
   assert.deepEqual(
     loaded.generation.members,
     [...loaded.generation.members].sort(),

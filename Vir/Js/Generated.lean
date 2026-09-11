@@ -62,7 +62,7 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.array.length"]
-opaque lengthJs
+opaque length
     {α : Type}
     (array : @& Lean.Vir.Js.Array α) :
     RuntimeM (Lean.Vir.Js Float)
@@ -79,7 +79,7 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.array.item"]
-opaque getJs
+opaque get
     {α : Type}
     (array : @& Lean.Vir.Js.Array α)
     (index : @& Lean.Vir.Js Float) :
@@ -177,7 +177,7 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.nodeList.length"]
-opaque lengthJs
+opaque length
     {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList α) :
     RuntimeM (Lean.Vir.Js Float)
@@ -194,7 +194,7 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.nodeList.item"]
-opaque itemNullable
+opaque item
     {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
     (index : @& Lean.Vir.Js Float) :
@@ -266,7 +266,7 @@ ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borro
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "js.nullable.isNull"]
-opaque isNullJs
+opaque isNull
     {α : Type}
     (value : @& Lean.Vir.Js.Nullable α) :
     RuntimeM (Lean.Vir.Js Bool)

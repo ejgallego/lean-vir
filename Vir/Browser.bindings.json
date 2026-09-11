@@ -47,6 +47,8 @@
       "TextMetrics": "TextMetrics"
     },
     "methodPolicies": {
+      "clearInterval": { "parameterRenames": { "id": "interval" } },
+      "clearTimeout": { "parameterRenames": { "id": "timeout" } },
       "AbortController.abort": {
         "omittedOptionalParameters": ["reason"],
         "semantics": "preserving",
@@ -116,6 +118,28 @@
       }
     },
     "exceptions": {
+      "browser.timer.clearInterval": {
+        "reason": "Selects a native interval token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.",
+        "semantics": "preserving",
+        "activeEffect": "release",
+        "arguments": {
+          "interval": {
+            "passing": "consumed",
+            "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" }
+          }
+        }
+      },
+      "browser.timer.clearTimeout": {
+        "reason": "Selects a native timeout token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.",
+        "semantics": "preserving",
+        "activeEffect": "release",
+        "arguments": {
+          "timeout": {
+            "passing": "consumed",
+            "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" }
+          }
+        }
+      },
       "browser.animation.cancelAnimationFrame": {
         "reason": "Lean gives the exact browser animation-frame token a phantom Js AnimationFrame type; the host passes that token unchanged to cancelAnimationFrame.",
         "semantics": "preserving",
@@ -496,7 +520,7 @@
         "id": "browser.timer.setTimeout",
         "group": "timers",
         "target": "browser.timer.setTimeout",
-        "lean": "Lean.Vir.Browser.Timer.setTimeoutJs",
+        "lean": "Lean.Vir.Browser.Timer.setTimeout",
         "marker": "vir_js",
         "reason": "VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setTimeout", "semantics": "preserving" },
@@ -509,25 +533,10 @@
         "result": { "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
       },
       {
-        "id": "browser.timer.clearTimeout",
-        "group": "timers",
-        "target": "browser.timer.clearTimeout",
-        "lean": "Lean.Vir.Browser.Timer.clearTimeout",
-        "marker": "vir_js",
-        "reason": "The exact timeout token is passed unchanged to clearTimeout; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout", "semantics": "preserving" },
-        "activeEffect": "release",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "timeout", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "browser.timer.setInterval",
         "group": "timers",
         "target": "browser.timer.setInterval",
-        "lean": "Lean.Vir.Browser.Timer.setIntervalJs",
+        "lean": "Lean.Vir.Browser.Timer.setInterval",
         "marker": "vir_js",
         "reason": "VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "setInterval", "semantics": "preserving" },
@@ -538,21 +547,6 @@
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
-      },
-      {
-        "id": "browser.timer.clearInterval",
-        "group": "timers",
-        "target": "browser.timer.clearInterval",
-        "lean": "Lean.Vir.Browser.Timer.clearInterval",
-        "marker": "vir_js",
-        "reason": "The exact interval token is passed unchanged to clearInterval; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval", "semantics": "preserving" },
-        "activeEffect": "release",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "interval", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       }
     ]
   },
@@ -585,7 +579,7 @@
         {
           "typescript": "requestAnimationFrame",
           "targets": ["browser.animation.requestAnimationFrame"],
-          "lean": ["Lean.Vir.Browser.Animation.requestAnimationFrameJs"]
+          "lean": ["Lean.Vir.Browser.Animation.requestAnimationFrame"]
         }
       ]
     },
@@ -596,42 +590,42 @@
       "lean": { "public": ["Lean.Vir.Browser.CanvasRenderingContext2D", "Lean.Vir.Browser.CanvasStyle", "Lean.Vir.Browser.TextMetrics"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["CanvasRenderingContext2D", "TextMetrics"] },
       "mappings": [
-        { "typescript": "CanvasRenderingContext2D.arc", "targets": ["browser.canvas2d.arc"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.arcJs"] },
+        { "typescript": "CanvasRenderingContext2D.arc", "targets": ["browser.canvas2d.arc"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.arc"] },
         { "typescript": "CanvasRenderingContext2D.beginPath", "targets": ["browser.canvas2d.beginPath"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.beginPath"] },
-        { "typescript": "CanvasRenderingContext2D.clearRect", "targets": ["browser.canvas2d.clearRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.clearRectJs"] },
+        { "typescript": "CanvasRenderingContext2D.clearRect", "targets": ["browser.canvas2d.clearRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.clearRect"] },
         { "typescript": "CanvasRenderingContext2D.closePath", "targets": ["browser.canvas2d.closePath"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.closePath"] },
         { "typescript": "CanvasRenderingContext2D.fill", "targets": ["browser.canvas2d.fill"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.fill"] },
-        { "typescript": "CanvasRenderingContext2D.fillRect", "targets": ["browser.canvas2d.fillRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.fillRectJs"] },
+        { "typescript": "CanvasRenderingContext2D.fillRect", "targets": ["browser.canvas2d.fillRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.fillRect"] },
         {
           "typescript": "CanvasRenderingContext2D.fillStyle",
           "accessors": {
             "get": { "target": "browser.canvas2d.getFillStyle", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.getFillStyle", "receiverName": "ctx" },
-            "set": { "target": "browser.canvas2d.setFillStyleValue", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyleValue", "receiverName": "ctx", "parameterName": "style" }
+            "set": { "target": "browser.canvas2d.setFillStyleValue", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyle", "receiverName": "ctx", "parameterName": "style" }
           }
         },
-        { "typescript": "CanvasRenderingContext2D.lineTo", "targets": ["browser.canvas2d.lineTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.lineToJs"] },
+        { "typescript": "CanvasRenderingContext2D.lineTo", "targets": ["browser.canvas2d.lineTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.lineTo"] },
         {
           "typescript": "CanvasRenderingContext2D.lineWidth",
           "accessors": {
             "get": { "target": "browser.canvas2d.getLineWidth", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.getLineWidth", "receiverName": "ctx" },
-            "set": { "target": "browser.canvas2d.setLineWidth", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setLineWidthJs", "receiverName": "ctx", "parameterName": "width" }
+            "set": { "target": "browser.canvas2d.setLineWidth", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setLineWidth", "receiverName": "ctx", "parameterName": "width" }
           }
         },
         { "typescript": "CanvasRenderingContext2D.measureText", "targets": ["browser.canvas2d.measureText"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.measureText"], "receiverName": "ctx" },
-        { "typescript": "CanvasRenderingContext2D.moveTo", "targets": ["browser.canvas2d.moveTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.moveToJs"] },
+        { "typescript": "CanvasRenderingContext2D.moveTo", "targets": ["browser.canvas2d.moveTo"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.moveTo"] },
         { "typescript": "CanvasRenderingContext2D.restore", "targets": ["browser.canvas2d.restore"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.restore"] },
-        { "typescript": "CanvasRenderingContext2D.rotate", "targets": ["browser.canvas2d.rotate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.rotateJs"] },
+        { "typescript": "CanvasRenderingContext2D.rotate", "targets": ["browser.canvas2d.rotate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.rotate"] },
         { "typescript": "CanvasRenderingContext2D.save", "targets": ["browser.canvas2d.save"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.save"] },
         { "typescript": "CanvasRenderingContext2D.stroke", "targets": ["browser.canvas2d.stroke"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.stroke"] },
-        { "typescript": "CanvasRenderingContext2D.strokeRect", "targets": ["browser.canvas2d.strokeRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.strokeRectJs"] },
+        { "typescript": "CanvasRenderingContext2D.strokeRect", "targets": ["browser.canvas2d.strokeRect"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.strokeRect"] },
         {
           "typescript": "CanvasRenderingContext2D.strokeStyle",
           "accessors": {
             "get": { "target": "browser.canvas2d.getStrokeStyle", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.getStrokeStyle", "receiverName": "ctx" },
-            "set": { "target": "browser.canvas2d.setStrokeStyleValue", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyleValue", "receiverName": "ctx", "parameterName": "style" }
+            "set": { "target": "browser.canvas2d.setStrokeStyleValue", "lean": "Lean.Vir.Browser.CanvasRenderingContext2D.setStrokeStyle", "receiverName": "ctx", "parameterName": "style" }
           }
         },
-        { "typescript": "CanvasRenderingContext2D.translate", "targets": ["browser.canvas2d.translate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.translateJs"] },
+        { "typescript": "CanvasRenderingContext2D.translate", "targets": ["browser.canvas2d.translate"], "lean": ["Lean.Vir.Browser.CanvasRenderingContext2D.translate"] },
         {
           "typescript": "TextMetrics.width",
           "accessors": {
@@ -650,7 +644,7 @@
         {
           "typescript": "Console.log",
           "targets": ["browser.console.log"],
-          "lean": ["Lean.Vir.Browser.Console.logJs"]
+          "lean": ["Lean.Vir.Browser.Console.log"]
         }
       ]
     },
@@ -718,8 +712,8 @@
           }
         },
         { "typescript": "CSSStyleDeclaration.setProperty", "targets": ["browser.cssStyleDeclaration.setProperty"], "lean": ["Lean.Vir.Browser.CSSStyleDeclaration.setProperty"], "receiverName": "declaration" },
-        { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListenerJs"] },
-        { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListenerJs"] }
+        { "typescript": "Element.addEventListener", "targets": ["browser.element.addEventListener"], "lean": ["Lean.Vir.Browser.Element.addEventListener"] },
+        { "typescript": "Element.removeEventListener", "targets": ["browser.element.removeEventListener"], "lean": ["Lean.Vir.Browser.Element.removeEventListener"] }
       ]
     },
     {
@@ -778,7 +772,7 @@
         {
           "typescript": "HTMLCanvasElement.getContext",
           "targets": ["browser.htmlCanvasElement.getContext2D"],
-          "lean": ["Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable"]
+          "lean": ["Lean.Vir.Browser.HTMLCanvasElement.getContext2D"]
         },
         {
           "typescript": "HTMLCanvasElement.height",
@@ -848,7 +842,11 @@
       "title": "Timers",
       "targets": ["browser.timer.*"],
       "lean": { "public": ["Lean.Vir.Browser.Timer"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] },
+      "mappings": [
+        { "typescript": "clearInterval", "targets": ["browser.timer.clearInterval"], "lean": ["Lean.Vir.Browser.Timer.clearInterval"] },
+        { "typescript": "clearTimeout", "targets": ["browser.timer.clearTimeout"], "lean": ["Lean.Vir.Browser.Timer.clearTimeout"] }
+      ]
     },
     {
       "id": "owned-primitives",

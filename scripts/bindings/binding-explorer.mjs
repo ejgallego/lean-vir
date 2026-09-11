@@ -539,6 +539,8 @@ function groupWorkItems(config, bindingRoot, surfaceCoverage, issues, generatedO
     "missing-provider",
     "runtime-only",
     "mapped-public-api-unreachable",
+    "mapped-private-binding-mismatch",
+    "mapped-private-api-unreachable",
     "extra-public-accessor-api",
   ]);
   issues.filter((entry) => structuralIssueKinds.has(entry.kind)).forEach((entry, index) =>
@@ -864,13 +866,36 @@ function declarationMatchesSelector(declaration, selector) {
   return declaration === selector || declaration.startsWith(`${selector}.`);
 }
 
-function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget, generatedOperations) {
+function reviewedPublicIssues(config, bindingRoot, surfaceCoverage, bindings, publicByTarget, generatedOperations) {
   if (surfaceCoverage?.mode !== "reviewed") return [];
   const selectors = bindingRoot.lean?.public ?? [];
   const issues = [];
   for (const mapping of surfaceCoverage.targetMappings) {
     const callers = publicByTarget.get(mapping.target) ?? [];
+    const generated = generatedOperations.find((operation) =>
+      operation.host.target === mapping.target && mapping.lean?.includes(operation.lean.declaration));
     for (const declaration of mapping.lean ?? []) {
+      if (generated?.lean.visibility === "private") {
+        const output = config.generation.output;
+        const module = output.slice(0, -".lean".length).replaceAll("/", ".");
+        const matches = bindings.find((binding) => binding.target === mapping.target)?.declarations
+          .filter((entry) => entry.private === true && entry.userName === declaration &&
+            entry.module === module && entry.source?.path === output) ?? [];
+        if (matches.length !== 1) {
+          issues.push(issue(
+            "mapped-private-binding-mismatch", "error",
+            `${declaration} must identify one compiler-private declaration in ${output} for ${mapping.target}`,
+            { target: mapping.target, declaration, typescript: mapping.typescript },
+          ));
+        } else if (!callers.some((caller) => caller.reached.path.at(-1) === matches[0].declaration)) {
+          issues.push(issue(
+            "mapped-private-api-unreachable", "error",
+            `${declaration} is a private binding for ${mapping.target}, but no public compiled entry reaches it`,
+            { target: mapping.target, declaration, typescript: mapping.typescript },
+          ));
+        }
+        continue;
+      }
       if (!callers.some((caller) => caller.entry.declaration === declaration)) {
         issues.push(issue(
           "mapped-public-api-unreachable",
@@ -883,8 +908,6 @@ function reviewedPublicIssues(bindingRoot, surfaceCoverage, publicByTarget, gene
       }
     }
     if (mapping.accessor === undefined) continue;
-    const generated = generatedOperations.some((operation) =>
-      operation.host.target === mapping.target && mapping.lean.includes(operation.lean.declaration));
     if (generated) continue;
     const reviewed = new Set(mapping.lean);
     for (const caller of callers) {
@@ -1022,8 +1045,10 @@ export function buildBindingExplorerReport(coverage, configs, typeScriptSurfaces
         }
       }
       issues.push(...reviewedPublicIssues(
+        config,
         bindingRoot,
         surfaceCoverage,
+        bindings,
         publicByTarget,
         generatedByGroup.get(bindingRoot.id) ?? [],
       ));

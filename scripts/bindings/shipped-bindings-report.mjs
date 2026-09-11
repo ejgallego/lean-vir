@@ -85,6 +85,8 @@ async function readInventory(path) {
       typeof binding.declaration !== "string" ||
       typeof binding.target !== "string" ||
       typeof binding.type !== "string" ||
+      (binding.private === true &&
+        (typeof binding.userName !== "string" || binding.userName.length === 0)) ||
       !validBoundaries.has(binding.boundary)
     ) {
       throw new Error(

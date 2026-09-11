@@ -6,33 +6,29 @@ public import Vir.React
 public section
 
 def freshEchoBang (s : String) : Lean.Vir.RuntimeM String := do
-  Lean.Vir.Common.echoString (s ++ "!")
+  Lean.Vir.JsValue.toString
+    (← Lean.Vir.Common.echoString (← Lean.Vir.JsValue.ofString (s ++ "!")))
 
 def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do
   let document ← Lean.Vir.Browser.Document.current
   Lean.Vir.Browser.Document.setTitle document (← Lean.Vir.JsValue.ofString s)
   Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Document.getTitle document)
 
-private def setFreshText
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element)
-    (text : String) : Lean.Vir.Browser.DomM Unit := do
-  let jsText ← Lean.Vir.JsValue.ofString text
-  Lean.Vir.Browser.Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
-
-private def getFreshText
-    (element : Lean.Vir.Js Lean.Vir.Browser.Element) :
-    Lean.Vir.Browser.DomM String := do
-  Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Element.getTextContent element)
-
 def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option String) := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) "#fresh" with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString "#fresh")) with
   | none => pure ("", none)
   | some fresh =>
-      setFreshText fresh s
-      Lean.Vir.Browser.Element.setAttributeString fresh "data-fresh" (s ++ "!")
-      let text ← getFreshText fresh
-      let attr ← Lean.Vir.Browser.Element.getAttributeString fresh "data-fresh"
+      let jsText ← Lean.Vir.JsValue.ofString s
+      Lean.Vir.Browser.Element.setTextContent fresh (← Lean.Vir.Js.Nullable.ofJs jsText)
+      let attrName ← Lean.Vir.JsValue.ofString "data-fresh"
+      Lean.Vir.Browser.Element.setAttribute fresh attrName
+        (← Lean.Vir.JsValue.ofString (s ++ "!"))
+      let text ← Lean.Vir.JsValue.toString (← Lean.Vir.Browser.Element.getTextContent fresh)
+      let attr ← match ← Lean.Vir.Js.Nullable.toOption
+          (← Lean.Vir.Browser.Element.getAttribute fresh attrName) with
+        | none => pure none
+        | some value => some <$> Lean.Vir.JsValue.toString value
       pure (text, attr)
 
 @[vir_js "test.react.value"]

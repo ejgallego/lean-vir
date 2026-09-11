@@ -89,6 +89,52 @@ const descriptor = {
 };
 const descriptors = new Map([["widget", descriptor]]);
 
+test("method visibility defaults public and privately renders only the selected declaration", () => {
+  const initial = buildGeneratedOperations(config, generation, descriptors)
+    .find((operation) => operation.id === "demo.widget.getAttribute");
+  assert.equal(initial.lean.visibility, "public");
+  const changed = structuredClone(generation);
+  changed.methodPolicies["Widget.getAttribute"] = { visibility: "private" };
+  const operation = buildGeneratedOperations(config, changed, descriptors)
+    .find((operation) => operation.id === "demo.widget.getAttribute");
+  assert.deepEqual({ ...operation, lean: initial.lean }, initial,
+    "visibility must not change the boundary or its TypeScript provenance");
+  assert.equal(operation.lean.visibility, "private");
+  const output = renderLeanBindings(config, changed, descriptors);
+  assert.match(output, /\nprivate opaque getAttribute\n/u);
+  assert.match(output, /\nopaque getLabel\n/u);
+  assert.equal((output.match(/private opaque/gu) ?? []).length, 1);
+  changed.methodPolicies["Widget.getAttribute"].visibility = "protected";
+  assert.throws(() => renderLeanBindings(config, changed, descriptors),
+    /visibility must be public or private/u);
+
+  changed.methodPolicies = { "Widget.label": { visibility: "private" } };
+  assert.throws(() => renderLeanBindings(config, changed, descriptors),
+    /property visibility is not supported by method policies/u);
+});
+
+test("protocol visibility defaults public, preserves its boundary, and rejects invalid values", () => {
+  const changed = structuredClone(generation);
+  changed.protocolOperations = [{
+    id: "demo.render", group: "widget", target: "demo.render",
+    lean: "Lean.Vir.Demo.Widget.render", marker: "vir_js",
+    reason: "A minimal VIR-owned operation.", upstreamRelation: { kind: "vir-owned" },
+    effect: { id: "dom", lean: "DomM" }, arguments: [],
+    result: { type: { lean: "Unit", representation: "immediate" } },
+  }];
+  const initial = buildGeneratedOperations(config, changed, descriptors).at(-1);
+  assert.equal(initial.lean.visibility, "public");
+  changed.protocolOperations[0].visibility = "private";
+  const operation = buildGeneratedOperations(config, changed, descriptors).at(-1);
+  assert.deepEqual({ ...operation, lean: initial.lean }, initial);
+  assert.equal(operation.lean.visibility, "private");
+  assert.match(renderLeanBindings(config, changed, descriptors),
+    /\nprivate opaque render : DomM Unit/u);
+  changed.protocolOperations[0].visibility = false;
+  assert.throws(() => renderLeanBindings(config, changed, descriptors),
+    /visibility must be public or private/u);
+});
+
 test("generation requires complete descriptors and rejects stale exceptions", () => {
   assert.throws(
     () => buildGeneratedOperations(config, generation, new Map()),

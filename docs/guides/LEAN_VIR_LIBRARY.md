@@ -76,10 +76,12 @@ it does not materialize a Lean array. `Js.Array.toLeanArray` and
 `Js.NodeList.toLeanArray` explicitly produce `Array (Js α)`. The resulting
 entry handles remain usable when the source collection is no longer reachable.
 
-Use `Js.Array.getJs` with a JavaScript number index for native indexing.
-Its result type follows the array's element parameter. The Lean `item` helper
-takes a `Nat` index and returns `none` outside the current length; an in-bounds
-sparse slot still contains native `undefined`.
+Use `Js.Array.get` with a JavaScript number index for native indexing.
+Its result type follows the array's element parameter; native sparse or missing
+slots still contain `undefined`. `Js.NodeList.item` takes a JavaScript number
+index and returns `Js.Nullable`; convert its result explicitly with
+`Js.Nullable.toOption` when a Lean `Option` is needed. Collection lengths are
+JavaScript numbers too.
 
 ## Explicit Conversions
 

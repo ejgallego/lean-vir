@@ -42,6 +42,12 @@ function validateActiveEffect(value, context) {
   }
 }
 
+function validateVisibility(value, context) {
+  if (value !== undefined && !["public", "private"].includes(value)) {
+    throw new Error(`${context} visibility must be public or private`);
+  }
+}
+
 function validateSemanticPolicy(value, context, additionalFields = []) {
   if (!object(value) || !nonemptyString(value.reason)) {
     throw new Error(`${context} must define semantics and reason`);
@@ -219,11 +225,13 @@ export function validateGenerationProfile(generation, context = "generation") {
         "fixedRestParameters",
         "fixedArguments",
         "parameterRenames",
+        "visibility",
         "semantics",
         "reason",
       ],
       `${context} method policy ${member}`,
     );
+    validateVisibility(policy.visibility, `${context} method policy ${member}`);
     if (policy.signature !== undefined &&
         (!Number.isInteger(policy.signature) || policy.signature < 0)) {
       throw new Error(`${context} method policy ${member} requires an overload index`);
@@ -998,6 +1006,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       declaration: mapping.lean[0],
       namespace: leanName.namespace,
       name: leanName.name,
+      visibility: policy.visibility ?? "public",
     },
     effect: {
       id: exception?.effect?.id ?? profile.effect.id,
@@ -1085,6 +1094,9 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
       continue;
     }
     if (symbol?.kind !== "property") throw new Error(`${member} is not a TypeScript property`);
+    if (generation.methodPolicies?.[member]?.visibility !== undefined) {
+      throw new Error(`${member} property visibility is not supported by method policies`);
+    }
     if (symbol.optional === true) {
       throw new Error(`${member} is optional; optional property generation is not supported yet`);
     }
@@ -1118,6 +1130,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
   const rootsById = new Map(config.roots.map((root) => [root.id, root]));
   const targets = new Set(operations.map((operation) => operation.host.target));
   for (const protocol of generation.protocolOperations ?? []) {
+    validateVisibility(protocol.visibility, `generated protocol ${protocol.id}`);
     if (!groups.has(protocol.group)) {
       throw new Error(`generated protocol ${protocol.id} references unknown API group ${protocol.group}`);
     }
@@ -1228,6 +1241,7 @@ export function buildGeneratedOperations(config, generation, descriptorsByRoot) 
         declaration: protocol.lean,
         namespace: leanName.namespace,
         name: leanName.name,
+        visibility: protocol.visibility ?? "public",
       },
       effect: {
         ...protocol.effect,

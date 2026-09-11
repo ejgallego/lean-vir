@@ -142,9 +142,9 @@ def firstHypothesisSummary (goal : Goal) : String :=
   | some hypothesis => hypothesisLabel hypothesis ++ " : " ++ hypothesis.type
 
 def metric (label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelText ← Node.text label
+  let labelText ← Node.text (← Lean.Vir.JsValue.ofString label)
   let labelNode ← Node.spanWith #[Style.metricLabel] #[labelText]
-  let valueText ← Node.text value
+  let valueText ← Node.text (← Lean.Vir.JsValue.ofString value)
   let valueNode ← Node.strongWith #[Style.metricValue] #[valueText]
   Node.divWith #[Style.metric] #[
     labelNode,
@@ -169,20 +169,20 @@ def metrics (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
 def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   match surface.goals[0]? with
   | none =>
-      let text ← Node.text "Move the cursor into a proof to see its first goal."
+      let text ← Node.text (← Lean.Vir.JsValue.ofString "Move the cursor into a proof to see its first goal.")
       Node.pWith #[Props.id "react-proof-hello-empty", Style.summary] #[
         text
       ]
   | some goal =>
-      let titleText ← Node.text (goalSummary goal)
+      let titleText ← Node.text (← Lean.Vir.JsValue.ofString (goalSummary goal))
       let title ← Node.pWith #[Props.id "react-proof-hello-goal-title", Style.summary] #[
         titleText
       ]
-      let targetText ← Node.text goal.target
+      let targetText ← Node.text (← Lean.Vir.JsValue.ofString goal.target)
       let target ← Node.preWith #[Props.id "react-proof-hello-target", Style.pre] #[
         targetText
       ]
-      let hypothesisText ← Node.text (firstHypothesisSummary goal)
+      let hypothesisText ← Node.text (← Lean.Vir.JsValue.ofString (firstHypothesisSummary goal))
       let hypothesis ← Node.pWith #[Props.id "react-proof-hello-hypothesis", Style.summary] #[
         hypothesisText
       ]
@@ -193,11 +193,12 @@ def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
       ]
 
 def View : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
-  let titleText ← Node.text "Hello ProofWidget from IRIF"
+  let surface ← LeanRef.fromJSL surface
+  let titleText ← Node.text (← Lean.Vir.JsValue.ofString "Hello ProofWidget from IRIF")
   let title ← Node.h3With #[Props.id "react-proof-hello-title", Style.title] #[
     titleText
   ]
-  let summaryText ← Node.text (firstGoalSummary surface)
+  let summaryText ← Node.text (← Lean.Vir.JsValue.ofString (firstGoalSummary surface))
   let summary ← Node.pWith #[Props.id "react-proof-hello-summary", Style.summary] #[
     summaryText
   ]
@@ -218,7 +219,7 @@ def View : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => 
     ]
 
 def view (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
-  Node.component (← View) surface
+  Node.component (← View) (← LeanRef.toJSL surface)
 
 def render (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
   view surface
