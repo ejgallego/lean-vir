@@ -317,6 +317,15 @@ state/resource values:
 - `Lean.Vir.JsValue.ofFloat : Float -> Lean.Vir.RuntimeM (Lean.Vir.Js Float)`
 - `Lean.Vir.JsValue.toFloat : @& Lean.Vir.Js Float -> Lean.Vir.RuntimeM Float`
 
+`JsValue.ofNat` represents a Lean `Nat` as a nonnegative JavaScript `bigint`,
+not a `number`; `toNat` requires that same representation. This deliberately
+preserves arbitrary precision. Raw `bigint` values are not JSON wire numbers:
+`JSON.stringify` rejects them, including inside records. `ofFloat n.toFloat`
+is not an exact substitute for arbitrary `Nat` values. The infoview
+`documentPosition` adapter already checks its coordinates against
+`0..Number.MAX_SAFE_INTEGER` and converts accepted bigints to numbers; it
+rejects out-of-range coordinates instead of rounding or clamping them.
+
 Top-level erased type parameters are allowed before runtime arguments in
 host-import signatures. The package records how many leading erased parameters
 the low-level trampoline must skip, while JavaScript receives only the

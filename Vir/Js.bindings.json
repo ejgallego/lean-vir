@@ -56,7 +56,7 @@
       {
         "id": "javascript.nat.of", "group": "primitive-conversions", "target": "js.nat",
         "lean": "Lean.Vir.JsValue.ofNat", "marker": "vir_js_explicit_conversion",
-        "reason": "Explicitly converts a Lean Nat into a JavaScript number resource.",
+        "reason": "Explicitly converts a Lean Nat into a nonnegative JavaScript bigint resource, preserving arbitrary precision. This is not a JavaScript number or a JSON wire number.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "Nat", "representation": "immediate" } }],
@@ -65,7 +65,7 @@
       {
         "id": "javascript.nat.value", "group": "primitive-conversions", "target": "js.nat.value",
         "lean": "Lean.Vir.JsValue.toNat", "marker": "vir_js_explicit_conversion",
-        "reason": "Explicitly decodes a JavaScript number resource as a Lean Nat.",
+        "reason": "Explicitly decodes a nonnegative JavaScript bigint resource as a Lean Nat, preserving arbitrary precision. Rejects JavaScript number values and negative bigints.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
