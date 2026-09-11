@@ -4,11 +4,8 @@ This document is the canonical API coverage source. The machine-readable data
 lives in the `vir-api-coverage` fenced block below. Tools that need a plain TSV
 can generate `build/analysis/api-coverage.tsv` without duplicating it in Git.
 
-The fenced block stays intentionally simple: tab-separated, one header row, one
-feature per row, and no multiline fields. If this repository later grows a
-Verso manual, keep this data in the documentation source as a named block or
-directive and update `scripts/check-api-coverage.mjs` to extract it there; do
-not move the source of truth back to a detached table.
+The block is tab-separated, with one header row, one feature per row and no
+multiline fields.
 
 This table records whether an API is implemented and available through the
 runtime; it is not a type-fidelity audit. A `supported` row can still contain

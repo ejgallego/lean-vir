@@ -3,13 +3,13 @@
 Import `Vir.*` modules to use APIs in the `Lean.Vir.*` namespace. These APIs
 call JavaScript while Lean runs through VIR's Wasm interpreter. This guide
 helps choose modules, effects and value representations; use the
-[binding reference](SHIPPED_BINDINGS.md) for exact generated signatures and
+[binding reference](../SHIPPED_BINDINGS.md) for exact generated signatures and
 upstream TypeScript correspondences.
 
 Shipped host declarations are generated from `Vir/**/*.bindings.json` into
 `Vir/**/Generated.lean`. Authored modules provide types and Lean helpers.
 Change the binding configuration when changing a generated declaration; the
-[binding translation contract](BINDING_MODALITIES.md) explains conversions,
+[binding translation contract](../reference/BINDING_MODALITIES.md) explains conversions,
 effects and reviewed protocol operations.
 
 ## Modules And Effects
@@ -46,7 +46,7 @@ enforce React purity or hook ordering.
 Repository package commands build the core library automatically.
 The optional infoview integration requires `lake build VirInfoview` and the
 repository npm dependencies because it generates a JavaScript bundle. For a
-downstream project, follow [Lake integration](LAKE_INTEGRATION.md).
+downstream project, follow [Lake integration](PACKAGES.md).
 
 ## JavaScript Values And Collections
 
@@ -60,7 +60,7 @@ Use `JSL α` when JavaScript should store an opaque Lean-owned value.
 Lean value. `JSL α` abbreviates `Js (LeanRef.Handle α)`: a `JSL String`
 stores a Lean string, whereas `Js String` is a JavaScript string. Frameworks
 store these carriers as ordinary JS objects. The
-[host lifetime contract](HOST_BINDINGS.md#lean-backed-javascript-values)
+[host lifetime contract](../reference/HOST_BINDINGS.md#lean-backed-javascript-values)
 owns foreign-root retention, collection, invalidation and disposal.
 
 Collection parameters have two conventions. For the same DOM elements:
@@ -79,10 +79,7 @@ entry handles remain usable when the source collection is no longer reachable.
 Use `Js.Array.getJs` with a JavaScript number index for native indexing.
 Its result type follows the array's element parameter. The Lean `item` helper
 takes a `Nat` index and returns `none` outside the current length; an in-bounds
-sparse slot still contains native `undefined`. Code using the old
-`Js.Array.getAs` or `Js.Array (Js α)` spelling should use `getJs` and
-`Js.Array α`. The `Js.NodeList (Js α)` and Lean `Array (Js α)` forms
-are unchanged.
+sparse slot still contains native `undefined`.
 
 ## Explicit Conversions
 
@@ -139,7 +136,7 @@ Lean boundary views, such as `Js α` and `Unit`.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed
-use. See the [RPC and Promise guide](PROOFWIDGETS_RPC_COMPATIBILITY.md) for
+use. See the [RPC and Promise guide](INFOVIEW.md) for
 continuations, cancellation and exact server-reference graphs.
 
 ## Packages And Host Imports
@@ -147,18 +144,17 @@ continuations, cancellation and exact server-reference graphs.
 `@[vir_export]` selects a declaration for JavaScript calls;
 `@[vir_startup]` selects an exported zero-argument, `Unit`-returning
 startup hook. Import `Vir.Attributes` directly or through `Vir`.
-[Lake integration](LAKE_INTEGRATION.md#mark-the-browser-surface) owns marker
-validation, visibility, dependency checks and invocation.
-[Local packages](LOCAL_IRPKG.md) covers compiled-module registration,
-generation and loading; [module inputs](MODULE_INPUTS.md) explains live snapshots.
+[Packages](PACKAGES.md) covers registration, marker validation, visibility,
+generation and loading; [module inputs](../reference/GENERATE_PACKAGE.md#input-contract)
+explains compiled and live snapshots.
 
 `Vir.ExternFallback` provides `vir_extern_fallback` for explicitly packaging
 a transparent extern's Lean reference body without changing native compilation.
-Use the [fallback workflow](LAKE_INTEGRATION.md#opt-into-a-lean-extern-reference-body)
+Use the [fallback workflow](PACKAGES.md#use-a-lean-extern-reference-body)
 for its restrictions and ownership rules.
 
 Exported Lean functions may use the supported
-[structural interface types](INTERFACE_PIPELINE.md#interface-value-codec-surface).
+[structural interface types](../reference/IRPKG_FORMAT.md#interface-descriptors).
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks
@@ -175,9 +171,9 @@ concrete wrapper.
 Host calls execute synchronously. A native Promise can cross as an exact
 `Js` result, but the dispatcher does not await it. A host import is separate
 from a native extern registration: its target must match a JavaScript provider
-key. Follow [custom host targets](HOST_BINDINGS.md#custom-targets) and
+key. Follow [custom host targets](../reference/HOST_BINDINGS.md#custom-targets) and
 [JavaScript runtime composition](JS_API.md#host-bindings) for provider setup.
-[HostInterop](../examples/HostInterop.lean) supplies executable Lean examples.
+[HostInterop](../../examples/HostInterop.lean) supplies executable Lean examples.
 
 ## Browser And Widget Workflows
 
@@ -186,25 +182,25 @@ Browser methods take explicit JS receivers. `Document.current` and
 `String` convert Lean text while keeping receiver selection explicit.
 Checked operations such as `EventTarget.asElement`,
 `KeyboardEvent.fromEvent` and `ElementCSSInlineStyle.fromElement` preserve
-the input identity on success. See the [binding reference](SHIPPED_BINDINGS.md)
+the input identity on success. See the [binding reference](../SHIPPED_BINDINGS.md)
 for the full DOM and canvas surface.
 
 `AbortController.create`, `getSignal` and `abort` expose the native
 controller, signal and no-reason abort operation. Dropping a handle or disposing
 VIR does not abort the controller. Applications also remove native DOM listeners
 using their exact receiver, event name and function identity; see
-[active-resource ownership](HOST_BINDINGS.md#active-resources).
+[active-resource ownership](../reference/HOST_BINDINGS.md#active-resources).
 
-The [React guide](REACT_NODE.md) owns nodes, roots, component identity and hooks;
-[ReactCounter](../examples/tutorials/ReactCounter.lean) is the small executable
+The [React guide](REACT.md) owns nodes, roots, component identity and hooks;
+[ReactCounter](../../examples/tutorials/ReactCounter.lean) is the small executable
 introduction. React providers require the real browser host. The Node wrapper
 provides environment-neutral JavaScript-value and console operations only.
 
 `React.Hooks.useId : ReactM (Js String)` returns React's native accessibility
 ID. Use it inside a component, not as a list key or application identity.
 
-For `Vir.Infoview`, follow [Infoview widgets](REACT_NODE.md#infoview-widgets)
-for activation and the [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md)
+For `Vir.Infoview`, follow [Infoview widgets](INFOVIEW.md#widget-activation)
+for activation and the [RPC tutorial](../../examples/tutorials/RpcReferenceWidget.md)
 for server calls. Its clipboard and editor-command helpers expose local
 synchronous capabilities with Lean `Bool` results. In particular,
 `Infoview.Clipboard.writeText` does not claim the asynchronous browser
@@ -222,4 +218,4 @@ Inspect the generated package report when generation fails:
 | Missing host import at runtime | The manifest target string exactly matches its `hostBindings` key and the correct browser/React host is installed. |
 | A returned Promise is rejected during lowering | Declare an exact `Js` result; structural or immediate results cannot await settlement in the synchronous dispatcher. |
 
-Use [HARNESS.md](HARNESS.md) to select the relevant check and its prerequisites.
+Use [HARNESS.md](../HARNESS.md) to select the relevant check and its prerequisites.

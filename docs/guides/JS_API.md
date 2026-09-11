@@ -6,7 +6,7 @@ through a generic JavaScript call API without requiring callers to manage WASM
 memory. A focused `.irpkg` is loaded as a one-member set.
 
 For the end-to-end "my Lean function from my JavaScript code" workflow, start
-with `docs/CALL_LEAN_FROM_JS.md`.
+with `docs/guides/CALL_LEAN_FROM_JS.md`.
 
 The module is also exposed through the package entry point:
 
@@ -111,7 +111,7 @@ names an entry point above.
 The browser runtime installs the built-in `common.*` and `browser.*` host
 bindings by default. The complete target map, factory list, custom binding
 rules, and cleanup behavior are documented in
-`docs/HOST_BINDINGS.md`.
+`docs/reference/HOST_BINDINGS.md`.
 
 `defaultHostBindings` may be either a binding map or a function returning a
 binding map. To enable browser React roots while keeping non-React imports free
@@ -473,7 +473,7 @@ metadata are reported as package-load errors.
 ## Lean To JavaScript Host Imports
 
 Lean sources can call synchronous JavaScript functions through declarations
-marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
+marked with `@[vir_js "..."]`. See `docs/guides/LEAN_VIR_LIBRARY.md` for the
 Lean-side API reference. The host-import boundary is deliberately narrower than
 the exported-call boundary: custom `@[vir_js]` declarations should use
 `Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for
@@ -501,8 +501,8 @@ choose where to place conversions or other policy; the binding layer does not
 hide global receiver selection inside the upstream operation.
 
 The full Lean-side declaration list is maintained in
-`docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
-and resource lifetime rules are maintained in `docs/HOST_BINDINGS.md`.
+`docs/guides/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
+and resource lifetime rules are maintained in `docs/reference/HOST_BINDINGS.md`.
 
 The built-in `common.*` and `browser.*` targets do not require a
 `hostBindings` option:
@@ -569,7 +569,7 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
 For callback ownership, failed-call rollback and exception propagation, see
-[HOST_BINDINGS.md](HOST_BINDINGS.md#active-resources).
+[HOST_BINDINGS.md](../reference/HOST_BINDINGS.md#active-resources).
 
 ## Closure And Resource Lifetime
 
@@ -581,7 +581,7 @@ throws, and subsequent disposal is a no-op.
 Unmount owned React UI before explicitly disposing its runtime, so effect cleanup
 can still enter Lean. Normal infoview shell unmount instead releases UI ownership
 without hard disposal. The full rules, including failure teardown and collection
-limits, live in [HOST_BINDINGS.md](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
+limits, live in [HOST_BINDINGS.md](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
 Package replacement is a separate operation: see
 [Replacing A Package Set](#replacing-a-package-set) for atomic handover, candidate
@@ -604,49 +604,18 @@ runtime layouts. The hosted `/dev.html` runner is therefore a convenience tool
 for trusted packages, not a hardened service for arbitrary third-party
 packages.
 
-Before treating `.irpkg` files as untrusted user content, the runtime should
-move ABI lookup into the package provider, validate layouts in the WASM shim,
-add package size and descriptor-depth limits, and run calls in a recoverable
-worker context.
+Package-provider lookup and ordered binary/manifest export and host-import
+checks already run at loading. They check metadata agreement, not whether
+declared types and layouts describe the actual Lean objects. Supporting
+untrusted input still requires layout validation, package-size and
+descriptor-depth limits, and a recoverable execution context.
 
 ## Generate A Local Package
 
-Generate a package from one Lake-registered Lean module and one or more root declarations:
-
-```bash
-npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
-```
-
-Omit roots to auto-discover public definitions owned by that module:
-
-```bash
-npm run generate:irpkg -- Fib build/generated/fib.irpkg
-```
-
-The command prints the package path, report path, package format, toolchain,
-declaration count, interface export count, JavaScript host import count, and
-target roots. The same summary is embedded in the manifest metadata so
-JavaScript and `/dev.html` can show exactly what was loaded.
-
-Inspect the embedded manifest without loading the browser:
-
-```bash
-npm run inspect:irpkg -- build/generated/fib.irpkg
-```
-
-The inspector also prints the package section directory so the binary envelope,
-manifest, and loader-visible payloads can be reviewed together.
-
-Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
-`/dev.html` while iterating locally. The runtime only needs URLs or bytes for
-the two assets:
-
-```js
-const vir = await createVirRuntime({
-  wasmUrl: "/vir-upstream.wasm",
-  irPackageSet: [await fetchBytes("/my-package.irpkg")],
-});
-```
+Follow [Packages](PACKAGES.md#generate-a-local-package) for module registration,
+root selection, configuration, inspection and the development runner. Supply
+the resulting bytes or descriptor URL through `irPackageSet`, as described in
+[Module Package Sets](#module-package-sets).
 
 ## Current Limits
 

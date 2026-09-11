@@ -1,8 +1,6 @@
 # Performance
 
-This document owns benchmark commands, artifact-cache behavior, and
-before/after comparison workflow. Setup, generated artifacts, and CI shape live
-in `docs/HARNESS.md`.
+For setup and generated-artifact prerequisites, see [HARNESS.md](../HARNESS.md).
 
 `npm run bench` runs the manifest-driven JavaScript runtime benchmark against
 the host Lean IR baseline. It restores or stores built benchmark inputs under
@@ -96,10 +94,10 @@ npm run bench:env-lookup -- \
 
 The profiling path uses the optimized, unstripped debug Wasm companion. Its
 timings are marked diagnostic and are not before/after evidence. See
-[Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
+[Environment Lookup Performance](../design/ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
 baseline and final profiles, measured representation experiments, and accepted
 local design.
-[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+[ULC-0001](../design/IR_DECLARATION_LOOKUP.md)
 owns the remaining environment/provider API decision.
 
 When the intervention is a Wasm build mode rather than a source-checkout
@@ -121,9 +119,9 @@ difference. Use the median of the per-round candidate/control ratios as the
 headline; the report retains the more outlier-sensitive geometric mean and the
 slower/equal/faster round counts as diagnostics.
 
-The repository-owned `Std.Format` conversion rows and accepted
+The `Std.Format` conversion rows and measured
 manifest-derived normalization-plan cache are documented in
-[Custom Inductive Object Conversion Performance](OBJECT_CONVERSION_PERFORMANCE.md).
+[Custom Inductive Object Conversion Performance](../design/OBJECT_CONVERSION_PERFORMANCE.md).
 
 Compare two saved reports with:
 
@@ -133,28 +131,25 @@ npm run bench:compare -- build/perf/before.json build/perf/after.json
 
 ## Browser benchmark catalog
 
-The standalone application under `benchmarks/browser/` owns the catalogued
-client-example format, candidate artifacts, differential tests, browser
-reports, and campaigns. Its current canonical example compares five
-`Std.Format.prettyM` backends; Illuminate is the first local second-client
-rehearsal. It does not initialize the VIR documentation site, Reveal, or Verso.
+The standalone application under `benchmarks/browser/` runs client examples,
+differential tests and browser performance campaigns. Its canonical example
+compares five `Std.Format.prettyM` backends. It runs independently of the VIR
+documentation site, Reveal and Verso.
 
 Root commands use the `bench:browser:*` prefix as convenience pointers. See
-[`benchmarks/browser/README.md`](../benchmarks/browser/README.md) for the
-authoritative command list, ignored artifact layout, example contribution
+[`benchmarks/browser/README.md`](../../benchmarks/browser/README.md) for the
+command list, ignored artifact layout, example contribution
 format, and measurement cautions.
 
-The Pages workflow generates and validates the canonical prettyM candidate in
-its own job, then deploys the admitted application under `/lean-vir/benchmarks/`.
-Its public catalog and `tests.json` are the same validated files used by the
-candidate build; no release publication step is involved.
+Pages serves the application under `/lean-vir/benchmarks/`, using the catalog
+and `tests.json` validated with the candidate build.
 
 ## Reading The Numbers
 
 Use a different comparison point depending on the question:
 
-- For PR review, compare against `main` with `npm run bench:paired`. This is the
-  regression check for the JavaScript runtime, package ABI, and shim changes.
+- For runtime, package ABI or shim regressions, compare two checkouts with
+  `npm run bench:paired`.
 - For pure interpreter cost, compare the `fib` and `sort` rows against the host
   Lean IR baseline printed in the same report. Those rows mostly measure Lean IR
   execution, not boundary conversion.
@@ -164,74 +159,31 @@ Use a different comparison point depending on the question:
 - For boundary conversion cost, compare each `base-*` row's `lower` sample with
   its `wasm` sample. `lower` isolates JavaScript-to-Lean object construction;
   `wasm` includes lowering, the interpreter call, result lifting, and release.
-- For new rows that do not exist on `main`, keep the current absolute per-call
-  number as the first baseline and compare future PRs against it.
+- A new row's absolute per-call measurement is its first baseline.
 
 Avoid comparing unrelated rows directly. For example, a recursive `Std.Format`
 row includes thousands of object conversions, while a scalar base row is mostly
 a small boundary call. They answer different questions.
 
-The comparison checks common benchmark rows for sample names, iteration counts,
-and checksums before printing per-call deltas. Rows present in only one report
-are listed separately with their per-call medians. The default benchmark
-includes the `branchAndSub` top-level dispatch row with both resolve-each-call
-and cached-slot samples, pure-runtime controls (`fib` and `sort`), JavaScript
-object-lowering rows, base boundary rows for `Unit`, `Bool`, `Nat`, `Int`,
-`String`, fixed-width unsigned integers, `USize`, `Float`, `Float32`,
-`ByteArray`, and shallow array inputs, plus end-to-end top-level value
-conversion rows for WIT-like scalar records, nested records/lists/options, and
-recursive custom inductives. It also includes host/resource rows for scalar host
-imports, callback root round trips, and DOM listener resource churn.
+The comparison checks common rows for sample names, iteration counts and
+checksums before printing per-call deltas. Rows present in only one report
+are listed separately with their per-call medians. The
+[benchmark sources](../../benchmarks) define the row catalog.
+
 The `format-tag-transitions` representative row and `format-empty-nodes`
-focused row use the generated `pretty-printer.irpkg` to exercise recursive
-`Std.Format` custom-inductive lowering through the same public runtime path.
+focused row use `pretty-printer.irpkg` to measure recursive `Std.Format`
+lowering through the public runtime. Host/resource rows repeat an exported
+operation from JavaScript where possible, measuring boundary conversion without
+a deep recursive Lean `DomM` loop.
 
-React is intentionally absent from this Node benchmark. The Node runtime's
-virtual document host rejects React operations instead of approximating React's
-renderer, reconciliation, or ownership behavior. Validate React against the real
-Chromium/React host with `npm run test:pages:browser`; any React performance
-campaign should likewise be a browser-catalog example rather than a virtual-host
-timing row.
+React is absent from this Node benchmark: the Node bindings provide neither
+a DOM nor React implementation. React performance needs the real browser host
+and a browser-catalog workload. [HARNESS.md](../HARNESS.md#browser-smoke) covers
+semantic checks; [OBJECT_ABI.md](../reference/OBJECT_ABI.md) defines object conversion.
 
-The `base-*` JSON rows are intended as the first regression surface for direct
-base-type conversion work. Each row has a `lower` sample for JavaScript object
-lowering and a `wasm` sample for the full top-level call. Calls over the
-supported object subset use the object ABI lane through the normal `wasm`
-sample, so the public `runtime.call(...)` path is also the main direct
-conversion measurement. The runtime currently lowers base arguments, `Array`,
-`List`, `Option`, `Prod`, and manifest-described
-structure/constructor values with object, `USize`, and scalar runtime fields,
-and lifts the same subset recursively. The no-fallback runtime smoke covers
-decimal scalars, `ByteArray`, `Array Nat -> Nat`, `Array String -> Nat`,
-`List UInt32 -> Nat`, `Array Nat -> Array Nat`, `List String -> List String`,
-`Option` arguments/results, `Prod` arguments/results, a nested
-`List (Nat × String)` argument, `Profile` records, `ProfileStats` mixed scalar
-records, trivial scalar wrappers, `Tagged Profile`, `Metered`, extended records,
-recursive structures/custom inductives, `Sum`/`Except` tagged unions, and
-nullary/unary/binary pretty-printer calls.
-JavaScript lowers inputs with the matching `vir_obj_*` constructor,
-`vir_obj_array`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
-`vir_call_resolved_objects`, and lifts the owned result with the matching
-inspection helpers. The scalar host/resource rows repeat one exported operation
-from JavaScript where possible, so they stress boundary conversion without
-primarily measuring a deep recursive Lean `DomM` loop.
-
-The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
-objects under the top-level `benchmarks` array. Every timed sample uses the same
-shape, regardless of whether it is named `lower`, `wasm`, `native`, `host`,
-`resolveEachCall`, `cachedSlot`, or `js`:
-
-```json
-{
-  "label": "base-bool",
-  "iterations": 10000,
-  "checksum": 0,
-  "medianMs": 185.0,
-  "perCallMs": 0.0185
-}
-```
-
-The `base-*` conversion rows use this stable row shape:
+The machine-readable report schema is `lean-vir.bench.v1`, with rows under
+`benchmarks`. Samples named `lower`, `wasm`, `native`, `host`,
+`resolveEachCall`, `cachedSlot` or `js` share the fields shown in this example:
 
 ```json
 {
@@ -261,15 +213,12 @@ interleaved measured rounds whose starting order rotates. Warm-up timings are
 excluded from the median, while warm-up checksums still participate in each
 candidate's stability check. Any per-candidate checksum instability or
 cross-candidate disagreement fails the benchmark. This row is the focused check
-for package-owned ABI and call-slot dispatch changes. Object host-import framing
-is more visible in the host/resource rows because those paths cross from Lean
-back into JavaScript. The broader `fib` and `sort` rows spend more time
-in Lean execution and should show smaller movement from boundary-only work.
+for call-slot dispatch. Host/resource rows expose the reverse crossing into
+JavaScript; `fib` and `sort` spend more time in Lean execution.
 `npm run bench:engines` remains a WASI command-module comparison across
 available engines for the broader `fib` and `sort` rows.
 
-For routine before/after comparisons between two already checked-out trees, use
-the paired runner:
+Compare two existing checkouts with the paired runner:
 
 ```bash
 npm run bench:paired -- --repeat 6 --out build/perf/general-abba \

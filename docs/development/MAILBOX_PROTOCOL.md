@@ -1,20 +1,9 @@
 # Agent Mailbox Protocol
 
-The agent mailbox is a small local message transport for coordinating work
-without turning branch or worktree state into a task database. It supports two
-common cases:
-
-1. agents working in different linked worktrees of the same project; and
-2. agents coordinating changes between dependent projects.
-
-The design deliberately separates a small, validated transport envelope from
-optional workflow conventions. Agents remain free to use the Markdown body and
-additional metadata that fit the conversation; the CLI is a guardrail and
-index, not a ticketing system.
-
-Mailbox contents are local coordination state. They are ignored by Git and do
-not replace commits, tracked design documents, issues, or pull requests as the
-durable record of a decision.
+Repository-local message transport for linked worktrees and dependent projects.
+Messages are ignored by Git; commits, issues and PRs remain the durable public
+record. Contribution and ownership rules are in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#agent-coordination).
 
 ## Canonical Mailbox
 
@@ -46,14 +35,7 @@ code change.
 - A VIR agent requesting a lean-zip validation uses the lean-zip mailbox.
 
 All messages in a conversation remain in the same thread home. Participants
-use `project/agent` addresses such as:
-
-```text
-vir/root
-vir/runtime
-lean-zip/root
-illuminate/hit-scene
-```
+use `project/agent` addresses such as `vir/runtime` or `lean-zip/root`.
 
 Use `project/*` when any agent in the destination project may claim the work;
 the standard ownership workflow expects a concrete `project/agent` recipient
@@ -231,155 +213,23 @@ ownership, routing, transition, or disposition conventions. These warnings are
 coordination advice, not transport failures. The Markdown body remains the
 authoritative place to explain intent and any deliberate exception.
 
-## Planning And Execution
+## Ownership and archival
 
-A mailbox thread is a conversation context, not intrinsically a task. Agents
-may use free-form threads to explore alternatives, assemble a plan, or record a
-decision without adding `kind`, `state`, ownership, or lane metadata.
+Lane checkpoints use the optional `owner`, `worktree`, `branch`, `base`, `head`,
+`worktree-state` and `publication` fields. The body supplies write scope,
+acceptance checks and any ownership handoff. Recorded metadata describes a
+checkpoint, not current Git or process state. A completion identifies the result
+and its durable commit, PR, design document or explicit disposable disposition.
+It does not authorize publication or deletion of a worktree or branch.
+An implementation claim identifies the sole writer; transfer names the new
+owner and checkpoint. Worktree retirement separately requires maintainer
+approval and checks of cleanliness, commit reachability and remote/PR state.
 
-```markdown
----
-protocol: agent-mailbox/v1
-message-id: plan-runtime-boundary
-thread-id: plan-runtime-boundary
-in-reply-to:
-time: 2026-08-13T13:45:00+02:00
-from: vir/root
-to: lean-zip/root
-subject: choose the runtime boundary
----
-
-## Context
-
-Compare the remaining options before opening implementation lanes.
-```
-
-For a small change, the same thread may move naturally from request through
-claim and completion. When planning produces several implementation lanes,
-keep the planning thread as the parent context and open one child request per
-lane and owning project. Put `parent-thread` on each child opener, express
-ordering with `depends-on`, and record claims and worktree checkpoints only in
-the executable child threads. This preserves discussion without turning one
-planning conversation into an ambiguous shared task.
-
-Before closing a planning thread, retain its durable conclusion in a tracked
-design document, commit, issue, pull request, or an explicit `no-action` or
-`discarded` disposition. The mailbox remains the coordination record rather
-than the sole home of a plan that future work depends on.
-
-## Worktree Ownership
-
-Before opening or claiming an implementation lane, read the mailbox and run:
-
-```bash
-git worktree list
-```
-
-The primary checkout remains the stable coordination base. New implementation
-work normally uses:
-
-```bash
-git worktree add -b <type>/<slug> .worktrees/<slug> <base-commit>
-```
-
-An implementation claim should record the project-relative
-worktree, branch, base commit, intended write scope, and publication boundary.
-Write scope stays
-in the Markdown body so paths can be listed clearly:
-
-```markdown
----
-protocol: agent-mailbox/v1
-message-id: VIR-ROOT-20260813-001
-thread-id: ROOT-VIR-20260813-001
-in-reply-to: ROOT-VIR-20260813-001
-time: 2026-08-13T15:10:00+02:00
-from: vir/runtime
-to: lean-zip/root
-kind: claim
-state: claimed
-owner: vir/runtime
-worktree: .worktrees/persist-ir-cache
-branch: fix/persist-ir-cache
-base: 5703203
-publication: local-only
-subject: persistent package interpreter accepted
----
-
-## Write Scope
-
-- `wasm/upstream_shim/interpreter/`
-- `fixtures/runtime/`
-
-No push or public PR is authorized.
-```
-
-The claim signals to another agent that it should not open an overlapping lane.
-A later handoff should name the new owner and the checkpoint it may consume.
-
-## Completion Checkpoints
-
-A completion reports the observable result and enough exact identity for a
-dependent agent to consume it:
-
-```markdown
----
-protocol: agent-mailbox/v1
-message-id: VIR-ROOT-20260813-002
-thread-id: ROOT-VIR-20260813-001
-in-reply-to: VIR-ROOT-20260813-001
-time: 2026-08-13T18:20:00+02:00
-from: vir/runtime
-to: lean-zip/root
-kind: completion
-state: completed
-worktree: .worktrees/persist-ir-cache
-branch: fix/persist-ir-cache
-base: 5703203
-head: abc1234
-worktree-state: clean
-publication: local-only
-disposition: ready-for-review
-subject: persistent package interpreter validated
----
-
-## Outcome
-
-Summarize behavior and compatibility.
-
-## Validation
-
-Record only the review-relevant checks and artifact identities.
-
-## Remaining Work
-
-State explicit follow-up or `None`.
-```
-
-Completion does not authorize pushing, opening a PR, deleting a worktree, or
-deleting a branch. Those remain explicit maintainer actions. Public PR bodies
-must not include local mailbox paths, worktree names, command transcripts, or
-routine coordination notes.
-
-## Durability And Cleanup
-
-Before closure, the completion or closure message identifies the durable home
-of the outcome:
-
-- a commit or landed pull request;
-- a retained branch for useful or rejected experimental evidence;
-- a tracked design document; or
-- an explicit decision that the evidence is disposable.
-
-Archive mailbox files only when every branch of a thread ends in `closed` or
-`cancelled`. The archive command moves the complete thread, not selected
-events, to `archive/<thread-id>/`. Open, claimed, blocked,
-completed-but-unclosed, and free-form active threads remain. Archives stay
-inspectable and may be deleted manually only after their outcome is durable.
-
-Mailbox deletion does not authorize worktree or branch deletion. Worktree
-retirement separately confirms cleanliness, commit reachability, remote/PR
-state, and maintainer approval.
+A thread can be archived only when **every** branch ends in `closed` or
+`cancelled`. The archive command moves the complete thread to
+`archive/<thread-id>/`; completed-but-unclosed and active free-form threads stay
+in the active mailbox. Archiving a thread does not remove its source worktree.
+Archived messages are deletable only after their outcome is retained durably.
 
 ## Commands
 
@@ -456,36 +306,3 @@ global message identity and cross-store integrity remain atomic. Remove a
 leftover lock only after confirming no mailbox operation is still running,
 then rerun both active and archive checks before retrying. Pass `--help` to any
 mailbox command for a concise command and option summary.
-
-## Design Lineage
-
-This is intentionally a filesystem-local subset, not a replacement for a
-network agent protocol:
-
-- [Maildir](https://manpages.debian.org/unstable/qmail/maildir.5.en.html)
-  contributes immutable per-message files and staged atomic delivery through a
-  temporary directory.
-- [RFC 5322](https://www.rfc-editor.org/rfc/rfc5322.html#section-3.6.4)
-  contributes opaque message identity and immediate-parent reply linkage,
-  including branching conversations.
-- [AMQP 1.0 messaging](https://docs.oasis-open.org/amqp/core/v1.0/amqp-core-messaging-v1.0.html)
-  contributes the separation between immutable message content and
-  infrastructure or application annotations.
-- [A2A](https://a2a-protocol.org/latest/specification/) contributes the
-  distinction between free-form messages and optional stateful tasks, plus
-  namespaced extension metadata.
-- [Claude Code agent teams](https://code.claude.com/docs/en/agent-teams)
-  demonstrate a local mailbox kept separate from a shared task list. This
-  protocol uses linked request threads instead of introducing a task database.
-- [MCP Agent Mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
-  demonstrates the fuller repository-coordination design space: inboxes,
-  searchable archives, read acknowledgements, and advisory file leases. Those
-  server and database features remain outside this local protocol.
-- [FIPA ACL](https://www.fipa.org/repository/aclspecs.html) demonstrates the
-  alternative of normative communicative acts. The mailbox keeps `kind`
-  advisory because these cooperating local agents do not need formal
-  performative semantics.
-
-The repository does not need agent discovery, authentication, streaming,
-remote transports, or typed artifacts. If those needs emerge, prefer adopting
-an established protocol rather than expanding this local format into one.

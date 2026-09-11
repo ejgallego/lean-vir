@@ -295,7 +295,7 @@ Common Lean values map to JavaScript values like this:
   `{ kind, fields }` depending on field count.
 - `ByteArray` uses `Uint8Array` in both directions.
 
-See `docs/JS_API.md` for the complete type surface, including `Sum`, `Except`,
+See `docs/guides/JS_API.md` for the complete type surface, including `Sum`, `Except`,
 `Lean.Expr`, nested structures, and host imports.
 
 ## Export Types Vs Host Import Types
@@ -325,11 +325,11 @@ If the Lean function needs to call back into JavaScript, mark an opaque Lean
 declaration with `@[vir_js "..."]` and pass a matching `hostBindings` function
 when creating the runtime.
 
-Lean:
+In `examples/MyApp.lean`, add `public import Vir.Js` immediately after `module`.
+Insert these declarations inside the existing `namespace MyApp`, before
+`end MyApp` (and still within its `public section`):
 
 ```lean
-import Vir.Js
-
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
@@ -337,6 +337,13 @@ def bumpViaJavaScript (n : Nat) : Lean.Vir.RuntimeM Nat := do
   let input ← Lean.Vir.JsValue.ofNat n
   let output ← jsBumpNat input
   Lean.Vir.JsValue.toNat output
+```
+
+Regenerate the package with the new function explicitly included among its
+exports; the earlier root list does not select it automatically:
+
+```bash
+npm run generate:irpkg -- MyApp web/public/my-app.irpkg MyApp.total MyApp.greeting MyApp.classify MyApp.validateName MyApp.bumpViaJavaScript
 ```
 
 JavaScript:
@@ -358,7 +365,7 @@ Host imports are synchronous in the current prototype.
 Most app code can pass only its custom `hostBindings`; the built-in browser
 bindings stay installed as defaults. Packages that call
 `Lean.Vir.React.Root.*` in a browser also need the separate React host entry.
-See `docs/JS_API.md` for the canonical `defaultHostBindings` composition and
+See `docs/guides/JS_API.md` for the canonical `defaultHostBindings` composition and
 low-level binding factory reference.
 
 ## Troubleshooting

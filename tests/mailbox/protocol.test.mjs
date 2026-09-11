@@ -66,11 +66,11 @@ async function put(mailbox, id, source) {
 }
 
 test("documentation message examples conform to the protocol", () => {
-  const source = readFileSync(repositoryPath("docs", "MAILBOX_PROTOCOL.md"), "utf8");
+  const source = readFileSync(repositoryPath("docs", "development", "MAILBOX_PROTOCOL.md"), "utf8");
   const examples = [...source.matchAll(/```markdown\n(---\n[\s\S]*?\n---\n[\s\S]*?)\n```/g)]
     .map((match, index) => parseMessage(`${match[1]}\n`, `documentation example ${index + 1}`));
 
-  assert.equal(examples.length, 4, "expected planning, request, claim, and completion examples");
+  assert.equal(examples.length, 1, "expected the documented request example");
   assert.deepEqual(validateMessages(examples).errors, []);
 });
 

@@ -34,7 +34,7 @@ maintainer requests a tracked fixture or report change.
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
-| Local `.irpkg` and reports | Follow [local packages](LOCAL_IRPKG.md) or [package configuration](INTERFACE_PIPELINE.md). |
+| Local `.irpkg` and reports | Follow [local packages](guides/PACKAGES.md#generate-a-local-package) or [package configuration](guides/PACKAGES.md#configure-package-generation). |
 
 Other ignored outputs include object caches and reports under `build/`, package
 `.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
@@ -44,7 +44,7 @@ compiling the shim; Lean codec constants remain ordinary source.
 
 For failures, inspect `build/upstream-probe/boundary.md`, its `link.map` and
 generated native wrappers, the relevant `build/generated/*.report.md`, or
-`build/fixtures/summary.json`. [Fixture coverage](FIXTURE_COVERAGE.md) explains
+`build/fixtures/summary.json`. [Fixture coverage](development/EXAMPLES_AND_FIXTURES.md) explains
 the summary fields. Binding and surface reports live under `build/bindings/`,
 `build/type-descriptors/` and `build/vir-surface/`.
 
@@ -122,12 +122,12 @@ semantics require the separate Chromium checks below.
   using its `web/dist` artifacts.
 - Surface analysis: `npm run test:surface`; add
   `CHROMIUM=/path/to/chromium npm run test:surface:browser` for report navigation
-  or responsive layout. [Surface analysis](SURFACE_ANALYSIS.md) owns capture,
+  or responsive layout. [Surface analysis](development/SURFACE_ANALYSIS.md) owns capture,
   comparison and rendering commands. API-coverage documentation uses
   `npm run check:api-coverage`.
 - Benchmark harness/cache/sampling changes: `npm run test:bench`. Declaration
   lookup/provider performance uses `npm run bench:env-lookup -- --json <new-output-path>`
-  and a separate `--cpu-profile` attribution run; see [performance](PERFORMANCE.md).
+  and a separate `--cpu-profile` attribution run; see [performance](development/PERFORMANCE.md).
   After a demo build, `npm run test:env-lookup:wasm-pair` is a correctness smoke,
   not timing evidence. `npm run size:wasm` inspects built Wasm/linker-map sizes.
 - Host-engine feature availability such as externref or JSPI:
@@ -145,7 +145,7 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 
 The no-build fixture path still builds the selected Lean modules and
 `vir_irpkg`, then compares compiled host-driver and Wasm results. It skips only
-the demo/Wasm build. [Fixture coverage](FIXTURE_COVERAGE.md) documents worker
+the demo/Wasm build. [Fixture coverage](development/EXAMPLES_AND_FIXTURES.md) documents worker
 limits and oracle expectations.
 
 Select runtime smokes by id/path substring or group:
@@ -246,7 +246,7 @@ CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs
 
 This manual characterization runs published infoview hooks unchanged with React
 in Chromium; it needs npm dependencies, but no Lean or Wasm. It is separate from
-the server gate. The [RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md#pinned-upstream-hook-limitations)
+the server gate. The [RPC guide](guides/INFOVIEW.md#pinned-upstream-hook-limitations)
 records the pinned-version findings and their implications for hook adoption.
 
 ## CI Shape
@@ -259,8 +259,8 @@ inputs. They do not refetch Lean source or reinstall the WASI SDK.
 
 For PRs, jobs check out the PR head SHA. GitHub artifact lookup and the SDK
 manifest use that same commit, keeping source and downloaded artifacts aligned.
-The [workflow files](../.github/workflows/) own job definitions. Pages runs
-`npm run build:site`; [surface analysis](SURFACE_ANALYSIS.md) explains its
+The [workflow files](../.github/workflows) own job definitions. Pages runs
+`npm run build:site`; [surface analysis](development/SURFACE_ANALYSIS.md) explains its
 deployed surface/size explorers.
 
 ## SDK Releases
@@ -272,4 +272,4 @@ archive to the matching release. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See
-[SDK installation](LAKE_INTEGRATION.md#install-the-browser-sdk).
+[SDK installation](guides/PACKAGES.md#install-the-browser-sdk).
