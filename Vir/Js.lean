@@ -12,6 +12,18 @@ public section
 
 namespace Lean.Vir
 
+/--
+Converts a `Nat` to an exact JavaScript number in `0..9007199254740991`
+(`Number.MAX_SAFE_INTEGER`), or returns `none` above that range.
+Checks the bound in `Nat` before converting to `Float`; never rounds or clamps
+an out-of-range input. Unlike `ofNat`, this returns a number, not a bigint.
+-/
+def JsValue.ofNatNumber? (value : Nat) : RuntimeM (Option (Js Float)) := do
+  if value ≤ 9007199254740991 then
+    return some (← JsValue.ofFloat value.toFloat)
+  else
+    return none
+
 namespace Js
 
 /-- Expected JavaScript shape rejected by a checked cast. -/

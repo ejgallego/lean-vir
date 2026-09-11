@@ -312,10 +312,24 @@ state/resource values:
 - `Lean.Vir.JsValue.toString : @& Lean.Vir.Js String -> Lean.Vir.RuntimeM String`
 - `Lean.Vir.JsValue.ofNat : Nat -> Lean.Vir.RuntimeM (Lean.Vir.Js Nat)`
 - `Lean.Vir.JsValue.toNat : @& Lean.Vir.Js Nat -> Lean.Vir.RuntimeM Nat`
+- `Lean.Vir.JsValue.ofNatNumber? : Nat -> Lean.Vir.RuntimeM (Option (Lean.Vir.Js Float))`
 - `Lean.Vir.JsValue.ofBool : Bool -> Lean.Vir.RuntimeM (Lean.Vir.Js Bool)`
 - `Lean.Vir.JsValue.toBool : @& Lean.Vir.Js Bool -> Lean.Vir.RuntimeM Bool`
 - `Lean.Vir.JsValue.ofFloat : Float -> Lean.Vir.RuntimeM (Lean.Vir.Js Float)`
 - `Lean.Vir.JsValue.toFloat : @& Lean.Vir.Js Float -> Lean.Vir.RuntimeM Float`
+
+`JsValue.ofNat` represents a Lean `Nat` as a nonnegative JavaScript `bigint`,
+not a `number`; `toNat` requires that same representation. This deliberately
+preserves arbitrary precision. Raw `bigint` values are not JSON wire numbers:
+`JSON.stringify` rejects them, including inside records. `ofFloat n.toFloat`
+is not an exact substitute for arbitrary `Nat` values. Use `ofNatNumber?` when
+the API needs a JavaScript number: it returns `some` of the exact number for
+`0..9007199254740991` and `none` above that range. The bound is checked in
+`Nat` before Float conversion; even exactly representable larger integers are
+rejected because they are outside the safe-integer range. The infoview
+`documentPosition` adapter already checks its coordinates against
+`0..Number.MAX_SAFE_INTEGER` and converts accepted bigints to numbers; it
+rejects out-of-range coordinates instead of rounding or clamping them.
 
 Top-level erased type parameters are allowed before runtime arguments in
 host-import signatures. The package records how many leading erased parameters
