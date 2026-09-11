@@ -287,8 +287,8 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   React-first plan for `externref`, JSPI, and related Wasm interop features.
 - [docs/INTERFACE_PIPELINE.md](docs/INTERFACE_PIPELINE.md) for package configs,
   manifests, supported type details, and interface internals.
-- [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) for
-  maintainer-facing implementation details.
+- [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for
+  implementation ownership and call flow.
 
 ## Repository Layout
 

@@ -100,6 +100,8 @@ request scheduler nor additional Lean proofs of these rules.
 Upstream `mk_rpc_widget%` calls a server method returning serialized
 `ProofWidgets.Html` and renders it with `HtmlDisplay`. It is an optional
 server-rendered authoring path, not the definition of a ProofWidgets component.
+Its serialized component nodes carry a component identifier/export, encoded
+props and children; preserve those fields and the upstream loading protocol.
 
 VIR's similarly named `Lean.Vir.ProofWidgets.Html` is a native
 `ReactM (Js React.Node)` action, not that wire datatype. For upstream wire
@@ -119,6 +121,23 @@ The real-server shell test separately exercises Lean continuations after UI
 cleanup and hard disposal. Neither test proves GC timing or arbitrary response
 schemas. The [harness guide](HARNESS.md#infoview-rpc-and-lifetime-checks) distinguishes
 these tests from standalone lifetime and upstream async-hook probes.
+
+### Pinned upstream hook limitations
+
+The [manual Chromium probe](../tests/infoview/upstream-async-probe.mjs) runs
+the published hooks unchanged against React. With `@leanprover/infoview` 0.13.0:
+
+- Strict Mode effect replay aborts the initial request without replacement in
+  both `useAsync` and `useAsyncPersistent`.
+- A cancelled request's late success can enter `useAsyncPersistent`'s cache
+  and appear when the next request starts; `useAsync` has no such cache.
+- The persistent hook drops the previous value on rejection, unlike the
+  tutorial's UI policy.
+
+These version-specific observations constrain adoption of those hooks. They
+are not VIR guarantees, an all-Lean parent test or grounds for a VIR request
+manager. [HARNESS.md](HARNESS.md#upstream-async-hook-probe) gives the command and
+prerequisites.
 
 ## Upstream reference points
 

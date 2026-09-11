@@ -3,7 +3,7 @@
 This note compares the current Lean-authored React surface with the public
 React API. It is an API-fidelity audit, not a replacement for the renderer
 implementation details in [REACT_NODE.md](REACT_NODE.md) or the ProofWidgets
-plan in [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md).
+plan in [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md).
 
 This is also the first audit template for future JavaScript library bindings.
 The binding should preserve the source library's names, call shapes, and

@@ -14,8 +14,10 @@ limits fail before any build starts.
 The runner writes `build/fixtures/summary.json` with per-fixture status,
 expected host and Wasm values, expectation rationale, imported IR declarations,
 native externs, initializer globals, and structured missing-boundary
-diagnostics for CI and boundary debugging. Each missing dependency records its
-name and any declaration path that reached it.
+diagnostics for CI and boundary debugging. Schema version 2 records zero seconds
+for package or Wasm phases that were not reached and `null` for unavailable
+outcome values or diagnostics. Missing dependencies preserve their name and
+declaration path as `{ name, via }` objects.
 
 The host interpreter remains the default oracle. When behavior intentionally
 depends on the execution target, an `expect` object must pin distinct decimal

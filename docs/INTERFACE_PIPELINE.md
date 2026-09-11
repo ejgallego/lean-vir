@@ -2,8 +2,9 @@
 
 This document owns package config shape, generated manifest semantics, and the
 current interface surface. Command selection and CI shape live in
-`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`;
-the split package generator internals live in `docs/GENERATE_PACKAGE.md`.
+[HARNESS.md](HARNESS.md); implementation ownership lives in
+[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md), and generator internals in
+[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md).
 
 The developer path is package-driven:
 
@@ -351,11 +352,10 @@ and add size/depth/execution limits around package loading and calls.
 
 ## WIT Direction
 
-WIT is still the right interface-description model to track, but not yet the
-runtime dependency for this demo path.
-
 The current artifact is a core `wasm32-wasip1` module with a generated manifest
-and a generic byte-payload call export. We are not committing this prototype to
-a component-model boundary yet. For now, `interfaces/lean-vir.wit` mirrors the
-generic manifest/call shape as a design reference while the browser runtime
-uses the embedded JSON manifest directly.
+and the owned-object-pointer call ABI described in [OBJECT_ABI.md](OBJECT_ABI.md).
+The browser runtime reads the embedded JSON manifest and invokes
+`vir_call_resolved_objects`.
+
+[interfaces/lean-vir.wit](../interfaces/lean-vir.wit) is a proposed byte-payload
+interface, not the current runtime ABI or a component-model implementation.

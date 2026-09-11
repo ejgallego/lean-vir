@@ -3,8 +3,7 @@
 For current workflows and contracts, start with the [documentation index](../README.md).
 This page links proposals and open decisions, not a list of implemented APIs.
 
-- [ProofWidgets component parity](../PROOFWIDGETS_PORTING.md#planned-component-parity)
-  and [compatibility questions](../REACT_PROOFWIDGETS_ROADMAP.md#open-questions).
+- [ProofWidgets component parity and open questions](../PROOFWIDGETS_PORTING.md#planned-component-parity).
 - [Optional package adapters](../PACKAGE_ADAPTER_ROADMAP.md#proposed-shape).
 - [Future Wasm features](../REACT_WASM_BINDINGS.md#future-wasm-features).
 - [Callback follow-up](../EVENT_CALLBACK_ROADMAP.md#remaining-work).

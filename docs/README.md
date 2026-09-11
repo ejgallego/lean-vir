@@ -52,9 +52,7 @@ their implemented contracts proposals.
 
 ## Design rationale and historical evidence
 
-- [Implementation notes](IMPLEMENTATION_NOTES.md) collect architecture rationale
-  and implementation history; use the task guides above for current workflows.
-  [Wasm interop](REACT_WASM_BINDINGS.md) explains the current boundary and
+- [Wasm interop](REACT_WASM_BINDINGS.md) explains the current boundary and
   possible future features; [callback notes](EVENT_CALLBACK_ROADMAP.md) likewise
   cover current behavior as well as remaining work.
 - [Environment lookup](ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
