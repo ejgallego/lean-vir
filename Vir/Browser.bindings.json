@@ -47,6 +47,8 @@
       "TextMetrics": "TextMetrics"
     },
     "methodPolicies": {
+      "clearInterval": { "parameterRenames": { "id": "interval" } },
+      "clearTimeout": { "parameterRenames": { "id": "timeout" } },
       "AbortController.abort": {
         "omittedOptionalParameters": ["reason"],
         "semantics": "preserving",
@@ -116,6 +118,28 @@
       }
     },
     "exceptions": {
+      "browser.timer.clearInterval": {
+        "reason": "Selects a native interval token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.",
+        "semantics": "preserving",
+        "activeEffect": "release",
+        "arguments": {
+          "interval": {
+            "passing": "consumed",
+            "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" }
+          }
+        }
+      },
+      "browser.timer.clearTimeout": {
+        "reason": "Selects a native timeout token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.",
+        "semantics": "preserving",
+        "activeEffect": "release",
+        "arguments": {
+          "timeout": {
+            "passing": "consumed",
+            "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" }
+          }
+        }
+      },
       "browser.animation.cancelAnimationFrame": {
         "reason": "Lean gives the exact browser animation-frame token a phantom Js AnimationFrame type; the host passes that token unchanged to cancelAnimationFrame.",
         "semantics": "preserving",
@@ -509,21 +533,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
       },
       {
-        "id": "browser.timer.clearTimeout",
-        "group": "timers",
-        "target": "browser.timer.clearTimeout",
-        "lean": "Lean.Vir.Browser.Timer.clearTimeout",
-        "marker": "vir_js",
-        "reason": "The exact timeout token is passed unchanged to clearTimeout; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearTimeout", "semantics": "preserving" },
-        "activeEffect": "release",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "timeout", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Timeout", "representation": "js-resource", "resourceInner": "Timeout" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
         "id": "browser.timer.setInterval",
         "group": "timers",
         "target": "browser.timer.setInterval",
@@ -538,21 +547,6 @@
           { "name": "delayMs", "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
-      },
-      {
-        "id": "browser.timer.clearInterval",
-        "group": "timers",
-        "target": "browser.timer.clearInterval",
-        "lean": "Lean.Vir.Browser.Timer.clearInterval",
-        "marker": "vir_js",
-        "reason": "The exact interval token is passed unchanged to clearInterval; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "clearInterval", "semantics": "preserving" },
-        "activeEffect": "release",
-        "effect": { "id": "dom", "lean": "DomM" },
-        "arguments": [
-          { "name": "interval", "passing": "consumed", "type": { "lean": "Lean.Vir.Js Interval", "representation": "js-resource", "resourceInner": "Interval" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       }
     ]
   },
@@ -848,7 +842,11 @@
       "title": "Timers",
       "targets": ["browser.timer.*"],
       "lean": { "public": ["Lean.Vir.Browser.Timer"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.dom.d.ts"], "roots": ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] },
+      "mappings": [
+        { "typescript": "clearInterval", "targets": ["browser.timer.clearInterval"], "lean": ["Lean.Vir.Browser.Timer.clearInterval"] },
+        { "typescript": "clearTimeout", "targets": ["browser.timer.clearTimeout"], "lean": ["Lean.Vir.Browser.Timer.clearTimeout"] }
+      ]
     },
     {
       "id": "owned-primitives",

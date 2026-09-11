@@ -100,6 +100,24 @@ end React.ElementType
 namespace React.Hooks
 
 /--
+Generated reviewed function call policy for TypeScript `React.useEffect`.
+
+Accepts a function that contains imperative, possibly effectful code.
+
+Call policy: Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.
+
+Upstream declaration: node_modules/@types/react/index.d.ts
+
+ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "react.useEffect"]
+opaque useEffectWithoutDeps
+    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback) :
+    Lean.Vir.React.ReactM Unit
+
+/--
 Faithful generated function binding for TypeScript `React.useId`.
 
 Upstream declaration: node_modules/@types/react/index.d.ts
@@ -163,22 +181,6 @@ opaque useRef
     {α : Type}
     (initial : @& Lean.Vir.Js α) :
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)))
-
-/--
-Generated binding for reviewed VIR protocol `react.hooks.use-effect`.
-
-Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.useEffect"]
-opaque useEffectWithoutDeps
-    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback) :
-    Lean.Vir.React.ReactM Unit
 
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-memo`.

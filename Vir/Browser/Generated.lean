@@ -1537,6 +1537,42 @@ end TextMetrics
 namespace Timer
 
 /--
+Generated reviewed function specialization of TypeScript `clearInterval`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/clearInterval)
+
+Specialization policy: Selects a native interval token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+ABI profile `browser-dom-faithful-v1`: receiver none; interval js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.timer.clearInterval"]
+opaque clearInterval
+    (interval : Lean.Vir.Js Interval) :
+    DomM Unit
+
+/--
+Generated reviewed function specialization of TypeScript `clearTimeout`.
+
+[MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/clearTimeout)
+
+Specialization policy: Selects a native timeout token from TypeScript's number-or-undefined input. The exact token is forwarded unchanged; the terminal Lean operation removes private cancellation state without revoking JavaScript aliases.
+
+Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
+
+ABI profile `browser-dom-faithful-v1`: receiver none; timeout js-resource/consumed/call; result immediate/value.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "browser.timer.clearTimeout"]
+opaque clearTimeout
+    (timeout : Lean.Vir.Js Timeout) :
+    DomM Unit
+
+/--
 Generated binding for reviewed VIR protocol `browser.timer.setTimeout`.
 
 VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setTimeout.
@@ -1554,22 +1590,6 @@ opaque setTimeoutJs
     DomM (Lean.Vir.Js Timeout)
 
 /--
-Generated binding for reviewed VIR protocol `browser.timer.clearTimeout`.
-
-The exact timeout token is passed unchanged to clearTimeout; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; timeout js-resource/consumed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.timer.clearTimeout"]
-opaque clearTimeout
-    (timeout : Lean.Vir.Js Timeout) :
-    DomM Unit
-
-/--
 Generated binding for reviewed VIR protocol `browser.timer.setInterval`.
 
 VIR selects the function callback arm, passes the callback and numeric delay in native order, privately records pending cancellation for teardown, and returns the exact token produced by setInterval.
@@ -1585,22 +1605,6 @@ opaque setIntervalJs
     (callback : DomM Unit)
     (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Interval)
-
-/--
-Generated binding for reviewed VIR protocol `browser.timer.clearInterval`.
-
-The exact interval token is passed unchanged to clearInterval; the terminal Lean operation also removes VIR's private pending-cancellation record without revoking JavaScript aliases.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `browser-dom-faithful-v1`: receiver none; interval js-resource/consumed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "browser.timer.clearInterval"]
-opaque clearInterval
-    (interval : Lean.Vir.Js Interval) :
-    DomM Unit
 
 end Timer
 

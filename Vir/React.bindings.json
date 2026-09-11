@@ -24,6 +24,11 @@
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {
+      "React.EffectCallback": {
+        "lean": "Lean.Vir.React.EffectCallback",
+        "semantics": "preserving",
+        "reason": "Lean.Vir.React.EffectCallback is the phantom marker for the exact JavaScript setup function."
+      },
       "React.ReactNode": {
         "lean": "Lean.Vir.React.Node",
         "semantics": "preserving",
@@ -36,6 +41,12 @@
       }
     },
     "methodPolicies": {
+      "React.useEffect": {
+        "omittedOptionalParameters": ["deps"],
+        "parameterRenames": { "effect": "setup" },
+        "semantics": "preserving",
+        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument."
+      },
       "createRoot": { "omittedOptionalParameters": ["options"] }
     },
     "exceptions": {
@@ -165,17 +176,6 @@
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Ref (Lean.Vir.Js α)" } }
-      },
-      {
-        "id": "react.hooks.use-effect", "group": "hooks", "target": "react.useEffect",
-        "lean": "Lean.Vir.React.Hooks.useEffectWithoutDeps", "marker": "vir_js",
-        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "setup", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "react.hooks.use-memo", "group": "hooks", "target": "react.useMemo",
@@ -408,6 +408,11 @@
       "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.Hooks.DependencyList", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerState", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.State", "Lean.Vir.React.StateSetter", "Lean.Vir.React.StateTuple"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useId", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] },
       "mappings": [
+        {
+          "typescript": "React.useEffect",
+          "targets": ["react.useEffect"],
+          "lean": ["Lean.Vir.React.Hooks.useEffectWithoutDeps"]
+        },
         {
           "typescript": "React.useId",
           "targets": ["react.useId"],
