@@ -159,19 +159,20 @@ try {
     defaultHostBindings: createBrowserHostBindings({ lifecycle }),
   });
   try {
-    for (const target of [
-      "js.float.owned",
-      "js.value.browser.canvasStyle.string",
-    ]) {
-      const hostImport = runtime.interfaceManifest.hostImports.find(
-        (entry) => entry.target === target,
-      );
-      assert.equal(hostImport?.boundary, "explicitConversion");
-    }
     const hostImport = (target) =>
       runtime.interfaceManifest.hostImports.find(
         (entry) => entry.target === target,
       );
+    // Check the conversions reached by the example's explicit call sites.
+    for (const target of [
+      "js.float",
+      "js.float.value",
+      "js.value.browser.canvasStyle.string",
+    ]) {
+      const entry = hostImport(target);
+      assert.ok(entry, `missing reachable conversion: ${target}`);
+      assert.equal(entry.boundary, "explicitConversion", target);
+    }
     assert.equal(
       hostImport("browser.element.getClassList")?.result?.type,
       "DOMTokenList",
