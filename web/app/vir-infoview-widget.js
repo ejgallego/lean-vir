@@ -11,6 +11,7 @@ import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
 import { rpcJsonFromValue } from "../src/rpc-json.js";
+import { widgetErrorMessage as errorMessage } from "../src/vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import {
@@ -1072,15 +1073,4 @@ function freshMountId(value) {
 
 function widgetCleanupError(errors, message) {
   return errors.length === 1 ? errors[0] : new AggregateError(errors, message);
-}
-
-function errorMessage(error, setupHint) {
-  const message =
-    error instanceof AggregateError
-      ? `${error.message}\n${error.errors.map((cause) => errorMessage(cause, "")).join("\n")}`
-      : error instanceof Error
-        ? error.message
-        : String(error);
-  const hint = typeof setupHint === "string" ? setupHint.trim() : "";
-  return hint.length === 0 ? message : `${message}\n\n${hint}`;
 }
