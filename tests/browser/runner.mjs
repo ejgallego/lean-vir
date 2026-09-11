@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   assertDistReady,
+  distRoot,
   launchChromium,
   openChromiumPage,
   serveDist,
@@ -54,7 +55,7 @@ try {
   await smokeSurfaceExplorer(cdp, server.origin);
   await smokeWasmSizeExplorer(cdp, server.origin);
   await smokeReactTamagotchi(cdp, server.origin);
-  await smokeBrowserReactLifetimes(cdp);
+  await smokeBrowserReactLifetimes(cdp, distRoot);
   for (const packageFile of packageFiles) {
     await smokeManifestDrivenEntryList(cdp, server.origin, packageFile);
   }

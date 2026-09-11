@@ -100,6 +100,18 @@ end React.ElementType
 namespace React.Hooks
 
 /--
+Faithful generated function binding for TypeScript `React.useId`.
+
+Upstream declaration: node_modules/@types/react/index.d.ts
+
+ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the TypeScript source or binding configuration.
+-/
+@[vir_js "react.useId"]
+opaque useId : Lean.Vir.React.ReactM (Lean.Vir.Js String)
+
+/--
 Generated binding for reviewed VIR protocol `react.hooks.use-reducer`.
 
 Passes the caller's native reducer and initial value unchanged to React.useReducer and returns React's exact result array.

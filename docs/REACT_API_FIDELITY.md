@@ -46,6 +46,7 @@ The audit baseline is the public React 19.2 reference, checked on
 - [`useMemo(calculateValue, dependencies)`](https://react.dev/reference/react/useMemo)
 - [`useCallback(fn, dependencies)`](https://react.dev/reference/react/useCallback)
 - [`useContext(SomeContext)`](https://react.dev/reference/react/useContext)
+- [`useId()`](https://react.dev/reference/react/useId)
 - [`createRoot(domNode, options?)`](https://react.dev/reference/react-dom/client/createRoot)
 
 ## Current Fidelity Audit
@@ -74,6 +75,14 @@ The audit baseline is the public React 19.2 reference, checked on
 | `useCallback`          | `useCallback(fn, dependencies)`                                                     | exact `Js Callback` and `Js DependencyList`                                                                 | Good. React selects and returns the exact function.                                                                                                                                                                                           |
 | `useContext`           | `useContext(SomeContext)`                                                           | exact `Js Context`                                                                                          | Good consumer binding; context creation/provider conveniences remain future work.                                                                                                                                                            |
 | External JS components | component value passed as element type                                              | `Js ElementType` first argument to `Node.createElement`                                                     | Foundation present. The smoke fixture binds an external component value this way; real library wrappers remain future binding work.                                                                                                           |
+
+`Hooks.useId : ReactM (Js String)` directly binds the pinned `useId(): string`
+declaration. React supplies the ID; VIR neither converts it to a Lean string nor
+keeps an ID registry. Use it for accessibility relationships inside components,
+not list keys or persistent application identities. The real Lean/Wasm browser
+fixture checks committed rerender stability, Strict Mode, distinct hook calls
+and instances across two roots, and native label/input/description links. This
+does not add hydration or `createRoot` options such as `identifierPrefix`.
 
 ## Main Mismatches
 
