@@ -200,6 +200,9 @@ The [React guide](REACT_NODE.md) owns nodes, roots, component identity and hooks
 introduction. React providers require the real browser host. The Node wrapper
 provides environment-neutral JavaScript-value and console operations only.
 
+`React.Hooks.useId : ReactM (Js String)` returns React's native accessibility
+ID. Use it inside a component, not as a list key or application identity.
+
 For `Vir.Infoview`, follow [Infoview widgets](REACT_NODE.md#infoview-widgets)
 for activation and the [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md)
 for server calls. Its clipboard and editor-command helpers expose local
