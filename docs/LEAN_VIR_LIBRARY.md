@@ -103,6 +103,12 @@ inside records; they are not JSON wire numbers. When an API requires a number,
 check its range before converting to `Float`: `ofFloat n.toFloat` alone
 does not preserve arbitrary `Nat` precision.
 
+`JsValue.ofNatNumber? : Nat → RuntimeM (Option (Js Float))` returns `some`
+of the exact JavaScript number for `0..9007199254740991`, and `none` above
+that range. It checks the bound in `Nat` before Float conversion, rejecting
+even exactly representable larger integers because they exceed the
+safe-integer range.
+
 The infoview `documentPosition` adapter checks coordinates against
 `0..Number.MAX_SAFE_INTEGER` before converting accepted bigints to numbers.
 It rejects out-of-range coordinates instead of rounding or clamping them.

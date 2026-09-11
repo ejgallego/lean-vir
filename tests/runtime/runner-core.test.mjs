@@ -27,6 +27,7 @@ test("runtime catalog is immutable and has unique ids and files", () => {
   assert.equal(new Set(runtimeTests.map((entry) => entry.id)).size, runtimeTests.length);
   assert.equal(new Set(runtimeTests.map((entry) => entry.file)).size, runtimeTests.length);
   assert.equal(runtimeTestPath(runtimeTests[0]), "tests/runtime/manifest-smoke.mjs");
+  assert.equal(runtimeTests.find((entry) => entry.id === "js-nat-number").group, "lean");
   assert.throws(() => runtimeTests.push({}), TypeError);
 });
 

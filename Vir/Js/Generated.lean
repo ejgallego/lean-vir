@@ -559,7 +559,7 @@ opaque toString
 /--
 Generated binding for reviewed VIR protocol `javascript.nat.of`.
 
-Explicitly converts a Lean Nat into a JavaScript number resource.
+Explicitly converts a Lean Nat into a nonnegative JavaScript bigint resource, preserving arbitrary precision. This is not a JavaScript number or a JSON wire number.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -575,7 +575,7 @@ opaque ofNat
 /--
 Generated binding for reviewed VIR protocol `javascript.nat.value`.
 
-Explicitly decodes a JavaScript number resource as a Lean Nat.
+Explicitly decodes a nonnegative JavaScript bigint resource as a Lean Nat, preserving arbitrary precision. Rejects JavaScript number values and negative bigints.
 
 Binding contract: `generation.protocolOperations`.
 
