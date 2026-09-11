@@ -1,804 +1,262 @@
 # Upstream Interpreter Boundary
 
-The demo goal is to compile Lean's real `src/library/ir_interpreter.cpp` for
-`wasm32-wasip1` and then supply only the runtime and environment surface needed
-for small browser examples such as `fib`, the Lean-rendered DOM Tamagotchi, and
-`SortDemo.demoFromArray`.
+VIR runs Lean's real IR interpreter in `wasm32-wasip1` over package-owned
+`Lean.IR.Decl` objects. This guide owns the native calling, declaration-provider
+and interpreter lifecycle contracts. [HOST_BINDINGS.md](HOST_BINDINGS.md) owns
+JavaScript identity and foreign-value lifetime; [OBJECT_ABI.md](OBJECT_ABI.md)
+owns the object-helper interface.
+
+## Boundary and provenance
+
+Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified and compile
+it against the pinned Lean headers. Link upstream runtime implementations before
+adding local providers. Local WASI policy and unsupported operations must remain
+explicit in [the shim](../wasm/upstream_shim/README.md); a stub is not an
+implementation of an operation required by a new workload.
+
+The build selects upstream runtime, utility and kernel sources plus pinned
+stage0 C modules from
+[`native-support-sources.txt`](../wasm/upstream_shim/native-support-sources.txt).
+The [build script](../scripts/build-upstream-probe.sh) owns that source selection.
+Its generated `lean/config.h` leaves `LEAN_MIMALLOC` disabled because the pinned
+source checkout lacks vendored mimalloc sources for a WASI rebuild; Lean's
+ordinary allocator is used. The `githash.h` overlay records the source commit,
+and `LEAN_BUILD_TYPE` is supplied to the platform implementation.
+
+Local `Name`, `Level` and `Expr` constructors let the package decoder and object
+ABI create real Lean objects without loading the full generated Lean-library
+constructor modules. Their fields and cached hash/data layout must agree with
+the linked kernel operations. `VIR_USE_UPSTREAM_KERNEL_EXPR_DATA` disables
+duplicate local cached-data exports when upstream `expr.cpp`/`level.cpp` supply
+them. The remaining level hash/depth helpers read that layout, and the binder-info
+helper reads the actual binder field, returning `.default` for non-binders.
+
+Native lookup is closed: `dlsym` accepts only the generated native registry and
+finite package host-import trampoline symbols. An `@[extern]` declaration alone
+does not prove provider availability. Project providers extend this static
+selection through [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md), using the
+same manifest for package native-over-fallback selection and the Wasm build.
+
+## Native boxed wrappers
+
+[`NativeExternSpec`](../Vir/GeneratePackage/NativeExterns.lean) stores VIR policy:
+declaration name, wrapper selection, explicit closure dependencies and an optional
+provider-symbol override. Its resolver obtains parameter IR types, borrow bits
+and result IR type from `Lean.IR.findEnvDecl`, and the C symbol from
+`Lean.getExternNameFor` unless explicitly overridden. Package generation, wrapper
+generation, surface analysis and catalog validation consume this resolved
+metadata. Provider selection remains VIR policy, not a compiler-metadata inference.
+
+The upstream interpreter invokes native functions through homogeneous boxed
+calls. Lean's normal `_boxed` declarations, with native `___boxed` symbols,
+perform scalar conversion and reference-count operations inferred by LCNF.
+Set `generateBoxedWrapper := true` when that compiler output is sufficient.
+The generator emits selected raw Lean bodies when available; imported
+implementation closures available only in compiled upstream output use the
+listed stage0 providers. Canonical inline runtime operations can likewise be
+materialized by generated adapters without a new shim provider.
+
+Local behavior belongs in raw providers. The three handwritten boxed ownership
+exceptions are `Array.ugetBorrowed`, `Array.getInternalBorrowed` and
+`Array.get!InternalBorrowed`. In
+[`native_symbols.cpp`](../wasm/upstream_shim/runtime/native_symbols.cpp), they
+consume temporary input references retained by the interpreter and return the
+raw borrowed result. The calling IR also treats that result as borrowed;
+adding a result retain would leak. Do not replace these wrappers by an
+apparently equivalent owned getter or infer ownership from the symbol spelling.
+The native-wrapper inventory enforces this explicit exception set.
+
+A shared raw symbol does not establish an interchangeable boxed ABI. For example,
+`UInt8.ofNatLT` needs its own lookup stem despite sharing `lean_uint8_of_nat`
+with `UInt8.ofNat`; its proof argument changes the call shape.
+`String.Pos.set`, `String.Pos.Raw.set` and `String.set` also have distinct stems
+for different boxed arities over one raw helper. Package calls preserve
+irrelevant arguments, so proof-bearing operations require an independently
+checked interpreter/wrapper match. Registration and successful linking alone
+are insufficient; remaining unsupported cases are listed below.
+
+Native constants use symbol addresses, not boxed nullary function calls.
+For example, `ByteArray.empty` is registered as `l_ByteArray_empty`, initialized
+once and marked persistent by the interpreter bridge.
+
+The build prelinks local exceptions, generated adapters and pinned stage0
+support in that precedence order. Duplicate-definition tolerance is confined
+to this relocatable bundle; an `llvm-nm` audit rejects collisions outside the
+explicit local/generated symbol set. The final Wasm link remains strict.
+Keep provider overrides explicit, and remove an override when it becomes
+redundant according to the metadata check.
+
+## Real IR and declaration lookup
 
-Run the boundary probe with:
-
-```bash
-npm run probe:upstream
-```
-
-The generated report is written to `build/upstream-probe/boundary.md`.
-
-Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
-`ir_interpreter.cpp`, the linked Lean runtime subset, and
-`wasm/upstream_shim/`. The demo closure is supplied through a package-backed
-provider as real Lean IR declaration objects, and manifest-supported browser
-calls execute that closure through the real upstream interpreter via package
-call slots.
-
-## Policy
-
-- Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
-- Compile the exact upstream file against the pinned Lean headers.
-- Link real Lean runtime source files into the WASI probe before adding local
-  stubs.
-- Do not model the demo interpreter with a parallel bespoke IR schema.
-- Provide real Lean IR declaration objects through `lean_ir_find_env_decl`.
-- Stub only runtime/library pieces that the current demo paths do not execute.
-- Keep general native symbol lookup unsupported; register only the demo externs
-  that are needed by the current closure.
-
-## Linked Runtime
-
-The probe links these upstream runtime sources:
-
-- `src/runtime/alloc.cpp`
-- `src/runtime/apply.cpp`
-- `src/runtime/exception.cpp`
-- `src/runtime/hash.cpp`
-- `src/runtime/mpn.cpp`
-- `src/runtime/mpz.cpp`
-- `src/runtime/object.cpp`
-- `src/runtime/object_ref.cpp`
-- `src/runtime/platform.cpp`
-- `src/runtime/utf8.cpp`
-
-It also links a narrow upstream utility and kernel slice:
-
-- `src/util/name.cpp` for interpreter name formatting and diagnostics;
-- `src/kernel/expr_eq_fn.cpp` for `Lean.Expr.eqv`;
-- `src/kernel/expr.cpp` and `src/kernel/level.cpp` for the structural expression
-  and level operations used by expression equality; and
-- `src/util/kvmap.cpp` for expression metadata equality.
-
-The expression and level sources own the canonical cached-data helper exports,
-so `VIR_USE_UPSTREAM_KERNEL_EXPR_DATA` disables the corresponding temporary
-definitions in `runtime/lean_object_constructors.cpp`. The shim still supplies
-the small `lean_level_hash` and `lean_level_depth` exports used by upstream
-`level.cpp`; they read the same cached data representation as the existing
-local constructors.
-
-The small `USize.toUInt64`, `Bool.toUInt64`, and `Void.mk` boundaries use the
-canonical inline implementations from Lean's runtime headers. Their generated
-boxed adapters materialize those operations without adding a shim provider or
-another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
-already linked `level.cpp`; registering it retains that function and its
-generated boxed adapter in the final module.
-
-`Nat.land`, `Int.ediv`, `Int.tdiv`, `Int.emod`, and `Int.tmod` similarly use
-canonical inline runtime implementations. The division registrations retain
-the scalar and big-integer paths already supplied by the selected runtime
-objects without adding another provider source. `String.Internal.get` resolves
-to `lean_string_utf8_get` in the already linked `object.cpp`,
-`System.Platform.getIsWindows` to
-`lean_system_platform_windows` in `platform.cpp`, and `Lean.Expr.equal` to the
-binder-sensitive equality implementation in the already linked
-`expr_eq_fn.cpp`. That last path asks upstream `expr.cpp` for
-`lean_expr_binder_info`; the shim supplies the same constant-time exported
-operation as Lean's `Expr.binderInfoEx`, reading the scalar field populated by
-the local expression constructors and returning `.default` for non-binders.
-This keeps the boundary faithful without pulling the complete generated
-`Lean/Expr.c` module into the runtime.
-
-The string frontier registers `String.Internal.trim`,
-`String.Internal.isPrefixOf`, `String.Internal.foldl`, and
-`String.Internal.isEmpty`. A later reassessment also registers
-`String.Internal.getUTF8Byte`; its inline runtime implementation and ordinary
-compiler-generated boxed wrapper add no generated provider module. The first
-two exports live in generated
-`Init/Data/String/TakeDrop.c`; retaining `trim` also reaches `Slice.c`,
-`FindPos.c`, and `Decode.c`. `foldl` is supplied by `Iterate.c`, while
-`isEmpty` resolves to `lean_string_isempty` in the already linked `Defs.c`.
-All five generated providers are listed explicitly in
-`native-support-sources.txt`, and section-level dead-code elimination keeps
-only the implementation closure reached by the registered symbols.
-
-The scalar and string ABI-completion sweep extends that same policy to ordinary
-`Bool`, `ISize`, `Int8`/`Int16`/`Int32`/`Int64`, `Nat`, fixed-width unsigned,
-`USize`, `String`, and `Substring` operations. Most scalar providers are inline
-runtime operations. String completion additionally selects the canonical
-`Data/String/Modify.c` and `Data/String/PosRaw.c` stage0 providers; checked raw
-substring operations retain `Util.c` and `Data/Repr.c` for panic construction.
-The runtime registry contains 442 audited native capabilities after this sweep.
-
-## Native Extern Metadata Ownership
-
-`Vir/GeneratePackage/NativeExterns.lean` currently combines two different
-responsibilities:
-
-- VIR policy: which native declarations the Wasm runtime promises to provide,
-  which declarations need generated boxed wrappers, and any additional runtime
-  dependency declarations; and
-- compiler metadata copied from Lean: parameter ownership and IR types, result
-  IR type, and the C backend symbol.
-
-The second part should not remain hand-maintained. The table contains backend
-symbols shared by several Lean declaration names, such as `String.append` /
-`String.Internal.append` and `Nat.decLe` / `Nat.ble`.
-The rejected string-alias experiment made the maintenance problem especially
-clear: adding an internal spelling required copying an existing signature and
-symbol even when it added almost no runnable surface.
-
-The pinned Lean API already exposes both inputs needed for a VIR-side
-prototype. `Lean.IR.findEnvDecl` returns the compiler IR declaration, including
-parameter ownership and IR types, and `Lean.getExternNameFor` with backend `c`
-returns the selected C backend symbol. The next consolidation should therefore
-replace the copied fields with a small VIR selection record and resolve the
-full native extern description from the imported environment. Provider
-availability and support-source selection remain explicit VIR policy; they must
-not be inferred from the presence of an `@[extern]` declaration.
-
-No Lean upstream API change is justified yet. First implement the local
-resolver, keep the existing ABI check as an invariant, and use the generated
-description for package validation, wrapper generation, surface analysis, and
-the restricted native registry. If that prototype exposes a stability or
-enumeration gap in the two existing Lean APIs, the upstream request should be a
-narrow compiler-metadata query returning declaration name, C symbol, ABI, and
-boxed-wrapper information. It should not contain VIR's allowlist, Wasm provider
-policy, support-source closure, or `.irpkg` details.
-
-For Lean-defined native exports whose implementation closure is available in
-the pinned compiler output rather than the imported kernel environment, the
-probe also cross-compiles the stage0 sources listed in
-`wasm/upstream_shim/native-support-sources.txt`. The list is intentionally
-small and reviewable; the strict final link exposes a missing provider after a
-toolchain update. `Lean.Expr.eqv` additionally needs the stage0
-`Lean/Data/KVMap.c` export for `DataValue` equality. Its syntax-valued case
-reaches `Lean.Syntax.structEq`, supplied by the listed `Lean/Meta/Defs.c`
-native-support module.
-
-The probe additionally links `wasm/upstream_shim/`. This is local demo code,
-not a fork of Lean. It is split by responsibility:
-
-- `interpreter/persistent_ir_interpreter.cpp` compiles the untouched pinned
-  upstream implementation and retains one interpreter session for the loaded
-  package set.
-- `interpreter/interpreter_bridge.cpp` owns interpreter initialization,
-  `lean_ir_find_env_decl` hooks, and boxed function execution.
-- `abi/call_abi.cpp` owns the package call surface exposed to JavaScript.
-- `abi/closure_abi.cpp` owns Lean closure roots and callback calls used when
-  function values cross to JavaScript.
-- `package/host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
-  trampoline grid used by restricted `dlsym` lookup.
-- `package/package_decl_provider.cpp` owns direct package-call summaries used
-  to compute call arity, IO handling, and boxed-boundary requirements.
-- `runtime/name_utils.cpp` owns shared Lean `Name` construction helpers.
-- `abi/object_abi.cpp` owns generic owned `lean_object *` helpers used by the
-  runtime object call path.
-- `abi/object_expr_abi.cpp` owns the temporary `Lean.Level`, `Lean.Expr`, literal,
-  and name-string helpers used by current object-boundary fixtures.
-- `abi/resource_abi.cpp` owns the shared external resource class used by
-  `Lean.Vir.Js α` values.
-- `runtime/native_symbols.cpp` owns the final borrowed-result ownership
-  adapters, the native constant provider, and raw environment-policy providers.
-- `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
-  restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
-  stubs.
-- `tools/GenerateNativeWrappers.lean` resolves the policy entries in
-  `Vir/GeneratePackage/NativeExterns.lean`, recompiles declarations marked with
-  `generateBoxedWrapper`, and emits
-  their selected declaration bodies, `_boxed` LCNF declarations, and registry
-  entries through Lean's standard compiler pipeline. Most selected declarations
-  need only an extern prototype plus the boxed adapter; Lean-defined support such
-  as `ByteArray.extract` also contributes its compiler-generated raw body. The
-  build cross-compiles that generated C and links it statically into the WASI
-  module.
-- `scripts/build-upstream-probe.sh` prelinks local native exceptions, the
-  generated wrapper object, and pinned stage0 support into one relocatable
-  native-support object. Duplicate-symbol tolerance is confined to this
-  prelink: local exceptions take precedence over upstream support, and generated
-  adapters take precedence over duplicate stage0 adapters. An `llvm-nm` audit
-  rejects collisions outside the local provider symbols and generated object.
-- `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
-  `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
-  WASI/platform, initializer, value-helper, and demo IO providers. Local raw
-  extern implementations belong in these focused provider files even when
-  Lean's compiler can generate their ordinary boxed adapters.
-- `runtime/lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
-  constructor replacements for exported Lean-library constructors.
-- `package/package_section_directory.cpp` owns `.irpkg` envelope and section
-  directory decoding.
-- `package/package_ir_decoder.cpp` owns section payload decoding and Lean IR
-  object materialization, including cleanup of partial decode graphs.
-- `package/package_decl_provider.cpp` owns staged package-set state,
-  conflict-checked declaration lookup, host import metadata, and initializer
-  execution.
-- `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
-  from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
-  packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
-  `tools/GeneratePackage.lean` is the CLI wrapper.
-- `package/decl_provider.h` is the replacement point for a future provider that
-  consumes Lean's raw module artifacts.
-
-Together they supply:
-
-- `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for the generated
-  package closures, including `fib`, `SortDemo.demoFromArray`, the
-  `Lean.Vir.Browser`-backed Tamagotchi UI entrypoints, and the fixture
-  dependencies.
-- small WASI/platform stubs for C++ exception throwing, trace/time/options
-  hooks, and the few environment helpers pulled in by the interpreter.
-- the generic package call interface used by the JavaScript runtime for
-  manifest-supported functions. The runtime resolves each manifest export once
-  with `vir_resolve_call_export` and then calls `vir_call_resolved_objects` with
-  the cached slot.
-- package-scoped JavaScript host import trampolines for declarations marked
-  with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
-- Lean closure roots for function-valued host-import arguments. The closure ABI owns
-  `vir_obj_closure_root`, `vir_closure_call_objects`, and
-  `vir_closure_release`; JavaScript associates each root with an ordinary
-  callable function and releases remaining roots during runtime teardown.
-- name construction primitives needed by `src/util/name.cpp`.
-
-The exported `vir_obj_*`, `vir_call_resolved_objects`, closure-root, and
-`env.vir_js_call_objects` symbols are internal WASM/runtime ABI hooks. They are
-stable only within a matching `lean_vir` revision and should not be treated as
-the JavaScript application API.
-
-The WASI probe generates local `lean/config.h` and `githash.h` overlays. The
-config overlay leaves `LEAN_MIMALLOC` disabled because the pinned Lean source
-checkout does not include vendored mimalloc sources for a WASI rebuild; this
-selects Lean's ordinary allocator path while still compiling Lean's real
-runtime code. The git-hash overlay records the pinned source commit, and the
-probe supplies Lean's normal `LEAN_BUILD_TYPE` input for `platform.cpp`.
-
-The build compiles stable sources into cached objects under
-`build/upstream-probe/obj`. Example edits regenerate the relevant
-`web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
-Compiler-generated native wrappers and their registry fragment live under
-`build/upstream-probe/generated`; they are build artifacts and are not checked
-into Git. The relocatable native-support bundle lives in the object cache. The
-artifact is relinked only when stable or generated objects, link flags, the
-Lean source commit, or the generated runtime overlays change.
-
-## Native Boxed Wrappers
-
-The upstream interpreter invokes native code through homogeneous boxed calls.
-For an extern with scalar or borrowed parameters, Lean's compiler normally
-provides a `_boxed` declaration whose native symbol has the `___boxed` suffix.
-That wrapper performs scalar unboxing/boxing and the reference-count updates
-inferred by the normal LCNF passes before calling the raw extern symbol.
-
-VIR keeps the final WASI module statically linked. Standard adapters can be
-marked with `generateBoxedWrapper := true` in the native extern specification
-table; the build then recompiles those imported declarations and emits their
-compiler-generated boxed wrappers together with any selected Lean-defined raw
-body available to the generator. If an exported Lean implementation depends on
-compiler-generated imported declarations that are present only in compiled
-library output, the probe links the pinned upstream-generated support module
-instead. This is how the `String.Internal` search/position operations and
-`Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
-raw implementations without copying either into the shim. The same path lets
-`Array.mk` and `Array.toList` call the real runtime exports backed by their
-compiler-generated list/array helpers. The native extern specification table
-remains the source of truth for wrapper selection;
-`npm run inspect:native-wrappers` reports it without duplicating the full list
-here. Local behavior and WASI policy belong in raw provider functions; their
-boxed adapters are still generated whenever the standard compiler output is
-correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
-only when VIR's all-owned interpreter boundary needs ownership behavior that
-Lean's standard wrapper cannot express.
-
-Proof-erased call shapes still require dynamic validation rather than inference
-from a shared raw symbol. Current `.irpkg` call expressions preserve irrelevant
-arguments, so the interpreter and Lean's ordinary three-argument boxed wrapper
-agree for `String.Internal.getUTF8Byte`; a mixed-width UTF-8 differential fixture
-checks all seven raw byte positions. `UInt8.ofNatLT` needs a distinct
-`l_UInt8_ofNatLT` lookup stem because its raw `lean_uint8_of_nat` symbol is shared
-with the one-argument `UInt8.ofNat`; a dynamic fixture checks the two-argument
-proof-bearing call. `Char.ofNatAux` still reaches an indirect-call signature
-mismatch with its ordinary generated boxed wrapper. Other proof-bearing
-declarations such as `Int.divExact`, `Nat.divExact`,
-`String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`,
-`String.next'`, `UInt16.ofNatLT`, and `USize.ofNat32` remain unsupported until
-independently checked. Native lookup must not infer an alias from a
-coincidentally shared raw symbol.
-
-`Thunk.mk` and `Thunk.get` have a separate interpreter boundary. Their ordinary
-wrappers register and link, but a dynamic cache test traps when the native
-thunk runtime attempts to force a VIR interpreter closure through a compiled
-function pointer. Supporting this pair needs an interpreter-aware thunk forcing
-design rather than two catalog entries.
-
-## Native Extern Metadata
-
-`Vir/GeneratePackage/NativeExterns.lean` records only VIR policy: the Lean
-declaration name, wrapper-selection bit, explicit closure dependencies, and an
-exceptional symbol override when VIR deliberately selects a different provider.
-The declaration parameter ABI, borrow bits, and result ABI come directly from
-`Lean.IR.findEnvDecl`. The native symbol comes from `Lean.getExternNameFor`
-unless the policy entry supplies an override.
-
-The consolidation experiment covered the then-current 223 registered
-declarations. Every ABI was available from Lean's imported environment; 213
-native symbols also matched Lean's standard C-extern resolution. Its ten
-deliberate overrides were
-`Array.mkEmpty`, `Array.emptyWithCapacity`, `ByteArray.empty`,
-`ByteArray.extract`, `String.Pos.Raw.set`, `String.Pos.set`, `String.set`,
-`UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. The current catalog adds
-`UInt8.ofNatLT` as an eleventh override so it does not collide with
-`UInt8.ofNat`'s shared raw symbol. These entries select existing VIR/runtime
-aliases or compiler-generated Lean bodies, so they are provider policy rather
-than copied ABI metadata. `npm run check:native-externs` resolves the full
-catalog, rejects missing declarations or symbols, rejects duplicate
-registrations, and flags overrides that have become redundant upstream.
-
-The wrapper generator exposes the same resolved metadata as a versioned JSON
-catalog with `vir_native_wrappers --catalog`. The boundary-registry and wrapper
-inventory checks consume that catalog instead of parsing Lean source syntax.
-Thus package closure extraction, surface analysis, wrapper generation, and
-validation all share one resolver. Against the pre-consolidation checkpoint,
-the resolved 223-entry catalog and generated wrapper C were identical. The
-release Wasm was also byte-identical: 657,138 bytes raw, 150,091 bytes with
-deterministic gzip, and the same SHA-256.
-
-Project-owned providers use the same resolver through the closed client-native
-manifest described in `docs/CLIENT_NATIVE_EXTERNS.md`. Its module imports,
-extern selection, and provider source list drive package native-over-fallback
-selection, compiler-generated wrappers, provider-symbol auditing, and the
-strict Wasm link. These entries extend only the generated static registry; they
-do not expose unrestricted dynamic symbol lookup.
-
-This result does not justify a new upstream API for catalog generation: Lean's
-existing environment and extern-name APIs provide the required information at
-generation time. It does not change the runtime declaration-provider boundary.
-The browser Wasm does not load a normal Lean `Environment`; it reconstructs the
-selected declarations from `.irpkg` packages behind `package/decl_provider.h`,
-so the upstream interpreter's ordinary environment lookup cannot replace that
-provider without shipping and initializing a substantially larger runtime
-environment.
-
-`npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
-The intentional ownership exceptions are the borrowed array getters
-`Array.ugetBorrowed`, `Array.getInternalBorrowed`, and
-`Array.get!InternalBorrowed`: their raw
-results are borrowed from the array, while a standard emitted boxed wrapper
-would release the array without first retaining the result. The explicit shim
-wrapper for `Array.ugetBorrowed` retains the result before releasing the array;
-the other two wrappers deliberately call the corresponding owned runtime APIs.
-This is the complete handwritten boxed-wrapper exception set. The inventory
-allowlists all three with their expected classification and rejects any new,
-missing, or reclassified handwritten adapter.
-
-## Real IR Declarations
-
-The upstream interpreter reads declarations through the Lean object layout
-accessors in `ir_interpreter.cpp`. A package-backed provider therefore has to
-return `Option decl` values using the same constructor layout:
-
-- `decl` uses `Fun`/`Extern` constructors and carries `fun_id`, parameters,
-  result type, and `fn_body`. Function declaration metadata is reconstructed as
-  `none`, and extern attributes as an empty array, because the interpreter does
-  not consume those fields.
-- `fn_body`, `expr`, and `alt` use the real upstream constructors. The
-  package codec covers every constructor in those current IR types rather than
-  only the cases reached by one fixture closure.
-- scalar `IRType` cases are decoded directly; `IRType.struct` and
-  `IRType.union` remain explicit package-generation errors.
-- `arg` uses constructor-backed variables and scalar erased arguments.
-- arrays must be Lean array objects, not C arrays.
-
-This is the critical distinction from the discarded bootstrap runners: the demo
-does not use a parallel C/C++ interpreter schema.
-
-## Package Closure Strategy
-
-For the demo, `/dev.html` and the smoke tests load focused `.irpkg` files
-containing the transitive declaration closure needed by each exported Lean
-surface. This keeps `.olean` loading, module initialization, and full
-environment construction out of scope while still exercising the real upstream
-interpreter over real Lean IR objects.
-
-The closure is extracted by `Vir/GeneratePackage/Closure.lean` from real
-`Lean.IR.Decl` values. The generator starts with declarations produced for the
-example sources, walks `FAp`/`PAP` references, and can now fall back to
-`Lean.IR.findEnvDecl` for imported IR declarations already available through
-the elaborated environment. This is still package-backed loading, not full
-module loading, but it lets fixtures include small upstream library closures
-such as `List.reverse._redArg`. The generator then emits a small binary package.
-`wasm/upstream_shim/package/package_section_directory.cpp` reads the package
-envelope, `wasm/upstream_shim/package/package_ir_decoder.cpp` decodes section
-payloads into the upstream interpreter's expected object layout at runtime, and
-`wasm/upstream_shim/package/package_decl_provider.cpp` owns the loaded package state.
-The generator report separates missing Lean IR declarations from missing native
-extern registrations, and the package decoder exposes its last load error for
-browser and smoke-test diagnostics.
-See `docs/GENERATE_PACKAGE.md` for the package generator module map and
-diagnostic flow.
-
-## Package Instance Lifecycle
-
-The upstream interpreter has process-lifetime native-symbol and initialized-
-global caches, plus per-interpreter declaration and evaluated-nullary caches.
-Public package replacement uses a fresh `WebAssembly.Instance` while reusing
-the already-compiled `WebAssembly.Module`, so no process-lifetime entry or
-Wasm pointer crosses package generations.
-
-Within one loaded package set, VIR retains one upstream interpreter session.
-This preserves upstream's lazy nullary semantics while allowing an evaluated
-object constant to survive later public calls. `vir_begin_ir_package_set` and
-all package-clear paths destroy the session before releasing its package-owned
-declarations; a failed evaluation also discards the session rather than reusing
-possibly unwound private stacks. The session adapter includes and compiles the
-pinned `ir_interpreter.cpp` unchanged because upstream keeps the interpreter
-class implementation-private.
-
-No package metadata is added for this cache. In particular, declarations
-selected through `@[implemented_by]` use their ordinary packaged IR closure;
-nullary loads reached through that implementation enter the same lazy cache.
-Initializer globals retain their existing explicit package metadata and
-`lean_run_init` path.
-
-When `VirRuntime.loadIrPackageSetBytes` replaces an active package set, it first
-instantiates and fully loads a candidate. A candidate failure disposes only
-that instance, leaving the active package set callable. A successful candidate
-is handed to the existing public runtime wrapper after the old callbacks,
-resources, host state, and binding leases are torn down. Nothing containing an
-old Wasm pointer or package-local slot may cross the handover.
-
-Teardown is best-effort and terminal. Host-binding disposers, resource
-disposers, Lean object handles, and closure roots are all attempted in a stable
-order; multiple failures are reported to JavaScript as an `AggregateError`
-afterward. If old-instance teardown fails during handover, the candidate is
-also disposed and the public wrapper is marked disposed.
-
-The provider can stage a complete package set in one fresh instance. Generated
-descriptors use Lean's dependency-first module-initialization order, while each
-member retains its owning initializer metadata. `vir_begin_ir_package_set`
-clears the candidate,
-`vir_append_ir_package` transactionally decodes each ordinary format-11 member,
-`vir_prepare_ir_package_set` builds the aggregate indices without running user
-initializers, and `vir_finish_ir_package_set` runs the initializer table once.
-The final root member supplies the interface manifest and export summaries.
-Each format-11 member protects its manifest bytes against corruption with a
-non-cryptographic 64-bit checksum, which both decoders verify; this does not
-establish agreement with the binary call tables.
-JavaScript then validates the manifest's binary-header format version and
-member/target invariants between prepare and finish. Before installing host
-bindings or running initializers, `vir_validate_package_contract` compares one
-manifest projection against the ordered binary export and host-import fields
-listed in `docs/IRPKG_FORMAT.md`. Any decode, prepare, or
-manifest failure calls `vir_abort_ir_package_set`, releasing all staged state.
-Duplicate declarations, initializer globals, host imports, and export summaries
-are rejected before a member is appended. JavaScript adopts the candidate only
-after the whole set is valid and initialized, so neither a partial dependency
-graph nor initialization under an invalid host contract is exposed through the
-public runtime wrapper.
-
-The JavaScript runtime and Wasm must come from the same revision. A Wasm without
-`vir_validate_package_contract` is rejected rather than silently skipping the
-check; this ABI requirement does not change the format-11 package encoding.
-
-This transaction protects provider state and public-runtime handover. It cannot
-undo arbitrary externally observable work—such as console output or unmanaged
-DOM mutation—from an initializer that succeeds before a later initializer
-fails. Browser lifecycle work should use reached `@[vir_startup]` entries and
-managed host resources so candidate disposal can release it.
-
-Manifest export indices remain scoped to the root package manifest rather than
-becoming global package identities. Individual package unload, version solving,
-remote resolution, and hot replacement of one member remain outside this
-slice; replacement always installs a complete set in a fresh instance.
-
-Within one instance, the package decoder owns every object it materializes.
-The helpers in `package_ir_builders.*` consume their owned object arguments,
-and the decoded-package owner releases top-level declarations, names,
-initializer mappings, host imports, and export summaries on failure or clear.
-The decoder also reads binary fields into named locals before constructor calls;
-its correctness does not depend on C++ argument evaluation order.
-
-## Package Call ABI
-
-The browser runtime does not send or parse a Lean display name on every call.
-After loading an `.irpkg`, it maps `entry`, `id`, and `jsName` to one manifest
-export record and resolves that record's zero-based array index with
-`vir_resolve_call_export(export_index)`. The provider matches the index against
-the structurally decoded export-summary names, preferring the generated boxed
-declaration when present. The returned call slot is package-local, 1-based, and
-uses `0` as the failure sentinel. Repeated calls then use
-`vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
-
-In package format 11, the package has an explicit section directory and a direct
-export call-summary section. `vir_call_resolved_objects` uses that table to
-validate object argument counts, effect handling, and boxed wasm32 boundary
-requirements. Resolved calls without a package-owned summary fail.
-The package also records host-import arity, erased-prefix count, and effect
-metadata for Lean-to-JavaScript calls. The shim uses that metadata to send
-borrowed Lean object arguments through `env.vir_js_call_objects`, and JavaScript
-uses the JSON manifest descriptors to lift arguments and lower the owned Lean
-object result. The
-opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
-Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
-resources.
-
-`vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
-helper. It accepts an array of owned `lean_object *` arguments, consumes those
-arguments once called, and returns an owned Lean object result on success. It
-uses a generated `_boxed` package declaration when one exists. If no `_boxed`
-declaration exists, it may call the base declaration only when the package
-signature does not require a boxed wasm32 boundary for the top-level argument or
-result type. The helper keeps higher-level JS lowering out of the shim;
-JavaScript drives it through the `vir_obj_*` construction and inspection
-primitives while the broader JS boundary policy remains open.
-The JavaScript runtime uses this lane for exported calls whose arguments can be
-lowered from the supported object subset and whose result can be lifted from it.
-Arguments and results support base values,
-`Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
-unions, and custom inductive constructors whose fields recursively stay in this
-subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
-packed scalar fields, including direct recursive references through supported
-fields. Direct `Lean.Expr` values use the object lane:
-JavaScript lowers the structural expression object through constructor-backed
-`vir_obj_expr_*`, `vir_obj_level_*`, and literal helpers, and lifts the owned
-Lean result back to the same structural JavaScript shape. Resources, callbacks,
-and effectful calls also use object arguments/results.
-
-The shim no longer exposes a JavaScript-to-Lean value byte payload call. The
-descriptor-bearing named payload format was removed earlier, and the resolved
-byte payload fallback has now been removed as well.
-Package-call summaries are direct metadata, not a runtime value codec.
-
-The shim also exposes the first experimental Lean object ABI helpers. The
-complete value/call export surface is documented in
-[OBJECT_ABI.md](OBJECT_ABI.md#export-surface).
-
-These helpers are still internal runtime primitives, not public Lean signature
-forms. They are the first step toward moving value lowering/lifting out of the
-C++ descriptor codec and into the JavaScript runtime. Constructors return owned
-Lean object references; `vir_call_resolved_objects` consumes owned arguments and
-returns an owned result. String and byte-array data pointers are borrowed and
-must be read before the object is released. Decimal scalar inspection uses a
-shim-owned scratch buffer that must be read before the next decimal inspection
-call. `vir_obj_array` consumes owned element references and returns one owned
-array object. `vir_obj_array_get` and `vir_obj_field` return new owned
-references. Lean lists use the generic scalar/constructor helpers: nil is scalar
-constructor tag `0`, and cons is constructor tag `1` with head and tail object
-fields.
-`vir_obj_ctor` consumes owned object-field references. See
-[OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
-
-The current explicit native externs cover the fixture/demo surface and measured
-runtime-frontier additions for `Nat`, `Int`, `ISize`, the signed and unsigned
-fixed-width integers, `Array`, `ByteArray`, `USize`, `Float`, `String`,
-`Substring`, and the helper externs reached by `Lean.Expr`/`Lean.Level` data
-computation. This includes the arithmetic and comparison operations
-needed by the demos, List/Array/String/ByteArray fixtures, array mutation
-through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
-`Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,
-String raw-position iteration and slicing through `String.push`/
-`String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
-`String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
-`String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
-`intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
-`String.find`/`String.Pos.Raw.offsetOfPos`, direct internal
-`trim`/`isPrefixOf`/`foldl`/`isEmpty`, plus parser-data primitives
-`String.hash`/`String.Internal.contains`/`String.Pos.Raw.isValid`, backed by
-imported upstream IR, plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
-`String.ofByteArray`, and `ByteArray.validateUTF8`, case conversion and string
-mutation through `String.toUpper`/`String.toLower`/`String.capitalize`/
-`String.decapitalize`, `Char.toUpper`/`Char.toLower`/`Char.utf8Size`, and the
-current numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
-arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
-comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
-bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
-`toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
-including a wide `UInt64.toNat` fixture returned through the manifest-driven
-package-call path, package-backed `Nat` literals wider than 32 bits,
-`USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
-`ByteArray.mk`/`ByteArray.get`, and
-`Float.sub`/`scaleB`/`toUInt32` plus native `abs`/`sqrt`/`sin`/`cos`/`acos`/
-`atan2`/`cbrt`/`floor` geometry math. Parser-adjacent hash/name/substring/pointer-address
-primitives (`mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
-`ptrAddrUnsafe`) are covered by a separate unsafe fixture that only compares
-stable same-object pointer equality. The parser input fixture additionally runs
-`Lean.Parser.mkInputContext`, `Lean.FileMap.toPosition`, and
-`Lean.Parser.mkParserState` over real upstream parser/input infrastructure.
-`Task.pure`, `Task.get`, and `Task.map` are covered only in the synchronous,
-already-resolved mode needed by real `Environment` values; the demo does not
-attempt to provide a task scheduler.
-This matters for Lean's expression pretty printer: probing
-`Lean.PrettyPrinter.ppExpr` shows that it reaches `MetaM` and then
-`Environment` async-constant state, where `Environment.checked` is a
-`Task Kernel.Environment`, `addConstAsync` and `promiseChecked` use promises
-and `Task.bind`, and `Lean.addDecl` can use `BaseIO.mapTask`. The current
-`pretty-printer.irpkg` intentionally stops at `Std.Format.pretty`; supporting
-`ppExpr` requires broadening the runtime boundary to Meta/Environment task and
-promise support plus the parenthesizer/formatter interpreter externs.
-`runtime/io_stubs.cpp` provides the local raw `IO.initializing` and
-`ST.Prim.Ref` operations, while Lean's compiler generates their boxed ABI
-adapters. `IO.initializing` is modeled as post-initialization, and the ST
-providers cover single-threaded reference allocation, read, write, and take
-semantics. Blocking IO and scheduler behavior remain outside the demo boundary.
-They are backed by a generated native registry include; a full native symbol
-loader is still out of scope. The public String search/drop fixture currently
-imports a small upstream IR closure and adds native registrations for the
-runtime helper boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
-`String.decodeChar`, `String.extract`, and `String.Slice.Pattern.Internal.memcmpStr`).
-`String.splitOn` additionally exercises the legacy `String.Pos.Raw.next`/
-`String.Pos.Raw.extract`/`String.Pos.Raw.atEnd` aliases over the same runtime
-helpers.
-`ByteArray.empty` is exposed as
-Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
-function, because the upstream interpreter loads native constants through the
-symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
-(`l_ByteArray_extract`) and delegates to the linked runtime
-`lean_byte_array_copy_slice` path. Its registered IR parameters mirror the real
-compiled declaration: the source byte array and stop index are borrowed, while
-the start index is consumed. `ByteArray.copySlice` now exposes that already
-retained raw provider through Lean's ordinary generated boxed wrapper. A
-differential fixture covers both destination growth and overlapping source and
-destination values, so this catalog addition needs no custom ownership adapter.
-The subsequent five-operation byte-array frontier adds
-`ByteArray.emptyWithCapacity`, `ByteArray.decEq`, `ByteArray.uget`,
-`ByteArray.data`, and `ByteArray.hash` through the same generated-wrapper path.
-Its differential fixture covers capacity-backed construction, equal and
-unequal values, proof-bearing in-bounds indexing, conversion to `Array UInt8`,
-and content hashing; all operations use Lean's inferred ownership metadata and
-need no shim-specific provider.
-
-`String.Pos.set`, `String.Pos.Raw.set`, and the legacy `String.set` each use a
-distinct native stem in the shim because their boxed arities differ, but all
-three wrappers delegate to the same linked runtime helper,
-`lean_string_utf8_set`.
-`runtime/lean_object_constructors.cpp` also owns minimal `Lean.Expr`/`Lean.Level` object
-construction for direct object-ABI calls, so JavaScript can lower structural
-boundary values into real `Lean.Expr` objects without depending on Lean-library
-exported constructor wrappers.
-
-JavaScript host imports deliberately do not widen the native extern policy.
-`Vir/GeneratePackage/Interface/Collect.lean` collects `@[vir_js "..."]` extern
-declarations into the package manifest and assigns each one a finite trampoline
-symbol. The shim
-recognizes only those package-provided symbols, calls the single imported
-`env.vir_js_call_objects` dispatcher, and still rejects unrelated dynamic symbol
-lookup.
-
-Function-valued host-import arguments use the same package-scoped policy. The
-JavaScript runtime roots the Lean closure with `vir_obj_closure_root`, passing
-only the callback arity and effect bit to the shim. JavaScript keeps the full
-manifest function descriptor in private state associated with the ordinary
-function, lowers callback arguments to owned objects, and lifts the owned
-object result returned by `vir_closure_call_objects`. Collection is a
-best-effort release backstop and runtime disposal deterministically calls
-`vir_closure_release`. The closure root table is re-entrant: executing a callback
-can register nested closures and may reallocate the table while a callback is
-running. The native caller therefore snapshots the selected root's function,
-arity, and effect flag before application and retains no table pointer across
-that re-entrant call.
-The JavaScript import dispatcher records synchronous host exceptions out of
-band because the C++ trampoline must return a structurally valid Lean object.
-Both top-level object calls and closure calls clear and consume that same error
-slot around their execution, so the trampoline's boxed placeholder cannot turn
-a host exception into a successful retained-callback result. Callback roots
-created while lifting a host call are released if any later phase of that call
-fails; only a completely successful binding may retain them.
-This keeps the Lean heap reference count explicit while avoiding any change to
-the upstream interpreter file.
-
-`Vir/GeneratePackage/NativeExterns.lean` is the source of truth for native extern
-policy. Run `npm run check:native-externs` after changing its
-`nativeExternSpecs` table; this verifies that every entry resolves through
-Lean's imported IR declarations and extern metadata. Run
-`npm run generate:boundary-registry` when a standalone generated registry is
-useful for inspection; it writes
-`build/generated/wasm/runtime/native_symbols_registry.inc`. The regular
-`npm run check:boundary-registry` guard verifies that every native extern has a matching `dlsym` symbol
-plus one of a boxed wrapper in `wasm/upstream_shim/runtime/native_symbols.cpp`,
-a compiler-generated wrapper selected by the native extern entry, or a native
-constant entry in the generated registry. `npm test` runs these checks before
-the smoke and fixture suites.
-
-The boxed wrappers can be inventoried with:
-
-```bash
-npm run inspect:native-wrappers
-```
-
-This separates wrappers emitted by Lean's standard compiler pipeline from the
-complete handwritten ownership-exception set. `npm run check:native-wrappers`
-rejects any missing, extra, reclassified, or unapproved handwritten boxed
-adapter. The inventory therefore guards the endpoint directly instead of
-retaining the migration-only macro and shape classifications used to select
-earlier compiler-generation batches.
-
-The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
-`package/decl_provider.h`. Today that provider is backed by package-owned indices
-over decoded `Lean.IR.Decl` data. Later it can be backed by generated module data
-or passed through a narrow upstream declaration-provider API without changing
-the package representation or WASI/platform shim. A measured real-environment
-prototype pulled in a disproportionate compiler-initialization closure and was
-rejected for this declaration-only runtime; the integration decision is
-tracked in
-[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md).
+[`package/decl_provider.h`](../wasm/upstream_shim/package/decl_provider.h).
+The provider returns `Option Decl` in Lean's actual constructor layout:
 
-## Current Boundary
+- `Fun`/`Extern` declarations carry the real names, parameters, result type and
+  body. Unused function metadata is reconstructed as `none`, and extern
+  attributes as an empty array.
+- Bodies, expressions and alternatives use upstream constructors; the codec
+  covers their current constructor set. Variables are constructor-backed,
+  erased arguments scalar, and arrays are Lean arrays rather than C arrays.
+- Scalar IR types are decoded directly. `IRType.struct` and `IRType.union`
+  remain explicit package-generation errors.
 
-The remaining gap is fidelity, not execution. The demo bodies now come from the
-real Lean compiler IR for the example sources and selected imported IR
-declarations, but they are loaded from a demo-specific package instead of Lean's
-generated module data. A later provider can replace this package with generated
-module data behind `package/decl_provider.h`.
+[IRPKG_FORMAT.md](IRPKG_FORMAT.md) owns the wire tags and layouts.
+[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and [MODULE_INPUTS.md](MODULE_INPUTS.md)
+own closure extraction and compiled/live module inputs. The browser reconstructs
+selected declarations from packages; it does not load raw Lean module artifacts
+or construct a normal compiler `Environment`.
 
-The parser vertical target now reaches `Lean.Parser.parseHeader`. Package
-generation records initialized globals as `(declaration, initializer)`
-pairs using Lean's own init-attribute metadata, then the WASM loader executes
-those initializers through upstream `lean_run_init` before evaluating demo
-roots. This initializes the parser and environment extension globals needed by
-the header parser while keeping the path compatible with a future generated
-module loader.
+The decoder owns every materialized object. IR builder helpers consume owned
+children, and the decoded-package owner releases declarations, names,
+initializer mappings, host imports and export summaries on failure or clear.
+Binary fields are read into named locals before constructor calls, so decoding
+does not depend on C++ argument evaluation order.
 
-The current parser support still uses a small shim boundary for opaque
-environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
-the raw `isReservedName` provider delegates back into packaged IR for
-`Lean.isReservedName`, and the raw `evalCheckMeta` provider accepts the check for
-the demo. Their boxed adapters are normal compiler output. The provider policy
-is the next fidelity boundary to remove if parser loading should behave exactly
-like a full Lean runtime.
+Keep alternative declaration loading behind the provider boundary, independent
+of the interpreter and WASI policy. [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+records why a real compiler-environment prototype was disproportionate for
+declaration-only execution and motivates an upstream provider API. That proposal
+does not change the current package format or interpreter lifetime.
 
-The runtime/platform stub files keep the remaining platform boundary explicit:
+## Package instance lifecycle
 
-- runtime budget and tracing hooks (`check_system`, heartbeat reset, time tasks,
-  and trace scopes) live in `runtime/runtime_environment_stubs.cpp` and are inert in
-  this single-threaded demo build;
-- initializer metadata queries are package-backed, using the same init-global
-  table that `vir_finish_ir_package_set` executes through upstream `lean_run_init`;
-- option registration, sorry dependency lookup, and export-name lookup remain
-  demo no-ops in `runtime/runtime_environment_stubs.cpp`;
-- stderr/error printing remains a demo no-op in `runtime/io_stubs.cpp` because the
-  package generator and JavaScript runtime provide the active diagnostics for
-  this path.
+Upstream has instance-wide native-symbol/initialized-global caches and
+per-interpreter declaration/evaluated-nullary caches. VIR keeps one interpreter
+session per loaded package set, preserving lazy nullary evaluation across public
+calls. `@[implemented_by]` closures use that same cache; initializer globals
+retain their explicit metadata and `lean_run_init` path.
 
-## Future Loading Path
+The session adapter includes the pinned interpreter implementation unchanged
+because its class is implementation-private. It discards the session on caught
+evaluation exceptions rather than reusing possibly unwound private stacks.
+Beginning or clearing a package set destroys the session before releasing its
+package-owned declarations.
 
-The current loader remains intentionally demo-specific: it decodes the package
-format emitted by `Vir/GeneratePackage/`, including module-partitioned sets, not
-Lean's raw generated `.ir` representation. A future loading step can move closer
-to Lean module data behind the same declaration-provider boundary without
-changing the upstream interpreter.
+Public replacement requires a fresh `WebAssembly.Instance`; the compiled
+`WebAssembly.Module` may be reused. The existing public JS wrapper adopts a
+candidate only after loading, validation and initialization succeed. Candidate
+failure disposes that candidate and leaves the active generation callable.
+Successful handover tears down old callbacks, resources, host state and binding
+leases before adopting new exports. Old pointers, closure roots and package-local
+slots never cross the handover. If old-generation cleanup fails, cleanup still
+attempts all resources, disposes the candidate and leaves the public wrapper
+terminally disposed. See [the replacement API](JS_API.md#replacing-a-package-set)
+and [cleanup rules](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
-## Future Wasm Interfaces
+The package-set transaction inside the fresh instance is:
 
-The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
-Ordinary scalar and structured values use descriptor-guided object lowering over
-the object ABI. Opaque resources cross the JS/Wasm boundary through
-`externref` side-channel imports, and Lean stores them as GC-finalized external
-objects that root the exact JavaScript values in the host runtime.
-`INTERFACE_TAG.FUNCTION` likewise avoids a serialized numeric token; Lean
-closures remain runtime-owned roots associated with ordinary JavaScript
-functions.
+1. `vir_begin_ir_package_set` clears candidate state.
+2. `vir_append_ir_package` decodes each format-11 member transactionally.
+   Duplicate declarations, initializer globals, host imports/symbols and export
+   summaries are rejected before append.
+3. `vir_prepare_ir_package_set` builds aggregate indices without running user
+   initializers. The final root member supplies the manifest and export summaries.
+4. JavaScript validates the manifest's format/member/target invariants and calls
+   `vir_validate_package_contract` before installing its host-import manifest.
+   That check compares ordered binary export/host-import fields with one manifest
+   projection.
+5. `vir_finish_ir_package_set` runs the initializer table through `lean_run_init`
+   once for a successful set. Generated descriptors order members dependency-first,
+   with each member retaining its owning initializer metadata.
 
-See `docs/REACT_WASM_BINDINGS.md` for the React-first binding plan and local
-feature probes. This repository uses `externref` terminology for host
-references; `nativeref` is not a standard WebAssembly feature name. The
-experimental React resource path requires `externref` instead of carrying a
-plain JavaScript map fallback.
+Decode, prepare, manifest or initializer failure aborts staged state.
+Manifest checksums detect corruption but do not prove agreement with binary call
+tables; the contract comparison is separately required. Runtime ABI 2 rejects
+Wasm without `vir_validate_package_contract`, rather than skipping validation.
+Use matching JavaScript and Wasm revisions. The check does not authenticate a
+package or prove that its IR implements its interface types; see the
+[format contract](IRPKG_FORMAT.md#section-directory).
 
-Useful WebAssembly features to track before widening the ABI:
+Rollback protects provider state and public handover. It cannot undo arbitrary
+external effects, such as console output or unmanaged DOM mutation performed by
+an initializer before a later initializer fails. Browser activity should use
+reached `@[vir_startup]` entries and managed host resources so candidate disposal
+can release it.
 
-- Reference Types are already part of the finished proposal set, and `externref`
-  is now required for JavaScript values. Exact values such as `Element`,
-  `Event`, and `ReactRoot` cross the C++/Wasm ABI through a side channel;
-  `externref` does not remove the need to root Lean heap closures while their
-  JavaScript functions remain live.
-- The Component Model is still proposal-track and is the right semantic target
-  for typed resources once this project moves beyond an internal `.irpkg`
-  manifest. The current `Lean.Vir.Js α` marker model is intentionally
-  compatible with that direction without committing to WIT today.
-- JS Promise Integration and Stack Switching are the relevant future mechanisms
-  for suspending Lean on Promise-shaped or coroutine-shaped host calls. Native
-  Promise objects can already cross synchronously as exact `Js` values and use
-  ordinary continuations; the interpreter does not await them.
-- Wasm GC and typed function references are useful platform work to watch, but
-  Lean closures are currently objects in Lean's own heap. They do not replace
-  the refcounted root/release bridge in this phase.
+Manifest export indices belong to the root manifest. Individual member unload,
+version solving, remote resolution and hot replacement of one member are not
+implemented; replacement installs a complete set.
 
-Primary status references:
+## Package call ABI
 
-- [WebAssembly finished proposals](https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md)
-- [WebAssembly active proposals](https://github.com/WebAssembly/proposals)
-- [WebAssembly feature status](https://webassembly.org/features/)
+JavaScript maps `entry`, `id` and `jsName` to a manifest export, then resolves
+its zero-based array index with `vir_resolve_call_export`. The provider matches
+structurally decoded names and prefers the packaged boxed declaration when
+present. The result is a package-local, 1-based slot; `0` means failure.
+Repeated calls use `vir_call_resolved_objects(slot, argv, argc)`, without reparsing
+a display name.
+
+The call requires a package-owned summary specifying argument count, effect
+handling and boxed wasm32 boundary requirements. It consumes owned argument
+objects after accepting the argument array and returns one owned object on
+success or `0` on a reported call failure. A base declaration may be used without
+a packaged `_boxed` declaration only when its signature does not require that
+boxed boundary. IO calls supply the world token and unwrap the successful IO
+result; an IO error is reported as call failure.
+
+JavaScript drives construction and inspection through `vir_obj_*`, and releases
+temporary arguments/results on its success and failure paths. Supported
+structural values, resources, callbacks and effectful calls all use this object
+lane. There is no JavaScript value byte-payload fallback; binary package call
+summaries are metadata, not a value codec.
+
+[OBJECT_ABI.md](OBJECT_ABI.md#export-surface) specifies each helper's consuming,
+owned-result or borrowed-view behavior. In particular, string/byte-array views
+must be read before their object is released, and decimal scratch data before
+the next decimal inspection. These exports, package slots, closure roots and
+`env.vir_js_call_objects` are internal hooks for matching runtime/Wasm revisions,
+not the JavaScript application API.
+
+## Host imports and reentrant callbacks
+
+A `@[vir_js]` declaration receives a finite package trampoline symbol; it does
+not widen native lookup. Package metadata supplies arity, erased-prefix count
+and effect information. The shim passes borrowed object arguments to
+`env.vir_js_call_objects`; JavaScript lifts them with manifest descriptors and
+lowers the returned value to an owned Lean object.
+
+For converted Lean functions, `vir_obj_closure_root` retains a closure with its
+arity and effect bit. JavaScript keeps the full function descriptor privately,
+lowers callback inputs to owned objects, and lifts the owned result of
+`vir_closure_call_objects`. Reentry may root more closures and reallocate the
+root table. The native caller therefore snapshots the selected function, arity
+and effect flag, retaining no table-entry pointer across application.
+[HOST_BINDINGS.md](HOST_BINDINGS.md#lean-backed-javascript-values) owns collection
+and explicit `vir_closure_release` lifetime rules.
+
+Synchronous host exceptions use a shared out-of-band error slot because the C++
+trampoline must return a structurally valid Lean object. Both top-level object
+calls and closure calls clear and consume that slot around execution; the boxed
+placeholder must never turn an exception into success. Callbacks created while
+lifting a host call are released if any later phase fails. Successful calls may
+retain them under the host contract's reachability rules.
+
+## Explicit limitations
+
+| Boundary | Current behavior and limit |
+| --- | --- |
+| Tasks and blocking IO | `Task.pure`, `Task.get` and `Task.map` support only the exercised synchronous, already-resolved mode. There is no task scheduler or general blocking-IO implementation. |
+| Native thunk forcing | `Thunk.mk`/`Thunk.get` wrappers can link, but the native forcing path cannot apply an interpreter closure as a compiled function pointer. Supporting this requires a closure-aware design. |
+| Proof-bearing native calls | `Char.ofNatAux` has an observed indirect-call signature mismatch. `Int.divExact`, `Nat.divExact`, `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT` and `USize.ofNat32` remain unsupported pending independent calling-convention checks. |
+| Parser environment policy | `evalConstCore` delegates to upstream `lean_eval_const`; `isReservedName` delegates to packaged IR; the raw `evalCheckMeta` provider accepts the check. This is not full Lean environment-policy fidelity. |
+| Budget, tracing and options | System/heartbeat, stack-info, timing and trace hooks are inert. Boolean option lookup returns its default; option registration exposes no discovery. Do not infer cancellation, budget enforcement or trace-sensitive behavior. |
+| Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are instead package-backed and aligned with the table run through `lean_run_init`. |
+| Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. Stderr/error-printing helpers are no-ops. |
+| Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; they do not provide ordinary native exception recovery. |
+| Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](FIXTURE_COVERAGE.md#known-pretty-printer-boundary). |
+
+Use the resolved native catalog and [fixture coverage](FIXTURE_COVERAGE.md) for
+the supported surface, not an inferred promise of full Lean runtime support.
+[REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md) owns prospective Wasm interfaces;
+native Promises already cross synchronously as exact JS values without
+suspending the interpreter.
+
+## Validation
+
+[Native tooling](../scripts/native/README.md) owns registry and wrapper checks;
+[HARNESS.md](HARNESS.md) selects checks and prerequisites. `npm run probe:upstream`
+produces the strict-link boundary report at `build/upstream-probe/boundary.md`.
+Use `npm run inspect:native-wrappers` for the generated/handwritten classification
+and `npm run check:native-externs` for compiler-metadata resolution. Generated
+registries, wrappers and cached objects stay under ignored `build/`.

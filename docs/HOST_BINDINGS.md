@@ -137,6 +137,9 @@ A wholly unreachable generation can be collected without running every foreign
 finalizer; this is not a collector for mixed Lean/JS cycles inside a runtime
 still owned elsewhere.
 
+Finalizer diagnostics store only bounded text, not error objects or failed
+payload graphs that could keep Lean-backed values alive.
+
 Intervals, listeners, Promise reactions and shared binding maps can retain their
 callbacks and therefore a generation. Their owners remain responsible for
 cancellation, removal and reference release. GC timing, released foreign roots

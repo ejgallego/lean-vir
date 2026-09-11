@@ -103,6 +103,52 @@ React restrictions remain programmer responsibilities. Lean does not add
 purity, valid hook ordering, complete dependency lists, replay-safe reducers,
 or lane acknowledgements that TypeScript React lacks.
 
+## Infoview Widgets
+
+Import `Vir.Infoview` for the widget shell and activation command. The
+[live example](../examples/tutorials/ReactProofWidgetHello.lean) supplies a
+`RuntimeM (Js (React.Component Surface))` factory, then uses
+`vir_proof_widget View` inside its namespace. The command generates
+`widgetSpec`, `createComponent`, `mount`, `irPackage` and `widgetProps`.
+`show_panel_widgets` activates the bundled `Lean.Vir.Infoview.widget` with those
+props. No application-authored JavaScript file is needed for this path.
+
+For manual assembly, [ReactWidget](../Vir/Infoview/Widget.lean) supplies the
+standard package roots and props. The component entry returns
+`RuntimeM (Js (React.Component Surface))`; the mount entry has type:
+
+```lean
+Js React.Root → Js (React.Component Surface) → Surface → DomM Unit
+```
+
+`WidgetProps` identifies the Wasm asset, `IRPackage`, component and mount
+entries. The default shell creates a private runtime/binding factory and one
+component function per loaded service. Cursor and surface updates reuse that
+function and the official React root; widget configuration or package revision
+changes replace the service. See the
+[UI cleanup contract](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal) for
+normal unmount versus hard disposal and failed-load cleanup.
+
+Packages use the authoritative active Lean module snapshot, including unsaved
+widget code. Revision checks cover the compiled declaration closure and local
+source ranges; imported changes are visible once the snapshot contains them.
+See [module inputs](MODULE_INPUTS.md) for visibility and acquisition rules.
+`autoReloadMs` enables stat/revision polling; zero disables polling.
+`ReactWidget` defaults to 1000 ms, while manually constructed `WidgetProps`
+defaults to zero. Cursor movement alone does not request package replacement.
+
+Build the optional widget module with `lake build VirInfoview`; see
+[setup and artifact prerequisites](HARNESS.md#setup). If the example is already
+open when that module is rebuilt, restart the Lean server or reopen the file.
+The shell bundle leaves `react`, `react-dom` and `@leanprover/infoview` external
+to use the infoview's dependencies. Its container stops propagation of click,
+context-menu, mouse-down and pointer-down events to the outer panel.
+
+For asynchronous server methods and exact server references, use the
+[RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md). Its tutorial's JavaScript async
+parent is a separate current authoring limit, not a requirement of this
+synchronous widget activation path.
+
 ## JavaScript Provenance
 
 The hook and element providers are shallow calls to public React 19 APIs; VIR

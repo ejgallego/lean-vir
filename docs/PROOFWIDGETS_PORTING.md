@@ -9,6 +9,11 @@ server-produced `ProofWidgets.Html` protocol, not the definition of a widget.
 ## Upstream Targets
 
 Reference repository: <https://github.com/leanprover-community/ProofWidgets4>.
+
+An upstream `Component Props` names a React export in a widget module; props
+cross through `RpcEncodable`. VIR ports should preserve that component/props
+model and reuse the infoview's module-loading environment.
+
 The upstream README points users to `ProofWidgets/Demos/` for live-codeable
 demos and calls out library-backed widgets such as Penrose, Recharts, Rubiks,
 and red-black trees. The directory currently includes small syntax/UI demos
@@ -92,6 +97,16 @@ Current authoring limits include:
   Lean-authored implementation of the components above.
 - External component imports and full infoview context integration still need
   acceptance coverage beyond the position-specific RPC session.
+
+Per-port open questions:
+
+- Which shared server/client declarations and identity-preserving accessors
+  remove duplicated schema assumptions? Follow the
+  [response-type contract](PROOFWIDGETS_RPC_COMPATIBILITY.md#server-references-and-response-types)
+  without introducing a second decoded object model.
+- Can the infoview/webview host provide raw binary asset transport instead of
+  base64 RPC payloads? This is a host-capability question, not a promised
+  upstream feature or a change to widget semantics.
 
 ## Responsibilities At The Boundary
 

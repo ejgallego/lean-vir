@@ -1,600 +1,268 @@
 # Harness
 
-This document is for maintaining Lean VIR. The user-facing quickstart stays in
-the top-level `README.md`; implementation ownership notes live in
-`scripts/README.md`.
-
-This document owns setup, generated-artifact policy, validation command
-selection, and CI shape. Package config and manifest semantics live in
-`docs/INTERFACE_PIPELINE.md`; architecture status lives in
-`docs/IMPLEMENTATION_NOTES.md`; package generator internals live in
-`docs/GENERATE_PACKAGE.md`.
-
-The repository-local harness has three jobs:
-
-- fetch and pin the upstream Lean source used for the WASI build
-- build the upstream IR interpreter plus the local WASI shim
-- generate and test `.irpkg`, WASM, site, and SDK artifacts
-
-It is intentionally shell and npm based. This repository does not use a
-branch-policy file, paired backports, or a large Python worktree harness.
+This guide covers maintainer setup, generated artifacts, check selection and CI.
+Start with the [quickstart](../README.md) to use VIR, the
+[developer guide](DEVELOPER_GUIDE.md) to change its implementation, or
+[tests/README.md](../tests/README.md) to add a test.
 
 ## Setup
 
-Install npm dependencies first:
-
 ```bash
 npm install
-```
-
-Then prepare the local Lean source checkout, WASI SDK, and demo WASM:
-
-```bash
 npm run setup
 npm run doctor
 ```
 
-`npm run setup` expands to:
+`setup` runs `fetch:lean`, `install:wasi` and `build:demo`. The toolchain in
+`lean-toolchain` determines the matching upstream checkout under
+`third_party/lean4-src/`. `doctor` fails for missing required commands/artifacts
+and warns when Chromium is unavailable for browser checks.
 
-```bash
-npm run fetch:lean
-npm run install:wasi
-npm run build:demo
-```
-
-`npm run doctor` checks the local command and artifact state after setup. It
-fails for missing required pieces and warns when Chromium is not available for
-browser smoke tests.
-
-The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
-pins the matching Lean source checkout under `third_party/lean4-src/`.
-Generating the Wasm size site also uses GNU `objdump`, `readelf`, and `c++filt`
-from binutils to enumerate sized functions and exact ELF byte classes in the
-installed Lean archives.
+The Wasm build defaults to 4 MiB initial memory and a 1 MiB stack. Set
+`VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE` in bytes to change them.
+The size explorer additionally requires GNU `objdump`, `readelf` and `c++filt`
+from binutils.
 
 ## Generated Artifacts
 
-Generated files are useful evidence while debugging, but they are not commit
-material by default:
+Generated artifacts are ignored and should remain outside commits unless the
+maintainer requests a tracked fixture or report change.
 
-- `build/`: object caches, generated source inputs, packages, fixture reports,
-  and summaries
-- `web/dist/`: Vite Pages output
-- `web/public/*.wasm`: generated browser WASM
-- `web/public/*.irpkg`: generated browser packages
-- `web/public/*.input.json` and `web/public/*.report.md`: generated package
-  diagnostics
-- `web/public/downloads/`: generated downloadable archives
-- `third_party/lean4-src/`: fetched Lean source checkout
-- `.tools/`: local WASI SDK and optional engine installs
+| Artifacts | Preparation / use |
+| --- | --- |
+| `web/public/vir-upstream.wasm`, `vir-upstream.dev.wasm` and browser `.irpkg` packages | `npm run build:demo`; runtime and no-build smoke checks reuse these files. |
+| Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
+| `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
+| Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
+| Local `.irpkg` and reports | Follow [local packages](LOCAL_IRPKG.md) or [package configuration](INTERFACE_PIPELINE.md). |
 
-The infoview widget bundle, C++ codec tags, and native-symbol registry are
-generated below `build/generated/` rather than committed. The optional
-`VirInfoview` library builds the infoview bundle; the default `Vir` library does
-not require npm or generated JavaScript. The WASM probe generates both C++
-inputs before compiling the shim. The Lean codec constants are ordinary source
-and define the wire values used to generate the C++ tags.
+Other ignored outputs include object caches and reports under `build/`, package
+`.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
+fetched Lean checkout, and local SDK/engine installs under `.tools/`. The probe
+generates its C++ codec tags and native registry under `build/generated/` before
+compiling the shim; Lean codec constants remain ordinary source.
 
-The most useful generated diagnostics are:
+For failures, inspect `build/upstream-probe/boundary.md`, its `link.map` and
+generated native wrappers, the relevant `build/generated/*.report.md`, or
+`build/fixtures/summary.json`. [Fixture coverage](FIXTURE_COVERAGE.md) explains
+the summary fields. Binding and surface reports live under `build/bindings/`,
+`build/type-descriptors/` and `build/vir-surface/`.
 
-- `build/upstream-probe/boundary.md`
-- `build/upstream-probe/link.map`
-- `build/upstream-probe/generated/native_wrappers.cpp`
-- `build/upstream-probe/generated/native_wrappers_registry.inc`
-- `build/generated/*.report.md`
-- `build/fixtures/summary.json`
-- `build/fixtures/*.report.md`
-- `build/vir-surface/*.json`
-- `build/vir-surface/*.md`
-- `build/bindings/index.html` and `build/bindings/report.json`
-- `build/type-descriptors/*.json`, `*.html`, and `*.md`
-
-The versioned `build/fixtures/summary.json` contract records fixture
-expectations, outcomes, phase timings, and structured package diagnostics.
-Schema version 2 records zero seconds for package or Wasm phases that were not
-reached, uses `null` for unavailable outcome values or diagnostics, and
-preserves missing-dependency paths as `{ name, via }` objects.
-
-Reference these reports in local notes or final summaries when they explain a
-failure, but keep them out of Git unless the maintainer asks for a tracked
-fixture/report change.
-
-Commands that reuse generated runtime artifacts expect
-`web/public/vir-upstream.wasm` and the generated browser `.irpkg` files to
-exist. SDK/local artifact packaging and SDK import smokes also expect the
-optimized debug companion `web/public/vir-upstream.dev.wasm`. Run
-`npm run build:demo` first when `npm run test:runtime`,
-`npm run test:runtime:pure`, `npm run test:runtime:lean`, `npm run test:infoview`,
-`npm run test:upstream:no-build`, or `npm run test:fixtures:no-build` reports a
-missing `web/public/...` artifact.
-
-## Command Map
-
-Toolchain and build:
-
-```bash
-npm run fetch:lean
-npm run install:wasi
-npm run build:infoview
-npm run check:infoview-bundle
-npm run build:demo
-npm run build:demo:release
-npm run build:demo-package
-npm run build:size-site
-npm run build:surface-site
-npm run build:frontier-size-site
-npm run build:analysis-site
-npm run build:site
-npm run check:api-coverage
-npm run check:package
-npm run check:package-abi
-npm run generate:ir-codec-tags
-npm run check:bindings
-npm run check:ir-codec-tags
-npm run check:native-externs
-npm run check:client-native-externs
-npm run generate:boundary-registry
-npm run check:boundary-registry
-npm run check:native-wrappers
-npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
-npm run analyze:surface -- /tmp/entry.json /tmp/entry.md --module Lean.Meta.Basic --root Lean.Meta.mkFreshExprMVar
-npm run analyze:target-surface -- --project /path/to/project --source Library/Entry.lean --module Library.Entry --root Library.Entry.main --output-prefix build/vir-surface/library-entry
-npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
-npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
-npm run render:target-surface-index -- build/vir-surface/targets demo "Demo target" build/vir-surface/demo.json
-npm run compare:surface -- control.json candidate.json delta.json delta.md
-```
-
-Package generation and inspection:
-
-```bash
-npm run generate:irpkg -- Fib web/public/local-fib.irpkg
-npm run prepare:irpkg -- examples/quickstart.virpkg.json
-npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
-npm run inspect:irpkg -- web/public/local-quickstart.irpkg
-npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
-npm run inspect:native-wrappers
-npm run size:wasm
-node tests/fixtures/runner.mjs --help
-```
-
-Tests:
-
-```bash
-npm run test:mailbox
-npm run test:packages:unit
-npm run test:bindings:unit
-npm run test:fixtures:unit
-npm run test:tutorials
-npm run test:bench
-npm run test:native:unit
-npm run test:surface
-npm run test:surface:browser
-npm run test:package-ir-builders
-npm run test:upstream
-npm run test:upstream:no-build
-npm run test:env-lookup:wasm-pair
-npm run test:infoview
-npm run test:runtime
-npm run test:runtime:unit
-npm run test:runtime:pure
-npm run test:runtime:lean
-npm run test:lake
-npm run test:wasm-extensions
-npm run test:fixtures
-npm run test:fixtures:no-build
-npm run test:site
-npm run test:pages:browser
-npm run accept:lean-zip -- /path/to/lean-zip
-npm test
-```
-
-`npm run accept:lean-zip -- /path/to/lean-zip` is an explicit external-client
-compatibility check for a lean-zip checkout using the same Lean toolchain as
-VIR. It builds a native oracle and a client-native VIR package, compares the
-compression results byte for byte, and independently inflates them. Add
-`--passes 1` for a shorter diagnostic run or `--profile` for attribution only;
-neither mode is stable performance evidence. Run it when interpreter, package,
-ABI, native-lookup, runtime-conversion, or Lean-zip integration changes need a
-real external-client check; documentation and mechanical layout changes do not
-normally require it. See the
-[Lean-zip package tooling notes](../scripts/packages/lean-zip/README.md) for the
-native-oracle/VIR boundary and the complete contract.
-
-`npm test` begins with the mailbox, package, native-registry, fixture, tutorial,
-benchmark, and surface contract suites. It then runs package ABI, declaration
-IR, native-boundary, API-coverage, binding, Lake, and Wasm integration checks.
-Finally, it builds the demo artifacts and reuses them for a paired-runner
-control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
-tests, and the fixture suite. It is the default pre-merge signal for code
-changes; `package.json` remains the exact command-order source of truth.
+If runtime, infoview or no-build checks report missing `web/public/` artifacts,
+run `npm run build:demo`. Rebuild when the source of the reused Wasm or packages
+changes; a no-build command does not refresh them.
 
 ## Smallest Useful Check
 
-- Artifact-cache, benchmark sampling, focused identity, or paired-runner changes:
-  `npm run test:bench`
-- Package declaration lookup or interpreter/provider performance changes:
-  `npm run bench:env-lookup -- --json <new-output-path>`; use a separate
-  `--cpu-profile` run for attribution
-- Package IR object-builder layout changes: `npm run test:package-ir-builders`
-- Paired Wasm runner integration changes: build the demo, then run
-  `npm run test:env-lookup:wasm-pair`; this is a correctness smoke, not timing
-  evidence
-- Native runtime coverage or library-surface analyzer changes:
-  `npm run test:surface`; use `npm run analyze:surface -- <report.json>
-<report.md>` for a complete installed-library report, then
-  `npm run render:surface -- <report.json> <html-directory>` for the interactive
-  folder/module/function browser. For a project pinned to another Lean release,
-  use `npm run analyze:target-surface -- ...` after building its imports; see
-  `docs/SURFACE_ANALYSIS.md`. For report navigation or responsive-layout
-  changes, also run `CHROMIUM=/path/to/chromium npm run test:surface:browser`.
-- Native extern declaration changes:
-  `npm run check:native-externs`; add
-  `npm run check:client-native-externs` when client manifest selection,
-  wrapper imports, or provider handoff changes
-- Shim/native extern registry changes:
-  `npm run check:native-externs`,
-  `npm run generate:boundary-registry`, then
-  `npm run check:boundary-registry` and `npm run check:native-wrappers`
-- Boxed native wrapper changes:
-  `npm run check:boundary-registry`, `npm run check:native-wrappers`, and
-  `npm run test:upstream`
-- API coverage documentation changes:
-  `npm run check:api-coverage`; use
-  `node scripts/check-api-coverage.mjs --write` only to materialize
-  `build/analysis/api-coverage.tsv`
-- Lean `@[vir_js]`, explicit conversion, JavaScript provider, or host-boundary
-  policy changes: `npm run check:bindings`
-- Array/Object/Promise type relationships: `npm run test:bindings:unit` for
-  descriptor/configuration mutations and `npm run test:bindings:lean` for
-  same-type acceptance and cross-type rejection. Both are in `check:bindings`;
-  these checks need no Wasm artifact or temporary downstream project.
-- IR package name/declaration tag changes:
-  `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
-  `npm run test:upstream`
-- IR package decoder validation or failure cleanup:
-  `npm run test:runtime -- package-decoder`
-- Upstream interpreter or WASI boundary changes:
-  `npm run test:upstream`
-- Upstream smoke after `npm run build:demo` has already refreshed the WASM and
-  browser packages:
-  `npm run test:upstream:no-build`
-- WASM section size and linker-map attribution after `npm run build:demo` or
-  `npm run build:demo:release`:
-  `npm run size:wasm`
-- JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
-  without Lean-dependent package generation:
-  `npm run test:runtime:pure`
-- Callback/JSL finalizer ownership and whole-generation collection, using
-  existing demo artifacts without Lean regeneration:
-  `node --expose-gc tests/runtime/generation-gc-smoke.mjs`
-  and `CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs`.
-  The browser command bundles current source with real Wasm and official React
-  Strict Mode/Suspense; npm dependencies and demo packages are required, not a
-  site build. Controlled-GC budgets are diagnostics, not guaranteed latency.
-  Retention controls distinguish whole-generation collection from explicit
-  cleanup; neither shared-map lease cleanup nor a Wasm capacity plateau is asserted.
-- Infoview shell normal unmount/refresh and failure teardown with actual React,
-  real Lean continuation bodies/stale guards and mocked asset/package RPC:
-  `lake build VirInfoview vir_irpkg +ShellLifetime`, then
-  `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target-module ShellLifetime Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
-  then `CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs`.
-  Requires matching `web/public/vir-upstream.wasm` and npm dependencies, not a
-  site build. It covers generation isolation, retained application activity,
-  polling, failure cleanup and controlled GC. Mocked transport makes this
-  separate from the [real-server checks](#infoview-rpc-and-lifetime-checks).
-- Runtime runner catalog, filtering, configuration, or scheduling policy without
-  generated Lean or Wasm artifacts:
-  `npm run test:runtime:unit`
-- Runtime package generation or SDK artifact import checks:
-  `npm run test:runtime:lean`
-- Direct compiled-module input, root selection, provenance, or source
-  re-elaboration regressions:
-  `npm run test:runtime -- module-input`
-- Module-based npm CLI/config validation, selected-module builds and output:
-  `npm run test:packages:unit` and `npm run test:runtime -- module-cli`
-- Browser module catalog, fixture-root unions or package-only selection:
-  `npm run test:packages:unit`, `npm run check:package`, then runtime/browser
-  checks against refreshed packages. Fixture module migration also requires
-  the native/Wasm oracle suite.
-- Lake module/package facets, downstream bundle input tracing and output
-  ownership, marked-module selection, or SDK installer changes:
-  `npm run test:lake`
-- Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
-  `npm run test:wasm-extensions`
-- A single runtime smoke id/path substring:
-  `npm run test:runtime -- <substring>`
-- An explicit runtime smoke group:
-  `npm run test:runtime -- --group pure`
-- Lean infoview bundle freshness, shell loading, local asset RPC, widget-entry
-  signatures, or server-mode module snapshots with opaque imports and unsaved edits,
-  non-module rejection, document provenance and revision/byte consistency:
-  `npm run test:infoview`
-- React proof-widget demo iteration after `npm run build:demo`:
-  open `examples/ReactProofWidget.lean` in VS Code; the widget package is built
-  from the active Lean server snapshot. Live documents must use `module`, but
-  do not need to be saved; private helpers and unsaved edits remain available.
-  If the file was already open before the
-  build, restart the Lean server or reopen the file so the editor sees the
-  rebuilt `Vir.Infoview` widget module.
-- Shared Tamagotchi widget demo iteration after `npm run build:demo`:
-  open `examples/ReactTamagotchiWidget.lean` in VS Code. The widget reuses the
-  same hook-backed `ReactTamagotchi.View` component as the browser React demo.
-- Lean fixture behavior or package generation coverage:
-  `npm run test:fixtures`
-- Fixture expectation, report-diagnostic, and runner-configuration contracts
-  without a Lean or Wasm build:
-  `npm run test:fixtures:unit`
-- A single fixture or fixture family:
-  `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`
-- A single fixture after `npm run build:demo` has already refreshed the WASM
-  and browser packages:
-  `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures:no-build`
-- Site bundle, SDK archive, or local archive shape:
-  `npm run test:site`
-- Browser interaction, DOM, React, timers, animation callbacks, or page runner
-  behavior:
-  `npm run build:site`
-  then `CHROMIUM=/path/to/chromium npm run test:pages:browser`
-- Broad pre-merge check:
-  `npm test`
+Choose the affected boundary first. `npm test` is the broad pre-merge code
+check; [package.json](../package.json) owns its exact command order. Browser
+semantics require the separate Chromium checks below.
 
-`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name, and additional
-roots by case-insensitive substring. For example:
+### Package and fixture work
+
+- Configuration, browser package catalog or output planning:
+  `npm run test:packages:unit`. Add `npm run check:package` and runtime/browser
+  checks against refreshed packages for catalog/root-selection changes. Fixture
+  module changes also need the host/Wasm oracle suite.
+- Compiled-module input and source re-elaboration regressions:
+  `npm run test:runtime -- module-input`. For npm module CLI/config behavior,
+  use `npm run test:runtime -- module-cli` alongside package units.
+- Lake facets, marked-module selection, downstream input tracing, output
+  ownership or SDK installation: `npm run test:lake`. Its cache checks cover
+  the exercised scenarios; they do not establish cache-only artifact reuse.
+- Fixture behavior: `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`;
+  omit the filter for the whole oracle suite. Expectations, structured
+  diagnostics and runner configuration alone use `npm run test:fixtures:unit`,
+  without a Lean or Wasm build.
+- IR object builders: `npm run test:package-ir-builders`. For package ABI
+  changes, run `npm run check:package-abi`; name/declaration tag changes also
+  need `npm run generate:ir-codec-tags`, `npm run check:ir-codec-tags` and
+  upstream smoke. Decoder validation/failure cleanup uses
+  `npm run test:runtime -- package-decoder`.
+
+### Native and host boundaries
+
+- Native declarations: `npm run check:native-externs`. Add
+  `npm run check:client-native-externs` for client manifest selection, wrapper
+  imports or provider handoff. Pure registry tooling uses
+  `npm run test:native:unit`.
+- Registry changes: regenerate with `npm run generate:boundary-registry`, then
+  run `npm run check:boundary-registry` and `npm run check:native-wrappers` in
+  addition to the declaration check. Boxed wrapper changes also need upstream
+  smoke. See [native tooling](../scripts/native/README.md) for inspection.
+- Interpreter or WASI behavior: `npm run test:upstream` builds the demo first.
+  Use `npm run test:upstream:no-build` only after refreshing its artifacts.
+- Lean host declarations, explicit conversions, JS providers or binding policy:
+  `npm run check:bindings`. Array/Object/Promise type relationships can start
+  with `npm run test:bindings:unit` and `npm run test:bindings:lean`; both are
+  included in that gate and need no Wasm or temporary downstream project.
+- External-client behavior across interpreter, package, ABI, native lookup or
+  conversion changes: `npm run accept:lean-zip -- /path/to/lean-zip`. See
+  [its acceptance contract](../scripts/packages/lean-zip/README.md); ordinary
+  documentation or mechanical layout changes do not require this check.
+
+### Runtime, browser and analysis work
+
+- Runtime runner catalog, filtering or scheduling: `npm run test:runtime:unit`
+  requires no generated artifacts. Runtime/host/manifest/callback behavior uses
+  `npm run test:runtime:pure` with existing demo artifacts; package generation
+  and SDK imports use `npm run test:runtime:lean`.
+- Infoview bundle freshness, shell loading, widget-entry signatures, asset RPC
+  or live module snapshots: `npm run test:infoview`. For actual-server RPC and
+  lifetime behavior, use the [browser recipes below](#infoview-rpc-and-lifetime-checks).
+- Site bundle or SDK/local archive shape: `npm run test:site` builds and checks
+  the site. DOM, React, timers, animation and page interactions additionally
+  need [Browser Smoke](#browser-smoke).
+- Surface analysis: `npm run test:surface`; add
+  `CHROMIUM=/path/to/chromium npm run test:surface:browser` for report navigation
+  or responsive layout. [Surface analysis](SURFACE_ANALYSIS.md) owns capture,
+  comparison and rendering commands. API-coverage documentation uses
+  `npm run check:api-coverage`.
+- Benchmark harness/cache/sampling changes: `npm run test:bench`. Declaration
+  lookup/provider performance uses `npm run bench:env-lookup -- --json <new-output-path>`
+  and a separate `--cpu-profile` attribution run; see [performance](PERFORMANCE.md).
+  After a demo build, `npm run test:env-lookup:wasm-pair` is a correctness smoke,
+  not timing evidence. `npm run size:wasm` inspects built Wasm/linker-map sizes.
+- Host-engine feature availability such as externref or JSPI:
+  `npm run test:wasm-extensions`. Tutorial changes use `npm run test:tutorials`.
+
+## Filters, Concurrency and No-Build Checks
+
+`VIR_FIXTURE_FILTER` matches fixture id, source path, entry name and additional
+roots by case-insensitive substring:
 
 ```bash
-VIR_FIXTURE_FILTER=string npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 ```
 
-`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`, and
-`VIR_RUNTIME_JOBS` controls the number of runtime smoke subprocesses. The
-available runtime smoke ids and groups are printed by:
+The no-build fixture path still builds the selected Lean modules and
+`vir_irpkg`, then compares compiled host-driver and Wasm results. It skips only
+the demo/Wasm build. [Fixture coverage](FIXTURE_COVERAGE.md) documents worker
+limits and oracle expectations.
+
+Select runtime smokes by id/path substring or group:
 
 ```bash
 node tests/runtime/runner.mjs --list
+npm run test:runtime -- package-decoder
+npm run test:runtime -- --group pure
 ```
 
-Runtime smoke tests are split into two groups:
-
-- `pure`: Node-only runtime, host binding, manifest, object ABI, and callback
-  tests that reuse existing demo artifacts.
-- `lean`: package-generator and SDK-import tests that require Lean and write
-  shared `build/lean-lib` / `.lake` outputs.
-
-The runtime runner executes pure tests in parallel, but serializes Lean-group
-tests to avoid concurrent writes to shared Lean build outputs on cold CI
-checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
-per test process. Runtime fixtures use the shared temporary Lake-project helper
-in `tests/support/module-project.mjs`; `createRuntimeModuleProject` pairs it with
-the prepared generator. Successful builds must precede package-negative tests;
-attribute and typechecking negatives instead inspect the build failure. The
-public npm CLI always builds its selected modules through Lake's cache.
-
-The test module-project helper accepts explicit simple module names and source
-text without rewriting headers or visibility. It pins the repository toolchain
-and local dependency; callers own scratch-directory cleanup. Always pair its
-`env()` result with its `directory` as cwd. Build only the intended module roots
-and check compilation before asserting package diagnostics. Do not combine
-independent negative fixtures into an umbrella import. Validate helper changes
-with `npm run test:fixtures:unit`, `npm run test:runtime -- module-project
-package-generation`, and the fixture oracle suite.
-
-Generated tests must declare their module visibility and compile-time imports
-explicitly. In particular, isolated marker imports need `meta import
-Vir.Attributes`, and isolated host-attribute imports need `meta import Vir.Host`.
-Assert `#eval` effects during compilation and their absence during packaging;
-do not confuse Lake's replayed build messages with re-executed source commands.
-
-`test:fixtures:no-build` is a local iteration shortcut. It requires
-`web/public/vir-upstream.wasm` from a previous `npm run build:demo`.
-
-The local package-generation helper, browser package generator, and fixture
-runner use the `vir_irpkg` Lake executable instead of repeatedly starting
-`lean --run tools/GeneratePackage.lean`. The fixture runner builds that
-executable and selected fixture modules before parallel execution. It reuses
-them for per-fixture packages and runs a host driver for every fixture. Drivers
-import compiled runtime bodies (`import all`) instead of copying source text;
-they retain `interpreter.prefer_native false` and unsafe-entry handling. Thus
-`--no-build` skips the demo/Wasm build, not the selected Lean module builds.
-
-The build and test entry points print compact timing summaries that are useful
-when comparing CI runs:
-
-- `npm run build:demo` prints browser package, compile, link, and total probe
-  timing.
-- `npm run build:demo:release` uses the same optimized build, then strips
-  `web/public/vir-upstream.wasm` for distribution bundles while keeping
-  `web/public/vir-upstream.dev.wasm` optimized but unstripped for debugging.
-- `npm run prepare:irpkg` prints Lean library, generator, package, and total
-  timing; when passed multiple configs, it prepares the generator once.
-- `npm run test:runtime` prints selected groups/filters plus per-test timings
-  and the slowest tests.
-- `npm run test:fixtures` prints build, generator, fixture-run, and slowest
-  fixture timings; the JSON summary also records per-fixture phase timings.
-
-## SDK Releases
-
-Tags named `v<package.json version>` trigger `.github/workflows/release-sdk.yml`,
-which validates the tag and ABI versions, builds `lean-vir-sdk.tar.gz`, imports
-the packaged SDK modules, and uploads it to the matching GitHub release. Create
-the tag from the final merged commit so the archive manifest records the
-revision clients actually depend on. Before that tag exists, test consumers
-with `VIR_SDK_ARCHIVE` or the commit-artifact fetch path; the zero-argument
-`:virSdk` facet intentionally targets the tagged release.
-
-## CI Shape
-
-The CI workflow keeps one job responsible for fetching the pinned Lean source,
-installing the WASI SDK, building the release-profile
-`web/public/vir-upstream.wasm` plus the optimized, unstripped
-`web/public/vir-upstream.dev.wasm`, generating browser `.irpkg` files, and
-running upstream smoke. That job uploads both the demo artifacts and the
-commit-addressed `lean-vir-sdk` archive. The pure runtime job downloads the
-demo artifacts and runs without installing Lean. The
-Lean-dependent runtime job installs Lean for the Lake facet, package-generation,
-and SDK metadata smoke tests. The fixture job also downloads the demo artifacts
-and runs in parallel without re-fetching Lean source or reinstalling the WASI
-SDK.
-
-The Pages workflow runs the same `npm run build:site` entry point. Its static
-artifact includes a fresh complete Lean-library surface scan under
-`web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer
-under `web/dist/size/`. The reports cross-link declarations, native providers,
-and retained symbols. The tracked native-frontier plan adds exact isolated and
-cluster raw/gzip measurements; blocker pressure remains a ranking hint, and
-only an A/B surface comparison gives exact unlocks. See
-`docs/SURFACE_ANALYSIS.md` for accounting and local reproduction.
-They are deployed at
-`https://ejgallego.github.io/lean-vir/surface/` and
-`https://ejgallego.github.io/lean-vir/size/` alongside the demo.
-
-For pull requests, every job explicitly checks out the pull request's head SHA
-instead of GitHub's synthetic merge ref. GitHub indexes commit artifacts by
-that head SHA, while `package-sdk-artifact` records the checked-out Git commit
-in the SDK manifest. Using the same ref in every job keeps source, artifact
-lookup, and SDK metadata aligned.
+`VIR_RUNTIME_TEST_FILTER` also selects smokes; `VIR_RUNTIME_JOBS` controls worker
+count. The `pure` group reuses demo artifacts and runs in parallel. The `lean`
+group generates packages or checks SDK imports and runs serially to avoid
+concurrent writes to shared `build/lean-lib` and `.lake` outputs. Pure runtime
+smokes are distinct from the artifact-free runner unit tests.
 
 ## Browser Smoke
 
-`npm run test:pages:browser` runs a built `web/dist/` site against headless
-Chromium over the Chrome DevTools Protocol. This is an explicit no-build path:
-before starting Chromium, it checks that every required artifact exists and
-that each `.irpkg` has the current package and interface-manifest versions.
-Missing or incompatible artifacts fail early and report `npm run build:site`
-as the refresh command.
-
-The script searches common Linux/macOS Chromium paths and `PATH`. If Chromium
-is elsewhere, set:
-
 ```bash
+npm run build:site
 CHROMIUM=/path/to/chromium npm run test:pages:browser
 ```
 
-Run `npm run build:site` first when you want to refresh `web/dist/`.
+The browser runner serves `web/dist/` to headless Chromium over the Chrome
+DevTools Protocol. It performs no build: missing artifacts or incompatible
+package/manifest versions fail before Chromium starts, with `build:site` as the
+remedy. Chromium is discovered in common Linux/macOS locations and `PATH`;
+set `CHROMIUM` when it is elsewhere.
+
+### Generation GC and mocked shell lifetime
+
+These checks use matching demo Wasm/packages and npm dependencies, without a
+site build:
+
+```bash
+node --expose-gc tests/runtime/generation-gc-smoke.mjs
+CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs
+```
+
+They cover callback/JSL finalizers and whole-generation collection. The browser
+check bundles current source with real Wasm and official React Strict Mode and
+Suspense. Retention controls distinguish collection from explicit cleanup.
+Controlled-GC budgets are diagnostic: collection does not establish shared-map
+lease cleanup or a Wasm capacity plateau.
+
+For normal shell unmount/refresh and failed-setup teardown with real React and
+Lean continuation bodies, but mocked asset/package RPC:
+
+```bash
+lake build VirInfoview vir_irpkg +ShellLifetime
+lake env .lake/build/bin/vir_irpkg \
+  build/shell-lifetime.irpkg build/shell-lifetime.report.md \
+  --target-module ShellLifetime \
+  Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount
+CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs
+```
+
+This checks generation isolation, retained application activity, stale guards,
+polling, failure cleanup and controlled GC. Mocked transport makes it separate
+from the actual-server checks below.
 
 ### Infoview RPC and lifetime checks
 
-`CHROMIUM=/path/to/chromium npm run test:infoview:browser` runs support/cleanup
-units and both real-server checks sequentially, as in CI. Each runner builds its
-Lean fixtures and bundles current JS against official React, the pinned RPC
-client and a real `lake serve` process. They require npm dependencies and matching
-`web/public/vir-upstream.wasm`, but no site build. Build missing or changed Wasm
-with `npm run build:demo` before running them.
+```bash
+CHROMIUM=/path/to/chromium npm run test:infoview:browser
+```
 
-- `node tests/infoview/rpc-browser.mjs` compiles the registered
-  `tutorials.RpcReferenceWidget` package. It checks position-specific sessions,
-  native Promise results, genuine `WithRpcRef`, rejection, cancellation and rerendering.
-  Held real replies test stale success independently of aborting.
-- `node tests/infoview/rpc-shell-lifetime.mjs` checks the actual shell with the
-  registered `ShellLifetime` module and native `RpcBrowserServer` support. The
-  shell acquires Wasm/packages through real asset/package RPC. Delayed success
-  and rejection after UI cleanup enter Lean stale guards; explicit disposal
-  rejects before body entry. Live-generation and reference-round-trip controls
-  distinguish these outcomes. The injected infoview context accessor supplies
-  official position-specific sessions; runtime-creation instrumentation observes
+The aggregate runs support/cleanup units and both real-server checks
+sequentially, as in CI. Each builds its Lean fixtures and bundles current JS
+against official React, the pinned RPC client and a real `lake serve` process.
+They need npm dependencies and matching `web/public/vir-upstream.wasm`, but no
+site build; use `npm run build:demo` for missing or changed Wasm.
+
+- `node tests/infoview/rpc-browser.mjs` checks position-specific sessions,
+  native Promise results, genuine `WithRpcRef`, rejection, cancellation and
+  rerendering with the `tutorials.RpcReferenceWidget` package. Held real replies
+  test stale success independently of aborting.
+- `node tests/infoview/rpc-shell-lifetime.mjs` uses the actual shell,
+  `ShellLifetime` and `RpcBrowserServer`. Wasm/packages arrive through real
+  asset/package RPC. Delayed success and rejection after UI cleanup enter Lean
+  stale guards; explicit disposal rejects before body entry. Live-generation
+  and reference-round-trip controls distinguish them. The injected context
+  accessor supplies official sessions; runtime instrumentation observes
   generations and supplies test bindings. Package/source/artifact hashes are
   reported after awaited teardown. This is not GC or automatic polling-refresh
   acceptance.
 
-Both runners share `tests/infoview/rpc-browser-harness.mjs` for LSP, cancellation,
-response gates, Chromium and teardown. Run its focused units with
-`node --test tests/infoview/rpc-browser-harness.test.mjs`.
-The separate `npm run test:runtime -- infoview-rpc-promise` smoke checks exact
-Promise/function identity and explicit Lean continuations through real Wasm.
+The shared LSP/cancellation/response-gate/Chromium harness has focused units:
+`node --test tests/infoview/rpc-browser-harness.test.mjs`. The separate
+`npm run test:runtime -- infoview-rpc-promise` smoke checks exact Promise/function
+identity and explicit Lean continuations through real Wasm.
 
 ### Upstream async-hook probe
 
-`CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs` runs the
-published infoview hooks unchanged with React in Chromium; no Lean or Wasm is
-needed. It is a manual characterization, not part of the server gate. In the
-pinned `@leanprover/infoview` 0.13.0 implementation it exposes:
-
-- Strict Mode effect replay aborting the initial request without starting a
-  replacement in both `useAsync` and `useAsyncPersistent`.
-- A cancelled request's late success entering `useAsyncPersistent`'s cache and
-  appearing when a subsequent request starts. Plain `useAsync` has no such cache.
-
-The persistent hook also omits the previous value on rejection, unlike the
-tutorial's UI policy. These observations constrain adoption of those hooks;
-they are not VIR guarantees, an all-Lean parent test or grounds for a new VIR
-request manager.
-
-## Performance Comparisons
-
-Benchmark commands, artifact-cache behavior, and before/after comparison
-workflow live in `docs/PERFORMANCE.md`.
-
-## Implementation Map
-
-Keep focused checks and shared helpers in the split modules instead of copying
-logic into entry-point scripts or pages:
-
-- Runtime smoke tests and host-engine Wasm probes: `tests/runtime/*.mjs`
-- Browser smoke cases and page suites: `tests/browser/*.mjs`
-- Fixture runner and pure contracts: `tests/fixtures/`; authored inputs:
-  `fixtures/`; shared test-only support: `tests/support/`
-- Process helpers: `scripts/process-utils.mjs`
-- Benchmark helpers: `benchmarks/harness/bench-differential.mjs` and
-  `benchmarks/harness/bench-utils.mjs`
-- Filesystem and executable lookup helpers: `scripts/file-utils.mjs`
-- Repository-root resolution shared by nested tooling:
-  `scripts/repository-paths.mjs`
-- Agent mailbox protocol and CLI: `docs/MAILBOX_PROTOCOL.md`,
-  `scripts/mailbox-lib.mjs`, and `scripts/mailbox.mjs`; focused contracts:
-  `tests/mailbox/`
-- IR package, browser-package, and artifact tooling: `scripts/packages/`;
-  shared artifact-bundle policy: `scripts/packages/artifact-bundle.mjs`;
-  focused and Lake integration checks: `tests/packages/`
-- Lean-zip acceptance and browser source-package producer:
-  `scripts/packages/lean-zip/`
-- Package-tooling contracts: `npm run test:packages:unit`
-- Native registry, wrapper, codec-tag, host-import, and ABI tooling:
-  `scripts/native/`; pure registry contracts: `npm run test:native:unit`
-- Surface, frontier-size, Wasm attribution, and report-rendering tooling:
-  `scripts/analysis/`; focused coverage: `tests/surface/`
-- Binding inventory, descriptor, generation, and explorer tooling (plus the
-  standalone type-anchor comparison fixture):
-  `scripts/bindings/`; focused coverage: `tests/bindings/`
-- Infoview widget smoke coverage: `tests/infoview/`
-- Browser page helpers: `web/app/pages/page-utils.js` and
-  `web/app/pages/input-parsers.js`
-- Host boundary and active lifecycle internals:
-  `web/src/host-boundary.js` and
-  `web/src/host/vir-active-host-bindings.js`
-
-## Worktree Workflow
-
-For multi-step implementation work, prefer a linked worktree:
-
 ```bash
-git worktree add -b feat/<slug> .worktrees/<slug> main
+CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs
 ```
 
-Keep `.worktrees/` local and ignored. Use ordinary Git commands; there is no
-repository-specific worktree harness here.
+This manual characterization runs published infoview hooks unchanged with React
+in Chromium; it needs npm dependencies, but no Lean or Wasm. It is separate from
+the server gate. The [RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md#pinned-upstream-hook-limitations)
+records the pinned-version findings and their implications for hook adoption.
 
-The root checkout is the stable base. Avoid using it for unrelated parallel
-implementation branches, and do not delete unrelated worktrees unless the
-maintainer explicitly asks.
+## CI Shape
 
-## Agent Mailbox
+CI builds the release/debug Wasm pair and browser packages once, runs upstream
+smoke, and uploads demo artifacts plus a commit-addressed `lean-vir-sdk` archive.
+Pure runtime jobs consume those artifacts without installing Lean;
+Lean-dependent runtime and fixture jobs reuse them while building their Lean
+inputs. They do not refetch Lean source or reinstall the WASI SDK.
 
-Inter-agent coordination uses the one local mailbox under the primary/root
-checkout, including when the participating agents are running in linked
-worktrees or dependent projects. See `docs/MAILBOX_PROTOCOL.md` for the small
-validated envelope, immutable message files, advisory workflow fields, and
-archival.
+For PRs, jobs check out the PR head SHA. GitHub artifact lookup and the SDK
+manifest use that same commit, keeping source and downloaded artifacts aligned.
+The [workflow files](../.github/workflows/) own job definitions. Pages runs
+`npm run build:site`; [surface analysis](SURFACE_ANALYSIS.md) explains its
+deployed surface/size explorers.
 
-```bash
-npm run mailbox:check
-npm run mailbox:list
-npm run mailbox:deliver -- /path/to/draft.md
-npm run mailbox:archive -- <thread-id>
-npm run mailbox:list -- --archive
-npm run test:mailbox
-```
+## SDK Releases
 
-The commands resolve the primary checkout from any linked worktree. `.agents/`
-is ignored local state and must not appear in public PR descriptions.
+Tags named `v<package.json version>` trigger
+[release-sdk.yml](../.github/workflows/release-sdk.yml), which validates tag and
+ABI versions, builds the SDK, imports its packaged modules and uploads the
+archive to the matching release. Create the tag from the final merged commit
+so its manifest identifies the revision clients use. Before the tag exists,
+select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
+`:virSdk` facet targets the tagged release. See
+[SDK installation](LAKE_INTEGRATION.md#install-the-browser-sdk).

@@ -65,6 +65,10 @@ as the sole owner of cases while rejecting missing categories, invalid values,
 unsafe artifact names, duplicate vectors, and incomplete profiling groups
 before execution.
 
+Use `npm run accept:lean-zip -- /path/to/lean-zip --passes 1` for a shorter
+diagnostic run. One pass omits the repeated-pass memory-stabilization check;
+its timings are not stable performance evidence.
+
 The optional profiling contract is deliberately narrow. Every profiling row
 uses the `large-heterogeneous` input. Levels 9 and 10 must each have a
 `large-compress`, `profile-match`, and matching `profile-base` row. The
