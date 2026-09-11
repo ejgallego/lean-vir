@@ -213,7 +213,7 @@ from the actual-server checks below.
 CHROMIUM=/path/to/chromium npm run test:infoview:browser
 ```
 
-The aggregate runs support/cleanup units and both real-server checks
+The aggregate runs support/cleanup/error-formatting units and both real-server checks
 sequentially, as in CI. Each builds its Lean fixtures and bundles current JS
 against official React, the pinned RPC client and a real `lake serve` process.
 They need npm dependencies and matching `web/public/vir-upstream.wasm`, but no
@@ -230,8 +230,10 @@ site build; use `npm run build:demo` for missing or changed Wasm.
   and reference-round-trip controls distinguish them. The injected context
   accessor supplies official sessions; runtime instrumentation observes
   generations and supplies test bindings. Package/source/artifact hashes are
-  reported after awaited teardown. This is not GC or automatic polling-refresh
-  acceptance.
+  reported after awaited teardown. It also checks readable build errors, slow
+  initial packages with polling enabled or disabled, polling after installation,
+  and abandoned-candidate teardown. This is not GC, warm-refresh recovery or
+  server-restart acceptance.
 
 The shared LSP/cancellation/response-gate/Chromium harness has focused units:
 `node --test tests/infoview/rpc-browser-harness.test.mjs`. The separate
