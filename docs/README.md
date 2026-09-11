@@ -84,6 +84,8 @@ ownership diagrams.
 
 ## Maintainer Guides
 
+- [LEAN_432_HANDOFF.md](LEAN_432_HANDOFF.md): Iris-compatible Lean 4.32.2
+  maintenance assignment, exact baseline, patch inventory and acceptance checks.
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md): implementation map, call-flow
   diagrams, object ownership, and focused validation pointers.
 - [MAILBOX_PROTOCOL.md](MAILBOX_PROTOCOL.md): same-project and cross-project
