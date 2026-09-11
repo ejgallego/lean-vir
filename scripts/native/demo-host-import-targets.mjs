@@ -92,6 +92,7 @@ export const demoHostImportTargets = [
   "react.state.modify",
   "react.useEffect",
   "react.useEffectWithDeps",
+  "react.useId",
   "react.useMemo",
   "react.useReducer",
   "react.useRef",
