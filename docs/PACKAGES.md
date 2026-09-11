@@ -212,11 +212,6 @@ replacement resets that state; failed replacement preserves it. The
 [replacement API](JS_API.md#replacing-a-package-set) owns candidate failure,
 old-generation invalidation and cleanup-failure behavior.
 
-A presentation renderer can use this pattern after creating the mount element
-and initializing its presentation framework, display initialization failures,
-and call `vir.dispose()` at page teardown. This is a suggested integration
-pattern, not a claim that a particular renderer provides VIR configuration.
-
 The [SlidesCanvas example](../examples/SlidesCanvas.lean) creates its DOM and
 canvas and schedules animation frames entirely from Lean:
 

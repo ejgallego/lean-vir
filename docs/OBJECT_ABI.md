@@ -186,7 +186,6 @@ Object pointers are scoped to one wasm runtime instance. They must not survive:
 - `VirRuntime.dispose`
 - package reload
 - wasm instance teardown
-- a future interpreter reset that releases package state
 
 Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary
@@ -220,35 +219,9 @@ objects and fresh constructor buffers, but repeated records and inductive
 constructors no longer rediscover field indexes, scalar offsets, and packed
 runtime counts on every visit.
 
-## Risks
+## Limits
 
-- Refcount mistakes are correctness bugs. Tests should cover every helper that
-  transfers or consumes ownership.
-- Lean's boxed and unboxed representations are runtime details. The exported
-  helpers are the boundary; JavaScript should not infer layouts from pointer
-  values.
-- String conversion still copies between JS UTF-16 and Lean UTF-8. This ABI can
-  avoid descriptor overhead, but it does not make Lean strings share JS storage.
-- Descriptor-free object calls must trust package metadata. The package version
-  needs to stay tied to the generated summary/layout metadata used by the JS
-  lowering code.
-- JS-facing bindings should choose between ordinary value types and
-  `Lean.Vir.Js α` resources based on semantics, not on the current lower-level
-  transport. The object ABI is an internal optimization path for ordinary value
-  types; it is not the public representation for JavaScript-owned objects.
-
-## Future Wasm features
-
-A native Promise can cross the synchronous host boundary as an exact `Js`
-value without suspending Lean. JS Promise Integration would need a concrete
-suspending API and a distinct async call surface; it does not fit the current
-synchronous transaction merely by awaiting a host result.
-
-The Component Model/WIT, stack switching, Wasm GC and typed function references
-are possible transport directions, not implemented API guarantees. Adopt one
-only for a concrete runtime benefit; do not emulate its ownership model in JS.
-`npm run test:wasm-extensions` checks required externref identity/support and
-reports optional JSPI separately. See the
-[reference-types proposal](https://github.com/WebAssembly/reference-types),
-[JSPI proposal](https://github.com/WebAssembly/js-promise-integration) and
-[Wasm proposal index](https://github.com/WebAssembly/proposals).
+The exported helpers, not pointer encodings, define the JavaScript boundary.
+String conversion copies between JS UTF-16 and Lean UTF-8; Lean strings do not
+share JavaScript storage. Object calls trust the generated summary and layout
+metadata; see the [package format's validation limits](IRPKG_FORMAT.md#validation-and-trust-limits).

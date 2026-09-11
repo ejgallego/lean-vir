@@ -2,8 +2,6 @@
 
 Start with the [quickstart](../README.md) to use VIR, or the
 [developer guide](DEVELOPER_GUIDE.md) to change its implementation.
-The guides below own the detailed contracts; this page is a route to them,
-not a second API inventory.
 
 ## Use VIR
 
@@ -38,23 +36,16 @@ not a second API inventory.
 - [Upstream boundary](UPSTREAM_BOUNDARY.md): interpreter and package-provider contract.
 - [Client-native externs](CLIENT_NATIVE_EXTERNS.md): C/C++ provider integration.
 
-Contribution and coordination rules live in [CONTRIBUTING.md](../CONTRIBUTING.md)
-and the [agent mailbox protocol](MAILBOX_PROTOCOL.md).
+Contribution and coordination rules live in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Design and evidence
 
-The [roadmap index](roadmap/README.md) links scoped upstream questions and
-proposed extensions. Those plans are not current API guarantees. Some reference
-guides also contain explicitly marked future-work sections; that does not make
-their implemented contracts proposals.
+The [upstream proposal](roadmap/README.md) explains the declaration-provider
+API request and the experiment behind it.
 
 - [Environment lookup](ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
   [object conversion](OBJECT_CONVERSION_PERFORMANCE.md) record measured design
   decisions. Their timings belong to the recorded workloads and versions,
   not to every current build.
-- [Surface experiments](SURFACE_EXPERIMENTS.md) preserve historical decisions,
-  and [package payload analysis](IRPKG_PAYLOAD_ANALYSIS.md) is a dated size
-  snapshot. Neither is a current coverage or size report.
-
-When editing documentation, follow the [writing policy](../CONTRIBUTING.md#documentation):
-keep enduring contracts and useful rationale, not routine development logs.
+- [Package payload analysis](IRPKG_PAYLOAD_ANALYSIS.md) is a dated size snapshot,
+  not a report of current package sizes.

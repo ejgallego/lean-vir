@@ -1,9 +1,8 @@
 # Examples, tutorials, and fixtures
 
 Choose client code's home by its purpose. Compiling a fixture into a browser
-package does not make it a public example. This guide owns placement, browser
-registration and fixture expectations; [HARNESS.md](HARNESS.md) owns check
-selection and artifact prerequisites.
+package does not make it a public example. See [HARNESS.md](HARNESS.md) for
+check selection and artifact prerequisites.
 
 ## Examples
 
@@ -36,8 +35,8 @@ Tutorials under `examples/tutorials/` teach one API with small, copyable code:
   introduces a live infoview component.
 - [RpcReferenceWidget](../examples/tutorials/RpcReferenceWidget.md) pairs a Lean
   renderer with a JavaScript React parent that owns native RPC Promises,
-  loading/error UI, cancellation and stale-result suppression. Its real-server
-  acceptance exercises both files; it is not an all-Lean async widget.
+  loading/error UI, cancellation and stale-result suppression. It is not an
+  all-Lean async widget.
 
 ## Fixtures
 
@@ -51,8 +50,8 @@ methods under [fixtures/infoview/](../fixtures/infoview/) are test inputs, not
 public `Vir` APIs.
 
 [fixtures/manifest.json](../fixtures/manifest.json) is the executable oracle
-catalog. Keep it off the landing and example pages; use `/demo.html` or the
-package runner for diagnosis and documentation for discovery.
+catalog. Its cases are available in `/demo.html` and the package runner;
+public application pages do not present the fixture catalog.
 
 ## Adding client code
 
@@ -98,7 +97,7 @@ Missing, duplicate and stale assignments are rejected by the
 browser-package generation, the upstream smoke and the browser catalog. A
 compiled module cannot be assigned to two different fixture source paths.
 
-The [shared manifest validator](../fixtures/fixture-manifest.mjs) owns version 1
+The [manifest validator](../fixtures/fixture-manifest.mjs) accepts version 1
 of the oracle catalog and rejects unknown fields. Each fixture has a unique
 lowercase filename-safe `id`, plus `source`, `entry` and `result: { "type": "Nat" }`;
 `unsafe: true` selects an unsafe host driver. The entry is always a package
@@ -169,13 +168,13 @@ The runner writes `build/fixtures/summary.json` using
 
 Unavailable timing, diagnostics or failure detail are `null`. Missing
 dependencies retain `{ name, via }`, where `via` is the declaration path.
-Use these fields to detect growth in the imported closure, initialization
-surface or native boundary; the [diagnostic parser](../tests/support/fixture-diagnostics.mjs)
-and [result tests](../tests/fixtures/runner-result.test.mjs) own exact examples.
+These fields expose growth in the imported closure, initialization surface or
+native boundary. The [diagnostic parser](../tests/support/fixture-diagnostics.mjs)
+and [result tests](../tests/fixtures/runner-result.test.mjs) show concrete examples.
 
 ## Coverage boundaries
 
-Use executable sources for the individual cases, not a prose passing inventory:
+The suites exercise different boundaries:
 
 - [Basic values](../fixtures/Basic.lean), [lists/options](../fixtures/ListOption.lean),
   [numeric/runtime boundaries](../fixtures/Boundary.lean),
@@ -189,7 +188,7 @@ Use executable sources for the individual cases, not a prose passing inventory:
   [marker checks](../tests/runtime/package-generator-smoke.mjs) distinguish
   elaboration failures from package diagnostics and exercise extern fallbacks.
 - [Browser suites](../tests/browser/) and [real-server RPC checks](../tests/infoview/)
-  own DOM, official React and editor semantics.
+  exercise DOM, official React and editor semantics.
 
 [Task fixtures](../fixtures/Task.lean) exercise only synchronous, already-resolved
 `Task.pure`, `Task.get` and `Task.map`. This provides no task scheduler or general
@@ -213,5 +212,5 @@ pretty path also reaches the parenthesizer and formatter interpreter boundary.
 These dependencies arise through real environments: `Environment.checked`
 stores a `Task Kernel.Environment`; `addConstAsync` and `promiseChecked` use
 `IO.Promise.result?.bind`, `AsyncConsts.findRecTask` uses `Task.bind`, and
-`Lean.addDecl` can use `BaseIO.mapTask`. Supporting `ppExpr` is a separate
-runtime-boundary effort from the small `Std.Format.pretty` package.
+`Lean.addDecl` can use `BaseIO.mapTask`. Those runtime dependencies are outside
+the small `Std.Format.pretty` package.

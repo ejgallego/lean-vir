@@ -112,11 +112,10 @@ The loader requires exactly one of each current section kind:
 
 The manifest payload starts with the checksum's low and high halves as two
 little-endian `u32` values, followed by the usual length-prefixed UTF-8 string.
+The checksum covers that string's exact UTF-8 bytes.
 
-The section payload encodings are the same payloads that the pre-v10 linear
-stream used, except that format 11 prefixes the manifest with a checksum of its
-exact UTF-8 bytes. The directory requires known, unique section kinds whose
-bounded, non-overlapping payloads begin after the complete header and directory.
+The directory requires known, unique section kinds whose bounded,
+non-overlapping payloads begin after the complete header and directory.
 Each section decoder also rejects trailing bytes. The runtime separately validates
 the manifest checksum, embedded schema, and package-set identities. The checksum
 detects corruption of the manifest bytes, not agreement with other sections;
@@ -153,11 +152,10 @@ Package `Name` tags and IR declaration payload tag values live in
 declaration, initializer-global, host-import, and export-summary sections; the
 other generated tag groups are specific to IR declarations.
 
-These assignments are part of the format-11 wire contract. Do not renumber or
-reuse them without reviewing whether `packageFormatVersion` must change. IR
-type tags `10` and `11` remain reserved for the currently unsupported
-`Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases. After editing the
-Lean constants or enum mapping, run `npm run generate:ir-codec-tags`, then
+These assignments are part of the format-11 wire contract; incompatible changes
+require a new `packageFormatVersion`. IR type tags `10` and `11` remain reserved
+for unsupported `Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases.
+After editing the Lean constants or enum mapping, run `npm run generate:ir-codec-tags`, then
 `npm run check:ir-codec-tags`.
 
 See [IRPKG_PAYLOAD_ANALYSIS.md](IRPKG_PAYLOAD_ANALYSIS.md) for a measured section
@@ -314,9 +312,7 @@ Before exposing entries, JavaScript validates export argument/result trees,
 host descriptors and metadata. It rejects unsupported tags, malformed recursive
 children, invalid enum constructors, inconsistent field layouts, invalid
 `trivialFieldIndex` and duplicate export names. Generation additionally rejects
-cross-target declaration collisions and duplicate export ids/JS names. Runtime
-tests round-trip generated descriptors through the compact descriptor codec to
-detect drift before a call enters Wasm.
+cross-target declaration collisions and duplicate export ids/JS names.
 
 The mandatory [manifest/binary comparison](#manifest-and-binary-agreement)
 already rejects disagreements in ordered export and host-call metadata at load
@@ -330,8 +326,7 @@ the Wasm sandbox prevents native memory escape, but neither authenticates a
 package or makes arbitrary remote packages safe. Hostile or malformed packages
 can trap the interpreter, exhaust CPU/Wasm memory, make a tab unresponsive or
 provide metadata inconsistent with actual IR layouts. Independent Wasm-side
-layout validation and size/depth/execution limits remain hardening work, not
-current guarantees.
+layout validation and general size/depth/execution limits are not provided.
 
 The current artifact is core `wasm32-wasip1` with embedded JSON and the owned
 object-pointer `vir_call_resolved_objects` ABI. The descriptor-bearing named

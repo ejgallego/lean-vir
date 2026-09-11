@@ -1,9 +1,8 @@
 # VIR Surface and Boundary Analysis
 
-The surface analyzer answers one question: **which Lean functions have a
-complete static IR dependency closure under VIR's current runtime policy?**
-For a blocked function it also shows every terminal boundary that must be
-addressed, when the report contains a complete frontier.
+The surface analyzer reports which Lean functions have a complete static IR
+dependency closure under VIR's runtime policy. Reports with complete frontiers
+also show every terminal blocker for each function.
 
 Use the JSON report as the authoritative, versioned artifact. Markdown is a
 compact summary; the browser explorer is an interactive view of the same data.
@@ -25,10 +24,8 @@ may still differ intentionally. A `@[vir_js]` extern is accepted as a host
 boundary, but this static analysis does not verify that a particular browser
 host provides it.
 
-The headline deliberately does not test package encoding, JavaScript-callable
-types, linking, or browser execution. Those are separate checks. A
-closure-complete result means only that the static VIR runtime boundary is
-complete.
+A closure-complete result covers only the static runtime boundary. It does not
+test package encoding, JavaScript-callable types, linking or browser execution.
 
 Two function totals are useful:
 
@@ -64,7 +61,7 @@ the selected roots. The remainder is support captured for VIR capabilities.
 
 ## Run an analysis
 
-Install dependencies and build the analyzer once:
+Install npm dependencies and build the analyzer:
 
 ```bash
 npm install
@@ -141,10 +138,8 @@ toolchain. The report records the manifest name, hash, and selection. This
 static analysis does not compile or link its providers; package and runtime
 validation remain separate.
 
-The target exporter intentionally imports only Lean. It duplicates a small
-amount of metadata and IR-reference extraction because VIR oleans built by one
-Lean version cannot be loaded by another; the parity smoke test keeps the two
-analysis paths aligned.
+The target exporter imports only Lean and performs its own metadata/reference
+extraction: VIR oleans built by one Lean version cannot be loaded by another.
 
 ### FIR compiler profile
 
@@ -183,8 +178,7 @@ npm run analyze:target-surface -- \
   --output-prefix build/vir-surface/lean-zip-operations
 ```
 
-These paths are examples of local checkout locations, not repository setup
-requirements.
+Replace the project paths with your local checkouts.
 
 ## Render and serve the browser explorer
 
@@ -243,9 +237,8 @@ runnability decision.
 `npm run build:analysis-site` produces the complete deployed surface and size
 explorers. `npm run build:site` includes them in `web/dist/`.
 
-The surface renderer also writes the versioned `data/size-links.json` bridge
-consumed by the frontier-cost and Wasm-size reports. Regenerate it from the
-surface JSON rather than editing it directly.
+The renderer also derives `data/size-links.json` from the surface JSON for the
+frontier-cost and Wasm-size reports.
 
 ## Measure size impact
 
@@ -287,11 +280,9 @@ npm run render:surface -- \
   --frontier-costs build/frontier-size-costs/example.json
 ```
 
-The UI displays the measured baseline's size and SHA-256 prefix. Costs are
-exact only for that baseline; the renderer does not claim that an old cost file
-matches the current checkout. Costs are also not additive because linker
-garbage collection and compression interact, so price a proposed cluster as a
-cluster.
+The UI displays the measured baseline's size and SHA-256 prefix. Costs belong
+to that baseline, which may differ from the current checkout. Linker garbage
+collection and compression make costs non-additive: measure a cluster together.
 
 A size result still does not tell how many functions become runnable. Measure
 that separately with identical control and candidate surface scans, then use
@@ -312,27 +303,13 @@ same captured source and root-reachable graph hashes. It reports exact newly
 runnable functions, regressions, nearest-blocker transitions, and
 module/library rollups.
 
-This distinction matters: removing the current primary blocker may merely
-expose the next boundary. Only the comparison's `newlyRunnable` set is an exact
-unlock count.
+Removing a primary blocker may expose another boundary. Only the comparison's
+`newlyRunnable` set is an exact unlock count.
 
 ## Validation and limits
 
-Run the schema, closure, comparison, rendering, and browser-navigation checks:
-
-```bash
-npm run test:surface
-CHROMIUM=/path/to/chromium npm run test:surface:browser
-```
-
-Rerun an exact-target analysis after changing either the target source or VIR's
-capability policy. The complete frontier describes the current dependency
-graph; a newly implemented capability may itself reveal new dependencies.
-
-Package generation, strict linking, and host-versus-Wasm fixtures remain the
-right follow-up before claiming that a closure-complete function executes
-faithfully.
-
-Older size/frontier studies are summarized in
-[SURFACE_EXPERIMENTS.md](SURFACE_EXPERIMENTS.md). They explain past runtime
-decisions but are not current measurements.
+A frontier applies to its captured target and capability policy. Changing
+either requires a new analysis; a capability may introduce further dependencies.
+Execution fidelity requires package generation, linking and host/Wasm
+comparison. [HARNESS.md](HARNESS.md#runtime-browser-and-analysis-work) lists
+the analysis and browser-navigation checks.

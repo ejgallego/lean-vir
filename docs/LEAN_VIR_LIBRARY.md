@@ -79,10 +79,7 @@ entry handles remain usable when the source collection is no longer reachable.
 Use `Js.Array.getJs` with a JavaScript number index for native indexing.
 Its result type follows the array's element parameter. The Lean `item` helper
 takes a `Nat` index and returns `none` outside the current length; an in-bounds
-sparse slot still contains native `undefined`. Code using the old
-`Js.Array.getAs` or `Js.Array (Js α)` spelling should use `getJs` and
-`Js.Array α`. The `Js.NodeList (Js α)` and Lean `Array (Js α)` forms
-are unchanged.
+sparse slot still contains native `undefined`.
 
 ## Explicit Conversions
 

@@ -1,8 +1,8 @@
 # Environment Lookup Performance
 
-This note records the reproducible workload, measured experiments, and accepted
-local implementation for VIR declaration lookup. Follow-up API and experiment
-decisions have their own roadmap cards.
+The focused measurements from 2026-08-05 explain VIR's declaration-name hashes
+and lookup indices. They used fresh interpreter entries; the current benchmark uses a
+package-scoped session, as described in [Performance](PERFORMANCE.md#environment-lookup-workload).
 
 ## Outcome
 
@@ -15,22 +15,14 @@ The reported lookup cost had two independent causes:
 2. `find_package_decl` and `find_package_boxed_decl` linearly scanned all loaded
    declarations for every fresh interpreter cache miss.
 
-The accepted implementation computes the same name hashes as Lean and builds
+The implementation computes the same name hashes as Lean and builds
 two `lean::name_hash_map<uint32_t>` indices when a package set is prepared. One
 map indexes full declaration names and the other indexes boxed base names;
 manifest validation and initializer execution happen afterward.
 Values remain stable slots in the package-owned declaration vector.
 
-No `.irpkg` format change is needed. A format-11 precomputed-index experiment
-was started when runtime sorting appeared to regress package loading, but the
-profile showed that the apparent sort cost was itself caused by constant name
-hashes. Correct hashes made index construction cheap, and the measured hash-map
-implementation does not regress package load.
-
-The representative Illuminate acceptance workload confirms that the focused
-result transfers to browser use: sustained 60 Hz callback mean was halved,
-callback CPU fell from 6.6% to 3.3%, and all eight order-balanced runs preserved
-identical DOM output without browser errors.
+Correct hashes also reduced index-construction cost. The measured hash-map
+implementation improved package loading without a format change.
 
 ## Reproducible Workload
 
@@ -49,28 +41,23 @@ entries without depending on Illuminate:
   installation in a fresh Wasm instance while excluding instantiation and
   disposal.
 
-[Performance](PERFORMANCE.md#environment-lookup-workload) owns the report,
-profile, and paired-comparison commands. Use `--no-build` only after matching
-artifacts have been built, keep profiling separate from timing evidence, and
-use an even AB/BA schedule for acceptance. Focused comparisons require the same
-workload, package content, harness sources, fixtures, run policies, diagnostic
-mode, Wasm artifact/build configuration, Node/V8 versions, Lean toolchain,
-platform/architecture, and CPU model. Package identity covers the complete
-manifest; reports retain the exact package SHA-256 for stricter manual
-acceptance.
+[Performance](PERFORMANCE.md#environment-lookup-workload) gives the report,
+profile and AB/BA comparison commands, including `--no-build` prerequisites
+and the complete comparison identity. Profiles are diagnostic; the timing
+comparisons below use unprofiled runs with matching artifacts and workloads.
 
 ## Measurements
 
-All decisions below use six order-balanced AB/BA passes on 2026-08-05, Node
+The focused comparisons used six order-balanced AB/BA passes on 2026-08-05, Node
 24.18.0, an AMD Ryzen AI 9 HX 370, the pinned Lean 4.33.0-rc2 toolchain, and
 the same format-10 package bytes within each comparison.
 
-| Comparison                                                              | Execution paired median | Package-load paired median | Decision              |
-| ----------------------------------------------------------------------- | ----------------------: | -------------------------: | --------------------- |
-| constant hashes + linear scan → correct hashes + linear scan            |                  -56.7% |                     -23.8% | accept hash fix       |
-| correct hashes + linear scan → correct hashes + sorted binary index     |                  -57.9% |                      -3.4% | useful, but not final |
-| correct hashes + sorted binary index → correct hashes + `name_hash_map` |                  -15.3% |                      -1.6% | accept hash map       |
-| original → accepted combined implementation                             |                  -84.8% |                     -26.2% | final focused result  |
+| Comparison | Execution paired median | Package-load paired median |
+| --- | ---: | ---: |
+| constant hashes + linear scan → correct hashes + linear scan | -56.7% | -23.8% |
+| correct hashes + linear scan → correct hashes + sorted binary index | -57.9% | -3.4% |
+| correct hashes + sorted binary index → correct hashes + `name_hash_map` | -15.3% | -1.6% |
+| original → combined implementation | -84.8% | -26.2% |
 
 For the final original-to-candidate comparison, aggregate medians moved from
 403.4 to 58.9 microseconds per fresh entry, a 6.85x speedup. All six paired
@@ -141,11 +128,11 @@ millisecond p95 for the isolated VIR callback, with no callback exceeding the
 16.7 millisecond frame budget. These values establish the post-index path, not
 a replacement baseline.
 
-The later lean-zip investigation superseded the resolution-only direction:
-evaluated nullary constants also needed to survive public calls, so VIR now
-retains the complete interpreter session for one package generation.
+VIR now retains the complete interpreter session for one package generation,
+including evaluated nullary constants across public calls; see the
+[interpreter lifecycle](UPSTREAM_BOUNDARY.md#package-instance-lifecycle).
 
-## Accepted Local Design
+## Name hashes and indices
 
 Decoded names now use Lean's real construction rules:
 
@@ -170,19 +157,17 @@ retain their `Lean.Name`; map values are declaration slots and add no
 declaration ownership. Clearing a package deletes both maps before releasing
 vector-owned names and declarations.
 
-This is close to upstream rather than a new VIR-specific hash structure:
+Lean's environment uses sorted `Name.quickLt` arrays for imported entries and a
+persistent hash map for local entries. Its C++ interpreter uses
+`lean::name_hash_map` for initializer, native-symbol, constant and symbol caches.
+The same C++ map measured faster than a sorted side index for VIR's flat
+declaration namespace.
 
-- Lean's environment lookup uses sorted `Name.quickLt` arrays for imported
-  module entries and a persistent hash map for local entries;
-- the upstream C++ interpreter already uses `lean::name_hash_map` for its
-  initializer, native-symbol, constant, and symbol caches;
-- VIR has a flat package-set declaration namespace, for which the shared C++
-  `name_hash_map` measured faster than a sorted side index.
+[Boundary fixtures](../fixtures/Boundary.lean) compare string and numeric
+`Name.hash` values against host Lean, including the largest UInt64 numeral and
+the oversized-numeral rule.
 
-The binary-search candidate remains a valid analogue of upstream imported
-lookup, but the hash map is the measured winner for VIR's flat provider.
-
-## Architecture Follow-up
+## Provider boundary
 
 VIR still supplies `lean_ir_find_env_decl*` and passes a dummy environment to
 the interpreter. Lean's default lookup expects a valid `Lean.Environment` with
@@ -190,10 +175,9 @@ module ownership and `Lean.IR.declMapExt` state, whereas `.irpkg` currently
 carries decoded declarations rather than an environment.
 
 [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
-records the completed real-environment experiment and the resulting
-explicit-provider request to transfer upstream. The experiment found that a
-valid environment pulls in a disproportionate compiler-initialization closure
-for VIR's declaration-only runtime.
+records why constructing a valid environment pulls in a disproportionate
+compiler-initialization closure for declaration-only execution, and describes
+the proposed upstream provider API.
 
 ## Rejected or Superseded Experiments
 
@@ -205,21 +189,6 @@ for VIR's declaration-only runtime.
 - A sorted side-vector index was a robust improvement and closely mirrors
   imported Lean environment lookup, but the corrected hash map was another
   15.3% faster in paired testing.
-- A format-11 precomputed sorted-index section was abandoned. Compatibility
-  was not a constraint, but measurements no longer justified the format and
-  decoder complexity.
-- Decoder-wide name interning remains unjustified.
-
-## Validation and Follow-up
-
-Repository validation covers package hits/misses, boxed separation, package
-sets and duplicate rejection, failed loads, initializers, reload, and fixture
-agreement. The boundary fixture includes string and numeric `Name.hash` values,
-including the largest UInt64 numeral and the oversized-numeral rule, so hash
-regressions are observable against host Lean.
-
-The representative Illuminate acceptance gate has passed: the focused result
-reproduced, sustained callback mean and CPU were halved, the original sampled
-hotspots moved, and DOM output remained identical. The environment/provider
-decision is recorded by the completed ULC-0001 experiment: keep VIR's indexed
-provider and propose a narrow upstream declaration-provider API.
+- A format-11 precomputed sorted-index section was abandoned: correct hashes
+  removed the apparent sorting regression, so the measurements no longer
+  justified the extra format and decoder complexity.

@@ -4,8 +4,8 @@ Last measured: 2026-08-08
 
 ## Result
 
-Cache the manifest-derived normalization plan for custom-inductive values. In
-the repository-owned `Std.Format` benchmark, the six-pass AB/BA paired median
+Caching the manifest-derived normalization plan for custom-inductive values
+reduced repeated work in the `Std.Format` benchmark. The six-pass AB/BA paired median
 improved by 61.9% for JavaScript lowering and 36.2% for the full Wasm call on
 the representative tag-transition workload. On the focused empty-node
 workload, lowering improved by 80.4% and the full call by 62.7%.
@@ -26,7 +26,7 @@ invalidates the entry, but arbitrary in-place descriptor mutation is not
 supported. Per-value kind, key, field-presence, and payload checks remain on
 every call, with the same diagnostics.
 
-## Repository-owned Benchmark
+## Workloads and measurements
 
 The workloads are rows in `npm run bench`, use the generated
 `pretty-printer.irpkg`, and enter through the normal
@@ -42,8 +42,8 @@ test, and a contract test pins each workload's constructor counts.
   append tree (2,047 nodes). It checks the exact empty output and uses 20
   lowering iterations or 12 full calls per internal sample.
 
-Each reported pass is the median of seven internal samples. The acceptance run
-used the canonical paired runner and selected these rows with the general
+Each reported pass is the median of seven internal samples. The measurement run
+used the paired runner and selected these rows with the general
 benchmark filter:
 
 ```bash
@@ -57,7 +57,7 @@ npm run bench:paired -- \
 
 `--no-build` requires the generated inputs to exist in both checkouts. For
 this comparison both sides received byte-identical copies. The report's
-comparison identity now includes every selected row, Node/V8/platform details,
+comparison identity includes every selected row, Node/V8/platform details,
 and all benchmark artifact hashes; the paired runner rejects a mismatch.
 
 | Workload and sample | Control median | Candidate median | Aggregate delta | Median paired delta | Paired candidate deltas |
@@ -69,7 +69,7 @@ and all benchmark artifact hashes; the paired runner rejects a mismatch.
 
 All structural checksums were stable. Every lowering pass and every focused
 full-call pass improved. Five of six representative full-call passes improved;
-the paired median remains the acceptance statistic in the presence of the one
+the paired median is the comparison statistic in the presence of the one
 noisy pass.
 
 The control runtime is clean `main` at
@@ -86,26 +86,21 @@ The comparison identity recorded these SHA-256 values:
 
 ## Profile Cross-check
 
-The initial diagnostic profiles used the same public object-conversion boundary
-and predicted the accepted movement. For tag transitions, the conversion-owner
+Diagnostic profiles used the same public object-conversion boundary.
+For tag transitions, the conversion-owner
 share fell from 76.3% to 63.9%; for empty nodes it fell from 74.0% to 37.1%.
 The control-only repeated plan-building helpers accounted for 29.5% of tag
 samples and 43.8% of empty-node samples, then disappeared from the candidate's
 top self symbols. `normalizeCustomInductive` itself fell from 9.0% to 3.3% for
 tags and from 11.6% to 4.5% for empty nodes.
 
-Sample shares are diagnostic. The order-balanced, uninstrumented,
-repository-owned comparison above is the acceptance evidence.
+Sample shares are attribution evidence; the order-balanced, uninstrumented
+comparison above measures the speedup.
 
-## Size And Validation
+## Bundle size and remaining cost
 
-The generated infoview bundle grew from 321,934 to 322,971 bytes. The Wasm is
-unchanged. Validation includes the cached/replaced-plan test, workload shape
-contract, pure JavaScript and Lean-backed runtime suites, generated infoview
-bundle parity, exact benchmark output checks, and upstream fixtures.
-
-After this change, the largest conversion-specific owners are
-`objectLayoutSlotsFromPlan`, `normalizeCustomInductiveFields`, and the remaining
-per-node construction path. The interpreter is now the largest owner in the
-empty-output profile, so further conversion changes should start from a fresh
-representative profile rather than extending this cache speculatively.
+The measured candidate's infoview bundle grew from 321,934 to 322,971 bytes;
+Wasm bytes were unchanged. In its profiles, the largest remaining conversion
+costs were `objectLayoutSlotsFromPlan`, `normalizeCustomInductiveFields` and
+per-node construction. The interpreter was the largest cost in the empty-output
+profile. These measurements do not quantify the benefit of further caching.

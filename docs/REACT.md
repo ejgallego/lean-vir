@@ -116,9 +116,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 Dependencies can contain arbitrary `Js` values; `DependencyList` helpers
 explicitly build the JavaScript array. React compares its entries as usual.
 Root options, reducer initialization and broader context/external-library
-bindings are coverage gaps, not reasons to introduce a second semantic model.
-Library bindings should preserve module/export identity and pass native
-components to `createElement`; keep React external and aligned with the host.
+bindings are not exposed. External components use the host's React instance.
 
 ## Host implementation and validation
 

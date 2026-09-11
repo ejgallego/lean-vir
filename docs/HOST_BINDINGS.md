@@ -273,8 +273,7 @@ lifecycle.
 
 `lean-vir/vir-runtime-node` provides only environment-neutral JavaScript value
 operations and console bindings. It deliberately has no built-in DOM model.
-Tests should inject the smallest binding map they exercise; applications that
-need a DOM outside a browser should use an external DOM implementation and
+Applications that need a DOM outside a browser can use an external DOM implementation and
 adapt its exact objects through `hostBindings`.
 
 ## Custom Targets
@@ -303,25 +302,14 @@ Bindings execute synchronously. Returning a Promise is allowed only as an
 exact `Js` resource result; VIR roots the Promise object without awaiting it.
 That exact-value path does not inspect `.then` or assimilate the result.
 Returning a Promise for a structurally lowered or immediate result is an
-error. User bindings override built-ins with the same target name. Do not
-manually encode handles, wrap values, or perform conversions that belong in an
-explicitly named Lean adapter.
+error. User bindings override built-ins with the same target name.
 
 ## Validation
 
-Changes to the JavaScript-value boundary should cover:
-
-- exact identity for objects, functions, arrays, `null`, and `undefined`;
-- callback identity, invocation, arity/errors and runtime-disposal invalidation;
-- JSL and callback finalization as a best-effort backstop;
-- active-resource completion, explicit cancellation, package replacement, and
-  runtime disposal;
-- failure after active-resource creation but before result publication;
-- official React behavior in Chromium, including Strict Mode and Suspense.
-
-Relevant commands include `npm run test:runtime`,
-`npm run test:upstream:no-build`, and
-`CHROMIUM=/path/to/chromium npm run test:pages:browser`.
+[HARNESS.md](HARNESS.md#runtime-browser-and-analysis-work) lists the runtime and
+browser checks. The [generation-lifetime](HARNESS.md#generation-gc-and-mocked-shell-lifetime)
+and [real-server](HARNESS.md#infoview-rpc-and-lifetime-checks) suites cover
+foreign-value collection, UI cleanup and hard disposal separately.
 
 ## References
 

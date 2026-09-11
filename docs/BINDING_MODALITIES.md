@@ -18,27 +18,11 @@ operation carries the operation's TypeScript-level type and derived modalities.
 
 ## Semantics Fidelity
 
-Semantics fidelity is the repository-wide rule for every upstream-backed
-binding. The canonical Lean boundary preserves every representable,
-caller-observable property of the upstream operation: operation identity and
-naming, types and absence, overload selection, mutation and object identity,
-synchronous or asynchronous behavior, success and failure behavior, argument
-lifetime and reuse, callback retention, terminal behavior, and result
-ownership.
-
-Runtime ownership machinery may retain independent internal leases needed to
-implement that contract. It must not consume, clone, revoke, normalize,
-convert, or otherwise change a caller-owned value unless the upstream
-operation does so. Memory-management convenience is not evidence for changing
-the public modality. For example, a reusable JavaScript argument remains
-borrowed even when the result must independently retain values reachable from
-it.
-
-Conversions and ergonomic policies belong in explicitly named Lean adapters
-above the canonical boundary. Such an adapter may be useful and generated, but
-it does not occupy the upstream operation's faithful documentation lane or
-count as semantics-preserving coverage. Unsupported or ambiguous semantics
-fail closed until they have an explicit representation or reviewed policy.
+An upstream-backed binding preserves the selected operation's types, absence,
+mutation, identity, errors, timing and lifetime behavior. Explicitly named
+conversions and adapters are classified separately. The runtime value and
+ownership contract is in [HOST_BINDINGS.md](HOST_BINDINGS.md#semantic-fidelity);
+this guide describes how generation represents and checks that contract.
 
 ### Type Parameter Fidelity
 
@@ -56,13 +40,9 @@ relationships. A coarse `Js`-resource classification is not evidence that these
 relationships were preserved. Unsupported generic translation must fail closed
 or remain an explicitly reported gap, not silently widen the declaration.
 
-Validation must use the upstream TypeScript type as an independent authority.
-Agreement between a handwritten protocol configuration and its generated Lean
-declaration proves consistency only; a reviewed `semantics: preserving` label
-does not itself prove type conformance. Regression tests for generic bindings
-must include rejected cross-type calls as well as accepted same-type calls.
-Runtime payload checks are a separate boundary defense, never a reason to
-accept an incorrectly typed binding.
+Agreement between configuration and generated Lean proves consistency, not
+TypeScript conformance. Neither a `semantics: preserving` label nor a runtime
+payload check establishes the correctness of the static type relationship.
 
 The current independent relationship check is deliberately small:
 `js-value-type-relationships.mjs` reads the descriptor's upstream `Array<T>`
@@ -171,17 +151,9 @@ separately trusted and tested.
 
 ### Direct Value Rule
 
-Generated bindings preserve the upstream value itself whenever it can cross as
-a JavaScript resource. `Js`, borrowing, ownership, and an effect carrier are
-boundary semantics, not intermediate representations. A VIR-specific props,
-node, collection, or scalar algebra cannot replace a representable upstream
-value in the generated operation. Explicitly named builders and conversions may
-sit above that operation, but the audit reports them as adapters rather than API
-fidelity.
-
-Any protocol operation that introduces a distinct data model must explain why
-the upstream value cannot cross directly. Convenience or easier decoding is not
-such a reason.
+Generated `Js` bindings transport the upstream value itself, not a VIR props,
+node or collection representation. Builders and conversions have separate
+names and contract classifications.
 
 ## Separate Questions
 
@@ -235,10 +207,6 @@ adapter, while only identity mappings and explicitly preserving facts can
 contribute to faithful coverage. This keeps widened phantom types and omitted
 receivers from being promoted silently.
 
-The profile is library policy, not user convenience policy. In particular, it
-does not turn JavaScript strings into Lean-owned `String` values. Applications
-can add conversions at their own API layer.
-
 The normal property rules are therefore mechanical:
 
 | TypeScript position             | Generated rule                                          |
@@ -258,11 +226,6 @@ both. The current `Lean.Vir.Js.Nullable` lane represents only `T | null`.
 Generation rejects `T | undefined`, `T | null | undefined`, and optional
 properties until their distinct JavaScript semantics have an explicit ABI
 representation.
-
-Direct-value transport is a generator invariant rather than a configurable
-policy. It covers ordinary objects, functions, native timer/frame tokens, and
-`null` payloads. Resource liveness and cleanup state stay out-of-band; they
-must not replace the public JavaScript value.
 
 ## Generated Binding Operations
 
@@ -288,11 +251,8 @@ Each operation records:
 - the reason for any explicit exception;
 - a protocol's machine-readable upstream relation.
 
-The checked-in `Vir/**/Generated.lean` declarations are rendered from these
-records.
-The binding explorer shows generated operations in an expandable conversion
-policy panel. There is no second shipped anchor or comparator policy to keep in
-sync.
+The checked-in `Vir/**/Generated.lean` declarations and the explorer's conversion
+policy panels are rendered from these records.
 
 ## Property Selection
 
@@ -361,14 +321,6 @@ unsupported parameter or result types fail generation.
 TypeScript parameter names that collide with Lean keywords are rendered as
 escaped Lean identifiers.
 
-The browser slice includes global functions, DOM methods, and properties.
-Selected overloads, parameter projections and renames, fixed-arity rest
-specializations, callbacks, primitive resources, and receiver/result overrides
-are all recorded in the same IR. The event-listener pair preserves the native
-receiver/event/listener triple and returns `Unit`; the separately declared
-`EventListener.ofLean` conversion creates the exact JavaScript function used by
-both native calls.
-
 ## Reviewed Protocol Operations
 
 Some shipped targets intentionally have no one-to-one TypeScript declaration:
@@ -407,11 +359,9 @@ Operations that need repository-private teardown may additionally declare an
 - `release` removes the record and performs the corresponding upstream
   cancellation or unmount.
 
-These roles describe policy that provider tests must exercise. They do not
-change value transport and do not claim that provider behavior is mechanically
-verified. Passive JavaScript values and React hook/node values have no
-active-effect role; JavaScript reachability and official React own their normal
-lifetime.
+These roles are declared policy, not mechanically verified provider behavior.
+Passive JavaScript values and React hook/node values have no active-effect role;
+JavaScript reachability and official React own their normal lifetime.
 
 ## Documentation Flow
 
@@ -467,14 +417,5 @@ Generation owns:
 - generated Lean declarations;
 - explorer explanations.
 
-## Current Boundary And Next Extension
-
-The implemented translation covers full and partial properties, selected
-overloads, explicit optional and required parameter projections, fixed literal
-arguments, fixed-arity rest specializations, parameter renames, resource-result
-mappings, and retained callback/disposer lifecycles. These rules derive the
-current Document, Element, Canvas 2D, animation-frame, and React root slices
-while retaining explicit reasons for every specialization.
-
-Structural records, generic containers, and broader union translations remain
-fail-closed until their policies are explicit and tested.
+Structural records and broader union translations are unsupported. Generic
+translation is limited to the selected relationships described above.

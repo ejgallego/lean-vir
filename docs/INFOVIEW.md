@@ -74,8 +74,7 @@ world token. The response type remains polymorphic.
 ## Promise continuations
 
 Host imports execute synchronously. A native Promise crosses as an exact `Js`
-result without awaiting, polling or translating it. Suspending the running Lean
-call until settlement would require a different boundary, such as JSPI.
+result without awaiting, polling or translating it.
 
 `Js.Promise.thenValue`, `thenPromise`, `thenVoid` and `catchValue` delegate to
 native Promise methods over exact `Js.Function1` values. They select
@@ -141,12 +140,11 @@ Upstream `mk_rpc_widget%` calls a server method returning serialized
 `ProofWidgets.Html` and renders it with `HtmlDisplay`. It is an optional
 server-rendered authoring path, not the definition of a ProofWidgets component.
 Its serialized component nodes carry a component identifier/export, encoded
-props and children; preserve those fields and the upstream loading protocol.
+props and children.
 
 VIR's similarly named `Lean.Vir.ProofWidgets.Html` is a native
 `ReactM (Js React.Node)` action, not that wire datatype. For upstream wire
-compatibility, pass the existing upstream value to upstream `HtmlDisplay`;
-a Lean port must preserve its format and reuse its module-loading dependencies.
+compatibility, pass the existing upstream value to upstream `HtmlDisplay`.
 The [component coverage](#component-coverage-and-gaps) below distinguishes
 interoperability from a Lean implementation of the same component.
 
@@ -165,8 +163,7 @@ these tests from standalone lifetime and upstream async-hook probes.
 ### Component coverage and gaps
 
 Upstream `Component Props` names a React export in a widget module; its props
-cross through `RpcEncodable`. Lean-authored ports should preserve that model
-and reuse upstream dependencies, not recreate an editor renderer. The static
+cross through `RpcEncodable`. The static
 HTML/JSX fixtures and VIR goals/hypotheses panel establish native authoring;
 they do not establish completed ports of these upstream components:
 
@@ -177,18 +174,6 @@ they do not establish completed ports of these upstream components:
 | `MakeEditLink` | The supplied editor edit/selection and native child/event behavior. |
 | `GoalTypePanel` / `SelectionPanel` | Panel props, position, goal locations and selected-expression behavior. |
 | `FilterDetails` / `Maximizable` / `InteractiveSvg` | Stateful filtering/layout, SVG events and server updates. |
-
-Useful upstream exercises are `Demos/Jsx.lean` for basic authoring,
-`LazyComputation.lean` for RPC references/actions, and `Plot.lean` for an
-external Recharts-style component with array data and props. External imports
-need module-specifier and named/default-export support through the host's
-loading environment, without bundling a second React. The existing external
-component smoke is not full library or infoview-context acceptance.
-
-Shared server/client schemas and identity-preserving field access remain an
-authoring question; follow the [response contract](#server-references-and-response-types).
-Raw binary transport instead of base64 RPC is a separate host-capability
-question, not a promised feature or a change in widget semantics.
 
 ### Pinned upstream hook limitations
 
@@ -202,10 +187,9 @@ the published hooks unchanged against React. With `@leanprover/infoview` 0.13.0:
 - The persistent hook drops the previous value on rejection, unlike the
   tutorial's UI policy.
 
-These version-specific observations constrain adoption of those hooks. They
-are not VIR guarantees, an all-Lean parent test or grounds for a VIR request
-manager. [HARNESS.md](HARNESS.md#upstream-async-hook-probe) gives the command and
-prerequisites.
+These observations are specific to the published upstream hooks, not VIR's
+Promise bindings. [HARNESS.md](HARNESS.md#upstream-async-hook-probe) gives the
+reproduction command and prerequisites.
 
 ## Upstream reference points
 

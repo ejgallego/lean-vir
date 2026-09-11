@@ -1,12 +1,8 @@
 # IR Package Payload Analysis
 
-This note looks past the format-10 package envelope and focuses on payload
-cost. The useful question is not only which section is large, but which section
-forces the most shim-side maintenance.
-
-The snapshot below was generated on 2026-07-23 by running
-`npm run probe:upstream`. Treat these numbers as a representative baseline, not
-as values that update automatically when the browser package set changes.
+This format-10 snapshot measures package payload size and identifies the code
+needed to decode each section. It was generated on 2026-07-23 with
+`npm run probe:upstream`; the numbers do not track later package changes.
 
 To reproduce the source data, generate the packages and inspect each one:
 
@@ -19,8 +15,7 @@ done
 
 The JSON reports expose the total byte length, declaration count, per-section
 byte lengths, and manifest export/host-import arrays used by the tables below.
-Record the Lean toolchain and date with any refreshed snapshot so later changes
-can be compared against the same inputs.
+Comparisons need the same package inputs and recorded Lean toolchain/date.
 
 ## Section Sizes
 
@@ -72,8 +67,8 @@ declaration payload shape is hand-maintained twice: once in Lean emission and
 once in C++ decoding. The C++ side also owns object construction details and
 reference-counting behavior while materializing upstream `Lean.IR` values.
 
-The first centralization step is now the package name/IR declaration payload
-tag table: `Vir/GeneratePackage/PackageIRTags.lean` owns the wire values and
+The package name/IR declaration payload tag table in
+`Vir/GeneratePackage/PackageIRTags.lean` defines the wire values, and
 `scripts/native/ir-codec-tags.mjs` maps them into the generated
 `build/generated/wasm/package/package_ir_tags.h`. Name tags are shared by
 declarations, initializer globals, host imports, and export summaries; the
@@ -82,39 +77,19 @@ numeric tag literals from the Lean emitter and C++ decoder, but the field order
 and object materialization code are still intentionally direct handwritten
 code.
 
-## Main Risks
+## Maintenance tradeoffs
 
-1. **IR payload drift.** Every supported `Lean.IR.Expr`, `FnBody`, `Alt`,
-   `Arg`, `Param`, and `IRType` case has parallel Lean and C++ code.
-2. **Object layout coupling.** The decoder does not just parse bytes; it
-   directly allocates Lean objects with constructors that must match upstream IR
-   layouts.
-3. **Size work can add maintenance.** Name/string interning or compression
-   could shrink packages, but it would add stateful decoding logic unless it is
-   generated or kept sharply isolated.
-4. **Host import bytes are not the issue.** Host import behavior has real shim
-   complexity, but its package payload is tiny. Optimizing that section for size
-   would not matter.
+Every supported `Lean.IR.Expr`, `FnBody`, `Alt`, `Arg`, `Param` and `IRType`
+case has parallel Lean/C++ encoding code. The decoder also allocates objects
+whose constructors and reference counts must match upstream IR layouts. Shared
+tags do not eliminate field-order or object-layout drift.
 
-## Best Next Targets
+This snapshot does not break declaration bytes down into names, strings, IR
+bodies or extern entries, so it cannot predict savings from interning or
+compression. Either technique adds decoder state. Host-import metadata is
+already a tiny share of these packages despite its behavioral complexity.
 
-1. **Add a declaration-payload inventory tool.** Count declaration entries,
-   extern entries, IR node tags, name/string bytes, and repeated names. This
-   tells us whether size comes from names, bodies, imported closures, or native
-   extern entries before changing the format.
-2. **Extend IR declaration codec generation.** The tag table is centralized.
-   The next step would be a generated field-order table or generated decoder
-   skeleton for the IR cases, still producing direct Lean/C++ code rather than a
-   runtime manifest interpreter.
-3. **Review native extern entries only when a real demo requires it.** Native
-   externs are encoded as full extern declarations today. A smaller
-   representation might reduce payload bytes, but it must preserve the current
-   static registry boundary and must not introduce general native lookup without
-   a concrete demo case.
-4. **Consider name/string interning only after measurement.** It is probably a
-   real size win, but it should not be the first move unless repeated-name data
-   proves it is worth the added decoder state.
-
-The strongest candidate is therefore not compression. It is a declaration
-payload inventory tool followed by deeper IR codec generation, because that
-attacks both package size understanding and the shim-side maintenance burden.
+Native externs are encoded as full extern declarations. A smaller encoding
+would still need to preserve the static registry boundary; package size alone
+does not justify general native lookup. The current binary and metadata
+validation contract is in [IRPKG_FORMAT.md](IRPKG_FORMAT.md).

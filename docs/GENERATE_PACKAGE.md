@@ -87,8 +87,7 @@ or package-set transport remain independent of input acquisition.
 
 Analysis tools may still elaborate sources, and historical benchmark catalogs
 use their pinned producers. Neither is a package-generator fallback. External
-adapters require matching module-capable dependencies/toolchains; they must not
-rewrite downstream sources or silently override dependency pins.
+adapters require matching module-capable dependencies/toolchains.
 
 ## Implementation ownership
 
@@ -186,11 +185,8 @@ metadata; installers reject older ABIs before replacing an SDK.
 
 Name and declaration-IR tags are a separate wire contract owned by
 `PackageIRTags.lean`; `scripts/native/ir-codec-tags.mjs` maps C++ enums and
-reserved slots. Run `npm run generate:ir-codec-tags` and
-`npm run check:ir-codec-tags` after editing assignments. The check also verifies
-that emitter/decoder use every non-reserved tag. See the
-[format's tag rules](IRPKG_FORMAT.md#ir-tags-and-decoded-ownership) before
-renumbering; unsupported `IRType.struct` and `IRType.union` slots remain reserved.
+reserved slots. The [format reference](IRPKG_FORMAT.md#ir-tags-and-decoded-ownership)
+documents reserved tags and codec-generation commands.
 
 ## Troubleshooting
 
@@ -208,24 +204,5 @@ first-discovered root-to-blocker path after `via`; the CLI prints the same path.
 | `Package Diagnostics` | Unsupported interface types/layouts, duplicate export ids/JS names or declaration-name collisions. Inspect the requested boundary and report. |
 | Boxed boundary diagnostics | Top-level `Float`, `Float32`, `UInt64` and trivial wrappers over them need compiler-generated `_boxed` companions at the wasm32 boundary. Generation includes an available companion and fails explicitly when it is missing. |
 
-## Review and validation
-
-| Boundary | Evidence to preserve |
-| --- | --- |
-| Selection | Four modes; repeated/empty targets; imported explicit roots; no dependency marker leakage. |
-| Closure | Private/transitive/diamond imports, opaque IR, generated boxed entries and missing-body errors. |
-| Initialization | Dependency-first order, exact initializer pairs/multiplicity, once-only owner partitioning and extern fallbacks. |
-| Editor | Unsaved edits change revision/bytes; private locals stay local; stat/build agree; non-module rejection is explicit. |
-| Compilation | No source re-elaboration; downstream builds, relocation, cache invalidation and missing/corrupt artifacts. |
-| Diagnostics | Attribute/type rejection is distinct from package-time interface/closure rejection; changed reports remain actionable. |
-| Runtime/UI | Comparable host/Wasm oracles, correct source links and real React/browser behavior. |
-
-Choose commands from [HARNESS.md](HARNESS.md#package-and-fixture-work), including
-module-input/CLI, Lake facet and infoview snapshot checks where affected.
-Descriptor/classifier and raw-metadata changes need package-generation coverage;
-new supported shapes need a targeted fixture. Inspect reports when diagnostics
-change. Public library/import-layout changes require
-`bash scripts/build-lean-lib.sh`. Version changes need refreshed package/runtime
-artifacts and the ABI/tag checks, not only constant agreement. External client
-execution and changed RPC/runtime combinations require acceptance at the exact
-checkpoint; successful package generation alone does not establish it.
+Validation commands are documented in
+[HARNESS.md](HARNESS.md#package-and-fixture-work).

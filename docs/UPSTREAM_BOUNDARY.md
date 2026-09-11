@@ -8,11 +8,9 @@ owns the object-helper interface.
 
 ## Boundary and provenance
 
-Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified and compile
-it against the pinned Lean headers. Link upstream runtime implementations before
-adding local providers. Local WASI policy and unsupported operations must remain
-explicit in [the shim](../wasm/upstream_shim/README.md); a stub is not an
-implementation of an operation required by a new workload.
+VIR compiles the unmodified `third_party/lean4-src/src/library/ir_interpreter.cpp`
+against the pinned Lean headers. [The local shim](../wasm/upstream_shim/README.md)
+supplies WASI policy and stubs for unsupported operations.
 
 The build selects upstream runtime, utility and kernel sources plus pinned
 stage0 C modules from
@@ -62,8 +60,7 @@ exceptions are `Array.ugetBorrowed`, `Array.getInternalBorrowed` and
 [`native_symbols.cpp`](../wasm/upstream_shim/runtime/native_symbols.cpp), they
 consume temporary input references retained by the interpreter and return the
 raw borrowed result. The calling IR also treats that result as borrowed;
-adding a result retain would leak. Do not replace these wrappers by an
-apparently equivalent owned getter or infer ownership from the symbol spelling.
+adding a result retain or substituting an owned getter would leak.
 The native-wrapper inventory enforces this explicit exception set.
 
 A shared raw symbol does not establish an interchangeable boxed ABI. For example,
@@ -83,8 +80,6 @@ The build prelinks local exceptions, generated adapters and pinned stage0
 support in that precedence order. Duplicate-definition tolerance is confined
 to this relocatable bundle; an `llvm-nm` audit rejects collisions outside the
 explicit local/generated symbol set. The final Wasm link remains strict.
-Keep provider overrides explicit, and remove an override when it becomes
-redundant according to the metadata check.
 
 ## Real IR and declaration lookup
 
@@ -113,8 +108,7 @@ initializer mappings, host imports and export summaries on failure or clear.
 Binary fields are read into named locals before constructor calls, so decoding
 does not depend on C++ argument evaluation order.
 
-Keep alternative declaration loading behind the provider boundary, independent
-of the interpreter and WASI policy. [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
 records why a real compiler-environment prototype was disproportionate for
 declaration-only execution and motivates an upstream provider API. That proposal
 does not change the current package format or interpreter lifetime.
@@ -248,9 +242,6 @@ retain them under the host contract's reachability rules.
 
 Use the resolved native catalog and [fixture coverage](EXAMPLES_AND_FIXTURES.md) for
 the supported surface, not an inferred promise of full Lean runtime support.
-[OBJECT_ABI.md](OBJECT_ABI.md#future-wasm-features) owns prospective Wasm interfaces;
-native Promises already cross synchronously as exact JS values without
-suspending the interpreter.
 
 ## Validation
 
