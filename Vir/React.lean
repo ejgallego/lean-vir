@@ -7,42 +7,11 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.React.Generated
+import all Vir.React.Generated
 
 public section
 
 namespace Lean.Vir.React
-
-private def stringToJs (value : String) : ReactM (Lean.Vir.Js String) := do
-  let jsValue ← Lean.Vir.JsValue.ofString value
-  pure jsValue
-
-namespace Component
-
-/--
-Converts a Lean render function into one reusable JavaScript React component.
-
-The returned JavaScript function is the component type. Reuse the same value
-where React should preserve hook state; creating another value intentionally
-creates another component type.
--/
-def ofLean
-    (render : props → ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Component props)) :=
-  ofLeanJs fun props => do
-    render (← Lean.Vir.LeanRef.fromJSL props)
-
-end Component
-
-namespace EffectCallback
-
-/-- Explicitly builds React's native setup-function shape from Lean setup and cleanup actions. -/
-def ofLean
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js EffectCallback) :=
-  ofLeanJs { setup, cleanup }
-
-end EffectCallback
 
 namespace Property
 
@@ -729,29 +698,9 @@ def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
     push jsDeps dep
   pure jsDeps
 
-def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := do
-  let jsDeps ← empty
-  for dep in deps do
-    let jsDep ← stringToJs dep
-    push jsDeps jsDep
-  pure jsDeps
-
 end DependencyList
 
-def useMemoWithArrayDeps {α β : Type}
-    (calculate : @& Lean.Vir.Js (MemoCalculation α))
-    (deps : @& Array (Lean.Vir.Js β)) :
-    ReactM (Lean.Vir.Js α) := do
-  let jsDeps ← DependencyList.ofArray deps
-  useMemo calculate jsDeps
-
-def useMemoWithStringDeps {α : Type}
-    (calculate : @& Lean.Vir.Js (MemoCalculation α))
-    (deps : @& Array String) :
-    ReactM (Lean.Vir.Js α) := do
-  let jsDeps ← DependencyList.ofStrings deps
-  useMemo calculate jsDeps
-
+/-- Calls React's native effect hook, omitting its dependency argument when absent. -/
 def useEffect
     (setup : @& Lean.Vir.Js EffectCallback)
     (dependencies : Option (Lean.Vir.Js DependencyList) := none) :
@@ -760,35 +709,7 @@ def useEffect
   | none => useEffectWithoutDeps setup
   | some deps => useEffectWithDeps setup deps
 
-/-- Lean convenience over `EffectCallback.ofLean` and the exact `useEffect` binding. -/
-def useLeanEffect {α : Type}
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
-    (dependencies : Option (Lean.Vir.Js DependencyList) := none) : ReactM Unit := do
-  let effect ← EffectCallback.ofLean setup cleanup
-  useEffect effect dependencies
-
-def useLeanEffectWithArrayDeps {α β : Type}
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
-    (deps : @& Array (Lean.Vir.Js β)) :
-    ReactM Unit := do
-  let jsDeps ← DependencyList.ofArray deps
-  useLeanEffect setup cleanup (some jsDeps)
-
-def useLeanEffectWithStringDeps {α : Type}
-    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
-    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit)
-    (deps : @& Array String) :
-    ReactM Unit := do
-  let jsDeps ← DependencyList.ofStrings deps
-  useLeanEffect setup cleanup (some jsDeps)
-
 end Hooks
-
-namespace Ref
-
-end Ref
 
 namespace State
 
@@ -803,78 +724,7 @@ def modify
 
 end State
 
-namespace ElementType
-
-def ofTag (tag : @& String) : ReactM (Lean.Vir.Js ElementType) := do
-  let jsTag ← Lean.Vir.JsValue.ofString tag
-  tagJs jsTag
-
-end ElementType
-
 namespace Node
-
-def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
-  let jsValue ← Lean.Vir.JsValue.ofString value
-  textJs jsValue
-
-def createElementTag
-    (tag : @& String)
-    (props : @& Lean.Vir.Js Props)
-    (children : @& Lean.Vir.Js.Array Node) :
-    ReactM (Lean.Vir.Js Node) := do
-  let elementType ← ElementType.ofTag tag
-  createElement elementType props children
-
-def fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
-    ReactM (Lean.Vir.Js Node) := do
-  let props ←
-    match key? with
-    | none => Props.empty
-    | some key => Props.fromEntries #[Props.key key]
-  let jsChildren ← Lean.Vir.Js.Array.ofArray children
-  fragmentWithKeyJs props jsChildren
-
-def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
-  fragmentWithKey none children
-
-def keyedFragment (key : String) (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
-  fragmentWithKey (some key) children
-
-/-- Creates a React element from an exact reusable JavaScript component function. -/
-def component
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) : ReactM (Lean.Vir.Js Node) := do
-  let jsProps ← Lean.Vir.LeanRef.toJSL props
-  componentJs component jsProps
-
-/-- Creates a keyed React element from an exact reusable JavaScript component function. -/
-def keyedComponent
-    (key : @& String)
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) :
-    ReactM (Lean.Vir.Js Node) := do
-  let jsProps ← Lean.Vir.LeanRef.toJSL props
-  let jsKey ← Lean.Vir.JsValue.ofString key
-  keyedComponentJs component jsProps jsKey
-
-/-- ProofWidgets-style alias for an exact reusable component value. -/
-def ofComponent
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) : ReactM (Lean.Vir.Js Node) :=
-  Node.component component props
-
-/-- ProofWidgets-style alias for a keyed exact component value. -/
-def keyedOfComponent
-    (key : @& String)
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) :
-    ReactM (Lean.Vir.Js Node) :=
-  Node.keyedComponent key component props
-
-/-- Creates an element from an exact component whose Lean props are `Unit`. -/
-def componentUnit
-    (component : @& Lean.Vir.Js (Component Unit)) : ReactM (Lean.Vir.Js Node) :=
-  Node.component component ()
 
 /-- Raw element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
 def elementWith
@@ -884,7 +734,8 @@ def elementWith
     ReactM (Lean.Vir.Js Node) := do
   let jsProps ← Props.fromEntries props
   let jsChildren ← Lean.Vir.Js.Array.ofArray children
-  createElementTag tag jsProps jsChildren
+  let elementType ← ElementType.tag (← Lean.Vir.JsValue.ofString tag)
+  createElement elementType jsProps jsChildren
 
 /-- Raw keyed element escape hatch. Prefer `Props.key` in React-shaped code. -/
 def keyedElementWith
@@ -1046,14 +897,14 @@ def textWith
     (build : TextBuilder)
     (props : Array Props.Entry)
     (value : String) : ReactM (Lean.Vir.Js Node) := do
-  let textNode ← text value
+  let textNode ← text (← Lean.Vir.JsValue.ofString value)
   build props #[textNode]
 
 def codeText (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
   textWith (fun props children => codeWith props children) props value
 
 def spanText (value : String) : ReactM (Lean.Vir.Js Node) := do
-  let textNode ← text value
+  let textNode ← text (← Lean.Vir.JsValue.ofString value)
   span #[textNode]
 
 def spanTextWith (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
@@ -1074,55 +925,5 @@ def buttonTextWith
   textWith (fun props children => buttonWith props children) props value
 
 end Node
-
-namespace Root
-
-/-- Builds a node in Lean, then passes that exact node to React DOM's `Root.render`. -/
-def render
-    (root : @& Lean.Vir.Js Root)
-    (tree : ReactM (Lean.Vir.Js Node)) : Lean.Vir.Browser.DomM Unit := do
-  let node ← ReactM.run tree
-  renderNode root node
-
-/--
-Creates a React root for the first element matching a CSS selector.
--/
-def createFromSelector (selector : String) : Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
-  | none => pure none
-  | some container => some <$> create container
-
-/--
-Creates a React root for a selector and runs an action when the selector exists.
-
-Returns `true` when a root was created and `false` when the selector did not match.
-This is a small convenience for exported browser demos.
--/
-def mountFromSelector
-    (selector : String)
-    (action : Lean.Vir.Js Root → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.Browser.DomM Bool := do
-  match ← createFromSelector selector with
-  | none => pure false
-  | some root =>
-      action root
-      pure true
-
-/--
-Renders an exact JavaScript React function component into a React root.
-
-Create the component once with `Component.ofLean` and reuse that value when
-React should preserve its component identity and hook state.
--/
-def renderComponent
-    (root : @& Lean.Vir.Js Root)
-    (component : @& Lean.Vir.Js (Component props))
-    (props : props) :
-    Lean.Vir.Browser.DomM Unit := do
-  let node ← ReactM.run (Node.component component props)
-  renderNode root node
-
-end Root
 
 end Lean.Vir.React

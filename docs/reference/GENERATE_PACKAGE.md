@@ -100,7 +100,7 @@ module. The map below groups shared policy separately from orchestration;
 | --- | --- |
 | Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. |
 | Names and dependency closure | [`LeanName`](../../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
-| Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. |
+| Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
 | Interface policy | [`Interface.Model`](../../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |
 | Classification and collection | [`Interface.Classify`](../../Vir/Interface/Classify) separates typed errors, helpers, type/layout classification and signature analysis. [`HostValidation`](../../Vir/HostValidation.lean) shares host signature/boundary policy between attributes and packaging. [`Interface.Collect`](../../Vir/GeneratePackage/Interface/Collect.lean) adds boxed-boundary, call-summary, duplicate and host-import collection checks. |
 | Encoding | [`PackageFormat`](../../Vir/GeneratePackage/PackageFormat.lean) owns format identities, versions and section kinds. [`PackageIRTags`](../../Vir/GeneratePackage/PackageIRTags.lean) owns Name/IR tags. [`Interface.Encode`](../../Vir/GeneratePackage/Interface/Encode.lean), [`Manifest.Encode`](../../Vir/GeneratePackage/Manifest/Encode.lean), [`Json`](../../Vir/GeneratePackage/Json.lean) and [`Emit`](../../Vir/GeneratePackage/Emit.lean) encode descriptors, metadata and package bytes. |
@@ -119,8 +119,11 @@ module. The map below groups shared policy separately from orchestration;
    ownership, acquiring newly reached owners until the closure is complete or
    no more IR is available. Explicit extern fallbacks supply an original-name
    adapter whose closure reaches the compiled reference body.
-4. `Interface.collectHostImports` repeats typed `Vir.HostValidation` for reached
-   imports, then checks package-only IR arity and slot limits.
+4. `Interface.collectHostImports` repeats typed `Vir.HostValidation` when the
+   declaration is visible. Private imports with hidden types use the signature
+   captured by the existing attribute, including in live snapshots without
+   filesystem acquisition. Raw externs without attribute data require visible
+   types. Target matching, IR arity and slot checks apply to every reached import.
 5. `Manifest.collectInterfaceManifest` shares marker preflight with attributes,
    classifies callable exports, includes host/index diagnostics, and rejects
    duplicate export ids and JavaScript names. Successful startup preflight
@@ -147,8 +150,10 @@ cache invalidation are documented in [Packages](../guides/PACKAGES.md#rebuilds-a
 binder/startup preflight with full type/layout classification. Attributes and
 package generation use the same typed path. Host-import attributes similarly
 run the complete signature classifier and JavaScript boundary policy.
-Packaging reruns these checks for explicit roots and raw marker/extern metadata,
-then adds boxed-boundary, IR arity, slot, duplicate and dependency checks.
+Packaging reruns typed checks where declarations are visible and uses captured
+attribute analysis for hidden private imports. It also validates explicit roots
+and raw marker/extern metadata, then adds boxed-boundary, IR arity, slot,
+duplicate and dependency checks.
 
 Classification tries the source type as written first, unfolding reducible
 abbreviation heads only when the outer shape is unsupported. This admits aliases

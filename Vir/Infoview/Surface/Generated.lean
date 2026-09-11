@@ -29,7 +29,7 @@ ABI profile `vir-infoview-protocol-v1`: receiver none; uri js-resource/borrowed/
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "infoview.documentPosition"]
-opaque documentPositionJs
+opaque documentPosition
     (uri : @& Lean.Vir.Js String)
     (fileName : @& Lean.Vir.Js String)
     (line : @& Lean.Vir.Js Nat)
@@ -53,7 +53,7 @@ ABI profile `vir-infoview-protocol-v1`: receiver none; text js-resource/borrowed
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "infoview.clipboard.writeText"]
-opaque writeTextJs
+opaque writeText
     (text : @& Lean.Vir.Js String) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
@@ -73,7 +73,7 @@ ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borr
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "infoview.command.revealPosition"]
-opaque revealPositionJs
+opaque revealPosition
     (position : @& Lean.Vir.Js Infoview.DocumentPosition) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
@@ -89,7 +89,7 @@ ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borr
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "infoview.command.insertText"]
-opaque insertTextJs
+opaque insertText
     (position : @& Lean.Vir.Js Infoview.DocumentPosition)
     (text : @& Lean.Vir.Js String) :
     Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)

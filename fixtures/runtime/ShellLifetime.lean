@@ -38,7 +38,7 @@ def continuation (stale : RuntimeRef Bool) (owner kind : String) (_ : Js.Any) : 
     record ("mutation:" ++ kind ++ ":" ++ owner)
 
 def schedule (owner : String) (_ : Js Event) : DomM Unit := do
-  let token ← Timer.setTimeout 60000 (record ("timer:" ++ owner))
+  let token ← Timer.setTimeout (record ("timer:" ++ owner)) (← JsValue.ofFloat 60000)
   Timer.clearTimeout token
   record ("scheduled:" ++ owner)
 
@@ -49,14 +49,17 @@ def createComponent : RuntimeM (Js (Component Lean.Vir.Infoview.Surface)) := do
     (← Js.Function.ofLeanVoid (continuation stale owner "failure"))
     (← EventListener.ofLean (schedule owner)) (← LeanRef.toJSL owner)
   Component.ofLean fun _ => do
-    Hooks.useLeanEffectWithArrayDeps
-      (do record ("setup:" ++ owner); JsValue.ofString owner)
-      (fun _ => do stale.set true; record ("cleanup:" ++ owner))
-      (#[] : Array (Js String))
+    let effect ← EffectCallback.ofLean {
+      setup := do record ("setup:" ++ owner); JsValue.ofString owner
+      cleanup := fun _ => do stale.set true; record ("cleanup:" ++ owner)
+    }
+    Hooks.useEffect effect (some (← Hooks.DependencyList.empty))
     Node.spanText owner
 
 def mount (root : Js Root) (component : Js (Component Lean.Vir.Infoview.Surface))
-    (surface : Lean.Vir.Infoview.Surface) : DomM Unit :=
-  Root.renderComponent root component surface
+    (surface : Lean.Vir.Infoview.Surface) : DomM Unit := do
+  let props ← Lean.Vir.LeanRef.toJSL surface
+  let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+  Lean.Vir.React.Root.render root node
 
 end Vir.Fixtures.ShellLifetime

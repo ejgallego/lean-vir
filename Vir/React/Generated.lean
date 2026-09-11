@@ -49,7 +49,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; render callback/owned/until-
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js_explicit_conversion "js.value.react.component"]
-opaque ofLeanJs
+opaque ofLean
     {props : Type}
     (render : Lean.Vir.JSL props → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component props))
@@ -70,7 +70,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; effect lean-owned/owned/unti
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js_explicit_conversion "js.value.react.effectCallback"]
-opaque ofLeanJs
+opaque ofLean
     {α : Type}
     (effect : Lean.Vir.React.LeanEffect α) :
     Lean.Vir.RuntimeM (Lean.Vir.Js Lean.Vir.React.EffectCallback)
@@ -91,7 +91,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; tag js-resource/borrowed/cal
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.elementType.tag"]
-opaque tagJs
+opaque tag
     (tag : @& Lean.Vir.Js String) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)
 
@@ -113,7 +113,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/c
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.useEffect"]
-opaque useEffectWithoutDeps
+private opaque useEffectWithoutDeps
     (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback) :
     Lean.Vir.React.ReactM Unit
 
@@ -247,7 +247,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/c
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.useEffectWithDeps"]
-opaque useEffectWithDeps
+private opaque useEffectWithDeps
     (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
     (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
     Lean.Vir.React.ReactM Unit
@@ -289,7 +289,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; value js-resource/borrowed/c
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.text"]
-opaque textJs
+opaque text
     (value : @& Lean.Vir.Js String) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
@@ -323,7 +323,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrow
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.component"]
-opaque componentJs
+opaque component
     {props : Type}
     (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
     (props : @& Lean.Vir.JSL props) :
@@ -341,7 +341,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrow
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.keyedComponent"]
-opaque keyedComponentJs
+opaque keyedComponent
     {props : Type}
     (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
     (props : @& Lean.Vir.JSL props)
@@ -360,7 +360,7 @@ ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/c
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.fragment"]
-opaque fragmentWithKeyJs
+opaque fragment
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
     (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
@@ -442,7 +442,7 @@ ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children js
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.root.renderNode"]
-opaque renderNode
+opaque render
     (root : @& Lean.Vir.Js Lean.Vir.React.Root)
     (children : @& Lean.Vir.Js Lean.Vir.React.Node) :
     Lean.Vir.Browser.DomM Unit

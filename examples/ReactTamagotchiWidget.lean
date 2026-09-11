@@ -36,13 +36,14 @@ def captionStyle : Props.Entry := style #[
 def View : Lean.Vir.RuntimeM (Lean.Vir.Js (Component Surface)) := do
   let petComponent ← ReactTamagotchi.View
   Component.ofLean fun surface => do
+    let surface ← Lean.Vir.LeanRef.fromJSL surface
     let caption ← Node.pTextWith
       #[
         Props.id "react-tamagotchi-widget-caption",
         captionStyle
       ]
       ("Shared React Tamagotchi component at " ++ surface.cursor.label)
-    let pet ← Node.component petComponent ()
+    let pet ← Node.component petComponent (← Lean.Vir.LeanRef.toJSL ())
     Node.sectionWith
       #[
         Props.id "react-tamagotchi-proof-widget",

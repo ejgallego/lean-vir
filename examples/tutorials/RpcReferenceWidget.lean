@@ -49,17 +49,18 @@ def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
 
 /-- A native React function component; constructing it once preserves hook identity. -/
 def View : RuntimeM (Js (React.Component (Js Reply))) := React.Component.ofLean fun reply => do
+  let reply ← LeanRef.fromJSL reply
   let count ← React.StateTuple.toState (← React.Hooks.useState (← JsValue.ofNat 0))
   let label ← JsValue.toString (← message reply)
   let n ← JsValue.toNat count.value
   React.Node.buttonWith #[React.Props.id "rpc-reference-view", React.Props.onClick do
     React.State.modify count fun previous => do
       JsValue.ofNat ((← JsValue.toNat previous) + 1)]
-    #[← React.Node.text s!"{label} / local {n}"]
+    #[← React.Node.text (← Lean.Vir.JsValue.ofString s!"{label} / local {n}")]
 
 /-- Build the native React element for a response kept in the parent React state. -/
 def render (component : Js (React.Component (Js Reply))) (reply : Js Reply) :
-    React.ReactM (Js React.Node) :=
-  React.Node.component component reply
+    React.ReactM (Js React.Node) := do
+  React.Node.component component (← LeanRef.toJSL reply)
 
 end RpcReferenceWidget

@@ -194,8 +194,8 @@ def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
 
 def withElement
     (selector : String) (f : Lean.Vir.Js Lean.Vir.Browser.Element → DomM Unit) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure ()
   | some element => f element
 
@@ -205,50 +205,58 @@ def setText (selector text : String) : DomM Unit := do
     Lean.Vir.Browser.Element.setTextContent element (← Lean.Vir.Js.Nullable.ofJs jsText)
 
 def getAttribute (selector name : String) : DomM (Option String) := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure none
-  | some element => Lean.Vir.Browser.Element.getAttributeString element name
+  | some element => do
+      let value ← Lean.Vir.Browser.Element.getAttribute element (← Lean.Vir.JsValue.ofString name)
+      (← Lean.Vir.Js.Nullable.toOption value).mapM fun value => do
+        Lean.Vir.JsValue.toString value
 
 def setAttribute (selector name value : String) : DomM Unit :=
-  withElement selector fun element =>
-    Lean.Vir.Browser.Element.setAttributeString element name value
+  withElement selector fun element => do
+    Lean.Vir.Browser.Element.setAttribute element
+      (← Lean.Vir.JsValue.ofString name) (← Lean.Vir.JsValue.ofString value)
 
 def getChecked (selector : String) : DomM Bool := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure false
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure false
-      | some input => Lean.Vir.Browser.HTMLInputElement.getCheckedBool input
+      | some input => Lean.Vir.JsValue.toBool (← Lean.Vir.Browser.HTMLInputElement.getChecked input)
 
 def setChecked (selector : String) (checked : Bool) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure ()
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ()
-      | some input => Lean.Vir.Browser.HTMLInputElement.setCheckedBool input checked
+      | some input => do
+          Lean.Vir.Browser.HTMLInputElement.setChecked input
+            (← Lean.Vir.JsValue.ofBool checked)
 
 def getValue (selector : String) : DomM String := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure ""
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ""
-      | some input => Lean.Vir.Browser.HTMLInputElement.getValueString input
+      | some input => Lean.Vir.JsValue.toString (← Lean.Vir.Browser.HTMLInputElement.getValue input)
 
 def setValue (selector value : String) : DomM Unit := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure ()
   | some element =>
       match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
       | none => pure ()
-      | some input => Lean.Vir.Browser.HTMLInputElement.setValueString input value
+      | some input => do
+          Lean.Vir.Browser.HTMLInputElement.setValue input
+            (← Lean.Vir.JsValue.ofString value)
 
 def render (state : PetState) (actionLabel : String) : DomM Unit := do
   let artwork := normalizeArtwork state.artwork
@@ -342,11 +350,12 @@ def uiRenameFromDom : DomM PetState := do
 def mountCallback
     (selector event : String)
     (callback : Lean.Vir.Js Lean.Vir.Browser.Event → DomM Unit) : DomM Nat := do
-  match ← Lean.Vir.Browser.Document.querySelectorString
-      (← Lean.Vir.Browser.Document.current) selector with
+  match ← Lean.Vir.Js.Nullable.toOption (← Lean.Vir.Browser.Document.querySelector
+      (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)) with
   | none => pure 0
   | some element =>
-      let _listener ← Lean.Vir.Browser.Element.addEventListener element event callback
+      Lean.Vir.Browser.Element.addEventListener element
+        (← Lean.Vir.JsValue.ofString event) (← Lean.Vir.Browser.EventListener.ofLean callback)
       pure 1
 
 def mountAction (action : Action) : DomM Nat :=
@@ -729,7 +738,7 @@ def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let eyeLeft ← pixelPart #["pet-eye", "pet-eye-left"] (eyeStyleFor state screen true)
   let eyeRight ← pixelPart #["pet-eye", "pet-eye-right"] (eyeStyleFor state screen false)
   let mouth ← pixelPart #["pet-mouth"] (mouthStyleFor state screen)
-  let signalText ← Node.text (signalText state.mood)
+  let signalText ← Node.text (← Lean.Vir.JsValue.ofString (signalText state.mood))
   let signal ←
     Node.spanWith
       #[
@@ -802,7 +811,7 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let artwork := Tamagotchi.normalizeArtwork state.artwork
   let moodLabel := state.mood.label
   let pet ← pixelPet state
-  let screenLabelText ← Node.text (displayName state ++ " / " ++ moodLabel)
+  let screenLabelText ← Node.text (← Lean.Vir.JsValue.ofString (displayName state ++ " / " ++ moodLabel))
   let screenLabel ← Node.spanWith #[] #[screenLabelText]
   let screen ← Node.divWith #[Props.classList #["pet-screen"], screenStyle state] #[pet, screenLabel]
   let leftButton ← emptySpanWith #["pet-device-button", "pet-device-button-left"] #[deviceButtonStyle (some "30px") none]
@@ -910,13 +919,16 @@ def tick (hook : ViewReducerState) : DomM Unit :=
 
 def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
   let deps ← Hooks.DependencyList.empty
-  Hooks.useLeanEffect
-    (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
-    (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
-    (some deps)
+  let effect ← EffectCallback.ofLean {
+    setup := do
+      Lean.Vir.Browser.Timer.setInterval (tick hook)
+        (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat liveTickMs.toNat).toFloat)
+    cleanup := fun interval => Lean.Vir.Browser.Timer.clearInterval interval
+  }
+  Hooks.useEffect effect (some deps)
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
-  let text ← Node.text widgetCss
+  let text ← Node.text (← Lean.Vir.JsValue.ofString widgetCss)
   Node.elementWith "style" #[] #[text]
 
 def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
@@ -941,7 +953,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
         progressStyle
       ]
       #[fill]
-  let counterText ← Node.text (progressLabel secondsLeft)
+  let counterText ← Node.text (← Lean.Vir.JsValue.ofString (progressLabel secondsLeft))
   let counter ←
     Node.spanWith
       #[
@@ -964,7 +976,7 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
   let state := normalizeViewState view.state
   useLiveTick hook
   let actionButton := fun action => do
-    let text ← Node.text action.label
+    let text ← Node.text (← Lean.Vir.JsValue.ofString action.label)
     Node.keyedButtonWith
       action.label
       #[
@@ -983,11 +995,14 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
         Props.type "checkbox",
         Props.checked (state.artwork == "octopus"),
         Props.onChange fun event => do
-          match ← Lean.Vir.Browser.Event.inputChecked? event with
+          match ← Lean.Vir.Browser.Event.inputElement? event with
           | none => pure ()
-          | some checked => dispatchViewAction hook (.artwork checked)
+          | some input => do
+              let checked ← Lean.Vir.JsValue.toBool
+                (← Lean.Vir.Browser.HTMLInputElement.getChecked input)
+              dispatchViewAction hook (.artwork checked)
       ]
-  let artText ← Node.text "Octopus"
+  let artText ← Node.text (← Lean.Vir.JsValue.ofString "Octopus")
   let artSpan ← Node.spanWith #[] #[artText]
   let artLabel ←
     Node.labelWith
@@ -1005,7 +1020,7 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
       ]
       #[artInput, artSpan]
   let deviceNode ← device state
-  let moodText ← Node.text state.mood.label
+  let moodText ← Node.text (← Lean.Vir.JsValue.ofString state.mood.label)
   let moodValueNode ←
     Node.spanWith
       #[
@@ -1028,7 +1043,7 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
     Node.divWith
       #[Props.classList #["action-grid", "react-pet-actions"], actionGridStyle]
       actionButtons
-  let resetText ← Node.text "Reset"
+  let resetText ← Node.text (← Lean.Vir.JsValue.ofString "Reset")
   let reset ←
     Node.buttonWith
       #[
@@ -1066,8 +1081,16 @@ def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
 
 def mount (selector : String) : DomM Bool := do
   let component ← View
-  Root.mountFromSelector selector fun root =>
-    Root.renderComponent root component ()
+  let container ← Lean.Vir.Browser.Document.querySelector
+    (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
+  match ← Lean.Vir.Js.Nullable.toOption container with
+  | none => pure false
+  | some container => do
+      let root ← Lean.Vir.React.Root.create container
+      let props ← Lean.Vir.LeanRef.toJSL ()
+      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      Lean.Vir.React.Root.render root node
+      pure true
 
 def mountDefault : DomM Bool :=
   mount "#react-pet-root"

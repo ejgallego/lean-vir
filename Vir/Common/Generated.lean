@@ -28,7 +28,7 @@ ABI profile `vir-common-protocol-v1`: receiver none; value js-resource/borrowed/
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "common.echoString"]
-opaque echoStringJs
+opaque echoString
     (value : @& Lean.Vir.Js String) :
     Lean.Vir.RuntimeM (Lean.Vir.Js String)
 
@@ -44,7 +44,7 @@ ABI profile `vir-common-protocol-v1`: receiver none; lhs js-resource/borrowed/ca
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "common.addNat"]
-opaque addNatJs
+opaque addNat
     (lhs : @& Lean.Vir.Js Nat)
     (rhs : @& Lean.Vir.Js Nat) :
     Lean.Vir.RuntimeM (Lean.Vir.Js Nat)

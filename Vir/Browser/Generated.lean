@@ -104,7 +104,7 @@ ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/un
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.animation.requestAnimationFrame"]
-opaque requestAnimationFrameJs
+opaque requestAnimationFrame
     (callback : Lean.Vir.Js Float → DomM Unit) :
     DomM (Lean.Vir.Js AnimationFrame)
 
@@ -126,7 +126,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.arc"]
-opaque arcJs
+opaque arc
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float)
@@ -163,7 +163,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.clearRect"]
-opaque clearRectJs
+opaque clearRect
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float)
@@ -217,7 +217,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.fillRect"]
-opaque fillRectJs
+opaque fillRect
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float)
@@ -257,7 +257,7 @@ ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-r
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.setFillStyleValue"]
-opaque setFillStyleValue
+opaque setFillStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (style : @& Lean.Vir.Js CanvasStyle) :
     DomM Unit
@@ -274,7 +274,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.lineTo"]
-opaque lineToJs
+opaque lineTo
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float) :
@@ -308,7 +308,7 @@ ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; width js-r
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.setLineWidth"]
-opaque setLineWidthJs
+opaque setLineWidth
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (width : @& Lean.Vir.Js Float) :
     DomM Unit
@@ -342,7 +342,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.moveTo"]
-opaque moveToJs
+opaque moveTo
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float) :
@@ -376,7 +376,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.rotate"]
-opaque rotateJs
+opaque rotate
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (angle : @& Lean.Vir.Js Float) :
     DomM Unit
@@ -427,7 +427,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.strokeRect"]
-opaque strokeRectJs
+opaque strokeRect
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float)
@@ -467,7 +467,7 @@ ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-r
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.setStrokeStyleValue"]
-opaque setStrokeStyleValue
+opaque setStrokeStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (style : @& Lean.Vir.Js CanvasStyle) :
     DomM Unit
@@ -484,7 +484,7 @@ ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borr
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.canvas2d.translate"]
-opaque translateJs
+opaque translate
     (canvasRenderingContext2D : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x : @& Lean.Vir.Js Float)
     (y : @& Lean.Vir.Js Float) :
@@ -530,7 +530,7 @@ ABI profile `browser-dom-faithful-v1`: console js-resource/borrowed/call; messag
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.console.log"]
-opaque logJs
+opaque log
     (console : @& Lean.Vir.Js Console)
     (message : @& Lean.Vir.Js String) :
     Lean.Vir.RuntimeM Unit
@@ -776,7 +776,7 @@ ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.element.addEventListener"]
-opaque addEventListenerJs
+opaque addEventListener
     (element : @& Lean.Vir.Js Element)
     (event : @& Lean.Vir.Js String)
     (listener : @& Lean.Vir.Js EventListener) :
@@ -968,7 +968,7 @@ ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.element.removeEventListener"]
-opaque removeEventListenerJs
+opaque removeEventListener
     (element : @& Lean.Vir.Js Element)
     (event : @& Lean.Vir.Js String)
     (listener : @& Lean.Vir.Js EventListener) :
@@ -1248,7 +1248,7 @@ ABI profile `browser-dom-faithful-v1`: canvas js-resource/borrowed/call; result 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "browser.htmlCanvasElement.getContext2D"]
-opaque getContext2DNullable
+opaque getContext2D
     (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
     DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
 
@@ -1584,7 +1584,7 @@ ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/un
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setTimeout"]
-opaque setTimeoutJs
+opaque setTimeout
     (callback : DomM Unit)
     (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Timeout)
@@ -1601,7 +1601,7 @@ ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/un
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "browser.timer.setInterval"]
-opaque setIntervalJs
+opaque setInterval
     (callback : DomM Unit)
     (delayMs : @& Lean.Vir.Js Float) :
     DomM (Lean.Vir.Js Interval)

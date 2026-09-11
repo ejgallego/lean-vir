@@ -102,14 +102,13 @@ assert.deepEqual(
 const publicCanvasContext = publicEntries.get(
   "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
 );
-assert.match(publicCanvasContext?.type ?? "", /DomM \(Option \(Lean\.Vir\.Js/u);
+assert.match(publicCanvasContext?.type ?? "", /DomM \(Lean\.Vir\.Js\.Nullable/u);
 assert.deepEqual(
   publicCanvasContext?.targets.find(
     (entry) => entry.target === "browser.htmlCanvasElement.getContext2D",
   )?.path,
   [
     "Lean.Vir.Browser.HTMLCanvasElement.getContext2D",
-    "Lean.Vir.Browser.HTMLCanvasElement.getContext2DNullable",
   ],
 );
 

@@ -69,7 +69,7 @@ lean_lib VirInfoviewFixtures where
 lean_lib VirRuntimeFixtures where
   srcDir := "fixtures/runtime"
   roots := #[`ShellLifetime, `InfoviewRpcPromise, `JsNatNumber,
-    `CollectionTypeFidelity, `ObjectTypeFidelity, `PromiseTypeFidelity]
+    `CollectionTypeFidelity, `ObjectTypeFidelity, `PromiseTypeFidelity, `BindingApi]
 
 /-- Standalone descriptor-forcing fixture, not a shipped binding authority. -/
 lean_lib VirTypeAnchorFixtures where

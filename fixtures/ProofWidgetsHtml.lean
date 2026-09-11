@@ -64,8 +64,16 @@ def View : RuntimeM (Component Unit) := do
 
 def mount (selector : String) : DomM Bool := do
   let component ← View
-  Lean.Vir.React.Root.mountFromSelector selector fun root =>
-    Lean.Vir.React.Root.renderComponent root component (componentProps ())
+  let container ← Lean.Vir.Browser.Document.querySelector
+    (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
+  match ← Lean.Vir.Js.Nullable.toOption container with
+  | none => pure false
+  | some container => do
+      let root ← Lean.Vir.React.Root.create container
+      let props ← Lean.Vir.LeanRef.toJSL (componentProps ())
+      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      Lean.Vir.React.Root.render root node
+      pure true
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-html-root"

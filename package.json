@@ -32,7 +32,7 @@
     "generate:bindings": "npm run check:lean-bindings && npm run generate:shipped-bindings && npm run generate:binding-explorer",
     "check:bindings": "npm run generate:bindings && npm run test:bindings:unit && npm run test:bindings:lean && npm run test:shipped-bindings && npm run test:binding-explorer",
     "test:bindings:unit": "node --test tests/bindings/*.test.mjs",
-    "test:bindings:lean": "lake build +CollectionTypeFidelity +ObjectTypeFidelity +PromiseTypeFidelity",
+    "test:bindings:lean": "lake build +CollectionTypeFidelity +ObjectTypeFidelity +PromiseTypeFidelity +BindingApi",
     "generate:type-descriptors": "node scripts/bindings/generate-ts-descriptors.mjs --anchors fixtures/type-anchors/vir-v1.anchors.json --out build/type-descriptors/vir-v1.json fixtures/type-anchors/vir-v1.types.d.ts",
     "generate:lean-type-anchor-manifest": "node scripts/bindings/generate-lean-type-anchor-manifest.mjs --module TypeAnchorFixture --roots fixtures/type-anchors/vir-v1.roots.txt --aliases fixtures/type-anchors/vir-v1.aliases.json --package build/type-descriptors/vir-v1.irpkg --report build/type-descriptors/vir-v1.package.report.md --out build/type-descriptors/vir-v1.manifest.json",
     "compare:type-anchors": "node scripts/bindings/check-type-anchors.mjs --fail-on-errors --descriptors build/type-descriptors/vir-v1.json --manifest build/type-descriptors/vir-v1.manifest.json --out build/type-descriptors/vir-v1.report.json",

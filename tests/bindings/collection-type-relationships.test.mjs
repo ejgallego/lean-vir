@@ -35,10 +35,10 @@ const operation = (policy, target) => policy.protocolOperations.find((entry) => 
 test("pinned Array<T> produces correlated Lean array signatures", async () => {
   const text = render();
   assert.match(text, /opaque push\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(value : @& Lean\.Vir\.Js α\)/u);
-  assert.match(text, /opaque getJs\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(index : @& Lean\.Vir\.Js Float\) :\s+RuntimeM \(Lean\.Vir\.Js α\)/u);
+  assert.match(text, /opaque get\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(index : @& Lean\.Vir\.Js Float\) :\s+RuntimeM \(Lean\.Vir\.Js α\)/u);
   assert.doesNotMatch(text, /getAs/u);
   const shipped = await readFile(new URL("../../Vir/Js/Generated.lean", import.meta.url), "utf8");
-  for (const name of ["push", "getJs"]) {
+  for (const name of ["push", "get"]) {
     const declaration = text.match(new RegExp(`opaque ${name}[^]*?RuntimeM \\(Lean\\.Vir\\.Js (?:Float|α)\\)`))[0];
     assert.ok(shipped.includes(declaration), `${name}: shipped Lean signature must be the validated translation`);
   }

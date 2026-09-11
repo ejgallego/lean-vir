@@ -69,6 +69,7 @@ def bindingJson (binding : Binding) : CoreM String := do
   let source ← declarationSourceJson binding.name
   return jsonObject #[
     ("declaration", jsonName binding.name),
+    ("userName", jsonName (privateToUserName binding.name)),
     ("module", jsonName binding.moduleName),
     ("private", jsonBool (isPrivateName binding.name)),
     ("marker", jsonString (markerLabel binding.metadata.marker)),

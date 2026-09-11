@@ -64,7 +64,7 @@ remain caller-managed; ordinary JS object graphs use JavaScript reachability.
 The browser binding uses official React 19 and ReactDOM with exact JavaScript
 values. React owns hook state and scheduling; component purity, hook ordering
 and effect discipline remain application responsibilities. The [React guide](guides/REACT.md)
-describes native calls and the separate Lean conveniences.
+describes native calls, explicit conversions and optional Lean builders.
 
 The Node wrapper provides no DOM or React implementation. Browser semantics
 are tested in Chromium.
@@ -80,8 +80,8 @@ Normal infoview UI cleanup is not interpreter disposal; see the
    result.
 4. If it creates an active registration, connect termination to
    `HostLifecycle` and result-publication rollback.
-5. If it is intentionally more convenient than the JavaScript API, expose the
-   convenience under a separate adapter name.
+5. Keep conversion explicit at the call site. Faithful bindings own the short
+   operation names; do not add parallel call-and-convert wrappers.
 6. Update package-generation and runtime tests. Use Chromium for DOM/React
    semantics.
 
