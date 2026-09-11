@@ -1,13 +1,53 @@
-# Native RPC in ProofWidgets
+# Infoview widgets and RPC
 
 VIR aims to let Lean-authored browser components use the same React values,
 infoview contexts and libraries as TypeScript-authored ProofWidgets components.
 RPC is one dependency a widget may use, not a separate widget execution model.
 
-Start with the [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md) for
-an executable client and `@[server_rpc_method]` example. This guide owns the RPC
-boundary; [HOST_BINDINGS.md](HOST_BINDINGS.md) owns foreign-value lifetime and
+Use [React](REACT.md) for component authoring and the
+[RPC tutorial](../examples/tutorials/RpcReferenceWidget.md) for an executable
+client and `@[server_rpc_method]` example. This guide owns editor integration;
+[HOST_BINDINGS.md](HOST_BINDINGS.md) owns foreign-value lifetime and
 [HARNESS.md](HARNESS.md#infoview-rpc-and-lifetime-checks) owns validation commands.
+
+## Widget activation
+
+Import `Vir.Infoview`. The [hello widget](../examples/tutorials/ReactProofWidgetHello.lean)
+supplies a `RuntimeM (Js (React.Component Surface))` factory and uses
+`vir_proof_widget View` inside its namespace. The command generates `widgetSpec`,
+`createComponent`, `mount`, `irPackage` and `widgetProps`; `show_panel_widgets`
+activates the bundled `Lean.Vir.Infoview.widget` with those props. This path needs
+no application-authored JavaScript file.
+
+For manual assembly, [ReactWidget](../Vir/Infoview/Widget.lean) supplies the
+package roots and props. The component entry returns
+`RuntimeM (Js (React.Component Surface))`; the mount entry has type:
+
+```lean
+Js React.Root → Js (React.Component Surface) → Surface → DomM Unit
+```
+
+`WidgetProps` identifies the Wasm asset, `IRPackage`, component and mount entries.
+The default shell creates a private runtime/binding factory and one component
+function per loaded service. Cursor/surface updates reuse that function and its
+React root; configuration or package revision changes replace the service.
+The [cleanup contract](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
+distinguishes normal UI release from hard disposal and failed setup.
+
+Packages use the authoritative active Lean module snapshot, including unsaved
+widget code. Revision checks cover its declaration closure and local source
+ranges; imported changes become visible when the snapshot contains them. See
+[module inputs](GENERATE_PACKAGE.md) for acquisition and visibility rules.
+`autoReloadMs` controls stat/revision polling: zero disables it, `ReactWidget`
+defaults to 1000 ms, and manually constructed `WidgetProps` defaults to zero.
+Cursor movement alone does not request package replacement.
+
+Build the optional widget module with `lake build VirInfoview`; see
+[setup](HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen
+an already-open example after rebuilding that module. The shell bundle leaves
+`react`, `react-dom` and `@leanprover/infoview` external to reuse the infoview's
+dependencies. Its container stops propagation of click, context-menu,
+mouse-down and pointer-down events to the outer panel.
 
 ## Sessions and calls
 
@@ -107,8 +147,8 @@ VIR's similarly named `Lean.Vir.ProofWidgets.Html` is a native
 `ReactM (Js React.Node)` action, not that wire datatype. For upstream wire
 compatibility, pass the existing upstream value to upstream `HtmlDisplay`;
 a Lean port must preserve its format and reuse its module-loading dependencies.
-The [porting plan](PROOFWIDGETS_PORTING.md#planned-component-parity) tracks
-`HtmlDisplay`, `InteractiveExpr` and the other component targets.
+The [component coverage](#component-coverage-and-gaps) below distinguishes
+interoperability from a Lean implementation of the same component.
 
 ## Current authoring coverage
 
@@ -121,6 +161,34 @@ The real-server shell test separately exercises Lean continuations after UI
 cleanup and hard disposal. Neither test proves GC timing or arbitrary response
 schemas. The [harness guide](HARNESS.md#infoview-rpc-and-lifetime-checks) distinguishes
 these tests from standalone lifetime and upstream async-hook probes.
+
+### Component coverage and gaps
+
+Upstream `Component Props` names a React export in a widget module; its props
+cross through `RpcEncodable`. Lean-authored ports should preserve that model
+and reuse upstream dependencies, not recreate an editor renderer. The static
+HTML/JSX fixtures and VIR goals/hypotheses panel establish native authoring;
+they do not establish completed ports of these upstream components:
+
+| Target | Behavior still to validate in a Lean-authored port |
+| --- | --- |
+| `InteractiveExpr` | Genuine elaborator-owned `ExprWithCtx`, tagged pretty-printing RPC and upstream `InteractiveCode`; a string goal snapshot is insufficient. |
+| `HtmlDisplay` | The existing serialized Html format, component exports, props/children and upstream module resolution. Using upstream HtmlDisplay directly is interoperability, not a completed Lean port. |
+| `MakeEditLink` | The supplied editor edit/selection and native child/event behavior. |
+| `GoalTypePanel` / `SelectionPanel` | Panel props, position, goal locations and selected-expression behavior. |
+| `FilterDetails` / `Maximizable` / `InteractiveSvg` | Stateful filtering/layout, SVG events and server updates. |
+
+Useful upstream exercises are `Demos/Jsx.lean` for basic authoring,
+`LazyComputation.lean` for RPC references/actions, and `Plot.lean` for an
+external Recharts-style component with array data and props. External imports
+need module-specifier and named/default-export support through the host's
+loading environment, without bundling a second React. The existing external
+component smoke is not full library or infoview-context acceptance.
+
+Shared server/client schemas and identity-preserving field access remain an
+authoring question; follow the [response contract](#server-references-and-response-types).
+Raw binary transport instead of base64 RPC is a separate host-capability
+question, not a promised feature or a change in widget semantics.
 
 ### Pinned upstream hook limitations
 

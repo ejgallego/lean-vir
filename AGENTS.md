@@ -107,6 +107,6 @@ asks for that machinery.
 - `docs/HARNESS.md`: setup, generated artifacts, and validation command map.
 - `docs/MAILBOX_PROTOCOL.md`: local inter-agent coordination and worktree
   ownership protocol.
-- `docs/LOCAL_IRPKG.md`: local `.irpkg` package workflow.
+- `docs/PACKAGES.md`: local `.irpkg` package workflow.
 - `docs/CALL_LEAN_FROM_JS.md` and `docs/JS_API.md`: JavaScript runtime usage.
 - `docs/UPSTREAM_BOUNDARY.md`: current upstream interpreter boundary details.

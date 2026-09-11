@@ -46,7 +46,7 @@ enforce React purity or hook ordering.
 Repository package commands build the core library automatically.
 The optional infoview integration requires `lake build VirInfoview` and the
 repository npm dependencies because it generates a JavaScript bundle. For a
-downstream project, follow [Lake integration](LAKE_INTEGRATION.md).
+downstream project, follow [Lake integration](PACKAGES.md).
 
 ## JavaScript Values And Collections
 
@@ -139,7 +139,7 @@ Lean boundary views, such as `Js α` and `Unit`.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed
-use. See the [RPC and Promise guide](PROOFWIDGETS_RPC_COMPATIBILITY.md) for
+use. See the [RPC and Promise guide](INFOVIEW.md) for
 continuations, cancellation and exact server-reference graphs.
 
 ## Packages And Host Imports
@@ -147,18 +147,17 @@ continuations, cancellation and exact server-reference graphs.
 `@[vir_export]` selects a declaration for JavaScript calls;
 `@[vir_startup]` selects an exported zero-argument, `Unit`-returning
 startup hook. Import `Vir.Attributes` directly or through `Vir`.
-[Lake integration](LAKE_INTEGRATION.md#mark-the-browser-surface) owns marker
-validation, visibility, dependency checks and invocation.
-[Local packages](LOCAL_IRPKG.md) covers compiled-module registration,
-generation and loading; [module inputs](MODULE_INPUTS.md) explains live snapshots.
+[Packages](PACKAGES.md) covers registration, marker validation, visibility,
+generation and loading; [module inputs](GENERATE_PACKAGE.md#input-contract)
+explains compiled and live snapshots.
 
 `Vir.ExternFallback` provides `vir_extern_fallback` for explicitly packaging
 a transparent extern's Lean reference body without changing native compilation.
-Use the [fallback workflow](LAKE_INTEGRATION.md#opt-into-a-lean-extern-reference-body)
+Use the [fallback workflow](PACKAGES.md#use-a-lean-extern-reference-body)
 for its restrictions and ownership rules.
 
 Exported Lean functions may use the supported
-[structural interface types](INTERFACE_PIPELINE.md#interface-value-codec-surface).
+[structural interface types](IRPKG_FORMAT.md#interface-descriptors).
 Ordinary `@[vir_js "target.name"]` host imports have a narrower boundary:
 `Unit`, exact `Js`/nullable values, and top-level Lean callback arguments
 whose own arguments and result are `Unit` or JS values. Nested callbacks
@@ -195,12 +194,12 @@ VIR does not abort the controller. Applications also remove native DOM listeners
 using their exact receiver, event name and function identity; see
 [active-resource ownership](HOST_BINDINGS.md#active-resources).
 
-The [React guide](REACT_NODE.md) owns nodes, roots, component identity and hooks;
+The [React guide](REACT.md) owns nodes, roots, component identity and hooks;
 [ReactCounter](../examples/tutorials/ReactCounter.lean) is the small executable
 introduction. React providers require the real browser host. The Node wrapper
 provides environment-neutral JavaScript-value and console operations only.
 
-For `Vir.Infoview`, follow [Infoview widgets](REACT_NODE.md#infoview-widgets)
+For `Vir.Infoview`, follow [Infoview widgets](INFOVIEW.md#widget-activation)
 for activation and the [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md)
 for server calls. Its clipboard and editor-command helpers expose local
 synchronous capabilities with Lean `Bool` results. In particular,

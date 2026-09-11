@@ -34,7 +34,7 @@ maintainer requests a tracked fixture or report change.
 | Release Wasm and its debug companion | `npm run build:demo:release` strips the release file; the debug companion remains optimized and unstripped. SDK/local archives and SDK import smokes need both. |
 | `web/dist/`, including SDK/local archives and analysis pages | `npm run build:site`; required before `test:pages:browser`. |
 | Infoview JavaScript bundle under `build/generated/` | `lake build VirInfoview` requires npm dependencies. The default `Vir` library needs no npm bundle. |
-| Local `.irpkg` and reports | Follow [local packages](LOCAL_IRPKG.md) or [package configuration](INTERFACE_PIPELINE.md). |
+| Local `.irpkg` and reports | Follow [local packages](PACKAGES.md#generate-a-local-package) or [package configuration](PACKAGES.md#configure-package-generation). |
 
 Other ignored outputs include object caches and reports under `build/`, package
 `.input.json` / `.report.md` files and `downloads/` under `web/public/`, the
@@ -44,7 +44,7 @@ compiling the shim; Lean codec constants remain ordinary source.
 
 For failures, inspect `build/upstream-probe/boundary.md`, its `link.map` and
 generated native wrappers, the relevant `build/generated/*.report.md`, or
-`build/fixtures/summary.json`. [Fixture coverage](FIXTURE_COVERAGE.md) explains
+`build/fixtures/summary.json`. [Fixture coverage](EXAMPLES_AND_FIXTURES.md) explains
 the summary fields. Binding and surface reports live under `build/bindings/`,
 `build/type-descriptors/` and `build/vir-surface/`.
 
@@ -138,7 +138,7 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 
 The no-build fixture path still builds the selected Lean modules and
 `vir_irpkg`, then compares compiled host-driver and Wasm results. It skips only
-the demo/Wasm build. [Fixture coverage](FIXTURE_COVERAGE.md) documents worker
+the demo/Wasm build. [Fixture coverage](EXAMPLES_AND_FIXTURES.md) documents worker
 limits and oracle expectations.
 
 Select runtime smokes by id/path substring or group:
@@ -239,7 +239,7 @@ CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs
 
 This manual characterization runs published infoview hooks unchanged with React
 in Chromium; it needs npm dependencies, but no Lean or Wasm. It is separate from
-the server gate. The [RPC guide](PROOFWIDGETS_RPC_COMPATIBILITY.md#pinned-upstream-hook-limitations)
+the server gate. The [RPC guide](INFOVIEW.md#pinned-upstream-hook-limitations)
 records the pinned-version findings and their implications for hook adoption.
 
 ## CI Shape
@@ -265,4 +265,4 @@ archive to the matching release. Create the tag from the final merged commit
 so its manifest identifies the revision clients use. Before the tag exists,
 select `VIR_SDK_ARCHIVE` or the exact-commit artifact path; the zero-argument
 `:virSdk` facet targets the tagged release. See
-[SDK installation](LAKE_INTEGRATION.md#install-the-browser-sdk).
+[SDK installation](PACKAGES.md#install-the-browser-sdk).

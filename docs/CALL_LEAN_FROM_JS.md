@@ -325,11 +325,11 @@ If the Lean function needs to call back into JavaScript, mark an opaque Lean
 declaration with `@[vir_js "..."]` and pass a matching `hostBindings` function
 when creating the runtime.
 
-Lean:
+In `examples/MyApp.lean`, add `public import Vir.Js` immediately after `module`.
+Insert these declarations inside the existing `namespace MyApp`, before
+`end MyApp` (and still within its `public section`):
 
 ```lean
-import Vir.Js
-
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
@@ -337,6 +337,13 @@ def bumpViaJavaScript (n : Nat) : Lean.Vir.RuntimeM Nat := do
   let input ← Lean.Vir.JsValue.ofNat n
   let output ← jsBumpNat input
   Lean.Vir.JsValue.toNat output
+```
+
+Regenerate the package with the new function explicitly included among its
+exports; the earlier root list does not select it automatically:
+
+```bash
+npm run generate:irpkg -- MyApp web/public/my-app.irpkg MyApp.total MyApp.greeting MyApp.classify MyApp.validateName MyApp.bumpViaJavaScript
 ```
 
 JavaScript:

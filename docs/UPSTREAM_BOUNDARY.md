@@ -102,8 +102,8 @@ The provider returns `Option Decl` in Lean's actual constructor layout:
   remain explicit package-generation errors.
 
 [IRPKG_FORMAT.md](IRPKG_FORMAT.md) owns the wire tags and layouts.
-[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) and [MODULE_INPUTS.md](MODULE_INPUTS.md)
-own closure extraction and compiled/live module inputs. The browser reconstructs
+[GENERATE_PACKAGE.md](GENERATE_PACKAGE.md) owns closure extraction and
+compiled/live module inputs. The browser reconstructs
 selected declarations from packages; it does not load raw Lean module artifacts
 or construct a normal compiler `Environment`.
 
@@ -244,11 +244,11 @@ retain them under the host contract's reachability rules.
 | Environment queries | Sorry-dependency and export-name lookup return `none`. Initializer-name queries are instead package-backed and aligned with the table run through `lean_run_init`. |
 | Local IO/reference providers | `IO.initializing` is scoped true during package initializer execution and restored afterward. ST references implement single-threaded allocation, get, set and take. Stderr/error-printing helpers are no-ops. |
 | Native exceptions | Unsupported C++ exception throwing and assertion-violation paths trap; they do not provide ordinary native exception recovery. |
-| Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](FIXTURE_COVERAGE.md#known-pretty-printer-boundary). |
+| Expression pretty printing | The fixture supports `Std.Format.pretty`. `Lean.PrettyPrinter.ppExpr` additionally needs Meta/Environment tasks/promises and parenthesizer/formatter support; see [the existing boundary analysis](EXAMPLES_AND_FIXTURES.md#known-pretty-printer-boundary). |
 
-Use the resolved native catalog and [fixture coverage](FIXTURE_COVERAGE.md) for
+Use the resolved native catalog and [fixture coverage](EXAMPLES_AND_FIXTURES.md) for
 the supported surface, not an inferred promise of full Lean runtime support.
-[REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md) owns prospective Wasm interfaces;
+[OBJECT_ABI.md](OBJECT_ABI.md#future-wasm-features) owns prospective Wasm interfaces;
 native Promises already cross synchronously as exact JS values without
 suspending the interpreter.
 

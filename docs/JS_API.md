@@ -604,49 +604,18 @@ runtime layouts. The hosted `/dev.html` runner is therefore a convenience tool
 for trusted packages, not a hardened service for arbitrary third-party
 packages.
 
-Before treating `.irpkg` files as untrusted user content, the runtime should
-move ABI lookup into the package provider, validate layouts in the WASM shim,
-add package size and descriptor-depth limits, and run calls in a recoverable
-worker context.
+Package-provider lookup and ordered binary/manifest export and host-import
+checks already run at loading. They check metadata agreement, not whether
+declared types and layouts describe the actual Lean objects. Supporting
+untrusted input still requires layout validation, package-size and
+descriptor-depth limits, and a recoverable execution context.
 
 ## Generate A Local Package
 
-Generate a package from one Lake-registered Lean module and one or more root declarations:
-
-```bash
-npm run generate:irpkg -- MergeSort build/generated/local.irpkg SortDemo.demo
-```
-
-Omit roots to auto-discover public definitions owned by that module:
-
-```bash
-npm run generate:irpkg -- Fib build/generated/fib.irpkg
-```
-
-The command prints the package path, report path, package format, toolchain,
-declaration count, interface export count, JavaScript host import count, and
-target roots. The same summary is embedded in the manifest metadata so
-JavaScript and `/dev.html` can show exactly what was loaded.
-
-Inspect the embedded manifest without loading the browser:
-
-```bash
-npm run inspect:irpkg -- build/generated/fib.irpkg
-```
-
-The inspector also prints the package section directory so the binary envelope,
-manifest, and loader-visible payloads can be reviewed together.
-
-Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
-`/dev.html` while iterating locally. The runtime only needs URLs or bytes for
-the two assets:
-
-```js
-const vir = await createVirRuntime({
-  wasmUrl: "/vir-upstream.wasm",
-  irPackageSet: [await fetchBytes("/my-package.irpkg")],
-});
-```
+Follow [Packages](PACKAGES.md#generate-a-local-package) for module registration,
+root selection, configuration, inspection and the development runner. Supply
+the resulting bytes or descriptor URL through `irPackageSet`, as described in
+[Module Package Sets](#module-package-sets).
 
 ## Current Limits
 

@@ -9,7 +9,7 @@ This two-file tutorial separates application effects from the Lean renderer:
 
 This example is not yet an all-Lean async widget: its pending continuations are
 native JavaScript functions and cannot reenter a disposed Lean runtime. See the
-[RPC guide](../../docs/PROOFWIDGETS_RPC_COMPATIBILITY.md) for the direct Promise
+[RPC guide](../../docs/INFOVIEW.md) for the direct Promise
 API and the distinction between cancellation, stale results and disposal.
 
 The executable server example is [RpcBrowserServer.lean](../../fixtures/infoview/RpcBrowserServer.lean).

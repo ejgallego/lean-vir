@@ -1,10 +1,10 @@
 # Lean Object ABI
 
-This note records the JavaScript-driven construction and inspection path for
+This guide describes the JavaScript-driven construction and inspection path for
 Lean runtime objects.
 
-The object ABI is now the JavaScript runtime call surface for package
-entrypoints, host imports, callbacks, and resources. Interface descriptors now
+The object ABI is the JavaScript runtime call surface for package
+entrypoints, host imports, callbacks, and resources. Interface descriptors
 remain in the embedded JSON manifest and JavaScript runtime helpers; the C++
 package call path consumes only direct summary metadata, not descriptor bytes.
 
@@ -27,6 +27,19 @@ The object ABI does not change the public Lean signature policy. It is the
 runtime implementation path for the plain-value lane: JavaScript constructs
 Lean objects directly for supported manifest value types. `Lean.Vir.Js α`
 remains the explicit resource lane for host-owned objects.
+
+### Externref and foreign values
+
+The [externref table](HOST_BINDINGS.md#interpreter-transport) roots the exact
+JavaScript payload; a Lean external object stores only its private root ID.
+Reference types remove serialization for these values, but do not construct
+ordinary Lean structures, arrays or inductives. Those still need this ABI's
+manifest-driven lowering/inspection API.
+
+Nor does externref root a Lean closure or heap value while JavaScript retains
+it. Converted callbacks and JSL objects carry that foreign obligation in
+[private lifetime state](HOST_BINDINGS.md#lean-backed-javascript-values), not a
+second JavaScript value model.
 
 ## Shape
 
@@ -179,35 +192,16 @@ Longer-lived Lean values need an explicit Lean root. Closures and JSL values
 already follow that pattern through private state associated with ordinary
 JavaScript functions and objects.
 
-## Call Path Target
+## Call path
 
-The target call path is:
-
-```mermaid
-sequenceDiagram
-  participant JS as JavaScript runtime
-  participant ABI as vir_obj_* helpers
-  participant IR as Lean IR interpreter
-
-  JS->>ABI: lower args to owned objects
-  JS->>IR: vir_call_resolved_objects(slot, argv, argc)
-  IR-->>JS: owned result object
-  JS->>ABI: lift result object
-  JS->>ABI: release result
-```
-
-The runtime value path now uses owned Lean objects. Primitive lane helpers are
+The runtime value path uses owned Lean objects. Primitive lane helpers are
 still useful for the hottest exact scalar signatures because they avoid object
 allocation, but the JavaScript-facing runtime no longer has a value byte
 fallback.
-`VirRuntime.call` covers calls whose arguments can be lowered from the current
-object subset and whose result can be lifted from it. Arguments and results
-currently support base values,
-`Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
-unions, and custom inductive constructors whose fields recursively stay in this
-subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
-packed scalar fields, including direct recursive references through supported
-fields. Direct `Lean.Expr` arguments and results are also covered through
+`VirRuntime.call` lowers and lifts the
+[supported manifest value types](JS_API.md#calls-and-manifest).
+Constructors may mix object fields, raw `USize` slots and packed scalar fields,
+including recursive references through supported fields. `Lean.Expr` uses
 constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`
 helpers; the public Lean type remains `Lean.Expr`, but the helpers call Lean's
 real constructors so cached expression data is preserved. Resources, callbacks,
@@ -226,27 +220,6 @@ objects and fresh constructor buffers, but repeated records and inductive
 constructors no longer rediscover field indexes, scalar offsets, and packed
 runtime counts on every visit.
 
-## Phases
-
-1. Base object primitives: String, decimal scalar, and ByteArray construction
-   and inspection, plus ownership tests.
-2. Object call helpers: resolved calls that accept already-lowered owned object
-   arguments and return an owned object result.
-3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate
-   copies for common browser data. Lists use the generic scalar/constructor
-   surface; generated metadata should eventually drive the general case.
-4. Generated layout support: structures and inductives lowered by package
-   metadata instead of ad hoc descriptors, including object, `USize`, and scalar
-   runtime fields.
-5. Direct `Lean.Expr` object calls: keep `Lean.Expr` as the user-facing type,
-   but lower/lift it through constructor-backed helpers because generic
-   constructor allocation cannot safely fabricate kernel expression metadata.
-6. Host import and callback integration: rooted resource and closure helpers
-   let Lean-to-JS calls and retained callbacks exchange objects directly.
-7. Value codec retirement: the JavaScript value codec and C++ runtime value
-   codec have been removed; object calls now validate against direct
-   package-call summary metadata.
-
 ## Risks
 
 - Refcount mistakes are correctness bugs. Tests should cover every helper that
@@ -263,3 +236,19 @@ runtime counts on every visit.
   `Lean.Vir.Js α` resources based on semantics, not on the current lower-level
   transport. The object ABI is an internal optimization path for ordinary value
   types; it is not the public representation for JavaScript-owned objects.
+
+## Future Wasm features
+
+A native Promise can cross the synchronous host boundary as an exact `Js`
+value without suspending Lean. JS Promise Integration would need a concrete
+suspending API and a distinct async call surface; it does not fit the current
+synchronous transaction merely by awaiting a host result.
+
+The Component Model/WIT, stack switching, Wasm GC and typed function references
+are possible transport directions, not implemented API guarantees. Adopt one
+only for a concrete runtime benefit; do not emulate its ownership model in JS.
+`npm run test:wasm-extensions` checks required externref identity/support and
+reports optional JSPI separately. See the
+[reference-types proposal](https://github.com/WebAssembly/reference-types),
+[JSPI proposal](https://github.com/WebAssembly/js-promise-integration) and
+[Wasm proposal index](https://github.com/WebAssembly/proposals).

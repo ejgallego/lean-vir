@@ -93,6 +93,10 @@ diary. Developer-facing guides are documentation too.
 - Use the [documentation map](docs/README.md) to find a contract's owning guide.
   Link to that guide elsewhere rather than duplicating its explanation; prefer
   updating it to adding a PR-specific document.
+- Prefer one main file per topic, with sections for usage, contracts and gaps.
+  An audit, implementation note or roadmap is not by itself a separate topic.
+  Split only for an independent reading task or useful dated evidence; do not
+  turn consolidation into an enormous manual.
 - Keep concise rationale and reproducible evidence that inform future decisions,
   including relevant versions and provenance. Omit the sequence of attempts when
   it adds no lasting explanation.

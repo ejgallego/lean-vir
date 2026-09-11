@@ -5,56 +5,49 @@ Start with the [quickstart](../README.md) to use VIR, or the
 The guides below own the detailed contracts; this page is a route to them,
 not a second API inventory.
 
-## Find a guide
+## Use VIR
 
-- **Use VIR in a Lean project:** [Lake integration](LAKE_INTEGRATION.md)
-  covers exports, module facets and SDK installation; the
-  [Lean library reference](LEAN_VIR_LIBRARY.md) covers the host APIs.
-- **Call Lean from JavaScript:** follow the [end-to-end guide](CALL_LEAN_FROM_JS.md),
-  then consult the [runtime API](JS_API.md).
-- **Generate or inspect a package:** start with [local packages](LOCAL_IRPKG.md).
-  See [module input rules](MODULE_INPUTS.md) for compiled and live snapshots,
-  [interface manifests](INTERFACE_PIPELINE.md) for configuration and types, and
-  [the binary format](IRPKG_FORMAT.md) or [generator internals](GENERATE_PACKAGE.md)
-  when changing the producer.
-- **Build a browser or infoview widget:** use the [React guide](REACT_NODE.md).
-  The [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md) demonstrates a
-  real server method; the [RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md)
-  explains sessions, Promises, references and current authoring limits.
-- **Add or audit a binding:** read the [translation contract](BINDING_MODALITIES.md)
-  and [binding reference workflow](SHIPPED_BINDINGS.md). The
-  [React fidelity audit](REACT_API_FIDELITY.md) compares supported calls and gaps;
-  [type anchors](TYPE_ANCHORS.md) are separate structural-debugging fixtures,
-  not the shipped-binding audit.
-- **Understand ownership or change the runtime:** the [host contract](HOST_BINDINGS.md)
-  owns JS identity, foreign-value lifetime, UI cleanup and runtime disposal.
-  Use the [object ABI](OBJECT_ABI.md) and [upstream boundary](UPSTREAM_BOUNDARY.md)
-  for interpreter details, or [client-native externs](CLIENT_NATIVE_EXTERNS.md)
-  to supply a C/C++ provider.
-- **Run checks or add an example:** the [harness guide](HARNESS.md) selects checks;
-  [examples and fixtures](EXAMPLES_AND_FIXTURES.md) explains where client code
-  belongs, and [adding demos](ADDING_DEMOS.md) gives the browser workflow.
-- **Investigate support or performance:** distinguish the [API inventory](API_COVERAGE.md),
-  [tested fixture surface](FIXTURE_COVERAGE.md) and
-  [static dependency analysis](SURFACE_ANALYSIS.md). For timing and profiling,
-  start with [performance](PERFORMANCE.md) and the
-  [browser benchmark guide](../benchmarks/browser/README.md).
+- [Packages](PACKAGES.md): register modules, select exports, build/load packages
+  and install the browser SDK.
+- [Lean library](LEAN_VIR_LIBRARY.md): effects, boundary values and API entry points.
+- [Call Lean from JavaScript](CALL_LEAN_FROM_JS.md): an end-to-end example;
+  [JavaScript API](JS_API.md) is the runtime reference.
+- [React](REACT.md): native values, components, hooks, JSX and supported calls.
+- [Infoview widgets and RPC](INFOVIEW.md): editor activation, sessions, server
+  references and ProofWidgets compatibility; try the
+  [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md).
+
+## Extend and maintain
+
+- [Host bindings](HOST_BINDINGS.md) owns JS identity, foreign-value lifetime,
+  rollback, UI cleanup and runtime disposal.
+- [Binding translation](BINDING_MODALITIES.md) and the
+  [binding reference workflow](SHIPPED_BINDINGS.md) cover generation and review.
+  [Type anchors](TYPE_ANCHORS.md) are separate structural-debugging fixtures.
+- [Examples and fixtures](EXAMPLES_AND_FIXTURES.md) covers contribution and oracle
+  rules; [Harness](HARNESS.md) selects checks and explains their prerequisites.
+- [Performance](PERFORMANCE.md) and the [browser benchmarks](../benchmarks/browser/README.md)
+  cover measurement. [Surface analysis](SURFACE_ANALYSIS.md) inspects static
+  dependencies; the [API inventory](API_COVERAGE.md) is a separate coverage record.
+
+## Implementation reference
+
+- [Generator](GENERATE_PACKAGE.md): module inputs, closure selection and output.
+- [Package format](IRPKG_FORMAT.md): binary sections and embedded manifest/types.
+- [Object ABI](OBJECT_ABI.md): Lean object construction and pointer ownership.
+- [Upstream boundary](UPSTREAM_BOUNDARY.md): interpreter and package-provider contract.
+- [Client-native externs](CLIENT_NATIVE_EXTERNS.md): C/C++ provider integration.
 
 Contribution and coordination rules live in [CONTRIBUTING.md](../CONTRIBUTING.md)
 and the [agent mailbox protocol](MAILBOX_PROTOCOL.md).
 
-## Proposals and follow-up work
+## Design and evidence
 
 The [roadmap index](roadmap/README.md) links scoped upstream questions and
 proposed extensions. Those plans are not current API guarantees. Some reference
 guides also contain explicitly marked future-work sections; that does not make
 their implemented contracts proposals.
 
-## Design rationale and historical evidence
-
-- [Wasm interop](REACT_WASM_BINDINGS.md) explains the current boundary and
-  possible future features; [callback notes](EVENT_CALLBACK_ROADMAP.md) likewise
-  cover current behavior as well as remaining work.
 - [Environment lookup](ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
   [object conversion](OBJECT_CONVERSION_PERFORMANCE.md) record measured design
   decisions. Their timings belong to the recorded workloads and versions,

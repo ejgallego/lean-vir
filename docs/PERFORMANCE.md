@@ -187,10 +187,9 @@ focused row use the generated `pretty-printer.irpkg` to exercise recursive
 `Std.Format` custom-inductive lowering through the same public runtime path.
 
 React is intentionally absent from this Node benchmark. The Node runtime's
-virtual document host rejects React operations instead of approximating React's
-renderer, reconciliation, or ownership behavior. Validate React against the real
-Chromium/React host with `npm run test:pages:browser`; any React performance
-campaign should likewise be a browser-catalog example rather than a virtual-host
+bindings provide neither a DOM nor React implementation. Validate React against
+the real Chromium/React host with `npm run test:pages:browser`; any React performance
+campaign should likewise be a browser-catalog example rather than a Node
 timing row.
 
 The `base-*` JSON rows are intended as the first regression surface for direct

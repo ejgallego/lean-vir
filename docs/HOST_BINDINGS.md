@@ -186,7 +186,9 @@ termination operation:
 The shared `HostLifecycle` registers each active value together with its exact
 cleanup function. Runtime disposal invokes those functions without inspecting
 or guessing methods on the value. Timer and frame completion remove their
-registration before invoking user code. Explicit React-root unmount removes
+registration before invoking user code. Cancellation of a registered timer or
+frame deactivates and detaches it before calling the platform cancellation
+function. Explicit React-root unmount removes
 its registration only after the platform unmount succeeds, so a failed unmount
 remains visible to runtime teardown.
 
@@ -252,47 +254,20 @@ identity. `EventListener.ofLean` is separate conversion sugar that turns a Lean
 closure into an ordinary self-owning JavaScript function; the DOM, not a VIR
 registration handle, retains that function.
 
+DOM and React event objects likewise cross unchanged. VIR does not invalidate
+an event when its callback returns; continued use follows the browser or
+framework's own validity rules.
+
 ## React Bindings
 
-The browser React host uses official React 19 and ReactDOM:
-
-- props are actual JavaScript objects;
-- child collections and dependency lists are actual arrays;
-- `React.createElement` returns the actual React element;
-- `useState`, `useReducer`, `useRef`, and `useMemo` return or store the values
-  chosen by React;
-- setter and dispatcher functions are React's functions;
-- refs expose React's mutable `{ current }` object;
-- roots are the objects returned by `ReactDOMClient.createRoot`.
-
-VIR does not emulate hook state, render replay, reconciliation, lanes, or
-commit semantics. Official React running in Chromium is the semantic oracle.
+The [React guide](REACT.md) owns component conversion, native values, hooks and
+supported call shapes. Official React/ReactDOM in Chromium supplies semantics;
+the host does not maintain an alternate hook or ownership model.
 
 `createBrowserHostBindings` accepts its optional React bindings as a factory,
 not as a preconstructed map. The browser host passes its one `HostLifecycle`
 to that factory so React roots cannot be registered in a hidden independent
 lifecycle.
-
-The Node wrapper installs no DOM or React providers. This avoids treating local
-test doubles as browser or React semantics. Non-browser callers that genuinely
-have a DOM implementation can supply it explicitly through `hostBindings`.
-
-The principal intentional React conveniences are:
-
-- optional Lean-side ProofWidgets builders, which lower to exact props objects
-  and child arrays before the React call;
-- `Component.ofLean`, which explicitly creates an ordinary reusable JavaScript
-  component function whose identity React observes;
-- `EffectCallback.ofLean`, which explicitly creates React's setup-function
-  shape from a Lean setup/cleanup descriptor;
-- `Root.render` and `Root.renderComponent`, which are Lean composition over
-  node construction and the exact `Root.renderNode` boundary.
-
-The conversions have declarations separate from the exact bindings. The React
-hook host contains no Lean-specific hook path, and the React root host contains
-no callback-render or component-render path. Direct `Root.renderNode` needs no
-VIR acknowledgement for superseded submissions because React retains the exact
-JavaScript node graph.
 
 ## Non-browser Hosts
 
@@ -337,7 +312,7 @@ explicitly named Lean adapter.
 Changes to the JavaScript-value boundary should cover:
 
 - exact identity for objects, functions, arrays, `null`, and `undefined`;
-- successful callback invocation and runtime-disposal invalidation;
+- callback identity, invocation, arity/errors and runtime-disposal invalidation;
 - JSL and callback finalization as a best-effort backstop;
 - active-resource completion, explicit cancellation, package replacement, and
   runtime disposal;

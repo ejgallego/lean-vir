@@ -15,9 +15,9 @@ For downstream Lake packages, the preferred workflow is:
 
 See
 [Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
-for the short form and [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for
+for the short form and [docs/PACKAGES.md](docs/PACKAGES.md) for
 the complete client workflow. The repository-local package runner remains the
-quickest way to explore one Lean file manually: it reads the embedded interface
+quickest way to explore one Lean module manually: it reads the embedded interface
 manifest and builds runnable controls automatically.
 
 ## Lake Facets, Exports, And Startup Hooks
@@ -81,7 +81,7 @@ v2 records every member's byte length and SHA-256; the package facet installs
 the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
-[docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
+[docs/PACKAGES.md](docs/PACKAGES.md) and the entirely
 Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
 real Lake target in this repository:
 
@@ -269,12 +269,10 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   a self-contained browser example, differential suite, or artifact build.
 - [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for implementation paths,
   call-flow diagrams, and object ownership.
-- [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
-  workflow.
+- [docs/PACKAGES.md](docs/PACKAGES.md) for module registration, marked exports,
+  Lake facets, local packages and SDK installation.
 - [docs/CLIENT_NATIVE_EXTERNS.md](docs/CLIENT_NATIVE_EXTERNS.md) for selecting
   project-owned native externs and compiling their C/C++ providers into Wasm.
-- [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for marked exports,
-  Lake facets, SDK installation, and Lean-authored Slides code.
 - [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported
   Lean declarations from app JavaScript.
 - [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
@@ -283,12 +281,10 @@ clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
   targets, external hosts, and resource cleanup.
 - [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
   import helpers.
-- [docs/REACT_WASM_BINDINGS.md](docs/REACT_WASM_BINDINGS.md) for the
-  React-first plan for `externref`, JSPI, and related Wasm interop features.
-- [docs/INTERFACE_PIPELINE.md](docs/INTERFACE_PIPELINE.md) for package configs,
-  manifests, supported type details, and interface internals.
-- [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for
-  implementation ownership and call flow.
+- [docs/REACT.md](docs/REACT.md) for components, hooks and supported React calls;
+  [docs/INFOVIEW.md](docs/INFOVIEW.md) for editor widgets and RPC.
+- [docs/IRPKG_FORMAT.md](docs/IRPKG_FORMAT.md) and
+  [docs/OBJECT_ABI.md](docs/OBJECT_ABI.md) for package metadata and object transport.
 
 ## Repository Layout
 
