@@ -70,41 +70,6 @@ def ofOption {α : Type} (value : Option (Lean.Vir.Js α)) : RuntimeM (Lean.Vir.
 
 end Nullable
 
-private def collectResourceItems {α : Type}
-    (item : Nat → RuntimeM (Option (Lean.Vir.Js α))) :
-    (remaining index : Nat) →
-    _root_.Array (Lean.Vir.Js α) →
-    RuntimeM (_root_.Array (Lean.Vir.Js α))
-  | 0, _, values => pure values
-  | remaining + 1, index, values => do
-      let values :=
-        match ← item index with
-        | none => values
-        | some value => values.push value
-      collectResourceItems item remaining (index + 1) values
-
-private def arrayResourceItem? {α : Type}
-    (size : Nat)
-    (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js α))
-    (index : Nat) :
-    RuntimeM (Option (Lean.Vir.Js α)) := do
-  if index < size then
-    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
-    some <$> item jsIndex
-  else
-    pure none
-
-private def nullableCollectionResourceItem? {α : Type}
-    (size : Nat)
-    (item : Lean.Vir.Js Float → RuntimeM (Lean.Vir.Js.Nullable α))
-    (index : Nat) :
-    RuntimeM (Option (Lean.Vir.Js α)) := do
-  if index < size then
-    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
-    Lean.Vir.Js.Nullable.toOption (← item jsIndex)
-  else
-    pure none
-
 namespace Array
 
 /-- Builds a native JavaScript array from JavaScript-owned values. -/
@@ -121,9 +86,11 @@ def toLeanArray {α : Type}
     (array : @& Lean.Vir.Js.Array α) :
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size := (← Lean.Vir.JsValue.toFloat (← length array)).toUInt64.toNat
-  collectResourceItems
-    (arrayResourceItem? size (get array))
-    size 0 (_root_.Array.mkEmpty size)
+  let mut values := _root_.Array.mkEmpty size
+  for index in [:size] do
+    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
+    values := values.push (← get array jsIndex)
+  pure values
 
 end Array
 
@@ -134,9 +101,13 @@ def toLeanArray {α : Type}
     (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α)) :
     RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
   let size := (← Lean.Vir.JsValue.toFloat (← length nodes)).toUInt64.toNat
-  collectResourceItems
-    (nullableCollectionResourceItem? size (item nodes))
-    size 0 (_root_.Array.mkEmpty size)
+  let mut values := _root_.Array.mkEmpty size
+  for index in [:size] do
+    let jsIndex ← Lean.Vir.JsValue.ofFloat index.toFloat
+    -- A live NodeList can shrink after the length snapshot.
+    if let some value ← Lean.Vir.Js.Nullable.toOption (← item nodes jsIndex) then
+      values := values.push value
+  pure values
 
 end NodeList
 

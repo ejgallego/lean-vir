@@ -11,6 +11,8 @@ worth opening on its own.
 
 - [MergeSort](../../examples/MergeSort.lean) supplies the landing page's
   `SortDemo.sortArray` call and displays the array returned by Lean.
+- [HostInterop](../../examples/HostInterop.lean) sets and reads the browser title,
+  with explicit conversion at the JavaScript boundary.
 - [Tamagotchi](../../Vir/Examples/Tamagotchi.lean) owns the reusable state machine
   and `ReactTamagotchi.View`. The standalone browser page and
   [infoview widget](../../examples/ReactTamagotchiWidget.lean) mount that same
@@ -21,9 +23,11 @@ inspection belong under developer tools.
 
 ## Developer tools
 
-[ReactProofWidget](../../examples/ReactProofWidget.lean) derives tactic actions
-from the current proof context and inserts the selected action at the cursor.
-It belongs in the infoview rather than the public React page.
+[VirNativeInfoview](../../examples/VirNativeInfoview.lean) renders the live goals
+and local context, with collapsible goal cards. It is the full viewer alongside
+the small Hello tutorial, not a second widget runtime. The older proof-action
+demo has been retired; tactic insertion and clipboard fallbacks are not features
+of this viewer.
 
 ## Tutorials
 
@@ -48,6 +52,12 @@ must protect a distinct encoding path. React and DOM cases belong with the
 [browser suites](../../tests/browser). The goal snapshots and cancellation-only
 methods under [fixtures/infoview/](../../fixtures/infoview) are test inputs, not
 public `Vir` APIs.
+
+[HostInterop regressions](../../fixtures/HostInterop.lean) exercise callbacks,
+collection traversal, DOM operations, timers and animation frames. They import
+the tiny title example and retain the `HostInterop.*` entry names used by tests
+and benchmarks; package acquisition selects `fixtures.HostInterop` for those
+regression entries.
 
 [fixtures/manifest.json](../../fixtures/manifest.json) is the executable oracle
 catalog. Its cases are available in `/demo.html` and the package runner;

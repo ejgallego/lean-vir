@@ -277,9 +277,9 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["ReactProofWidget.createComponent", "ReactProofWidget.mount"] #[
-    `ReactProofWidget.createComponent,
-    `ReactProofWidget.mount
+  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.mount"] #[
+    `VirNativeInfoview.createComponent,
+    `VirNativeInfoview.mount
   ]
   expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.mount"] #[
     `ReactProofWidgetHello.createComponent,
@@ -289,11 +289,11 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
     `ReactTamagotchiWidget.createComponent,
     `ReactTamagotchiWidget.mount
   ]
-  expectRootsOk #["ReactProofWidget.mount", "ReactProofWidget.mount"] #[
-    `ReactProofWidget.mount
+  expectRootsOk #["VirNativeInfoview.mount", "VirNativeInfoview.mount"] #[
+    `VirNativeInfoview.mount
   ]
   expectRootsError #[]
-  expectRootsError #["ReactProofWidget."]
+  expectRootsError #["VirNativeInfoview."]
   expect "authoring widget component entry"
     (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
   expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.mount")

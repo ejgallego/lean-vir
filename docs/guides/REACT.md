@@ -13,7 +13,7 @@ The binding receives those values unchanged; `React.createElement` decides
 what to copy or retain. There is no VIR node graph or props protocol.
 
 ```lean
-import Vir.React
+import Vir.React.Core
 
 open Lean.Vir.React
 
@@ -38,8 +38,15 @@ array, including an optional key in the props object.
 
 ### Lean HTML and JSX
 
+`Vir.React.Builders` adds pure property/event descriptions and tag helpers;
+`Props.fromEntries` is their shared effectful conversion to a native props object.
+`Vir.React` remains the convenience import for both core and builders.
+
 Optional `Vir.ProofWidgets.Html` and `Vir.ProofWidgets.Jsx` provide Lean builders
 and notation over these operations, not a serializable or alternate node tree.
+Their attribute names alias the same builder definitions. `Html` represents a
+deferred React computation, whereas `Js Node` is an already-constructed value;
+that distinction preserves when child actions run.
 `Html.ofComponent` passes `ComponentProps` containing props and child `Html`
 actions to an ordinary Lean component function.
 
@@ -101,7 +108,7 @@ VIR keeps no speculative hook slots, action queues or dependency leases.
 
 This table describes selected call shapes, not full React coverage. The
 [generated declarations](../../Vir/React/Generated.lean) and
-[Lean composition and builders](../../Vir/React.lean) own exact signatures. The comparison
+[native Lean composition](../../Vir/React/Core.lean) own exact signatures. The comparison
 baseline is the [React 19.2 public reference](https://react.dev/reference/react).
 
 | React operation | Lean surface and boundary |

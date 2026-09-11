@@ -25,6 +25,30 @@ export async function smokeBrowserReactLifetimes(cdp, artifactDirectory) {
   await smokeBrowserReactRefLifetime(cdp);
   await smokeBrowserReactStrictModeLifetime(cdp);
   await smokeBrowserReactUseId(cdp, artifactDirectory);
+  await smokeBrowserNativeInfoviewUpdates(cdp, artifactDirectory);
+}
+
+export async function smokeBrowserNativeInfoviewUpdates(
+  cdp,
+  artifactDirectory = fileURLToPath(new URL("../../web/public/", import.meta.url)),
+) {
+  const [wasm, pkg, source] = await Promise.all([
+    ...[wasmPublicFile, hostPackageFile].map((file) =>
+      readFile(resolve(artifactDirectory, file))),
+    bundledBrowserProbe("./react-native-infoview-entry.js", "development"),
+  ]);
+  await evaluateBrowserProbe(cdp, source, "lean-vir-native-infoview-updates-smoke.js");
+  const result = await evaluate(cdp,
+    `runVirNativeInfoviewUpdates(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])}).then(
+      value => ({ ok: true, value }),
+      error => ({ ok: false, error: error.stack ?? String(error),
+        causes: error.errors?.map(cause => cause.stack ?? String(cause)) })
+    )`);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value, {
+    submissions: 4, initialGoals: 3, collapsedAfterUpdate: true, finalGoals: 0,
+  });
+  return result.value;
 }
 
 export async function smokeBrowserReactUseId(
@@ -169,7 +193,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     cdp = await openChromiumPage(chromium);
     await smokeBrowserReactLifetimes(cdp);
-    console.log("React browser checks passed: refs, Strict Mode, lifetimes, and real-Lean/Wasm useId");
+    console.log("React browser checks passed: refs, Strict Mode, lifetimes, real-Lean/Wasm useId and native infoview updates");
   } finally {
     cdp?.close();
     await chromium.close();

@@ -94,6 +94,8 @@ build_module Vir/Browser/Generated.lean
 build_module Vir/Browser.lean
 build_module Vir/React/Types.lean
 build_module Vir/React/Generated.lean
+build_module Vir/React/Core.lean
+build_module Vir/React/Builders.lean
 build_module Vir/React.lean
 build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean

@@ -63,10 +63,17 @@
         {
           "module": "HostInterop",
           "roots": [
-            "HostInterop.titleHandshake",
+            "HostInterop.titleHandshake"
+          ]
+        },
+        {
+          "module": "fixtures.HostInterop",
+          "roots": [
             "HostInterop.titleHandshakeLoop",
             "HostInterop.callbackRoundTrip",
             "HostInterop.floatRoundTrip",
+            "HostInterop.arrayThroughLean",
+            "HostInterop.nodeListThroughLean",
             "HostInterop.querySelectorAllCount",
             "HostInterop.querySelectorAllLeanCount",
             "HostInterop.querySelectorAllArrayCount",
@@ -160,11 +167,10 @@
           ]
         },
         {
-          "module": "ReactProofWidget",
+          "module": "VirNativeInfoview",
           "roots": [
-            "ReactProofWidget.createComponent",
-            "ReactProofWidget.mount",
-            "ReactProofWidget.renderSnapshotIntoSelector"
+            "VirNativeInfoview.createComponent",
+            "VirNativeInfoview.mount"
           ]
         }
       ],

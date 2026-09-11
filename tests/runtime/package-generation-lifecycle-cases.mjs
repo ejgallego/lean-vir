@@ -37,7 +37,7 @@ export async function runIrPackageLifecycleSmoke({
   const secondPackage = join(freshDir, "reload-host-second.irpkg");
   const secondReport = join(freshDir, "reload-host-second.report.md");
 
-  const builtHost = spawnSync("lake", ["build", "+HostInterop"], { encoding: "utf8" });
+  const builtHost = spawnSync("lake", ["build", "+fixtures.HostInterop"], { encoding: "utf8" });
   assert.equal(builtHost.status, 0, builtHost.stderr || builtHost.stdout);
 
   const generatedFirst = runVirIrpkg([
@@ -56,7 +56,7 @@ export async function runIrPackageLifecycleSmoke({
     secondPackage,
     secondReport,
     "--target-module",
-    "HostInterop",
+    "fixtures.HostInterop",
     "HostInterop.callbackRoundTrip",
     "HostInterop.titleHandshake",
   ]);
