@@ -215,7 +215,9 @@ export default function VirInfoviewWidget(props) {
       const config = widgetRuntimeConfigFromProps(props);
       if (config.autoReloadMs > 0) {
         intervalId = setInterval(() => {
-          if (inFlight) {
+          // The first package has no installed revision yet. Polling here can
+          // continually supersede a slow initial load before it can mount.
+          if (inFlight || loadedRef.current === null) {
             return;
           }
           inFlight = true;
