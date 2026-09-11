@@ -76,9 +76,7 @@ arbitrary result phantom. Use a generated getter with an actual field contract,
 or a narrow check before typed use. `Js.String.fromAny` accepts only primitive
 strings and preserves the exact value; all other kinds, including boxed strings,
 fail with `TypeError`. It does not coerce or decode/re-encode. In a native Promise
-fulfillment callback, this check's failure rejects the resulting chain. This
-intentionally rejects malformed message fields earlier than the old unchecked
-RPC projections; successful replies and reference transport are unchanged.
+fulfillment callback, this check's failure rejects the resulting chain.
 
 The package manifest currently calls the raw JavaScript-value lane
 `hostResource`. That is a legacy ABI classification name, not a JavaScript
@@ -120,53 +118,58 @@ ordinary values.
 
 ## Lean-Backed JavaScript Values
 
-JSL objects and Lean callbacks require one unavoidable bridge because their
-payload lives in the Lean heap.
+JSL objects and converted Lean callbacks need bridge state because their payload
+lives in the Lean heap. A JSL value is an ordinary empty JavaScript object with
+one retained Lean pointer; a callback is an ordinary function with one closure
+root. Private WeakMaps associate those values with their roots. There is no
+public retain/release protocol, and native functions acquire no Lean lifetime.
 
-`Lean.Vir.JSL α` is represented by an ordinary empty JavaScript object. Private
-WeakMap state associates that object with one retained Lean pointer. The
-object's finalizer releases the pointer after collection, and runtime disposal
-releases it deterministically. There is no public `retain`, `release`, handle,
-or wrapper API.
+A live value strongly retains its original runtime generation: the Wasm instance
+and host state containing its Lean payload. Collection releases the foreign root
+through a best-effort finalizer; explicit disposal releases it deterministically.
+Calling a Lean callback after disposal fails before entering its Lean body.
 
-A Lean callback is represented by an ordinary JavaScript function. Private
-WeakMap state associates the function with one closure root. JavaScript code
-calls and stores it like any other function. Collection is a best-effort
-release backstop; runtime disposal deterministically invalidates remaining
-callbacks and releases their roots.
+Global finalization registries hold only weak references to cleanup records;
+generation-owned sets keep those records available while the generation is live.
+This includes the entire JSL cell and its `onRelease` closure. Otherwise global
+metadata could anchor a runtime whose externref table points back to the targets.
+A wholly unreachable generation can be collected without running every foreign
+finalizer; this is not a collector for mixed Lean/JS cycles inside a runtime
+still owned elsewhere.
 
-`FinalizationRegistry` scheduling is nondeterministic. Applications that need
-deterministic cleanup dispose the VIR runtime. A callback invoked after its
-runtime is disposed fails instead of entering freed Lean state.
+Intervals, listeners, Promise reactions and shared binding maps can retain their
+callbacks and therefore a generation. Their owners remain responsible for
+cancellation, removal and reference release. GC timing, released foreign roots
+and Wasm memory/table capacity are different observations.
 
-A still-live callback or JSL object strongly owns the original generation,
-including its Wasm exports and host state. Global registries hold only
-`WeakRef`s to the cleanup records; generation-owned tracking sets keep records
-available for finalization and explicit shutdown. In particular, global JSL
-cleanup metadata does not strongly capture the cell's `onRelease` closure.
-Thus a wholly unreachable generation can be collected even when its externref
-table points back to callback/JSL targets. Finalizers need not run when the
-whole foreign heap is itself collected.
+The shared binding-map lease counter is decremented by explicit teardown, not
+by collection of an undisposed runtime. A retained factory/shared map can keep
+an outstanding lease count and defer its last-owner disposer. Use explicit
+disposal when deterministic shared-resource cleanup is needed; collection alone
+does not establish that those resources were released.
 
-An externally owned runtime still strongly roots its table values. Mixed cycles
-inside that live generation are not collected by this correction. A reachable
-native interval, listener, Promise reaction or shared binding-map entry may
-also retain its callback/JSL and original generation. Their owners remain
-responsible for cancellation, removal and reference release. Core in-place
-package replacement still invalidates old callback/JSL roots before adopting
-new exports. Normal infoview shell UI cleanup unmounts the owned React root
-and detaches shell references without hard-disposing the generation. Failed
-setup, synchronous mount-entry calls and obsolete never-installed candidates
-retain hard teardown; later React render errors are not caught by that path.
-Application-owned active work keeps its ordinary cleanup obligations.
+## UI Cleanup Versus Runtime Disposal
 
-Collection is not deterministic active-resource cleanup. In particular, the
-existing shared binding lease counter is decremented by explicit teardown,
-not by collection of an undisposed runtime. A retained factory/shared map can
-therefore retain an outstanding lease count and defer its last-owner disposer.
-Use explicit runtime disposal when deterministic shared-resource cleanup is
-needed. Neither zero foreign-root counts nor a collected facade establishes
-that Wasm allocator capacity or a shared map's resources were released.
+Unmount owned React UI while its Lean cleanup callbacks are still usable.
+After that, distinguish releasing UI ownership from shutting down the interpreter:
+
+| Operation | Effect on the generation |
+| --- | --- |
+| Normal infoview unmount or mounted-generation refresh | Unmounts the owned root and detaches shell references; surviving callbacks/JSL remain usable in their original generation. |
+| Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
+| Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](JS_API.md#replacing-a-package-set). |
+
+Normal shell cleanup detaches its loaded reference before unmount and surfaces
+cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
+effect. Obsolete load results cannot install UI. Refreshed services use fresh
+factories and browser/React lifecycles, reusing compiled Wasm and the mutable
+editor host context; the latter is not a frozen per-generation snapshot.
+
+UI cleanup does not restrict new activity or cancel application-owned timers,
+listeners, subscriptions or independent roots. Those still need application
+cleanup. Failed setup, synchronous mount-entry failures and obsolete candidates
+that were never installed retain hard teardown. The mount-entry catch does not
+handle errors thrown later by React rendering.
 
 ## Active Resources
 
@@ -190,18 +193,24 @@ failed or superseded generation without invalidating the live generation.
 Preconstructed binding maps are reference-counted only so intentional sharing
 across an atomic replacement remains safe.
 
-Host calls are failure-atomic. Immediately before invoking a binding, the
-runtime opens a private transaction. An active resource created by that call
-registers an undo operation. The transaction commits only after the returned
+New lifecycle-managed resources are published transactionally. Before invoking a
+binding, the runtime opens a private transaction. An active resource created by
+that call registers an undo operation. The transaction commits only after the returned
 JavaScript value has been completely lowered to Lean. If the binding throws,
 returns a Promise for a non-resource result, or result lowering fails, rollback
 terminates the newly created activity. A Promise declared as an exact `Js`
 result is simply rooted and commits like any other JavaScript object. This
 transaction is out of band and does not alter the returned value.
 
+If argument lifting or the host call fails, callbacks created for that failed
+call are released. A synchronous host exception is rethrown by the owning export
+or callback call before any placeholder interpreter result is treated as success.
+
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
-resources. Runtime teardown attempts every cleanup and reports multiple
-failures as an `AggregateError`.
+resources. Runtime disposal attempts every binding hook, active resource, Lean
+handle, JSL cell and callback even if cleanup throws. One failure is rethrown
+directly; multiple failures become an `AggregateError` in cleanup order.
+Disposal is terminal and subsequent `dispose()` calls are no-ops.
 
 ## Browser Bindings
 
@@ -314,6 +323,7 @@ const vir = await createVirRuntime({
 
 Bindings execute synchronously. Returning a Promise is allowed only as an
 exact `Js` resource result; VIR roots the Promise object without awaiting it.
+That exact-value path does not inspect `.then` or assimilate the result.
 Returning a Promise for a structurally lowered or immediate result is an
 error. User bindings override built-ins with the same target name. Do not
 manually encode handles, wrap values, or perform conversions that belong in an

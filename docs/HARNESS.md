@@ -269,25 +269,20 @@ changes; `package.json` remains the exact command-order source of truth.
   existing demo artifacts without Lean regeneration:
   `node --expose-gc tests/runtime/generation-gc-smoke.mjs`
   and `CHROMIUM=/path/to/chromium node tests/browser/generation-gc.mjs`.
-  The browser command bundles the current source and runs real Wasm with
-  official React development Strict Mode/Suspense; it needs npm dependencies
-  and demo packages, but no site build. Controlled-GC observation budgets are
-  test diagnostics, not a promised finalization latency. Cases distinguish
-  acyclic root release, retained-value/interval/shared-map controls, whole
-  table-to-target generation collection, owner isolation, hard replacement,
-  cleanup failures and explicit shutdown. Shared-map collection checks do not
-  assert automatic lease-counter cleanup or a Wasm memory-capacity plateau.
+  The browser command bundles current source with real Wasm and official React
+  Strict Mode/Suspense; npm dependencies and demo packages are required, not a
+  site build. Controlled-GC budgets are diagnostics, not guaranteed latency.
+  Retention controls distinguish whole-generation collection from explicit
+  cleanup; neither shared-map lease cleanup nor a Wasm capacity plateau is asserted.
 - Infoview shell normal unmount/refresh and failure teardown with actual React,
   real Lean continuation bodies/stale guards and mocked asset/package RPC:
   `lake build VirInfoview vir_irpkg +ShellLifetime`, then
   `lake env .lake/build/bin/vir_irpkg build/shell-lifetime.irpkg build/shell-lifetime.report.md --target-module ShellLifetime Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount`,
   then `CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs`.
-  The focused probe needs the matching `web/public/vir-upstream.wasm` and npm
-  dependencies, but no site build. It checks G1/G2 isolation, delayed success/
-  rejection, application listener retention, late scheduling, polling/obsolete
-  load suppression, explicit shutdown, injected cleanup/setup/render failures,
-  and controlled-GC collection after owners release references. The transport
-  is mocked; this does not replace real-server RPC integration acceptance.
+  Requires matching `web/public/vir-upstream.wasm` and npm dependencies, not a
+  site build. It covers generation isolation, retained application activity,
+  polling, failure cleanup and controlled GC. Mocked transport makes this
+  separate from the [real-server checks](#infoview-rpc-and-lifetime-checks).
 - Runtime runner catalog, filtering, configuration, or scheduling policy without
   generated Lean or Wasm artifacts:
   `npm run test:runtime:unit`
@@ -479,53 +474,52 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
-`npm run test:infoview:browser` runs gate/cleanup units and both real-server
-acceptance checks below sequentially. CI uses this same command; it does not run
-the separate GC or upstream async characterization probes.
+### Infoview RPC and lifetime checks
 
-The native RPC check (`node tests/infoview/rpc-browser.mjs`) builds the current
-infoview imports and registered `tutorials.RpcReferenceWidget`
-module, selecting its six unchanged `RpcReferenceWidget` exports (`request`,
-`reference`, `readReference`, `message`, `View`, `render`) into a bundled package, then
-uses `web/public/vir-upstream.wasm`, official React, the pinned infoview RPC
-client, and a real `lake serve` process in Chromium. It does not need a site
-build. If the Wasm artifact is missing or its producer changed, first build the
-matching artifact with `npm run build:demo`. `CHROMIUM` works as above.
+`CHROMIUM=/path/to/chromium npm run test:infoview:browser` runs support/cleanup
+units and both real-server checks sequentially, as in CI. Each runner builds its
+Lean fixtures and bundles current JS against official React, the pinned RPC
+client and a real `lake serve` process. They require npm dependencies and matching
+`web/public/vir-upstream.wasm`, but no site build. Build missing or changed Wasm
+with `npm run build:demo` before running them.
 
-`CHROMIUM=/path/to/chromium node tests/infoview/rpc-shell-lifetime.mjs`
-checks the actual infoview shell against a real Lean server. It builds infoview
-imports and the registered `ShellLifetime` module through Lake, then compiles
-native `RpcBrowserServer` support with all generated artifact siblings into
-the checkout's private Lake output. Both live server documents use `module`;
-the shell document imports the public/meta RPC support via `meta import` and
-the runtime component via ordinary `import ShellLifetime`. RPC method bodies,
-goal positions and live document provenance are unchanged. Native support stays
-available to the server without contributing handlers to the selected runtime closure;
-the shell obtains Wasm and generated packages through the real asset/package
-RPC methods. A matching `web/public/vir-upstream.wasm` is required. No site build
-or tutorial migration is needed.
+- `node tests/infoview/rpc-browser.mjs` compiles the registered
+  `tutorials.RpcReferenceWidget` package. It checks position-specific sessions,
+  native Promise results, genuine `WithRpcRef`, rejection, cancellation and rerendering.
+  Held real replies test stale success independently of aborting.
+- `node tests/infoview/rpc-shell-lifetime.mjs` checks the actual shell with the
+  registered `ShellLifetime` module and native `RpcBrowserServer` support. The
+  shell acquires Wasm/packages through real asset/package RPC. Delayed success
+  and rejection after UI cleanup enter Lean stale guards; explicit disposal
+  rejects before body entry. Live-generation and reference-round-trip controls
+  distinguish these outcomes. The injected infoview context accessor supplies
+  official position-specific sessions; runtime-creation instrumentation observes
+  generations and supplies test bindings. Package/source/artifact hashes are
+  reported after awaited teardown. This is not GC or automatic polling-refresh
+  acceptance.
 
-The test delays genuine server success and rejection until after owning-UI
-unmount or configuration replacement. Both enter the unchanged Lean fixture's
-stale guard; explicit runtime disposal instead rejects before body entry.
-An exact `WithRpcRef` round trip and live-generation mutation controls distinguish
-these cases. The infoview context accessor is injected with official
-position-specific sessions; transport, package generation, React, shell and
-Lean callbacks are real. This is not automatic polling-refresh or GC acceptance.
-The runner reports package/source/artifact hashes only after awaited cleanup.
-
-Both real-server runners share `tests/infoview/rpc-browser-harness.mjs` for LSP,
-cancellation, response gating, Chromium and teardown. Its focused success/error
-gate checks run with
+Both runners share `tests/infoview/rpc-browser-harness.mjs` for LSP, cancellation,
+response gates, Chromium and teardown. Run its focused units with
 `node --test tests/infoview/rpc-browser-harness.test.mjs`.
+The separate `npm run test:runtime -- infoview-rpc-promise` smoke checks exact
+Promise/function identity and explicit Lean continuations through real Wasm.
 
-`CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs`
-is a separate manual characterization probe for the pinned upstream infoview
-async hooks. It requires neither Lean nor Wasm and prints controlled request,
-Strict Mode, cancellation, and stale-result traces. It imports the published
-hooks unchanged; their current limitations are observations, not assertions
-that VIR should preserve those bugs. See
-[the compatibility note](PROOFWIDGETS_RPC_COMPATIBILITY.md#component-unmount-is-not-interpreter-disposal).
+### Upstream async-hook probe
+
+`CHROMIUM=/path/to/chromium node tests/infoview/upstream-async-probe.mjs` runs the
+published infoview hooks unchanged with React in Chromium; no Lean or Wasm is
+needed. It is a manual characterization, not part of the server gate. In the
+pinned `@leanprover/infoview` 0.13.0 implementation it exposes:
+
+- Strict Mode effect replay aborting the initial request without starting a
+  replacement in both `useAsync` and `useAsyncPersistent`.
+- A cancelled request's late success entering `useAsyncPersistent`'s cache and
+  appearing when a subsequent request starts. Plain `useAsync` has no such cache.
+
+The persistent hook also omits the previous value on rejection, unlike the
+tutorial's UI policy. These observations constrain adoption of those hooks;
+they are not VIR guarantees, an all-Lean parent test or grounds for a new VIR
+request manager.
 
 ## Performance Comparisons
 

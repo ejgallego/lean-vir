@@ -29,14 +29,17 @@ builds may populate their build caches. The acceptance command removes its
 temporary project unless `--keep` is requested; the browser exporter always
 removes its temporary project.
 
-The upstream module port is maintainer-owned. Full external acceptance of this
-adapter migration is deferred until a matching module-capable checkpoint is
-available. That run must compile the actual adapter, including the transparent
-Lean bodies required by `vir_extern_fallback`, and exercise the compression
-matrix below. The `lean-zip-module-project` runtime smoke checks real module
-compilation and inherited native linking with a small test dependency; it does
-not claim compression equivalence. Historical browser catalogs continue to
-invoke their pinned producers and are not repinned by this migration.
+External acceptance compiles the actual adapter, including the transparent Lean
+bodies required by `vir_extern_fallback`, and exercises the compression matrix
+below. Record the client and VIR revisions, toolchain, and Wasm binary identity
+with the result. Reusing a compatible Wasm binary validates that binary for the
+tested workload, not a fresh whole-runtime build.
+
+The `lean-zip-module-project` runtime smoke checks module compilation and
+inherited native linking with a small test dependency; it does not establish
+lean-zip compression equivalence. Compression acceptance does not validate the
+separate browser package export or repin historical browser catalogs, which
+continue to invoke their pinned producers.
 
 ## Acceptance boundary
 

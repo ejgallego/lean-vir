@@ -568,81 +568,25 @@ const vir = await createVirRuntime({
 console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
-Bindings receive decoded JavaScript values and return a value matching the Lean
-result type. `Unit` returns use `undefined`. Function-valued Lean arguments are
-ordinary callable JavaScript functions. Store and invoke them exactly as in
-JavaScript; there is no public retain/release protocol. JavaScript reachability
-keeps their private Lean roots alive, with runtime disposal as the deterministic
-cleanup boundary. If argument conversion, binding execution, synchronous-result
-validation, or result conversion fails, the runtime releases callbacks lifted
-for that failed call. Built-in active-resource creators also roll back a newly
-installed timer, animation frame, or React root when the result cannot be
-published to Lean.
-Object-style
-`imports` factory options are treated as overrides on top of the generated
-import table. If you provide a custom `imports` function to
-`createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
-or otherwise install `env.vir_js_call_objects` plus the resource-root imports.
+For callback ownership, failed-call rollback and exception propagation, see
+[HOST_BINDINGS.md](HOST_BINDINGS.md#active-resources).
 
 ## Closure And Resource Lifetime
 
-JavaScript values returned by VIR are the actual values, not releasable runtime
-wrappers. Ordinary values follow JavaScript reachability. A host
-binding can store and invoke a Lean callback like any other function:
+Ordinary JavaScript results follow JS reachability. Converted Lean callbacks and
+JSL values retain their original runtime; `vir.dispose()` invalidates those values
+and attempts all runtime-owned cleanup. Disposal is terminal even if cleanup
+throws, and subsequent disposal is a no-op.
 
-```js
-hostBindings: {
-  "demo.withCallback": (callback) => callback(41),
-}
-```
+Unmount owned React UI before explicitly disposing its runtime, so effect cleanup
+can still enter Lean. Normal infoview shell unmount instead releases UI ownership
+without hard disposal. The full rules, including failure teardown and collection
+limits, live in [HOST_BINDINGS.md](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal).
 
-Lean callbacks and JSL objects have private WeakMap state that roots their Lean
-payload. `FinalizationRegistry` is a best-effort abandonment backstop; its
-schedule is not deterministic. `vir.dispose()` is the deterministic boundary:
-it releases remaining Lean roots and invalidates subsequent callback calls.
-
-Timers, frames, and React roots are active resources with explicit platform
-termination. Each built-in `HostLifecycle` entry stores its exact cleanup
-function; it does not infer cleanup from methods on the JavaScript value. A
-private host-call transaction also rolls back a newly created active resource
-if result lowering fails. Passive values and native event listeners are never
-inserted into this lifecycle; the DOM retains a listener until the caller
-removes that exact function or the target becomes unreachable.
-
-Synchronous JavaScript exceptions raised by a host binding are recorded by the
-Wasm import boundary and consumed by the owning call. This applies equally to
-top-level exports and callback calls: the original host error is thrown once
-before any placeholder interpreter result can be treated as success.
-
-Runtime disposal is terminal and comprehensive: all binding hooks, active resources,
-Lean object handles, JSL cells, and callbacks are attempted even if one throws.
-One cleanup failure is rethrown directly; multiple failures are reported as an
-`AggregateError` in cleanup order. The runtime remains disposed, and a later
-`dispose()` is a no-op.
-Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
-set loaded performs an atomic fresh-instance replacement as described above.
-Old package resources are cleaned up only after the candidate set has loaded
-successfully. See [host bindings](HOST_BINDINGS.md) for the complete boundary
-contract and the
-[event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for callback-specific
-follow-up work.
-
-### Infoview UI ownership
-
-Normal infoview shell unmount and mounted-generation refresh release the owned
-React root and shell references while surviving callback/JSL values retain the
-original runtime. Unmount stops shell polling; ordinary auto-refresh keeps its
-polling effect. Obsolete loads cannot install UI. The shell does not cancel all
-application work or add a retired runtime state. Callers
-clean up their own listeners, timers and independent roots. They can still use
-ordinary APIs from retained callbacks after UI cleanup.
-
-`dispose()` remains explicit hard shutdown. Core in-place package replacement
-also invalidates old callback/JSL values. Shell setup/render failures and
-obsolete never-installed candidates retain hard teardown. Distinct refreshed
-shell services use fresh factories and binding lifecycles, so they do not move
-old numeric roots into new exports. This does not promise automatic disposal
-for arbitrary retained factories or intentionally shared binding maps.
+Package replacement is a separate operation: see
+[Replacing A Package Set](#replacing-a-package-set) for atomic handover, candidate
+failure and invalidation of old values. Neither disposal nor replacement makes
+an old Lean component function usable with a new interpreter.
 
 ## Trust Boundary
 

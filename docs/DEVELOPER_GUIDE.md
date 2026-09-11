@@ -23,7 +23,7 @@ incorrect static declaration. See [BINDING_MODALITIES.md](BINDING_MODALITIES.md#
 | JS boundary           | `web/src/host-boundary.js`                                                   | Externref roots and host-call rollback transactions.                                        |
 | Active host lifecycle | `web/src/host/vir-active-host-bindings.js`                                   | Shared lifecycle plus timer and frame teardown.                                             |
 | Browser providers     | `web/src/vir-host-bindings.js`, `web/src/host/vir-infoview-host-bindings.js` | Browser targets and the repository-owned infoview protocol.                                 |
-| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Official browser React host and explicit Node unsupported shims.                            |
+| React providers       | `web/src/vir-react-host-bindings.js`, `web/src/react/`                       | Official browser React host.                                                               |
 
 ## Top-Level Call Flow
 
@@ -52,45 +52,16 @@ lower a structural or immediate result is rejected before commit.
 
 ## JavaScript Values And Ownership
 
-Do not build a second object graph in VIR. JavaScript identity and reachability
-are the ownership oracle for ordinary values. Props own their properties,
-arrays own their elements, closures own their captures, and React owns the
-graphs it stores. Passing or returning an object preserves exact identity.
+Use JavaScript reachability for ordinary values, not a second VIR object graph.
+The boundary has three distinct mechanisms:
 
-The externref table is transport, not an ownership wrapper. It roots the exact
-value while a Lean external object names it. Its numeric ids are private to the
-interpreter ABI.
+- externref slots root exact JS values while Lean holds them;
+- JSL objects and converted callbacks retain foreign Lean payloads;
+- `HostLifecycle` tracks timers, frames and React roots that need termination.
 
-Two value kinds contain Lean heap references and therefore need private bridge
-state:
-
-- a JSL value is an ordinary object associated with one retained Lean pointer;
-- a Lean callback is an ordinary function associated with one closure root.
-
-WeakMaps hide that association. Finalizers are a best-effort GC backstop;
-runtime disposal is the deterministic release boundary. Neither value exposes
-public retain/release methods.
-
-A live callback or JSL object strongly retains its original runtime. The global
-finalization registries hold only weak references to cleanup records; the
-runtime's callback set and host state's JSL set keep those records available
-while that generation remains owned. Weakening the entire JSL cell also avoids
-an indirect global anchor through its `onRelease` closure. This permits an
-otherwise unreachable whole generation, including table-to-target cycles, to
-be collected without weakening live values or exact externref slots.
-
-This is not a cross-heap cycle collector: an externally owned generation can
-still retain mixed Lean/JavaScript cycles through its table. Platform activities
-and binding maps that retain values can deliberately keep a generation alive.
-Collection timing, foreign-root release, and Wasm memory/table capacity are
-separate observations. See [HOST_BINDINGS.md](HOST_BINDINGS.md) for shared-map
-cleanup limitations.
-
-Explicit `HostLifecycle` state is only for schedules, animation frames, and
-React roots. Native event listeners follow the DOM's receiver/type/function
-identity protocol and remain caller-managed. If a new lifecycle-managed value
-is returned by a host call, register its rollback before returning it. Do not
-put passive values in the lifecycle merely to observe their reachability.
+[HOST_BINDINGS.md](HOST_BINDINGS.md#lean-backed-javascript-values) owns the
+lifetime, finalization, rollback and shared-map limits. Native DOM listeners
+remain caller-managed. Do not register passive values merely to observe them.
 
 ## React Boundary
 
@@ -109,13 +80,9 @@ The Node wrapper deliberately provides no DOM or React implementation. Add
 browser and React semantic tests to the official Chromium suite; focused Node
 tests may inject only the individual host operations they exercise.
 
-The infoview shell's normal cleanup unmounts its owned React root while Lean
-cleanup callbacks remain usable and detaches its loaded reference before
-unmount. Surviving values retain that original runtime; normal refresh installs
-a distinct service with fresh factory/bindings. A synchronous mount-entry failure
-still unmounts the root and hard-disposes the service. This does not catch errors
-thrown later by React rendering. Shell polling is owned by its own effect, while
-application activity remains the application's responsibility.
+Normal infoview UI cleanup is not interpreter disposal. See the
+[shell ownership contract](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
+before changing unmount, refresh or failure handling.
 
 ## Adding A Host Import
 

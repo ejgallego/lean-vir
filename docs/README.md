@@ -1,14 +1,15 @@
 # Documentation
 
-This directory contains the maintainer and integration notes for Lean VIR. The
-top-level `README.md` remains the user-facing quickstart.
+This directory contains contributor and integration guides, reference material
+and design rationale for Lean VIR. The top-level `README.md` is the user-facing
+quickstart. Follow the [documentation policy](../CONTRIBUTING.md#documentation)
+when changing these guides.
 
 ## Developer Reading Paths
 
 Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for implementation work.
-It maps the Lean API, package generator, WASI shim, JavaScript runtime, host
-resources, React bridge, and benchmark code, and includes call-flow and
-ownership diagrams.
+It maps the Lean API, package generator, WASI shim, JavaScript runtime and host
+call flow. Subsystem guides own the detailed contracts.
 
 - Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
@@ -32,6 +33,13 @@ ownership diagrams.
   [REACT_NODE.md](REACT_NODE.md),
   [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md),
   `web/src/host/vir-active-host-bindings.js`, and `web/src/react/`.
+- Infoview RPC work: read [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md)
+  and the [tutorial](../examples/tutorials/RpcReferenceWidget.md), then
+  `Vir/Infoview/Surface.bindings.json` and
+  `web/src/host/vir-infoview-host-bindings.js`. For runtime/UI lifetime, read
+  [HOST_BINDINGS.md](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal),
+  `web/src/runtime/callbacks.js`, `web/src/runtime/object-values.js` and
+  `web/app/vir-infoview-widget.js`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
   [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md),
@@ -53,7 +61,11 @@ ownership diagrams.
 
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md) owns the public Lean API inventory.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md) owns JavaScript host target behavior and
-  resource cleanup rules.
+  foreign-value lifetime, UI/runtime ownership and resource cleanup rules.
+- [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md) owns the
+  session, Promise and server-reference boundary; [HARNESS.md](HARNESS.md) owns
+  commands and test coverage, and [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md)
+  owns planned component parity.
 - [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md) owns the consolidated library
   explorer and exhaustive compiler/runtime reconciliation for shipped
   JavaScript boundaries.
@@ -61,8 +73,8 @@ ownership diagrams.
   TypeScript-to-Lean ABI profile, generated binding-operation model, and exception policy.
 - [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
   renderer details.
-- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns implementation paths, call-flow
-  diagrams, and object ownership.
+- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns the implementation map, call flow
+  and review principles; detailed ownership rules live in HOST_BINDINGS.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md) owns the WASI/upstream interpreter
   boundary.
 
@@ -81,6 +93,8 @@ ownership diagrams.
   demo APIs.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md): JavaScript host bindings, exact-value
   roots, and active-resource teardown.
+- [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md): using
+  native RPC sessions, Promises and server references in Lean-authored widgets.
 
 ## Maintainer Guides
 
@@ -141,10 +155,6 @@ ownership diagrams.
   audit against React's public API and next binding priorities.
 - [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md): first upstream
   ProofWidgets porting targets and external JS library binding pressure.
-- [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md):
-  exact RPC-session, Promise, and server-reference compatibility boundary.
-- [PROOFWIDGETS_RPC_REVIEW.md](PROOFWIDGETS_RPC_REVIEW.md):
-  native RPC change scope, reviewer reading order and correctness questions.
 - [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and
