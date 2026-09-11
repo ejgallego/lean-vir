@@ -1,6 +1,18 @@
-# VIR Roadmap Cards
+# Plans and Follow-up Work
 
-This directory tracks small, reviewable maintainer cards for repository-local
+For current workflows and contracts, start with the [documentation index](../README.md).
+This page links proposals and open decisions, not a list of implemented APIs.
+
+- [ProofWidgets component parity](../PROOFWIDGETS_PORTING.md#planned-component-parity)
+  and [compatibility questions](../REACT_PROOFWIDGETS_ROADMAP.md#open-questions).
+- [Optional package adapters](../PACKAGE_ADAPTER_ROADMAP.md#proposed-shape).
+- [Future Wasm features](../REACT_WASM_BINDINGS.md#future-wasm-features).
+- [Callback follow-up](../EVENT_CALLBACK_ROADMAP.md#remaining-work).
+
+These notes may also describe existing foundations; follow the linked sections
+for proposed work rather than treating the whole document as unimplemented.
+
+This directory also tracks small, reviewable maintainer cards for repository-local
 follow-up and upstream Lean work. A card owns one problem, the evidence that
 makes it actionable, and the decision needed before implementation.
 

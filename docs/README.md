@@ -1,166 +1,69 @@
 # Documentation
 
-This directory contains contributor and integration guides, reference material
-and design rationale for Lean VIR. The top-level `README.md` is the user-facing
-quickstart. Follow the [documentation policy](../CONTRIBUTING.md#documentation)
-when changing these guides.
+Start with the [quickstart](../README.md) to use VIR, or the
+[developer guide](DEVELOPER_GUIDE.md) to change its implementation.
+The guides below own the detailed contracts; this page is a route to them,
+not a second API inventory.
 
-## Developer Reading Paths
+## Find a guide
 
-Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for implementation work.
-It maps the Lean API, package generator, WASI shim, JavaScript runtime and host
-call flow. Subsystem guides own the detailed contracts.
+- **Use VIR in a Lean project:** [Lake integration](LAKE_INTEGRATION.md)
+  covers exports, module facets and SDK installation; the
+  [Lean library reference](LEAN_VIR_LIBRARY.md) covers the host APIs.
+- **Call Lean from JavaScript:** follow the [end-to-end guide](CALL_LEAN_FROM_JS.md),
+  then consult the [runtime API](JS_API.md).
+- **Generate or inspect a package:** start with [local packages](LOCAL_IRPKG.md).
+  See [module input rules](MODULE_INPUTS.md) for compiled and live snapshots,
+  [interface manifests](INTERFACE_PIPELINE.md) for configuration and types, and
+  [the binary format](IRPKG_FORMAT.md) or [generator internals](GENERATE_PACKAGE.md)
+  when changing the producer.
+- **Build a browser or infoview widget:** use the [React guide](REACT_NODE.md).
+  The [RPC tutorial](../examples/tutorials/RpcReferenceWidget.md) demonstrates a
+  real server method; the [RPC contract](PROOFWIDGETS_RPC_COMPATIBILITY.md)
+  explains sessions, Promises, references and current authoring limits.
+- **Add or audit a binding:** read the [translation contract](BINDING_MODALITIES.md)
+  and [binding reference workflow](SHIPPED_BINDINGS.md). The
+  [React fidelity audit](REACT_API_FIDELITY.md) compares supported calls and gaps;
+  [type anchors](TYPE_ANCHORS.md) are separate structural-debugging fixtures,
+  not the shipped-binding audit.
+- **Understand ownership or change the runtime:** the [host contract](HOST_BINDINGS.md)
+  owns JS identity, foreign-value lifetime, UI cleanup and runtime disposal.
+  Use the [object ABI](OBJECT_ABI.md) and [upstream boundary](UPSTREAM_BOUNDARY.md)
+  for interpreter details, or [client-native externs](CLIENT_NATIVE_EXTERNS.md)
+  to supply a C/C++ provider.
+- **Run checks or add an example:** the [harness guide](HARNESS.md) selects checks;
+  [examples and fixtures](EXAMPLES_AND_FIXTURES.md) explains where client code
+  belongs, and [adding demos](ADDING_DEMOS.md) gives the browser workflow.
+- **Investigate support or performance:** distinguish the [API inventory](API_COVERAGE.md),
+  [tested fixture surface](FIXTURE_COVERAGE.md) and
+  [static dependency analysis](SURFACE_ANALYSIS.md). For timing and profiling,
+  start with [performance](PERFORMANCE.md) and the
+  [browser benchmark guide](../benchmarks/browser/README.md).
 
-- Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
-  [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
-  [TYPE_ANCHORS.md](TYPE_ANCHORS.md),
-  `Vir/InterfaceValidation.lean`,
-  `Vir/Interface/Model.lean`,
-  `Vir/Interface/Classify/Error.lean`,
-  `Vir/Interface/Classify/Core.lean`,
-  `Vir/Interface/Classify/Signature.lean`,
-  `Vir/HostMetadata.lean`,
-  `Vir/HostValidation.lean`,
-  `Vir/GeneratePackage/Interface/Encode.lean`,
-  `web/src/runtime/core.js`,
-  `web/src/runtime/object-values.js`,
-  `web/src/runtime/vir-codec.js`,
-  `web/src/runtime/object-abi.js`, and
-  `web/src/runtime/vir-value-normalizers.js`.
-- Browser or React host work: read
-  [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),
-  [HOST_BINDINGS.md](HOST_BINDINGS.md),
-  [REACT_NODE.md](REACT_NODE.md),
-  [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md),
-  `web/src/host/vir-active-host-bindings.js`, and `web/src/react/`.
-- Infoview RPC work: read [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md)
-  and the [tutorial](../examples/tutorials/RpcReferenceWidget.md), then
-  `Vir/Infoview/Surface.bindings.json` and
-  `web/src/host/vir-infoview-host-bindings.js`. For runtime/UI lifetime, read
-  [HOST_BINDINGS.md](HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal),
-  `web/src/runtime/callbacks.js`, `web/src/runtime/object-values.js` and
-  `web/app/vir-infoview-widget.js`.
-- WASI/runtime boundary work: read
-  [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
-  [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md),
-  `wasm/upstream_shim/README.md`,
-  `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
-  `wasm/upstream_shim/abi/call_abi.cpp`.
-- Runtime coverage work: read [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md),
-  `Vir/GeneratePackage/Surface/`, `tools/AnalyzeSurface.lean`, and
-  `web/tools/surface-report/`.
-- Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
-  [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
-  [`benchmarks/browser/README.md`](../benchmarks/browser/README.md),
-  `benchmarks/harness/bench-vir.mjs`,
-  `benchmarks/harness/bench-env-lookup.mjs`,
-  `benchmarks/harness/bench-differential.mjs`, and
-  `benchmarks/harness/bench-utils.mjs`.
+Contribution and coordination rules live in [CONTRIBUTING.md](../CONTRIBUTING.md)
+and the [agent mailbox protocol](MAILBOX_PROTOCOL.md).
 
-## Documentation Ownership
+## Proposals and follow-up work
 
-- [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md) owns the public Lean API inventory.
-- [HOST_BINDINGS.md](HOST_BINDINGS.md) owns JavaScript host target behavior and
-  foreign-value lifetime, UI/runtime ownership and resource cleanup rules.
-- [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md) owns the
-  session, Promise and server-reference boundary; [HARNESS.md](HARNESS.md) owns
-  commands and test coverage, and [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md)
-  owns planned component parity.
-- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md) owns the consolidated library
-  explorer and exhaustive compiler/runtime reconciliation for shipped
-  JavaScript boundaries.
-- [BINDING_MODALITIES.md](BINDING_MODALITIES.md) owns the generated
-  TypeScript-to-Lean ABI profile, generated binding-operation model, and exception policy.
-- [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
-  renderer details.
-- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns the implementation map, call flow
-  and review principles; detailed ownership rules live in HOST_BINDINGS.
-- [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md) owns the WASI/upstream interpreter
-  boundary.
+The [roadmap index](roadmap/README.md) links scoped upstream questions and
+proposed extensions. Those plans are not current API guarantees. Some reference
+guides also contain explicitly marked future-work sections; that does not make
+their implemented contracts proposals.
 
-## User And Integration Guides
+## Design rationale and historical evidence
 
-- [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md): marked VIR exports, Lake facets,
-  SDK installation, and the all-Lean Slides canvas workflow.
-- [LOCAL_IRPKG.md](LOCAL_IRPKG.md): local `.irpkg` package generation and
-  `/dev.html` loading.
-- [CLIENT_NATIVE_EXTERNS.md](CLIENT_NATIVE_EXTERNS.md): project-owned native
-  extern selection and C/C++ provider compilation.
-- [CALL_LEAN_FROM_JS.md](CALL_LEAN_FROM_JS.md): calling exported Lean
-  declarations from JavaScript.
-- [JS_API.md](JS_API.md): runtime wrapper API details.
-- [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md): Lean-side host import helpers and
-  demo APIs.
-- [HOST_BINDINGS.md](HOST_BINDINGS.md): JavaScript host bindings, exact-value
-  roots, and active-resource teardown.
-- [PROOFWIDGETS_RPC_COMPATIBILITY.md](PROOFWIDGETS_RPC_COMPATIBILITY.md): using
-  native RPC sessions, Promises and server references in Lean-authored widgets.
+- [Implementation notes](IMPLEMENTATION_NOTES.md) collect architecture rationale
+  and implementation history; use the task guides above for current workflows.
+  [Wasm interop](REACT_WASM_BINDINGS.md) explains the current boundary and
+  possible future features; [callback notes](EVENT_CALLBACK_ROADMAP.md) likewise
+  cover current behavior as well as remaining work.
+- [Environment lookup](ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
+  [object conversion](OBJECT_CONVERSION_PERFORMANCE.md) record measured design
+  decisions. Their timings belong to the recorded workloads and versions,
+  not to every current build.
+- [Surface experiments](SURFACE_EXPERIMENTS.md) preserve historical decisions,
+  and [package payload analysis](IRPKG_PAYLOAD_ANALYSIS.md) is a dated size
+  snapshot. Neither is a current coverage or size report.
 
-## Maintainer Guides
-
-- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md): implementation map, call-flow
-  diagrams, object ownership, and focused validation pointers.
-- [MAILBOX_PROTOCOL.md](MAILBOX_PROTOCOL.md): same-project and cross-project
-  agent communication, lane ownership, handoff, and cleanup rules.
-- [HARNESS.md](HARNESS.md): setup, generated artifacts, validation commands,
-  and CI shape.
-- [ADDING_DEMOS.md](ADDING_DEMOS.md): adding browser demos and package roots.
-- [EXAMPLES_AND_FIXTURES.md](EXAMPLES_AND_FIXTURES.md): deciding whether client
-  code is a public example, a copyable tutorial, a developer tool, or a test
-  fixture.
-- [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
-  supported types, and interface internals.
-- [TYPE_ANCHORS.md](TYPE_ANCHORS.md): standalone fixture/debug comparison of
-  TypeScript and compiler-produced Lean interface descriptors.
-- [BINDING_MODALITIES.md](BINDING_MODALITIES.md): deterministic binding
-  modalities, generated-operation provenance, and justified exceptions.
-- [SHIPPED_BINDINGS.md](SHIPPED_BINDINGS.md): the consolidated binding library
-  explorer, colocated API-group manifests, exhaustive `vir_js` inventory,
-  forward and reverse browsing, preserving boundary contracts, and shipped
-  provider key reconciliation.
-- [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
-  map, data flow, and diagnostics.
-- [MODULE_INPUTS.md](MODULE_INPUTS.md): module-only design decisions, migration
-  boundaries, and the focused review checklist.
-- [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary
-  and native externs.
-- [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md): current architecture and
-  implementation status.
-- [FIXTURE_COVERAGE.md](FIXTURE_COVERAGE.md): fixture coverage and known
-  unsupported surface.
-- [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
-  behavior, and before/after comparisons.
-- [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
-  environment-lookup evidence, measured alternatives, and accepted local
-  provider-index design.
-- [OBJECT_CONVERSION_PERFORMANCE.md](OBJECT_CONVERSION_PERFORMANCE.md): cached
-  custom-inductive normalization plans and repository-owned `Std.Format`
-  measurements.
-- [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md): static runnable-surface
-  definition, full-library scan and interactive HTML workflows, report
-  interpretation, and runtime control/candidate comparison rules.
-- [SURFACE_EXPERIMENTS.md](SURFACE_EXPERIMENTS.md): historical frontier
-  findings and accepted or rejected runtime decisions.
-- [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
-  inspection, ownership, and codec-retirement roadmap.
-
-## Roadmaps
-
-- [roadmap/README.md](roadmap/README.md): scoped maintainer cards for VIR-local
-  and upstream Lean follow-up work.
-- [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource
-  ownership direction.
-- [REACT_NODE.md](REACT_NODE.md): current Lean-authored React Node surface.
-- [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md): Lean React API fidelity
-  audit against React's public API and next binding priorities.
-- [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md): first upstream
-  ProofWidgets porting targets and external JS library binding pressure.
-- [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
-  infoview and ProofWidgets alignment.
-- [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and
-  related Wasm interop plan.
-- [PACKAGE_ADAPTER_ROADMAP.md](PACKAGE_ADAPTER_ROADMAP.md): optional generated
-  JavaScript adapters, exact ABI requirements, and Wasm export profile
-  direction.
-- [OBJECT_ABI.md](OBJECT_ABI.md): staged plan for JS-driven Lean object
-  lowering/lifting.
+When editing documentation, follow the [writing policy](../CONTRIBUTING.md#documentation):
+keep enduring contracts and useful rationale, not routine development logs.
