@@ -112,11 +112,16 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `useMemo(calculate, deps)` | Exact calculation and dependency array; returns React's selected value. |
 | `useCallback(fn, deps)` | Exact callback and dependency array; returns React's selected function. |
 | `useContext(context)` | Exact consumer context; context creation/provider bindings are not exposed. |
+| `useId()` | `Hooks.useId : ReactM (Js String)` returns React's exact accessibility ID, without string conversion or a VIR ID registry. |
 
 Dependencies can contain arbitrary `Js` values; `DependencyList` helpers
 explicitly build the JavaScript array. React compares its entries as usual.
 Root options, reducer initialization and broader context/external-library
 bindings are not exposed. External components use the host's React instance.
+
+Use `useId` inside components for accessibility relationships, not list keys or
+persistent application identities. The binding does not add hydration or root
+options such as `identifierPrefix`.
 
 ## Host implementation and validation
 
@@ -134,6 +139,9 @@ root for registration/rollback tests, but do not establish React semantics.
 
 The browser matrix checks exact value/ref identity, ref assignment and clearing,
 Strict Mode effects, same-result memo updates, interleaved lanes, Suspense,
-render/unmount and reused versus replaced component functions. Use the
+render/unmount and reused versus replaced component functions. The Lean/Wasm
+`useId` fixture checks committed rerender stability, distinct IDs and accessible
+label/input/description links across instances and roots, with and without
+Strict Mode. Use the
 [browser checks](HARNESS.md#browser-smoke); editor/RPC behavior has
 [separate real-server acceptance](HARNESS.md#infoview-rpc-and-lifetime-checks).

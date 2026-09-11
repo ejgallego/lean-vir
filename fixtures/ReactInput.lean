@@ -16,6 +16,24 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
+/-- Uses native IDs without converting them to Lean strings or constructing IDs locally. -/
+def useIdField (caption : String) : ReactM (Js Node) := do
+  let inputId ← Hooks.useId
+  let hintId ← Hooks.useId
+  let labelProps ← Props.empty
+  Js.Object.set labelProps (← JsValue.ofString "htmlFor") inputId
+  let label ← Node.createElementTag "label" labelProps
+    (← Js.Array.ofArray #[← Node.text caption])
+  let inputProps ← Props.empty
+  Js.Object.set inputProps (← JsValue.ofString "id") inputId
+  Js.Object.set inputProps (← JsValue.ofString "aria-describedby") hintId
+  let input ← Node.createElementTag "input" inputProps (← Js.Array.empty)
+  let hintProps ← Props.empty
+  Js.Object.set hintProps (← JsValue.ofString "id") hintId
+  let hint ← Node.createElementTag "p" hintProps
+    (← Js.Array.ofArray #[← Node.text "Enter a value"])
+  Node.div #[label, input, hint]
+
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
 

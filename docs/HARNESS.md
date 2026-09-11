@@ -113,6 +113,13 @@ semantics require the separate Chromium checks below.
 - Site bundle or SDK/local archive shape: `npm run test:site` builds and checks
   the site. DOM, React, timers, animation and page interactions additionally
   need [Browser Smoke](#browser-smoke).
+- React hooks, refs and component identity: `npm run build:demo-package`, then
+  `CHROMIUM=/path/to/chromium node tests/browser/react-lifetimes.mjs`.
+  Requires matching `web/public/vir-upstream.wasm` and npm dependencies, not a
+  site build. Includes actual Lean/Wasm `useId` calls, committed rerender
+  stability and accessible label/input/description links across instances and
+  roots, with and without Strict Mode. The Pages suite runs the same probes
+  using its `web/dist` artifacts.
 - Surface analysis: `npm run test:surface`; add
   `CHROMIUM=/path/to/chromium npm run test:surface:browser` for report navigation
   or responsive layout. [Surface analysis](SURFACE_ANALYSIS.md) owns capture,

@@ -5,19 +5,50 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
 
-import { evaluate } from "./harness.mjs";
+import { evaluate, launchChromium, openChromiumPage } from "./harness.mjs";
+import {
+  hostPackageFile,
+  wasmPublicFile,
+} from "../../scripts/packages/browser-package-config.mjs";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
 const strictModeResultKey = "__leanVirReactStrictModeSmoke";
 const browserProbeBundles = new Map();
 
-export async function smokeBrowserReactLifetimes(cdp) {
+export async function smokeBrowserReactLifetimes(cdp, artifactDirectory) {
   await smokeBrowserReactRefLifetime(cdp);
   await smokeBrowserReactStrictModeLifetime(cdp);
+  await smokeBrowserReactUseId(cdp, artifactDirectory);
+}
+
+export async function smokeBrowserReactUseId(
+  cdp,
+  artifactDirectory = fileURLToPath(new URL("../../web/public/", import.meta.url)),
+) {
+  const [wasm, pkg, source] = await Promise.all([
+    ...[wasmPublicFile, hostPackageFile].map((file) =>
+      readFile(resolve(artifactDirectory, file))),
+    bundledBrowserProbe("./react-use-id-entry.js", "development"),
+  ]);
+  await evaluateBrowserProbe(cdp, source, "lean-vir-react-use-id-smoke.js");
+  const result = await evaluate(cdp,
+    `runVirReactUseId(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])}).then(
+      value => ({ ok: true, value }),
+      error => ({ ok: false, error: error.stack ?? String(error),
+        causes: error.errors?.map(cause => cause.stack ?? String(cause)) })
+    )`);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value, [
+    { strict: false, instances: 3, distinctIds: 6 },
+    { strict: true, instances: 3, distinctIds: 6 },
+  ]);
+  return result.value;
 }
 
 async function smokeBrowserReactRefLifetime(cdp) {
@@ -130,4 +161,17 @@ async function bundledBrowserProbe(entry, nodeEnv) {
   }
   browserProbeBundles.set(cacheKey, output.text);
   return output.text;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const chromium = await launchChromium();
+  let cdp;
+  try {
+    cdp = await openChromiumPage(chromium);
+    await smokeBrowserReactLifetimes(cdp);
+    console.log("React browser checks passed: refs, Strict Mode, lifetimes, and real-Lean/Wasm useId");
+  } finally {
+    cdp?.close();
+    await chromium.close();
+  }
 }

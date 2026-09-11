@@ -12,7 +12,10 @@
     "abiProfile": {
       "id": "vir-react-protocol-v1",
       "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "types": {
+        "string": { "lean": "String", "representation": "js-resource" },
+        "void": { "lean": "Unit", "representation": "immediate" }
+      },
       "resource": {
         "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
         "argument": { "passing": "borrowed", "retention": "call" },
@@ -403,7 +406,14 @@
       "title": "Hooks",
       "targets": ["react.state.modify", "react.use*"],
       "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.Hooks.DependencyList", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerState", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.State", "Lean.Vir.React.StateSetter", "Lean.Vir.React.StateTuple"] },
-      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] }
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useId", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] },
+      "mappings": [
+        {
+          "typescript": "React.useId",
+          "targets": ["react.useId"],
+          "lean": ["Lean.Vir.React.Hooks.useId"]
+        }
+      ]
     }
   ]
 }

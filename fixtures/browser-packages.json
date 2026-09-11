@@ -133,6 +133,7 @@
         {
           "module": "fixtures.ReactInput",
           "roots": [
+            "ReactInput.useIdField",
             "ReactInput.mountInput",
             "ReactInput.mountChangeInput",
             "ReactInput.mountSelectTextarea",
