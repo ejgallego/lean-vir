@@ -47,10 +47,8 @@ The JavaScript runtime stages the complete set in a fresh instance, rejects
 identity conflicts, installs the root manifest last, and runs initializer
 globals in module order only after every member is available.
 
-The same package encoder also supports focused developer packages through
-`npm run generate:irpkg`, backed by `scripts/packages/lean-to-irpkg.mjs`. That
-utility accepts explicit roots, or it can package the public source definitions
-from a single Lean file. The `/dev.html` Vite entry point loads a served or
+The same encoder supports [focused packages from compiled modules](LOCAL_IRPKG.md#generate-a-package).
+The `/dev.html` Vite entry point loads a served or
 uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
 go through `vir_call_resolved_objects`; package format 11 stores direct
