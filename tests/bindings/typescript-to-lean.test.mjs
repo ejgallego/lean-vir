@@ -511,6 +511,21 @@ test("optional parameters can explicitly forward the native undefined union", ()
     shape.args[1].type = type;
     assert.equal(operation().arguments[1].type, "Lean.Vir.Js.UndefinedOr String");
     assert.deepEqual(operation().typescript.signaturePolicy.forwardedOptionalParameters, ["mode"]);
+    assert.deepEqual(operation().semantics, {
+      relation: "unreviewed",
+      evidence: "method-policy",
+      detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+    });
+  }
+  const policy = native.methodPolicies["Widget.getAttribute"];
+  for (const semantics of ["preserving", "changing"]) {
+    policy.semantics = semantics;
+    policy.reason = "Reviewed explicit-argument call surface; no automatic omission equivalence claim.";
+    assert.deepEqual(operation().semantics, {
+      relation: semantics,
+      evidence: "reviewed-method-policy",
+      detail: policy.reason,
+    });
   }
   for (const absence of ["null", "nullish"]) {
     shape.args[1].type = { kind: "option", absence, element: stringShape };

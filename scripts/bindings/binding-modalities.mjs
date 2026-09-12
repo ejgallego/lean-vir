@@ -412,6 +412,7 @@ function exceptionFor(generation, operationId) {
 function methodPolicyChangesCall(policy) {
   return policy.signature !== undefined ||
     (policy.omittedOptionalParameters?.length ?? 0) !== 0 ||
+    (policy.forwardedOptionalParameters?.length ?? 0) !== 0 ||
     (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
     (policy.omittedRestParameters?.length ?? 0) !== 0 ||
     Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
