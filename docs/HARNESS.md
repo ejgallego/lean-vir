@@ -79,6 +79,12 @@ semantics require the separate Chromium checks below.
   enforces an 8 GiB peak-RSS budget, retaining logs/package/results under
   `build/generator-memory-*`. Its `-- --no-build` option reuses prepared inputs.
   This is a resource regression, not a statistical latency benchmark.
+- Shared resolved-input API: `npm run test:generator:inputs` checks repeated
+  setup order/idempotence, conflicting paths, missing mapped private data despite
+  conventional copies, warm query reuse and damaged-setup repair. It needs Lean,
+  not Wasm. The cache campaign also exercises query-only acquisition and direct
+  generation at every phase, from a spaced workspace/custom build directory;
+  its Wasm gate compares both routes' actual 42-to-43 behavior.
 - Lake facets, marked-module selection, downstream input tracing, output
   ownership or SDK installation: `npm run test:lake`. For isolated cold,
   cache-only (conventional root/dependency artifacts absent), restoration and

@@ -110,6 +110,22 @@ shared-runtime extern registration nor general dynamic lookup.
 
 ## Build a module package set
 
+### What the client builds and caches
+
+Lake acquires compatible compiled modules from its cache or builds missing/outdated
+inputs. VIR's native generator then builds the application's selected package set.
+The browser SDK is a separate prebuilt distribution: download/verify it or supply
+an exact local archive. A missing SDK is not a request to install WASI SDK or
+rebuild Lean/VIR's browser runtime. Applications own their final HTML/JS/CSS build
+and deployment; browsers receive SDK/package bytes, not `.olean`, raw `.ir` or
+local setup files. Custom native runtimes require an explicit producer workflow.
+
+Cache the SDK by its verified distribution identity and compilation artifacts
+through Lake. A generated package set remains a complete, selection-dependent
+target; its dependency shards are not canonical whole-module cache entries.
+
+### Package generation
+
 ```bash
 lake build +MySlides.Runtime:vir
 ```
@@ -177,6 +193,46 @@ Module identities and ordinal shard names avoid checkout-local paths in the
 package set. Manifests omit wall-clock timestamps, so identical
 source/toolchain/profile inputs can produce identical bytes across build
 directories. The diagnostic report retains its generation timestamp.
+
+### Acquire inputs without generating a package
+
+For a custom packaging command, query the module's `:virInputs` facet:
+
+```sh
+lake query +MySlides.Runtime:virInputs
+lake query @lean_vir/vir_irpkg
+```
+
+These return the setup-file path and native generator executable path. Pass the
+returned paths to the generator in the same Lake environment:
+
+```sh
+lake env /returned/vir_irpkg app.irpkg app.report.md \
+  --setup /returned/Runtime.setup.json \
+  --target-marked-module MySlides.Runtime
+```
+
+`:virInputs` only acquires compiled inputs; it does not build the generator,
+emit a package, install an SDK or stage web assets. Both it and `:vir` use the
+same typed Lake resolver and full implementation traces. Querying it needs no
+additional downstream facet declaration. A custom Lake build rule must depend
+on the facet's job to retain those traces, not merely hash its setup JSON:
+compiled contents can change at the same paths. Do not reconstruct either
+returned path.
+
+For several target modules, query each `:virInputs` and repeat `--setup` before
+the selection arguments. The generator merges artifact maps, rejecting conflicting
+paths for a module; it still imports each target independently. SDK installation
+and package selection are not encoded in setup files. Keep files and paths fixed
+for the duration of generation, and query again after compilation/cache changes.
+
+The ordinary npm CLI, config batch and browser-catalog producer use this route.
+Repository helper `resolveVirInputsSync({ modules, cwd })` can query a different
+Lake workspace; `prepareVirIrpkgSync({ modules, lakeTargets })` prepares this
+repository's native generator and inputs. Additional `lakeTargets` express actual
+host prerequisites, not a second list of module inputs. Remaining standalone
+test/bindings and external-project adapters are not automatically migrated by
+using the same generator executable.
 
 ## Install the browser SDK
 

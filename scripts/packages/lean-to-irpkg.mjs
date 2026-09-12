@@ -70,7 +70,7 @@ console.log(`report:  ${reportPath}`);
 console.log(`mode:    ${mode}`);
 
 const generator = prepareVirIrpkgSync({
-  lakeTargets: [`+${module}`],
+  modules: [module],
 });
 if (!generator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(generator)}`);
@@ -79,7 +79,7 @@ if (!generator.ok) {
 
 const generated = spawnSync(
   generator.path,
-  [packagePath, reportPath, ...targetArgs],
+  [packagePath, reportPath, ...generator.inputArgs, ...targetArgs],
   { cwd: root, env: generator.env, stdio: "inherit" },
 );
 const status = generated.status ?? 1;
