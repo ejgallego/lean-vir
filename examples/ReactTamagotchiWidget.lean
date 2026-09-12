@@ -14,8 +14,9 @@ public section
 
 namespace ReactTamagotchiWidget
 
+open Lean.Vir
 open Lean.Vir.React
-open Lean.Vir.Infoview (Surface)
+open Lean.Vir.Infoview
 
 abbrev style := Lean.Vir.Examples.Style.style
 
@@ -33,16 +34,17 @@ def captionStyle : Props.Entry := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def View : Lean.Vir.RuntimeM (Lean.Vir.Js (Component Surface)) := do
+def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
   let petComponent ← ReactTamagotchi.View
-  Component.ofLean fun surface => do
-    let surface ← Lean.Vir.LeanRef.fromJSL surface
+  FunctionComponent.ofLean fun props => do
+    let position ← PanelWidgetProps.pos props
+    let uri ← JsValue.toString (← PanelPosition.uri position)
     let caption ← Node.pTextWith
       #[
         Props.id "react-tamagotchi-widget-caption",
         captionStyle
       ]
-      ("Shared React Tamagotchi component at " ++ surface.cursor.label)
+      ("Shared React Tamagotchi component at " ++ uri)
     let pet ← Node.component petComponent (← Lean.Vir.LeanRef.toJSL ())
     Node.sectionWith
       #[
@@ -53,7 +55,7 @@ def View : Lean.Vir.RuntimeM (Lean.Vir.Js (Component Surface)) := do
       ]
       #[caption, pet]
 
-vir_proof_widget View with mountId := "vir-react-tamagotchi-widget"
+vir_proof_widget View
 
 end ReactTamagotchiWidget
 

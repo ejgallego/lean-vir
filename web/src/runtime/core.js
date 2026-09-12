@@ -556,11 +556,9 @@ export class VirRuntime extends ObjectValueRuntime {
     this.requireLiveRuntime();
     this.requireFunction("vir_closure_call_objects");
     const fnArgs = requireFunctionArgs(type, "callback");
-    if (args.length !== fnArgs.length) {
-      throw new Error(
-        `callback expects ${fnArgs.length} arguments, got ${args.length}`,
-      );
-    }
+    // Like ordinary JS formal parameters, ignore extra arguments and read
+    // missing arguments as undefined. Each declared boundary view still
+    // performs its normal conversion/check when lowered into Lean.
     const argObjs = [];
     try {
       fnArgs.forEach((arg, index) => {

@@ -257,10 +257,12 @@ const harness = (globalThis.__shellTest = {
     const call = runtime.call.bind(runtime);
     runtime.call = (...args) => {
       if (args[0] === prefix + "createComponent") state.factoryCalls++;
-      if (state.throwRender && args[0] === prefix + "renderComponent") {
-        throw new Error("render sentinel");
-      }
       const value = call(...args);
+      if (state.throwComponentRender && args[0] === prefix + "createComponent") {
+        return function ThrowingComponent() {
+          throw new Error("render sentinel");
+        };
+      }
       return state.invalidComponent && args[0] === prefix + "createComponent"
         ? null
         : value;
@@ -277,10 +279,9 @@ async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   const config = {
     wasmPath: "shell.wasm",
     irPackage: {
-      roots: [prefix + "createComponent", prefix + "renderComponent"],
+      roots: [prefix + "createComponent"],
     },
     componentEntry: prefix + "createComponent",
-    entry: prefix + "renderComponent",
     pos: { uri: "file:///ShellLifetime.lean", line: 0, character: 0 },
     ...props,
   };
@@ -558,7 +559,7 @@ async function normalUnmountFailure() {
 }
 
 async function failedCandidates() {
-  runtimeFault = { throwRender: true };
+  runtimeFault = { throwComponentRender: true };
   allowConsoleDiagnostic("render sentinel", 2);
   const renderFailure = await mountShell();
   await until(
@@ -566,26 +567,26 @@ async function failedCandidates() {
       renderFailure.container.querySelector(
         '[data-shell-error-boundary="true"]',
       ),
-    "render entry failure reaches the ancestor boundary",
+    "factory component render failure reaches the ancestor boundary",
   );
   const rendered = states.at(-1);
   check(
     boundaryErrors.at(-1)?.includes("render sentinel") &&
       renderFailure.container.textContent.includes("render sentinel"),
-    "render entry failure is owned by the React error boundary",
+    "factory component render failure is owned by the React error boundary",
   );
   check(
     rendered.disposed === 0 &&
       rendered.cleanups === 0 &&
       harness.loadedRef.current === null,
-    "render entry failure detaches without hard disposal or invented cleanup",
+    "factory component render failure detaches without hard disposal or invented cleanup",
   );
   rendered.captured.success(undefined);
   checkContinuation(rendered, "success", false);
   check(
     readJsl(rendered.runtime.deref(), rendered.captured.payload) ===
       rendered.label,
-    "render-entry failure leaves captured JSL on the live generation",
+    "factory component render failure leaves captured JSL on the live generation",
   );
   rendered.captured = null;
   await renderFailure.unmount();

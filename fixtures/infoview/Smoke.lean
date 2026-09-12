@@ -52,25 +52,20 @@ def expectRootsError (roots : Array String) : IO Unit := do
   | .error _ => pure ()
 
 def AuthoringComponent : Lean.Vir.RuntimeM
-    (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
-  Lean.Vir.React.Component.ofLean fun _surface => do
+    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun _props => do
     Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString "authoring smoke")
 
-vir_proof_widget AuthoringComponent with mountId := "vir-smoke-widget"
+vir_proof_widget AuthoringComponent
 
 example : Lean.Vir.RuntimeM
-    (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
+    (Lean.Vir.React.FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) :=
   createComponent
-
-example : Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
-    Lean.Vir.Infoview.Surface → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=
-  renderComponent
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
   expect "authoring package roots" <|
     package.roots == #[
-      "SmokeInfoviewLean.createComponent",
-      "SmokeInfoviewLean.renderComponent"
+      "SmokeInfoviewLean.createComponent"
     ]
 
 def smokeVar : Lean.IR.VarId :=
@@ -266,8 +261,8 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
     Lean.Vir.Infoview.widget.javascript == generatedWidget
   expect "base64 vir" (Lean.Vir.Infoview.base64Encode "vir".toUTF8 == "dmly")
   expect "base64 Lean" (Lean.Vir.Infoview.base64Encode "Lean".toUTF8 == "TGVhbg==")
-  expect "embedded widget bundle has cursor surface" <|
-    1 < (Lean.Vir.Infoview.widget.javascript.splitOn "documentPositionFromInfoviewPosition").length
+  expect "embedded widget bundle does not normalize panel props" <|
+    (Lean.Vir.Infoview.widget.javascript.splitOn "surfaceFromInfoviewProps").length == 1
   expect "embedded widget bundle uses infoview react-dom external" <|
     1 < (Lean.Vir.Infoview.widget.javascript.splitOn "from \"react-dom\"").length
   expect "embedded widget bundle avoids react-dom/client" <|
@@ -276,27 +271,22 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.renderComponent"] #[
-    `VirNativeInfoview.createComponent,
-    `VirNativeInfoview.renderComponent
+  expectRootsOk #["VirNativeInfoview.createComponent"] #[
+    `VirNativeInfoview.createComponent
   ]
-  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.renderComponent"] #[
-    `ReactProofWidgetHello.createComponent,
-    `ReactProofWidgetHello.renderComponent
+  expectRootsOk #["ReactProofWidgetHello.createComponent"] #[
+    `ReactProofWidgetHello.createComponent
   ]
-  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.renderComponent"] #[
-    `ReactTamagotchiWidget.createComponent,
-    `ReactTamagotchiWidget.renderComponent
+  expectRootsOk #["ReactTamagotchiWidget.createComponent"] #[
+    `ReactTamagotchiWidget.createComponent
   ]
-  expectRootsOk #["VirNativeInfoview.renderComponent", "VirNativeInfoview.renderComponent"] #[
-    `VirNativeInfoview.renderComponent
+  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.createComponent"] #[
+    `VirNativeInfoview.createComponent
   ]
   expectRootsError #[]
   expectRootsError #["VirNativeInfoview."]
   expect "authoring widget component entry"
     (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
-  expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.renderComponent")
-  expect "authoring widget mount id" (widgetProps.mountId == "vir-smoke-widget")
   expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.ReactWidget.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage

@@ -63,6 +63,11 @@ functions such as React state setters already cross as `Js.Function1` values
 and need no conversion. `Js.erase` similarly forgets only a phantom type and
 returns the exact same JavaScript value as `Js.Any`.
 
+Converted callbacks use ordinary JavaScript formal-argument rules: extra
+arguments are ignored and omitted arguments arrive as `undefined`. Declared
+Lean boundary views still apply their normal conversion checks. This permits
+React to invoke a unary component with its additional internal argument.
+
 Unknown values narrow through the polymorphic `Js.cast` operation. Its
 `Js.Cast` instance selects a type-specific predicate and returns
 `Except Js.TypeConvError (Js target)` in the instance's effect. The initial

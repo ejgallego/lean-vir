@@ -231,6 +231,7 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/Common.bindings.json`
 - `Vir/Js.bindings.json`
 - `Vir/React.bindings.json`
+- `Vir/Infoview/Panel.bindings.json`
 - `Vir/Infoview/Surface.bindings.json`
 
 Selected upstream declarations may be pinned as small provenance-bearing

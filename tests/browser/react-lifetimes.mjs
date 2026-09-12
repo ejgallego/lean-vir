@@ -46,7 +46,7 @@ export async function smokeBrowserNativeInfoviewUpdates(
     )`);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value, {
-    submissions: 4, initialGoals: 3, collapsedAfterUpdate: true, finalGoals: 0,
+    submissions: 5, boundaryChecks: 5, initialGoals: 4, collapsedAfterUpdate: true, finalGoals: 0,
   });
   return result.value;
 }

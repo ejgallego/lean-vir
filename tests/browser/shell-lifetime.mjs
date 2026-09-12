@@ -33,7 +33,6 @@ function prepareShellLifetimePackage() {
     "--target-module",
     "ShellLifetime",
     "Vir.Fixtures.ShellLifetime.createComponent",
-    "Vir.Fixtures.ShellLifetime.renderComponent",
   ]);
 }
 async function buildShellLifetime({ withoutRemovalInvalidation = false } = {}) {
@@ -56,6 +55,7 @@ async function buildShellLifetime({ withoutRemovalInvalidation = false } = {}) {
         }));
         builder.onLoad({ filter: /.*/, namespace: "shell-test" }, () => ({
           contents: `import * as React from 'react';
+        export { TaggedText_stripTags } from '@leanprover/infoview-api';
         export const EditorContext = React.createContext(null);
         export function useClientNotificationEffect() { throw new Error('unexpected lifecycle notification hook'); }
         export function useRpcSession() { return globalThis.__shellTest.rpc; }`,

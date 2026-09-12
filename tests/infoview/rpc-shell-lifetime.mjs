@@ -66,7 +66,7 @@ async function main() {
             namespace: "rpc-shell-test",
           }));
           builder.onLoad({ filter: /.*/, namespace: "rpc-shell-test" }, () => ({
-            contents: `export { EditorConnection, EditorContext, useClientNotificationEffect }
+            contents: `export { EditorConnection, EditorContext, TaggedText_stripTags, useClientNotificationEffect }
               from ${JSON.stringify(fileURLToPath(import.meta.resolve("@leanprover/infoview")))};
             export function useRpcSession() { return globalThis.__rpcShell.session; }`,
             loader: "js",

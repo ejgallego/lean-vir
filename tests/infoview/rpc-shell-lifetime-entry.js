@@ -185,12 +185,11 @@ async function run() {
     root = createRoot(container, {
       onUncaughtError: (error) => unexpected.push(error),
     });
-    const roots = [prefix + "createComponent", prefix + "renderComponent"];
+    const roots = [prefix + "createComponent"];
     function renderWidget(session, position, entries = roots, {
       autoReloadMs = 0,
       setupHint = "",
       componentEntry = prefix + "createComponent",
-      entry = prefix + "renderComponent",
       editorConnection = editor,
     } = {}) {
       globalThis.__rpcShell.session = session;
@@ -201,7 +200,6 @@ async function run() {
             wasmPath: "web/public/vir-upstream.wasm",
             irPackage: { roots: entries },
             componentEntry,
-            entry,
             pos: { uri: config.uri, ...position },
             autoReloadMs,
             setupHint,
@@ -213,6 +211,7 @@ async function run() {
       const count = states.length;
       await renderWidget(session, position, entries, options);
       await waitFor("real-server shell ready", () => {
+        if (unexpected.length !== 0) throw unexpected[0];
         const error = container.querySelector(
           '[data-vir-infoview-state="error"]',
         );
@@ -361,7 +360,9 @@ async function run() {
       a,
       "configuration-replacement",
     );
-    const current = await mount(b, config.b, [...roots].reverse());
+    // A factory-only package has one root: reversing it no longer changes
+    // configuration. Include an existing fixture export to request a new package.
+    const current = await mount(b, config.b, [...roots, prefix + "record"]);
     check(
       previous.runtime !== current.runtime &&
         !previous.runtime.disposed &&
@@ -531,8 +532,8 @@ async function run() {
     // Exercise inherited upstream context with the all-Lean tutorial in the
     // actual shell, not a second root with a manually forwarded provider.
     packageReplyDelayMs = 0;
-    const tutorialEntries = ["RpcReferenceWidget.createComponent", "RpcReferenceWidget.renderComponent"];
-    const tutorialOptions = { componentEntry: tutorialEntries[0], entry: tutorialEntries[1] };
+    const tutorialEntries = ["RpcReferenceWidget.createComponent"];
+    const tutorialOptions = { componentEntry: tutorialEntries[0] };
     await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
     await waitFor("all-Lean tutorial ready in actual shell", () => {
       const error = container.querySelector('[data-vir-infoview-state="error"]');

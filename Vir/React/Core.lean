@@ -18,6 +18,13 @@ public section
 
 namespace Lean.Vir.React
 
+/-- Creates a native function component from a Lean render callback. -/
+def FunctionComponent.ofLean
+    (render : Lean.Vir.Js props → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.RuntimeM (FunctionComponent props) := by
+  unfold ReactM at render
+  exact Lean.Vir.Js.Function.ofLean render
+
 namespace StateSetter
 
 def set

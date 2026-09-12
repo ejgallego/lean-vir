@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { EditorContext, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
+import { EditorContext, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
@@ -15,16 +15,11 @@ import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
 import { collectCleanupError } from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
-let nextMountId = 0;
 const wasmModuleCache = new Map();
 
 const shellStyle = {
   display: "grid",
   gap: "0.5rem",
-  minWidth: 0,
-};
-
-const mountStyle = {
   minWidth: 0,
 };
 
@@ -48,19 +43,17 @@ export default function VirInfoviewWidget(props) {
     kind: "loading",
     message: "Loading VIR widget...",
   });
-  const [mountId] = React.useState(() => freshMountId(props.mountId));
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
   const [reloadToken, setReloadToken] = React.useState(0);
   const refreshGenerationRef = React.useRef(0);
   const loadingGenerationRef = React.useRef(null);
-  const surface = surfaceFromInfoviewProps(props, rpcSession);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
       : JSON.stringify(props.irPackage);
   const configurationKey = JSON.stringify([
-    props.wasmPath, irPackageKey, props.componentEntry, props.entry,
+    props.wasmPath, irPackageKey, props.componentEntry,
   ]);
 
   React.useLayoutEffect(() => {
@@ -106,7 +99,6 @@ export default function VirInfoviewWidget(props) {
         service.runtime,
         config.componentEntry,
       );
-      const entry = validateWidgetEntry(service.runtime, config.entry);
       const component = service.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
@@ -116,7 +108,6 @@ export default function VirInfoviewWidget(props) {
       const next = {
         service,
         component,
-        entry,
         configurationKey,
         generation: refreshGenerationRef.current,
       };
@@ -124,7 +115,7 @@ export default function VirInfoviewWidget(props) {
       setLoaded(next);
       service = null;
       setReloadToken(0);
-      setStatus({ kind: "ready", message: entry.entry });
+      setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
       if (service !== null) {
@@ -161,8 +152,6 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
-    mountId,
   ]);
 
   React.useEffect(() => {
@@ -181,8 +170,6 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
-    mountId,
     reloadToken,
   ]);
 
@@ -237,7 +224,6 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
     props.autoReloadMs,
   ]);
 
@@ -252,13 +238,9 @@ export default function VirInfoviewWidget(props) {
       onPointerDown: stopInfoviewEvent,
       style: shellStyle,
     },
-    e("div", {
-      id: mountId,
-      className: "vir-infoview-widget-mount",
-      style: mountStyle,
-    }, loaded?.configurationKey === configurationKey
-      ? e(LoadedWidget, { key: loaded.generation, loaded, surface })
-      : null),
+    loaded?.configurationKey === configurationKey
+      ? e(loaded.component, { ...props, key: loaded.generation })
+      : null,
     status.kind === "ready"
       ? null
       : e(
@@ -271,31 +253,6 @@ export default function VirInfoviewWidget(props) {
 
 function stopInfoviewEvent(event) {
   event.stopPropagation();
-}
-
-// Like upstream DynamicComponent, return the native element in the existing
-// React tree. Contexts, reconciliation and render errors belong to React.
-function LoadedWidget({ loaded, surface }) {
-  return loaded.service.runtime.call(
-    loaded.entry.entry, loaded.component, surface,
-  );
-}
-
-export function validateWidgetEntry(runtime, entryName) {
-  const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
-  if (
-    !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 2 ||
-    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.RESOURCE
-  ) {
-    throw new Error(
-      `VIR widget entry ${entryName} must be an effectful Component -> Surface -> Node entry`,
-    );
-  }
-  return entry;
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {
@@ -331,241 +288,6 @@ function requireWidgetManifestEntry(runtime, entryName, label) {
   return entry;
 }
 
-export function surfaceFromInfoviewProps(props, rpcSession) {
-  const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
-    goalFromInteractiveGoal(goal, index, "goal"),
-  );
-  const termGoal =
-    props?.termGoal === null || props?.termGoal === undefined
-      ? []
-      : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
-  const cursor = documentPositionFromInfoviewPosition(props?.pos);
-  const selections = arrayOrEmpty(props?.selectedLocations).map(
-    selectedLocationFromInfoviewLocation,
-  );
-  return {
-    position: cursor.label,
-    cursor,
-    goals: [...goals, ...termGoal],
-    selectedLocations: selections.map((selection) => selection.label),
-    selections,
-    rpcSession,
-  };
-}
-
-function goalFromInteractiveGoal(goal, index, kind) {
-  const userName = optionalStringValue(
-    readOption(goal?.userName ?? goal?.["userName?"]),
-  );
-  const mvarId = optionalStringValue(goal?.mvarId?.name ?? goal?.mvarId);
-  const title =
-    kind === "term"
-      ? "Term goal"
-      : userName.length === 0
-        ? `Goal ${index + 1}`
-        : `case ${userName}`;
-  const idSeed =
-    kind === "term" ? `term-${index}` : optionalStringValue(mvarId || userName);
-  const id = safeDomId(idSeed.length === 0 ? `${kind}-${index}` : idSeed);
-  return {
-    id,
-    kind,
-    index,
-    title,
-    userName: userName.length === 0 ? null : userName,
-    mvarId: mvarId.length === 0 ? null : mvarId,
-    status: goalStatus(goal, index, kind),
-    target: nonEmptyText(taggedTextToPlain(goal?.type), "(unavailable target)"),
-    hypotheses: arrayOrEmpty(goal?.hyps).map((hypothesis, hypothesisIndex) =>
-      hypothesisFromBundle(hypothesis, id, hypothesisIndex),
-    ),
-  };
-}
-
-function hypothesisFromBundle(hypothesis, goalId, index) {
-  const names = arrayOrEmpty(hypothesis?.names).filter(
-    (name) => typeof name === "string",
-  );
-  const fvarIds = arrayOrEmpty(hypothesis?.fvarIds)
-    .map(infoviewIdToString)
-    .filter((id) => id.length !== 0);
-  const idSeed =
-    names.length === 0
-      ? optionalStringValue(fvarIds[0] ?? `hyp-${index}`)
-      : names.join("-");
-  return {
-    id: safeDomId(`${goalId}-${idSeed}`),
-    names,
-    fvarIds,
-    type: nonEmptyText(
-      taggedTextToPlain(hypothesis?.type),
-      "(unavailable type)",
-    ),
-    value: optionalTaggedTextToPlain(hypothesis?.val ?? hypothesis?.["val?"]),
-  };
-}
-
-export function taggedTextToPlain(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map(taggedTextToPlain).join("");
-  }
-  if (typeof value !== "object") {
-    return String(value);
-  }
-  if (typeof value.text === "string") {
-    return value.text;
-  }
-  if (Array.isArray(value.append)) {
-    return value.append.map(taggedTextToPlain).join("");
-  }
-  if (Array.isArray(value.tag)) {
-    return taggedTextToPlain(value.tag[1]);
-  }
-  return "";
-}
-
-function optionalTaggedTextToPlain(value) {
-  const option = readOption(value);
-  return option === null ? null : taggedTextToPlain(option);
-}
-
-function readOption(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === "object") {
-    if (value.kind === "none") {
-      return null;
-    }
-    if (value.kind === "some") {
-      return value.value;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, "some")) {
-      return value.some;
-    }
-  }
-  return value;
-}
-
-function goalStatus(goal, index, kind) {
-  if (kind === "term") {
-    return "term";
-  }
-  if (readOption(goal?.isInserted ?? goal?.["isInserted?"]) === true) {
-    return "inserted";
-  }
-  if (readOption(goal?.isRemoved ?? goal?.["isRemoved?"]) === true) {
-    return "removed";
-  }
-  return index === 0 ? "active" : "pending";
-}
-
-function documentPositionFromInfoviewPosition(pos) {
-  const hasPosition = pos !== null && typeof pos === "object";
-  const line =
-    hasPosition && Number.isInteger(pos.line) && pos.line >= 0 ? pos.line : 0;
-  const character =
-    hasPosition && Number.isInteger(pos.character) && pos.character >= 0
-      ? pos.character
-      : 0;
-  const uri = hasPosition && typeof pos.uri === "string" ? pos.uri : "";
-  const fileName = fileNameFromUri(uri);
-  const label = hasPosition
-    ? formatDocumentPositionLabel(fileName, line, character)
-    : "unknown position";
-  return {
-    uri,
-    fileName,
-    line,
-    character,
-    label,
-  };
-}
-
-function formatDocumentPositionLabel(fileName, line, character) {
-  const label = `line ${line + 1}:${character + 1}`;
-  return fileName.length === 0
-    ? label
-    : `${fileName}:${line + 1}:${character + 1}`;
-}
-
-function fileNameFromUri(uri) {
-  if (uri.length === 0) {
-    return "";
-  }
-  return decodeURIComponent(uri).split(/[\\/]/).pop() ?? "";
-}
-
-function selectedLocationFromInfoviewLocation(location, index) {
-  const label = formatSelectedLocation(location, index);
-  const kind = selectedLocationKind(location);
-  return {
-    id: safeDomId(`${kind}-${label}-${index}`),
-    kind,
-    label,
-  };
-}
-
-function formatSelectedLocation(location, index) {
-  if (location === null || location === undefined) {
-    return `location-${index}`;
-  }
-  if (typeof location === "string") {
-    return location;
-  }
-  if (typeof location === "object") {
-    return (
-      optionalStringValue(location.kind ?? location.type ?? location.id) ||
-      `location-${index}`
-    );
-  }
-  return String(location);
-}
-
-function selectedLocationKind(location) {
-  if (location !== null && typeof location === "object") {
-    return optionalStringValue(location.kind ?? location.type) || "location";
-  }
-  return "location";
-}
-
-function infoviewIdToString(value) {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value !== null && typeof value === "object") {
-    return optionalStringValue(value.name ?? value.id);
-  }
-  return "";
-}
-
-function arrayOrEmpty(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function optionalStringValue(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function nonEmptyText(value, fallback) {
-  const text = optionalStringValue(value).trim();
-  return text.length === 0 ? fallback : text;
-}
-
-function safeDomId(value) {
-  const normalized = String(value)
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return normalized.length === 0 ? "item" : normalized;
-}
-
 function requiredString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`VIR widget ${label} must be a non-empty string`);
@@ -589,7 +311,6 @@ function widgetRuntimeConfigFromProps(props) {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
     componentEntry: requiredString(props.componentEntry, "componentEntry"),
-    entry: requiredString(props.entry, "entry"),
     position: requiredPosition(props.pos, "pos"),
     autoReloadMs: optionalNonNegativeInteger(
       props.autoReloadMs,
@@ -669,6 +390,8 @@ async function createRuntimeService({ rpcSession, hostContext, sources }) {
       }),
       reactHostBindings: createBrowserReactHostBindings,
       infoviewUseClientNotificationEffect: useClientNotificationEffect,
+      infoviewUseRpcSession: useRpcSession,
+      infoviewStripTags: TaggedText_stripTags,
     });
   return {
     packageRevision: sources.packageSource.revision ?? "",
@@ -945,15 +668,6 @@ export function decodeBase64Bytes(base64) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function freshMountId(value) {
-  const prefix =
-    typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value)
-      ? value
-      : "vir-infoview-widget";
-  nextMountId += 1;
-  return `${prefix}-${nextMountId}`;
 }
 
 function widgetCleanupError(errors, message) {
