@@ -124,6 +124,18 @@ jobs:
           path: web/public
       - run: npm run test:infoview
       - run: npm run test:lake:cache:wasm
+        id: lake_cache
+        env:
+          TMPDIR: ${{ runner.temp }}
+      - name: Preserve failed Lake cache campaign
+        if: failure() && steps.lake_cache.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lake-cache-failure
+          path: ${{ runner.temp }}/vir-lake-cache-artifacts-*
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run test:runtime:lean
 
   fixtures:

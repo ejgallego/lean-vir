@@ -45,6 +45,7 @@ const descriptorPath = path.join(
   ".lake/build/vir/module-sets/CacheFixture/Root.irpkg-set.json",
 );
 const setupPath = descriptorPath.replace(/[.]irpkg-set[.]json$/, ".setup.json");
+let succeeded = false;
 
 try {
   assert.ok(
@@ -146,8 +147,9 @@ try {
     await assertRuntimeResult("restoration control", "43");
     console.log("VIR Lake cache-only artifact smoke ok");
   }
+  succeeded = true;
 } finally {
-  if (!keep && !options.expectCacheOnlyFailure) {
+  if (succeeded && !keep && !options.expectCacheOnlyFailure) {
     rmSync(temporary, { recursive: true, force: true });
   } else if (existsSync(temporary)) {
     console.log(`VIR Lake cache artifact workspace: ${temporary}`);
@@ -286,9 +288,10 @@ function runBuild(label, restore) {
       LAKE_RESTORE_ARTIFACTS: restore ? "true" : "false",
     },
   });
-  assert.ifError(result.error);
-  const log = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  const log = `${result.stdout ?? ""}\n${result.stderr ?? ""}` +
+    (result.error ? `\n${result.error.stack ?? result.error}\n` : "");
   writeFileSync(path.join(logs, `${label}.log`), log);
+  assert.ifError(result.error);
   return { status: result.status, log };
 }
 

@@ -89,6 +89,10 @@ semantics require the separate Chromium checks below.
   the demo artifacts; source-only Lake checks do not require Wasm.
   CI runs `test:lake:facets` separately and executes the cache campaign only once,
   with Wasm. Every phase checks descriptor hashes and byte lengths against files.
+  Failed cache campaigns retain and print their temporary workspace (including
+  captured process errors, logs, setup maps and artifacts); successful normal runs clean
+  up unless `--keep` is passed. CI uploads failed campaign workspaces for seven
+  days, including hidden Lake files. Missing Wasm fails before workspace creation.
 - Fixture behavior: `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`;
   omit the filter for the whole oracle suite. Expectations, structured
   diagnostics and runner configuration alone use `npm run test:fixtures:unit`,
