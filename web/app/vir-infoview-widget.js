@@ -12,10 +12,7 @@ import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.
 import { widgetErrorMessage as errorMessage } from "../src/vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
-import {
-  collectCleanupError,
-  throwCollectedErrors,
-} from "../src/runtime/cleanup.js";
+import { collectCleanupError } from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
 let nextMountId = 0;
@@ -55,7 +52,6 @@ export default function VirInfoviewWidget(props) {
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
   const [reloadToken, setReloadToken] = React.useState(0);
-  const irPackageRevisionRef = React.useRef("");
   const refreshGenerationRef = React.useRef(0);
   const loadingGenerationRef = React.useRef(null);
   const surface = surfaceFromInfoviewProps(props, rpcSession);
@@ -117,7 +113,6 @@ export default function VirInfoviewWidget(props) {
           `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
         );
       }
-      irPackageRevisionRef.current = service.packageRevision;
       const next = {
         service,
         component,
@@ -209,7 +204,7 @@ export default function VirInfoviewWidget(props) {
             rpcSession: hostContextRef.current.rpcSession,
             irPackage: config.irPackage,
             position: hostContextRef.current.position,
-            currentRevision: irPackageRevisionRef.current,
+            currentRevision: loadedRef.current.service.packageRevision,
           })
             .then((shouldReload) => {
               if (!disposed && shouldReload) {

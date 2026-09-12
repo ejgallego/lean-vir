@@ -4,16 +4,38 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { evaluate, launchChromium, openChromiumPage } from "./harness.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const [wasm, pkg] = await Promise.all([
-  readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)),
-  readFile(new URL("../../build/shell-lifetime.irpkg", import.meta.url)),
-]);
+
+function run(args) {
+  const result = spawnSync("lake", args, {
+    cwd: root,
+    stdio: "inherit",
+    timeout: 120000,
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `lake ${args.join(" ")}`);
+}
+
+function prepareShellLifetimePackage() {
+  run(["build", "VirInfoview", "vir_irpkg", "+ShellLifetime"]);
+  run([
+    "env",
+    ".lake/build/bin/vir_irpkg",
+    "build/shell-lifetime.irpkg",
+    "build/shell-lifetime.report.md",
+    "--target-module",
+    "ShellLifetime",
+    "Vir.Fixtures.ShellLifetime.createComponent",
+    "Vir.Fixtures.ShellLifetime.renderComponent",
+  ]);
+}
 async function buildShellLifetime({ withoutRemovalInvalidation = false } = {}) {
   return build({
     absWorkingDir: root,
@@ -144,22 +166,45 @@ function assertPendingRemovalControl(result, expected) {
   assert.equal(result.loaded, false);
 }
 
-const [redBundle, greenBundle] = await Promise.all([
-  buildShellLifetime({ withoutRemovalInvalidation: true }),
-  buildShellLifetime(),
-]);
-const chromium = await launchChromium({ exposeGc: true });
-let cdp;
-try {
-  cdp = await openChromiumPage(chromium);
-  const wasmBase64 = wasm.toString("base64");
-  const packageBase64 = pkg.toString("base64");
-  const red = await runPendingRemovalControl(cdp, redBundle, wasmBase64, packageBase64);
-  assertPendingRemovalControl(red, { disposed: 0, factoryCalls: 1, cleanups: 0 });
-  const green = await runPendingRemovalControl(cdp, greenBundle, wasmBase64, packageBase64);
-  assertPendingRemovalControl(green, { disposed: 1, factoryCalls: 0, cleanups: 0 });
-  console.log("actual React pending-removal control: red leak, green unpublished disposal");
-  if (process.env.VIR_SHELL_LIFETIME_FOCUS_ONLY !== "1") {
+async function main() {
+  prepareShellLifetimePackage();
+  const [wasm, pkg, redBundle, greenBundle] = await Promise.all([
+    readFile(join(root, "web/public/vir-upstream.wasm")),
+    readFile(join(root, "build/shell-lifetime.irpkg")),
+    buildShellLifetime({ withoutRemovalInvalidation: true }),
+    buildShellLifetime(),
+  ]);
+  const chromium = await launchChromium({ exposeGc: true });
+  let cdp;
+  try {
+    cdp = await openChromiumPage(chromium);
+    const wasmBase64 = wasm.toString("base64");
+    const packageBase64 = pkg.toString("base64");
+    const red = await runPendingRemovalControl(
+      cdp,
+      redBundle,
+      wasmBase64,
+      packageBase64,
+    );
+    assertPendingRemovalControl(red, {
+      disposed: 0,
+      factoryCalls: 1,
+      cleanups: 0,
+    });
+    const green = await runPendingRemovalControl(
+      cdp,
+      greenBundle,
+      wasmBase64,
+      packageBase64,
+    );
+    assertPendingRemovalControl(green, {
+      disposed: 1,
+      factoryCalls: 0,
+      cleanups: 0,
+    });
+    console.log(
+      "actual React pending-removal control: red leak, green unpublished disposal",
+    );
     await evaluate(cdp, `${greenBundle.outputFiles[0].text}\nvoid 0;`);
     const result = await evaluate(
       cdp,
@@ -167,8 +212,10 @@ try {
     );
     assert.equal(result.ok, true);
     console.log("actual shell/Lean/Chromium lifetime smoke ok", result);
+  } finally {
+    cdp?.close();
+    await chromium.close();
   }
-} finally {
-  cdp?.close();
-  await chromium.close();
 }
+
+await main();

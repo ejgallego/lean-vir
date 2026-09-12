@@ -113,6 +113,44 @@ function recordConsoleDiagnostic(level, args) {
   }
 }
 
+function observeDiagnostics() {
+  const unexpectedStart = unexpectedConsole.length;
+  const unhandledStart = unhandled.length;
+  const consoleError = console.error,
+    consoleWarn = console.warn;
+  const onUnhandled = (event) => {
+    unhandled.push(String(event.reason));
+    event.preventDefault();
+  };
+  globalThis.addEventListener("unhandledrejection", onUnhandled);
+  console.error = (...args) => {
+    recordConsoleDiagnostic("error", args);
+    consoleError(...args);
+  };
+  console.warn = (...args) => {
+    recordConsoleDiagnostic("warn", args);
+    consoleWarn(...args);
+  };
+  return () => {
+    console.error = consoleError;
+    console.warn = consoleWarn;
+    globalThis.removeEventListener("unhandledrejection", onUnhandled);
+    check(
+      unexpectedConsole.length === unexpectedStart,
+      `unexpected console diagnostic: ${unexpectedConsole
+        .slice(unexpectedStart)
+        .map(({ level, message }) => `${level}: ${message}`)
+        .join("; ")}`,
+    );
+    check(
+      unhandled.length === unhandledStart,
+      `unexpected unhandled rejection: ${unhandled
+        .slice(unhandledStart)
+        .join("; ")}`,
+    );
+  };
+}
+
 async function tick() {
   await React.act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -808,6 +846,7 @@ function installMockRpc(wasmBase64, packageBase64) {
 async function pendingCandidateAfterCommittedRemoval(wasmBase64, packageBase64) {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   installMockRpc(wasmBase64, packageBase64);
+  const finishDiagnostics = observeDiagnostics();
   const gate = deferred();
   const timing = {
     loadReady: false,
@@ -883,6 +922,7 @@ async function pendingCandidateAfterCommittedRemoval(wasmBase64, packageBase64) 
       } catch {}
     }
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    finishDiagnostics();
   }
 }
 
@@ -890,21 +930,7 @@ globalThis.runPendingCandidateAfterCommittedRemoval = pendingCandidateAfterCommi
 
 globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  const onUnhandled = (event) => {
-    unhandled.push(String(event.reason));
-    event.preventDefault();
-  };
-  globalThis.addEventListener("unhandledrejection", onUnhandled);
-  const consoleError = console.error,
-    consoleWarn = console.warn;
-  console.error = (...args) => {
-    recordConsoleDiagnostic("error", args);
-    consoleError(...args);
-  };
-  console.warn = (...args) => {
-    recordConsoleDiagnostic("warn", args);
-    consoleWarn(...args);
-  };
+  const finishDiagnostics = observeDiagnostics();
   const setIntervalOriginal = globalThis.setInterval,
     clearIntervalOriginal = globalThis.clearInterval;
   const intervals = new Set();
@@ -937,16 +963,6 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
       failures.every((failure) => failure.includes("normal cleanup sentinel")),
       "only the injected React cleanup error is observed when React forwards it",
     );
-    check(
-      unexpectedConsole.length === 0,
-      `unexpected console diagnostic: ${unexpectedConsole
-        .map(({ level, message }) => `${level}: ${message}`)
-        .join("; ")}`,
-    );
-    check(
-      unhandled.length === 0,
-      `unexpected unhandled rejection: ${unhandled.join("; ")}`,
-    );
     return {
       ok: true,
       generations: states.length,
@@ -968,10 +984,8 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
   } finally {
     globalThis.setInterval = setIntervalOriginal;
     globalThis.clearInterval = clearIntervalOriginal;
-    console.error = consoleError;
-    console.warn = consoleWarn;
     for (const id of intervals) clearIntervalOriginal(id);
-    globalThis.removeEventListener("unhandledrejection", onUnhandled);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    finishDiagnostics();
   }
 };
