@@ -173,7 +173,21 @@ duplicate and dependency checks.
 Classification tries the source type as written first, unfolding reducible
 abbreviation heads only when the outer shape is unsupported. This admits aliases
 such as `abbrev UserId := Nat` and effect aliases while preserving primitive,
-container and resource handling. Core/signature classification returns
+container and resource handling. Full classification additionally permits head
+beta reduction and projections from closed, fully applied record constructors.
+For example, a record's type field may select `String`, and a constant family
+`(fun _ => String) key` may discard its bound key. Ordinary definitions unfold
+only to expose the projection receiver; opaque/irreducible definitions,
+matches/recursors and lets are not evaluated. A shared budget of 32 head visits
+bounds each new reduction attempt; exhaustion leaves the alias-reduced type
+unchanged. A result with free variables, metavariables or loose bound variables
+is not admitted by this reduction. Primitive/resource/effect heads remain
+intact, and the ordinary layout and host-boundary checks still apply.
+This is not general dependent-type support or a guarantee that full `Lean.Json`
+or application-specific document types cross the structural ABI. Marker-only
+export/startup preflight retains its existing abbreviation policy.
+
+Core/signature classification returns
 `InterfaceClassifierError` values with nested type context. Host validation
 composes them with typed boundary errors; each user boundary renders diagnostics
 there, rather than sharing preformatted success/failure strings.
