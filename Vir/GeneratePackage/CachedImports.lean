@@ -18,8 +18,17 @@ namespace Vir.GeneratePackage
 extension states are deliberately not cached. Never free these regions: imported
 extensions can retain references beyond the declaration index's lifetime. -/
 public structure CompiledImportCache where
+  private mk ::
+  /-- Fixed resolution context; changing paths requires a fresh cache. -/
+  importArts : NameMap ImportArtifacts
   data : NameMap (Array (ModuleData × CompactedRegion)) := {}
   ir : NameMap (Array (ModuleData × CompactedRegion)) := {}
+
+/-- Begin one generation with Lake-resolved paths, or conventional search paths
+when no mapping is supplied. The private constructor prevents replacing the
+resolution map while retaining regions read under a different map. -/
+public def CompiledImportCache.empty (importArts : NameMap ImportArtifacts := {}) :
+    CompiledImportCache := { importArts }
 
 private abbrev CachedImportM := StateRefT ImportState (StateRefT CompiledImportCache IO)
 
@@ -37,14 +46,18 @@ where
   loadData (i : Import) := do
     if let some parts := (← getThe CompiledImportCache).data.find? i.module then
       return parts
-    let parts ← readModuleDataPartsOfMod i.module
+    let parts ← if let some arts := (← getThe CompiledImportCache).importArts.find? i.module then
+        readModuleDataParts (arts.oleanParts (inServer := false))
+      else readModuleDataPartsOfMod i.module
     modifyThe CompiledImportCache fun cache =>
       { cache with data := cache.data.insert i.module parts }
     return parts
   loadIR (i : Import) := do
     if let some parts := (← getThe CompiledImportCache).ir.find? i.module then
       return parts
-    let parts ← readIRPartsOfMod i.module
+    let parts ← if let some arts := (← getThe CompiledImportCache).importArts.find? i.module then
+        readModuleDataParts arts.irParts
+      else readIRPartsOfMod i.module
     modifyThe CompiledImportCache fun cache =>
       { cache with ir := cache.ir.insert i.module parts }
     return parts

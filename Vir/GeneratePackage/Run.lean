@@ -70,8 +70,9 @@ structure AnalyzedPackage where
 structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
 
-private unsafe def loadRunDeclIndex (targets : Array Target) : IO DeclIndex := do
-  let index ← loadDeclIndex targets
+private unsafe def loadRunDeclIndex (targets : Array Target)
+    (importArts : NameMap ImportArtifacts) : IO DeclIndex := do
+  let index ← loadDeclIndex targets importArts
   let index ← match ← Vir.readClientNativeExternManifestFromEnv with
     | none => pure index
     | some manifest =>
@@ -138,8 +139,9 @@ def buildPackageFromIndex
   | .error err =>
       return .error err
 
-unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
-  let index ← loadRunDeclIndex targets
+unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath)
+    (importArts : NameMap ImportArtifacts := {}) : IO UInt32 := do
+  let index ← loadRunDeclIndex targets importArts
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest
@@ -196,7 +198,8 @@ unsafe def runModuleSet
     (rootModule : Name)
     (packagePath descriptorPath shardDir : System.FilePath)
     (rootRelativePath shardRelativeDir : String)
-    (reportPath : System.FilePath) : IO UInt32 := do
+    (reportPath : System.FilePath)
+    (importArts : NameMap ImportArtifacts := {}) : IO UInt32 := do
   if targets.size != 1 then
     IO.eprintln s!"module package-set generation requires exactly one target, got {targets.size}"
     return 1
@@ -213,7 +216,7 @@ unsafe def runModuleSet
     IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
     return 1
 
-  let index ← loadRunDeclIndex targets
+  let index ← loadRunDeclIndex targets importArts
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
   let manifest := analysis.manifest

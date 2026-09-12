@@ -34,10 +34,19 @@ marked targets use `marked`.
 
 ### Compiled modules
 
-Lake owns compilation. The generator calls Lean's direct `importModules` API
-through `importModuleEnv`, without a source frontend or generated import driver.
+Lake owns compilation. Through `loadDeclIndex`, the generator uses a cached
+adapter of Lean's importer and ordinary `finalizeImport`, without a source
+frontend or generated import driver.
 Source commands such as `#eval` execute during compilation, not again during
 packaging. Build the named module and artifacts before invoking the executable.
+
+The optional `--setup <setup.json>` immediately after the package/report paths
+reads Lean's `ModuleSetup.importArts` map. Lake supplies resolved root and
+transitive artifacts, including private data and full IR, so cache-only inputs
+need not exist at conventional search-path locations. `DeclIndex` retains this
+map for subsequent owning-module loads. Only artifact paths are consumed; setup
+options, plugins and target selection do not override the generator's import
+context. Without a setup file, ordinary Lean search paths remain in use.
 
 Acquisition preserves `module; import all M` semantics: ordinary/meta `Init`
 imports, private target IR, persistent extensions and module-system visibility.
@@ -57,8 +66,11 @@ exported level with interpretation IR. Lean 4.33 has no overlapping-import
 artifact cache hook; the adapter uses `import all Lean.Environment` for its
 internal acquisition types/readers and ordinary `finalizeImport`. On toolchain
 changes, compare it with upstream `importModulesCore` and run the import-cache
-equivalence tests. Cache scope is one index with fixed search paths/artifacts,
-not a process-global cache. Compacted regions must not be explicitly freed:
+equivalence tests. `CompiledImportCache.empty` fixes the resolved artifact map
+for one index; changing the map requires a fresh cache. Resolved data/IR reads
+are memoized just like conventional search-path reads. Search paths and file
+contents must remain fixed, and the cache is not process-global.
+Compacted regions must not be explicitly freed:
 imported extension closures can retain references outside the index.
 
 Input identity is a typed module/snapshot identity, not a display label or
@@ -124,7 +136,7 @@ module. The map below groups shared policy separately from orchestration;
 ## Data flow and initialization
 
 1. The CLI constructs targets with independent origin and selection. Compiled
-   inputs use `importModuleEnv`; server inputs use `prepareSnapshotInput`.
+   inputs use `loadDeclIndex`; server inputs use `prepareSnapshotInput`.
 2. `Inputs.loadDeclIndex` records input environments, owned IR names and marker
    sets. All-public and marked selection filter to the requested module.
    Different module targets defining the same Lean declaration name produce a

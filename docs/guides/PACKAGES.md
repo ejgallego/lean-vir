@@ -158,8 +158,14 @@ stay unchanged. The selected `VIR_NATIVE_EXTERN_MANIFEST` path and contents are
 also inputs. A missing root, report or listed shard, or a member whose length
 or SHA-256 differs from the descriptor, invalidates the cached target. Size
 checks use filesystem metadata; one portable Node crypto invocation hashes all
-members. These checks cover the descriptor cache; they do not establish
-cache-only reuse of Lean's input artifacts.
+members.
+
+Compiled inputs use Lake's resolved artifact paths, including cache-only hits
+with no conventional `.olean` or `.ir` files restored under `.lake/build`.
+The facet carries root and transitive private/IR artifacts through a local Lean
+setup file; later owning-module loads use the same mapping. No cache restoration
+setting is required. The setup file is build-local input metadata, not part of
+the published package set; output locations and descriptor ownership are unchanged.
 
 The descriptor is one Lake target. Invalidating it regenerates every reached
 member; unchanged members are not independently cached. Before generation the

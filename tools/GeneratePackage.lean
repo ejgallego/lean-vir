@@ -77,22 +77,32 @@ unsafe def main (args : List String) : IO UInt32 := do
       IO.eprintln "at least one explicit package target is required"
       return 2
   | packagePath :: reportPath :: targetArgs =>
+      -- Lake's setup format transports resolved compiled inputs only. The
+      -- generator still owns its import context, options and target selection.
+      let (importArts, targetArgs) ← match targetArgs with
+        | "--setup" :: setupPath :: rest => do
+            let setup ← ModuleSetup.load setupPath
+            pure (setup.importArts, rest)
+        | _ => pure (({} : NameMap ImportArtifacts), targetArgs)
+      if targetArgs.isEmpty then
+        IO.eprintln "at least one explicit package target is required"
+        return 2
       match targetArgs with
       | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::
           rootRelativePath :: shardRelativeDir :: targetArgs =>
           match Vir.parseDottedName moduleName, parseTargets targetArgs with
           | .ok rootModule, .ok targets =>
               Vir.GeneratePackage.runModuleSet targets rootModule
-                packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath
+                packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath importArts
           | .error err, _ | _, .error err =>
               IO.eprintln err
               return 2
       | _ =>
           match parseTargets targetArgs with
-          | .ok targets => Vir.GeneratePackage.run targets packagePath reportPath
+          | .ok targets => Vir.GeneratePackage.run targets packagePath reportPath importArts
           | .error err =>
               IO.eprintln err
               return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--setup <setup.json>] [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target-module <module> <root>... | --package-module <module> <root>... | --target-all-module <module> | --target-marked-module <module>]"
       return 2
