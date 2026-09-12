@@ -52,6 +52,12 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 // this out-of-band cell, and ordinary JavaScript reachability controls when
 // that root is released.
 const leanObjectHandleStates = new WeakMap();
+
+// Read-only brand query for explicit value codecs; no lease or liveness change.
+export function isLeanObjectHandle(value) {
+  return leanObjectHandleStates.has(value);
+}
+
 const leanObjectHandleFinalizer =
   typeof FinalizationRegistry === "function"
     ? new FinalizationRegistry((weakCell) => {

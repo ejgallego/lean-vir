@@ -18,6 +18,7 @@ import {
 import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
+import { createJsonValueHostBindings } from "./host/vir-json-value-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
 
 export {
@@ -36,6 +37,7 @@ export function createCommonHostBindings() {
   return {
     ...createJsValueHostBindings(),
     ...createJsCollectionHostBindings(),
+    ...createJsonValueHostBindings(),
     "common.echoString": (value) => value,
     "common.addNat": (lhs, rhs) => lhs + rhs,
   };

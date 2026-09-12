@@ -101,6 +101,7 @@ async function run() {
         const record = {
           id,
           message: params.params?.message,
+          title: params.params?.title,
           cancelled: false,
           settled: false,
         };
@@ -166,6 +167,57 @@ async function run() {
         },
       });
     runtime = await makeRuntime();
+    const typedMethod = "RpcBrowserServer.echoValue";
+    const beforeInvalid = requests.length;
+    const invalidEncoding = runtime.call("JsonValueCodec.call", b, typedMethod,
+      "invalid encoding", {}, 9007199254740992n);
+    check(invalidEncoding.kind === "error" && requests.length === beforeInvalid,
+      "unsafe Lean request is rejected before any RPC dispatch");
+    const typedRequest = (title, method = typedMethod, options = {}) => {
+      const result = runtime.call("JsonValueCodec.call", b, method, title, options, 7);
+      check(result.kind === "ok" && result.value instanceof Promise,
+        "typed RPC returns a native Promise after checked request encoding");
+      return result.value;
+    };
+    const summarize = runtime.call("JsonValueCodec.resultSummary");
+    const typedReply = typedRequest("shared Foo");
+    check((await typedReply).title === "shared Foo replied", "RPC fulfillment remains native data");
+    check(await typedReply.then(summarize) === "shared Foo replied:8:1",
+      "the Lean continuation decodes and uses shared Foo without a JSL result");
+    const malformedResult = await typedRequest("typed malformed", "RpcBrowserServer.malformedValue")
+      .then(summarize);
+    check(malformedResult.startsWith("error:"), "malformed Foo is a checked decoding error");
+    for (const [title, fragment] of [["typed rejection", "typed example rejection"],
+      ["typed overflow", "safe range"]]) {
+      let rejection;
+      try { await typedRequest(title); } catch (error) { rejection = error; }
+      check(rejection?.message.includes(fragment),
+        "native failure precedes emission of an invalid typed response");
+    }
+    const controller = new AbortController();
+    const cancelledValue = typedRequest("typed cancellation", typedMethod,
+      { abortSignal: controller.signal }).then(() => null, (error) => error);
+    await until("typed request dispatched", () => requests.some(r => r.title === "typed cancellation"));
+    controller.abort();
+    check((await cancelledValue)?.code === -32800, "typed calls preserve native cancellation");
+    const sampleWire = runtime.call("JsonValueCodec.sampleWire").value;
+    const invalidRequests = [
+      ["typed bad shape", { title: "typed bad shape" }],
+      ["typed fraction", { ...sampleWire, title: "typed fraction",
+        primary: { ...sampleWire.primary, count: 1.5 } }],
+      ["typed negative", { ...sampleWire, title: "typed negative",
+        primary: { ...sampleWire.primary, count: -1 } }],
+    ];
+    for (const [title, params] of invalidRequests) {
+      let rejection;
+      try { await b.call(typedMethod, params); } catch (error) { rejection = error; }
+      check(rejection?.code === -32602, `${title}: native request decoding rejects invalid data`);
+    }
+    const extraFields = await b.call(typedMethod, {
+      ...sampleWire, title: "ordinary field names", p: "data", __rpcref: "data",
+    });
+    check(extraFields.title === "ordinary field names replied",
+      "the server codec leaves unknown-field policy to Foo's FromJson instance");
     let component = runtime.call("RpcReferenceWidget.View");
     root = createRoot(document.getElementById("app"));
     const query = (message, extra = {}) => ({
@@ -471,6 +523,9 @@ async function run() {
       (record) =>
         record.error &&
         !(record.cancelled && record.error.code === -32800) &&
+        !((record.title === "typed rejection" && record.error.message.includes("typed example rejection")) ||
+          (record.title === "typed overflow" && record.error.message.includes("safe range"))) &&
+        !(invalidRequests.some(([title]) => title === record.title) && record.error.code === -32602) &&
         !(
           ["visible error", "obsolete error"].includes(record.message) &&
           record.error.message.includes("RPC example rejection")
@@ -489,6 +544,7 @@ async function run() {
       realReference: goal.target,
       strictReplayRequests: [abandoned.id, successor.id],
       samePositionEdits: 2,
+      typedValueRequests: requests.filter(record => record.title !== undefined).length,
       requests: requests.length,
     };
   }, [

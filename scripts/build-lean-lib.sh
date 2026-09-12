@@ -88,6 +88,11 @@ build_module Vir/Runtime.lean
 build_module Vir/Js/Types.lean
 build_module Vir/Js/Generated.lean
 build_module Vir/Js.lean
+build_module Vir/JsonValue/Codec.lean
+build_module Vir/JsonValue/Types.lean
+build_module Vir/JsonValue/Generated.lean
+build_module Vir/JsonValue/Js.lean
+build_module Vir/JsonValue.lean
 build_module Vir/Common/Generated.lean
 build_module Vir/Common.lean
 build_module Vir/Browser/Types.lean
