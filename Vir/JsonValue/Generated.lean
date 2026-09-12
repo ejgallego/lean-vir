@@ -23,7 +23,7 @@ Explicitly validates the complete ordinary-value graph before copying it into Le
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-json-value-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
+ABI profile `vir-json-value-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -39,7 +39,7 @@ Copies a validated JSON node into the existing structural object ABI while child
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-json-value-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
+ABI profile `vir-json-value-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -55,7 +55,7 @@ Explicitly constructs one ordinary JSON node from checked Lean values and alread
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-json-value-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
+ABI profile `vir-json-value-v1` (bridge-handle retention): receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
