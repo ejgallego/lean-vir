@@ -110,7 +110,7 @@
     "test:generator:memory": "node tests/packages/generator-memory.mjs",
     "test:generator:imports": "lake build +ModuleSetFixture.InputSelection +fixtures.HostInterop Vir.GeneratePackage.Inputs && lake env lean --run tests/packages/ImportCache.lean module && lake env lean --run tests/packages/ImportCache.lean host",
     "test:native:unit": "node --test tests/native/*.test.mjs",
-    "test:tutorials": "lake build VirInfoview Vir.Examples.Style && lake env lean examples/tutorials/ReactCounter.lean && lake env lean examples/tutorials/ReactProofWidgetHello.lean && lake env lean examples/tutorials/RpcReferenceWidget.lean",
+    "test:tutorials": "lake build VirInfoview Vir.Examples.Style +tutorials.RpcReferenceWidget && lake env lean examples/tutorials/ReactCounter.lean && lake env lean examples/tutorials/ReactProofWidgetHello.lean && lake env lean examples/tutorials/RpcReferenceWidget.lean",
     "test:bench": "node --test tests/benchmarks/*.test.mjs",
     "test:package-ir-builders": "bash tests/packages/ir-builders.sh",
     "test:env-lookup:wasm-pair": "npm run bench:env-lookup:wasm-pair -- --check --warmups 0 --samples 1 --iterations 1 --load-iterations 1 web/public/vir-upstream.wasm web/public/vir-upstream.wasm",
