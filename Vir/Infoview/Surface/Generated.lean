@@ -25,7 +25,7 @@ Calls the upstream infoview hook with the exact method, callback and dependency 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; method js-resource/borrowed/call; callback js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; method js-resource/borrowed/call; callback js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -44,7 +44,7 @@ Constructs the fixed host-side document-position record used by editor commands.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; uri js-resource/borrowed/call; fileName js-resource/borrowed/call; line js-resource/borrowed/call; character js-resource/borrowed/call; label js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; uri js-resource/borrowed/call; fileName js-resource/borrowed/call; line js-resource/borrowed/call; character js-resource/borrowed/call; label js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -68,7 +68,7 @@ Constructs an ordinary empty ClientRequestOptions object, omitting abortSignal r
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -82,7 +82,7 @@ Assigns the exact native AbortSignal to options.abortSignal without wrapping the
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; options js-resource/borrowed/call; signal js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; options js-resource/borrowed/call; signal js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -103,7 +103,7 @@ Implements the local synchronous infoview clipboard capability. It returns false
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; text js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; text js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -123,7 +123,7 @@ Dispatches the local editor reveal-position capability and reports whether a dis
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; position js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -139,7 +139,7 @@ Dispatches the local editor insert-text capability and reports whether it was ap
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; position js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; position js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -160,7 +160,7 @@ Calls the exact position-specific infoview RPC session with the exact method str
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -180,7 +180,7 @@ Passes the exact ClientRequestOptions and AbortSignal to the position-specific s
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-infoview-protocol-v1`: receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; options js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; session js-resource/borrowed/call; method js-resource/borrowed/call; params js-resource/borrowed/call; options js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/

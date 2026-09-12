@@ -128,6 +128,10 @@ A live value strongly retains its original runtime generation: the Wasm instance
 and host state containing its Lean payload. Collection releases the foreign root
 through a best-effort finalizer; explicit disposal releases it deterministically.
 Calling a Lean callback after disposal fails before entering its Lean body.
+If invoked as a Promise reaction, that failure rejects the resulting Promise.
+Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet
+settlement of pending JavaScript work. Terminal handling that must survive
+disposal must run outside the disposed Lean runtime.
 
 Global finalization registries hold only weak references to cleanup records;
 generation-owned sets keep those records available while the generation is live.

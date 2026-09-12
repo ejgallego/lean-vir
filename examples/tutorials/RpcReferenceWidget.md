@@ -75,12 +75,15 @@ rules.
 Normal infoview unmount runs React effect cleanup and removes the upstream
 notification subscription, but it does not hard-dispose the VIR runtime.
 Surviving callbacks therefore remain callable in their original generation and
-must obey the application's stale guard. Explicit runtime disposal and failed
-setup or mount are hard teardown boundaries; a later callback cannot enter its
-Lean body after disposal. This example leaves Promise continuations attached;
-an embedding that explicitly disposes its runtime must first let pending
-reactions settle. Hard disposal can otherwise turn a later callback invocation
-into an unhandled Promise rejection.
+must obey the application's stale guard.
+
+This example leaves Promise continuations attached. Explicit runtime disposal
+invalidates them before Lean body entry, so a later response can produce an
+unhandled Promise rejection. Another Lean rejection handler or stale guard
+cannot run after disposal. An embedding requiring quiet immediate teardown
+needs terminal handling outside the disposed runtime; waiting for every request
+is not sufficient for work that may never settle. See the
+[runtime disposal contract](../../docs/reference/HOST_BINDINGS.md#lean-backed-javascript-values).
 
 For the real-server browser check and prerequisites, see
 [Infoview RPC and lifetime checks](../../docs/HARNESS.md#infoview-rpc-and-lifetime-checks).

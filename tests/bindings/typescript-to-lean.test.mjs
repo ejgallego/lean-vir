@@ -156,7 +156,7 @@ test("TypeScript property shapes and an ABI profile determine Lean declarations"
   assert.match(output, /opaque getLabel\n    \(widget : @& Lean\.Vir\.Js Widget\) :\n    DomM \(Lean\.Vir\.Js String\)/u);
   assert.match(output, /opaque setLabel\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(label : @& Lean\.Vir\.Js\.Nullable String\) :\n    DomM Unit/u);
   assert.match(output, /@\[vir_js "demo\.widget\.getLabel"\]/u);
-  assert.match(output, /ABI profile `demo-faithful-v1`/u);
+  assert.match(output, /ABI profile `demo-faithful-v1` \(bridge-handle retention\): widget js-resource\/borrowed\/call/u);
   assert.doesNotMatch(output, /\(label : @& String\)/u);
 });
 

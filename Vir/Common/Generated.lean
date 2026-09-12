@@ -23,7 +23,7 @@ VIR-owned smoke-test protocol that round-trips a JavaScript string resource.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-common-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-common-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -39,7 +39,7 @@ VIR-owned smoke-test protocol that adds two JavaScript number resources interpre
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-common-protocol-v1`: receiver none; lhs js-resource/borrowed/call; rhs js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-common-protocol-v1` (bridge-handle retention): receiver none; lhs js-resource/borrowed/call; rhs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/

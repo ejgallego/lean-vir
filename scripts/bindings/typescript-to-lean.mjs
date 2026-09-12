@@ -107,7 +107,7 @@ function operationModalities(operation, profile) {
       : modalityLabel(operation.receiver.argument);
   const arguments_ = operation.arguments.map(modalityLabel);
   const result = `result ${operation.result.modalities.representation}/${operation.result.modalities.ownership}`;
-  return `ABI profile \`${profile.id}\`: ${[receiver, ...arguments_, result].join("; ")}.`;
+  return `ABI profile \`${profile.id}\` (bridge-handle retention): ${[receiver, ...arguments_, result].join("; ")}.`;
 }
 
 function leanDocText(value) {

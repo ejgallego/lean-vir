@@ -166,13 +166,18 @@ differences.
 | ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Representation     | `immediate`, `js-resource`               | How a TypeScript value crosses the Lean/JavaScript boundary.                                                                          |
 | Argument passing   | `value`, `borrowed`, `owned`, `consumed` | What the runtime does with the argument for this invocation. `value` applies to immediate values; the other modes apply to resources. |
-| Argument retention | `call`, `until-release`, `runtime`       | How long the host may retain a resource.                                                                                              |
+| Bridge retention | `call`, `until-release`, `runtime`       | Duration of the Lean-side ownership obligation described by the argument's `retention` metadata, not native JS reachability. |
 | Result ownership   | `value`, `owned`, `borrowed`             | Whether a result is immediate or which side owns the returned resource.                                                               |
 | Effect             | for example `dom` / `DomM`               | Which Lean host-effect carrier wraps the result.                                                                                      |
 
-A borrowed resource cannot have retention beyond `call`. The generator rejects
-that combination instead of emitting a declaration that contradicts its host
-ABI policy.
+A borrowed Lean handle cannot have bridge retention beyond `call`; the
+generator rejects that combination. This does **not** forbid the host from
+retaining the exact JavaScript payload after the call. React may keep effect
+callbacks and dependency arrays, and subscriptions may keep notification
+callbacks. Those native references follow JavaScript reachability; converted
+Lean callbacks retain their closure roots as described in
+[Lean-backed JavaScript values](HOST_BINDINGS.md#lean-backed-javascript-values).
+Neither `borrowed/call` nor dropping a Lean handle revokes those references.
 
 These modes are runtime/ABI policy, not an affine Lean type system. `@&` marks
 borrowed arguments for Lean's calling convention; it does not prevent a caller
@@ -399,8 +404,8 @@ away only through an explicit `kind: "none"` exception. Unknown operation ids,
 unknown generated argument names, unsupported fields, unsafe borrowed
 lifetimes, and exceptions on immediate values are errors.
 
-Exceptions are intended for semantics that TypeScript declarations do not
-express, such as a host retaining a callback until explicit release. They are
+Exceptions are intended for bridge policy that TypeScript declarations do not
+express, such as consuming a handle for a terminal operation. They are
 not a place to restate ordinary profile defaults. The generated operation marks
 every override and its reason, so review can distinguish inference from policy.
 An exception's optional `semantics` field records whether the reviewed override
