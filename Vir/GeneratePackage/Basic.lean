@@ -104,7 +104,7 @@ structure DeclSource where
 def DeclSource.display (source : DeclSource) : String := source.origin.display
 
 structure DeclIndex where
-  compiledImports : CompiledImportCache := {}
+  compiledImports : CompiledImportCache := .empty
   localDecls : NameMap LoadedDecl := {}
   sources : Array DeclSource := #[]
   clientNativeExternSpecs : Array NativeExternSpec := #[]

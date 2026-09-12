@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -70,6 +70,18 @@ try {
     "--target-marked-module",
     moduleName,
   ]);
+  const setupPath = join(scratch, "empty.setup.json");
+  await writeFile(setupPath, JSON.stringify({
+    name: moduleName, isModule: true, importArts: {},
+    dynlibs: [], plugins: [], options: {},
+  }));
+  assert.deepEqual(
+    (await generate("setup-marked", [
+      "--setup", setupPath, "--target-marked-module", moduleName,
+    ])).bytes,
+    marked.bytes,
+    "an empty artifact map must preserve conventional module imports",
+  );
   assert.deepEqual(
     marked.manifest.exports.map((entry) => entry.entry),
     [selected],
@@ -128,6 +140,8 @@ try {
 
   for (const args of [
     [],
+    ["--setup"],
+    ["--setup", setupPath],
     ["--target-module", moduleName],
     ["--package-module", moduleName],
     ["--target-marked-module"],

@@ -34,8 +34,9 @@ private unsafe def importModuleEnvCached (moduleName : Name)
   ] opts
   return (env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated"), cache)
 
-unsafe def importModuleEnv (moduleName : Name) : IO Environment := do
-  return (← importModuleEnvCached moduleName {}).1
+unsafe def importModuleEnv (moduleName : Name)
+    (importArts : NameMap ImportArtifacts := {}) : IO Environment := do
+  return (← importModuleEnvCached moduleName (.empty importArts)).1
 
 def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name := do
   let moduleIdx ← env.getModuleIdxFor? name
@@ -122,9 +123,10 @@ private def importedLoadedDecl?
       decl
     }
 
-unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
+unsafe def loadDeclIndex (targets : Array Target)
+    (importArts : NameMap ImportArtifacts := {}) : IO DeclIndex := do
   initSearchPath (← getBuildDir)
-  let mut index : DeclIndex := {}
+  let mut index : DeclIndex := { compiledImports := .empty importArts }
   for target in targets do
     let .module moduleName := target.origin
       | throw <| IO.userError "live snapshots require prepareSnapshotInput, not filesystem acquisition"

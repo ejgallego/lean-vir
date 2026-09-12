@@ -123,6 +123,7 @@ jobs:
           name: vir-demo-artifacts
           path: web/public
       - run: npm run test:infoview
+      - run: npm run test:lake:cache:wasm
       - run: npm run test:runtime:lean
 
   fixtures:

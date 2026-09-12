@@ -220,23 +220,27 @@ private def virPackageSetComplete
 private def buildVirPackageSetFacet
     (mod : Module) : FetchM (Job System.FilePath) := do
   let generatorJob ← vir_irpkg.fetch
-  let moduleJob ← mod.leanArts.fetch
+  let moduleJob ← mod.exportInfo.fetch
   let importsJob ← mod.transImports.fetch
   let importArtsJob ← importsJob.bindM fun imports => do
-    let jobs ← imports.mapM fun imported => imported.leanArts.fetch
+    let jobs ← imports.mapM fun imported => do
+      (← imported.exportInfo.fetch).mapM fun info => do
+        addTrace info.allArtsTrace
+        return (imported.name, info.allArts)
     return Job.collectArray jobs "VIR imported module IR"
   let packagePath := virModuleOutput mod "module-sets" "irpkg"
   let reportPath := virModuleOutput mod "module-sets" "report.md"
   let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
   let shardDir := virModuleOutput mod "module-sets" "parts"
+  let setupPath := virModuleOutput mod "module-sets" "setup.json"
   let moduleName := mod.name.toString
   let rootRelativePath := mod.fileName "irpkg"
   let shardRelativeDir := shardDir.fileName.getD shardDir.toString
   let clientNativeManifest? ← IO.getEnv "VIR_NATIVE_EXTERN_MANIFEST"
   generatorJob.bindM fun generator =>
     moduleJob.bindM fun artifacts =>
-      importArtsJob.mapM fun _ => do
-        unless artifacts.ir?.isSome do
+      importArtsJob.mapM fun imports => do
+        unless artifacts.allArts.ir?.isSome do
           -- Rejection must also invalidate an older successful source package.
           removeFileIfExists descriptorPath
           removeFileIfExists packagePath
@@ -244,6 +248,7 @@ private def buildVirPackageSetFacet
           removeDirAllIfExists shardDir
           error s!"VIR package input `{moduleName}` requires a `module` header and compiled IR"
         addLeanTrace
+        addTrace artifacts.allArtsTrace
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
         addPureTrace (clientNativeManifest?.getD "<unset>") "VIR client-native extern manifest"
@@ -263,11 +268,21 @@ private def buildVirPackageSetFacet
           createParentDirs reportPath
           createParentDirs descriptorPath
           IO.FS.createDirAll shardDir
+          -- Keep Lake's resolved paths, including private data and full IR.
+          -- Cache-only builds need not restore conventional .lake/build files.
+          let importArts := imports.foldl (init := ({} : Lean.NameMap Lean.ImportArtifacts))
+            fun arts (name, paths) => arts.insert name paths
+          let setup : Lean.ModuleSetup := {
+            name := mod.name
+            importArts := importArts.insert mod.name artifacts.allArts
+          }
+          IO.FS.writeFile setupPath (Lean.toJson setup).compress
           proc {
             cmd := generator.toString
             args := #[
               packagePath.toString,
-              reportPath.toString
+              reportPath.toString,
+              "--setup", setupPath.toString
             ] ++ #[
               "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
               rootRelativePath, shardRelativeDir

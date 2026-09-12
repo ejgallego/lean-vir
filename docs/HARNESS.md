@@ -72,14 +72,21 @@ semantics require the separate Chromium checks below.
   use `npm run test:runtime -- module-cli` alongside package units.
 - Compiled import sharing: `npm run test:generator:imports` compares cached
   contexts to Lean's independent imports, including private visibility and
-  import-level upgrades. On Linux with GNU `/usr/bin/time`,
+  import-level upgrades. It repeats these checks with relocated resolved
+  artifacts and conventional project lookup disabled, including region reuse
+  and a fresh-context missing-root control. On Linux with GNU `/usr/bin/time`,
   `npm run test:generator:memory` measures the full demo-host generator and
   enforces an 8 GiB peak-RSS budget, retaining logs/package/results under
   `build/generator-memory-*`. Its `-- --no-build` option reuses prepared inputs.
   This is a resource regression, not a statistical latency benchmark.
 - Lake facets, marked-module selection, downstream input tracing, output
-  ownership or SDK installation: `npm run test:lake`. Its cache checks cover
-  the exercised scenarios; they do not establish cache-only artifact reuse.
+  ownership or SDK installation: `npm run test:lake`. For isolated cold,
+  cache-only (conventional root/dependency artifacts absent), restoration and
+  imported-body invalidation checks, use `npm run test:lake:cache`.
+  Once matching `web/public/vir-upstream.wasm` is available,
+  `npm run test:lake:cache:wasm` also executes every phase's real package set:
+  42 before the private-body change, 43 afterward. CI runs this after downloading
+  the demo artifacts; source-only Lake checks do not require Wasm.
 - Fixture behavior: `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`;
   omit the filter for the whole oracle suite. Expectations, structured
   diagnostics and runner configuration alone use `npm run test:fixtures:unit`,
