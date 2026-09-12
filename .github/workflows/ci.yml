@@ -115,6 +115,7 @@ jobs:
       - run: npm ci
       - run: npm run test:lake
       - run: npm run test:generator:imports
+      - run: npm run test:interface
       - run: npm run test:generator:memory
       - name: Download demo artifacts
         uses: actions/download-artifact@v4
