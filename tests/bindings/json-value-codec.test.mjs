@@ -64,14 +64,18 @@ test("array holes and extra properties cannot silently disappear", () => {
   assert.equal(check(Object.setPrototypeOf([], null)).kind, "error");
 });
 
-test("cycles and reserved RPC reference shapes are excluded", () => {
+test("cycles are excluded", () => {
   const cycle = { child: [] };
   cycle.child.push(cycle);
   assert.match(check(cycle).value, /cyclic/);
-  assert.match(check({ nested: { __rpcref: "7" } }).value, /reserved RPC/);
-  assert.match(check({ p: "7" }).value, /legacy RPC/);
-  assert.equal(check({ p: 7 }).kind, "ok");
-  assert.equal(check({ p: "7", ordinary: true }).kind, "ok");
+});
+
+test("ordinary field names do not imply RPC reference provenance", () => {
+  for (const value of [{ p: "hello" }, { __rpcref: "ordinary" },
+    { nested: { p: "7" } }, { p: 7 }, { p: "7", ordinary: true }]) {
+    assert.equal(check(value).kind, "ok");
+    assert.deepEqual(build(inspect(value)), value);
+  }
 });
 
 test("invalid UTF-16 cannot be silently replaced during Lean string lowering", () => {

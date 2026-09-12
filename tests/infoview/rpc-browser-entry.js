@@ -179,13 +179,14 @@ async function run() {
         "typed RPC returns a native Promise after checked request encoding");
       return result.value;
     };
-    const typedResult = runtime.call("JsonValueCodec.resultSummary",
-      await typedRequest("shared Foo"));
-    check(typedResult.kind === "ok" && typedResult.value === "shared Foo replied:8:1",
-      "shared Foo is encoded natively and decoded by the interpreted client");
-    const malformedResult = runtime.call("JsonValueCodec.resultSummary",
-      await typedRequest("typed malformed", "RpcBrowserServer.malformedValue"));
-    check(malformedResult.kind === "error", "malformed Foo is a checked decoding error");
+    const summarize = runtime.call("JsonValueCodec.resultSummary");
+    const typedReply = typedRequest("shared Foo");
+    check((await typedReply).title === "shared Foo replied", "RPC fulfillment remains native data");
+    check(await typedReply.then(summarize) === "shared Foo replied:8:1",
+      "the Lean continuation decodes and uses shared Foo without a JSL result");
+    const malformedResult = await typedRequest("typed malformed", "RpcBrowserServer.malformedValue")
+      .then(summarize);
+    check(malformedResult.startsWith("error:"), "malformed Foo is a checked decoding error");
     for (const [title, fragment] of [["typed rejection", "typed example rejection"],
       ["typed overflow", "safe range"]]) {
       let rejection;
@@ -200,16 +201,23 @@ async function run() {
     controller.abort();
     check((await cancelledValue)?.code === -32800, "typed calls preserve native cancellation");
     const sampleWire = runtime.call("JsonValueCodec.sampleWire").value;
-    for (const [title, params] of [
+    const invalidRequests = [
       ["typed bad shape", { title: "typed bad shape" }],
       ["typed fraction", { ...sampleWire, title: "typed fraction",
         primary: { ...sampleWire.primary, count: 1.5 } }],
-      ["typed reference", { ...sampleWire, title: "typed reference", __rpcref: "7" }],
-    ]) {
+      ["typed negative", { ...sampleWire, title: "typed negative",
+        primary: { ...sampleWire.primary, count: -1 } }],
+    ];
+    for (const [title, params] of invalidRequests) {
       let rejection;
       try { await b.call(typedMethod, params); } catch (error) { rejection = error; }
       check(rejection?.code === -32602, `${title}: native request decoding rejects invalid data`);
     }
+    const extraFields = await b.call(typedMethod, {
+      ...sampleWire, title: "ordinary field names", p: "data", __rpcref: "data",
+    });
+    check(extraFields.title === "ordinary field names replied",
+      "the server codec leaves unknown-field policy to Foo's FromJson instance");
     let component = runtime.call("RpcReferenceWidget.View");
     root = createRoot(document.getElementById("app"));
     const query = (message, extra = {}) => ({
@@ -517,7 +525,7 @@ async function run() {
         !(record.cancelled && record.error.code === -32800) &&
         !((record.title === "typed rejection" && record.error.message.includes("typed example rejection")) ||
           (record.title === "typed overflow" && record.error.message.includes("safe range"))) &&
-        !(["typed bad shape", "typed fraction", "typed reference"].includes(record.title) && record.error.code === -32602) &&
+        !(invalidRequests.some(([title]) => title === record.title) && record.error.code === -32602) &&
         !(
           ["visible error", "obsolete error"].includes(record.message) &&
           record.error.message.includes("RPC example rejection")

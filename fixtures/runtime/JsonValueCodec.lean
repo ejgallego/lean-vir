@@ -6,7 +6,9 @@ Author: Emilio J. Gallego Arias
 
 module
 public import JsonRpcFoo
-public import Vir.Infoview.JsonRpc
+public import Vir.Infoview.Surface
+public import Vir.JsonValue
+public import Vir.Js
 public section
 
 namespace JsonValueCodec
@@ -31,17 +33,23 @@ def leanHandle : RuntimeM (JSL Nat) := LeanRef.toJSL 42
 
 def call (session : Js Infoview.RpcSession) (method : Js String) (title : String)
     (options : Js Infoview.ClientRequestOptions) (count : Nat) :
-    RuntimeM (Except String (Js.Promise (LeanRef.Handle (Except String Foo)))) :=
-  Infoview.JsonRpc.callValue session method
-    { sample with title, primary := { sample.primary with count } } (some options)
-
-def resultSummary (value : JSL (Except String Foo)) : RuntimeM (Except String String) := do
-  match ← LeanRef.fromJSL value with
+    RuntimeM (Except String (Js.Promise Js.Any.Value)) := do
+  let request := { sample with title, primary := { sample.primary with count } }
+  match ← JsonValue.encodeJs request with
   | .error error => return .error error
-  | .ok foo =>
-    if foo.primary.label != sample.primary.label || foo.primary.enabled != sample.primary.enabled ||
-        foo.rows != sample.rows || foo.selected != sample.selected then
-      return .error "shared Foo fields changed in transit"
-    return .ok s!"{foo.title}:{foo.primary.count}:{foo.rows.size}"
+  | .ok params => return .ok (← Infoview.RpcSession.callWithOptions session method params options)
+
+/-- Decode and use Foo inside a Lean continuation; only its display text returns to JS. -/
+def resultSummary : RuntimeM (Js.Function1 Js.Any (Js String)) :=
+  Js.Function.ofLean fun value => do
+    let text ← match ← JsonValue.decodeJs (α := Foo) value with
+      | .error error => pure s!"error: {error}"
+      | .ok foo =>
+        if foo.primary.label != sample.primary.label || foo.primary.enabled != sample.primary.enabled ||
+            foo.rows != sample.rows || foo.selected != sample.selected then
+          pure "error: shared Foo fields changed in transit"
+        else
+          pure s!"{foo.title}:{foo.primary.count}:{foo.rows.size}"
+    JsValue.ofString text
 
 end JsonValueCodec

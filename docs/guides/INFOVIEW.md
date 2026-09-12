@@ -81,7 +81,7 @@ world token. The response type remains polymorphic.
 
 ## Shared ordinary values
 
-For reference-free requests and responses, import `Vir.Infoview.JsonRpc` and
+For reference-free requests and responses, import `Vir.JsonValue` and
 explicitly choose `ToJson`/`FromJson` instances for a shared Lean type. The
 [shared Foo](../../fixtures/runtime/JsonRpcFoo.lean) includes nested records,
 arrays, an option and an inductive. The native
@@ -95,18 +95,32 @@ On the server, `JsonRpc.serveValue` adapts a typed
 decoding and response encoding before serialization. Import its server-only
 module with `public meta import Vir.Infoview.JsonRpc.Server`.
 
-On the client, `JsonRpc.callValue` explicitly encodes the request, calls the
-unchanged position-specific RPC API, and decodes fulfillment. Its result is:
+On the client, compose explicit conversion with the native position-specific
+RPC API. Decode the reply inside the Lean continuation that uses it. For
+example, with application-defined `showError`/`updateView` actions and native
+`ignore`/`fail` callbacks for the terminal Promise:
 
 ```lean
-RuntimeM (Except String (Js.Promise (LeanRef.Handle (Except String Response))))
+match ← JsonValue.encodeJs request with
+| .error error => showError error
+| .ok params =>
+  let pending : Js.Promise Js.Any.Value ←
+    RpcSession.callWithOptions session method params options
+  let receive ← Js.Function.ofLeanVoid fun reply => do
+    match ← JsonValue.decodeJs (α := Response) reply with
+    | .error error => showError error
+    | .ok response => updateView response
+  let handled ← Js.Promise.thenVoid pending receive
+  let _ ← Js.Promise.thenVoidWithRejection handled ignore fail
+  pure ()
 ```
 
-The outer `Except` reports encoding failure before dispatch. Transport/server
-errors reject the native Promise. Fulfillment is a browser-local JSL containing
-the checked decoding result; a continuation uses `LeanRef.fromJSL` to read it.
-It is not a Promise containing a native Lean heap object. Optional request
-options preserve the exact abort signal and ordinary cancellation behavior.
+Encoding failure precedes dispatch. The RPC Promise and its reply remain native;
+the decoded `Response` stays in Lean, with no JSL intermediate. Transport/server
+errors and exceptions in the continuation reject the resulting Promise; attach
+rejection handling to that chain, as in the [RPC tutorial](../../examples/tutorials/RpcReferenceWidget.lean).
+Request options preserve the exact abort signal. Cancellation and stale-result
+guards remain application responsibilities.
 
 The value domain is null, booleans, well-formed Unicode strings, dense arrays,
 same-realm ordinary string-keyed data objects and mathematical integers in
@@ -115,13 +129,18 @@ integers are rejected; native `JsonNumber` is checked before conversion can
 round it. An existing instance that deliberately encodes a number as a string
 still produces a string—there is no implicit numeric string fallback.
 
-Undefined, functions, DOM objects, this SDK's JSL handles, accessors, cycles, symbol/non-enumerable
-properties and RPC reference markers (`__rpcref` and legacy singleton
-`{"p":"…"}`) are excluded. Proxies and concurrent mutation are outside the
-ordinary-data contract, not a sandbox guarantee. Copies do not preserve object
-identity or aliases. Private handle brands from another SDK instance are not
-detectable; do not submit foreign handles as ordinary data. Use raw RPC for
-`WithRpcRef` responses.
+Undefined, functions, DOM objects, this SDK's JSL handles, accessors, cycles and
+symbol/non-enumerable properties are excluded. Proxies and concurrent mutation
+are outside the ordinary-data contract, not a sandbox guarantee. Copies do not
+preserve object identity or aliases. Private handle brands from another SDK
+instance are not detectable; do not submit foreign handles as ordinary data.
+
+The codec does not infer reference provenance from field names: `p` and
+`__rpcref` are ordinary data keys. The upstream infoview transport, however,
+registers singleton `{"p":"…"}` or `{"__rpcref":"…"}` objects as references,
+depending on its negotiated wire format. Avoid those shapes in ordinary RPC
+responses. Successful value decoding does not establish reference-copy safety;
+keep genuine `WithRpcRef` values on the raw RPC path with their original session.
 
 An external server may already have lost numeric precision before decoding;
 client checks cannot recover the original JSON lexeme. Use the paired server

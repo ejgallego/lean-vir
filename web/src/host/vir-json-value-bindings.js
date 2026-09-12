@@ -54,13 +54,10 @@ function inspectNode(value, path) {
         fail(fieldPath(path, key), "non-index array property");
       children.push(descriptor.value);
     } else {
-      if (key === "__rpcref") fail(path, "reserved RPC reference key __rpcref");
       children.push({ fst: key, snd: descriptor.value });
     }
   }
   if (array && children.length !== value.length) fail(path, "sparse array");
-  if (!array && children.length === 1 && children[0].fst === "p" &&
-      typeof children[0].snd === "string") fail(path, "legacy RPC reference-shaped object");
   return { kind: array ? "array" : "object", value: children };
 }
 

@@ -44,12 +44,7 @@ partial def validate (value : Json) (path : String := "$") : Except String Unit 
   | .arr values =>
     for i in [:values.size] do validate values[i]! s!"{path}[{i}]"
   | .obj fields =>
-    let entries := fields.toList
-    if fields.contains "__rpcref" then
-      throw s!"{path}: reserved RPC reference key __rpcref"
-    if let [("p", .str _)] := entries then
-      throw s!"{path}: legacy RPC reference-shaped object"
-    for (key, value) in entries do validate value (fieldPath path key)
+    for (key, value) in fields.toList do validate value (fieldPath path key)
   | _ => pure ()
 
 /-- Explicitly selected ToJson representation, checked before it crosses the wire. -/
