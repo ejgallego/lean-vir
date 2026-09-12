@@ -102,15 +102,6 @@ def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
 
 end DependencyList
 
-/-- Calls React's native effect hook, omitting its dependency argument when absent. -/
-def useEffect
-    (setup : @& Lean.Vir.Js EffectCallback)
-    (dependencies : Option (Lean.Vir.Js DependencyList) := none) :
-    ReactM Unit :=
-  match dependencies with
-  | none => useEffectWithoutDeps setup
-  | some deps => useEffectWithDeps setup deps
-
 end Hooks
 
 namespace State

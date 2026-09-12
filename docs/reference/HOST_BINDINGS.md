@@ -128,6 +128,10 @@ A live value strongly retains its original runtime generation: the Wasm instance
 and host state containing its Lean payload. Collection releases the foreign root
 through a best-effort finalizer; explicit disposal releases it deterministically.
 Calling a Lean callback after disposal fails before entering its Lean body.
+If invoked as a Promise reaction, that failure rejects the resulting Promise.
+Hard disposal prevents Lean entry; it does not guarantee cancellation or quiet
+settlement of pending JavaScript work. Terminal handling that must survive
+disposal must run outside the disposed Lean runtime.
 
 Global finalization registries hold only weak references to cleanup records;
 generation-owned sets keep those records available while the generation is live.
@@ -167,6 +171,9 @@ cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
 effect. Obsolete load results cannot install UI. Refreshed services use fresh
 factories and browser/React lifecycles, reusing compiled Wasm and the mutable
 editor host context; the latter is not a frozen per-generation snapshot.
+The separate React root receives that upstream `EditorContext` through a stable
+per-service provider component; the inner component identity and nested prop
+values are preserved. The shell does not implement notification subscriptions.
 
 UI cleanup does not restrict new activity or cancel application-owned timers,
 listeners, subscriptions or independent roots. Those still need application

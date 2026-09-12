@@ -8,6 +8,7 @@ module
 
 meta import fixtures.infoview.RpcBrowserServer
 import ShellLifetime
+import tutorials.RpcReferenceWidget
 
 -- Reuse the actual RPC methods and Lean stale-guard component unchanged.
 -- The browser asks the server to package these roots from this live snapshot.

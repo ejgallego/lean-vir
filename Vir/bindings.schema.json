@@ -175,6 +175,11 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
+        "forwardedOptionalParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "omittedRequiredParameters": {
           "type": "array",
           "uniqueItems": true,
@@ -250,6 +255,7 @@
           "properties": {
             "constructor": { "type": "string", "minLength": 1 },
             "nullableConstructor": { "type": "string", "minLength": 1 },
+            "undefinedOrConstructor": { "type": "string", "minLength": 1 },
             "argument": { "$ref": "#/$defs/passingRetention" },
             "result": {
               "type": "object",

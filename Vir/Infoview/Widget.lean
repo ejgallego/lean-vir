@@ -21,7 +21,8 @@ namespace Lean.Vir.Infoview
 Props for the minimal VIR infoview shell.
 
 The component entry must return the exact JavaScript component function. The
-mount entry receives the shell's exact React root, that function, and a
+mount entry receives the shell's exact React root, a stable component rendering
+that function under the upstream EditorContext, and a
 JavaScript-built surface structure from the real infoview panel props. The
 shell owns and unmounts the root on normal cleanup without disposing the VIR
 runtime; surviving callbacks and JSL values retain their original generation.

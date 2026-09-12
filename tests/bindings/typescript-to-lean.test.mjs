@@ -156,7 +156,7 @@ test("TypeScript property shapes and an ABI profile determine Lean declarations"
   assert.match(output, /opaque getLabel\n    \(widget : @& Lean\.Vir\.Js Widget\) :\n    DomM \(Lean\.Vir\.Js String\)/u);
   assert.match(output, /opaque setLabel\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(label : @& Lean\.Vir\.Js\.Nullable String\) :\n    DomM Unit/u);
   assert.match(output, /@\[vir_js "demo\.widget\.getLabel"\]/u);
-  assert.match(output, /ABI profile `demo-faithful-v1`/u);
+  assert.match(output, /ABI profile `demo-faithful-v1` \(bridge-handle retention\): widget js-resource\/borrowed\/call/u);
   assert.doesNotMatch(output, /\(label : @& String\)/u);
 });
 
@@ -168,7 +168,7 @@ test("undefined and nullish options fail closed instead of using Js.Nullable", (
   for (const absence of ["undefined", "nullish"]) {
     assert.throws(
       () => leanType({ kind: "option", absence, element: stringShape }, generation),
-      new RegExp(`uses TypeScript ${absence} absence; only null-backed nullable resources are supported`, "u"),
+      new RegExp(`uses TypeScript ${absence} absence without a matching native resource constructor`, "u"),
     );
   }
   assert.throws(
@@ -496,6 +496,59 @@ test("method generation defaults only unique signatures and fails closed on over
     () => renderLeanBindings(config, generation, overloadedDescriptors),
     /is overloaded and requires an explicit generation\.methodPolicies signature/u,
   );
+});
+
+test("optional parameters can explicitly forward the native undefined union", () => {
+  const native = structuredClone(generation);
+  native.abiProfile.resource.undefinedOrConstructor = "Lean.Vir.Js.UndefinedOr";
+  native.methodPolicies["Widget.getAttribute"] = { forwardedOptionalParameters: ["mode"] };
+  const inputs = structuredClone(descriptors);
+  const shape = inputs.get("widget").symbols.find((symbol) => symbol.id === "Widget.getAttribute").shape;
+  shape.args.push({ name: "mode", optional: true, type: stringShape });
+  const operation = () => buildGeneratedOperations(config, native, inputs)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  for (const type of [stringShape, { kind: "option", absence: "undefined", element: stringShape }]) {
+    shape.args[1].type = type;
+    assert.equal(operation().arguments[1].type, "Lean.Vir.Js.UndefinedOr String");
+    assert.deepEqual(operation().typescript.signaturePolicy.forwardedOptionalParameters, ["mode"]);
+    assert.deepEqual(operation().semantics, {
+      relation: "unreviewed",
+      evidence: "method-policy",
+      detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+    });
+  }
+  const policy = native.methodPolicies["Widget.getAttribute"];
+  for (const semantics of ["preserving", "changing"]) {
+    policy.semantics = semantics;
+    policy.reason = "Reviewed explicit-argument call surface; no automatic omission equivalence claim.";
+    assert.deepEqual(operation().semantics, {
+      relation: semantics,
+      evidence: "reviewed-method-policy",
+      detail: policy.reason,
+    });
+  }
+  for (const absence of ["null", "nullish"]) {
+    shape.args[1].type = { kind: "option", absence, element: stringShape };
+    assert.throws(operation, /nullish absence/u);
+  }
+  shape.args[1].type = { kind: "literal", value: "fixed" };
+  native.methodPolicies["Widget.getAttribute"].fixedArguments = { mode: "fixed" };
+  assert.throws(operation, /cannot both omit\/forward and fix/u);
+  delete native.methodPolicies["Widget.getAttribute"].fixedArguments;
+  shape.args[1].type = stringShape;
+  native.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = ["mode"];
+  assert.throws(operation, /invalid forwarded optional/u);
+  native.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = [];
+  shape.args[1].optional = false;
+  assert.throws(operation, /must forward an optional/u);
+  shape.args[1].optional = true;
+  shape.args.unshift({ name: "earlier", optional: true, type: stringShape });
+  native.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = ["earlier"];
+  assert.throws(operation, /cannot omit an optional parameter before/u);
+  shape.args.shift();
+  native.methodPolicies["Widget.getAttribute"].omittedOptionalParameters = [];
+  delete native.abiProfile.resource.undefinedOrConstructor;
+  assert.throws(operation, /undefined absence without/u);
 });
 
 test("optional method parameters require an explicit trailing omission", () => {

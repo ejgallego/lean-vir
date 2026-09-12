@@ -925,7 +925,7 @@ def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
         (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat liveTickMs.toNat).toFloat)
     cleanup := fun interval => Lean.Vir.Browser.Timer.clearInterval interval
   }
-  Hooks.useEffect effect (some deps)
+  Hooks.useEffect effect (Js.UndefinedOr.ofJs deps)
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString widgetCss)

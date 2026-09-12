@@ -23,7 +23,7 @@ Explicitly converts a transferred Lean unary callback into an ordinary JavaScrip
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -44,7 +44,7 @@ Explicitly converts a transferred Lean render callback into one reusable JavaScr
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; render callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; render callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -65,7 +65,7 @@ Explicitly converts separate transferred Lean setup and cleanup callbacks into t
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; effect lean-owned/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; effect lean-owned/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -86,7 +86,7 @@ Uses the exact DOM tag string as a React ElementType value.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; tag js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; tag js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -104,17 +104,18 @@ Generated reviewed function call policy for TypeScript `React.useEffect`.
 
 Accepts a function that contains imperative, possibly effectful code.
 
-Call policy: Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.
+Call policy: Passes the exact setup and dependency array or undefined to React.useEffect. Explicit undefined follows its omitted-argument behavior; an empty array remains distinct.
 
 Upstream declaration: node_modules/@types/react/index.d.ts
 
-ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; setup js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.useEffect"]
-private opaque useEffectWithoutDeps
-    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback) :
+opaque useEffect
+    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
+    (deps : @& Lean.Vir.Js.UndefinedOr Lean.Vir.React.DependencyList) :
     Lean.Vir.React.ReactM Unit
 
 /--
@@ -122,7 +123,7 @@ Faithful generated function binding for TypeScript `React.useId`.
 
 Upstream declaration: node_modules/@types/react/index.d.ts
 
-ABI profile `vir-react-protocol-v1`: receiver none; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -136,7 +137,7 @@ Passes the caller's native reducer and initial value unchanged to React.useReduc
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; reducer js-resource/borrowed/call; initial js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; reducer js-resource/borrowed/call; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -155,7 +156,7 @@ Passes the initial value unchanged to React.useState and returns React's exact r
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; initial js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -172,7 +173,7 @@ Creates a typed React ref object initialized with a JavaScript-owned value.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; initial js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; initial js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -189,7 +190,7 @@ Passes the caller's native calculation function and dependency array unchanged t
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; calculate js-resource/borrowed/call; deps js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; calculate js-resource/borrowed/call; deps js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -207,7 +208,7 @@ Passes the caller's native JavaScript function and dependency array unchanged to
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; callback js-resource/borrowed/call; deps js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; callback js-resource/borrowed/call; deps js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -225,7 +226,7 @@ Passes a native React context object unchanged to React.useContext and returns i
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; context js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; context js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -234,23 +235,6 @@ opaque useContext
     {α : Type}
     (context : @& Lean.Vir.Js (Lean.Vir.React.Context α)) :
     Lean.Vir.React.ReactM (Lean.Vir.Js α)
-
-/--
-Generated binding for reviewed VIR protocol `react.hooks.use-effect-with-deps`.
-
-Passes the caller's native setup function and dependency array unchanged to React.useEffect.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.useEffectWithDeps"]
-private opaque useEffectWithDeps
-    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
-    (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
-    Lean.Vir.React.ReactM Unit
 
 end React.Hooks
 
@@ -263,7 +247,7 @@ Explicitly converts a transferred Lean calculation into an ordinary zero-argumen
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; calculate callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; calculate callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -284,7 +268,7 @@ Uses the exact JavaScript string as a React text node.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -300,7 +284,7 @@ Calls React.createElement with the exact ElementType, props object, and child ar
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; elementType js-resource/borrowed/call; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; elementType js-resource/borrowed/call; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -318,7 +302,7 @@ Calls React.createElement with the exact JavaScript function component and JSL-b
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -336,7 +320,7 @@ Calls React.createElement with the exact JavaScript function component, JSL-back
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; key js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; key js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -355,7 +339,7 @@ Calls React.createElement with React.Fragment, the exact props object, and child
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; props js-resource/borrowed/call; children js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -376,7 +360,7 @@ Explicitly converts a transferred Lean reducer callback into an ordinary JavaScr
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; reducer callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; reducer callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -398,7 +382,7 @@ Reads the current value from React's exact mutable ref object.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; ref js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; ref js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -415,7 +399,7 @@ Writes the exact JavaScript value to React's mutable ref object without scheduli
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; ref js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; ref js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -437,7 +421,7 @@ Specialization policy: Root rendering is a DOM effect; the exact ReactNode JavaS
 
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62
 
-ABI profile `vir-react-protocol-v1`: root js-resource/borrowed/call; children js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): root js-resource/borrowed/call; children js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -454,7 +438,7 @@ Specialization policy: Unmount is terminal for the Lean root argument: it remove
 
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L63
 
-ABI profile `vir-react-protocol-v1`: root js-resource/consumed/call; result immediate/value.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): root js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -472,7 +456,7 @@ Specialization policy: VIR restricts the TypeScript Container union to Element a
 
 Upstream declaration: https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L86
 
-ABI profile `vir-react-protocol-v1`: receiver none; container js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; container js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -492,7 +476,7 @@ Passes the Lean updater as React's functional state action; React may invoke it 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-react-protocol-v1`: receiver none; setter js-resource/borrowed/call; update callback/owned/until-release; result immediate/value.
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; setter js-resource/borrowed/call; update callback/owned/until-release; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/

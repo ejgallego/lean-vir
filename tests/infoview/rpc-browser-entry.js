@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { RpcSessions } from "@leanprover/infoview-api";
-import { RpcReferenceWidget } from "../../examples/tutorials/rpc-reference-widget.js";
+import { EditorContext, EditorConnection, useClientNotificationEffect } from "@leanprover/infoview";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
@@ -41,8 +41,30 @@ async function run() {
   const requests = [];
   const unexpected = [];
   const notifications = new Set();
+  const notificationHandlers = new Set();
+  let subscriptions = 0;
+  const editor = new EditorConnection({
+    async subscribeClientNotifications(method) {
+      check(method === "textDocument/didChange", "native subscription method");
+      subscriptions++;
+    },
+    async unsubscribeClientNotifications() { subscriptions--; },
+  }, {
+    sentClientNotification: {
+      on(handler) {
+        notificationHandlers.add(handler);
+        return { dispose() { notificationHandlers.delete(handler); } };
+      },
+    },
+  });
+  const emit = (method, params) => {
+    for (const handler of [...notificationHandlers]) handler([method, params]);
+  };
   // Hold the first replay's actual transport outcome until its successor renders.
   const replayGate = Promise.withResolvers();
+  const editGate = Promise.withResolvers();
+  let holdNextEdit = false;
+  let heldEditId;
   let replayRequestId;
   const onUnhandled = (event) => unexpected.push(event.reason);
   const onError = (event) => unexpected.push(event.error ?? event.message);
@@ -83,6 +105,7 @@ async function run() {
           settled: false,
         };
         requests.push(record);
+        if (holdNextEdit) { heldEditId = id; holdNextEdit = false; }
         if (record.message === "strict replay" && replayRequestId === undefined)
           replayRequestId = id;
         const promise = post("/call", { id, params });
@@ -102,6 +125,7 @@ async function run() {
         } finally {
           record.received = true;
           if (id === replayRequestId) await replayGate.promise;
+          if (id === heldEditId) await editGate.promise;
           record.settled = true;
           options?.abortSignal?.removeEventListener("abort", cancel);
         }
@@ -123,14 +147,23 @@ async function run() {
         async (path) => new Uint8Array(await (await fetch(path)).arrayBuffer()),
       ),
     );
+    let renderedReply;
     const makeRuntime = () =>
       createVirRuntime({
         wasmBytes,
         irPackageSet: [packageBytes],
-        defaultHostBindings: () =>
-          createBrowserHostBindings({
+        defaultHostBindings: () => {
+          const bindings = createBrowserHostBindings({
             reactHostBindings: createBrowserReactHostBindings,
-          }),
+            infoviewUseClientNotificationEffect: useClientNotificationEffect,
+          });
+          const get = bindings["js.object.get"];
+          bindings["js.object.get"] = (object, key) => {
+            if (key === "message" && object?.ref) renderedReply = object;
+            return get(object, key);
+          };
+          return bindings;
+        },
       });
     runtime = await makeRuntime();
     let component = runtime.call("RpcReferenceWidget.View");
@@ -144,12 +177,10 @@ async function run() {
     const render = (session, params) =>
       React.act(() =>
         root.render(
-          React.createElement(RpcReferenceWidget, {
-            session,
-            query: params,
-            runtime,
-            view: component,
-          }),
+          React.createElement(EditorContext.Provider, { value: editor },
+            runtime.call("RpcReferenceWidget.render", component, {
+              session, query: params, uri: config.uri,
+            })),
         ),
       );
     const request = (message) =>
@@ -177,24 +208,15 @@ async function run() {
       document.querySelector("[data-rpc-status]")?.dataset.rpcStatus;
     // Exercise the actual tutorial effect under official Strict Mode. Repeated
     // setups have identical query text but distinct request and response objects.
-    let renderedReply;
-    const observedRuntime = {
-      call(entry, ...args) {
-        if (entry === "RpcReferenceWidget.render") renderedReply = args[1];
-        return runtime.call(entry, ...args);
-      },
-    };
     React.act(() =>
       root.render(
         React.createElement(
           React.StrictMode,
           null,
-          React.createElement(RpcReferenceWidget, {
-            runtime: observedRuntime,
-            view: component,
-            session: a,
-            query: query("strict replay"),
-          }),
+          React.createElement(EditorContext.Provider, { value: editor },
+            runtime.call("RpcReferenceWidget.render", component, {
+              session: a, query: query("strict replay"), uri: config.uri,
+            })),
         ),
       ),
     );
@@ -221,6 +243,8 @@ async function run() {
       status() === "ready" && renderedReply === successor.value,
       "Strict Mode successor publishes its exact response",
     );
+    check(subscriptions === 1 && notificationHandlers.size === 1,
+      "Strict Mode retains one upstream notification subscription");
     React.act(() => document.getElementById("rpc-reference-view").click());
     await React.act(async () => {
       replayGate.resolve();
@@ -262,6 +286,45 @@ async function run() {
     );
     React.act(() => document.getElementById("rpc-reference-view").click());
     check(text().includes("local 1"), "Lean hook state update");
+    const stableQuery = query("same-position edit");
+    render(a, stableQuery);
+    await settle("same-position edit");
+    const beforeEdit = requests.length;
+    const button = document.getElementById("rpc-reference-view");
+    render(a, stableQuery);
+    React.act(() => emit("textDocument/didChange", {
+      textDocument: { uri: "file:///another.lean", version: 2 }, contentChanges: [],
+    }));
+    React.act(() => emit("textDocument/didSave", { textDocument: { uri: config.uri } }));
+    await React.act(async () => { await sleep(20); });
+    check(requests.length === beforeEdit,
+      "unchanged rerender, other document and other method do not request");
+    holdNextEdit = true;
+    const changed = await post("/edit", {});
+    React.act(() => emit("textDocument/didChange", changed));
+    await React.act(async () => {
+      await until("first edit's genuine response held", () =>
+        requests.length === beforeEdit + 1 && requests.at(-1).received);
+    });
+    const firstEdit = requests.at(-1);
+    const changedAgain = await post("/edit", {});
+    React.act(() => emit("textDocument/didChange", changedAgain));
+    await React.act(async () => {
+      await until("same-position request settled", () =>
+        requests.length === beforeEdit + 2 && requests.at(-1).settled);
+    });
+    const secondEdit = requests.at(-1);
+    check(renderedReply === secondEdit.value && secondEdit.value?.message === "same-position edit" &&
+      text().includes("local 1") && document.getElementById("rpc-reference-view") === button,
+      "real edit refreshes the same position without resetting child state");
+    await React.act(async () => {
+      editGate.resolve();
+      await until("obsolete edit delivered", () => firstEdit.settled);
+    });
+    check(firstEdit.cancelled && firstEdit.value !== secondEdit.value &&
+      renderedReply === secondEdit.value && status() === "ready" &&
+      document.getElementById("rpc-reference-view") === button && text().includes("local 1"),
+      "late same-position edit cannot overwrite its successor");
 
     await gate("arm", "superseded");
     render(a, query("superseded"));
@@ -269,7 +332,7 @@ async function run() {
     check(
       status() === "loading" &&
         text().includes("previous response") &&
-        text().includes("first / local 1"),
+        text().includes("same-position edit / local 1"),
       "refresh labels retained response",
     );
     render(b, query("second"));
@@ -333,10 +396,30 @@ async function run() {
     await settle("visible error");
     check(
       status() === "error" &&
-        text().includes("RPC example rejection") &&
+        text().includes("The request or response handler failed") &&
         text().includes("second / local 1"),
       "failure is visible without destroying last reply",
     );
+    await gate("arm", "obsolete error");
+    render(b, query("obsolete error", { fail: true }));
+    await ready("obsolete error");
+    render(b, query("recovered"));
+    await settle("recovered");
+    await release("obsolete error");
+    check(request("obsolete error").error?.code === -32602 &&
+      request("obsolete error").cancelled && status() === "ready" &&
+      text().includes("recovered / local 1"),
+      "genuine stale rejection cannot replace the current response or status");
+
+    // Native Promise controls, not server-wire claims: rejection values need
+    // not be Error objects or have a readable message property.
+    for (const reason of [undefined, null, { get message() { throw new Error("unreadable"); } }]) {
+      render({ call: () => Promise.reject(reason) }, query("arbitrary rejection"));
+      await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      check(status() === "error" && text().includes("The request or response handler failed") &&
+        text().includes("recovered / local 1"),
+        "rejection display does not inspect an arbitrary error payload");
+    }
 
     // Real goal snapshots belong to the test server, not a public VIR protocol.
     const ref = await b.call("RpcBrowserServer.goalAt", { pos: config.b });
@@ -352,11 +435,6 @@ async function run() {
     await ready("old package");
     const old = runtime;
     React.act(() => root.render(null));
-    old.dispose();
-    check(
-      old.liveCallbacks.size === 0,
-      "replacement releases old Lean closure roots",
-    );
     runtime = await makeRuntime();
     component = runtime.call("RpcReferenceWidget.View");
     render(a, query("replacement"));
@@ -364,36 +442,37 @@ async function run() {
     await release("old package");
     check(
       request("old package").value?.message === "old package",
-      "disposed generation's request actually succeeds",
+      "unmounted generation's request actually succeeds",
     );
     check(
       text().includes("replacement / local 0") &&
         !text().includes("old package"),
-      "disposed generation cannot publish a late success",
+      "unmounted generation's Lean stale guard prevents a late success",
     );
+    old.dispose();
+    check(old.liveCallbacks.size === 0, "explicit disposal releases old Lean roots");
 
     await gate("arm", "after unmount");
     render(a, query("after unmount"));
     await ready("after unmount");
     unmount();
-    runtime.dispose();
-    check(
-      runtime.liveCallbacks.size === 0,
-      "unmount releases every Lean closure root",
-    );
+    check(subscriptions === 0 && notificationHandlers.size === 0,
+      "unmount removes the upstream subscription and callback");
     await release("after unmount");
     check(
       request("after unmount").value?.message === "after unmount" &&
         !text().includes("after unmount"),
       "late success after unmount is inert",
     );
+    runtime.dispose();
+    check(runtime.liveCallbacks.size === 0, "explicit disposal releases Lean closure roots");
 
     const failures = requests.filter(
       (record) =>
         record.error &&
         !(record.cancelled && record.error.code === -32800) &&
         !(
-          record.message === "visible error" &&
+          ["visible error", "obsolete error"].includes(record.message) &&
           record.error.message.includes("RPC example rejection")
         ),
     );
@@ -409,10 +488,12 @@ async function run() {
         .length,
       realReference: goal.target,
       strictReplayRequests: [abandoned.id, successor.id],
+      samePositionEdits: 2,
       requests: requests.length,
     };
   }, [
     ["replay response gate", () => replayGate.resolve()],
+    ["edit response gate", () => editGate.resolve()],
     ["React root", unmount],
     ["VIR runtime", () => runtime?.dispose()],
     ["RPC sessions", () => sessions?.dispose()],

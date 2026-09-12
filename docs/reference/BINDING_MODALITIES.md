@@ -166,13 +166,18 @@ differences.
 | ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Representation     | `immediate`, `js-resource`               | How a TypeScript value crosses the Lean/JavaScript boundary.                                                                          |
 | Argument passing   | `value`, `borrowed`, `owned`, `consumed` | What the runtime does with the argument for this invocation. `value` applies to immediate values; the other modes apply to resources. |
-| Argument retention | `call`, `until-release`, `runtime`       | How long the host may retain a resource.                                                                                              |
+| Bridge retention | `call`, `until-release`, `runtime`       | Duration of the Lean-side ownership obligation described by the argument's `retention` metadata, not native JS reachability. |
 | Result ownership   | `value`, `owned`, `borrowed`             | Whether a result is immediate or which side owns the returned resource.                                                               |
 | Effect             | for example `dom` / `DomM`               | Which Lean host-effect carrier wraps the result.                                                                                      |
 
-A borrowed resource cannot have retention beyond `call`. The generator rejects
-that combination instead of emitting a declaration that contradicts its host
-ABI policy.
+A borrowed Lean handle cannot have bridge retention beyond `call`; the
+generator rejects that combination. This does **not** forbid the host from
+retaining the exact JavaScript payload after the call. React may keep effect
+callbacks and dependency arrays, and subscriptions may keep notification
+callbacks. Those native references follow JavaScript reachability; converted
+Lean callbacks retain their closure roots as described in
+[Lean-backed JavaScript values](HOST_BINDINGS.md#lean-backed-javascript-values).
+Neither `borrowed/call` nor dropping a Lean handle revokes those references.
 
 These modes are runtime/ABI policy, not an affine Lean type system. `@&` marks
 borrowed arguments for Lean's calling convention; it does not prevent a caller
@@ -223,10 +228,11 @@ Unsupported TypeScript shapes fail generation. They are not silently converted
 to opaque Lean types.
 
 Descriptor options retain whether absence came from `null`, `undefined`, or
-both. The current `Lean.Vir.Js.Nullable` lane represents only `T | null`.
-Generation rejects `T | undefined`, `T | null | undefined`, and optional
-properties until their distinct JavaScript semantics have an explicit ABI
-representation.
+both. `Lean.Vir.Js.Nullable` represents only `T | null`;
+`Lean.Vir.Js.UndefinedOr` represents `T | undefined` when the ABI profile opts
+in with `resource.undefinedOrConstructor`. Both carry exact JS payloads.
+Generation still rejects nullish unions (`T | null | undefined`) and optional
+properties; neither is silently reduced to one absence case.
 
 ## Generated Binding Operations
 
@@ -301,15 +307,16 @@ providing a justified operation exception; this deliberately marks a reviewed
 signature projection rather than a faithful translation. Overload selection,
 optional or rest-parameter omission, fixed arguments, and parameter projection
 must carry `semantics` plus `reason` when no operation exception classifies the
-change. Every optional
-parameter must either be represented by a supported translation rule or named
-in `omittedOptionalParameters`; the current generator implements the latter
-path. A rest parameter must be omitted explicitly or projected to one or more
+change. Every optional parameter must be listed in either
+`omittedOptionalParameters` or `forwardedOptionalParameters`. The latter emits
+the native value-or-undefined type, including undefined from the parameter's
+`?` syntax. Forwarding is appropriate when the API treats explicit `undefined`
+like omission, as React's dependency argument does; it does not preserve
+`arguments.length`. A rest parameter must be omitted explicitly or projected to one or more
 named fixed-arity Lean binders through `fixedRestParameters`. A method policy or reviewed protocol can mark an implementation declaration
 `visibility: "private"`; public is the default. Private implementations remain
-in the compiler inventory and must be reachable from a public API. For example,
-React's two effect arities implement the single public `useEffect` without
-adding an optional-value host ABI. The existing `vir_js` attribute preserves its
+in the compiler inventory and must be reachable from a public API.
+The existing `vir_js` attribute preserves its
 validated signature for private imports, so compiled and live-snapshot packages
 can use it without reopening source files. Visible declarations and raw externs
 still receive typed analysis; packaging checks the target and compiled arity.
@@ -397,8 +404,8 @@ away only through an explicit `kind: "none"` exception. Unknown operation ids,
 unknown generated argument names, unsupported fields, unsafe borrowed
 lifetimes, and exceptions on immediate values are errors.
 
-Exceptions are intended for semantics that TypeScript declarations do not
-express, such as a host retaining a callback until explicit release. They are
+Exceptions are intended for bridge policy that TypeScript declarations do not
+express, such as consuming a handle for a terminal operation. They are
 not a place to restate ordinary profile defaults. The generated operation marks
 every override and its reason, so review can distinguish inference from policy.
 An exception's optional `semantics` field records whether the reviewed override

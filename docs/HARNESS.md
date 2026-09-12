@@ -236,7 +236,10 @@ site build; use `npm run build:demo` for missing or changed Wasm.
 - `node tests/infoview/rpc-shell-lifetime.mjs` uses the actual shell,
   `ShellLifetime` and `RpcBrowserServer`. Wasm/packages arrive through real
   asset/package RPC. Delayed success and rejection after UI cleanup enter Lean
-  stale guards; explicit disposal rejects before body entry. Live-generation
+  stale guards. The hard-disposal cases start requests, unmount, dispose, then
+  deliver success or rejection: no Lean body is entered, and a native JavaScript
+  observer catches the bridge error. They prove safe invalidation, not quiet
+  teardown of the tutorial's discarded Promise chain. Live-generation
   and reference-round-trip controls distinguish them. The injected context
   accessor supplies official sessions; runtime instrumentation observes
   generations and supplies test bindings. Package/source/artifact hashes are

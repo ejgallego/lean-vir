@@ -19,6 +19,7 @@ await writeFile(
     "import * as React from 'react';",
     "",
     "export const EditorContext = React.createContext(null);",
+    "export function useClientNotificationEffect() { throw new Error('unexpected smoke notification hook'); }",
     "",
     "export function useRpcSession() {",
     "  return { call() { throw new Error('unexpected smoke RPC call through React hook'); } };",

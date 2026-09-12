@@ -214,13 +214,13 @@ unsafe def snapshotPackage (suffix : String) : IO (String × ByteArray) := do
 unsafe def privateEffectSnapshot : IO Unit := do
   let source := "untitled:PrivateEffectSnapshot.lean"
   let env ← snapshotEnvironment source <|
-    "module\npublic import Vir.React\nopen Lean.Vir Lean.Vir.React\n" ++
+    "module\npublic import InfoviewFixtures.PrivateHost\nopen Lean.Vir Lean.Vir.React\n" ++
     "public def effectCalls (setup : Js EffectCallback) (deps : Js DependencyList) : Browser.DomM Unit := ReactM.run do\n" ++
-    "  Hooks.useEffect setup\n  Hooks.useEffect setup (some deps)\n"
+    "  InfoviewFixtures.PrivateHost.call setup deps\n"
   let input ← IO.ofExcept <| Vir.GeneratePackage.prepareSnapshotInput source env #[`effectCalls]
   let pkg ← IO.ofExcept <| ← Vir.GeneratePackage.buildPackageFromIndex
     "private-effects" #[input.target] input.index
-  for target in #["react.useEffect", "react.useEffectWithDeps"] do
+  for target in #["react.useEffect"] do
     expect s!"live snapshot retains private effect import {target}" <|
       pkg.manifest.hostImports.any fun entry =>
         entry.target == target && Lean.isPrivateName entry.name

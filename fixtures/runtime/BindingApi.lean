@@ -23,13 +23,13 @@ example (callback : DomM Unit) (delay : Js Float) : DomM (Js Timeout) :=
 example (array : Js.Array α) (index : Js Float) : RuntimeM (Js α) :=
   Js.Array.get array index
 
-example (setup : Js React.EffectCallback) : React.ReactM Unit :=
-  React.Hooks.useEffect setup
+example (setup : Js React.EffectCallback) : React.ReactM Unit := do
+  React.Hooks.useEffect setup (← Js.UndefinedOr.undefined)
 
 example (setup : Js React.EffectCallback) (deps : Js React.DependencyList) : React.ReactM Unit :=
-  React.Hooks.useEffect setup (some deps)
+  React.Hooks.useEffect setup (Js.UndefinedOr.ofJs deps)
 
--- Ordinary clients cannot call private arity implementations or removed wrappers.
+-- Removed arity implementations and conversion wrappers stay absent.
 example : True := by
   fail_if_success have _ := Lean.Vir.React.Hooks.useEffectWithoutDeps
   fail_if_success have _ := Lean.Vir.React.Hooks.useEffectWithDeps
@@ -37,6 +37,17 @@ example : True := by
   fail_if_success have _ := Lean.Vir.Browser.Document.querySelectorString
   fail_if_success have _ := Lean.Vir.React.Hooks.useLeanEffect
   trivial
+
+example (_setup : Js React.EffectCallback) (_deps : Js React.DependencyList)
+    (_null : Js.Nullable React.DependencyList) : True := by
+  fail_if_success have _ := React.Hooks.useEffect _setup (some _deps)
+  fail_if_success have _ := React.Hooks.useEffect _setup (none : Option (Js React.DependencyList))
+  fail_if_success have _ := React.Hooks.useEffect _setup (Js.erase _deps)
+  fail_if_success have _ := React.Hooks.useEffect _setup _null
+  trivial
+
+open scoped Lean.Vir.Js in
+example : RuntimeM (Js String) := js#"native string"
 
 example (_console : Js Console) (_message : String) : True := by
   fail_if_success have _ := Console.log _console _message

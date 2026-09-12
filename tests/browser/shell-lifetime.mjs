@@ -34,6 +34,7 @@ const bundle = await build({
         builder.onLoad({ filter: /.*/, namespace: "shell-test" }, () => ({
           contents: `import * as React from 'react';
         export const EditorContext = React.createContext(null);
+        export function useClientNotificationEffect() { throw new Error('unexpected lifecycle notification hook'); }
         export function useRpcSession() { return globalThis.__shellTest.rpc; }`,
           loader: "js",
           resolveDir: root,

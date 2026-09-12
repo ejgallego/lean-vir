@@ -186,6 +186,10 @@ export function validateGenerationProfile(generation, context = "generation") {
       !object(profile.receiver.globalTypes) || !object(generation.resources)) {
     throw new Error(`${context} does not define a valid ABI profile`);
   }
+  if (profile.resource.undefinedOrConstructor !== undefined &&
+      !nonemptyString(profile.resource.undefinedOrConstructor)) {
+    throw new Error(`${context} has an invalid undefined-or resource constructor`);
+  }
   for (const [name, policy] of Object.entries(profile.receiver.globalTypes)) {
     if (!nonemptyString(name)) throw new Error(`${context} global receiver type is empty`);
     validateSemanticPolicy(policy, `${context} global receiver ${name}`);
@@ -220,6 +224,7 @@ export function validateGenerationProfile(generation, context = "generation") {
       [
         "signature",
         "omittedOptionalParameters",
+        "forwardedOptionalParameters",
         "omittedRequiredParameters",
         "omittedRestParameters",
         "fixedRestParameters",
@@ -242,6 +247,11 @@ export function validateGenerationProfile(generation, context = "generation") {
       throw new Error(`${context} method policy ${member} has invalid omitted optional parameters`);
     }
     const omittedRequired = policy.omittedRequiredParameters ?? [];
+    const forwarded = policy.forwardedOptionalParameters ?? [];
+    if (!Array.isArray(forwarded) || !forwarded.every(nonemptyString) ||
+        new Set(forwarded).size !== forwarded.length || forwarded.some((name) => omitted.includes(name))) {
+      throw new Error(`${context} method policy ${member} has invalid forwarded optional parameters`);
+    }
     if (!Array.isArray(omittedRequired) || !omittedRequired.every(nonemptyString) ||
         new Set(omittedRequired).size !== omittedRequired.length) {
       throw new Error(`${context} method policy ${member} has invalid omitted required parameters`);
@@ -317,9 +327,11 @@ function nullableResource(shape, generation, profile, context) {
   if (absence === undefined) {
     throw new Error(`${context} option is missing TypeScript absence provenance`);
   }
-  if (absence !== "null") {
+  const constructorKey = absence === "undefined" ? "undefinedOrConstructor" : "nullableConstructor";
+  const constructor = profile.resource[constructorKey];
+  if ((absence !== "null" && absence !== "undefined") || !nonemptyString(constructor)) {
     throw new Error(
-      `${context} uses TypeScript ${absence} absence; only null-backed nullable resources are supported`,
+      `${context} uses TypeScript ${absence} absence without a matching native resource constructor`,
     );
   }
   const element = translateType(shape.element, generation, profile, context);
@@ -327,13 +339,13 @@ function nullableResource(shape, generation, profile, context) {
     throw new Error(`${context} nullable values require a JavaScript resource element`);
   }
   return translatedType(
-    `${profile.resource.nullableConstructor} ${element.resourceInner}`,
+    `${constructor} ${element.resourceInner}`,
     "js-resource",
     [
       ...element.provenance,
       typeProvenance(
-        "generation.abiProfile.resource.nullableConstructor",
-        `nullable resource constructor ${profile.resource.nullableConstructor}`,
+        `generation.abiProfile.resource.${constructorKey}`,
+        `${absence} resource constructor ${constructor}`,
       ),
     ],
     element.resourceInner,
@@ -400,6 +412,7 @@ function exceptionFor(generation, operationId) {
 function methodPolicyChangesCall(policy) {
   return policy.signature !== undefined ||
     (policy.omittedOptionalParameters?.length ?? 0) !== 0 ||
+    (policy.forwardedOptionalParameters?.length ?? 0) !== 0 ||
     (policy.omittedRequiredParameters?.length ?? 0) !== 0 ||
     (policy.omittedRestParameters?.length ?? 0) !== 0 ||
     Object.keys(policy.fixedRestParameters ?? {}).length !== 0 ||
@@ -827,6 +840,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
   const policy = generation.methodPolicies?.[member] ?? {};
   const { shape, provenance: signatureProvenance } = selectedMethodShape(member, symbol, policy);
   const omitted = new Set(policy.omittedOptionalParameters ?? []);
+  const forwarded = new Set(policy.forwardedOptionalParameters ?? []);
   const omittedRequired = new Set(policy.omittedRequiredParameters ?? []);
   const omittedRest = new Set(policy.omittedRestParameters ?? []);
   const fixedRest = policy.fixedRestParameters ?? {};
@@ -842,6 +856,13 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     const argument = shape.args.find((candidate) => candidate.name === name);
     if (argument === undefined) throw new Error(`${member} policy omits missing parameter ${name}`);
     if (argument.optional !== true) throw new Error(`${member} policy cannot omit required parameter ${name}`);
+  }
+  for (const name of forwarded) {
+    const argument = shape.args.find((candidate) => candidate.name === name);
+    if (argument === undefined) throw new Error(`${member} policy forwards missing parameter ${name}`);
+    if (argument.optional !== true || argument.rest === true || omitted.has(name)) {
+      throw new Error(`${member} policy must forward an optional non-rest, non-omitted parameter ${name}`);
+    }
   }
   for (const name of omittedRest) {
     const argument = shape.args.find((candidate) => candidate.name === name);
@@ -868,8 +889,8 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
         !Object.is(argument.type.value, value)) {
       throw new Error(`${member} fixed argument ${name} does not match its TypeScript literal`);
     }
-    if (omitted.has(name) || omittedRequired.has(name)) {
-      throw new Error(`${member} policy cannot both omit and fix parameter ${name}`);
+    if (omitted.has(name) || omittedRequired.has(name) || forwarded.has(name)) {
+      throw new Error(`${member} policy cannot both omit/forward and fix parameter ${name}`);
     }
   }
   if (Object.keys(fixedArguments).length !== 0 && exception === null) {
@@ -933,16 +954,24 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
     if (omittedRequired.has(argument.name)) continue;
     if (Object.hasOwn(fixedArguments, argument.name)) continue;
     if (argument.optional === true) {
-      if (!omitted.has(argument.name)) {
-        throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission policy`);
+      if (omitted.has(argument.name)) {
+        omittedTrailingParameter = true;
+        continue;
       }
-      omittedTrailingParameter = true;
-      continue;
+      if (!forwarded.has(argument.name)) {
+        throw new Error(`${member} optional parameter ${argument.name} requires an explicit omission or forwarding policy`);
+      }
     }
     if (omittedTrailingParameter) {
       throw new Error(`${member} cannot omit an optional parameter before ${argument.name}`);
     }
-    addArgument(parameterRenames[argument.name] ?? argument.name, argument.type);
+    let argumentType = argument.type;
+    if (forwarded.has(argument.name)) {
+      argumentType = argumentType.kind === "option"
+        ? { ...argumentType, absence: argumentType.absence === "undefined" ? "undefined" : "nullish" }
+        : { kind: "option", absence: "undefined", element: argumentType };
+    }
+    addArgument(parameterRenames[argument.name] ?? argument.name, argumentType);
   }
   for (const name of Object.keys(exception?.arguments ?? {})) {
     if (!knownParameters.has(name)) {
@@ -993,6 +1022,7 @@ function methodOperation(config, root, mapping, symbol, generation, profile, { f
       signaturePolicy: {
         selection: policy.signature ?? "unique",
         omittedOptionalParameters: [...omitted],
+        forwardedOptionalParameters: [...forwarded],
         omittedRequiredParameters: [...omittedRequired],
         omittedRestParameters: [...omittedRest],
         fixedRestParameters: structuredClone(fixedRest),

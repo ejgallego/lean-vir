@@ -27,6 +27,16 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "javascript.undefined", "group": "undefined", "target": "js.undefined",
+        "lean": "Lean.Vir.Js.UndefinedOr.undefined", "marker": "vir_js",
+        "reason": "Returns the exact JavaScript undefined value, with no Option encoding or object wrapper.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"],
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value α" } }
+      },
+      {
         "id": "javascript.string.of", "group": "primitive-conversions", "target": "js.string",
         "lean": "Lean.Vir.JsValue.ofString", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a Lean-owned String into a JavaScript string resource.",
@@ -452,6 +462,13 @@
       "title": "Nullable values",
       "targets": ["js.nullable.*"],
       "lean": { "public": ["Lean.Vir.Js.Nullable"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "undefined",
+      "title": "Undefined or value",
+      "targets": ["js.undefined"],
+      "lean": { "public": ["Lean.Vir.Js.UndefinedOr"] },
       "upstream": { "kind": "internal" }
     },
     {

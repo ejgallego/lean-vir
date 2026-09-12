@@ -18,12 +18,18 @@
       },
       "resource": {
         "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "undefinedOrConstructor": "Lean.Vir.Js.UndefinedOr",
         "argument": { "passing": "borrowed", "retention": "call" },
         "result": { "ownership": "owned" }
       },
       "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
     },
     "resources": {
+      "React.DependencyList": {
+        "lean": "Lean.Vir.React.DependencyList",
+        "semantics": "preserving",
+        "reason": "The exact native array for React's readonly unknown[] dependency list; callers must not mutate arrays retained by React."
+      },
       "React.EffectCallback": {
         "lean": "Lean.Vir.React.EffectCallback",
         "semantics": "preserving",
@@ -42,11 +48,10 @@
     },
     "methodPolicies": {
       "React.useEffect": {
-        "visibility": "private",
-        "omittedOptionalParameters": ["deps"],
+        "forwardedOptionalParameters": ["deps"],
         "parameterRenames": { "effect": "setup" },
         "semantics": "preserving",
-        "reason": "Passes the caller's native setup function unchanged to React.useEffect without a dependency argument."
+        "reason": "Passes the exact setup and dependency array or undefined to React.useEffect. Explicit undefined follows its omitted-argument behavior; an empty array remains distinct."
       },
       "createRoot": { "omittedOptionalParameters": ["options"] }
     },
@@ -212,19 +217,6 @@
           { "name": "context", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Context α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Context α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
-      },
-      {
-        "id": "react.hooks.use-effect-with-deps", "group": "hooks", "target": "react.useEffectWithDeps",
-        "lean": "Lean.Vir.React.Hooks.useEffectWithDeps", "marker": "vir_js",
-        "visibility": "private",
-        "reason": "Passes the caller's native setup function and dependency array unchanged to React.useEffect.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useEffect", "semantics": "preserving" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "setup", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } },
-          { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
         "id": "react.ref.get", "group": "references", "target": "react.ref.get",
@@ -413,7 +405,7 @@
         {
           "typescript": "React.useEffect",
           "targets": ["react.useEffect"],
-          "lean": ["Lean.Vir.React.Hooks.useEffectWithoutDeps"]
+          "lean": ["Lean.Vir.React.Hooks.useEffect"]
         },
         {
           "typescript": "React.useId",

@@ -23,7 +23,7 @@ Constructs an empty native JavaScript Array.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -39,7 +39,7 @@ Selects the one-item arity of Array<T>.push(...items: T[]): number. The receiver
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -57,7 +57,7 @@ Returns the exact native JavaScript Number stored in Array.length.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -74,7 +74,7 @@ Preserves Array<T>'s [n: number]: T relationship. This is the TypeScript uncheck
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; array js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -96,7 +96,7 @@ Explicitly converts a transferred Lean unary callback into an ordinary JavaScrip
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -114,7 +114,7 @@ Explicitly converts a transferred Lean unary callback with a discarded result in
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -131,7 +131,7 @@ Calls an exact unary JavaScript function with one exact JavaScript argument and 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -150,7 +150,7 @@ Calls the exact JavaScript function with one exact JavaScript argument and disca
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -172,7 +172,7 @@ Returns the exact native JavaScript Number stored in NodeList.length.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -189,7 +189,7 @@ Calls NodeList.item and represents a missing entry as JavaScript null.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; nodes js-resource/borrowed/call; index js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -207,7 +207,7 @@ Copies a NodeList into a JavaScript Array without crossing its entries into Lean
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; nodes js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -228,7 +228,7 @@ Constructs a JavaScript null resource for a statically selected phantom type.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -244,7 +244,7 @@ Injects a JavaScript resource into VIR's JavaScript nullable representation.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -261,7 +261,7 @@ Tests a JavaScript nullable resource without decoding its payload.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -278,7 +278,7 @@ Extracts the non-null payload of a JavaScript nullable resource.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -299,7 +299,7 @@ Constructs an ordinary empty JavaScript object without a VIR-specific props repr
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -313,7 +313,7 @@ Assigns the exact JavaScript value to the exact property name on an ordinary Jav
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -332,7 +332,7 @@ Reads an exact property value with an erased static shape, including undefined f
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -354,7 +354,7 @@ Selects Promise.then<B>'s B callback-return alternative and returns the exact na
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -373,7 +373,7 @@ Selects Promise.then<B>'s PromiseLike<B> callback-return alternative with a nati
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -392,7 +392,7 @@ Calls native Promise.then with an exact JavaScript callback whose result is unde
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -410,7 +410,7 @@ Selects Promise.then<B, B> with both handlers returning the same B shape, so B |
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -430,7 +430,7 @@ Calls native Promise.then with both exact handlers returning undefined and retur
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onFulfilled js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -449,7 +449,7 @@ Selects Promise<T>.catch<T> with a Js.Any rejection input and recovery to the sa
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; promise js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; promise js-resource/borrowed/call; onRejected js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -471,7 +471,7 @@ Checks for a primitive JavaScript string and returns that exact value. Throws Ty
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -491,7 +491,7 @@ Projects position 0 of an exact native two-element tuple, preserving the first p
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -509,7 +509,7 @@ Projects position 1 of an exact native two-element tuple, preserving the second 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; tuple js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -522,6 +522,26 @@ opaque second
 
 end Js.Tuple2
 
+namespace Js.UndefinedOr
+
+/--
+Generated binding for reviewed VIR protocol `javascript.undefined`.
+
+Returns the exact JavaScript undefined value, with no Option encoding or object wrapper.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.undefined"]
+opaque undefined
+    {α : Type} :
+    RuntimeM (Lean.Vir.Js.UndefinedOr α)
+
+end Js.UndefinedOr
+
 namespace JsValue
 
 /--
@@ -531,7 +551,7 @@ Explicitly converts a Lean-owned String into a JavaScript string resource.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -547,7 +567,7 @@ Explicitly decodes a JavaScript string resource into a Lean-owned String.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -563,7 +583,7 @@ Explicitly converts a Lean Nat into a nonnegative JavaScript bigint resource, pr
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -579,7 +599,7 @@ Explicitly decodes a nonnegative JavaScript bigint resource as a Lean Nat, prese
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -595,7 +615,7 @@ Explicitly converts a Lean Bool into a JavaScript boolean resource.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -611,7 +631,7 @@ Explicitly decodes a JavaScript boolean resource as a Lean Bool.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -627,7 +647,7 @@ Explicitly preserves a Lean Float as a JavaScript IEEE-754 number resource.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value immediate/value/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -643,7 +663,7 @@ Explicitly decodes a JavaScript IEEE-754 number resource as a Lean Float.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -663,7 +683,7 @@ Creates an ordinary self-owning JavaScript object that retains the Lean-owned va
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -680,7 +700,7 @@ Returns a fresh owned Lean reference from a live self-owning JavaScript object.
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `vir-javascript-protocol-v1`: receiver none; value js-resource/borrowed/call; result lean-owned/value.
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result lean-owned/value.
 
 This declaration is generated; edit the binding configuration.
 -/

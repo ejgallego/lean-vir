@@ -27,7 +27,7 @@ Call policy: Omitting the optional reason selects native AbortController.abort()
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L3364
 
-ABI profile `browser-dom-faithful-v1`: controller js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): controller js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -45,7 +45,7 @@ The **`signal`** read-only property of the AbortController interface returns an 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L3358
 
-ABI profile `browser-dom-faithful-v1`: abortController js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): abortController js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -61,7 +61,7 @@ Calls new AbortController() and returns the exact controller. The generator deri
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -81,7 +81,7 @@ Specialization policy: Lean gives the exact browser animation-frame token a phan
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver none; handle js-resource/consumed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; handle js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -99,7 +99,7 @@ Specialization policy: VIR adapts the Lean callback and privately records pendin
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -121,7 +121,7 @@ Call policy: Omitting counterclockwise preserves the TypeScript default value fa
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; radius js-resource/borrowed/call; startAngle js-resource/borrowed/call; endAngle js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; radius js-resource/borrowed/call; startAngle js-resource/borrowed/call; endAngle js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -142,7 +142,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.begin
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -158,7 +158,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.clear
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -178,7 +178,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.close
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -196,7 +196,7 @@ Call policy: The selected overload is fill(fillRule?), and omitting fillRule pre
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -212,7 +212,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.fillR
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -234,7 +234,7 @@ Specialization policy: The JavaScript-owned CanvasStyle marker faithfully preser
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -252,7 +252,7 @@ Specialization policy: The JavaScript-owned CanvasStyle marker faithfully preser
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -269,7 +269,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.lineT
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -287,7 +287,7 @@ Faithful generated getter binding for TypeScript `CanvasRenderingContext2D.lineW
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -303,7 +303,7 @@ Faithful generated setter binding for TypeScript `CanvasRenderingContext2D.lineW
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -320,7 +320,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.measu
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -337,7 +337,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.moveT
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -355,7 +355,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.resto
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -371,7 +371,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.rotat
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; angle js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; angle js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -388,7 +388,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.save`
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -406,7 +406,7 @@ Call policy: The selected zero-argument overload is the complete current-path st
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -422,7 +422,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.strok
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; w js-resource/borrowed/call; h js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -444,7 +444,7 @@ Specialization policy: The JavaScript-owned CanvasStyle marker faithfully preser
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -462,7 +462,7 @@ Specialization policy: The JavaScript-owned CanvasStyle marker faithfully preser
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): ctx js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -479,7 +479,7 @@ Faithful generated method binding for TypeScript `CanvasRenderingContext2D.trans
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvasRenderingContext2D js-resource/borrowed/call; x js-resource/borrowed/call; y js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -501,7 +501,7 @@ Explicitly injects a Lean-owned string into the string arm of the exact JavaScri
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; style lean-owned/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; style lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -525,7 +525,7 @@ Specialization policy: The selected one-message call passes the exact Console re
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: console js-resource/borrowed/call; message js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): console js-resource/borrowed/call; message js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -542,7 +542,7 @@ Returns the host-global Console as an exact JavaScript value; this is explicit e
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -564,7 +564,7 @@ Call policy: Omitting priority preserves CSSStyleDeclaration.setProperty's defau
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L6588
 
-ABI profile `browser-dom-faithful-v1`: declaration js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): declaration js-resource/borrowed/call; property js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -590,7 +590,7 @@ Specialization policy: The selected non-generic string overload passes the exact
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12929
 
-ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; tagName js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): document js-resource/borrowed/call; tagName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -611,7 +611,7 @@ Specialization policy: The selected non-generic selector overload passes the exa
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -632,7 +632,7 @@ Specialization policy: The selected non-generic selector overload passes the exa
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): document js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -651,7 +651,7 @@ The **`document.title`** property gets or sets the current title of the document
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): document js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -669,7 +669,7 @@ The **`document.title`** property gets or sets the current title of the document
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12848
 
-ABI profile `browser-dom-faithful-v1`: document js-resource/borrowed/call; title js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): document js-resource/borrowed/call; title js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -686,7 +686,7 @@ Returns the host-global Document as an exact JavaScript value; this is explicit 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -708,7 +708,7 @@ Call policy: The selected one-token call passes the exact DOMTokenList receiver 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12165
 
-ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -729,7 +729,7 @@ Call policy: The selected one-token call passes the exact DOMTokenList receiver 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12183
 
-ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): tokenList js-resource/borrowed/call; className js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -750,7 +750,7 @@ Call policy: Omitting force selects DOMTokenList.toggle's standard toggle behavi
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L12201
 
-ABI profile `browser-dom-faithful-v1`: tokenList js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): tokenList js-resource/borrowed/call; token js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -771,7 +771,7 @@ Specialization policy: VIR selects the JavaScript function arm of EventListenerO
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13915
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -793,7 +793,7 @@ Specialization policy: VIR currently specializes Node's generic appendChild oper
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L26125
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; node js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -812,7 +812,7 @@ The read-only **`classList`** property of the Element interface contains a live 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -830,7 +830,7 @@ The read-only **`classList`** property of the Element interface contains a live 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13520
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; classList js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; classList js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -849,7 +849,7 @@ The **`getAttribute()`** method of the Element interface returns the value of a 
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13681
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -868,7 +868,7 @@ The **`innerHTML`** property of the Element interface gets or sets the HTML or X
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -886,7 +886,7 @@ The **`innerHTML`** property of the Element interface gets or sets the HTML or X
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13570
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; innerHTML js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; innerHTML js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -907,7 +907,7 @@ Specialization policy: The non-generic selector overload returns the exact eleme
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27086
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -928,7 +928,7 @@ Specialization policy: The non-generic selector overload returns the exact JavaS
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L27097
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; selectors js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -947,7 +947,7 @@ Removes node.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L10671
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -963,7 +963,7 @@ Specialization policy: VIR selects the JavaScript function arm of EventListenerO
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13917
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; event js-resource/borrowed/call; listener js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -983,7 +983,7 @@ The **`setAttribute()`** method of the Element interface sets the value of an at
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13869
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; qualifiedName js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1001,7 +1001,7 @@ Faithful generated getter binding for TypeScript `Element.textContent`.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1017,7 +1017,7 @@ Faithful generated setter binding for TypeScript `Element.textContent`.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13913
 
-ABI profile `browser-dom-faithful-v1`: element js-resource/borrowed/call; textContent js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): element js-resource/borrowed/call; textContent js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1034,7 +1034,7 @@ Checks an erased JavaScript value with the browser Element brand and preserves t
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; value js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1054,7 +1054,7 @@ Faithful generated getter binding for TypeScript `ElementCSSInlineStyle.style`.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
 
-ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): elementCSSInlineStyle js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1070,7 +1070,7 @@ Faithful generated setter binding for TypeScript `ElementCSSInlineStyle.style`.
 
 Upstream declaration: https://unpkg.com/typescript@6.0.3/lib/lib.dom.d.ts#L13930
 
-ABI profile `browser-dom-faithful-v1`: elementCSSInlineStyle js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): elementCSSInlineStyle js-resource/borrowed/call; style js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1087,7 +1087,7 @@ This checked structural narrowing preserves the exact JavaScript element value w
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1109,7 +1109,7 @@ The **`currentTarget`** read-only property of the Event interface identifies the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1127,7 +1127,7 @@ The **`preventDefault()`** method of the Event interface tells the user agent th
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): event js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1145,7 +1145,7 @@ The **`stopPropagation()`** method of the Event interface prevents further propa
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): event js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1163,7 +1163,7 @@ The read-only **`target`** property of the Event interface is a reference to the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: event js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1179,7 +1179,7 @@ This local protocol extracts the common value property from supported form-contr
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; event js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1199,7 +1199,7 @@ Explicitly converts a transferred Lean event callback into an ordinary JavaScrip
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1219,7 +1219,7 @@ Checks whether an EventTarget is an Element and preserves the exact JavaScript i
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; target js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; target js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1243,7 +1243,7 @@ Specialization policy: VIR specializes HTMLCanvasElement.getContext to the fixed
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: canvas js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): canvas js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1261,7 +1261,7 @@ The **`HTMLCanvasElement.height`** property is a positive integer reflecting the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1279,7 +1279,7 @@ The **`HTMLCanvasElement.height`** property is a positive integer reflecting the
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; height js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLCanvasElement js-resource/borrowed/call; height js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1298,7 +1298,7 @@ The **`HTMLCanvasElement.width`** property is a positive integer reflecting the 
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLCanvasElement js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1316,7 +1316,7 @@ The **`HTMLCanvasElement.width`** property is a positive integer reflecting the 
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLCanvasElement js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLCanvasElement js-resource/borrowed/call; width js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1333,7 +1333,7 @@ This checked narrowing preserves the exact JavaScript value and has no correspon
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1355,7 +1355,7 @@ The **`checked`** property of the HTMLInputElement interface specifies the curre
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1373,7 +1373,7 @@ The **`checked`** property of the HTMLInputElement interface specifies the curre
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; checked js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLInputElement js-resource/borrowed/call; checked js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1392,7 +1392,7 @@ The **`value`** property of the HTMLInputElement interface represents the curren
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLInputElement js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1410,7 +1410,7 @@ The **`value`** property of the HTMLInputElement interface represents the curren
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: hTMLInputElement js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): hTMLInputElement js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1427,7 +1427,7 @@ This checked narrowing preserves the exact JavaScript value and has no correspon
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; element js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; element js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1447,7 +1447,7 @@ This explicit convenience conversion creates a JavaScript string value before ca
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; value lean-owned/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; value lean-owned/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1463,7 +1463,7 @@ This explicit convenience conversion creates a JavaScript number value for the l
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; value immediate/value/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; value immediate/value/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1485,7 +1485,7 @@ The KeyboardEvent interface's **`key`** read-only property returns the value of 
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: keyboardEvent js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): keyboardEvent js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1501,7 +1501,7 @@ This checked narrowing preserves the exact JavaScript event value and has no cor
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; event js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1523,7 +1523,7 @@ The read-only **`width`** property of the TextMetrics interface contains the tex
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: metrics js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): metrics js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1545,7 +1545,7 @@ Specialization policy: Selects a native interval token from TypeScript's number-
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver none; interval js-resource/consumed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; interval js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1563,7 +1563,7 @@ Specialization policy: Selects a native timeout token from TypeScript's number-o
 
 Upstream declaration: node_modules/typescript/lib/lib.dom.d.ts
 
-ABI profile `browser-dom-faithful-v1`: receiver none; timeout js-resource/consumed/call; result immediate/value.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; timeout js-resource/consumed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
@@ -1579,7 +1579,7 @@ VIR selects the function callback arm, passes the callback and numeric delay in 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/
@@ -1596,7 +1596,7 @@ VIR selects the function callback arm, passes the callback and numeric delay in 
 
 Binding contract: `generation.protocolOperations`.
 
-ABI profile `browser-dom-faithful-v1`: receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
+ABI profile `browser-dom-faithful-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; delayMs js-resource/borrowed/call; result js-resource/owned.
 
 This declaration is generated; edit the binding configuration.
 -/

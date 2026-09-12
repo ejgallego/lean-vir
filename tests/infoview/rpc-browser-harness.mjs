@@ -62,6 +62,7 @@ export async function runRpcBrowserAcceptance({
   const gates = new Map();
   const calls = [];
   const diagnostics = [];
+  let documentVersion = 1;
   let stderr = "";
   let deadline;
 
@@ -174,6 +175,16 @@ export async function runRpcBrowserAcceptance({
           assert.ok(gate, "unknown response gate");
           if (body.action === "open") gate.resolve();
           result = gate.ready;
+        } else if (req.url === "/edit") {
+          const params = {
+            textDocument: { uri, version: ++documentVersion },
+            contentChanges: [{ text: `${source}\n-- browser edit ${documentVersion}\n` }],
+          };
+          await connection.sendNotification("textDocument/didChange", params);
+          await connection.sendRequest("textDocument/waitForDiagnostics", {
+            uri, version: documentVersion,
+          });
+          result = params;
         } else if (req.url === "/call") {
           const token = new CancellationTokenSource();
           pending.set(body.id, token);

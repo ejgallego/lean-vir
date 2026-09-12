@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 
 import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
+import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 
 const resultKey = "__leanVirReactStrictModeSmoke";
 const hookLifecycle = createHostLifecycle();
@@ -29,6 +30,7 @@ globalThis[resultKey] = runReactSmoke().then(
 async function runReactSmoke() {
   return {
     strict: await runStrictModeEffectProbe(),
+    optionalDependencies: await runOptionalDependenciesProbe(),
     lanes: await runInterleavedStateLaneProbe(),
     reducer: await runReducerIdentityProbe(),
     memo: await runMemoIdentityProbe(),
@@ -201,6 +203,41 @@ async function runStrictModeEffectProbe() {
   } finally {
     container.remove();
   }
+}
+
+async function runOptionalDependenciesProbe() {
+  const undefinedValue = createJsValueHostBindings()["js.undefined"]();
+  requireState(undefinedValue === undefined, "undefined must not be an envelope or null");
+  requireState(!Object.hasOwn(hookBindings, "react.useEffectWithDeps"), "one native effect binding");
+  const empty = [];
+  const counts = { every: 0, once: 0, cleanedEvery: 0, cleanedOnce: 0 };
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  function Probe() {
+    hookBindings["react.useEffect"](() => {
+      counts.every++;
+      return () => counts.cleanedEvery++;
+    }, undefinedValue);
+    hookBindings["react.useEffect"](() => {
+      counts.once++;
+      return () => counts.cleanedOnce++;
+    }, empty);
+    return null;
+  }
+  try {
+    flushSync(() => root.render(React.createElement(Probe)));
+    await waitFor(() => counts.every === 1 && counts.once === 1, "initial optional effects", counts);
+    flushSync(() => root.render(React.createElement(Probe)));
+    await waitFor(() => counts.every === 2, "undefined dependencies rerun", counts);
+    requireState(counts.once === 1 && counts.cleanedOnce === 0, "empty array must not rerun");
+    requireState(counts.cleanedEvery === 1 && empty.length === 0, "replacement cleanup preserves array");
+  } finally {
+    flushSync(() => root.unmount());
+    container.remove();
+  }
+  requireState(counts.cleanedEvery === 2 && counts.cleanedOnce === 1, "both effects clean up on unmount");
+  return counts;
 }
 
 async function runReducerIdentityProbe() {

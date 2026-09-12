@@ -132,6 +132,7 @@ export function createBrowserAnimationHostBindings(lifecycle) {
 }
 
 export function createBrowserHostBindings({
+  infoviewUseClientNotificationEffect = null,
   lifecycle = createHostLifecycle(),
   infoviewCommandDispatcher = null,
   reactHostBindings = null,
@@ -153,6 +154,7 @@ export function createBrowserHostBindings({
     ...createBrowserAnimationHostBindings(lifecycle),
     ...createInfoviewHostBindings({
       commandDispatcher: infoviewCommandDispatcher,
+      useClientNotificationEffect: infoviewUseClientNotificationEffect,
     }),
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
