@@ -109,6 +109,7 @@
     "test:packages:unit": "node --test tests/packages/*.test.mjs",
     "test:generator:memory": "node tests/packages/generator-memory.mjs",
     "test:generator:imports": "lake build +ModuleSetFixture.InputSelection +fixtures.HostInterop Vir.GeneratePackage.Inputs && lake env lean --run tests/packages/ImportCache.lean module && lake env lean --run tests/packages/ImportCache.lean host && node tests/packages/import-cache-resolved.mjs",
+    "test:generator:inputs": "node tests/packages/resolved-setups.mjs",
     "test:interface": "lake build Vir.Attributes Vir.HostValidation Vir.Js Vir.Browser.Types Vir.React.Types && mkdir -p build/interface-tests && lake env lean --root=tests/packages -o build/interface-tests/InterfaceReduction.olean tests/packages/InterfaceReduction.lean && LEAN_PATH=build/interface-tests lake env lean tests/packages/InterfaceReductionImported.lean",
     "test:native:unit": "node --test tests/native/*.test.mjs",
     "test:tutorials": "lake build VirInfoview Vir.Examples.Style +tutorials.RpcReferenceWidget && lake env lean examples/tutorials/ReactCounter.lean && lake env lean examples/tutorials/ReactProofWidgetHello.lean && lake env lean examples/tutorials/RpcReferenceWidget.lean",

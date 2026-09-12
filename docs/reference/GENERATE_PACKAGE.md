@@ -40,13 +40,23 @@ frontend or generated import driver.
 Source commands such as `#eval` execute during compilation, not again during
 packaging. Build the named module and artifacts before invoking the executable.
 
-The optional `--setup <setup.json>` immediately after the package/report paths
+The optional repeated `--setup <setup.json>` immediately after the package/report paths
 reads Lean's `ModuleSetup.importArts` map. Lake supplies resolved root and
 transitive artifacts, including private data and full IR, so cache-only inputs
 need not exist at conventional search-path locations. `DeclIndex` retains this
 map for subsequent owning-module loads. Only artifact paths are consumed; setup
 options, plugins and target selection do not override the generator's import
-context. Without a setup file, ordinary Lean search paths remain in use.
+context. Multiple setup files must agree on the paths of overlapping modules;
+they provide acquisition capability, not a union of exposed declarations.
+The `:virInputs` facet exposes this input-only operation to other producers.
+
+Resolution remains an overlay: mapped parts are authoritative and a missing
+mapped file fails, even if a conventional copy exists. Unmapped modules use Lean
+search paths. In particular Lake's project-module graph does not list toolchain
+modules such as `Init`; retain the matching Lake execution environment. Neither
+an incomplete hand-authored setup nor an empty setup enables a strict closed-map
+mode. Without a setup file, ordinary Lean search paths remain in use. No plugin
+or dynamic-library loading policy is added by this API.
 
 Acquisition preserves `module; import all M` semantics: ordinary/meta `Init`
 imports, private target IR, persistent extensions and module-system visibility.
