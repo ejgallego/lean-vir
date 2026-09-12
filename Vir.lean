@@ -13,6 +13,7 @@ public meta import Vir.Attributes
 public import Vir.Host
 public import Vir.Runtime
 public import Vir.Js
+public import Vir.JsonValue
 public import Vir.Common
 public import Vir.Browser
 public import Vir.React

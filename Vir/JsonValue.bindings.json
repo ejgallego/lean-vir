@@ -1,0 +1,59 @@
+{
+  "$schema": "./bindings.schema.json",
+  "version": 2,
+  "id": "json-values",
+  "title": "Explicit JSON value conversion",
+  "description": "Checked ordinary JSON values with a safe-integer numeric domain; separate from raw JS bindings.",
+  "lean": { "modules": ["Vir.JsonValue.Js", "Vir.JsonValue.Generated"] },
+  "generation": {
+    "output": "Vir/JsonValue/Generated.lean",
+    "imports": ["Vir.JsonValue.Types"],
+    "namespace": "Lean.Vir.JsonValue",
+    "abiProfile": {
+      "id": "vir-json-value-v1",
+      "effect": { "id": "runtime", "lean": "RuntimeM" },
+      "types": { "void": { "lean": "Unit", "representation": "immediate" } },
+      "resource": {
+        "constructor": "Lean.Vir.Js", "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
+    },
+    "resources": {},
+    "protocolOperations": [
+      {
+        "id": "json-value.check", "group": "conversion", "target": "jsonValue.check",
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "lean": "Lean.Vir.JsonValue.Internal.check", "marker": "vir_js_explicit_conversion", "visibility": "private",
+        "reason": "Explicitly validates the complete ordinary-value graph before copying it into Lean; rejects unsupported shapes, non-safe-integer numbers and reserved reference objects.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js.Any", "representation": "js-resource", "resourceInner": "Js.Any.Value" } }],
+        "result": { "type": { "lean": "Except String Unit", "representation": "lean-owned" } }
+      },
+      {
+        "id": "json-value.inspect", "group": "conversion", "target": "jsonValue.inspect",
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "lean": "Lean.Vir.JsonValue.Internal.inspect", "marker": "vir_js_explicit_conversion", "visibility": "private",
+        "reason": "Copies a validated JSON node into the existing structural object ABI while child values remain exact JS resources. Used synchronously after the whole-graph check.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js.Any", "representation": "js-resource", "resourceInner": "Js.Any.Value" } }],
+        "result": { "type": { "lean": "View", "representation": "lean-owned" } }
+      },
+      {
+        "id": "json-value.build", "group": "conversion", "target": "jsonValue.build",
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "lean": "Lean.Vir.JsonValue.Internal.build", "marker": "vir_js_explicit_conversion", "visibility": "private",
+        "reason": "Explicitly constructs one ordinary JSON node from checked Lean values and already converted JS children; no wire stringify or implicit binding conversion.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "arguments": [{ "name": "value", "type": { "lean": "View", "representation": "lean-owned" } }],
+        "result": { "type": { "lean": "Js.Any", "representation": "js-resource", "resourceInner": "Js.Any.Value" } }
+      }
+    ]
+  },
+  "roots": [{
+    "id": "conversion", "title": "JSON value codec", "targets": ["jsonValue.*"],
+    "lean": { "public": ["Lean.Vir.JsonValue"] },
+    "upstream": { "kind": "internal" }
+  }]
+}

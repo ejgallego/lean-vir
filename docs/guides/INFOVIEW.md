@@ -79,6 +79,57 @@ phantom type. Adding another request type parameter would exceed the current
 six-argument interpreter import limit, which includes erased parameters and the
 world token. The response type remains polymorphic.
 
+## Shared ordinary values
+
+For reference-free requests and responses, import `Vir.Infoview.JsonRpc` and
+explicitly choose `ToJson`/`FromJson` instances for a shared Lean type. The
+[shared Foo](../../fixtures/runtime/JsonRpcFoo.lean) includes nested records,
+arrays, an option and an inductive. The native
+[server](../../fixtures/infoview/RpcBrowserServer.lean) and interpreted
+[client](../../fixtures/runtime/JsonValueCodec.lean) import that same declaration;
+neither needs a parallel JavaScript schema or application `.js` file.
+
+On the server, `JsonRpc.serveValue` adapts a typed
+`Request → RequestM (RequestTask Response)` handler to
+`Json → RequestM (RequestTask Json)` for `@[server_rpc_method]`. It checks request
+decoding and response encoding before serialization. Import its server-only
+module with `public meta import Vir.Infoview.JsonRpc.Server`.
+
+On the client, `JsonRpc.callValue` explicitly encodes the request, calls the
+unchanged position-specific RPC API, and decodes fulfillment. Its result is:
+
+```lean
+RuntimeM (Except String (Js.Promise (LeanRef.Handle (Except String Response))))
+```
+
+The outer `Except` reports encoding failure before dispatch. Transport/server
+errors reject the native Promise. Fulfillment is a browser-local JSL containing
+the checked decoding result; a continuation uses `LeanRef.fromJSL` to read it.
+It is not a Promise containing a native Lean heap object. Optional request
+options preserve the exact abort signal and ordinary cancellation behavior.
+
+The value domain is null, booleans, well-formed Unicode strings, dense arrays,
+same-realm ordinary string-keyed data objects and mathematical integers in
+`[-9007199254740991, 9007199254740991]`. Fractions, negative JS zero and unsafe
+integers are rejected; native `JsonNumber` is checked before conversion can
+round it. An existing instance that deliberately encodes a number as a string
+still produces a string—there is no implicit numeric string fallback.
+
+Undefined, functions, DOM objects, this SDK's JSL handles, accessors, cycles, symbol/non-enumerable
+properties and RPC reference markers (`__rpcref` and legacy singleton
+`{"p":"…"}`) are excluded. Proxies and concurrent mutation are outside the
+ordinary-data contract, not a sandbox guarantee. Copies do not preserve object
+identity or aliases. Private handle brands from another SDK instance are not
+detectable; do not submit foreign handles as ordinary data. Use raw RPC for
+`WithRpcRef` responses.
+
+An external server may already have lost numeric precision before decoding;
+client checks cannot recover the original JSON lexeme. Use the paired server
+adapter for pre-serialization validation. Custom instances remain responsible
+for their round-trip laws and schema policy, including unknown-field handling.
+`Vir.JsonValue` also exposes `encodeJs`/`decodeJs` for non-RPC uses. Conversion
+visits each node through the object ABI; no zero-copy claim is made.
+
 ## Promise continuations
 
 Host imports execute synchronously. A native Promise crosses as an exact `Js`

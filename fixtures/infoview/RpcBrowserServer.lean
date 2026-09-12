@@ -9,12 +9,34 @@ module
 public import Vir.Infoview
 public meta import Vir.Infoview
 public meta import Lean.Server.FileWorker.RequestHandling
+public meta import JsonRpcFoo
+public meta import Vir.Infoview.JsonRpc.Server
 
 public section
 
 namespace RpcBrowserServer
 
 open Lean Server
+
+meta def typedReply (foo : JsonRpcFixture.Foo) : RequestM (RequestTask JsonRpcFixture.Foo) :=
+  RequestM.asTask do
+    while foo.title == "typed cancellation" do
+      RequestM.checkCancelled
+      IO.sleep 10
+    if foo.title == "typed rejection" then
+      throw (RequestError.invalidParams "typed example rejection")
+    let count := if foo.title == "typed overflow" then 9007199254740992 else foo.primary.count + 1
+    return { foo with title := foo.title ++ " replied", primary := { foo.primary with count } }
+
+/-- Both sides use JsonRpcFixture.Foo; only the selected JSON wire value crosses RPC. -/
+@[server_rpc_method]
+meta def echoValue (params : Json) : RequestM (RequestTask Json) :=
+  Vir.Infoview.JsonRpc.serveValue typedReply params
+
+/-- Deliberately bypass the typed encoder to exercise client schema rejection. -/
+@[server_rpc_method]
+meta def malformedValue (_params : Json) : RequestM (RequestTask Json) :=
+  RequestM.pureTask (pure (Json.mkObj [("title", toJson "missing fields")]))
 
 meta structure Payload where
   message : String

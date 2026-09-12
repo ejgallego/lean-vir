@@ -232,7 +232,9 @@ site build; use `npm run build:demo` for missing or changed Wasm.
 - `node tests/infoview/rpc-browser.mjs` checks position-specific sessions,
   native Promise results, genuine `WithRpcRef`, rejection, cancellation and
   rerendering with the `tutorials.RpcReferenceWidget` package. Held real replies
-  test stale success independently of aborting.
+  test stale success independently of aborting. The same package includes the
+  shared `JsonRpcFoo` value-codec fixture: real-Wasm shape/numeric checks and
+  native-server typed request/response, malformed-value and cancellation tests.
 - `node tests/infoview/rpc-shell-lifetime.mjs` uses the actual shell,
   `ShellLifetime` and `RpcBrowserServer`. Wasm/packages arrive through real
   asset/package RPC. Delayed success and rejection after UI cleanup enter Lean
