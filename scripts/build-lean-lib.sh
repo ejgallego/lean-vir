@@ -73,6 +73,7 @@ build_module Vir/ExportValidation.lean
 build_module Vir/ExternFallback.lean
 build_module Vir/InterfaceValidation.lean
 build_module Vir/Interface/Model.lean
+build_module Vir/GeneratePackage/CachedImports.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/Json.lean
 build_module Vir/GeneratePackage/Interface/Encode.lean

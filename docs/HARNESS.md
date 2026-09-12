@@ -67,6 +67,13 @@ semantics require the separate Chromium checks below.
 - Compiled-module input and source re-elaboration regressions:
   `npm run test:runtime -- module-input`. For npm module CLI/config behavior,
   use `npm run test:runtime -- module-cli` alongside package units.
+- Compiled import sharing: `npm run test:generator:imports` compares cached
+  contexts to Lean's independent imports, including private visibility and
+  import-level upgrades. On Linux with GNU `/usr/bin/time`,
+  `npm run test:generator:memory` measures the full demo-host generator and
+  enforces an 8 GiB peak-RSS budget, retaining logs/package/results under
+  `build/generator-memory-*`. Its `-- --no-build` option reuses prepared inputs.
+  This is a resource regression, not a statistical latency benchmark.
 - Lake facets, marked-module selection, downstream input tracing, output
   ownership or SDK installation: `npm run test:lake`. Its cache checks cover
   the exercised scenarios; they do not establish cache-only artifact reuse.

@@ -19,19 +19,23 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
-unsafe def importModuleEnv (moduleName : Name) : IO Environment := do
+private unsafe def importModuleEnvCached (moduleName : Name)
+    (cache : CompiledImportCache) : IO (Environment × CompiledImportCache) := do
   -- Match `module; import all M` without parsing or elaborating a driver.
   -- Init's runtime and meta imports are implicit in a non-prelude Lean header.
   -- The exported level is essential: the default private level disables the
   -- module system and would silently accept legacy inputs.
   enableInitializersExecution
   let opts := Elab.async.set ({} : Options) false
-  let env ← importModules #[
+  let (env, cache) ← cache.importModules #[
     { module := `Init },
     { module := `Init, isMeta := true },
     { module := moduleName, importAll := true, isExported := false }
-  ] opts (loadExts := true) (level := .exported)
-  return env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated")
+  ] opts
+  return (env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated"), cache)
+
+unsafe def importModuleEnv (moduleName : Name) : IO Environment := do
+  return (← importModuleEnvCached moduleName {}).1
 
 def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name := do
   let moduleIdx ← env.getModuleIdxFor? name
@@ -126,7 +130,8 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       | throw <| IO.userError "live snapshots require prepareSnapshotInput, not filesystem acquisition"
     if index.loadedModules.contains moduleName then
       continue
-    let env ← importModuleEnv moduleName
+    let (env, compiledImports) ← importModuleEnvCached moduleName index.compiledImports
+    index := { index with compiledImports }
     let mut names : Array Name := #[]
     for decl in moduleDeclarations moduleName env do
       if environmentModuleForDecl? env decl.name != some moduleName then
@@ -286,10 +291,11 @@ def DeclIndex.moduleInitializationOrderForTarget?
 unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) : IO DeclIndex := do
   if index.loadedModules.contains moduleName then
     return index
-  let env ← importModuleEnv moduleName
+  let (env, compiledImports) ← importModuleEnvCached moduleName index.compiledImports
   let source := s!"module {moduleName}"
   let mut index := {
     index with
+    compiledImports
     sources := index.sources.push {
       origin := .module moduleName
       env
