@@ -60,6 +60,9 @@ semantics require the separate Chromium checks below.
 
 ### Package and fixture work
 
+- Interface head reduction and its rejection boundaries: `npm run test:interface`
+  checks the classifier and export attributes locally and through a compiled
+  module import, without Wasm or npm dependencies.
 - Configuration, browser package catalog or output planning:
   `npm run test:packages:unit`. Add `npm run check:package` and runtime/browser
   checks against refreshed packages for catalog/root-selection changes. Fixture
