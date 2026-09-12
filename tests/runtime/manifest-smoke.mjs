@@ -447,33 +447,6 @@ const animationFrameImport = hostRuntime.interfaceManifest.hostImports.find(
 );
 assert.equal(animationFrameImport?.args[0]?.type?.kind, "function");
 assert.equal(animationFrameImport?.args[0]?.type?.args[0]?.type?.type, "Js");
-const infoviewClipboardImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "infoview.clipboard.writeText",
-);
-assert.equal(infoviewClipboardImport?.args[0]?.type?.type, "Js");
-assert.equal(infoviewClipboardImport?.result?.type, "Js");
-const infoviewRevealPositionImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "infoview.command.revealPosition",
-  );
-assert.equal(infoviewRevealPositionImport?.args[0]?.type?.type, "Js");
-assert.equal(infoviewRevealPositionImport?.result?.type, "Js");
-const infoviewInsertTextImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "infoview.command.insertText",
-);
-assert.equal(infoviewInsertTextImport?.args[0]?.type?.type, "Js");
-assert.equal(infoviewInsertTextImport?.args[1]?.type?.type, "Js");
-assert.equal(infoviewInsertTextImport?.result?.type, "Js");
-const infoviewDocumentPositionImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "infoview.documentPosition",
-  );
-assert.equal(infoviewDocumentPositionImport?.effect, "runtime");
-assert.equal(infoviewDocumentPositionImport?.args.length, 5);
-for (const arg of infoviewDocumentPositionImport?.args ?? []) {
-  assert.equal(arg.type?.type, "Js");
-}
-assert.equal(infoviewDocumentPositionImport?.result?.type, "Js");
 const testCallNatCallbackImport =
   hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.callNatCallback",

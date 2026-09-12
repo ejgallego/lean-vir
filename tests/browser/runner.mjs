@@ -78,7 +78,7 @@ try {
 
   cdp.close();
   console.log(
-    "pages browser smoke ok: landing, minimal runtime example, runtime diagnostics, React Tamagotchi, React proof goal transitions, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, atomic package loads, retained runtimes after load failure, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths",
+    "pages browser smoke ok: landing, minimal runtime example, runtime diagnostics, React Tamagotchi, native infoview same-root updates, React DOM ref lifetime, React Strict Mode and abandoned-render lifetimes, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, atomic package loads, retained runtimes after load failure, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths",
   );
 } catch (error) {
   const details = chromium?.stderr() ?? "";

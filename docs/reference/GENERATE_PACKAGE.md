@@ -46,6 +46,21 @@ would bypass module restrictions. Missing artifacts and non-module inputs fail
 with Lean's import error. This internal import context produces no frontend-only
 lint warnings.
 
+One generation shares immutable compiled artifact groups through
+`CompiledImportCache`, including later owning-module loads. Each target still
+gets a fresh Lean import state and environment: sharing a union environment
+would expose unrelated targets' declarations and private metadata. Neither
+visibility flags nor extension state are shared between these contexts.
+
+`CachedImports` is a narrow adapter of the pinned Lean import algorithm at
+exported level with interpretation IR. Lean 4.33 has no overlapping-import
+artifact cache hook; the adapter uses `import all Lean.Environment` for its
+internal acquisition types/readers and ordinary `finalizeImport`. On toolchain
+changes, compare it with upstream `importModulesCore` and run the import-cache
+equivalence tests. Cache scope is one index with fixed search paths/artifacts,
+not a process-global cache. Compacted regions must not be explicitly freed:
+imported extension closures can retain references outside the index.
+
 Input identity is a typed module/snapshot identity, not a display label or
 canonical source path. Configuration normalization and package planning are
 pure; acquisition and filesystem reads/writes belong to orchestration. Source
@@ -98,7 +113,7 @@ module. The map below groups shared policy separately from orchestration;
 
 | Boundary | Source owners |
 | --- | --- |
-| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. |
+| Targets and acquisition | [`Basic`](../../Vir/GeneratePackage/Basic.lean) defines targets, collected declarations and limits. [`Inputs`](../../Vir/GeneratePackage/Inputs.lean) owns compiled/live acquisition, `DeclIndex`, markers, fallback adapters, declaration ownership, on-demand import-all environments and collision diagnostics. [`CachedImports`](../../Vir/GeneratePackage/CachedImports.lean) shares raw artifacts while preserving independent import contexts. |
 | Names and dependency closure | [`LeanName`](../../Vir/LeanName.lean) parses strict dotted names for tools and clients. [`IRDependencies`](../../Vir/IRDependencies.lean) walks IR references and formats dependency paths; [`Closure`](../../Vir/GeneratePackage/Closure.lean) resolves roots and collects typed IR. [`ExternFallback`](../../Vir/ExternFallback.lean) owns transparent extern-body clones and recursion rejection. |
 | Native and host metadata | [`NativeExterns`](../../Vir/GeneratePackage/NativeExterns.lean) owns VIR's registration policy; resolved compiler metadata and wrappers remain with [native tooling](../../scripts/native/README.md). [`HostMetadata`](../../Vir/HostMetadata.lean) is the single encoder/decoder of VIR targets in Lean extern symbols. [`Host`](../../Vir/Host.lean) retains attribute-validated signatures in compiled metadata, including private imports. |
 | Interface policy | [`Interface.Model`](../../Vir/Interface/Model.lean) defines descriptors, effects, layouts and boundaries. [`InterfaceValidation`](../../Vir/InterfaceValidation.lean) owns typed binder/startup preflight, effects and abbreviation reduction. [`ExportValidation`](../../Vir/ExportValidation.lean) checks visible compiled closures and defers opaque imports; [`Attributes`](../../Vir/Attributes.lean) owns declaration-kind/postponed-compilation handling. |

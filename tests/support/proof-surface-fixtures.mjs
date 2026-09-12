@@ -14,13 +14,13 @@ export function createProofSurfaceFixture({
   rpcSession = unavailableRpcSession,
 } = {}) {
   return {
-    position: "ReactProofWidget.lean:42:7",
+    position: "VirNativeInfoview.lean:42:7",
     cursor: {
-      uri: "file:///workspace/ReactProofWidget.lean",
-      fileName: "ReactProofWidget.lean",
+      uri: "file:///workspace/VirNativeInfoview.lean",
+      fileName: "VirNativeInfoview.lean",
       line: 41,
       character: 6,
-      label: "ReactProofWidget.lean:42:7",
+      label: "VirNativeInfoview.lean:42:7",
     },
     goals: [
       {
@@ -77,12 +77,12 @@ export function createProofSurfaceFixture({
 export function createMovedProofSurfaceFixture(base = createProofSurfaceFixture()) {
   return {
     ...base,
-    position: "ReactProofWidget.lean:87:3",
+    position: "VirNativeInfoview.lean:87:3",
     cursor: {
       ...base.cursor,
       line: 86,
       character: 2,
-      label: "ReactProofWidget.lean:87:3",
+      label: "VirNativeInfoview.lean:87:3",
     },
     selectedLocations: ["step"],
     selections: [

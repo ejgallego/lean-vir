@@ -44,7 +44,7 @@ lean_lib VirInfoview where
 lean_lib VirExamples where
   srcDir := "examples"
   roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort, `HostInterop,
-    `Tamagotchi, `ReactProofWidget, `tutorials.ReactProofWidgetHello,
+    `Tamagotchi, `VirNativeInfoview, `tutorials.ReactProofWidgetHello,
     `tutorials.RpcReferenceWidget]
 
 /-- Authored browser fixtures; paths are preserved for source navigation. -/
@@ -53,7 +53,8 @@ lean_lib VirBrowserFixtures where
     `fixtures.RecursiveTypes, `fixtures.Boundary, `fixtures.ExprPrinter,
     `fixtures.FormatPretty, `fixtures.JsonCompress, `fixtures.LeanParser,
     `fixtures.LeanParserHeader, `fixtures.Task, `fixtures.ReactCounter,
-    `fixtures.ReactInput, `fixtures.ProofWidgetsHtml, `fixtures.ProofWidgetsJsxSubset]
+    `fixtures.ReactInput, `fixtures.HostInterop, `fixtures.ProofWidgetsHtml,
+    `fixtures.ProofWidgetsJsxSubset]
 
 /-- Module-system fixtures for composable package-set regression tests. -/
 lean_lib VirModuleFixtures where

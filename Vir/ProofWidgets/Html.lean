@@ -68,118 +68,22 @@ abbrev PropEntry : Type 1 :=
 
 namespace PropEntry
 
-def key (value : String) : PropEntry :=
-  Lean.Vir.React.Props.key value
-
-def property (value : Attr) : PropEntry :=
-  Lean.Vir.React.Props.property value
-
-def eventHandler (value : Handler) : PropEntry :=
-  Lean.Vir.React.Props.eventHandler value
-
-def ref {α : Type}
-    (value : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) : PropEntry :=
-  Lean.Vir.React.Props.ref value
+export Lean.Vir.React.Props (key property eventHandler ref)
 
 end PropEntry
 
 namespace Attr
 
-def string (name value : String) : Attr :=
-  Lean.Vir.React.Property.string name value
-
-def bool (name : String) (value : Bool) : Attr :=
-  Lean.Vir.React.Property.bool name value
-
-def int (name : String) (value : Int) : Attr :=
-  Lean.Vir.React.Property.int name value
-
-def float (name : String) (value : Float) : Attr :=
-  Lean.Vir.React.Property.float name value
-
-def id (value : String) : Attr :=
-  Lean.Vir.React.Property.id value
-
-def className (value : String) : Attr :=
-  Lean.Vir.React.Property.className value
-
-def classList (classes : Array String) : Attr :=
-  Lean.Vir.React.Property.classList classes
-
-def title (value : String) : Attr :=
-  Lean.Vir.React.Property.title value
-
-def role (value : String) : Attr :=
-  Lean.Vir.React.Property.role value
-
-def ariaLabel (value : String) : Attr :=
-  Lean.Vir.React.Property.ariaLabel value
-
-def data (name value : String) : Attr :=
-  Lean.Vir.React.Property.data name value
-
-def dataTestId (value : String) : Attr :=
-  Lean.Vir.React.Property.dataTestId value
-
-def tabIndex (value : Int) : Attr :=
-  Lean.Vir.React.Property.tabIndex value
-
-def stylePairs (entries : Array (String × String)) : Attr :=
-  Lean.Vir.React.Property.stylePairs entries
-
-def src (value : String) : Attr :=
-  Lean.Vir.React.Property.src value
-
-def alt (value : String) : Attr :=
-  Lean.Vir.React.Property.alt value
-
-def href (value : String) : Attr :=
-  Lean.Vir.React.Property.href value
-
-def target (value : String) : Attr :=
-  Lean.Vir.React.Property.target value
-
-def rel (value : String) : Attr :=
-  Lean.Vir.React.Property.rel value
-
-def type (value : String) : Attr :=
-  Lean.Vir.React.Property.type value
-
-def inputValue (value : String) : Attr :=
-  Lean.Vir.React.Property.inputValue value
-
-def checked (value : Bool) : Attr :=
-  Lean.Vir.React.Property.checked value
+export Lean.Vir.React.Property (
+  string bool int float id className classList title role ariaLabel data dataTestId
+  tabIndex stylePairs src alt href target rel type inputValue checked
+)
 
 end Attr
 
 namespace Handler
 
-def on (name : String)
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
-    Handler :=
-  Lean.Vir.React.EventHandler.on name callback
-
-def onClick (callback : Lean.Vir.Browser.DomM Unit) : Handler :=
-  Lean.Vir.React.EventHandler.onClick callback
-
-def onClickWith
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
-    Handler :=
-  Lean.Vir.React.EventHandler.onClickWith callback
-
-def onInput
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
-    Handler :=
-  Lean.Vir.React.EventHandler.onInput callback
-
-def onChange
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
-    Handler :=
-  Lean.Vir.React.EventHandler.onChange callback
-
-def onSubmit (callback : Lean.Vir.Browser.DomM Unit) : Handler :=
-  Lean.Vir.React.EventHandler.onSubmit callback
+export Lean.Vir.React.EventHandler (on onClick onClickWith onInput onChange onSubmit)
 
 end Handler
 

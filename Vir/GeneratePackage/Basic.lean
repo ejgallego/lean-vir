@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Lean.Compiler.IR.CompilerM
+public import Vir.GeneratePackage.CachedImports
 public import Vir.GeneratePackage.NativeExterns
 public import Vir.Interface.Model
 public import Vir.IRDependencies
@@ -103,6 +104,7 @@ structure DeclSource where
 def DeclSource.display (source : DeclSource) : String := source.origin.display
 
 structure DeclIndex where
+  compiledImports : CompiledImportCache := {}
   localDecls : NameMap LoadedDecl := {}
   sources : Array DeclSource := #[]
   clientNativeExternSpecs : Array NativeExternSpec := #[]

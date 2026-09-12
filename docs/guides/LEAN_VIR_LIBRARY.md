@@ -21,7 +21,9 @@ effects and reviewed protocol operations.
 | `Vir.Js` | Exact JavaScript values, collections, functions, Promises and explicit conversions. |
 | `Vir.Common` | Small environment-neutral helpers such as string echo and natural-number addition. |
 | `Vir.Browser` | DOM receivers, events, timers, animation and canvas. |
-| `Vir.React` | Native React nodes, roots, components and hooks. |
+| `Vir.React.Core` | Native React nodes, roots, components and hooks. |
+| `Vir.React.Builders` | Optional Lean property, event and HTML builders. |
+| `Vir.React` | Convenience import for core and builders. |
 | `Vir.ProofWidgets` | Optional HTML/JSX notation over native React values. |
 | `Vir.Infoview` | The optional widget shell, proof surface, RPC and local editor capabilities. |
 | `Vir.Attributes` / `Vir.ExternFallback` | Package markers / explicit use of a Lean extern reference body. |

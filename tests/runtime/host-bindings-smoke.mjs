@@ -41,6 +41,67 @@ bindings["js.function.callVoid"]((value) => {
 }, nativeItem);
 assert.equal(calledWith, nativeItem);
 
+// Exercise the compiled Lean loops, including length snapshots and missing
+// entries. These overrides observe reads while retaining native provider behavior.
+const collectionReads = [];
+const collectionRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSet: [hostPackageBytes],
+  hostBindings: Object.fromEntries([
+    "js.array.length", "js.array.item", "js.nodeList.length", "js.nodeList.item",
+  ].map((name) => [name, (...args) => {
+    collectionReads.push([name, ...args.slice(1)]);
+    return bindings[name](...args);
+  }])),
+});
+try {
+  const throughArray = (input) => {
+    collectionReads.length = 0;
+    return collectionRuntime.call("HostInterop.arrayThroughLean", input);
+  };
+  assert.deepEqual(throughArray([]), []);
+  assert.deepEqual(collectionReads, [["js.array.length"]]);
+  const callback = () => {};
+  const values = [nativeItem, undefined, null, callback];
+  const copied = throughArray(values);
+  assert.notEqual(copied, values);
+  values.forEach((value, index) => assert.equal(copied[index], value));
+  assert.deepEqual(collectionReads, [
+    ["js.array.length"], ...values.map((_, index) => ["js.array.item", index]),
+  ]);
+  const sparse = new Array(2);
+  sparse[1] = nativeItem;
+  assert.deepEqual(throughArray(sparse), [undefined, nativeItem]);
+  assert.deepEqual(collectionReads, [
+    ["js.array.length"], ["js.array.item", 0], ["js.array.item", 1],
+  ]);
+
+  const liveNodes = [nativeItem, {}, {}];
+  const liveList = {
+    get length() { return liveNodes.length; },
+    item(index) {
+      if (index === 0) liveNodes.splice(1);
+      return liveNodes[index] ?? null;
+    },
+  };
+  collectionReads.length = 0;
+  const surviving = collectionRuntime.call("HostInterop.nodeListThroughLean", liveList);
+  assert.deepEqual(surviving, [nativeItem]);
+  assert.equal(surviving[0], nativeItem);
+  assert.deepEqual(collectionReads, [
+    ["js.nodeList.length"], ["js.nodeList.item", 0],
+    ["js.nodeList.item", 1], ["js.nodeList.item", 2],
+  ]);
+  collectionReads.length = 0;
+  assert.deepEqual(collectionRuntime.call("HostInterop.nodeListThroughLean", {
+    length: 0,
+    item() { throw new Error("empty NodeList must not be indexed"); },
+  }), []);
+  assert.deepEqual(collectionReads, [["js.nodeList.length"]]);
+} finally {
+  collectionRuntime.dispose();
+}
+
 let retainedCallback = null;
 const retainedCallbackRuntime = await createVirRuntime({
   wasmBytes,

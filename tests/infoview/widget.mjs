@@ -85,7 +85,7 @@ const rpcSession = {
     if (method === "Lean.Vir.Infoview.statIRPackage") {
       irPackageStatCount += 1;
       return {
-        source: "examples/ReactProofWidget.lean",
+        source: "examples/VirNativeInfoview.lean",
         roots: params.package.roots,
         revision: irPackageRevision,
       };
@@ -93,7 +93,7 @@ const rpcSession = {
     if (method === "Lean.Vir.Infoview.buildIRPackage") {
       irPackageBuildCount += 1;
       return {
-        source: "examples/ReactProofWidget.lean",
+        source: "examples/VirNativeInfoview.lean",
         roots: params.package.roots,
         byteSize: String(packageBytes.length),
         revision: irPackageRevision,
@@ -126,13 +126,13 @@ const rpcSession = {
 
 assert.equal(typeof infoviewWidgetComponent, "function");
 assert.equal(
-  validateWidgetComponentEntry(runtime, "ReactProofWidget.createComponent")
+  validateWidgetComponentEntry(runtime, "VirNativeInfoview.createComponent")
     .entry,
-  "ReactProofWidget.createComponent",
+  "VirNativeInfoview.createComponent",
 );
 assert.equal(
-  validateWidgetEntry(runtime, "ReactProofWidget.mount").entry,
-  "ReactProofWidget.mount",
+  validateWidgetEntry(runtime, "VirNativeInfoview.mount").entry,
+  "VirNativeInfoview.mount",
 );
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
@@ -257,8 +257,8 @@ assert.equal(
       rpcSession,
       {
         roots: [
-          "ReactProofWidget.createComponent",
-          "ReactProofWidget.mount",
+          "VirNativeInfoview.createComponent",
+          "VirNativeInfoview.mount",
         ],
       },
       { line: 0, character: 0 },
@@ -287,8 +287,8 @@ const runtimeOptions = await loadRuntimeOptions({
   wasmPath: "web/public/vir-upstream.wasm",
   irPackage: {
     roots: [
-      "ReactProofWidget.createComponent",
-      "ReactProofWidget.mount",
+      "VirNativeInfoview.createComponent",
+      "VirNativeInfoview.mount",
     ],
   },
   position: { line: 0, character: 0 },
@@ -306,8 +306,8 @@ assert.equal(
 );
 const reloadIRPackage = {
   roots: [
-    "ReactProofWidget.createComponent",
-    "ReactProofWidget.mount",
+    "VirNativeInfoview.createComponent",
+    "VirNativeInfoview.mount",
   ],
 };
 const reloadPosition = { line: 0, character: 0 };
@@ -342,12 +342,12 @@ const irPackageServiceConfig = {
   wasmPath: "web/public/vir-upstream.wasm",
   irPackage: {
     roots: [
-      "ReactProofWidget.createComponent",
-      "ReactProofWidget.mount",
+      "VirNativeInfoview.createComponent",
+      "VirNativeInfoview.mount",
     ],
   },
-  componentEntry: "ReactProofWidget.createComponent",
-  entry: "ReactProofWidget.mount",
+  componentEntry: "VirNativeInfoview.createComponent",
+  entry: "VirNativeInfoview.mount",
   position: { line: 0, character: 0 },
   setupHint: "",
 };

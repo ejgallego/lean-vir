@@ -29,11 +29,29 @@ def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) 
 def sameNodeListElement {α : Type} (list : Js.NodeList (Js α)) : RuntimeM (Js.Array α) :=
   Js.NodeList.toArray list
 
+def sameLeanArrayElement {α : Type} (array : Js.Array α) : RuntimeM (_root_.Array (Js α)) :=
+  Js.Array.toLeanArray array
+
+def sameLeanNodeListElement {α : Type} (list : Js.NodeList (Js α)) :
+    RuntimeM (_root_.Array (Js α)) :=
+  Js.NodeList.toLeanArray list
+
+example {α β : Type} (array : Js.Array α) : True := by
+  fail_if_success
+    have unrelated : RuntimeM (_root_.Array (Js β)) := Js.Array.toLeanArray array
+  fail_if_success
+    have unwrapped : RuntimeM (_root_.Array α) := Js.Array.toLeanArray array
+  trivial
+
 example {α β : Type} (list : Js.NodeList (Js α)) : True := by
   fail_if_success
     have unrelated : RuntimeM (Js.Array β) := Js.NodeList.toArray list
   fail_if_success
     have doubleWrapped : RuntimeM (Js.Array (Js α)) := Js.NodeList.toArray list
+  fail_if_success
+    have unrelated : RuntimeM (_root_.Array (Js β)) := Js.NodeList.toLeanArray list
+  fail_if_success
+    have unwrapped : RuntimeM (_root_.Array α) := Js.NodeList.toLeanArray list
   trivial
 
 example {α : Type} (list : Js.NodeList α) : True := by

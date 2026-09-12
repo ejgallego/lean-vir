@@ -73,6 +73,7 @@ build_module Vir/ExportValidation.lean
 build_module Vir/ExternFallback.lean
 build_module Vir/InterfaceValidation.lean
 build_module Vir/Interface/Model.lean
+build_module Vir/GeneratePackage/CachedImports.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/Json.lean
 build_module Vir/GeneratePackage/Interface/Encode.lean
@@ -94,6 +95,8 @@ build_module Vir/Browser/Generated.lean
 build_module Vir/Browser.lean
 build_module Vir/React/Types.lean
 build_module Vir/React/Generated.lean
+build_module Vir/React/Core.lean
+build_module Vir/React/Builders.lean
 build_module Vir/React.lean
 build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean
