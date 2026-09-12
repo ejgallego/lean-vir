@@ -152,8 +152,8 @@ TypeScript declaration + VIR ABI policy + explicit annotation
 The generated operation keeps the operation's TypeScript-level type together
 with the selected overload, receiver shape, effect, and authored ownership or
 retention policy. Descriptors distinguish `null`, `undefined`, and nullish
-absence; generation rejects the latter two and optional properties until they
-have explicit representations. Convenience conversions belong in a separate
+absence. `Js.Nullable` and opt-in `Js.UndefinedOr` preserve the first two;
+nullish unions and optional properties remain unsupported. Convenience conversions belong in a separate
 application-facing layer and do not count as upstream bindings.
 
 Non-identity resource markers and host-global receiver choices are explicit

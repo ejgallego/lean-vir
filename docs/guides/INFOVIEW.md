@@ -106,8 +106,10 @@ rejects the chained Promise without invoking the sibling rejection handler.
 ## Editor notifications
 
 `Infoview.useClientNotificationEffect method callback dependencies` forwards to
-the upstream infoview hook. With `none`, VIR omits the optional dependencies
-argument; with `some deps`, it passes the exact JavaScript dependency array.
+the upstream infoview hook. The dependency argument is
+`Js.UndefinedOr React.DependencyList`: `Js.UndefinedOr.undefined` produces native
+`undefined` (the upstream omitted-argument behavior), while `Js.UndefinedOr.ofJs deps`
+passes the exact JavaScript array, including `[]`.
 The upstream `EditorContext` owns subscription and cleanup. VIR does not queue,
 filter or schedule notifications.
 
@@ -116,7 +118,7 @@ whose document URI equals the current `Surface.cursor.uri`, and increments an
 application revision used by its request effect. The URI filter and decision to
 rerun RPC are application policy, not behavior imposed by the binding. Other
 applications may choose different methods, filters and dependencies while
-following React's hook rules. The example omits dependencies to follow editor
+following React's hook rules. The example passes `undefined` to follow editor
 connection replacement too: upstream uses an explicit array exactly as supplied,
 without adding the editor identity to it.
 

@@ -522,6 +522,26 @@ opaque second
 
 end Js.Tuple2
 
+namespace Js.UndefinedOr
+
+/--
+Generated binding for reviewed VIR protocol `javascript.undefined`.
+
+Returns the exact JavaScript undefined value, with no Option encoding or object wrapper.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.undefined"]
+opaque undefined
+    {α : Type} :
+    RuntimeM (Lean.Vir.Js.UndefinedOr α)
+
+end Js.UndefinedOr
+
 namespace JsValue
 
 /--

@@ -54,6 +54,28 @@ end Undefined
 abbrev Undefined : Type :=
   Lean.Vir.Js Undefined.Value
 
+namespace UndefinedOr
+
+/-- Phantom shape for the native JavaScript union `α | undefined`. -/
+opaque Value (α : Type) : Type
+
+end UndefinedOr
+
+/-- The exact JavaScript payload, not a Lean `Option` or a wrapper object. -/
+abbrev UndefinedOr (α : Type) : Type :=
+  Lean.Vir.Js (UndefinedOr.Value α)
+
+namespace UndefinedOr
+
+@[inline] unsafe def ofJsImpl {α : Type} (value : Lean.Vir.Js α) : UndefinedOr α :=
+  unsafeCast value
+
+/-- Widens the phantom type without changing the value, root, or lifetime. -/
+@[implemented_by ofJsImpl]
+axiom ofJs {α : Type} (value : Lean.Vir.Js α) : UndefinedOr α
+
+end UndefinedOr
+
 namespace Function
 
 /--

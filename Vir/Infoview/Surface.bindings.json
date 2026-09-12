@@ -23,29 +23,16 @@
     "resources": {},
     "protocolOperations": [
       {
-        "id": "infoview.client-notification-effect-deps", "group": "client-notifications", "target": "infoview.useClientNotificationEffectWithDeps",
-        "lean": "Lean.Vir.Infoview.useClientNotificationEffectWithDeps", "marker": "vir_js", "visibility": "private",
-        "reason": "Calls the upstream infoview hook with the exact method, native callback and explicit dependency array. The upstream EditorContext and hook own subscription and cleanup; VIR neither queues nor filters notifications.",
+        "id": "infoview.client-notification-effect", "group": "client-notifications", "target": "infoview.useClientNotificationEffect",
+        "lean": "Lean.Vir.Infoview.useClientNotificationEffect", "marker": "vir_js",
+        "reason": "Calls the upstream infoview hook with the exact method, callback and dependency array or undefined. Upstream treats undefined as omitted and owns subscription and cleanup; VIR neither queues nor filters notifications.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "useClientNotificationEffect", "semantics": "preserving" },
         "typeParameters": ["params"],
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
           { "name": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js params) Unit" } },
-          { "name": "deps", "type": { "lean": "Lean.Vir.Js React.DependencyList", "representation": "js-resource", "resourceInner": "React.DependencyList" } }
-        ],
-        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
-      },
-      {
-        "id": "infoview.client-notification-effect", "group": "client-notifications", "target": "infoview.useClientNotificationEffect",
-        "lean": "Lean.Vir.Infoview.useClientNotificationEffectWithoutDeps", "marker": "vir_js", "visibility": "private",
-        "reason": "Calls the upstream infoview hook with the exact method and native callback, omitting the optional dependencies argument.",
-        "upstreamRelation": { "kind": "upstream-adapter", "member": "useClientNotificationEffect", "semantics": "preserving" },
-        "typeParameters": ["params"],
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
-          { "name": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js params) Unit" } }
+          { "name": "deps", "type": { "lean": "Lean.Vir.Js.UndefinedOr React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value React.DependencyList" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },

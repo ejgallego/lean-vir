@@ -18,6 +18,7 @@ export function createJsValueHostBindings() {
     return value;
   };
   bindings["js.float.owned"] = jsFloatValue;
+  bindings["js.undefined"] = () => undefined;
   bindings["js.nullable.null"] = () => null;
   bindings["js.nullable.of"] = (value) => value;
   bindings["js.nullable.isNull"] = (value) => value === null;

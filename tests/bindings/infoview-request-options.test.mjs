@@ -47,15 +47,17 @@ test("the no-options call omits the native argument", () => {
   assert.equal(bindings["infoview.rpcSession.call"](session, "method", {}), 42);
 });
 
-test("notification hook forwards exact values and native optional arity", () => {
+test("notification hook forwards exact undefined or array values through one binding", () => {
   const calls = [];
   const native = (...args) => { calls.push(args); };
   const bindings = createInfoviewHostBindings({ useClientNotificationEffect: native });
   const callback = () => {};
   const deps = [];
-  bindings["infoview.useClientNotificationEffect"]("method", callback);
-  bindings["infoview.useClientNotificationEffectWithDeps"]("method", callback, deps);
-  assert.equal(calls[0].length, 2);
+  bindings["infoview.useClientNotificationEffect"]("method", callback, undefined);
+  bindings["infoview.useClientNotificationEffect"]("method", callback, deps);
+  assert.equal(calls[0].length, 3);
+  assert.equal(calls[0][2], undefined);
+  assert.equal(Object.hasOwn(bindings, "infoview.useClientNotificationEffectWithDeps"), false);
   assert.equal(calls[1].length, 3);
   assert.equal(calls[0][1], callback);
   assert.equal(calls[1][1], callback);

@@ -87,7 +87,7 @@ export const demoHostImportTargets = [
   "react.root.unmount",
   "react.state.modify",
   "react.useEffect",
-  "react.useEffectWithDeps",
+  "js.undefined",
   "react.useId",
   "react.useMemo",
   "react.useReducer",

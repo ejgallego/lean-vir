@@ -821,7 +821,9 @@ function renderTypeTransformation(operation, { showHeading = true } = {}) {
         rows.push(renderTransformationRow(
           formatTypeScriptParameter(argument),
           emitted.name + ": " + displayLeanName(emitted.type),
-          emitted.role === "callback" ? "retained callback policy" : "preserving representation",
+          policy.forwardedOptionalParameters?.includes(argument.name)
+            ? "native value or undefined (explicit forwarding)"
+            : emitted.role === "callback" ? "retained callback policy" : "preserving representation",
         ));
       }
     }
@@ -943,6 +945,8 @@ function renderOperationPolicy(operation) {
       (signature.omittedOptionalParameters.length === 0
         ? " · no parameters omitted"
         : " · omitted: " + escapeHtml(signature.omittedOptionalParameters.join(", "))) +
+      ((signature.forwardedOptionalParameters ?? []).length === 0 ? "" :
+        " · forwarded as value or undefined: " + escapeHtml(signature.forwardedOptionalParameters.join(", "))) +
       "</p>") +
     (operation.protocol === undefined ? "" : '<p class="policy-source"><b>Policy-authored protocol:</b> ' +
       escapeHtml(operation.protocol.reason) + "</p>") +
@@ -1117,7 +1121,9 @@ function signaturePolicySummary(signature) {
   return "Signature " + signature.selection + " · " + signature.provenance +
     (signature.omittedOptionalParameters.length === 0
       ? " · no optional parameters omitted"
-      : " · omitted optional parameters: " + signature.omittedOptionalParameters.join(", "));
+      : " · omitted optional parameters: " + signature.omittedOptionalParameters.join(", ")) +
+    ((signature.forwardedOptionalParameters ?? []).length === 0 ? "" :
+      " · forwarded as value or undefined: " + signature.forwardedOptionalParameters.join(", "));
 }
 
 function renderGenerationDecisions(operation) {

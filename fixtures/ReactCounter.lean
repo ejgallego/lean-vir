@@ -92,12 +92,12 @@ def renderStaticIntoSelector (selector : String) : DomM Bool := do
 def effectProbe : RuntimeM (Js (Component Unit)) :=
   Component.ofLean fun _ => do
     let effect ← EffectCallback.ofLean { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
-    Hooks.useEffect effect
+    Hooks.useEffect effect (← Js.UndefinedOr.undefined)
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
     let effectWithDeps ← EffectCallback.ofLean
       { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
-    Hooks.useEffect effectWithDeps (some deps)
+    Hooks.useEffect effectWithDeps (Js.UndefinedOr.ofJs deps)
     let text ← Node.text (← Lean.Vir.JsValue.ofString "react:effect")
     Node.spanWith #[Props.id "react-effect-label"] #[text]
 

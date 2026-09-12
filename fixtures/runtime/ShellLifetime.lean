@@ -53,7 +53,7 @@ def createComponent : RuntimeM (Js (Component Lean.Vir.Infoview.Surface)) := do
       setup := do record ("setup:" ++ owner); JsValue.ofString owner
       cleanup := fun _ => do stale.set true; record ("cleanup:" ++ owner)
     }
-    Hooks.useEffect effect (some (← Hooks.DependencyList.empty))
+    Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Hooks.DependencyList.empty))
     Node.spanText owner
 
 def mount (root : Js Root) (component : Js (Component Lean.Vir.Infoview.Surface))

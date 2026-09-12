@@ -223,10 +223,11 @@ Unsupported TypeScript shapes fail generation. They are not silently converted
 to opaque Lean types.
 
 Descriptor options retain whether absence came from `null`, `undefined`, or
-both. The current `Lean.Vir.Js.Nullable` lane represents only `T | null`.
-Generation rejects `T | undefined`, `T | null | undefined`, and optional
-properties until their distinct JavaScript semantics have an explicit ABI
-representation.
+both. `Lean.Vir.Js.Nullable` represents only `T | null`;
+`Lean.Vir.Js.UndefinedOr` represents `T | undefined` when the ABI profile opts
+in with `resource.undefinedOrConstructor`. Both carry exact JS payloads.
+Generation still rejects nullish unions (`T | null | undefined`) and optional
+properties; neither is silently reduced to one absence case.
 
 ## Generated Binding Operations
 
@@ -301,15 +302,16 @@ providing a justified operation exception; this deliberately marks a reviewed
 signature projection rather than a faithful translation. Overload selection,
 optional or rest-parameter omission, fixed arguments, and parameter projection
 must carry `semantics` plus `reason` when no operation exception classifies the
-change. Every optional
-parameter must either be represented by a supported translation rule or named
-in `omittedOptionalParameters`; the current generator implements the latter
-path. A rest parameter must be omitted explicitly or projected to one or more
+change. Every optional parameter must be listed in either
+`omittedOptionalParameters` or `forwardedOptionalParameters`. The latter emits
+the native value-or-undefined type, including undefined from the parameter's
+`?` syntax. Forwarding is appropriate when the API treats explicit `undefined`
+like omission, as React's dependency argument does; it does not preserve
+`arguments.length`. A rest parameter must be omitted explicitly or projected to one or more
 named fixed-arity Lean binders through `fixedRestParameters`. A method policy or reviewed protocol can mark an implementation declaration
 `visibility: "private"`; public is the default. Private implementations remain
-in the compiler inventory and must be reachable from a public API. For example,
-React's two effect arities implement the single public `useEffect` without
-adding an optional-value host ABI. The existing `vir_js` attribute preserves its
+in the compiler inventory and must be reachable from a public API.
+The existing `vir_js` attribute preserves its
 validated signature for private imports, so compiled and live-snapshot packages
 can use it without reopening source files. Visible declarations and raw externs
 still receive typed analysis; packaging checks the target and compiled arity.

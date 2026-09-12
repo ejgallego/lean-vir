@@ -29,8 +29,7 @@ export function createBrowserReactHostBindings(lifecycle) {
     "react.useMemo": (calculate, deps) => React.useMemo(calculate, deps),
     "react.useCallback": (callback, deps) => React.useCallback(callback, deps),
     "react.useContext": (context) => React.useContext(context),
-    "react.useEffect": (setup) => React.useEffect(setup),
-    "react.useEffectWithDeps": (setup, deps) => React.useEffect(setup, deps),
+    "react.useEffect": (setup, deps) => React.useEffect(setup, deps),
     "react.ref.get": (ref) => ref.current,
     "react.ref.set": (ref, value) => {
       ref.current = value;

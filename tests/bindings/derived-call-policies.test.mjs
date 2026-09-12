@@ -50,13 +50,17 @@ for (const [library, group, members] of [
         ({ name, role, type, modalities })), [{
         name, role: "argument", type,
         modalities: { representation: "js-resource", passing: isEffect ? "borrowed" : "consumed", retention: "call" },
-      }]);
+      }, ...(isEffect ? [{
+        name: "deps", role: "argument", type: "Lean.Vir.Js.UndefinedOr Lean.Vir.React.DependencyList",
+        modalities: { representation: "js-resource", passing: "borrowed", retention: "call" },
+      }] : [])]);
       assert.equal(operation.result.lean, "Unit");
       assert.deepEqual(operation.result.modalities, { representation: "immediate", ownership: "value" });
       assert.equal(operation.effect.lean, isEffect ? "Lean.Vir.React.ReactM" : "DomM");
       assert.equal(operation.activeEffect, isEffect ? undefined : "release");
       assert.equal(operation.semantics.relation, "preserving");
-      assert.deepEqual(operation.typescript.signaturePolicy.omittedOptionalParameters, isEffect ? ["deps"] : []);
+      assert.deepEqual(operation.typescript.signaturePolicy.omittedOptionalParameters, []);
+      assert.deepEqual(operation.typescript.signaturePolicy.forwardedOptionalParameters, isEffect ? ["deps"] : []);
       if (!isEffect) {
         // The native-token specialization does not erase upstream undefined provenance.
         assert.deepEqual(operation.typescript.shape.args[0].type, {

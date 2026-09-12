@@ -40,11 +40,13 @@ test("useId derives its exact string result and zero-argument shape from pinned 
   assert.equal(operation.semantics.evidence, "typescript-derived");
 });
 
-test("useId generation does not silently erase unsupported upstream absence", () => {
+test("useId generation preserves undefined and rejects unsupported nullish absence", () => {
   const changed = structuredClone(descriptor);
   const symbol = changed.symbols.find((symbol) => symbol.id === "React.useId");
   symbol.shape.result = {
     kind: "option", absence: "undefined", element: symbol.shape.result,
   };
-  assert.throws(() => operations(changed), /only null-backed nullable resources are supported/u);
+  assert.equal(operations(changed)[0].result.lean, "Lean.Vir.Js.UndefinedOr String");
+  symbol.shape.result.absence = "nullish";
+  assert.throws(() => operations(changed), /without a matching native resource constructor/u);
 });

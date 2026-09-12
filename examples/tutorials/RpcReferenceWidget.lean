@@ -8,6 +8,7 @@ module
 
 public import Vir.Infoview
 public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -23,6 +24,7 @@ namespace RpcReferenceWidget
 open Lean.Vir
 
 open Lean.Vir.React Lean.Vir.Browser
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 /-- Response shape: a message and a nested server-owned RPC reference. -/
 opaque Reply : Type
@@ -34,29 +36,30 @@ def request (session : Js Infoview.RpcSession) (method : Js String)
 
 /-- Both projections preserve the exact nested values registered by the RPC client. -/
 def reference (reply : Js Reply) : RuntimeM Js.Any := do
-  Js.Object.get reply (← JsValue.ofString "ref")
+  Js.Object.get reply (← js#"ref")
 
 /-- Checks the projected primitive string; malformed fields fail without coercion. -/
 def message (reply : Js Reply) : RuntimeM (Js String) := do
-  Js.String.fromAny (← Js.Object.get reply (← JsValue.ofString "message"))
+  Js.String.fromAny (← Js.Object.get reply (← js#"message"))
 
 /-- Send the exact registered reference back to its owning RPC session. -/
 def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
     RuntimeM (Js.Promise String) := do
   let params ← Js.Object.empty
-  Js.Object.set params (← JsValue.ofString "ref") (← reference reply)
-  Infoview.RpcSession.call session (← JsValue.ofString "RpcBrowserServer.read") params
+  Js.Object.set params (← js#"ref") (← reference reply)
+  Infoview.RpcSession.call session (← js#"RpcBrowserServer.read") params
 
 /-- A native React function component; constructing it once preserves hook identity. -/
 private def ResponseView : RuntimeM (Js (React.Component (Js Reply))) := React.Component.ofLean fun reply => do
   let reply ← LeanRef.fromJSL reply
   let count ← React.StateTuple.toState (← React.Hooks.useState (← JsValue.ofNat 0))
-  let label ← JsValue.toString (← message reply)
+  let label ← message reply
   let n ← JsValue.toNat count.value
-  React.Node.buttonWith #[React.Props.id "rpc-reference-view", React.Props.onClick do
+  return ← <button id="rpc-reference-view" onClick={do
     React.State.modify count fun previous => do
-      JsValue.ofNat ((← JsValue.toNat previous) + 1)]
-    #[← React.Node.text (← Lean.Vir.JsValue.ofString s!"{label} / local {n}")]
+      JsValue.ofNat ((← JsValue.toNat previous) + 1)}>
+    {Node.text label}{ProofWidgets.Html.text s!" / local {n}"}
+  </button>
 
 /-- Keep the session and query identities stable until the request should change. -/
 structure Input where
@@ -75,12 +78,13 @@ private def renderView (child : Js (Component (Js Reply))) (input : Input) :
     (← Hooks.useState (← LeanRef.toJSL ({} : ResponseState)))
   let revision ← StateTuple.toState (← Hooks.useState (← JsValue.ofNat 0))
   let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do
-    let document ← Js.Object.get params (← JsValue.ofString "textDocument")
-    let uri ← Js.String.fromAny (← Js.Object.get document (← JsValue.ofString "uri"))
+    let document ← Js.Object.get params (← js#"textDocument")
+    let uri ← Js.String.fromAny (← Js.Object.get document (← js#"uri"))
     if (← JsValue.toString uri) == input.uri then
       State.modify revision fun previous => do JsValue.ofNat ((← JsValue.toNat previous) + 1)
-  -- Omitted dependencies also follow replacement of the upstream editor context.
-  Infoview.useClientNotificationEffect (← JsValue.ofString "textDocument/didChange") changed
+  -- Undefined dependencies also follow replacement of the upstream editor context.
+  Infoview.useClientNotificationEffect (← js#"textDocument/didChange") changed
+    (← Js.UndefinedOr.undefined)
   let effect ← EffectCallback.ofLean {
     setup := do
       let active ← RuntimeRef.new true
@@ -90,7 +94,7 @@ private def renderView (child : Js (Component (Js Reply))) (input : Input) :
       State.modify response fun previous => do
         let previous : ResponseState ← LeanRef.fromJSL previous
         LeanRef.toJSL { previous with status := "loading", error := "" }
-      let pending ← request input.session (← JsValue.ofString "RpcBrowserServer.create")
+      let pending ← request input.session (← js#"RpcBrowserServer.create")
         input.query options
       let succeed ← Js.Function.ofLeanVoid fun (reply : Js Reply) => do
         if ← active.get then
@@ -115,21 +119,23 @@ private def renderView (child : Js (Component (Js Reply))) (input : Input) :
       active.set false
       AbortController.abort abort
   }
-  Hooks.useEffect effect (some (← Js.Array.ofArray
+  Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Js.Array.ofArray
     #[Js.erase input.session, Js.erase input.query, Js.erase revision.value]))
   let state : ResponseState ← LeanRef.fromJSL response.value
   let previous := if state.reply.isSome then " Showing the previous response." else ""
   let status := if state.status == "loading" then s!"Loading…{previous}"
     else if state.status == "error" then s!"Request failed: {state.error}.{previous}"
     else "Ready"
-  let label ← Node.elementWith "p" #[
-    Props.role (if state.status == "error" then "alert" else "status"),
-    Props.string "data-rpc-status" state.status]
-    #[← Node.text (← JsValue.ofString status)]
-  let children ← match state.reply with
-    | none => pure #[label]
-    | some reply => do pure #[label, ← Node.component child (← LeanRef.toJSL reply)]
-  Node.elementWith "section" #[Props.bool "aria-busy" (state.status == "loading")] children
+  let children : Array ProofWidgets.Html := match state.reply with
+    | none => #[]
+    | some reply => #[do Node.component child (← LeanRef.toJSL reply)]
+  return ← <section {...#[Props.bool "aria-busy" (state.status == "loading")]}>
+    <p role={if state.status == "error" then "alert" else "status"}
+        {...#[Props.string "data-rpc-status" state.status]}>
+      {ProofWidgets.Html.text status}
+    </p>
+    {...children}
+  </section>
 
 /-- Construct once: native React function identity preserves parent and child state. -/
 def View : RuntimeM (Js (Component Input)) := do
@@ -144,9 +150,9 @@ def render (component : Js (Component Input)) (input : Input) : ReactM (Js Node)
 def WidgetView : RuntimeM (Js (Component Infoview.Surface)) := do
   let child ← ResponseView
   let query ← Js.Object.empty
-  Js.Object.set query (← JsValue.ofString "message") (← JsValue.ofString "Hello from Lean")
-  Js.Object.set query (← JsValue.ofString "fail") (← JsValue.ofBool false)
-  Js.Object.set query (← JsValue.ofString "waitForCancellation") (← JsValue.ofBool false)
+  Js.Object.set query (← js#"message") (← js#"Hello from Lean")
+  Js.Object.set query (← js#"fail") (← JsValue.ofBool false)
+  Js.Object.set query (← js#"waitForCancellation") (← JsValue.ofBool false)
   Component.ofLean fun props => do
     let surface : Infoview.Surface ← LeanRef.fromJSL props
     renderView child { session := surface.rpcSession, query, uri := surface.cursor.uri }

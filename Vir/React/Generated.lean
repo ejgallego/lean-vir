@@ -104,17 +104,18 @@ Generated reviewed function call policy for TypeScript `React.useEffect`.
 
 Accepts a function that contains imperative, possibly effectful code.
 
-Call policy: Passes the caller's native setup function unchanged to React.useEffect without a dependency argument.
+Call policy: Passes the exact setup and dependency array or undefined to React.useEffect. Explicit undefined follows its omitted-argument behavior; an empty array remains distinct.
 
 Upstream declaration: node_modules/@types/react/index.d.ts
 
-ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; result immediate/value.
+ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
 
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.useEffect"]
-private opaque useEffectWithoutDeps
-    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback) :
+opaque useEffect
+    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
+    (deps : @& Lean.Vir.Js.UndefinedOr Lean.Vir.React.DependencyList) :
     Lean.Vir.React.ReactM Unit
 
 /--
@@ -234,23 +235,6 @@ opaque useContext
     {α : Type}
     (context : @& Lean.Vir.Js (Lean.Vir.React.Context α)) :
     Lean.Vir.React.ReactM (Lean.Vir.Js α)
-
-/--
-Generated binding for reviewed VIR protocol `react.hooks.use-effect-with-deps`.
-
-Passes the caller's native setup function and dependency array unchanged to React.useEffect.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1`: receiver none; setup js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.useEffectWithDeps"]
-private opaque useEffectWithDeps
-    (setup : @& Lean.Vir.Js Lean.Vir.React.EffectCallback)
-    (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
-    Lean.Vir.React.ReactM Unit
 
 end React.Hooks
 

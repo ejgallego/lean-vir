@@ -44,17 +44,21 @@ The response stays an exact JavaScript graph. `reference` projects the original
 nested server reference and `readReference` sends that value back to its owning
 session. Copying a token into a Lean record or JSON value would not preserve the
 RPC client's reference lifetime. `message` checks only that one field is a
-primitive string; it does not validate the complete reply schema.
+primitive string; it does not validate the complete reply schema. JSX embeds
+`Node.text label` directly, so this string is not decoded into Lean and encoded
+again for display. With `open scoped Lean.Vir.Js`, `js#"message"` abbreviates
+the effectful `JsValue.ofString "message"` construction for literal keys.
 
 ## Same-position edits
 
 `Infoview.useClientNotificationEffect` forwards the method, callback and optional
-dependency list to the upstream infoview hook. Omitting dependencies and passing
-an empty JavaScript array remain distinct. The tutorial subscribes to
+dependency list to the upstream infoview hook. Native `undefined` and an empty
+JavaScript array remain distinct, expressed by `Js.UndefinedOr`, not `Option`.
+The tutorial subscribes to
 `textDocument/didChange`, filters notifications to the current surface URI and
 increments a revision included in the request effect's dependencies. Filtering
 by URI and choosing to refresh are application policy; VIR does not queue,
-filter or schedule notifications. This example omits hook dependencies so the
+filter or schedule notifications. This example passes `undefined` so the
 subscription follows the current editor connection on every render as well as
 changes to the URI. This subscribes/unsubscribes every render; the upstream hook
 does not await those operations, and VIR adds no ordering. An explicit dependency

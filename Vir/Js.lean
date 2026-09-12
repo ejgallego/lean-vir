@@ -26,6 +26,9 @@ def JsValue.ofNatNumber? (value : Nat) : RuntimeM (Option (Js Float)) := do
 
 namespace Js
 
+/-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
+scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
+
 /-- Expected JavaScript shape rejected by a checked cast. -/
 structure TypeConvError where
   expected : String

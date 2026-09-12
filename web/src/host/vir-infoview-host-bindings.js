@@ -24,13 +24,7 @@ export function createInfoviewHostBindings({
     "infoview.clientRequestOptions.setAbortSignal": (options, signal) => {
       options.abortSignal = signal;
     },
-    "infoview.useClientNotificationEffect": (method, callback) => {
-      if (useClientNotificationEffect === null) {
-        throw new Error("useClientNotificationEffect requires the upstream infoview host");
-      }
-      return useClientNotificationEffect(method, callback);
-    },
-    "infoview.useClientNotificationEffectWithDeps": (method, callback, deps) => {
+    "infoview.useClientNotificationEffect": (method, callback, deps) => {
       if (useClientNotificationEffect === null) {
         throw new Error("useClientNotificationEffect requires the upstream infoview host");
       }

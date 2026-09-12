@@ -90,10 +90,13 @@ and reducer dispatchers remain React's functions.
 Convert Lean closures explicitly with `Reducer.ofLean`, `MemoCalculation.ofLean`
 or `Callback.ofUnary`. `EffectCallback.ofLean` creates React's setup function
 from a `{ setup, cleanup }` record. Pass that function to `Hooks.useEffect`;
-a native function needs no conversion. This single public hook accepts optional
-dependencies: omission calls React without a dependency argument, while
-`some deps` passes the exact array, including an explicitly empty array.
-The two native arity implementations are private.
+a native function needs no conversion. Its dependency argument is
+`Js.UndefinedOr React.DependencyList`, the native `DependencyList | undefined`
+union, not a Lean `Option`. Pass `(← Js.UndefinedOr.undefined)` to run after
+each commit, or `Js.UndefinedOr.ofJs deps` for the exact array. An empty array
+does not request reruns on updates; development Strict Mode can replay setup.
+`DependencyList` corresponds to TypeScript's `readonly unknown[]`; VIR uses the
+native JS array shape, so callers must not mutate it while React retains it.
 
 Refs are the actual callback or `{ current }` object; React can write a DOM node
 or `null` to `current`. Event props store the exact handler function and receive
