@@ -59,16 +59,6 @@ const bundle = await build({
             ),
           }),
         );
-        builder.onLoad({ filter: /vir-react-dom-client\.js$/ }, () => ({
-          contents: `import { createRoot as actualCreateRoot } from 'react-dom/client';
-        export function createRoot(container) {
-          const root = actualCreateRoot(container);
-          globalThis.__shellTest.createdRoot(root);
-          return root;
-        }`,
-          loader: "js",
-          resolveDir: root,
-        }));
         // Observe ownership without exporting a production test hook or changing policy.
         builder.onLoad(
           { filter: /vir-infoview-widget\.js$/ },

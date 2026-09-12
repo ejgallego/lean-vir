@@ -222,7 +222,7 @@ lake build VirInfoview vir_irpkg +ShellLifetime
 lake env .lake/build/bin/vir_irpkg \
   build/shell-lifetime.irpkg build/shell-lifetime.report.md \
   --target-module ShellLifetime \
-  Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount
+  Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.renderComponent
 CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs
 ```
 

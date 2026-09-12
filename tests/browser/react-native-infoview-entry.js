@@ -22,18 +22,7 @@ globalThis.runVirNativeInfoviewUpdates = async (wasm, pkg) => {
     wasmModule: new WebAssembly.Module(new Uint8Array(wasm)),
     irPackageSet: [new Uint8Array(pkg)],
     hostBindings: createBrowserHostBindings({
-      reactHostBindings: (lifecycle) => {
-        const bindings = createBrowserReactHostBindings(lifecycle);
-        return {
-          ...bindings,
-          "react.root.renderNode": (submittedRoot, node) => {
-            check(submittedRoot === root, "every Lean mount must reuse the exact React root");
-            check(node.type === component, "every Lean mount must reuse the exact component function");
-            submissions++;
-            return bindings["react.root.renderNode"](submittedRoot, node);
-          },
-        };
-      },
+      reactHostBindings: createBrowserReactHostBindings,
     }),
   });
   const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -42,7 +31,10 @@ globalThis.runVirNativeInfoviewUpdates = async (wasm, pkg) => {
   document.body.append(container);
   const query = (selector) => container.querySelector(selector);
   const mount = (surface) => React.act(async () => {
-    runtime.call("VirNativeInfoview.mount", root, component, surface);
+    const node = runtime.call("VirNativeInfoview.renderComponent", component, surface);
+    check(node.type === component, "every element must reuse the exact component function");
+    submissions++;
+    root.render(node);
   });
   const empty = (surface) => ({
     ...surface, goals: [], selectedLocations: [], selections: [],
@@ -122,7 +114,7 @@ globalThis.runVirNativeInfoviewUpdates = async (wasm, pkg) => {
     await mount(empty(updated));
     inspectEmpty(updated);
     check(query("#vir-native-infoview") === panel, "goals-to-empty must reconcile the existing panel");
-    check(submissions === 4, "all four snapshots must use the generated Lean mount entry");
+    check(submissions === 4, "all four snapshots must use the generated Lean element entry");
     return { submissions, initialGoals: surface.goals.length, collapsedAfterUpdate: true, finalGoals: 0 };
   } finally {
     try {

@@ -162,24 +162,27 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 
 | Operation | Effect on the generation |
 | --- | --- |
-| Normal infoview unmount or mounted-generation refresh | Unmounts the owned root and detaches shell references; surviving callbacks/JSL remain usable in their original generation. |
+| Normal infoview unmount or mounted-generation refresh | React removes the descendant UI and the shell releases its references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
 | Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](../guides/JS_API.md#replacing-a-package-set). |
 
-Normal shell cleanup detaches its loaded reference before unmount and surfaces
-cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
+Normal shell cleanup detaches its loaded reference; React owns descendant
+unmount and cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
 effect. Obsolete load results cannot install UI. Refreshed services use fresh
 factories and browser/React lifecycles, reusing compiled Wasm and the mutable
 editor host context; the latter is not a frozen per-generation snapshot.
-The separate React root receives that upstream `EditorContext` through a stable
-per-service provider component; the inner component identity and nested prop
-values are preserved. The shell does not implement notification subscriptions.
+The widget participates in the infoview's existing React tree, inheriting its
+contexts. The shell does not implement notification subscriptions.
 
 UI cleanup does not restrict new activity or cancel application-owned timers,
 listeners, subscriptions or independent roots. Those still need application
-cleanup. Failed setup, synchronous mount-entry failures and obsolete candidates
-that were never installed retain hard teardown. The mount-entry catch does not
-handle errors thrown later by React rendering.
+cleanup. Failed loading, component-factory/manifest validation and obsolete
+candidates that were never published retain hard teardown. Once published,
+element-entry and component-render errors follow React's error boundaries; they
+do not implicitly dispose the runtime. This also leaves Lean effect cleanup
+usable when React removes the failed subtree.
+React may retain failed subtrees and their callbacks after a cleanup error;
+VIR does not guarantee collection while those JavaScript owners remain.
 
 ## Active Resources
 

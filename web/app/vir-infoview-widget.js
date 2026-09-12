@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import { EditorContext, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
-import { createRoot } from "../src/vir-react-dom-client.js";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
@@ -53,18 +52,20 @@ export default function VirInfoviewWidget(props) {
     message: "Loading VIR widget...",
   });
   const [mountId] = React.useState(() => freshMountId(props.mountId));
-  const mountElementRef = React.useRef(null);
   const loadedRef = React.useRef(null);
+  const [loaded, setLoaded] = React.useState(null);
   const [reloadToken, setReloadToken] = React.useState(0);
-  const [runtimeToken, setRuntimeToken] = React.useState(0);
   const irPackageRevisionRef = React.useRef("");
   const refreshGenerationRef = React.useRef(0);
+  const loadingGenerationRef = React.useRef(null);
   const surface = surfaceFromInfoviewProps(props, rpcSession);
-  const surfaceKey = surfaceCacheKey(surface);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
       : JSON.stringify(props.irPackage);
+  const configurationKey = JSON.stringify([
+    props.wasmPath, irPackageKey, props.componentEntry, props.entry,
+  ]);
 
   React.useLayoutEffect(() => {
     let position = null;
@@ -78,10 +79,15 @@ export default function VirInfoviewWidget(props) {
     hostContextRef.current.rpcSession = rpcSession;
     hostContextRef.current.editorConnection = editorConnection;
     hostContextRef.current.position = position;
+    hostContextRef.current.configurationKey = configurationKey;
     setupHintRef.current = setupHint;
-  }, [rpcSession, editorConnection, props.pos, props.setupHint]);
+  }, [rpcSession, editorConnection, props.pos, props.setupHint, configurationKey]);
 
   async function refreshLoadedWidget(isDisposed) {
+    const generation = refreshGenerationRef.current;
+    loadingGenerationRef.current = generation;
+    const obsolete = () => isDisposed() ||
+      configurationKey !== hostContextRef.current.configurationKey;
     let setupHint = "";
     let service = null;
     try {
@@ -92,7 +98,7 @@ export default function VirInfoviewWidget(props) {
         hostContext: hostContextRef.current,
         config,
       });
-      if (isDisposed()) {
+      if (obsolete()) {
         disposeRuntimeService(service);
         return;
       }
@@ -108,54 +114,49 @@ export default function VirInfoviewWidget(props) {
         );
       }
       irPackageRevisionRef.current = service.packageRevision;
-      const current = loadedRef.current;
-      loadedRef.current = null;
-      if (current !== null) {
-        current.root.unmount();
-      }
-      if (mountElementRef.current === null) {
-        throw new Error("VIR widget mount element is unavailable");
-      }
-      loadedRef.current = {
+      const next = {
         service,
-        root: createRoot(mountElementRef.current),
-        componentEntry,
-        component: withEditorContext(component, hostContextRef.current),
+        component,
         entry,
+        configurationKey,
+        generation: refreshGenerationRef.current,
       };
+      loadedRef.current = next;
+      setLoaded(next);
       service = null;
       setReloadToken(0);
-      setRuntimeToken((token) => token + 1);
+      setStatus({ kind: "ready", message: entry.entry });
     } catch (error) {
       const errors = [error];
       if (service !== null) {
         collectCleanupError(errors, () => disposeRuntimeService(service));
       }
       const failure = widgetCleanupError(errors, "VIR widget loading failed");
-      if (!isDisposed()) {
+      if (!obsolete()) {
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
         console.error(failure);
+      }
+    } finally {
+      if (loadingGenerationRef.current === generation) {
+        loadingGenerationRef.current = null;
       }
     }
   }
 
   React.useEffect(() => {
     let disposed = false;
+    setLoaded(null);
+    setStatus({ kind: "loading", message: "Loading VIR widget..." });
     const generation = ++refreshGenerationRef.current;
     refreshLoadedWidget(
       () => disposed || generation !== refreshGenerationRef.current,
     );
     return () => {
       disposed = true;
-      const loaded = loadedRef.current;
-      if (loaded !== null) {
-        // Detach shell ownership even when application effect cleanup throws.
-        // Surviving values still own this generation; only explicit shutdown
-        // and the separate failure paths below dispose it.
-        loadedRef.current = null;
-        loaded.root.unmount();
-      }
+      // React owns the descendant UI. Release shell ownership, not the runtime:
+      // surviving callbacks and JSL still own their original generation.
+      loadedRef.current = null;
     };
   }, [
     props.wasmPath,
@@ -196,7 +197,7 @@ export default function VirInfoviewWidget(props) {
         intervalId = setInterval(() => {
           // The first package has no installed revision yet. Polling here can
           // continually supersede a slow initial load before it can mount.
-          if (inFlight || loadedRef.current === null) {
+          if (inFlight || loadedRef.current === null || loadingGenerationRef.current !== null) {
             return;
           }
           inFlight = true;
@@ -241,35 +242,6 @@ export default function VirInfoviewWidget(props) {
     props.autoReloadMs,
   ]);
 
-  React.useEffect(() => {
-    const loaded = loadedRef.current;
-    if (loaded === null) {
-      return;
-    }
-    try {
-      loaded.service.runtime.call(
-        loaded.entry.entry,
-        loaded.root,
-        loaded.component,
-        surface,
-      );
-      setStatus({ kind: "ready", message: loaded.entry.entry });
-    } catch (error) {
-      if (loadedRef.current === loaded) {
-        loadedRef.current = null;
-      }
-      const errors = [error];
-      collectCleanupError(errors, () => disposeLoadedWidget(loaded));
-      setStatus({
-        kind: "error",
-        message: errorMessage(
-          widgetCleanupError(errors, "VIR widget render failed"),
-          setupHintRef.current,
-        ),
-      });
-    }
-  }, [runtimeToken, surfaceKey, mountId, rpcSession, editorConnection]);
-
   return e(
     "section",
     {
@@ -282,11 +254,12 @@ export default function VirInfoviewWidget(props) {
       style: shellStyle,
     },
     e("div", {
-      ref: mountElementRef,
       id: mountId,
       className: "vir-infoview-widget-mount",
       style: mountStyle,
-    }),
+    }, loaded?.configurationKey === configurationKey
+      ? e(LoadedWidget, { key: loaded.generation, loaded, surface })
+      : null),
     status.kind === "ready"
       ? null
       : e(
@@ -301,28 +274,26 @@ function stopInfoviewEvent(event) {
   event.stopPropagation();
 }
 
-// A separate React root does not inherit the outer infoview's context. Keep
-// this component type stable for the service, forwarding the native context.
-function withEditorContext(component, hostContext) {
-  return function InfoviewContext(props) {
-    return e(EditorContext.Provider, { value: hostContext.editorConnection },
-      e(component, props));
-  };
+// Like upstream DynamicComponent, return the native element in the existing
+// React tree. Contexts, reconciliation and render errors belong to React.
+function LoadedWidget({ loaded, surface }) {
+  return loaded.service.runtime.call(
+    loaded.entry.entry, loaded.component, surface,
+  );
 }
 
 export function validateWidgetEntry(runtime, entryName) {
   const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 3 ||
+    entry.args?.length !== 2 ||
     entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.UNIT
+    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
+    entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
+    entry.result?.interfaceTag !== INTERFACE_TAG.RESOURCE
   ) {
     throw new Error(
-      `VIR widget entry ${entryName} must be an effectful Root -> Component -> Surface -> Unit entry`,
+      `VIR widget entry ${entryName} must be an effectful Component -> Surface -> Node entry`,
     );
   }
   return entry;
@@ -361,14 +332,6 @@ function requireWidgetManifestEntry(runtime, entryName, label) {
   return entry;
 }
 
-// Failed rendering remains an explicit shutdown boundary.
-function disposeLoadedWidget(loaded) {
-  const errors = [];
-  collectCleanupError(errors, () => loaded.root.unmount());
-  collectCleanupError(errors, () => disposeRuntimeService(loaded.service));
-  throwCollectedErrors(errors, "VIR widget cleanup failed");
-}
-
 export function surfaceFromInfoviewProps(props, rpcSession) {
   const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
     goalFromInteractiveGoal(goal, index, "goal"),
@@ -389,11 +352,6 @@ export function surfaceFromInfoviewProps(props, rpcSession) {
     selections,
     rpcSession,
   };
-}
-
-export function surfaceCacheKey(surface) {
-  const { rpcSession: _rpcSession, ...serializableSurface } = surface;
-  return JSON.stringify(serializableSurface);
 }
 
 function goalFromInteractiveGoal(goal, index, kind) {

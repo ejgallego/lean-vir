@@ -62,16 +62,15 @@ example : Lean.Vir.RuntimeM
     (Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface)) :=
   createComponent
 
-example : Lean.Vir.Js Lean.Vir.React.Root →
-    Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
-    Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Unit :=
-  mount
+example : Lean.Vir.Js (Lean.Vir.React.Component Lean.Vir.Infoview.Surface) →
+    Lean.Vir.Infoview.Surface → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=
+  renderComponent
 
 def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
   expect "authoring package roots" <|
     package.roots == #[
       "SmokeInfoviewLean.createComponent",
-      "SmokeInfoviewLean.mount"
+      "SmokeInfoviewLean.renderComponent"
     ]
 
 def smokeVar : Lean.IR.VarId :=
@@ -277,26 +276,26 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"
   expectPathError "web/../lakefile.lean"
-  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.mount"] #[
+  expectRootsOk #["VirNativeInfoview.createComponent", "VirNativeInfoview.renderComponent"] #[
     `VirNativeInfoview.createComponent,
-    `VirNativeInfoview.mount
+    `VirNativeInfoview.renderComponent
   ]
-  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.mount"] #[
+  expectRootsOk #["ReactProofWidgetHello.createComponent", "ReactProofWidgetHello.renderComponent"] #[
     `ReactProofWidgetHello.createComponent,
-    `ReactProofWidgetHello.mount
+    `ReactProofWidgetHello.renderComponent
   ]
-  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.mount"] #[
+  expectRootsOk #["ReactTamagotchiWidget.createComponent", "ReactTamagotchiWidget.renderComponent"] #[
     `ReactTamagotchiWidget.createComponent,
-    `ReactTamagotchiWidget.mount
+    `ReactTamagotchiWidget.renderComponent
   ]
-  expectRootsOk #["VirNativeInfoview.mount", "VirNativeInfoview.mount"] #[
-    `VirNativeInfoview.mount
+  expectRootsOk #["VirNativeInfoview.renderComponent", "VirNativeInfoview.renderComponent"] #[
+    `VirNativeInfoview.renderComponent
   ]
   expectRootsError #[]
   expectRootsError #["VirNativeInfoview."]
   expect "authoring widget component entry"
     (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
-  expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.mount")
+  expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.renderComponent")
   expect "authoring widget mount id" (widgetProps.mountId == "vir-smoke-widget")
   expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.ReactWidget.defaultWasmPath)

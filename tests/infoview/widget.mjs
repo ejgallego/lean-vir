@@ -55,7 +55,6 @@ const {
   shouldReloadIRPackage,
   statIRPackage,
   statAsset,
-  surfaceCacheKey,
   surfaceFromInfoviewProps,
   taggedTextToPlain,
   validateWidgetEntry,
@@ -132,13 +131,25 @@ assert.equal(
   "VirNativeInfoview.createComponent",
 );
 assert.equal(
-  validateWidgetEntry(runtime, "VirNativeInfoview.mount").entry,
-  "VirNativeInfoview.mount",
+  validateWidgetEntry(runtime, "VirNativeInfoview.renderComponent").entry,
+  "VirNativeInfoview.renderComponent",
 );
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /Root -> Component -> Surface -> Unit/,
+  /Component -> Surface -> Node/,
 );
+const elementEntry = validateWidgetEntry(runtime, "VirNativeInfoview.renderComponent");
+for (const incompatible of [
+  { ...elementEntry, args: [{ type: { interfaceTag: INTERFACE_TAG.RESOURCE } }, ...elementEntry.args],
+    result: { interfaceTag: INTERFACE_TAG.UNIT } },
+  { ...elementEntry, result: { interfaceTag: INTERFACE_TAG.UNIT } },
+]) {
+  assert.throws(
+    () => validateWidgetEntry({ findManifestEntry: () => incompatible }, "legacy-or-void"),
+    /Component -> Surface -> Node/,
+    "old root-taking mounts and void entries must not be accepted as elements",
+  );
+}
 assert.throws(
   () =>
     validateWidgetEntry(
@@ -150,7 +161,6 @@ assert.throws(
               effect: "dom",
               args: [
                 { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
-                { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
                 {
                   type: {
                     interfaceTag: INTERFACE_TAG.STRUCTURE,
@@ -158,14 +168,14 @@ assert.throws(
                   },
                 },
               ],
-              result: { interfaceTag: INTERFACE_TAG.UNIT },
+              result: { interfaceTag: INTERFACE_TAG.RESOURCE },
             },
           ],
         },
       },
       "WrongSurface.mount",
     ),
-  /Root -> Component -> Surface -> Unit/,
+  /Component -> Surface -> Node/,
 );
 assert.equal(
   taggedTextToPlain({
@@ -237,14 +247,6 @@ assert.deepEqual(surfaceFixture, {
 });
 assert.equal(surfaceFixture.goals[0].target, "xs.reverse.reverse = xs");
 assert.equal(
-  surfaceCacheKey(surfaceFixture),
-  surfaceCacheKey(
-    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture), {
-      call: rpcSession.call,
-    }),
-  ),
-);
-assert.equal(
   decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2],
   "r".charCodeAt(0),
 );
@@ -259,7 +261,7 @@ assert.equal(
       {
         roots: [
           "VirNativeInfoview.createComponent",
-          "VirNativeInfoview.mount",
+          "VirNativeInfoview.renderComponent",
         ],
       },
       { line: 0, character: 0 },
@@ -289,7 +291,7 @@ const runtimeOptions = await loadRuntimeOptions({
   irPackage: {
     roots: [
       "VirNativeInfoview.createComponent",
-      "VirNativeInfoview.mount",
+      "VirNativeInfoview.renderComponent",
     ],
   },
   position: { line: 0, character: 0 },
@@ -308,7 +310,7 @@ assert.equal(
 const reloadIRPackage = {
   roots: [
     "VirNativeInfoview.createComponent",
-    "VirNativeInfoview.mount",
+    "VirNativeInfoview.renderComponent",
   ],
 };
 const reloadPosition = { line: 0, character: 0 };
@@ -344,11 +346,11 @@ const irPackageServiceConfig = {
   irPackage: {
     roots: [
       "VirNativeInfoview.createComponent",
-      "VirNativeInfoview.mount",
+      "VirNativeInfoview.renderComponent",
     ],
   },
   componentEntry: "VirNativeInfoview.createComponent",
-  entry: "VirNativeInfoview.mount",
+  entry: "VirNativeInfoview.renderComponent",
   position: { line: 0, character: 0 },
   setupHint: "",
 };

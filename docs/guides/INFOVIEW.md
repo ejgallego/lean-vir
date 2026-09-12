@@ -15,28 +15,31 @@ client and `@[server_rpc_method]` example. This guide owns editor integration;
 Import `Vir.Infoview`. The [hello widget](../../examples/tutorials/ReactProofWidgetHello.lean)
 supplies a `RuntimeM (Js (React.Component Surface))` factory and uses
 `vir_proof_widget View` inside its namespace. The command generates `widgetSpec`,
-`createComponent`, `mount`, `irPackage` and `widgetProps`; `show_panel_widgets`
+`createComponent`, `renderComponent`, `irPackage` and `widgetProps`; `show_panel_widgets`
 activates the bundled `Lean.Vir.Infoview.widget` with those props. This path needs
 no application-authored JavaScript file.
 
 For manual assembly, [ReactWidget](../../Vir/Infoview/Widget.lean) supplies the
 package roots and props. The component entry returns
-`RuntimeM (Js (React.Component Surface))`; the mount entry has type:
+`RuntimeM (Js (React.Component Surface))`; the element entry has type:
 
 ```lean
-Js React.Root → Js (React.Component Surface) → Surface → DomM Unit
+Js (React.Component Surface) → Surface → ReactM (Js React.Node)
 ```
 
-`WidgetProps` identifies the Wasm asset, `IRPackage`, component and mount entries.
+`WidgetProps` identifies the Wasm asset, `IRPackage`, component and element entries.
 The default shell creates a private runtime/binding factory and one inner
-component function per loaded service. Because its separate React root does not
-inherit the outer infoview context, the shell also creates one stable per-service
-wrapper that supplies the exact current upstream `EditorContext`. The mount
-entry receives that wrapper rather than literally the component-entry result;
-the wrapper renders the inner component with unchanged prop values, including the
-unchanged nested `leanProps` value. Cursor/surface updates reuse the wrapper,
-inner function and React root; configuration or package revision changes
-replace the service.
+component function per loaded service. The element entry explicitly converts
+`Surface` to JSL props and returns a native element using that exact function.
+Like upstream ProofWidgets, the shell renders the element in the infoview's
+existing React tree. All surrounding contexts are inherited without a provider
+bridge. Cursor/surface updates reuse the component; configuration or package
+revision changes replace the service and remount its subtree. Element construction
+and component rendering follow ordinary React render rules and error boundaries.
+
+The former `mount(root, component, surface)` protocol is replaced by
+`renderComponent(component, surface)`. Manual widget specifications use
+`renderName` instead of `mountName`; regenerate their packages and shell together.
 The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
 distinguishes normal UI release from hard disposal and failed setup.
 
