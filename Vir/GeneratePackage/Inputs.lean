@@ -34,10 +34,6 @@ private unsafe def importModuleEnvCached (moduleName : Name)
   ] opts
   return (env.setMainModule (.str (.str `VirIRInput moduleName.toString) "Generated"), cache)
 
-unsafe def importModuleEnv (moduleName : Name)
-    (importArts : NameMap ImportArtifacts := {}) : IO Environment := do
-  return (← importModuleEnvCached moduleName (.empty importArts)).1
-
 def environmentModuleForDecl? (env : Environment) (name : Name) : Option Name := do
   let moduleIdx ← env.getModuleIdxFor? name
   env.header.moduleNames[moduleIdx]?

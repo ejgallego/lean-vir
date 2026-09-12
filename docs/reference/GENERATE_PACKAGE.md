@@ -34,7 +34,7 @@ marked targets use `marked`.
 
 ### Compiled modules
 
-Lake owns compilation. Through `importModuleEnv`, the generator uses a cached
+Lake owns compilation. Through `loadDeclIndex`, the generator uses a cached
 adapter of Lean's importer and ordinary `finalizeImport`, without a source
 frontend or generated import driver.
 Source commands such as `#eval` execute during compilation, not again during
@@ -136,7 +136,7 @@ module. The map below groups shared policy separately from orchestration;
 ## Data flow and initialization
 
 1. The CLI constructs targets with independent origin and selection. Compiled
-   inputs use `importModuleEnv`; server inputs use `prepareSnapshotInput`.
+   inputs use `loadDeclIndex`; server inputs use `prepareSnapshotInput`.
 2. `Inputs.loadDeclIndex` records input environments, owned IR names and marker
    sets. All-public and marked selection filter to the requested module.
    Different module targets defining the same Lean declaration name produce a

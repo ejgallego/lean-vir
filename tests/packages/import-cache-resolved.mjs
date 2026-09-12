@@ -20,6 +20,7 @@ import { repositoryRoot } from "../../scripts/repository-paths.mjs";
 // The aggregate import test prepares these artifacts first. Keep a separate
 // resolved-path context, without modifying or moving the owner's build outputs.
 const compiled = path.join(repositoryRoot, ".lake/build/lib/lean");
+mkdirSync(path.join(repositoryRoot, "build"), { recursive: true });
 const output = mkdtempSync(
   path.join(repositoryRoot, "build/import-cache-resolved-"),
 );

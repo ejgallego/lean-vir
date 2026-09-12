@@ -113,7 +113,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run test:lake
+      - run: npm run test:lake:facets
       - run: npm run test:generator:imports
       - run: npm run test:interface
       - run: npm run test:generator:memory

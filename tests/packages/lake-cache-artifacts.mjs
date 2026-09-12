@@ -60,7 +60,6 @@ try {
   const coldLog = build("cold", false);
   assert.match(coldLog, /Built .*CacheFixture[.]Root:vir/);
   const cold = packageSummary();
-  assertPackageContract(cold);
   await assertRuntimeResult("cold", "42");
 
   moveConventionalBuilds("cold");
@@ -104,6 +103,7 @@ try {
       "warm build reran the VIR facet",
     );
     assert.deepEqual(outputSnapshot(), beforeWarm);
+    assert.deepEqual(packageSummary(), cached);
     assertNoConventionalCompiledInputs("warm-no-op");
     await assertRuntimeResult("warm no-op", "42");
 
@@ -112,6 +112,7 @@ try {
     assert.match(changedLog, /Built .*CacheFixture[.]Hidden/);
     assert.match(changedLog, /Built .*CacheFixture[.]Root:vir/);
     const changed = packageSummary();
+    assertRejectsStaleDescriptorIntegrity();
     const changedSetup = setupArtifactIdentity();
     assert.deepEqual(changed.contract, cold.contract);
     assert.equal(
@@ -431,6 +432,8 @@ function packageSummary() {
       path: entry.path,
       descriptorSha256: entry.sha256,
       actualSha256: sha256(bytes),
+      descriptorByteLength: entry.byteLength,
+      actualByteLength: bytes.byteLength,
       owner: manifest.metadata.packageSetMember,
       exports: manifest.exports.map(({ entry, startup, source }) => ({
         entry,
@@ -439,7 +442,7 @@ function packageSummary() {
       })),
     };
   });
-  return {
+  const summary = {
     contract: {
       format: descriptor.format,
       version: descriptor.version,
@@ -456,6 +459,8 @@ function packageSummary() {
     ),
     members,
   };
+  assertPackageContract(summary);
+  return summary;
 }
 
 function assertPackageContract(summary) {
@@ -470,7 +475,14 @@ function assertPackageContract(summary) {
     ],
   );
   for (const member of summary.members) {
-    assert.equal(member.descriptorSha256, member.actualSha256);
+    assert.equal(
+      member.descriptorSha256, member.actualSha256,
+      `${member.module}: descriptor sha256 mismatch`,
+    );
+    assert.equal(
+      member.descriptorByteLength, member.actualByteLength,
+      `${member.module}: descriptor byteLength mismatch`,
+    );
     assert.deepEqual(member.owner, {
       module: member.module,
       role: member.role,
@@ -485,6 +497,24 @@ function assertPackageContract(summary) {
       source: "module CacheFixture.Root",
     },
   ]);
+}
+
+function assertRejectsStaleDescriptorIntegrity() {
+  const original = readFileSync(descriptorPath);
+  try {
+    for (const [field, value] of [
+      ["sha256", "0".repeat(64)], ["byteLength", 0],
+    ]) {
+      const descriptor = JSON.parse(original);
+      descriptor.packages[1][field] = value;
+      writeFileSync(descriptorPath, JSON.stringify(descriptor));
+      assert.throws(
+        () => packageSummary(), new RegExp(`descriptor ${field} mismatch`),
+      );
+    }
+  } finally {
+    writeFileSync(descriptorPath, original);
+  }
 }
 
 function outputSnapshot() {

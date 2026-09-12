@@ -87,6 +87,8 @@ semantics require the separate Chromium checks below.
   `npm run test:lake:cache:wasm` also executes every phase's real package set:
   42 before the private-body change, 43 afterward. CI runs this after downloading
   the demo artifacts; source-only Lake checks do not require Wasm.
+  CI runs `test:lake:facets` separately and executes the cache campaign only once,
+  with Wasm. Every phase checks descriptor hashes and byte lengths against files.
 - Fixture behavior: `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`;
   omit the filter for the whole oracle suite. Expectations, structured
   diagnostics and runner configuration alone use `npm run test:fixtures:unit`,
