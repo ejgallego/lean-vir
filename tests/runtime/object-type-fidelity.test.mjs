@@ -10,9 +10,28 @@ import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collec
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { VirHostState } from "../../web/src/runtime/host-state.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 
 const objects = createJsCollectionHostBindings();
 const requireString = createJsValueHostBindings()["js.string.fromAny"];
+
+test("callback formal parameters ignore extras and receive undefined when absent", () => {
+  const runtime = Object.create(VirRuntime.prototype);
+  const lowered = [];
+  Object.assign(runtime, {
+    exports: { vir_closure_call_objects() {} },
+    makeObjectValue(_type, value) { lowered.push(value); return lowered.length; },
+    callClosureObjects(_root, _type, args) { assert.equal(args.length, 1); },
+    releaseOwnedObjects() {},
+  });
+  const type = { effect: "runtime", args: [{ name: "value", type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] };
+  const value = {};
+  const args = [value];
+  Object.defineProperty(args, 1, { get() { assert.fail("unused argument must not be lowered"); } });
+  runtime.callClosure(1, type, args);
+  runtime.callClosure(1, type, []);
+  assert.deepEqual(lowered, [value, undefined]);
+});
 
 test("dynamic properties preserve exact values, missing undefined and getter behavior", () => {
   for (const value of [{}, [], () => {}, "text", 0, 1n, false, null, undefined]) {

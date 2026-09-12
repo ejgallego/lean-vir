@@ -7,9 +7,12 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
-import { readRuntimeArtifacts } from "./shared.mjs";
+import { readFile } from "node:fs/promises";
 
-const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
+const [wasmBytes, hostPackageBytes] = await Promise.all(
+  ["vir-upstream.wasm", "demo-host.irpkg"].map(file =>
+    readFile(new URL(`../../web/public/${file}`, import.meta.url))),
+);
 
 let retainedCallback = null;
 const runtime = await createVirRuntime({
@@ -68,27 +71,22 @@ assert.throws(
 );
 failedRuntime.dispose();
 
-let wrongArityCallback = null;
-const wrongArityRuntime = await createVirRuntime({
+let extraArgumentCallback = null;
+const extraArgumentRuntime = await createVirRuntime({
   wasmBytes,
   irPackageSet: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
-      wrongArityCallback = callback;
-      return callback(input, input);
+      extraArgumentCallback = callback;
+      return callback(input, { unused: true });
     },
     "test.recordNat": () => undefined,
   },
 });
-assert.throws(
-  () => wrongArityRuntime.call("HostInterop.callbackRoundTrip", 1),
-  /callback expects 1 arguments, got 2/,
-);
-assert.equal(wrongArityRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => wrongArityCallback(1n),
-  /closure root id is not live|disposed runtime/,
-);
-wrongArityRuntime.dispose();
+assert.equal(extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1), "8");
+assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
+assert.equal(extraArgumentCallback(2n, undefined), 9n);
+extraArgumentRuntime.dispose();
+assert.throws(() => extraArgumentCallback(2n, undefined), /disposed runtime/);
 
 console.log("self-owning callback lifecycle smoke ok");

@@ -5,30 +5,21 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { EditorContext, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
-import { createRoot } from "../src/vir-react-dom-client.js";
+import { EditorContext, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
 import { widgetErrorMessage as errorMessage } from "../src/vir-widget-errors.js";
 import { isEffectfulInterfaceEffect } from "../src/runtime/interface-effects.js";
 import { INTERFACE_TAG } from "../src/runtime/interface-tags.js";
-import {
-  collectCleanupError,
-  throwCollectedErrors,
-} from "../src/runtime/cleanup.js";
+import { collectCleanupError } from "../src/runtime/cleanup.js";
 
 const e = React.createElement;
-let nextMountId = 0;
 const wasmModuleCache = new Map();
 
 const shellStyle = {
   display: "grid",
   gap: "0.5rem",
-  minWidth: 0,
-};
-
-const mountStyle = {
   minWidth: 0,
 };
 
@@ -52,19 +43,18 @@ export default function VirInfoviewWidget(props) {
     kind: "loading",
     message: "Loading VIR widget...",
   });
-  const [mountId] = React.useState(() => freshMountId(props.mountId));
-  const mountElementRef = React.useRef(null);
   const loadedRef = React.useRef(null);
+  const [loaded, setLoaded] = React.useState(null);
   const [reloadToken, setReloadToken] = React.useState(0);
-  const [runtimeToken, setRuntimeToken] = React.useState(0);
-  const irPackageRevisionRef = React.useRef("");
   const refreshGenerationRef = React.useRef(0);
-  const surface = surfaceFromInfoviewProps(props, rpcSession);
-  const surfaceKey = surfaceCacheKey(surface);
+  const loadingGenerationRef = React.useRef(null);
   const irPackageKey =
     props.irPackage === null || props.irPackage === undefined
       ? ""
       : JSON.stringify(props.irPackage);
+  const configurationKey = JSON.stringify([
+    props.wasmPath, irPackageKey, props.componentEntry,
+  ]);
 
   React.useLayoutEffect(() => {
     let position = null;
@@ -78,10 +68,19 @@ export default function VirInfoviewWidget(props) {
     hostContextRef.current.rpcSession = rpcSession;
     hostContextRef.current.editorConnection = editorConnection;
     hostContextRef.current.position = position;
+    hostContextRef.current.configurationKey = configurationKey;
     setupHintRef.current = setupHint;
-  }, [rpcSession, editorConnection, props.pos, props.setupHint]);
+    return () => {
+      // Invalidate pending candidates at removal, before passive cleanup runs.
+      hostContextRef.current.configurationKey = null;
+    };
+  }, [rpcSession, editorConnection, props.pos, props.setupHint, configurationKey]);
 
   async function refreshLoadedWidget(isDisposed) {
+    const generation = refreshGenerationRef.current;
+    loadingGenerationRef.current = generation;
+    const obsolete = () => isDisposed() ||
+      configurationKey !== hostContextRef.current.configurationKey;
     let setupHint = "";
     let service = null;
     try {
@@ -92,7 +91,7 @@ export default function VirInfoviewWidget(props) {
         hostContext: hostContextRef.current,
         config,
       });
-      if (isDisposed()) {
+      if (obsolete()) {
         disposeRuntimeService(service);
         return;
       }
@@ -100,69 +99,59 @@ export default function VirInfoviewWidget(props) {
         service.runtime,
         config.componentEntry,
       );
-      const entry = validateWidgetEntry(service.runtime, config.entry);
       const component = service.runtime.call(componentEntry.entry);
       if (typeof component !== "function") {
         throw new Error(
           `VIR widget component entry ${componentEntry.entry} did not return a JavaScript function`,
         );
       }
-      irPackageRevisionRef.current = service.packageRevision;
-      const current = loadedRef.current;
-      loadedRef.current = null;
-      if (current !== null) {
-        current.root.unmount();
-      }
-      if (mountElementRef.current === null) {
-        throw new Error("VIR widget mount element is unavailable");
-      }
-      loadedRef.current = {
+      const next = {
         service,
-        root: createRoot(mountElementRef.current),
-        componentEntry,
-        component: withEditorContext(component, hostContextRef.current),
-        entry,
+        component,
+        configurationKey,
+        generation: refreshGenerationRef.current,
       };
+      loadedRef.current = next;
+      setLoaded(next);
       service = null;
       setReloadToken(0);
-      setRuntimeToken((token) => token + 1);
+      setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
       if (service !== null) {
         collectCleanupError(errors, () => disposeRuntimeService(service));
       }
       const failure = widgetCleanupError(errors, "VIR widget loading failed");
-      if (!isDisposed()) {
+      if (!obsolete()) {
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
         console.error(failure);
+      }
+    } finally {
+      if (loadingGenerationRef.current === generation) {
+        loadingGenerationRef.current = null;
       }
     }
   }
 
   React.useEffect(() => {
     let disposed = false;
+    setLoaded(null);
+    setStatus({ kind: "loading", message: "Loading VIR widget..." });
     const generation = ++refreshGenerationRef.current;
     refreshLoadedWidget(
       () => disposed || generation !== refreshGenerationRef.current,
     );
     return () => {
       disposed = true;
-      const loaded = loadedRef.current;
-      if (loaded !== null) {
-        // Detach shell ownership even when application effect cleanup throws.
-        // Surviving values still own this generation; only explicit shutdown
-        // and the separate failure paths below dispose it.
-        loadedRef.current = null;
-        loaded.root.unmount();
-      }
+      // React owns the descendant UI. Release shell ownership, not the runtime:
+      // surviving callbacks and JSL still own their original generation.
+      loadedRef.current = null;
     };
   }, [
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
-    mountId,
   ]);
 
   React.useEffect(() => {
@@ -181,8 +170,6 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
-    mountId,
     reloadToken,
   ]);
 
@@ -196,7 +183,7 @@ export default function VirInfoviewWidget(props) {
         intervalId = setInterval(() => {
           // The first package has no installed revision yet. Polling here can
           // continually supersede a slow initial load before it can mount.
-          if (inFlight || loadedRef.current === null) {
+          if (inFlight || loadedRef.current === null || loadingGenerationRef.current !== null) {
             return;
           }
           inFlight = true;
@@ -204,7 +191,7 @@ export default function VirInfoviewWidget(props) {
             rpcSession: hostContextRef.current.rpcSession,
             irPackage: config.irPackage,
             position: hostContextRef.current.position,
-            currentRevision: irPackageRevisionRef.current,
+            currentRevision: loadedRef.current.service.packageRevision,
           })
             .then((shouldReload) => {
               if (!disposed && shouldReload) {
@@ -237,38 +224,8 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    props.entry,
     props.autoReloadMs,
   ]);
-
-  React.useEffect(() => {
-    const loaded = loadedRef.current;
-    if (loaded === null) {
-      return;
-    }
-    try {
-      loaded.service.runtime.call(
-        loaded.entry.entry,
-        loaded.root,
-        loaded.component,
-        surface,
-      );
-      setStatus({ kind: "ready", message: loaded.entry.entry });
-    } catch (error) {
-      if (loadedRef.current === loaded) {
-        loadedRef.current = null;
-      }
-      const errors = [error];
-      collectCleanupError(errors, () => disposeLoadedWidget(loaded));
-      setStatus({
-        kind: "error",
-        message: errorMessage(
-          widgetCleanupError(errors, "VIR widget render failed"),
-          setupHintRef.current,
-        ),
-      });
-    }
-  }, [runtimeToken, surfaceKey, mountId, rpcSession, editorConnection]);
 
   return e(
     "section",
@@ -281,12 +238,9 @@ export default function VirInfoviewWidget(props) {
       onPointerDown: stopInfoviewEvent,
       style: shellStyle,
     },
-    e("div", {
-      ref: mountElementRef,
-      id: mountId,
-      className: "vir-infoview-widget-mount",
-      style: mountStyle,
-    }),
+    loaded?.configurationKey === configurationKey
+      ? e(loaded.component, { ...props, key: loaded.generation })
+      : null,
     status.kind === "ready"
       ? null
       : e(
@@ -299,33 +253,6 @@ export default function VirInfoviewWidget(props) {
 
 function stopInfoviewEvent(event) {
   event.stopPropagation();
-}
-
-// A separate React root does not inherit the outer infoview's context. Keep
-// this component type stable for the service, forwarding the native context.
-function withEditorContext(component, hostContext) {
-  return function InfoviewContext(props) {
-    return e(EditorContext.Provider, { value: hostContext.editorConnection },
-      e(component, props));
-  };
-}
-
-export function validateWidgetEntry(runtime, entryName) {
-  const entry = requireWidgetManifestEntry(runtime, entryName, "entry");
-  if (
-    !isEffectfulInterfaceEffect(entry.effect) ||
-    entry.args?.length !== 3 ||
-    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.RESOURCE ||
-    entry.args[2]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
-    entry.args[2]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.interfaceTag !== INTERFACE_TAG.UNIT
-  ) {
-    throw new Error(
-      `VIR widget entry ${entryName} must be an effectful Root -> Component -> Surface -> Unit entry`,
-    );
-  }
-  return entry;
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {
@@ -361,254 +288,6 @@ function requireWidgetManifestEntry(runtime, entryName, label) {
   return entry;
 }
 
-// Failed rendering remains an explicit shutdown boundary.
-function disposeLoadedWidget(loaded) {
-  const errors = [];
-  collectCleanupError(errors, () => loaded.root.unmount());
-  collectCleanupError(errors, () => disposeRuntimeService(loaded.service));
-  throwCollectedErrors(errors, "VIR widget cleanup failed");
-}
-
-export function surfaceFromInfoviewProps(props, rpcSession) {
-  const goals = arrayOrEmpty(props?.goals).map((goal, index) =>
-    goalFromInteractiveGoal(goal, index, "goal"),
-  );
-  const termGoal =
-    props?.termGoal === null || props?.termGoal === undefined
-      ? []
-      : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
-  const cursor = documentPositionFromInfoviewPosition(props?.pos);
-  const selections = arrayOrEmpty(props?.selectedLocations).map(
-    selectedLocationFromInfoviewLocation,
-  );
-  return {
-    position: cursor.label,
-    cursor,
-    goals: [...goals, ...termGoal],
-    selectedLocations: selections.map((selection) => selection.label),
-    selections,
-    rpcSession,
-  };
-}
-
-export function surfaceCacheKey(surface) {
-  const { rpcSession: _rpcSession, ...serializableSurface } = surface;
-  return JSON.stringify(serializableSurface);
-}
-
-function goalFromInteractiveGoal(goal, index, kind) {
-  const userName = optionalStringValue(
-    readOption(goal?.userName ?? goal?.["userName?"]),
-  );
-  const mvarId = optionalStringValue(goal?.mvarId?.name ?? goal?.mvarId);
-  const title =
-    kind === "term"
-      ? "Term goal"
-      : userName.length === 0
-        ? `Goal ${index + 1}`
-        : `case ${userName}`;
-  const idSeed =
-    kind === "term" ? `term-${index}` : optionalStringValue(mvarId || userName);
-  const id = safeDomId(idSeed.length === 0 ? `${kind}-${index}` : idSeed);
-  return {
-    id,
-    kind,
-    index,
-    title,
-    userName: userName.length === 0 ? null : userName,
-    mvarId: mvarId.length === 0 ? null : mvarId,
-    status: goalStatus(goal, index, kind),
-    target: nonEmptyText(taggedTextToPlain(goal?.type), "(unavailable target)"),
-    hypotheses: arrayOrEmpty(goal?.hyps).map((hypothesis, hypothesisIndex) =>
-      hypothesisFromBundle(hypothesis, id, hypothesisIndex),
-    ),
-  };
-}
-
-function hypothesisFromBundle(hypothesis, goalId, index) {
-  const names = arrayOrEmpty(hypothesis?.names).filter(
-    (name) => typeof name === "string",
-  );
-  const fvarIds = arrayOrEmpty(hypothesis?.fvarIds)
-    .map(infoviewIdToString)
-    .filter((id) => id.length !== 0);
-  const idSeed =
-    names.length === 0
-      ? optionalStringValue(fvarIds[0] ?? `hyp-${index}`)
-      : names.join("-");
-  return {
-    id: safeDomId(`${goalId}-${idSeed}`),
-    names,
-    fvarIds,
-    type: nonEmptyText(
-      taggedTextToPlain(hypothesis?.type),
-      "(unavailable type)",
-    ),
-    value: optionalTaggedTextToPlain(hypothesis?.val ?? hypothesis?.["val?"]),
-  };
-}
-
-export function taggedTextToPlain(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map(taggedTextToPlain).join("");
-  }
-  if (typeof value !== "object") {
-    return String(value);
-  }
-  if (typeof value.text === "string") {
-    return value.text;
-  }
-  if (Array.isArray(value.append)) {
-    return value.append.map(taggedTextToPlain).join("");
-  }
-  if (Array.isArray(value.tag)) {
-    return taggedTextToPlain(value.tag[1]);
-  }
-  return "";
-}
-
-function optionalTaggedTextToPlain(value) {
-  const option = readOption(value);
-  return option === null ? null : taggedTextToPlain(option);
-}
-
-function readOption(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === "object") {
-    if (value.kind === "none") {
-      return null;
-    }
-    if (value.kind === "some") {
-      return value.value;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, "some")) {
-      return value.some;
-    }
-  }
-  return value;
-}
-
-function goalStatus(goal, index, kind) {
-  if (kind === "term") {
-    return "term";
-  }
-  if (readOption(goal?.isInserted ?? goal?.["isInserted?"]) === true) {
-    return "inserted";
-  }
-  if (readOption(goal?.isRemoved ?? goal?.["isRemoved?"]) === true) {
-    return "removed";
-  }
-  return index === 0 ? "active" : "pending";
-}
-
-function documentPositionFromInfoviewPosition(pos) {
-  const hasPosition = pos !== null && typeof pos === "object";
-  const line =
-    hasPosition && Number.isInteger(pos.line) && pos.line >= 0 ? pos.line : 0;
-  const character =
-    hasPosition && Number.isInteger(pos.character) && pos.character >= 0
-      ? pos.character
-      : 0;
-  const uri = hasPosition && typeof pos.uri === "string" ? pos.uri : "";
-  const fileName = fileNameFromUri(uri);
-  const label = hasPosition
-    ? formatDocumentPositionLabel(fileName, line, character)
-    : "unknown position";
-  return {
-    uri,
-    fileName,
-    line,
-    character,
-    label,
-  };
-}
-
-function formatDocumentPositionLabel(fileName, line, character) {
-  const label = `line ${line + 1}:${character + 1}`;
-  return fileName.length === 0
-    ? label
-    : `${fileName}:${line + 1}:${character + 1}`;
-}
-
-function fileNameFromUri(uri) {
-  if (uri.length === 0) {
-    return "";
-  }
-  return decodeURIComponent(uri).split(/[\\/]/).pop() ?? "";
-}
-
-function selectedLocationFromInfoviewLocation(location, index) {
-  const label = formatSelectedLocation(location, index);
-  const kind = selectedLocationKind(location);
-  return {
-    id: safeDomId(`${kind}-${label}-${index}`),
-    kind,
-    label,
-  };
-}
-
-function formatSelectedLocation(location, index) {
-  if (location === null || location === undefined) {
-    return `location-${index}`;
-  }
-  if (typeof location === "string") {
-    return location;
-  }
-  if (typeof location === "object") {
-    return (
-      optionalStringValue(location.kind ?? location.type ?? location.id) ||
-      `location-${index}`
-    );
-  }
-  return String(location);
-}
-
-function selectedLocationKind(location) {
-  if (location !== null && typeof location === "object") {
-    return optionalStringValue(location.kind ?? location.type) || "location";
-  }
-  return "location";
-}
-
-function infoviewIdToString(value) {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value !== null && typeof value === "object") {
-    return optionalStringValue(value.name ?? value.id);
-  }
-  return "";
-}
-
-function arrayOrEmpty(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function optionalStringValue(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function nonEmptyText(value, fallback) {
-  const text = optionalStringValue(value).trim();
-  return text.length === 0 ? fallback : text;
-}
-
-function safeDomId(value) {
-  const normalized = String(value)
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return normalized.length === 0 ? "item" : normalized;
-}
-
 function requiredString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`VIR widget ${label} must be a non-empty string`);
@@ -632,7 +311,6 @@ function widgetRuntimeConfigFromProps(props) {
     wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
     componentEntry: requiredString(props.componentEntry, "componentEntry"),
-    entry: requiredString(props.entry, "entry"),
     position: requiredPosition(props.pos, "pos"),
     autoReloadMs: optionalNonNegativeInteger(
       props.autoReloadMs,
@@ -712,6 +390,8 @@ async function createRuntimeService({ rpcSession, hostContext, sources }) {
       }),
       reactHostBindings: createBrowserReactHostBindings,
       infoviewUseClientNotificationEffect: useClientNotificationEffect,
+      infoviewUseRpcSession: useRpcSession,
+      infoviewStripTags: TaggedText_stripTags,
     });
   return {
     packageRevision: sources.packageSource.revision ?? "",
@@ -988,15 +668,6 @@ export function decodeBase64Bytes(base64) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function freshMountId(value) {
-  const prefix =
-    typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value)
-      ? value
-      : "vir-infoview-widget";
-  nextMountId += 1;
-  return `${prefix}-${nextMountId}`;
 }
 
 function widgetCleanupError(errors, message) {

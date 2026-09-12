@@ -152,6 +152,10 @@ structure ReducerState (state action : Type) where
 /-- React node object created by the JavaScript host through React's public API. -/
 opaque Node : Type
 
+/-- A native function component receiving JavaScript props directly from React. -/
+abbrev FunctionComponent (props : Type) :=
+  Lean.Vir.Js.Function1 (Lean.Vir.Js props) (Lean.Vir.Js Node)
+
 /-- React dependency lists are ordinary JavaScript arrays. -/
 abbrev DependencyList : Type :=
   Lean.Vir.Js.Array.Value Lean.Vir.Js.Any.Value

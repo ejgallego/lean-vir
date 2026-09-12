@@ -25,7 +25,7 @@ effects and reviewed protocol operations.
 | `Vir.React.Builders` | Optional Lean property, event and HTML builders. |
 | `Vir.React` | Convenience import for core and builders. |
 | `Vir.ProofWidgets` | Optional HTML/JSX notation over native React values. |
-| `Vir.Infoview` | The optional widget shell, proof surface, RPC and local editor capabilities. |
+| `Vir.Infoview` | The optional widget shell, native panel props, RPC and local editor capabilities. |
 | `Vir.Attributes` / `Vir.ExternFallback` | Package markers / explicit use of a Lean extern reference body. |
 
 Choose the effect according to the operation:
@@ -208,7 +208,12 @@ for activation and the [RPC tutorial](../../examples/tutorials/RpcReferenceWidge
 for server calls. Its clipboard and editor-command helpers expose local
 synchronous capabilities with Lean `Bool` results. In particular,
 `Infoview.Clipboard.writeText` does not claim the asynchronous browser
-Clipboard API contract; native RPC calls return exact Promises.
+Clipboard API contract; native RPC calls return exact Promises. An infoview
+factory has type `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)`:
+React passes those native props directly, while `Infoview.useRpcSession` is the
+actual surrounding-context hook. Position coordinates remain JavaScript numbers
+as `Js Float`; optional upstream fields remain `Js.UndefinedOr` until an
+application explicitly converts them.
 
 ## Troubleshooting
 

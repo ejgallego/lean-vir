@@ -1,0 +1,246 @@
+{
+  "$schema": "../bindings.schema.json",
+  "version": 2,
+  "id": "infoview-panel",
+  "title": "Infoview native panel props",
+  "description": "Exact upstream infoview panel-widget props, goal data, and tagged-text accessors.",
+  "lean": { "modules": ["Vir.Infoview.Panel", "Vir.Infoview.Panel.Generated"] },
+  "generation": {
+    "output": "Vir/Infoview/Panel/Generated.lean",
+    "imports": ["Vir.Infoview.Panel.Types", "Vir.React.Types"],
+    "namespace": "Lean.Vir",
+    "abiProfile": {
+      "id": "vir-infoview-panel-native-v1",
+      "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+      "types": {
+        "boolean": { "lean": "Bool", "representation": "js-resource" },
+        "number": { "lean": "Float", "representation": "js-resource" },
+        "string": { "lean": "String", "representation": "js-resource" },
+        "void": { "lean": "Unit", "representation": "immediate" }
+      },
+      "resource": {
+        "constructor": "Lean.Vir.Js",
+        "nullableConstructor": "Lean.Vir.Js.Nullable",
+        "undefinedOrConstructor": "Lean.Vir.Js.UndefinedOr",
+        "argument": { "passing": "borrowed", "retention": "call" },
+        "result": { "ownership": "owned" }
+      },
+      "receiver": { "default": { "passing": "borrowed", "retention": "call" }, "globalTypes": {} }
+    },
+    "resources": {},
+    "protocolOperations": [
+      {
+        "id": "infoview.use-rpc-session", "group": "panel-widget", "target": "infoview.useRpcSession",
+        "lean": "Lean.Vir.Infoview.useRpcSession", "marker": "vir_js",
+        "reason": "Calls the actual upstream React hook and returns its exact position-specific RPC session object.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "useRpcSession", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" }, "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.RpcSession", "representation": "js-resource", "resourceInner": "Infoview.RpcSession" } }
+      },
+      {
+        "id": "infoview.panel-widget-props.pos", "group": "panel-widget", "target": "infoview.panelWidgetProps.pos",
+        "lean": "Lean.Vir.Infoview.PanelWidgetProps.pos", "marker": "vir_js",
+        "reason": "Returns the exact native PanelWidgetProps.pos value without normalizing its document position.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "PanelWidgetProps.pos", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "props", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelWidgetProps", "representation": "js-resource", "resourceInner": "Infoview.PanelWidgetProps" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.PanelPosition", "representation": "js-resource", "resourceInner": "Infoview.PanelPosition" } }
+      },
+      {
+        "id": "infoview.panel-widget-props.goals", "group": "panel-widget", "target": "infoview.panelWidgetProps.goals",
+        "lean": "Lean.Vir.Infoview.PanelWidgetProps.goals", "marker": "vir_js",
+        "reason": "Returns PanelWidgetProps.goals as the exact native array.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "PanelWidgetProps.goals", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "props", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelWidgetProps", "representation": "js-resource", "resourceInner": "Infoview.PanelWidgetProps" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Infoview.InteractiveGoal" } }
+      },
+      {
+        "id": "infoview.panel-widget-props.term-goal", "group": "panel-widget", "target": "infoview.panelWidgetProps.termGoal",
+        "lean": "Lean.Vir.Infoview.PanelWidgetProps.termGoal", "marker": "vir_js",
+        "reason": "Returns the exact optional PanelWidgetProps.termGoal value, retaining undefined rather than supplying a default.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "PanelWidgetProps.termGoal", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "props", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelWidgetProps", "representation": "js-resource", "resourceInner": "Infoview.PanelWidgetProps" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr Infoview.InteractiveTermGoal", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Infoview.InteractiveTermGoal" } }
+      },
+      {
+        "id": "infoview.panel-position.uri", "group": "panel-position", "target": "infoview.panelPosition.uri",
+        "lean": "Lean.Vir.Infoview.PanelPosition.uri", "marker": "vir_js",
+        "reason": "Returns the exact DocumentPosition.uri string.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "DocumentPosition.uri", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "position", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelPosition", "representation": "js-resource", "resourceInner": "Infoview.PanelPosition" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "infoview.panel-position.line", "group": "panel-position", "target": "infoview.panelPosition.line",
+        "lean": "Lean.Vir.Infoview.PanelPosition.line", "marker": "vir_js",
+        "reason": "Returns the exact native JavaScript number in DocumentPosition.line; it is not narrowed to Nat.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Position.line", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "position", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelPosition", "representation": "js-resource", "resourceInner": "Infoview.PanelPosition" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "infoview.panel-position.character", "group": "panel-position", "target": "infoview.panelPosition.character",
+        "lean": "Lean.Vir.Infoview.PanelPosition.character", "marker": "vir_js",
+        "reason": "Returns the exact native JavaScript number in DocumentPosition.character; it is not narrowed to Nat.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Position.character", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "position", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.PanelPosition", "representation": "js-resource", "resourceInner": "Infoview.PanelPosition" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "infoview.interactive-goal.hyps", "group": "interactive-goals", "target": "infoview.interactiveGoal.hyps",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.hyps", "marker": "vir_js",
+        "reason": "Returns InteractiveGoal.hyps as its exact native array.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.hyps", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array Infoview.InteractiveHypothesisBundle", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Infoview.InteractiveHypothesisBundle" } }
+      },
+      {
+        "id": "infoview.interactive-goal.type", "group": "interactive-goals", "target": "infoview.interactiveGoal.type",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.type", "marker": "vir_js",
+        "reason": "Returns the exact InteractiveGoal.type tagged-text value.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.type", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Infoview.CodeWithInfos" } }
+      },
+      {
+        "id": "infoview.interactive-goal.user-name", "group": "interactive-goals", "target": "infoview.interactiveGoal.userName",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.userName", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveGoal.userName value, retaining undefined.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.userName", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr String", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value String" } }
+      },
+      {
+        "id": "infoview.interactive-goal.mvar-id", "group": "interactive-goals", "target": "infoview.interactiveGoal.mvarId",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.mvarId", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveGoal.mvarId value, retaining undefined.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.mvarId", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr String", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value String" } }
+      },
+      {
+        "id": "infoview.interactive-goal.is-inserted", "group": "interactive-goals", "target": "infoview.interactiveGoal.isInserted",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.isInserted", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveGoal.isInserted value, retaining undefined.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.isInserted", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr Bool", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Bool" } }
+      },
+      {
+        "id": "infoview.interactive-goal.is-removed", "group": "interactive-goals", "target": "infoview.interactiveGoal.isRemoved",
+        "lean": "Lean.Vir.Infoview.InteractiveGoal.isRemoved", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveGoal.isRemoved value, retaining undefined.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveGoal.isRemoved", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr Bool", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Bool" } }
+      },
+      {
+        "id": "infoview.interactive-term-goal.hyps", "group": "interactive-goals", "target": "infoview.interactiveTermGoal.hyps",
+        "lean": "Lean.Vir.Infoview.InteractiveTermGoal.hyps", "marker": "vir_js",
+        "reason": "Returns InteractiveTermGoal.hyps as its exact native array.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveTermGoal.hyps", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveTermGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveTermGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array Infoview.InteractiveHypothesisBundle", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Infoview.InteractiveHypothesisBundle" } }
+      },
+      {
+        "id": "infoview.interactive-term-goal.type", "group": "interactive-goals", "target": "infoview.interactiveTermGoal.type",
+        "lean": "Lean.Vir.Infoview.InteractiveTermGoal.type", "marker": "vir_js",
+        "reason": "Returns the exact InteractiveTermGoal.type tagged-text value.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveTermGoal.type", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "goal", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveTermGoal", "representation": "js-resource", "resourceInner": "Infoview.InteractiveTermGoal" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Infoview.CodeWithInfos" } }
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.names", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.names",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.names", "marker": "vir_js",
+        "reason": "Returns InteractiveHypothesisBundle.names as its exact native array.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveHypothesisBundle.names", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "hypothesis", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveHypothesisBundle", "representation": "js-resource", "resourceInner": "Infoview.InteractiveHypothesisBundle" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array String", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value String" } }
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.type", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.type",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.type", "marker": "vir_js",
+        "reason": "Returns the exact InteractiveHypothesisBundle.type tagged-text value.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveHypothesisBundle.type", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "hypothesis", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveHypothesisBundle", "representation": "js-resource", "resourceInner": "Infoview.InteractiveHypothesisBundle" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Infoview.CodeWithInfos" } }
+      },
+      {
+        "id": "infoview.interactive-hypothesis-bundle.val", "group": "interactive-goals", "target": "infoview.interactiveHypothesisBundle.val",
+        "lean": "Lean.Vir.Infoview.InteractiveHypothesisBundle.val", "marker": "vir_js",
+        "reason": "Returns the exact optional InteractiveHypothesisBundle.val tagged-text value, retaining undefined.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "InteractiveHypothesisBundle.val", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "hypothesis", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.InteractiveHypothesisBundle", "representation": "js-resource", "resourceInner": "Infoview.InteractiveHypothesisBundle" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Infoview.CodeWithInfos" } }
+      },
+      {
+        "id": "infoview.code-with-infos.strip-tags", "group": "code-with-infos", "target": "infoview.codeWithInfos.stripTags",
+        "lean": "Lean.Vir.Infoview.CodeWithInfos.stripTags", "marker": "vir_js",
+        "reason": "Specializes upstream TaggedText_stripTags to CodeWithInfos and returns its exact JavaScript string result.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "TaggedText_stripTags", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [{ "name": "code", "type": { "lean": "Lean.Vir.Js Infoview.CodeWithInfos", "representation": "js-resource", "resourceInner": "Infoview.CodeWithInfos" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+      }
+    ]
+  },
+  "roots": [
+    {
+      "id": "panel-widget", "title": "Panel widget props and RPC hook",
+      "targets": ["infoview.useRpcSession", "infoview.panelWidgetProps.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.useRpcSession", "Lean.Vir.Infoview.PanelWidgetProps"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview",
+        "declarations": ["node_modules/@leanprover/infoview/dist/infoview/userWidget.d.ts", "node_modules/@leanprover/infoview/dist/infoview/rpcSessions.d.ts"],
+        "roots": ["PanelWidgetProps", "useRpcSession"]
+      }
+    },
+    {
+      "id": "panel-position", "title": "Native document position",
+      "targets": ["infoview.panelPosition.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.PanelPosition"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview",
+        "declarations": ["node_modules/@leanprover/infoview/dist/infoview/util.d.ts", "node_modules/vscode-languageserver-types/lib/esm/main.d.ts"],
+        "roots": ["DocumentPosition", "Position"]
+      }
+    },
+    {
+      "id": "interactive-goals", "title": "Native interactive goals",
+      "targets": ["infoview.interactiveGoal.*", "infoview.interactiveTermGoal.*", "infoview.interactiveHypothesisBundle.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.InteractiveGoal", "Lean.Vir.Infoview.InteractiveTermGoal", "Lean.Vir.Infoview.InteractiveHypothesisBundle"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview-api",
+        "declarations": ["node_modules/@leanprover/infoview-api/dist/rpcApi.d.ts"],
+        "roots": ["InteractiveGoal", "InteractiveTermGoal", "InteractiveHypothesisBundle"]
+      }
+    },
+    {
+      "id": "code-with-infos", "title": "Native tagged code text",
+      "targets": ["infoview.codeWithInfos.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.CodeWithInfos"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview-api",
+        "declarations": ["node_modules/@leanprover/infoview-api/dist/rpcApi.d.ts", "node_modules/@leanprover/infoview-api/dist/util.d.ts"],
+        "roots": ["CodeWithInfos", "TaggedText_stripTags"]
+      }
+    }
+  ]
+}

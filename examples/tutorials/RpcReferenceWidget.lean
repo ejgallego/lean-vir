@@ -147,15 +147,17 @@ def render (component : Js (Component Input)) (input : Input) : ReactM (Js Node)
   Node.component component (← LeanRef.toJSL input)
 
 /-- The standard infoview entry needs no application-authored JavaScript. -/
-def WidgetView : RuntimeM (Js (Component Infoview.Surface)) := do
+def WidgetView : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do
   let child ← ResponseView
   let query ← Js.Object.empty
   Js.Object.set query (← js#"message") (← js#"Hello from Lean")
   Js.Object.set query (← js#"fail") (← JsValue.ofBool false)
   Js.Object.set query (← js#"waitForCancellation") (← JsValue.ofBool false)
-  Component.ofLean fun props => do
-    let surface : Infoview.Surface ← LeanRef.fromJSL props
-    renderView child { session := surface.rpcSession, query, uri := surface.cursor.uri }
+  FunctionComponent.ofLean fun props => do
+    let session ← Infoview.useRpcSession
+    let pos ← Infoview.PanelWidgetProps.pos props
+    let uri ← JsValue.toString (← Infoview.PanelPosition.uri pos)
+    renderView child { session, query, uri }
 
 vir_proof_widget WidgetView
 

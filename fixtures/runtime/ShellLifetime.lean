@@ -24,6 +24,9 @@ opaque recordJs (event : Js String) : RuntimeM Unit
 def record (event : String) : RuntimeM Unit := do
   recordJs (← JsValue.ofString event)
 
+@[vir_js "test.shell.context"]
+opaque context : RuntimeM Unit
+
 @[vir_js "test.shell.capture"]
 opaque capture
     (success failure : Js.Function1 Js.Any Unit)
@@ -42,24 +45,19 @@ def schedule (owner : String) (_ : Js Event) : DomM Unit := do
   Timer.clearTimeout token
   record ("scheduled:" ++ owner)
 
-def createComponent : RuntimeM (Js (Component Lean.Vir.Infoview.Surface)) := do
+def createComponent : RuntimeM (FunctionComponent Lean.Vir.Infoview.PanelWidgetProps) := do
   let owner ← JsValue.toString (← labelJs)
   let stale ← RuntimeRef.new false
   capture (← Js.Function.ofLeanVoid (continuation stale owner "success"))
     (← Js.Function.ofLeanVoid (continuation stale owner "failure"))
     (← EventListener.ofLean (schedule owner)) (← LeanRef.toJSL owner)
-  Component.ofLean fun _ => do
+  FunctionComponent.ofLean fun _ => do
+    context
     let effect ← EffectCallback.ofLean {
       setup := do record ("setup:" ++ owner); JsValue.ofString owner
       cleanup := fun _ => do stale.set true; record ("cleanup:" ++ owner)
     }
     Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Hooks.DependencyList.empty))
     Node.spanText owner
-
-def mount (root : Js Root) (component : Js (Component Lean.Vir.Infoview.Surface))
-    (surface : Lean.Vir.Infoview.Surface) : DomM Unit := do
-  let props ← Lean.Vir.LeanRef.toJSL surface
-  let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
-  Lean.Vir.React.Root.render root node
 
 end Vir.Fixtures.ShellLifetime

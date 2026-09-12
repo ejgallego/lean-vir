@@ -13,30 +13,31 @@ client and `@[server_rpc_method]` example. This guide owns editor integration;
 ## Widget activation
 
 Import `Vir.Infoview`. The [hello widget](../../examples/tutorials/ReactProofWidgetHello.lean)
-supplies a `RuntimeM (Js (React.Component Surface))` factory and uses
-`vir_proof_widget View` inside its namespace. The command generates `widgetSpec`,
-`createComponent`, `mount`, `irPackage` and `widgetProps`; `show_panel_widgets`
-activates the bundled `Lean.Vir.Infoview.widget` with those props. This path needs
-no application-authored JavaScript file.
+supplies a `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)` factory
+and uses `vir_proof_widget View` inside its namespace. The command generates
+`widgetSpec`, `createComponent`, `irPackage` and `widgetProps`; the package root
+is only the factory. `show_panel_widgets` activates the bundled
+`Lean.Vir.Infoview.widget` with those props. This path needs no
+application-authored JavaScript file.
 
 For manual assembly, [ReactWidget](../../Vir/Infoview/Widget.lean) supplies the
-package roots and props. The component entry returns
-`RuntimeM (Js (React.Component Surface))`; the mount entry has type:
+package root and props. Its component entry returns:
 
 ```lean
-Js React.Root → Js (React.Component Surface) → Surface → DomM Unit
+RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)
 ```
 
-`WidgetProps` identifies the Wasm asset, `IRPackage`, component and mount entries.
-The default shell creates a private runtime/binding factory and one inner
-component function per loaded service. Because its separate React root does not
-inherit the outer infoview context, the shell also creates one stable per-service
-wrapper that supplies the exact current upstream `EditorContext`. The mount
-entry receives that wrapper rather than literally the component-entry result;
-the wrapper renders the inner component with unchanged prop values, including the
-unchanged nested `leanProps` value. Cursor/surface updates reuse the wrapper,
-inner function and React root; configuration or package revision changes
-replace the service.
+`WidgetProps` identifies the Wasm asset, `IRPackage` and component factory.
+The default shell creates a private runtime/binding factory and one native
+function component per loaded service. React calls that function in the
+infoview's existing tree and passes its native `PanelWidgetProps` without a
+VIR clone or decode. The binding preserves nested field values; it does not
+promise a stable top-level props-object identity across React renders. All
+surrounding contexts are inherited without a provider bridge. Prop updates reuse
+the component; configuration or package revision changes replace the service and
+remount its subtree. Rendering follows ordinary React render rules and error
+boundaries.
+
 The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
 distinguishes normal UI release from hard disposal and failed setup.
 
@@ -52,13 +53,14 @@ Build the optional widget module with `lake build VirInfoview`; see
 [setup](../HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen
 an already-open example after rebuilding that module. The shell bundle leaves
 `react`, `react-dom` and `@leanprover/infoview` external to reuse the infoview's
-dependencies. Its container stops propagation of click, context-menu,
-mouse-down and pointer-down events to the outer panel.
+dependencies.
 
 ## Sessions and calls
 
-`Surface.rpcSession` supplies the exact official, position-specific
-`RpcSessionAtPos` returned by the infoview's `useRpcSession()`.
+`Infoview.useRpcSession` calls the actual upstream `useRpcSession()` hook and
+returns its exact official, position-specific `RpcSessionAtPos`. It obtains its
+position from the surrounding infoview context, which may differ from
+`PanelWidgetProps.pos`; use each value for the contract that supplied it.
 
 | Lean operation or value | Native behavior |
 | --- | --- |
@@ -114,7 +116,7 @@ The upstream `EditorContext` owns subscription and cleanup. VIR does not queue,
 filter or schedule notifications.
 
 The tutorial listens for `textDocument/didChange`, accepts only notifications
-whose document URI equals the current `Surface.cursor.uri`, and increments an
+whose document URI equals its `PanelWidgetProps.pos` URI, and increments an
 application revision used by its request effect. The URI filter and decision to
 rerun RPC are application policy, not behavior imposed by the binding. Other
 applications may choose different methods, filters and dependencies while
@@ -180,8 +182,10 @@ interoperability from a Lean implementation of the same component.
 The tutorial is an all-Lean async application: its Lean effect owns Promise
 continuations, abort setup, stale-result suppression, request status and child
 state. It uses genuine `Server.WithRpcRef` values and contains a same-position
-edit policy, but it is not full ProofWidgets component parity. Its goal snapshot
-is display data, not an elaborator-owned expression/context.
+edit policy, but it is not full ProofWidgets component parity. The goal demo
+uses upstream `TaggedText_stripTags` to project `CodeWithInfos` to plain text;
+it does not claim parity with upstream interactive-code components or an
+elaborator-owned expression/context viewer.
 
 The real-server shell test separately exercises Lean continuations after UI
 cleanup and hard disposal. Neither test proves GC timing or arbitrary response
@@ -200,7 +204,7 @@ they do not establish completed ports of these upstream components:
 | `InteractiveExpr` | Genuine elaborator-owned `ExprWithCtx`, tagged pretty-printing RPC and upstream `InteractiveCode`; a string goal snapshot is insufficient. |
 | `HtmlDisplay` | The existing serialized Html format, component exports, props/children and upstream module resolution. Using upstream HtmlDisplay directly is interoperability, not a completed Lean port. |
 | `MakeEditLink` | The supplied editor edit/selection and native child/event behavior. |
-| `GoalTypePanel` / `SelectionPanel` | Panel props, position, goal locations and selected-expression behavior. |
+| `GoalTypePanel` / `SelectionPanel` | Interactive-code rendering, goal locations and selected-expression behavior; raw panel props retain `selectedLocations`, but VIR has no typed getter yet. |
 | `FilterDetails` / `Maximizable` / `InteractiveSvg` | Stateful filtering/layout, SVG events and server updates. |
 
 ### Pinned upstream hook limitations

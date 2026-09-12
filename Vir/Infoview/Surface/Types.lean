@@ -26,39 +26,4 @@ structure DocumentPosition where
   character : Nat
   label : String
 
-/-- A selected infoview location, normalized from the JavaScript widget props. -/
-structure SelectedLocation where
-  id : String
-  kind : String
-  label : String
-
-/-- A local hypothesis shown in an infoview proof goal. -/
-structure Hypothesis where
-  id : String
-  names : Array String
-  fvarIds : Array String
-  type : String
-  value : Option String
-
-/-- A single proof goal in the narrow VIR infoview surface. -/
-structure Goal where
-  id : String
-  kind : String
-  index : Nat
-  title : String
-  userName : Option String
-  mvarId : Option String
-  status : String
-  target : String
-  hypotheses : Array Hypothesis
-
-/-- The narrow proof surface passed from the JavaScript infoview shell to Lean. -/
-structure Surface where
-  position : String
-  cursor : DocumentPosition
-  goals : Array Goal
-  selectedLocations : Array String
-  selections : Array SelectedLocation
-  rpcSession : Lean.Vir.Js RpcSession
-
 end Lean.Vir.Infoview
