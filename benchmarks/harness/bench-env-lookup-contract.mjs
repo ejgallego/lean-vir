@@ -28,6 +28,7 @@ const environmentLookupSharedHarnessPaths = [
   "web/src/host/vir-infoview-host-bindings.js",
   "web/src/host/vir-js-collection-bindings.js",
   "web/src/host/vir-js-value-bindings.js",
+  "web/src/host/vir-json-value-bindings.js",
   "web/app/pages/browser-package-config.js",
   "web/src/react/vir-react-root.js",
   "web/src/runtime/call-timing.js",
