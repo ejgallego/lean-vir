@@ -81,6 +81,10 @@ export default function VirInfoviewWidget(props) {
     hostContextRef.current.position = position;
     hostContextRef.current.configurationKey = configurationKey;
     setupHintRef.current = setupHint;
+    return () => {
+      // Invalidate pending candidates at removal, before passive cleanup runs.
+      hostContextRef.current.configurationKey = null;
+    };
   }, [rpcSession, editorConnection, props.pos, props.setupHint, configurationKey]);
 
   async function refreshLoadedWidget(isDisposed) {

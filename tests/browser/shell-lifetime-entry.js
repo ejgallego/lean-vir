@@ -33,6 +33,22 @@ let shellIntervalCount = 0;
 const inheritedContext = React.createContext(null);
 const inheritedContextValue = "outer infoview context";
 
+function RemovalLayoutProbe({ onCleanup, children }) {
+  React.useLayoutEffect(() => () => onCleanup(), [onCleanup]);
+  return children;
+}
+
+function shellWidget(config, onRemovalLayoutCleanup) {
+  const widget = React.createElement(VirInfoviewWidget, config);
+  return onRemovalLayoutCleanup === null
+    ? widget
+    : React.createElement(
+        RemovalLayoutProbe,
+        { onCleanup: onRemovalLayoutCleanup },
+        widget,
+      );
+}
+
 class ShellErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -110,6 +126,14 @@ async function until(predicate, label) {
   throw new Error(`shell observation timed out: ${label}`);
 }
 
+async function untilBare(predicate, label) {
+  for (let i = 0; i < 100; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (predicate()) return;
+  }
+  throw new Error(`shell observation timed out: ${label}`);
+}
+
 function fixtureState() {
   const state = {
     label: `G${states.length + 1}`,
@@ -119,6 +143,7 @@ function fixtureState() {
     contexts: [],
     schedules: 0,
     cancellations: 0,
+    factoryCalls: 0,
     captured: null,
     ...runtimeFault,
   };
@@ -130,6 +155,8 @@ function fixtureState() {
 const harness = (globalThis.__shellTest = {
   rpc: null,
   loadedRef: null,
+  afterLoadRuntimeService: (service) => service,
+  widgetPassiveCleanup: () => {},
   runtimeOptions(options) {
     const state = fixtureState();
     // Wrap only test host observations. The actual shell still creates a fresh
@@ -191,6 +218,7 @@ const harness = (globalThis.__shellTest = {
     };
     const call = runtime.call.bind(runtime);
     runtime.call = (...args) => {
+      if (args[0] === prefix + "createComponent") state.factoryCalls++;
       if (state.throwRender && args[0] === prefix + "renderComponent") {
         throw new Error("render sentinel");
       }
@@ -202,7 +230,7 @@ const harness = (globalThis.__shellTest = {
   },
 });
 
-async function mountShell(props = {}) {
+async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container, {
@@ -226,7 +254,7 @@ async function mountShell(props = {}) {
         React.createElement(
           ShellErrorBoundary,
           null,
-          React.createElement(VirInfoviewWidget, config),
+          shellWidget(config, onRemovalLayoutCleanup),
         ),
       ),
     ),
@@ -249,11 +277,14 @@ async function mountShell(props = {}) {
             React.createElement(
               ShellErrorBoundary,
               null,
-              React.createElement(VirInfoviewWidget, config),
+              shellWidget(config, onRemovalLayoutCleanup),
             ),
           ),
         ),
       );
+    },
+    removeTransition() {
+      React.startTransition(() => root.render(null));
     },
     async unmount() {
       try {
@@ -726,37 +757,7 @@ async function obsoleteConfigurationCandidate() {
   await shell.unmount();
 }
 
-globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  const onUnhandled = (event) => {
-    unhandled.push(String(event.reason));
-    event.preventDefault();
-  };
-  globalThis.addEventListener("unhandledrejection", onUnhandled);
-  const consoleError = console.error,
-    consoleWarn = console.warn;
-  console.error = (...args) => {
-    recordConsoleDiagnostic("error", args);
-    consoleError(...args);
-  };
-  console.warn = (...args) => {
-    recordConsoleDiagnostic("warn", args);
-    consoleWarn(...args);
-  };
-  const setIntervalOriginal = globalThis.setInterval,
-    clearIntervalOriginal = globalThis.clearInterval;
-  const intervals = new Set();
-  globalThis.setInterval = (...args) => {
-    const id = setIntervalOriginal(...args);
-    intervals.add(id);
-    shellIntervalCount = intervals.size;
-    return id;
-  };
-  globalThis.clearInterval = (id) => {
-    intervals.delete(id);
-    shellIntervalCount = intervals.size;
-    return clearIntervalOriginal(id);
-  };
+function installMockRpc(wasmBase64, packageBase64) {
   harness.rpc = {
     async call(method, params) {
       if (method.endsWith("statIRPackage")) {
@@ -802,6 +803,123 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
       };
     },
   };
+}
+
+async function pendingCandidateAfterCommittedRemoval(wasmBase64, packageBase64) {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  installMockRpc(wasmBase64, packageBase64);
+  const gate = deferred();
+  const timing = {
+    loadReady: false,
+    removalLayoutCleanups: 0,
+    passiveCleanups: 0,
+    passiveCleanupsAtHandoff: null,
+    shellRemovedAtHandoff: false,
+  };
+  const before = states.length;
+  let shell = null;
+  let unmounted = false;
+  harness.afterLoadRuntimeService = async (servicePromise) => {
+    const service = await servicePromise;
+    timing.loadReady = true;
+    await gate.promise;
+    timing.passiveCleanupsAtHandoff = timing.passiveCleanups;
+    timing.shellRemovedAtHandoff =
+      shell !== null &&
+      shell.container.querySelector(".vir-infoview-widget-shell") === null;
+    return service;
+  };
+  harness.widgetPassiveCleanup = () => {
+    timing.passiveCleanups = (timing.passiveCleanups ?? 0) + 1;
+  };
+  try {
+    shell = await mountShell({}, {
+      onRemovalLayoutCleanup: () => {
+        timing.removalLayoutCleanups++;
+        gate.resolve();
+      },
+    });
+    await until(() => timing.loadReady, "candidate load held at source await");
+    // Keep the root alive and let React schedule this transition normally.
+    // `act` would synchronously flush the passive cleanup we need to observe.
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    shell.removeTransition();
+    await untilBare(
+      () => timing.removalLayoutCleanups === 1,
+      "shell removal layout cleanup committed",
+    );
+    await untilBare(
+      () => timing.passiveCleanupsAtHandoff !== null,
+      "candidate source await returned during shell removal",
+    );
+    check(
+      timing.removalLayoutCleanups === 1 &&
+        timing.shellRemovedAtHandoff &&
+        timing.passiveCleanupsAtHandoff === 0,
+      "candidate source await returns after committed removal and before passive cleanup",
+    );
+    check(states.length === before + 1, "one held candidate creates one runtime");
+    const candidate = states.at(-1);
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    await shell.unmount();
+    unmounted = true;
+    return {
+      timing,
+      candidate: {
+        disposed: candidate.disposed,
+        factoryCalls: candidate.factoryCalls,
+        cleanups: candidate.cleanups,
+      },
+      loaded: harness.loadedRef.current !== null,
+    };
+  } finally {
+    harness.afterLoadRuntimeService = (service) => service;
+    harness.widgetPassiveCleanup = () => {};
+    if (shell !== null && !unmounted) {
+      // The successful unmount above has already released this root; this is
+      // only a failure-path attempt to keep the focused control isolated.
+      try {
+        await shell.unmount();
+      } catch {}
+    }
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+}
+
+globalThis.runPendingCandidateAfterCommittedRemoval = pendingCandidateAfterCommittedRemoval;
+
+globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const onUnhandled = (event) => {
+    unhandled.push(String(event.reason));
+    event.preventDefault();
+  };
+  globalThis.addEventListener("unhandledrejection", onUnhandled);
+  const consoleError = console.error,
+    consoleWarn = console.warn;
+  console.error = (...args) => {
+    recordConsoleDiagnostic("error", args);
+    consoleError(...args);
+  };
+  console.warn = (...args) => {
+    recordConsoleDiagnostic("warn", args);
+    consoleWarn(...args);
+  };
+  const setIntervalOriginal = globalThis.setInterval,
+    clearIntervalOriginal = globalThis.clearInterval;
+  const intervals = new Set();
+  globalThis.setInterval = (...args) => {
+    const id = setIntervalOriginal(...args);
+    intervals.add(id);
+    shellIntervalCount = intervals.size;
+    return id;
+  };
+  globalThis.clearInterval = (id) => {
+    intervals.delete(id);
+    shellIntervalCount = intervals.size;
+    return clearIntervalOriginal(id);
+  };
+  installMockRpc(wasmBase64, packageBase64);
   try {
     await normalUnmount();
     await mountedRefresh();
