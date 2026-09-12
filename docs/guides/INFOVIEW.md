@@ -28,9 +28,15 @@ Js React.Root → Js (React.Component Surface) → Surface → DomM Unit
 ```
 
 `WidgetProps` identifies the Wasm asset, `IRPackage`, component and mount entries.
-The default shell creates a private runtime/binding factory and one component
-function per loaded service. Cursor/surface updates reuse that function and its
-React root; configuration or package revision changes replace the service.
+The default shell creates a private runtime/binding factory and one inner
+component function per loaded service. Because its separate React root does not
+inherit the outer infoview context, the shell also creates one stable per-service
+wrapper that supplies the exact current upstream `EditorContext`. The mount
+entry receives that wrapper rather than literally the component-entry result;
+the wrapper renders the inner component with unchanged prop values, including the
+unchanged nested `leanProps` value. Cursor/surface updates reuse the wrapper,
+inner function and React root; configuration or package revision changes
+replace the service.
 The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-disposal)
 distinguishes normal UI release from hard disposal and failed setup.
 
@@ -61,9 +67,11 @@ mouse-down and pointer-down events to the outer panel.
 | `Js.Promise Response` | The exact returned Promise, not an awaited or decoded reply |
 | `Js Response` | The exact response graph, including registered server references |
 
-Pass the JavaScript wire value expected by the server as request data. Options
-are the native options object; pass an `AbortController`'s signal in
-`options.abortSignal` when cancellation is needed.
+Pass the JavaScript wire value expected by the server as request data.
+`ClientRequestOptions.empty` constructs an ordinary empty JavaScript options
+object and omits `abortSignal`. `ClientRequestOptions.setAbortSignal` assigns an
+`AbortController`'s exact native signal to that object without wrapping either
+value or changing cancellation behavior.
 JSL stores browser-local Lean values; it is not an RPC wire representation.
 
 `callWithOptions` takes `Js.Any` request data; use `Js.erase` to forget only its
@@ -94,6 +102,23 @@ conversion and acquire no VIR-specific lifetime.
 result type; the void form selects `undefined`. This is not
 `then(onFulfilled).catch(onRejected)`: an exception in the fulfillment handler
 rejects the chained Promise without invoking the sibling rejection handler.
+
+## Editor notifications
+
+`Infoview.useClientNotificationEffect method callback dependencies` forwards to
+the upstream infoview hook. With `none`, VIR omits the optional dependencies
+argument; with `some deps`, it passes the exact JavaScript dependency array.
+The upstream `EditorContext` owns subscription and cleanup. VIR does not queue,
+filter or schedule notifications.
+
+The tutorial listens for `textDocument/didChange`, accepts only notifications
+whose document URI equals the current `Surface.cursor.uri`, and increments an
+application revision used by its request effect. The URI filter and decision to
+rerun RPC are application policy, not behavior imposed by the binding. Other
+applications may choose different methods, filters and dependencies while
+following React's hook rules. The example omits dependencies to follow editor
+connection replacement too: upstream uses an explicit array exactly as supplied,
+without adding the editor identity to it.
 
 ## Server references and response types
 
@@ -150,10 +175,11 @@ interoperability from a Lean implementation of the same component.
 
 ## Current authoring coverage
 
-The tutorial has a JavaScript async parent and a Lean stateful renderer. It
-exercises genuine `Server.WithRpcRef`, rerendering, cancellation and errors,
-but does not yet demonstrate an all-Lean async parent or full component parity.
-Its goal snapshot is display data, not an elaborator-owned expression/context.
+The tutorial is an all-Lean async application: its Lean effect owns Promise
+continuations, abort setup, stale-result suppression, request status and child
+state. It uses genuine `Server.WithRpcRef` values and contains a same-position
+edit policy, but it is not full ProofWidgets component parity. Its goal snapshot
+is display data, not an elaborator-owned expression/context.
 
 The real-server shell test separately exercises Lean continuations after UI
 cleanup and hard disposal. Neither test proves GC timing or arbitrary response

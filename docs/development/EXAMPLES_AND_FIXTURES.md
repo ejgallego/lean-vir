@@ -37,10 +37,10 @@ Tutorials under `examples/tutorials/` teach one API with small, copyable code:
   callbacks.
 - [ReactProofWidgetHello](../../examples/tutorials/ReactProofWidgetHello.lean)
   introduces a live infoview component.
-- [RpcReferenceWidget](../../examples/tutorials/RpcReferenceWidget.md) pairs a Lean
-  renderer with a JavaScript React parent that owns native RPC Promises,
-  loading/error UI, cancellation and stale-result suppression. It is not an
-  all-Lean async widget.
+- [RpcReferenceWidget](../../examples/tutorials/RpcReferenceWidget.md) is an
+  all-Lean infoview application whose effect owns native RPC Promise
+  continuations, loading/error state, cancellation, stale-result suppression
+  and same-position edit refresh policy.
 
 ## Fixtures
 

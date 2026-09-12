@@ -167,6 +167,9 @@ cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
 effect. Obsolete load results cannot install UI. Refreshed services use fresh
 factories and browser/React lifecycles, reusing compiled Wasm and the mutable
 editor host context; the latter is not a frozen per-generation snapshot.
+The separate React root receives that upstream `EditorContext` through a stable
+per-service provider component; the inner component identity and nested prop
+values are preserved. The shell does not implement notification subscriptions.
 
 UI cleanup does not restrict new activity or cancel application-owned timers,
 listeners, subscriptions or independent roots. Those still need application

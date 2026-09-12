@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { EditorContext, useRpcSession } from "@leanprover/infoview";
+import { EditorContext, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createRoot } from "../src/vir-react-dom-client.js";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
@@ -120,7 +120,7 @@ export default function VirInfoviewWidget(props) {
         service,
         root: createRoot(mountElementRef.current),
         componentEntry,
-        component,
+        component: withEditorContext(component, hostContextRef.current),
         entry,
       };
       service = null;
@@ -268,7 +268,7 @@ export default function VirInfoviewWidget(props) {
         ),
       });
     }
-  }, [runtimeToken, surfaceKey, mountId, rpcSession]);
+  }, [runtimeToken, surfaceKey, mountId, rpcSession, editorConnection]);
 
   return e(
     "section",
@@ -299,6 +299,15 @@ export default function VirInfoviewWidget(props) {
 
 function stopInfoviewEvent(event) {
   event.stopPropagation();
+}
+
+// A separate React root does not inherit the outer infoview's context. Keep
+// this component type stable for the service, forwarding the native context.
+function withEditorContext(component, hostContext) {
+  return function InfoviewContext(props) {
+    return e(EditorContext.Provider, { value: hostContext.editorConnection },
+      e(component, props));
+  };
 }
 
 export function validateWidgetEntry(runtime, entryName) {
@@ -702,6 +711,7 @@ async function createRuntimeService({ rpcSession, hostContext, sources }) {
         hostContext,
       }),
       reactHostBindings: createBrowserReactHostBindings,
+      infoviewUseClientNotificationEffect: useClientNotificationEffect,
     });
   return {
     packageRevision: sources.packageSource.revision ?? "",

@@ -4,7 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
+export function createInfoviewHostBindings({
+  commandDispatcher = null,
+  useClientNotificationEffect = null,
+} = {}) {
   return {
     "infoview.documentPosition": (uri, fileName, line, character, label) =>
       documentPosition(uri, fileName, line, character, label),
@@ -17,6 +20,22 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
       session.call(method, params),
     "infoview.rpcSession.callWithOptions": (session, method, params, options) =>
       session.call(method, params, options),
+    "infoview.clientRequestOptions.empty": () => ({}),
+    "infoview.clientRequestOptions.setAbortSignal": (options, signal) => {
+      options.abortSignal = signal;
+    },
+    "infoview.useClientNotificationEffect": (method, callback) => {
+      if (useClientNotificationEffect === null) {
+        throw new Error("useClientNotificationEffect requires the upstream infoview host");
+      }
+      return useClientNotificationEffect(method, callback);
+    },
+    "infoview.useClientNotificationEffectWithDeps": (method, callback, deps) => {
+      if (useClientNotificationEffect === null) {
+        throw new Error("useClientNotificationEffect requires the upstream infoview host");
+      }
+      return useClientNotificationEffect(method, callback, deps);
+    },
   };
 }
 

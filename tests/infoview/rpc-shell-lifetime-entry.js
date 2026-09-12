@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { RpcSessions } from "@leanprover/infoview-api";
+import { EditorConnection, EditorContext } from "@leanprover/infoview";
 import VirInfoviewWidget from "../../web/app/vir-infoview-widget.js";
 import { describeError, until, withCleanup } from "./rpc-test-support.js";
 
@@ -66,6 +67,22 @@ async function run() {
     calls = [],
     tasks = [],
     notifications = new Set();
+  const notificationHandlers = new Set();
+  let subscriptions = 0;
+  const editor = new EditorConnection({
+    async subscribeClientNotifications(method) {
+      check(method === "textDocument/didChange", "native subscription method");
+      subscriptions++;
+    },
+    async unsubscribeClientNotifications() { subscriptions--; },
+  }, {
+    sentClientNotification: {
+      on(handler) {
+        notificationHandlers.add(handler);
+        return { dispose() { notificationHandlers.delete(handler); } };
+      },
+    },
+  });
   const onError = (event) => unexpected.push(event.error ?? event.message);
   const onUnhandled = (event) => unexpected.push(event.reason);
   globalThis.addEventListener("error", onError);
@@ -157,19 +174,22 @@ async function run() {
     function renderWidget(session, position, entries = roots, {
       autoReloadMs = 0,
       setupHint = "",
+      componentEntry = prefix + "createComponent",
+      entry = prefix + "mount",
+      editorConnection = editor,
     } = {}) {
       globalThis.__rpcShell.session = session;
       return React.act(async () =>
         root.render(
-          React.createElement(VirInfoviewWidget, {
+          React.createElement(EditorContext.Provider, { value: editorConnection }, React.createElement(VirInfoviewWidget, {
             wasmPath: "web/public/vir-upstream.wasm",
             irPackage: { roots: entries },
-            componentEntry: prefix + "createComponent",
-            entry: prefix + "mount",
+            componentEntry,
+            entry,
             pos: { uri: config.uri, ...position },
             autoReloadMs,
             setupHint,
-          }),
+          })),
         ),
       );
     }
@@ -488,6 +508,76 @@ async function run() {
     check(abandonedCall.replyDelayMs >= 2200, "obsolete reply was genuinely delayed");
     check(states.at(-1).events.length === 0, "obsolete candidate never enters Lean setup");
     check(!container.querySelector("[data-vir-infoview-state]"), "obsolete result cannot reinstall UI");
+    const obsoleteState = states.at(-1);
+
+    // Exercise the actual shell context bridge with the all-Lean tutorial, not
+    // only a manually provided context around an independent browser root.
+    packageReplyDelayMs = 0;
+    const tutorialEntries = ["RpcReferenceWidget.createComponent", "RpcReferenceWidget.mount"];
+    const tutorialOptions = { componentEntry: tutorialEntries[0], entry: tutorialEntries[1] };
+    await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
+    await waitFor("all-Lean tutorial ready in actual shell", () => {
+      const error = container.querySelector('[data-vir-infoview-state="error"]');
+      if (error) throw new Error(error.textContent);
+      return container.querySelector('[data-rpc-status="ready"]');
+    });
+    const tutorialState = states.at(-1);
+    const tutorialCalls = () => calls.filter((call) =>
+      call.params.method === "RpcBrowserServer.create" &&
+      call.params.params?.message === "Hello from Lean");
+    const tutorialFirst = tutorialCalls().length;
+    const button = container.querySelector("#rpc-reference-view");
+    React.act(() => button.click());
+    check(subscriptions === 1 && notificationHandlers.size === 1,
+      "actual shell forwards upstream EditorContext into the Lean root");
+    await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
+    await tick();
+    check(tutorialCalls().length === tutorialFirst, "unchanged shell render does not request");
+    const replacementHandlers = new Set();
+    let replacementSubscriptions = 0;
+    const replacementEditor = new EditorConnection({
+      async subscribeClientNotifications() { replacementSubscriptions++; },
+      async unsubscribeClientNotifications() { replacementSubscriptions--; },
+    }, {
+      sentClientNotification: {
+        on(handler) {
+          replacementHandlers.add(handler);
+          return { dispose() { replacementHandlers.delete(handler); } };
+        },
+      },
+    });
+    await renderWidget(a, config.a, tutorialEntries,
+      { ...tutorialOptions, editorConnection: replacementEditor });
+    check(subscriptions === 0 && notificationHandlers.size === 0 &&
+      replacementSubscriptions === 1 && replacementHandlers.size === 1,
+      "editor replacement moves the native subscription to the current connection");
+    check(tutorialCalls().length === tutorialFirst,
+      "editor replacement alone does not restart RPC");
+    const change = await post("/edit", {});
+    React.act(() => {
+      for (const handler of [...notificationHandlers])
+        handler(["textDocument/didChange", change]);
+    });
+    await tick();
+    check(tutorialCalls().length === tutorialFirst, "old editor notifications are inert");
+    await React.act(async () => {
+      for (const handler of [...replacementHandlers])
+        handler(["textDocument/didChange", change]);
+    });
+    await waitFor("actual shell same-position edit response", () =>
+      tutorialCalls().length === tutorialFirst + 1 && tutorialCalls().at(-1).settled &&
+      container.querySelector('[data-rpc-status="ready"]'));
+    check(tutorialCalls().at(-1).params.position.line === config.a.line &&
+      tutorialCalls().at(-1).params.position.character === config.a.character,
+      "edit refresh uses the same official RPC position");
+    check(states.at(-1) === tutorialState &&
+      container.querySelector("#rpc-reference-view") === button && button.textContent.includes("local 1"),
+      "edit refresh preserves runtime, native component, DOM and Lean hook state");
+    await unmountUI();
+    check(subscriptions === 0 && notificationHandlers.size === 0 &&
+      replacementSubscriptions === 0 && replacementHandlers.size === 0 &&
+      !tutorialState.runtime.disposed,
+      "shell UI cleanup unsubscribes without hard runtime disposal");
 
     return {
       generations: lifetimeStates.map((state) => ({
@@ -505,9 +595,10 @@ async function run() {
       startup,
       obsoleteInitial: {
         replyDelayMs: abandonedCall.replyDelayMs,
-        disposed: states.at(-1).runtime.disposed,
-        events: states.at(-1).events,
+        disposed: obsoleteState.runtime.disposed,
+        events: obsoleteState.events,
       },
+      allLeanEditRefresh: { requests: tutorialCalls().length, subscriptionsAfterUnmount: subscriptions },
     };
   }, [
     [

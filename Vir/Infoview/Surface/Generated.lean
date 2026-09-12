@@ -10,12 +10,50 @@ module
 
 public import Vir.Browser.Types
 public import Vir.Infoview.Surface.Types
+public import Vir.React.Types
 
 public section
 
 namespace Lean.Vir
 
 namespace Infoview
+
+/--
+Generated binding for reviewed VIR protocol `infoview.client-notification-effect-deps`.
+
+Calls the upstream infoview hook with the exact method, native callback and explicit dependency array. The upstream EditorContext and hook own subscription and cleanup; VIR neither queues nor filters notifications.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; method js-resource/borrowed/call; callback js-resource/borrowed/call; deps js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.useClientNotificationEffectWithDeps"]
+private opaque useClientNotificationEffectWithDeps
+    {params : Type}
+    (method : @& Lean.Vir.Js String)
+    (callback : @& Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit)
+    (deps : @& Lean.Vir.Js React.DependencyList) :
+    Lean.Vir.React.ReactM Unit
+
+/--
+Generated binding for reviewed VIR protocol `infoview.client-notification-effect`.
+
+Calls the upstream infoview hook with the exact method and native callback, omitting the optional dependencies argument.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; method js-resource/borrowed/call; callback js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.useClientNotificationEffect"]
+private opaque useClientNotificationEffectWithoutDeps
+    {params : Type}
+    (method : @& Lean.Vir.Js String)
+    (callback : @& Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit) :
+    Lean.Vir.React.ReactM Unit
 
 /--
 Generated binding for reviewed VIR protocol `infoview.document-position`.
@@ -38,6 +76,41 @@ opaque documentPosition
     Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.DocumentPosition)
 
 end Infoview
+
+namespace Infoview.ClientRequestOptions
+
+/--
+Generated binding for reviewed VIR protocol `infoview.request-options.empty`.
+
+Constructs an ordinary empty ClientRequestOptions object, omitting abortSignal rather than substituting null.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.clientRequestOptions.empty"]
+opaque empty : Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.ClientRequestOptions)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.request-options.abort-signal`.
+
+Assigns the exact native AbortSignal to options.abortSignal without wrapping the signal or changing cancellation behavior.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-protocol-v1`: receiver none; options js-resource/borrowed/call; signal js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.clientRequestOptions.setAbortSignal"]
+opaque setAbortSignal
+    (options : @& Lean.Vir.Js Infoview.ClientRequestOptions)
+    (signal : @& Lean.Vir.Js Browser.AbortSignal) :
+    Lean.Vir.RuntimeM Unit
+
+end Infoview.ClientRequestOptions
 
 namespace Infoview.Clipboard
 

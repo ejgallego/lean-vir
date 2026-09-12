@@ -38,7 +38,7 @@ function replaceOnce(source, before, after) {
 async function main() {
   // No copied Lean program or simulated package: the server imports these exact
   // existing fixtures and the real shell invokes statIRPackage/buildIRPackage.
-  run(["build", "VirInfoview", "+ShellLifetime"]);
+  run(["build", "VirInfoview", "+ShellLifetime", "+tutorials.RpcReferenceWidget"]);
   for (const fixture of [
     "fixtures/infoview/RpcBrowserServer",
   ]) {
@@ -66,8 +66,8 @@ async function main() {
             namespace: "rpc-shell-test",
           }));
           builder.onLoad({ filter: /.*/, namespace: "rpc-shell-test" }, () => ({
-            contents: `import * as React from 'react';
-            export const EditorContext = React.createContext(null);
+            contents: `export { EditorConnection, EditorContext, useClientNotificationEffect }
+              from ${JSON.stringify(fileURLToPath(import.meta.resolve("@leanprover/infoview")))};
             export function useRpcSession() { return globalThis.__rpcShell.session; }`,
             loader: "js",
             resolveDir: root,

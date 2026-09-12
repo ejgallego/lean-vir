@@ -7,7 +7,7 @@
   "lean": { "modules": ["Vir.Infoview.Surface", "Vir.Infoview.Surface.Generated"] },
   "generation": {
     "output": "Vir/Infoview/Surface/Generated.lean",
-    "imports": ["Vir.Browser.Types", "Vir.Infoview.Surface.Types"],
+    "imports": ["Vir.Browser.Types", "Vir.React.Types", "Vir.Infoview.Surface.Types"],
     "namespace": "Lean.Vir",
     "abiProfile": {
       "id": "vir-infoview-protocol-v1",
@@ -22,6 +22,54 @@
     },
     "resources": {},
     "protocolOperations": [
+      {
+        "id": "infoview.client-notification-effect-deps", "group": "client-notifications", "target": "infoview.useClientNotificationEffectWithDeps",
+        "lean": "Lean.Vir.Infoview.useClientNotificationEffectWithDeps", "marker": "vir_js", "visibility": "private",
+        "reason": "Calls the upstream infoview hook with the exact method, native callback and explicit dependency array. The upstream EditorContext and hook own subscription and cleanup; VIR neither queues nor filters notifications.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "useClientNotificationEffect", "semantics": "preserving" },
+        "typeParameters": ["params"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js params) Unit" } },
+          { "name": "deps", "type": { "lean": "Lean.Vir.Js React.DependencyList", "representation": "js-resource", "resourceInner": "React.DependencyList" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "infoview.client-notification-effect", "group": "client-notifications", "target": "infoview.useClientNotificationEffect",
+        "lean": "Lean.Vir.Infoview.useClientNotificationEffectWithoutDeps", "marker": "vir_js", "visibility": "private",
+        "reason": "Calls the upstream infoview hook with the exact method and native callback, omitting the optional dependencies argument.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "useClientNotificationEffect", "semantics": "preserving" },
+        "typeParameters": ["params"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "method", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js params) Unit" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "infoview.request-options.empty", "group": "request-options", "target": "infoview.clientRequestOptions.empty",
+        "lean": "Lean.Vir.Infoview.ClientRequestOptions.empty", "marker": "vir_js",
+        "reason": "Constructs an ordinary empty ClientRequestOptions object, omitting abortSignal rather than substituting null.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "ClientRequestOptions", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [],
+        "result": { "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } }
+      },
+      {
+        "id": "infoview.request-options.abort-signal", "group": "request-options", "target": "infoview.clientRequestOptions.setAbortSignal",
+        "lean": "Lean.Vir.Infoview.ClientRequestOptions.setAbortSignal", "marker": "vir_js",
+        "reason": "Assigns the exact native AbortSignal to options.abortSignal without wrapping the signal or changing cancellation behavior.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "ClientRequestOptions.abortSignal", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
+        "arguments": [
+          { "name": "options", "role": "receiver", "type": { "lean": "Lean.Vir.Js Infoview.ClientRequestOptions", "representation": "js-resource", "resourceInner": "Infoview.ClientRequestOptions" } },
+          { "name": "signal", "type": { "lean": "Lean.Vir.Js Browser.AbortSignal", "representation": "js-resource", "resourceInner": "Browser.AbortSignal" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
       {
         "id": "infoview.document-position", "group": "commands", "target": "infoview.documentPosition",
         "lean": "Lean.Vir.Infoview.documentPosition", "marker": "vir_js",
@@ -97,6 +145,27 @@
     ]
   },
   "roots": [
+    {
+      "id": "client-notifications", "title": "Infoview client notifications",
+      "targets": ["infoview.useClientNotificationEffect*"],
+      "lean": { "public": ["Lean.Vir.Infoview.useClientNotificationEffect"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview",
+        "declarations": ["node_modules/@leanprover/infoview/dist/infoview/util.d.ts"],
+        "roots": ["useClientNotificationEffect"]
+      }
+    },
+    {
+      "id": "request-options",
+      "title": "RPC request options",
+      "targets": ["infoview.clientRequestOptions.*"],
+      "lean": { "public": ["Lean.Vir.Infoview.ClientRequestOptions"] },
+      "upstream": {
+        "kind": "typescript", "package": "@leanprover/infoview-api",
+        "declarations": ["Vir/Infoview/RpcSession.contract.d.ts"],
+        "roots": ["ClientRequestOptions"]
+      }
+    },
     {
       "id": "clipboard",
       "title": "Clipboard",
