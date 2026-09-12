@@ -78,6 +78,8 @@ async function run() {
   let nextId = 0,
     sessions,
     root;
+  let packageReplyDelayMs = 0;
+  let invalidRootCall;
   const container = document.getElementById("app");
   const tick = () =>
     React.act(async () => {
@@ -105,8 +107,11 @@ async function run() {
       },
       async call(params, options) {
         const id = ++nextId,
-          call = { id, params };
+          call = { id, params, startedAt: performance.now() };
         calls.push(call);
+        const replyDelay = params.method === "Lean.Vir.Infoview.buildIRPackage"
+          ? packageReplyDelayMs
+          : 0;
         const signal = options?.abortSignal;
         const cancel = () => {
           call.cancelled = true;
@@ -116,12 +121,20 @@ async function run() {
         if (signal?.aborted) cancel();
         try {
           call.value = await post("/call", { id, params });
+          // Delay delivery of a genuine server reply, not package generation or
+          // its contents. The official RpcSessions client still receives it.
+          if (replyDelay > 0) {
+            const started = performance.now();
+            await new Promise((resolve) => setTimeout(resolve, replyDelay));
+            call.replyDelayMs = performance.now() - started;
+          }
           return call.value;
         } catch (error) {
           call.error = error;
           throw error;
         } finally {
           call.settled = true;
+          call.settledAt = performance.now();
           signal?.removeEventListener("abort", cancel);
         }
       },
@@ -141,10 +154,12 @@ async function run() {
       onUncaughtError: (error) => unexpected.push(error),
     });
     const roots = [prefix + "createComponent", prefix + "mount"];
-    async function mount(session, position, entries = roots) {
+    function renderWidget(session, position, entries = roots, {
+      autoReloadMs = 0,
+      setupHint = "",
+    } = {}) {
       globalThis.__rpcShell.session = session;
-      const count = states.length;
-      await React.act(async () =>
+      return React.act(async () =>
         root.render(
           React.createElement(VirInfoviewWidget, {
             wasmPath: "web/public/vir-upstream.wasm",
@@ -152,20 +167,27 @@ async function run() {
             componentEntry: prefix + "createComponent",
             entry: prefix + "mount",
             pos: { uri: config.uri, ...position },
-            autoReloadMs: 0,
+            autoReloadMs,
+            setupHint,
           }),
         ),
       );
+    }
+    async function mount(session, position, entries = roots, options = {}) {
+      const count = states.length;
+      await renderWidget(session, position, entries, options);
       await waitFor("real-server shell ready", () => {
         const error = container.querySelector(
           '[data-vir-infoview-state="error"]',
         );
         if (error) throw new Error(error.textContent);
-        return (
+        const ready = (
           states.length === count + 1 &&
           states.at(-1).events.includes(`setup:${states.at(-1).label}`) &&
           container.querySelector('[data-vir-infoview-state="ready"]')
         );
+        if (!ready) options.checkLoading?.();
+        return ready;
       });
       return states.at(-1);
     }
@@ -362,8 +384,113 @@ async function run() {
           };
         }),
     );
+    const lifetimeStates = states.slice();
+
+    // A server-side package-root failure must survive the shell's presentation
+    // boundary, including its original text/code and the configured setup hint.
+    const invalidRoot = "Vir.Fixtures.ShellLifetime.MissingStartupRoot";
+    const setupHint = "Build the widget module and check its export roots.";
+    await renderWidget(a, config.a, [invalidRoot], { setupHint });
+    await waitFor("invalid package root error UI", () =>
+      container.querySelector('[data-vir-infoview-state="error"]'),
+    );
+    invalidRootCall = calls.find((call) =>
+      call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
+      call.params.params?.package?.roots?.includes(invalidRoot),
+    );
+    const errorText = container.querySelector(".vir-infoview-widget-status").textContent;
+    check(invalidRootCall?.error?.code === -32602, "real invalid-root RPC code");
+    check(
+      invalidRootCall.error.message.includes(invalidRoot) &&
+        errorText.includes(invalidRootCall.error.message) &&
+        errorText.includes("(-32602)"),
+      `original package error message and code rendered: ${errorText}`,
+    );
+    check(errorText.includes(setupHint), "setup hint remains visible");
+    check(!errorText.includes("[object Object]"), "plain RPC error is readable");
+    check(states.length === 3, "invalid package root installs no runtime");
+    await unmountUI();
+
+    const startup = [];
+    for (const autoReloadMs of [0, 1000]) {
+      const firstCall = calls.length;
+      const phaseCalls = (method) => calls.slice(firstCall).filter((call) =>
+        call.params.method === `Lean.Vir.Infoview.${method}`,
+      );
+      // Leave margin for browser timer resolution while requiring >= 2.2s.
+      packageReplyDelayMs = 2250;
+      const state = await mount(a, config.a, roots, {
+        autoReloadMs,
+        checkLoading() {
+          check(
+            phaseCalls("statIRPackage").length <= 1,
+            "initial package polling must not supersede the pending installation",
+          );
+        },
+      });
+      packageReplyDelayMs = 0;
+      const packageCall = phaseCalls("buildIRPackage")[0];
+      check(packageCall?.replyDelayMs >= 2200, "genuine package reply delayed at least 2.2s");
+      check(phaseCalls("buildIRPackage").length === 1, "one initial package build");
+      check(
+        phaseCalls("statIRPackage").filter((call) =>
+          call.startedAt < packageCall.settledAt,
+        ).length === 1,
+        "only initial acquisition stats the package before reply delivery",
+      );
+      if (autoReloadMs > 0) {
+        await waitFor("polling resumes after installation", () =>
+          phaseCalls("statIRPackage").some((call) =>
+            call.settled && call.startedAt > packageCall.settledAt,
+          ),
+        );
+      } else {
+        await React.act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1100));
+        });
+        check(phaseCalls("statIRPackage").length === 1, "disabled polling stays off");
+      }
+      check(states.at(-1) === state, "unchanged revision does not replace the runtime");
+      check(phaseCalls("buildIRPackage").length === 1, "polling does not rebuild an unchanged package");
+      startup.push({
+        autoReloadMs,
+        replyDelayMs: packageCall.replyDelayMs,
+        packageRevision: packageCall.value.revision,
+        builds: phaseCalls("buildIRPackage").length,
+        stats: phaseCalls("statIRPackage").length,
+        resumedAfterInstall: phaseCalls("statIRPackage").some((call) =>
+          call.settled && call.startedAt > packageCall.settledAt,
+        ),
+      });
+      await unmountUI();
+      check(
+        !state.runtime.disposed && state.events.includes(`cleanup:${state.label}`),
+        "startup control preserves normal UI cleanup policy",
+      );
+    }
+    // An initial result abandoned by the UI must still take the hard teardown
+    // path; the polling fix must not turn it into an installed generation.
+    const beforeAbandon = states.length;
+    const abandonedCallStart = calls.length;
+    packageReplyDelayMs = 2250;
+    await renderWidget(a, config.a, roots, { autoReloadMs: 1000 });
+    let abandonedCall;
+    await waitFor("obsolete initial package reply held", () => {
+      abandonedCall = calls.slice(abandonedCallStart).find((call) =>
+        call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+      );
+      return abandonedCall?.value && !abandonedCall.settled;
+    });
+    await unmountUI();
+    await waitFor("obsolete initial candidate disposed", () =>
+      states.length === beforeAbandon + 1 && states.at(-1).runtime?.disposed,
+    );
+    check(abandonedCall.replyDelayMs >= 2200, "obsolete reply was genuinely delayed");
+    check(states.at(-1).events.length === 0, "obsolete candidate never enters Lean setup");
+    check(!container.querySelector("[data-vir-infoview-state]"), "obsolete result cannot reinstall UI");
+
     return {
-      generations: states.map((state) => ({
+      generations: lifetimeStates.map((state) => ({
         label: state.label,
         events: state.events,
       })),
@@ -374,6 +501,13 @@ async function run() {
         bridgeError: task.bridgeError?.message ?? null,
       })),
       packages,
+      invalidPackage: { error: invalidRootCall.error, rendered: errorText },
+      startup,
+      obsoleteInitial: {
+        replyDelayMs: abandonedCall.replyDelayMs,
+        disposed: states.at(-1).runtime.disposed,
+        events: states.at(-1).events,
+      },
     };
   }, [
     [
@@ -429,6 +563,7 @@ async function run() {
         const failures = calls.filter(
           (call) =>
             call.error &&
+            call !== invalidRootCall &&
             !(
               call.params.method === "RpcBrowserServer.create" &&
               deliberateFailures.has(call.params.params?.message) &&
