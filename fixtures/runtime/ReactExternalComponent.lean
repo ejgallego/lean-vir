@@ -24,12 +24,12 @@ def externalComponentProbe : RuntimeM (FunctionComponent Props) :=
     Node.createElement component props children
 
 def mount (selector : String) : DomM Bool := do
-  let component ← externalComponentProbe
   let container ← Lean.Vir.Browser.Document.querySelector
     (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
   match ← Lean.Vir.Js.Nullable.toOption container with
   | none => pure false
   | some container => do
+      let component ← externalComponentProbe
       let root ← Lean.Vir.React.Root.create container
       let props ← Lean.Vir.React.Props.empty
       let node ← Lean.Vir.React.ReactM.run do
