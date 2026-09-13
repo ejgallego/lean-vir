@@ -9,7 +9,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Browser.Types
-public import Vir.Infoview.Surface.Types
+public import Vir.Infoview.Client.Types
 public import Vir.React.Types
 
 public section
@@ -36,26 +36,6 @@ opaque useClientNotificationEffect
     (callback : @& Lean.Vir.Js.Function1 (Lean.Vir.Js params) Unit)
     (deps : @& Lean.Vir.Js.UndefinedOr React.DependencyList) :
     Lean.Vir.React.ReactM Unit
-
-/--
-Generated binding for reviewed VIR protocol `infoview.document-position`.
-
-Constructs the fixed host-side document-position record used by editor commands.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; uri js-resource/borrowed/call; fileName js-resource/borrowed/call; line js-resource/borrowed/call; character js-resource/borrowed/call; label js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "infoview.documentPosition"]
-opaque documentPosition
-    (uri : @& Lean.Vir.Js String)
-    (fileName : @& Lean.Vir.Js String)
-    (line : @& Lean.Vir.Js Nat)
-    (character : @& Lean.Vir.Js Nat)
-    (label : @& Lean.Vir.Js String) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.DocumentPosition)
 
 end Infoview
 
@@ -93,63 +73,6 @@ opaque setAbortSignal
     Lean.Vir.RuntimeM Unit
 
 end Infoview.ClientRequestOptions
-
-namespace Infoview.Clipboard
-
-/--
-Generated binding for reviewed VIR protocol `infoview.clipboard.write-text`.
-
-Implements the local synchronous infoview clipboard capability. It returns false when no copy request can be dispatched, true after synchronous copy or native async dispatch, and reports a later Promise rejection through the host error channel.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; text js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "infoview.clipboard.writeText"]
-opaque writeText
-    (text : @& Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-end Infoview.Clipboard
-
-namespace Infoview.Command
-
-/--
-Generated binding for reviewed VIR protocol `infoview.command.reveal`.
-
-Dispatches the local editor reveal-position capability and reports whether a dispatcher handled it.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; position js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "infoview.command.revealPosition"]
-opaque revealPosition
-    (position : @& Lean.Vir.Js Infoview.DocumentPosition) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-/--
-Generated binding for reviewed VIR protocol `infoview.command.insert`.
-
-Dispatches the local editor insert-text capability and reports whether it was applied.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-infoview-protocol-v1` (bridge-handle retention): receiver none; position js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "infoview.command.insertText"]
-opaque insertText
-    (position : @& Lean.Vir.Js Infoview.DocumentPosition)
-    (text : @& Lean.Vir.Js String) :
-    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
-
-end Infoview.Command
 
 namespace Infoview.RpcSession
 

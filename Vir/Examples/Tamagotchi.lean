@@ -970,7 +970,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     ]
     #[bar, counter]
 
-def View : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
+def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let hook ← useViewState
   let view ← Lean.Vir.LeanRef.fromJSL hook.value
   let state := normalizeViewState view.state
@@ -1087,8 +1087,9 @@ def mount (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 

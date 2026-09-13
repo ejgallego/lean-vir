@@ -25,6 +25,28 @@ def FunctionComponent.ofLean
   unfold ReactM at render
   exact Lean.Vir.Js.Function.ofLean render
 
+namespace Node
+
+@[inline] private unsafe def componentPropsImpl {α : Type}
+    (props : Lean.Vir.Js α) : Lean.Vir.Js Props := unsafeCast props
+
+@[implemented_by componentPropsImpl]
+private axiom componentProps {α : Type}
+    (props : Lean.Vir.Js α) : Lean.Vir.Js Props
+
+/--
+Builds an element from a native function component and its native props.
+The function and its matching native props are passed directly to React.
+-/
+def functionComponent
+    (component : @& FunctionComponent props)
+    (props : @& Lean.Vir.Js props)
+    (children : @& Lean.Vir.Js.Array Node) :
+    ReactM (Lean.Vir.Js Node) :=
+  createElement (FunctionComponent.asElementType component) (componentProps props) children
+
+end Node
+
 namespace StateSetter
 
 def set

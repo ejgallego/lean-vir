@@ -281,7 +281,7 @@ end EventHandler
 namespace Props
 
 -- Reuse the constructors for the unified Lean prop-entry vocabulary.
-export Entry (key ref property eventHandler)
+export Entry (key ref property eventHandler raw)
 
 def string (name value : String) : Entry :=
   property <| Property.string name value
@@ -600,12 +600,14 @@ def pushEntry (props : @& Lean.Vir.Js Lean.Vir.React.Props) : Entry → ReactM U
   | .ref value => setJs props "ref" value
   | .property value => setPropertyValueEntry props value
   | .eventHandler value => setEventHandlerValue props value
+  | .raw name value => setJs props name value
 
 def fromEntries (entries : Array Entry) : ReactM (Lean.Vir.Js Lean.Vir.React.Props) := do
   let props ← empty
   for entry in entries do
     pushEntry props entry
   pure props
+
 
 end Props
 

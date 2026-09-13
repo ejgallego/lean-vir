@@ -18,12 +18,4 @@ opaque RpcSession : Type
 /-- Exact infoview `ClientRequestOptions`, including its native AbortSignal. -/
 opaque ClientRequestOptions : Type
 
-/-- Cursor position for the current infoview snapshot. -/
-structure DocumentPosition where
-  uri : String
-  fileName : String
-  line : Nat
-  character : Nat
-  label : String
-
 end Lean.Vir.Infoview

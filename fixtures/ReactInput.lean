@@ -41,8 +41,8 @@ def checkedLabel (checked : Bool) : String :=
 def selectTextareaLabel (note flavor : String) : String :=
   "note:" ++ note ++ "; flavor:" ++ flavor
 
-def inputComponent : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def inputComponent : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofString ""
     let name ← StateTuple.toState (← Hooks.useState initial)
     let nameValue ← JsValue.toString name.value
@@ -65,8 +65,8 @@ def inputComponent : RuntimeM (Js (Component Unit)) :=
     let output ← Node.spanWith #[Props.id "react-name-output"] #[outputText]
     Node.divWith #[Props.id "react-input-widget"] #[label, input, output]
 
-def changeInputComponent : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def changeInputComponent : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofString ""
     let value ← StateTuple.toState (← Hooks.useState initial)
     let currentValue ← JsValue.toString value.value
@@ -99,8 +99,8 @@ def changeInputComponent : RuntimeM (Js (Component Unit)) :=
       ]
       #[label, input, output]
 
-def checkboxComponent : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def checkboxComponent : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofBool false
     let checked ← StateTuple.toState (← Hooks.useState initial)
     let checkedValue ← JsValue.toBool checked.value
@@ -123,8 +123,8 @@ def checkboxComponent : RuntimeM (Js (Component Unit)) :=
         #[outputText]
     Node.divWith #[Props.id "react-checkbox-widget"] #[input, output]
 
-def selectTextareaComponent : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initialNote ← JsValue.ofString "draft"
     let note ← StateTuple.toState (← Hooks.useState initialNote)
     let noteValue ← JsValue.toString note.value
@@ -242,8 +242,9 @@ def mountInput (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
@@ -255,8 +256,9 @@ def mountChangeInput (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
@@ -268,8 +270,9 @@ def mountSelectTextarea (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
@@ -281,8 +284,9 @@ def mountCheckbox (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 

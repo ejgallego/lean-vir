@@ -7,4 +7,4 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Browser
-public import Vir.Infoview.Surface.Generated
+public import Vir.Infoview.Client.Generated

@@ -130,12 +130,25 @@ structure EventHandler where
 
 namespace Props
 
+/-- Native React props carrying one explicitly named Lean-backed `data` field. -/
+opaque WithData (α : Type) : Type
+
+@[inline] unsafe def withDataAsPropsImpl {α : Type}
+    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props := unsafeCast value
+
+/-- Forget only the declared `data` field shape, preserving the native object. -/
+@[implemented_by withDataAsPropsImpl]
+axiom WithData.asProps {α : Type}
+    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props
+
 /-- One public React props entry. -/
 inductive Entry where
   | key (value : String)
   | ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α)))
   | property (value : Property)
   | eventHandler (value : EventHandler)
+  /-- An explicitly named exact JavaScript property value. -/
+  | raw {α : Type} (name : String) (value : Lean.Vir.Js α)
 
 end Props
 
@@ -149,25 +162,33 @@ structure ReducerState (state action : Type) where
   value : Lean.Vir.Js state
   dispatch : Lean.Vir.Js (ReducerDispatch state action)
 
-/-- React node object created by the JavaScript host through React's public API. -/
+/-- Native `ReactNode`: elements, text, empty values, child arrays and other
+values accepted by React, not only `ReactElement` objects. -/
 opaque Node : Type
 
 /-- A native function component receiving JavaScript props directly from React. -/
 abbrev FunctionComponent (props : Type) :=
   Lean.Vir.Js.Function1 (Lean.Vir.Js props) (Lean.Vir.Js Node)
 
+namespace FunctionComponent
+
+/--
+Views a function component as the `React.ElementType` accepted by
+`React.createElement`. This changes only the Lean phantom type: React receives
+the exact same function object, so its component identity is preserved.
+-/
+@[inline] unsafe def asElementTypeImpl {props : Type}
+    (component : FunctionComponent props) : Lean.Vir.Js ElementType :=
+  unsafeCast component
+
+@[implemented_by asElementTypeImpl]
+axiom asElementType {props : Type}
+    (component : FunctionComponent props) : Lean.Vir.Js ElementType
+
+end FunctionComponent
+
 /-- React dependency lists are ordinary JavaScript arrays. -/
 abbrev DependencyList : Type :=
   Lean.Vir.Js.Array.Value Lean.Vir.Js.Any.Value
-
-/--
-An exact JavaScript React function component whose props originate in Lean.
-
-The JavaScript function value itself is the React component type and therefore
-its identity. Construct it once with `Component.ofLean` and reuse that value
-where React should preserve hook state. VIR does not maintain a parallel string
-identity registry.
--/
-opaque Component (props : Type := Unit) : Type
 
 end Lean.Vir.React

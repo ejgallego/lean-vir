@@ -20,45 +20,46 @@ structure StatProps where
   label : String
   value : String
 
-def Stat : RuntimeM (Component StatProps) := Component.ofLean fun ctx =>
-  Html.liWith
-    #[
-      Attr.className "pw-html-stat",
-      Attr.data "label" ctx.props.label
-    ]
-    #[
-      Html.spanWith #[Attr.className "pw-html-stat-label"] #[Html.text ctx.props.label],
-      Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text ctx.props.value]
+def Stat : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData StatProps)) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+    let data ← Lean.Vir.React.Props.WithData.data nativeProps
+    let props ← Lean.Vir.LeanRef.fromJSL data
+    Html.elementWithProps "li" #[
+      Lean.Vir.React.Props.className "pw-html-stat",
+      Lean.Vir.React.Props.data "label" props.label
+    ] #[
+      Html.elementWithProps "span" #[Lean.Vir.React.Props.className "pw-html-stat-label"] #[Html.text props.label],
+      Html.elementWithProps "strong" #[Lean.Vir.React.Props.className "pw-html-stat-value"] #[Html.text props.value]
     ]
 
-def View : RuntimeM (Component Unit) := do
+def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := do
   let stat ← Stat
-  Component.ofLean fun _ =>
-    Html.sectionWith
+  Lean.Vir.React.FunctionComponent.ofLean fun _ =>
+    Html.elementWithProps "section"
     #[
-      Attr.id "proofwidgets-html-demo",
-      Attr.role "region",
-      Attr.ariaLabel "ProofWidgets HTML facade demo",
-      Attr.classList #["pw-html-demo", "is-live"],
-      Attr.dataTestId "proofwidgets-html"
+      Lean.Vir.React.Props.id "proofwidgets-html-demo",
+      Lean.Vir.React.Props.role "region",
+      Lean.Vir.React.Props.ariaLabel "ProofWidgets HTML facade demo",
+      Lean.Vir.React.Props.classList #["pw-html-demo", "is-live"],
+      Lean.Vir.React.Props.dataTestId "proofwidgets-html"
     ]
     #[
-      Html.h3With #[Attr.className "pw-html-title"] #[
+      Html.elementWithProps "h3" #[Lean.Vir.React.Props.className "pw-html-title"] #[
         Html.text "ProofWidgets-style Html"
       ],
-      Html.pWith #[Attr.className "pw-html-summary"] #[
+      Html.elementWithProps "p" #[Lean.Vir.React.Props.className "pw-html-summary"] #[
         Html.text "This tree is written through a shallow Html facade and rendered as native React nodes."
       ],
-      Html.ulWith #[Attr.className "pw-html-stats"] #[
-        Html.ofComponent stat { label := "Elements", value := "5" },
-        Html.ofComponent stat { label := "Components", value := "1" },
-        Html.liWith #[Attr.className "pw-html-stat"] #[
-          Html.spanWith #[Attr.className "pw-html-stat-label"] #[Html.text "Text"],
-          Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text "native"]
+      Html.elementWithProps "ul" #[Lean.Vir.React.Props.className "pw-html-stats"] #[
+        (do Html.component stat (← Lean.Vir.LeanRef.toJSL { label := "Elements", value := "5" })),
+        (do Html.component stat (← Lean.Vir.LeanRef.toJSL { label := "Components", value := "1" })),
+        Html.elementWithProps "li" #[Lean.Vir.React.Props.className "pw-html-stat"] #[
+          Html.elementWithProps "span" #[Lean.Vir.React.Props.className "pw-html-stat-label"] #[Html.text "Text"],
+          Html.elementWithProps "strong" #[Lean.Vir.React.Props.className "pw-html-stat-value"] #[Html.text "native"]
         ]
       ],
-      Html.element "code" #[Attr.className "pw-html-code"] #[
-        Html.text "Html.element \"section\" attrs children"
+      Html.elementWithProps "code" #[Lean.Vir.React.Props.className "pw-html-code"] #[
+        Html.text "Html.elementWithProps \"section\" props children"
       ]
     ]
 
@@ -70,8 +71,9 @@ def mount (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL (componentProps ())
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.ReactM.run Lean.Vir.React.Props.empty
+      let children ← Lean.Vir.Js.Array.ofArray #[]
+      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.functionComponent component props children)
       Lean.Vir.React.Root.render root node
       pure true
 

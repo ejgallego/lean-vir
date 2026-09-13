@@ -15,13 +15,13 @@ client and `@[server_rpc_method]` example. This guide owns editor integration;
 Import `Vir.Infoview`. The [hello widget](../../examples/tutorials/ReactProofWidgetHello.lean)
 supplies a `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)` factory
 and uses `vir_proof_widget View` inside its namespace. The command generates
-`widgetSpec`, `createComponent`, `irPackage` and `widgetProps`; the package root
+`createComponent`, `irPackage` and `widgetProps`; the package root
 is only the factory. `show_panel_widgets` activates the bundled
 `Lean.Vir.Infoview.widget` with those props. This path needs no
 application-authored JavaScript file.
 
-For manual assembly, [ReactWidget](../../Vir/Infoview/Widget.lean) supplies the
-package root and props. Its component entry returns:
+For manual assembly, construct [WidgetProps](../../Vir/Infoview/Widget.lean)
+with the package roots and factory entry name. The factory returns:
 
 ```lean
 RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)
@@ -45,7 +45,7 @@ Packages use the authoritative active Lean module snapshot, including unsaved
 widget code. Revision checks cover its declaration closure and local source
 ranges; imported changes become visible when the snapshot contains them. See
 [module inputs](../reference/GENERATE_PACKAGE.md) for acquisition and visibility rules.
-`autoReloadMs` controls stat/revision polling: zero disables it, `ReactWidget`
+`autoReloadMs` controls stat/revision polling: zero disables it, `vir_proof_widget`
 defaults to 1000 ms, and manually constructed `WidgetProps` defaults to zero.
 Cursor movement alone does not request package replacement.
 

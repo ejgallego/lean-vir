@@ -30,6 +30,96 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "infoview.editorContext", "group": "editor", "target": "infoview.editorContext",
+        "lean": "Lean.Vir.Infoview.editorContext", "marker": "vir_js",
+        "reason": "Returns the exact upstream EditorContext for React.Hooks.useContext.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js (React.Context Infoview.EditorConnection)","representation":"js-resource","resourceInner":"React.Context Infoview.EditorConnection"}}
+      },
+      {
+        "id": "infoview.editorConnection.api", "group": "editor", "target": "infoview.editorConnection.api",
+        "lean": "Lean.Vir.Infoview.EditorConnection.api", "marker": "vir_js",
+        "reason": "Returns the exact native editor API receiver.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"EditorConnection.api","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+          {"name":"connection","type":{"lean":"Lean.Vir.Js Infoview.EditorConnection","representation":"js-resource","resourceInner":"Infoview.EditorConnection"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.EditorApi","representation":"js-resource","resourceInner":"Infoview.EditorApi"}}
+      },
+      {
+        "id": "infoview.editorConnection.revealPosition", "group": "editor", "target": "infoview.editorConnection.revealPosition",
+        "lean": "Lean.Vir.Infoview.EditorConnection.revealPosition", "marker": "vir_js",
+        "reason": "Calls the native method with exact receiver and position; returns its Promise without handling rejection.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"EditorConnection.revealPosition","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+          {"name":"connection","type":{"lean":"Lean.Vir.Js Infoview.EditorConnection","representation":"js-resource","resourceInner":"Infoview.EditorConnection"}},
+          {"name":"position","type":{"lean":"Lean.Vir.Js Infoview.PanelPosition","representation":"js-resource","resourceInner":"Infoview.PanelPosition"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Promise Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Promise.Value Unit"}}
+      },
+      {
+        "id": "infoview.editorApi.copyToClipboard", "group": "editor", "target": "infoview.editorApi.copyToClipboard",
+        "lean": "Lean.Vir.Infoview.EditorApi.copyToClipboard", "marker": "vir_js",
+        "reason": "Returns the native editor clipboard Promise; no browser fallback or Boolean dispatch status.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"EditorApi.copyToClipboard","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+          {"name":"api","type":{"lean":"Lean.Vir.Js Infoview.EditorApi","representation":"js-resource","resourceInner":"Infoview.EditorApi"}},
+          {"name":"text","type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Promise Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Promise.Value Unit"}}
+      },
+      {
+        "id": "infoview.editorApi.insertText", "group": "editor", "target": "infoview.editorApi.insertText",
+        "lean": "Lean.Vir.Infoview.EditorApi.insertText", "marker": "vir_js",
+        "reason": "Forwards exact text, kind and position or undefined. This upstream optional-position contract treats undefined as absence; not a universal omission equivalence. Returns the exact Promise.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"EditorApi.insertText","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+          {"name":"api","type":{"lean":"Lean.Vir.Js Infoview.EditorApi","representation":"js-resource","resourceInner":"Infoview.EditorApi"}},
+          {"name":"text","type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}},
+          {"name":"kind","type":{"lean":"Lean.Vir.Js Infoview.TextInsertKind","representation":"js-resource","resourceInner":"Infoview.TextInsertKind"}},
+          {"name":"position","type":{"lean":"Lean.Vir.Js.UndefinedOr Infoview.TextDocumentPositionParams","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Infoview.TextDocumentPositionParams"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Promise Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Promise.Value Unit"}}
+      },
+      {
+        "id": "infoview.panelPosition.toTdpp", "group": "editor", "target": "infoview.panelPosition.toTdpp",
+        "lean": "Lean.Vir.Infoview.PanelPosition.toTdpp", "marker": "vir_js",
+        "reason": "Delegates to upstream DocumentPosition.toTdpp without a VIR position record.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"DocumentPositionOperations.toTdpp","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+          {"name":"position","type":{"lean":"Lean.Vir.Js Infoview.PanelPosition","representation":"js-resource","resourceInner":"Infoview.PanelPosition"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.TextDocumentPositionParams","representation":"js-resource","resourceInner":"Infoview.TextDocumentPositionParams"}}
+      },
+      {
+        "id": "infoview.textInsertKind.here", "group": "editor", "target": "infoview.textInsertKind.here",
+        "lean": "Lean.Vir.Infoview.TextInsertKind.here", "marker": "vir_js",
+        "reason": "Returns the native here string union member.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"TextInsertKind","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.TextInsertKind","representation":"js-resource","resourceInner":"Infoview.TextInsertKind"}}
+      },
+      {
+        "id": "infoview.textInsertKind.above", "group": "editor", "target": "infoview.textInsertKind.above",
+        "lean": "Lean.Vir.Infoview.TextInsertKind.above", "marker": "vir_js",
+        "reason": "Returns the native above string union member.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"TextInsertKind","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"Lean.Vir.RuntimeM"},
+        "arguments": [
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.TextInsertKind","representation":"js-resource","resourceInner":"Infoview.TextInsertKind"}}
+      },
+      {
         "id": "infoview.use-rpc-session", "group": "panel-widget", "target": "infoview.useRpcSession",
         "lean": "Lean.Vir.Infoview.useRpcSession", "marker": "vir_js",
         "reason": "Calls the actual upstream React hook and returns its exact position-specific RPC session object.",
@@ -203,6 +293,43 @@
   },
   "roots": [
     {
+      "id": "editor",
+      "title": "Native infoview editor API",
+      "targets": [
+        "infoview.editorContext",
+        "infoview.editorConnection.api",
+        "infoview.editorConnection.revealPosition",
+        "infoview.editorApi.copyToClipboard",
+        "infoview.editorApi.insertText",
+        "infoview.panelPosition.toTdpp",
+        "infoview.textInsertKind.here",
+        "infoview.textInsertKind.above"
+      ],
+      "lean": {
+        "public": [
+          "Lean.Vir.Infoview.editorContext",
+          "Lean.Vir.Infoview.EditorConnection",
+          "Lean.Vir.Infoview.EditorApi",
+          "Lean.Vir.Infoview.TextInsertKind",
+          "Lean.Vir.Infoview.PanelPosition.toTdpp"
+        ]
+      },
+      "upstream": {
+        "kind": "typescript",
+        "package": "@leanprover/infoview",
+        "declarations": [
+          "Vir/Infoview/Editor.contract.d.ts"
+        ],
+        "roots": [
+          "EditorConnection",
+          "EditorApi",
+          "TextInsertKind",
+          "DocumentPosition",
+          "DocumentPositionOperations"
+        ]
+      }
+    },
+    {
       "id": "panel-widget", "title": "Panel widget props and RPC hook",
       "targets": ["infoview.useRpcSession", "infoview.panelWidgetProps.*"],
       "lean": { "public": ["Lean.Vir.Infoview.useRpcSession", "Lean.Vir.Infoview.PanelWidgetProps"] },
@@ -214,7 +341,7 @@
     },
     {
       "id": "panel-position", "title": "Native document position",
-      "targets": ["infoview.panelPosition.*"],
+      "targets": ["infoview.panelPosition.uri", "infoview.panelPosition.line", "infoview.panelPosition.character"],
       "lean": { "public": ["Lean.Vir.Infoview.PanelPosition"] },
       "upstream": {
         "kind": "typescript", "package": "@leanprover/infoview",

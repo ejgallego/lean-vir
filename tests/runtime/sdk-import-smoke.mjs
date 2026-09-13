@@ -166,7 +166,7 @@ try {
   );
   assert.equal(typeof bindings["react.node.text"], "function");
   assert.equal(typeof bindings["react.node.createElement"], "function");
-  assert.equal(typeof bindings["js.value.react.component"], "function");
+  assert.equal(typeof bindings["react.props.withData.make"], "function");
   assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");

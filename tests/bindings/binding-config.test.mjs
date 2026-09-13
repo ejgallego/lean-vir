@@ -15,7 +15,7 @@ import {
 
 const browserPath = new URL("../../Vir/Browser.bindings.json", import.meta.url).pathname;
 const browser = JSON.parse(await readFile(browserPath, "utf8"));
-const infoviewPath = new URL("../../Vir/Infoview/Surface.bindings.json", import.meta.url).pathname;
+const infoviewPath = new URL("../../Vir/Infoview/Client.bindings.json", import.meta.url).pathname;
 const infoview = JSON.parse(await readFile(infoviewPath, "utf8"));
 
 test("the shared loader validates a complete binding library", async () => {
@@ -137,7 +137,7 @@ test("binding configuration requires a TypeScript declaration surface", async ()
 
 test("binding configuration requires a local declaration contract", async () => {
   const invalid = structuredClone(infoview);
-  delete invalid.roots.find((root) => root.id === "commands").upstream.declarations;
+  invalid.roots[0].upstream = { kind: "local", roots: ["LocalHost"] };
 
   await assert.rejects(
     validateBindingConfig(invalid, infoviewPath),
@@ -290,8 +290,7 @@ test("private active-effect roles are fail-closed", async () => {
 
 test("local protocol relations identify their declaration member", async () => {
   const invalid = structuredClone(infoview);
-  delete invalid.generation.protocolOperations.find((operation) =>
-    operation.upstreamRelation.kind === "local-contract").upstreamRelation.member;
+  invalid.generation.protocolOperations[0].upstreamRelation = { kind: "local-contract" };
 
   await assert.rejects(
     validateBindingConfig(invalid, infoviewPath),

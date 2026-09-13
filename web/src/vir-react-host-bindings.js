@@ -15,10 +15,9 @@ export function createBrowserReactHostBindings(lifecycle) {
     "react.elementType.tag": (tag) => tag,
     "react.node.createElement": (elementType, props, children) =>
       React.createElement(elementType, props, ...children),
-    "react.node.component": (component, leanProps) =>
-      React.createElement(component, { leanProps }),
-    "react.node.keyedComponent": (component, leanProps, key) =>
-      React.createElement(component, { leanProps, key }),
+    "react.props.withData.make": (data) => ({ data }),
+    "react.props.withData.get": (props) => props.data,
+    "react.props.withData.children": (props) => props.children,
     "react.node.fragment": (props, children) =>
       React.createElement(React.Fragment, props, ...children),
     "react.useState": (initial) => React.useState(initial),
@@ -43,9 +42,5 @@ export function createBrowserReactHostBindings(lifecycle) {
       const value = effect.setup();
       return () => effect.cleanup(value);
     },
-    "js.value.react.component": (render) =>
-      function LeanComponent(props) {
-        return render(props.leanProps);
-      },
   };
 }

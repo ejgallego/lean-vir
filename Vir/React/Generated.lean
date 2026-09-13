@@ -35,27 +35,6 @@ opaque ofUnary
 
 end React.Callback
 
-namespace React.Component
-
-/--
-Generated binding for reviewed VIR protocol `react.component.of-lean`.
-
-Explicitly converts a transferred Lean render callback into one reusable JavaScript React function component; that returned function is the React component identity.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; render callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.component"]
-opaque ofLean
-    {props : Type}
-    (render : Lean.Vir.JSL props → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Component props))
-
-end React.Component
-
 namespace React.EffectCallback
 
 /--
@@ -296,43 +275,6 @@ opaque createElement
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
-Generated binding for reviewed VIR protocol `react.node.component`.
-
-Calls React.createElement with the exact JavaScript function component and JSL-backed Lean props.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.node.component"]
-opaque component
-    {props : Type}
-    (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
-    (props : @& Lean.Vir.JSL props) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
-
-/--
-Generated binding for reviewed VIR protocol `react.node.keyed-component`.
-
-Calls React.createElement with the exact JavaScript function component, JSL-backed Lean props, and key.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; component js-resource/borrowed/call; props js-resource/borrowed/call; key js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.node.keyedComponent"]
-opaque keyedComponent
-    {props : Type}
-    (component : @& Lean.Vir.Js (Lean.Vir.React.Component props))
-    (props : @& Lean.Vir.JSL props)
-    (key : @& Lean.Vir.Js String) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
-
-/--
 Generated binding for reviewed VIR protocol `react.node.fragment`.
 
 Calls React.createElement with React.Fragment, the exact props object, and child array values.
@@ -350,6 +292,61 @@ opaque fragment
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 end React.Node
+
+namespace React.Props.WithData
+
+/--
+Generated binding for reviewed VIR protocol `react.props.with-data.children`.
+
+Returns the exact native props.children ReactNode, including undefined, a single node or an array. Does not normalize or evaluate children.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; props js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.props.withData.children"]
+opaque children
+    {α : Type}
+    (props : @& Lean.Vir.Js (Lean.Vir.React.Props.WithData α)) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js React.Node)
+
+/--
+Generated binding for reviewed VIR protocol `react.props.with-data.make`.
+
+Constructs an ordinary native props object with the explicitly supplied JSL as its data field; no component function wrapping or implicit boxing.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; data js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.props.withData.make"]
+opaque make
+    {α : Type}
+    (data : @& Lean.Vir.JSL α) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js (React.Props.WithData α))
+
+/--
+Generated binding for reviewed VIR protocol `react.props.with-data.get`.
+
+Reads the exact explicit native props.data field as its declared Lean-backed value.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; props js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.props.withData.get"]
+opaque data
+    {α : Type}
+    (props : @& Lean.Vir.Js (Lean.Vir.React.Props.WithData α)) :
+    Lean.Vir.React.ReactM (Lean.Vir.JSL α)
+
+end React.Props.WithData
 
 namespace React.Reducer
 

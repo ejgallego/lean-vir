@@ -15,17 +15,30 @@ const lifecycle = createHostLifecycle();
 const reactBindings = createBrowserReactHostBindings(lifecycle);
 
 {
-  const component = ({ leanProps }) => leanProps.label;
-  const leanProps = { label: "first" };
-  const firstNode = reactBindings["react.node.component"](component, leanProps);
+  const data = {};
+  const props = reactBindings["react.props.withData.make"](data);
+  const other = reactBindings["react.props.withData.make"](data);
+  assert.notEqual(props, other);
+  assert.equal(Object.getPrototypeOf(props), Object.prototype);
+  const component = p => reactBindings["react.props.withData.get"](p);
+  for (const children of [[], ["one"], ["one", "two"]]) {
+    const element = reactBindings["react.node.createElement"](component, props, children);
+    assert.notEqual(element.props, props);
+    assert.equal(element.type, component);
+    assert.equal(element.type(element.props), data);
+    assert.deepEqual(reactBindings["react.props.withData.children"](element.props),
+      children.length === 0 ? undefined : children.length === 1 ? children[0] : children);
+  }
+}
+
+{
+  const component = ({ label }) => label;
+  const props = { label: "first" };
+  const firstNode = reactBindings["react.node.createElement"](component, props, []);
   assert.equal(firstNode.type, component);
-  assert.equal(firstNode.props.leanProps, leanProps);
+  assert.equal(firstNode.props.label, "first");
   assert.equal(firstNode.type(firstNode.props), "first");
-  const keyed = reactBindings["react.node.keyedComponent"](
-    component,
-    leanProps,
-    "counter-key",
-  );
+  const keyed = reactBindings["react.node.createElement"](component, { ...props, key: "counter-key" }, []);
   assert.equal(keyed.key, "counter-key");
 }
 
@@ -89,9 +102,6 @@ assert.equal(fragment.type, React.Fragment);
     cleanup,
   });
   assert.equal(effect()(), property);
-  const render = (leanProps) => leanProps;
-  const component = conversions["js.value.react.component"](render);
-  assert.equal(component({ leanProps: property }), property);
 }
 
 {
@@ -173,14 +183,9 @@ assert.equal(fragment.type, React.Fragment);
   bindings["react.root.renderNode"](root, element);
   assert.equal(rendered.at(-1), element);
   const component = () => element;
-  const leanProps = {};
-  const componentNode = reactBindings["react.node.component"](
-    component,
-    leanProps,
-  );
+  const componentNode = reactBindings["react.node.createElement"](component, {}, []);
   bindings["react.root.renderNode"](root, componentNode);
   assert.equal(rendered.at(-1).type, component);
-  assert.equal(rendered.at(-1).props.leanProps, leanProps);
   bindings["react.root.unmount"](root);
   assert.equal(unmounts, 1);
   assert.equal(lifecycle.debugResourceCounts().active, 0);

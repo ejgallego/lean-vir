@@ -7,10 +7,8 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsValueHostBindings } from "../../web/src/host/vir-js-value-bindings.js";
-import { createInfoviewHostBindings } from "../../web/src/host/vir-infoview-host-bindings.js";
 
 const { "js.nat": ofNat, "js.nat.value": toNat } = createJsValueHostBindings();
-const { "infoview.documentPosition": documentPosition } = createInfoviewHostBindings();
 const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
 
 test("Nat providers preserve zero and arbitrary-precision nonnegative bigints", () => {
@@ -31,29 +29,5 @@ test("Nat decoding rejects JavaScript numbers and negative bigints", () => {
 test("Nat bigint resources are not raw JSON wire numbers", () => {
   for (const value of [0n, 3n, maxSafe + 2n]) {
     assert.throws(() => JSON.stringify({ line: ofNat(value) }), TypeError);
-  }
-});
-
-test("documentPosition converts safe bigint coordinates to exact JSON numbers", () => {
-  for (const [line, character] of [[0n, maxSafe], [maxSafe, 3n]]) {
-    const position = documentPosition("file:///test.lean", "test.lean",
-      ofNat(line), ofNat(character), "location");
-    assert.deepEqual(position, {
-      uri: "file:///test.lean", fileName: "test.lean",
-      line: Number(line), character: Number(character), label: "location",
-    });
-    assert.equal(BigInt(position.line), line);
-    assert.equal(BigInt(position.character), character);
-    assert.deepEqual(JSON.parse(JSON.stringify(position)), position);
-  }
-});
-
-test("documentPosition rejects unsafe coordinates in either field", () => {
-  for (const value of [-1n, maxSafe + 1n, maxSafe + 2n,
-    -1, 0.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity]) {
-    for (const [line, character] of [[value, 0n], [0n, value]]) {
-      assert.throws(() => documentPosition("file:///test.lean", "test.lean",
-        line, character, "location"), /non-negative safe-integer coordinates/u);
-    }
   }
 });

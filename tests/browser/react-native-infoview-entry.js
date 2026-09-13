@@ -15,6 +15,47 @@ import {
   createNativePanelFixture,
 } from "../support/native-panel-fixtures.mjs";
 
+globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
+  const runtime = await createVirRuntime({
+    wasmModule: new WebAssembly.Module(new Uint8Array(wasm)),
+    irPackageSet: [new Uint8Array(pkg)],
+    hostBindings: createBrowserHostBindings({ reactHostBindings: createBrowserReactHostBindings }),
+  });
+  const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const previousTitle = document.title;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const containers = [];
+  try {
+    for (const [entry, id] of [["ProofWidgetsHtml.mount", "native-html"],
+      ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
+      const container = document.createElement("div");
+      container.id = id;
+      document.body.append(container);
+      containers.push(container);
+      await React.act(async () => check(runtime.call(entry, `#${id}`), `${entry} mounts`));
+    }
+    check(containers[0].querySelectorAll(".pw-html-stat").length === 3,
+      "explicit Lean data fields must survive native React props copying");
+    const jsx = containers[1];
+    check(jsx.querySelector(".pw-jsx-card-title").textContent === "JSX-shaped combinators",
+      "typed JSX props reach the native component");
+    check(jsx.querySelectorAll(".pw-jsx-row").length === 3,
+      "multiple native children remain in the Card subtree");
+    check(jsx.querySelector("#proofwidgets-jsx-badge-info").textContent.includes("component children"),
+      "a single native text child remains in the Badge subtree");
+    await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
+    check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
+    return true;
+  } finally {
+    try { await React.act(async () => runtime.dispose()); }
+    finally {
+      containers.forEach(container => container.remove());
+      document.title = previousTitle;
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    }
+  }
+};
+
 globalThis.runVirNativeInfoviewUpdates = async (wasm, pkg) => {
   let root;
   let component;

@@ -18,6 +18,20 @@ namespace Lean.Vir
 namespace Infoview
 
 /--
+Generated binding for reviewed VIR protocol `infoview.editorContext`.
+
+Returns the exact upstream EditorContext for React.Hooks.useContext.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.editorContext"]
+opaque editorContext : Lean.Vir.RuntimeM (Lean.Vir.Js (React.Context Infoview.EditorConnection))
+
+/--
 Generated binding for reviewed VIR protocol `infoview.use-rpc-session`.
 
 Calls the actual upstream React hook and returns its exact position-specific RPC session object.
@@ -52,6 +66,83 @@ opaque stripTags
     Lean.Vir.RuntimeM (Lean.Vir.Js String)
 
 end Infoview.CodeWithInfos
+
+namespace Infoview.EditorApi
+
+/--
+Generated binding for reviewed VIR protocol `infoview.editorApi.copyToClipboard`.
+
+Returns the native editor clipboard Promise; no browser fallback or Boolean dispatch status.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; api js-resource/borrowed/call; text js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.editorApi.copyToClipboard"]
+opaque copyToClipboard
+    (api : @& Lean.Vir.Js Infoview.EditorApi)
+    (text : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Unit)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.editorApi.insertText`.
+
+Forwards exact text, kind and position or undefined. This upstream optional-position contract treats undefined as absence; not a universal omission equivalence. Returns the exact Promise.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; api js-resource/borrowed/call; text js-resource/borrowed/call; kind js-resource/borrowed/call; position js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.editorApi.insertText"]
+opaque insertText
+    (api : @& Lean.Vir.Js Infoview.EditorApi)
+    (text : @& Lean.Vir.Js String)
+    (kind : @& Lean.Vir.Js Infoview.TextInsertKind)
+    (position : @& Lean.Vir.Js.UndefinedOr Infoview.TextDocumentPositionParams) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Unit)
+
+end Infoview.EditorApi
+
+namespace Infoview.EditorConnection
+
+/--
+Generated binding for reviewed VIR protocol `infoview.editorConnection.api`.
+
+Returns the exact native editor API receiver.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; connection js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.editorConnection.api"]
+opaque api
+    (connection : @& Lean.Vir.Js Infoview.EditorConnection) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.EditorApi)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.editorConnection.revealPosition`.
+
+Calls the native method with exact receiver and position; returns its Promise without handling rejection.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; connection js-resource/borrowed/call; position js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.editorConnection.revealPosition"]
+opaque revealPosition
+    (connection : @& Lean.Vir.Js Infoview.EditorConnection)
+    (position : @& Lean.Vir.Js Infoview.PanelPosition) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Unit)
+
+end Infoview.EditorConnection
 
 namespace Infoview.InteractiveGoal
 
@@ -244,6 +335,22 @@ end Infoview.InteractiveTermGoal
 namespace Infoview.PanelPosition
 
 /--
+Generated binding for reviewed VIR protocol `infoview.panelPosition.toTdpp`.
+
+Delegates to upstream DocumentPosition.toTdpp without a VIR position record.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; position js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.panelPosition.toTdpp"]
+opaque toTdpp
+    (position : @& Lean.Vir.Js Infoview.PanelPosition) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.TextDocumentPositionParams)
+
+/--
 Generated binding for reviewed VIR protocol `infoview.panel-position.uri`.
 
 Returns the exact DocumentPosition.uri string.
@@ -344,5 +451,37 @@ opaque termGoal
     Lean.Vir.RuntimeM (Lean.Vir.Js.UndefinedOr Infoview.InteractiveTermGoal)
 
 end Infoview.PanelWidgetProps
+
+namespace Infoview.TextInsertKind
+
+/--
+Generated binding for reviewed VIR protocol `infoview.textInsertKind.here`.
+
+Returns the native here string union member.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.textInsertKind.here"]
+opaque here : Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.TextInsertKind)
+
+/--
+Generated binding for reviewed VIR protocol `infoview.textInsertKind.above`.
+
+Returns the native above string union member.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-infoview-panel-native-v1` (bridge-handle retention): receiver none; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "infoview.textInsertKind.above"]
+opaque above : Lean.Vir.RuntimeM (Lean.Vir.Js Infoview.TextInsertKind)
+
+end Infoview.TextInsertKind
 
 end Lean.Vir

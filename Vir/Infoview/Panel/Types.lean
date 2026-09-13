@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.Infoview.Surface.Types
+public import Vir.Infoview.Client.Types
 
 public section
 
@@ -15,7 +15,7 @@ namespace Lean.Vir.Infoview
 /-- Exact upstream `PanelWidgetProps`; no VIR-owned props record is introduced. -/
 opaque PanelWidgetProps : Type
 
-/-- Exact upstream infoview `DocumentPosition`, distinct from VIR's legacy command record. -/
+/-- Exact upstream infoview `DocumentPosition`. -/
 opaque PanelPosition : Type
 
 /-- Exact upstream `InteractiveGoal` object. -/
@@ -29,5 +29,15 @@ opaque InteractiveHypothesisBundle : Type
 
 /-- Exact upstream `CodeWithInfos` tagged-text value. -/
 opaque CodeWithInfos : Type
+
+/-- Native infoview editor connection and API receivers. -/
+opaque EditorConnection : Type
+opaque EditorApi : Type
+
+/-- Native LSP document/position pair accepted by EditorApi.insertText. -/
+opaque TextDocumentPositionParams : Type
+
+/-- Native 'here' | 'above' string union. -/
+opaque TextInsertKind : Type
 
 end Lean.Vir.Infoview

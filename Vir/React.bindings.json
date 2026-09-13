@@ -87,6 +87,18 @@
     },
     "protocolOperations": [
       {
+        "id": "react.props.with-data.children", "group": "nodes", "target": "react.props.withData.children",
+        "lean": "Lean.Vir.React.Props.WithData.children", "marker": "vir_js",
+        "reason": "Returns the exact native props.children ReactNode, including undefined, a single node or an array. Does not normalize or evaluate children.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": ["α"],
+        "effect": {"id":"react","lean":"Lean.Vir.React.ReactM"},
+        "arguments": [
+          {"name":"props","role":"receiver","type":{"lean":"Lean.Vir.Js (Lean.Vir.React.Props.WithData α)","representation":"js-resource","resourceInner":"Lean.Vir.React.Props.WithData α"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js React.Node","representation":"js-resource","resourceInner":"React.Node"}}
+      },
+      {
         "id": "react.reducer.of-lean", "group": "value-conversions", "target": "js.value.react.reducer",
         "lean": "Lean.Vir.React.Reducer.ofLean", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a transferred Lean reducer callback into an ordinary JavaScript function; React remains responsible for invocation and replay semantics.",
@@ -131,17 +143,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.EffectCallback", "representation": "js-resource", "resourceInner": "Lean.Vir.React.EffectCallback" } }
       },
       {
-        "id": "react.component.of-lean", "group": "value-conversions", "target": "js.value.react.component",
-        "lean": "Lean.Vir.React.Component.ofLean", "marker": "vir_js_explicit_conversion",
-        "reason": "Explicitly converts a transferred Lean render callback into one reusable JavaScript React function component; that returned function is the React component identity.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "typeParameters": ["props"], "effect": { "id": "runtime", "lean": "Lean.Vir.RuntimeM" },
-        "arguments": [
-          { "name": "render", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.JSL props → Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)", "representation": "callback" } }
-        ],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } }
-      },
-      {
         "id": "react.state.modify", "group": "hooks", "target": "react.state.modify",
         "lean": "Lean.Vir.React.StateSetter.modify", "marker": "vir_js",
         "reason": "Passes the Lean updater as React's functional state action; React may invoke it according to normal updater semantics.",
@@ -152,6 +153,27 @@
           { "name": "update", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "react.props.with-data.make", "group": "nodes", "target": "react.props.withData.make",
+        "lean": "Lean.Vir.React.Props.WithData.make", "marker": "vir_js",
+        "reason": "Constructs an ordinary native props object with the explicitly supplied JSL as its data field; no component function wrapping or implicit boxing.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": ["α"],
+        "effect": {"id":"react","lean":"Lean.Vir.React.ReactM"},
+        "arguments": [
+          {"name":"data","type":{"lean":"Lean.Vir.JSL α","representation":"js-resource","resourceInner":"Lean.Vir.LeanRef.Handle α"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js (React.Props.WithData α)","representation":"js-resource","resourceInner":"React.Props.WithData α"}}
+      },
+      {
+        "id": "react.props.with-data.get", "group": "nodes", "target": "react.props.withData.get",
+        "lean": "Lean.Vir.React.Props.WithData.data", "marker": "vir_js",
+        "reason": "Reads the exact explicit native props.data field as its declared Lean-backed value.",
+        "upstreamRelation": { "kind": "vir-owned" }, "typeParameters": ["α"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "props", "role": "receiver", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Props.WithData α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props.WithData α" } }],
+        "result": { "type": { "lean": "Lean.Vir.JSL α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
         "id": "react.hooks.use-reducer", "group": "hooks", "target": "react.useReducer",
@@ -271,33 +293,6 @@
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
-        "id": "react.node.component", "group": "nodes", "target": "react.node.component",
-        "lean": "Lean.Vir.React.Node.component", "marker": "vir_js",
-        "reason": "Calls React.createElement with the exact JavaScript function component and JSL-backed Lean props.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "component", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } },
-          { "name": "props", "type": { "lean": "Lean.Vir.JSL props", "representation": "js-resource", "resourceInner": "props" } }
-        ],
-        "typeParameters": ["props"],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-      },
-      {
-        "id": "react.node.keyed-component", "group": "nodes", "target": "react.node.keyedComponent",
-        "lean": "Lean.Vir.React.Node.keyedComponent", "marker": "vir_js",
-        "reason": "Calls React.createElement with the exact JavaScript function component, JSL-backed Lean props, and key.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [
-          { "name": "component", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Component props)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Component props" } },
-          { "name": "props", "type": { "lean": "Lean.Vir.JSL props", "representation": "js-resource", "resourceInner": "props" } },
-          { "name": "key", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
-        ],
-        "typeParameters": ["props"],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-      },
-      {
         "id": "react.node.fragment", "group": "nodes", "target": "react.node.fragment",
         "lean": "Lean.Vir.React.Node.fragment", "marker": "vir_js",
         "reason": "Calls React.createElement with React.Fragment, the exact props object, and child array values.",
@@ -329,7 +324,7 @@
     {
       "id": "nodes",
       "title": "React nodes",
-      "targets": ["react.node.*"],
+      "targets": ["react.node.*", "react.props.withData.*"],
       "lean": { "public": ["Lean.Vir.React.Node"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ReactNode", "React.createElement"] }
     },

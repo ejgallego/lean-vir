@@ -24,7 +24,7 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
-def Counter : RuntimeM (Js (Component Unit)) := Component.ofLean fun _ => do
+def Counter : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
   let count ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toNat count.value
@@ -44,8 +44,9 @@ def mount (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 

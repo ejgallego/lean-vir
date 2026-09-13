@@ -36,7 +36,7 @@ def captionStyle : Props.Entry := style #[
 
 def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
   let petComponent ← ReactTamagotchi.View
-  FunctionComponent.ofLean fun props => do
+  FunctionFunctionComponent.ofLean fun props => do
     let position ← PanelWidgetProps.pos props
     let uri ← JsValue.toString (← PanelPosition.uri position)
     let caption ← Node.pTextWith
@@ -45,7 +45,7 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
         captionStyle
       ]
       ("Shared React Tamagotchi component at " ++ uri)
-    let pet ← Node.component petComponent (← Lean.Vir.LeanRef.toJSL ())
+    let pet ← Node.functionComponent petComponent (← Props.empty) (← Js.Array.empty)
     Node.sectionWith
       #[
         Props.id "react-tamagotchi-proof-widget",

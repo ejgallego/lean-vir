@@ -19,6 +19,7 @@ await writeFile(
     "import * as React from 'react';",
     "",
     "export const EditorContext = React.createContext(null);",
+    "export const DocumentPosition = {};",
     "export function TaggedText_stripTags() { throw new Error('unexpected smoke tagged text call'); }",
     "export function useClientNotificationEffect() { throw new Error('unexpected smoke notification hook'); }",
     "",
@@ -242,14 +243,8 @@ const irPackageServiceConfig = {
   position: { line: 0, character: 0 },
   setupHint: "",
 };
-const irPackageHostContext = {
-  rpcSession,
-  editorConnection: null,
-  position: { line: 0, character: 0 },
-};
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
-  hostContext: irPackageHostContext,
   config: irPackageServiceConfig,
 });
 assert.equal(

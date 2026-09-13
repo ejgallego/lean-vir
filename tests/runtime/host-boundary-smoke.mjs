@@ -278,50 +278,6 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   hostState.dispose();
 }
 
-{
-  const calls = [];
-  const bindings = createInfoviewHostBindings({
-    commandDispatcher: {
-      insertText(...payload) {
-        calls.push(payload);
-      },
-    },
-  });
-  const position = bindings["infoview.documentPosition"](
-    "file:///Main.lean",
-    "Main.lean",
-    3n,
-    7n,
-    "Main",
-  );
-  assert.equal(
-    bindings["infoview.command.insertText"](position, "exact text"),
-    true,
-  );
-  assert.deepEqual(calls, [
-    [
-      {
-        uri: "file:///Main.lean",
-        fileName: "Main.lean",
-        line: 3,
-        character: 7,
-        label: "Main",
-      },
-      "exact text",
-    ],
-  ]);
-  assert.throws(
-    () =>
-      bindings["infoview.documentPosition"](
-        "file:///Main.lean",
-        "Main.lean",
-        -1n,
-        0n,
-        "Main",
-      ),
-    /non-negative safe-integer coordinates/,
-  );
-}
 
 {
   const lifecycle = createHostLifecycle();

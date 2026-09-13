@@ -10,6 +10,17 @@ public import Vir.React
 open Lean.Vir
 open Lean.Vir.Browser
 
+-- Application data shapes cannot be silently interchanged or inferred from an object.
+example (_props : Js (React.Props.WithData String)) : True := by
+  fail_if_success have _ : Js (React.Props.WithData Nat) := _props
+  fail_if_success have _ : RuntimeM (JSL Nat) := React.Props.WithData.data _props
+  trivial
+
+example (_component : React.FunctionComponent (React.Props.WithData String))
+    (_props : Js (React.Props.WithData Nat)) (_children : Js.Array React.Node) : True := by
+  fail_if_success have _ := React.Node.functionComponent _component _props _children
+  trivial
+
 -- The short names preserve the native value boundary, not Lean conversions.
 example (console : Js Console) (message : Js String) : RuntimeM Unit :=
   Console.log console message

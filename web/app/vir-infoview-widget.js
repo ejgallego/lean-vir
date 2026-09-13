@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import { EditorContext, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
+import { DocumentPosition, EditorContext, TaggedText_stripTags, useClientNotificationEffect, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "../src/vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "../src/vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "../src/vir-runtime.js";
@@ -32,10 +32,8 @@ const statusStyle = {
 
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
-  const editorConnection = React.useContext(EditorContext);
   const hostContextRef = React.useRef({
     rpcSession,
-    editorConnection,
     position: null,
   });
   const setupHintRef = React.useRef("");
@@ -66,7 +64,6 @@ export default function VirInfoviewWidget(props) {
       // The loading effect reports invalid widget configuration.
     }
     hostContextRef.current.rpcSession = rpcSession;
-    hostContextRef.current.editorConnection = editorConnection;
     hostContextRef.current.position = position;
     hostContextRef.current.configurationKey = configurationKey;
     setupHintRef.current = setupHint;
@@ -74,7 +71,7 @@ export default function VirInfoviewWidget(props) {
       // Invalidate pending candidates at removal, before passive cleanup runs.
       hostContextRef.current.configurationKey = null;
     };
-  }, [rpcSession, editorConnection, props.pos, props.setupHint, configurationKey]);
+  }, [rpcSession, props.pos, props.setupHint, configurationKey]);
 
   async function refreshLoadedWidget(isDisposed) {
     const generation = refreshGenerationRef.current;
@@ -88,7 +85,6 @@ export default function VirInfoviewWidget(props) {
       setupHint = config.setupHint;
       service = await loadRuntimeService({
         rpcSession: hostContextRef.current.rpcSession,
-        hostContext: hostContextRef.current,
         config,
       });
       if (obsolete()) {
@@ -361,33 +357,20 @@ function optionalNonNegativeInteger(value, label) {
   return value;
 }
 
-export async function loadRuntimeService({
-  rpcSession,
-  hostContext = null,
-  config,
-}) {
+export async function loadRuntimeService({ rpcSession, config }) {
   const sources = await resolveRuntimeSources(rpcSession, config);
-  return createRuntimeService({
-    rpcSession,
-    hostContext: hostContext ?? {
-      rpcSession,
-      editorConnection: null,
-      position: config.position,
-    },
-    sources,
-  });
+  return createRuntimeService({ rpcSession, sources });
 }
 
-async function createRuntimeService({ rpcSession, hostContext, sources }) {
+async function createRuntimeService({ rpcSession, sources }) {
   const runtimeOptions = await loadRuntimeOptionsFromSources({
     rpcSession,
     sources,
   });
   runtimeOptions.defaultHostBindings = () =>
     createBrowserHostBindings({
-      infoviewCommandDispatcher: createInfoviewCommandDispatcher({
-        hostContext,
-      }),
+      infoviewEditorContext: EditorContext,
+      infoviewPositionToTdpp: DocumentPosition.toTdpp,
       reactHostBindings: createBrowserReactHostBindings,
       infoviewUseClientNotificationEffect: useClientNotificationEffect,
       infoviewUseRpcSession: useRpcSession,
@@ -397,55 +380,6 @@ async function createRuntimeService({ rpcSession, hostContext, sources }) {
     packageRevision: sources.packageSource.revision ?? "",
     disposed: false,
     runtime: await createBundledVirRuntime(runtimeOptions),
-  };
-}
-
-function createInfoviewCommandDispatcher({ hostContext }) {
-  return {
-    revealPosition(position) {
-      const editorConnection = hostContext.editorConnection ?? null;
-      if (
-        editorConnection === null ||
-        typeof editorConnection !== "object" ||
-        typeof editorConnection.revealPosition !== "function"
-      ) {
-        return false;
-      }
-      editorConnection.revealPosition(position).catch((error) => {
-        console.error(error);
-      });
-      return true;
-    },
-    insertText(position, text) {
-      const editorConnection = hostContext.editorConnection ?? null;
-      if (
-        editorConnection === null ||
-        typeof editorConnection !== "object" ||
-        editorConnection.api === null ||
-        typeof editorConnection.api !== "object" ||
-        typeof editorConnection.api.applyEdit !== "function"
-      ) {
-        return false;
-      }
-      const cursor = { line: position.line, character: position.character };
-      const edit = editorConnection.api.applyEdit({
-        changes: {
-          [position.uri]: [
-            { range: { start: cursor, end: cursor }, newText: text },
-          ],
-        },
-      });
-      if (
-        edit !== null &&
-        typeof edit === "object" &&
-        typeof edit.catch === "function"
-      ) {
-        edit.catch((error) => {
-          console.error(error);
-        });
-      }
-      return true;
-    },
   };
 }
 

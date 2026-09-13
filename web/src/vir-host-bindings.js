@@ -137,7 +137,8 @@ export function createBrowserHostBindings({
   infoviewStripTags = null,
   infoviewUseClientNotificationEffect = null,
   lifecycle = createHostLifecycle(),
-  infoviewCommandDispatcher = null,
+  infoviewEditorContext = null,
+  infoviewPositionToTdpp = null,
   reactHostBindings = null,
 } = {}) {
   const reactBindings =
@@ -156,13 +157,14 @@ export function createBrowserHostBindings({
     ...createTimerHostBindings(lifecycle),
     ...createBrowserAnimationHostBindings(lifecycle),
     ...createInfoviewHostBindings({
-      commandDispatcher: infoviewCommandDispatcher,
       useClientNotificationEffect: infoviewUseClientNotificationEffect,
     }),
     ...reactBindings,
     ...createInfoviewPanelBindings({
       useRpcSession: infoviewUseRpcSession,
       stripTags: infoviewStripTags,
+      editorContext: infoviewEditorContext,
+      positionToTdpp: infoviewPositionToTdpp,
     }),
     [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
   };

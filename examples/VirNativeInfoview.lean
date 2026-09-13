@@ -21,6 +21,8 @@ open Lean.Vir.ProofWidgets
 
 namespace Style
 
+abbrev PropEntry := Lean.Vir.React.Props.Entry
+
 abbrev style := Lean.Vir.Examples.Style.style
 abbrev vscodeColor := Lean.Vir.Examples.Style.vscodeColor
 abbrev border := Lean.Vir.Examples.Style.border
@@ -200,9 +202,10 @@ def hypothesisNames (hypothesis : Js InteractiveHypothesisBundle) (fallback : St
   let names ← names.mapM fun name => do JsValue.toString name
   pure <| if names.isEmpty then fallback else " ".intercalate names.toList
 
-def HypothesisRow : RuntimeM (Lean.Vir.ProofWidgets.Component HypothesisProps) :=
-  Lean.Vir.ProofWidgets.Component.ofLean fun ctx => do
-    let props := ctx.props
+def HypothesisRow : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData HypothesisProps)) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+    let data ← Lean.Vir.React.Props.WithData.data nativeProps
+    let props ← Lean.Vir.LeanRef.fromJSL data
     let hypothesis := props.hypothesis
     let id := s!"{props.goalIndex}-{props.index}"
     let names ← hypothesisNames hypothesis s!"hypothesis {props.index + 1}"
@@ -277,7 +280,7 @@ def GoalCardBody
     (index : Nat)
     (hypotheses : Array (Js InteractiveHypothesisBundle))
     (target : Js CodeWithInfos)
-    (hypothesisRow : Lean.Vir.ProofWidgets.Component HypothesisProps) : ReactM (Js Lean.Vir.React.Node) := do
+    (hypothesisRow : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData HypothesisProps)) : ReactM (Js Lean.Vir.React.Node) := do
   let initialCollapsed ← JsValue.ofBool false
   let collapsedState ← Lean.Vir.React.StateTuple.toState
     (← Lean.Vir.React.Hooks.useState initialCollapsed)
@@ -286,9 +289,9 @@ def GoalCardBody
   let toggle : DomM Unit := do
     let next ← JsValue.ofBool (!collapsed)
     Lean.Vir.React.State.set collapsedState next
-  let hypotheses : Array Html := hypotheses.mapIdx fun hypothesisIndex hypothesis =>
-    Html.keyedOfComponent s!"{goalId}-{hypothesisIndex}" hypothesisRow {
-      hypothesis, goalIndex := index, index := hypothesisIndex }
+  let hypotheses : Array Html := hypotheses.mapIdx fun hypothesisIndex hypothesis => do
+    Html.keyedComponent s!"{goalId}-{hypothesisIndex}" hypothesisRow
+      (← Lean.Vir.LeanRef.toJSL { hypothesis, goalIndex := index, index := hypothesisIndex })
   let context : Html := if hypotheses.isEmpty then
     Html.elementWithProps "p" #[
       Lean.Vir.React.Props.className "vir-native-infoview-no-hypotheses", Style.empty
@@ -337,20 +340,22 @@ def GoalCardBody
     Style.goalCard
   ] (#[header] ++ details)
 
-def TacticGoalCard : RuntimeM (Lean.Vir.ProofWidgets.Component TacticGoalCardProps) := do
+def TacticGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData TacticGoalCardProps)) := do
   let hypothesisRow ← HypothesisRow
-  Lean.Vir.ProofWidgets.Component.ofLean fun ctx => do
-    let props := ctx.props
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+    let data ← Lean.Vir.React.Props.WithData.data nativeProps
+    let props ← Lean.Vir.LeanRef.fromJSL data
     let title ← tacticGoalName props.goal props.index
     let status ← tacticGoalStatus props.goal
     let hypotheses ← Js.Array.toLeanArray (← InteractiveGoal.hyps props.goal)
     let target ← InteractiveGoal.type props.goal
     GoalCardBody s!"goal-{props.index}" props.key title status props.index hypotheses target hypothesisRow
 
-def TermGoalCard : RuntimeM (Lean.Vir.ProofWidgets.Component TermGoalCardProps) := do
+def TermGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData TermGoalCardProps)) := do
   let hypothesisRow ← HypothesisRow
-  Lean.Vir.ProofWidgets.Component.ofLean fun ctx => do
-    let props := ctx.props
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+    let data ← Lean.Vir.React.Props.WithData.data nativeProps
+    let props ← Lean.Vir.LeanRef.fromJSL data
     let hypotheses ← Js.Array.toLeanArray (← InteractiveTermGoal.hyps props.goal)
     let target ← InteractiveTermGoal.type props.goal
     GoalCardBody s!"term-{props.index}" "term" "Term goal" "term" props.index hypotheses target hypothesisRow
@@ -365,9 +370,11 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
     let termGoal? ← Js.UndefinedOr.toOption (← PanelWidgetProps.termGoal props)
     let tacticNodes ← tacticGoals.mapIdxM fun index goal => do
       let key ← tacticGoalKey goal index
-      pure <| Html.keyedOfComponent key tacticGoalCard { goal, index, key }
+      pure <| Html.keyedComponent key tacticGoalCard (← Lean.Vir.LeanRef.toJSL { goal, index, key })
     let termNodes : Array Html := (termGoal?.map fun goal => #[
-      Html.keyedOfComponent s!"term-{tacticGoals.size}" termGoalCard { goal, index := tacticGoals.size }
+      (do
+        Html.keyedComponent s!"term-{tacticGoals.size}" termGoalCard
+          (← Lean.Vir.LeanRef.toJSL { goal, index := tacticGoals.size }))
     ]).getD #[]
     let goals := tacticNodes ++ termNodes
     let goalCount := goals.size

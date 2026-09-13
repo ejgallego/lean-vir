@@ -11,8 +11,26 @@ Author: Emilio J. Gallego Arias
 export function createInfoviewPanelBindings({
   useRpcSession = null,
   stripTags = null,
+  editorContext = null,
+  positionToTdpp = null,
 } = {}) {
   return {
+    "infoview.editorContext": () => {
+      if (editorContext === null) {
+        throw new Error("EditorContext requires the upstream infoview host");
+      }
+      return editorContext;
+    },
+    "infoview.editorConnection.api": (connection) => connection.api,
+    "infoview.editorConnection.revealPosition": (connection, position) =>
+      connection.revealPosition(position),
+    "infoview.editorApi.copyToClipboard": (api, text) => api.copyToClipboard(text),
+    "infoview.editorApi.insertText": (api, text, kind, position) =>
+      api.insertText(text, kind, position),
+    "infoview.panelPosition.toTdpp": (position) =>
+      requireUpstream(positionToTdpp, "DocumentPosition.toTdpp")(position),
+    "infoview.textInsertKind.here": () => "here",
+    "infoview.textInsertKind.above": () => "above",
     "infoview.useRpcSession": () => requireUpstream(
       useRpcSession,
       "useRpcSession",

@@ -110,9 +110,6 @@ that range. It checks the bound in `Nat` before Float conversion, rejecting
 even exactly representable larger integers because they exceed the
 safe-integer range.
 
-The infoview `documentPosition` adapter checks coordinates against
-`0..Number.MAX_SAFE_INTEGER` before converting accepted bigints to numbers.
-It rejects out-of-range coordinates instead of rounding or clamping them.
 These host-value conversions are distinct from the
 [structural export representation](JS_API.md#calls-and-manifest) used when
 JavaScript calls a Lean entrypoint.
@@ -205,10 +202,12 @@ ID. Use it inside a component, not as a list key or application identity.
 
 For `Vir.Infoview`, follow [Infoview widgets](INFOVIEW.md#widget-activation)
 for activation and the [RPC tutorial](../../examples/tutorials/RpcReferenceWidget.md)
-for server calls. Its clipboard and editor-command helpers expose local
-synchronous capabilities with Lean `Bool` results. In particular,
-`Infoview.Clipboard.writeText` does not claim the asynchronous browser
-Clipboard API contract; native RPC calls return exact Promises. An infoview
+for server calls. `Hooks.useContext (← Infoview.editorContext)` returns the
+native editor connection. `EditorConnection.revealPosition` and
+`EditorApi.copyToClipboard` / `insertText` return the upstream Promises;
+errors remain observable by the caller. There is no clipboard fallback or
+Boolean dispatch status. `PanelPosition.toTdpp` delegates to the upstream
+conversion when insertion needs an LSP document/position pair. An infoview
 factory has type `RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)`:
 React passes those native props directly, while `Infoview.useRpcSession` is the
 actual surrounding-context hook. Position coordinates remain JavaScript numbers

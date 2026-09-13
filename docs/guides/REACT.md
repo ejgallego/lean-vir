@@ -47,8 +47,11 @@ and notation over these operations, not a serializable or alternate node tree.
 Their attribute names alias the same builder definitions. `Html` represents a
 deferred React computation, whereas `Js Node` is an already-constructed value;
 that distinction preserves when child actions run.
-`Html.ofComponent` passes `ComponentProps` containing props and child `Html`
-actions to an ordinary Lean component function.
+`Html.component` accepts an explicitly boxed application value. Its optional
+native `Props.WithData α` shape holds that value in `data`; children are evaluated
+when constructing the element and passed as ordinary React children, not stored
+as Lean actions in a component-props record. Attributes and handlers share one
+`Props.Entry` array.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
@@ -58,14 +61,20 @@ keys and handlers. This native authoring facade is distinct from upstream's
 
 ## Components and roots
 
-`Component.ofLean` converts a Lean render function into one ordinary JavaScript
+`FunctionComponent.ofLean` converts a Lean render function into one ordinary JavaScript
 function. That returned function is the React component type: reuse it to
 preserve identity; creating a new function asks React to mount a different type.
-Its callback receives `JSL props`; recover the Lean value explicitly with
-`LeanRef.fromJSL`. `Node.component` accepts an explicitly boxed `JSL` props
-object and places it under the native props object's `leanProps` field. Reuse
-that box when props identity should stay stable. React owns invocation, hook
-state, replay and keys.
+Its callback receives native `Js props`. `Node.functionComponent` takes that
+function, a matching native props object, and native child array. There is no
+second component function wrapping the Lean callback. React owns invocation,
+hook state, replay and keys.
+
+For application-owned Lean data, explicitly box it with `LeanRef.toJSL`, then
+construct `Props.WithData.make box`. Read `Props.WithData.data props` and use
+`LeanRef.fromJSL` inside the component. React may copy the outer props object;
+the nested box retains its exact identity. `WithData.children` returns the exact
+React node (undefined, one child or an array), not an assumed child array.
+Native panel props and ordinary native components need no `WithData` object.
 
 `Root.create` returns the native `ReactDOMClient.createRoot` object.
 `Root.render` calls its `render` method with the actual node. Construct that
@@ -117,7 +126,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | React operation | Lean surface and boundary |
 | --- | --- |
 | `createElement(type, props, ...children)` | `Node.createElement` takes exact type/props and a JS child array. Tag/text/JSX helpers perform explicit construction above it. |
-| Function component | `Component.ofLean` creates the native function once; external component values can be passed as `Js ElementType`. |
+| Function component | `FunctionComponent.ofLean` creates the native function once; external component values can be passed as `Js ElementType`. |
 | `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
@@ -146,7 +155,7 @@ options such as `identifierPrefix`.
 providers separately from the generic runtime. The code in
 [`web/src/react/`](../../web/src/react) calls public React APIs; it contains no
 copied reconciler or hook implementation. Its extra JS implements explicit
-Lean-function conversion, `leanProps` placement and browser-root lifecycle.
+explicit application-data property access, effect conversion and browser-root lifecycle.
 The [object ABI](../reference/OBJECT_ABI.md#externref-and-foreign-values) explains the Wasm
 transport; it is not another React API.
 
