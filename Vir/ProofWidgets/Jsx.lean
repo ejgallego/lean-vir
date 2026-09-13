@@ -307,9 +307,10 @@ private meta def transformTag
     `(Html.elementWithProps $(quote tag) $props $children)
 
 /--
-JSX-like syntax for VIR-native HTML. Lowercase tags are React elements and
-uppercase tags are native `React.FunctionComponent` values whose optional
-Lean-backed data is carried in the explicit `props.data` field.
+JSX-like syntax for VIR-native HTML. Lowercase tags are React elements.
+Uppercase tags require `React.FunctionComponent (React.Props.WithData α)`:
+their Lean record attributes (or `Unit`) are boxed into `props.data`.
+Use `Node.functionComponent` directly for other native props shapes.
 -/
 macro_rules
   | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) =>

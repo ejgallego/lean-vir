@@ -44,7 +44,7 @@ lean_lib VirInfoview where
 lean_lib VirExamples where
   srcDir := "examples"
   roots := #[`SlidesCanvas, `Fib, `Quickstart, `MergeSort, `HostInterop,
-    `Tamagotchi, `VirNativeInfoview, `tutorials.ReactProofWidgetHello,
+    `Tamagotchi, `VirNativeInfoview, `ReactTamagotchiWidget, `tutorials.ReactProofWidgetHello,
     `tutorials.RpcReferenceWidget]
 
 /-- Authored browser fixtures; paths are preserved for source navigation. -/

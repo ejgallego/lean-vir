@@ -36,7 +36,7 @@ def captionStyle : Props.Entry := style #[
 
 def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
   let petComponent ← ReactTamagotchi.View
-  FunctionFunctionComponent.ofLean fun props => do
+  FunctionComponent.ofLean fun props => do
     let position ← PanelWidgetProps.pos props
     let uri ← JsValue.toString (← PanelPosition.uri position)
     let caption ← Node.pTextWith

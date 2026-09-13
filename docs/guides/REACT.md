@@ -53,6 +53,10 @@ when constructing the element and passed as ordinary React children, not stored
 as Lean actions in a component-props record. Attributes and handlers share one
 `Props.Entry` array.
 
+Uppercase JSX currently requires `FunctionComponent (Props.WithData α)` and
+boxes its Lean record attributes (or `Unit`) automatically. For components with
+other native props shapes, use `Node.functionComponent` directly.
+
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
 interpolated attributes, text/child spreads, uppercase components, typed props,
