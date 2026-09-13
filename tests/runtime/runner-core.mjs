@@ -115,6 +115,7 @@ export const runtimeTests = Object.freeze(
       file: "infoview-rpc-promise-smoke.mjs",
       group: "lean",
     },
+    { id: "host-error-propagation", file: "host-error-propagation-smoke.mjs", group: "lean" },
     { id: "js-nat-number", file: "js-nat-number-smoke.mjs", group: "lean" },
     {
       id: "package-generation",

@@ -580,7 +580,7 @@ export class VirRuntime extends ObjectValueRuntime {
     let argvPtr = 0;
     let resultObj = 0;
     try {
-      this.hostState?.clearCallError();
+      if (this.hostState?.callError) throw this.hostState.callError;
       if (argObjs.length !== 0) {
         argvPtr = this.allocByteLength(
           argObjs.length * 4,

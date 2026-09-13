@@ -56,6 +56,13 @@ are the explicit exception used by conversions such as `js.string.value`.
 Exported Lean functions called from JavaScript use the separate structural
 interface codec.
 
+A failed effectful host import propagates an IO error inside Lean, stopping
+ordinary bind continuation. The owning JavaScript call reports the original
+host exception; catching the internal IO error does not clear that exception.
+Previously completed host effects are not rolled back as a group. This is not
+a general exception model for pure imports: their failures are reported at the
+JavaScript boundary, but early termination of pure Lean evaluation is not guaranteed.
+
 `Js.Function1 argument result` does not wrap a function and VIR does not
 dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
 `Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native

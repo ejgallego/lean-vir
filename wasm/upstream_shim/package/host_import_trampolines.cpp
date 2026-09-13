@@ -28,7 +28,11 @@ static void cleanup_object_args(uint32_t argc, object ** args) {
 }
 
 static object * default_host_import_result(bool is_io) {
-    return is_io ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
+    // Pure imports have no IO error carrier. Their existing placeholder behavior
+    // remains a limitation; this repair only short-circuits effectful evaluation.
+    return is_io
+        ? lean_io_result_mk_error(lean_mk_io_user_error(lean_mk_string("JavaScript host import failed")))
+        : lean_box(0);
 }
 
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
@@ -45,13 +49,12 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         slot,
         args == nullptr ? nullptr : args + erased_prefix_args,
         js_argc);
-    // JavaScript records host exceptions out of band and consumes them at the
-    // owning top-level or closure call. Keep the interpreter result structurally
-    // valid until that boundary reports the recorded exception.
-    if (value == nullptr) {
-        value = lean_box(0);
-    }
     cleanup_object_args(argc, args);
+    // The original JavaScript exception is reported at the owning call boundary.
+    // Propagate an IO failure here so Lean bind does not execute its continuation.
+    if (value == nullptr) {
+        return default_host_import_result(is_io);
+    }
     if (is_io) {
         return lean_io_result_mk_ok(value);
     }
