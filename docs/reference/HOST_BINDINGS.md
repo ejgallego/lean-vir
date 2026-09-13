@@ -56,12 +56,24 @@ are the explicit exception used by conversions such as `js.string.value`.
 Exported Lean functions called from JavaScript use the separate structural
 interface codec.
 
+A failed effectful host import propagates an IO error inside Lean, stopping
+ordinary bind continuation. The owning JavaScript call reports the original
+host exception; catching the internal IO error does not clear that exception.
+Previously completed host effects are not rolled back as a group. This is not
+a general exception model for pure imports: their failures are reported at the
+JavaScript boundary, but early termination of pure Lean evaluation is not guaranteed.
+
 `Js.Function1 argument result` does not wrap a function and VIR does not
 dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
 `Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native
 functions such as React state setters already cross as `Js.Function1` values
 and need no conversion. `Js.erase` similarly forgets only a phantom type and
 returns the exact same JavaScript value as `Js.Any`.
+
+Converted callbacks use ordinary JavaScript formal-argument rules: extra
+arguments are ignored and omitted arguments arrive as `undefined`. Declared
+Lean boundary views still apply their normal conversion checks. This permits
+React to invoke a unary component with its additional internal argument.
 
 Unknown values narrow through the polymorphic `Js.cast` operation. Its
 `Js.Cast` instance selects a type-specific predicate and returns
@@ -162,24 +174,28 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 
 | Operation | Effect on the generation |
 | --- | --- |
-| Normal infoview unmount or mounted-generation refresh | Unmounts the owned root and detaches shell references; surviving callbacks/JSL remain usable in their original generation. |
+| Normal infoview unmount or mounted-generation refresh | React removes the descendant UI and the shell releases its references; surviving callbacks/JSL remain usable in their original generation. |
 | Explicit runtime disposal | Invalidates Lean callbacks/JSL and attempts all runtime-owned cleanup. |
 | Core in-place package replacement | Invalidates old Lean roots; never moves them into the new exports. Public factory-managed replacement is described in [JS_API.md](../guides/JS_API.md#replacing-a-package-set). |
 
-Normal shell cleanup detaches its loaded reference before unmount and surfaces
-cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
+Normal shell cleanup detaches its loaded reference; React owns descendant
+unmount and cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
 effect. Obsolete load results cannot install UI. Refreshed services use fresh
-factories and browser/React lifecycles, reusing compiled Wasm and the mutable
-editor host context; the latter is not a frozen per-generation snapshot.
-The separate React root receives that upstream `EditorContext` through a stable
-per-service provider component; the inner component identity and nested prop
-values are preserved. The shell does not implement notification subscriptions.
+factories and browser/React lifecycles, reusing compiled Wasm.
+Components read the current native editor connection through React context;
+there is no mutable command-dispatch proxy between the component and editor.
+The widget participates in the infoview's existing React tree, inheriting its
+contexts. The shell does not implement notification subscriptions.
 
 UI cleanup does not restrict new activity or cancel application-owned timers,
 listeners, subscriptions or independent roots. Those still need application
-cleanup. Failed setup, synchronous mount-entry failures and obsolete candidates
-that were never installed retain hard teardown. The mount-entry catch does not
-handle errors thrown later by React rendering.
+cleanup. Failed loading, component-factory/manifest validation and obsolete
+candidates that were never published retain hard teardown. Once published,
+element-entry and component-render errors follow React's error boundaries; they
+do not implicitly dispose the runtime. This also leaves Lean effect cleanup
+usable when React removes the failed subtree.
+React may retain failed subtrees and their callbacks after a cleanup error;
+VIR does not guarantee collection while those JavaScript owners remain.
 
 ## Active Resources
 

@@ -16,6 +16,7 @@ import {
   createDOMTokenListHostBindings,
 } from "./host/vir-dom-host-bindings.js";
 import { createInfoviewHostBindings } from "./host/vir-infoview-host-bindings.js";
+import { createInfoviewPanelBindings } from "./host/vir-infoview-panel-bindings.js";
 import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-boundary.js";
@@ -132,9 +133,12 @@ export function createBrowserAnimationHostBindings(lifecycle) {
 }
 
 export function createBrowserHostBindings({
+  infoviewUseRpcSession = null,
+  infoviewStripTags = null,
   infoviewUseClientNotificationEffect = null,
   lifecycle = createHostLifecycle(),
-  infoviewCommandDispatcher = null,
+  infoviewEditorContext = null,
+  infoviewPositionToTdpp = null,
   reactHostBindings = null,
 } = {}) {
   const reactBindings =
@@ -153,10 +157,15 @@ export function createBrowserHostBindings({
     ...createTimerHostBindings(lifecycle),
     ...createBrowserAnimationHostBindings(lifecycle),
     ...createInfoviewHostBindings({
-      commandDispatcher: infoviewCommandDispatcher,
       useClientNotificationEffect: infoviewUseClientNotificationEffect,
     }),
     ...reactBindings,
+    ...createInfoviewPanelBindings({
+      useRpcSession: infoviewUseRpcSession,
+      stripTags: infoviewStripTags,
+      editorContext: infoviewEditorContext,
+      positionToTdpp: infoviewPositionToTdpp,
+    }),
     [VIR_HOST_DISPOSE]: () => lifecycle.dispose(),
   };
 }

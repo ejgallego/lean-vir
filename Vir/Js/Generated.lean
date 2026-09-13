@@ -540,6 +540,40 @@ opaque undefined
     {α : Type} :
     RuntimeM (Lean.Vir.Js.UndefinedOr α)
 
+/--
+Generated binding for reviewed VIR protocol `javascript.undefined-or.is-undefined`.
+
+Tests for the exact JavaScript undefined value without decoding the payload or treating null as absent.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.undefinedOr.isUndefined"]
+opaque isUndefined
+    {α : Type}
+    (value : @& Lean.Vir.Js.UndefinedOr α) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.undefined-or.value`.
+
+Returns the exact defined payload, throwing TypeError on undefined. Checks absence, not the caller-declared payload shape.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.undefinedOr.value"]
+opaque get
+    {α : Type}
+    (value : @& Lean.Vir.Js.UndefinedOr α) :
+    RuntimeM (Js α)
+
 end Js.UndefinedOr
 
 namespace JsValue

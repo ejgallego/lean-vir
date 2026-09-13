@@ -19,6 +19,13 @@ export function createJsValueHostBindings() {
   };
   bindings["js.float.owned"] = jsFloatValue;
   bindings["js.undefined"] = () => undefined;
+  bindings["js.undefinedOr.isUndefined"] = (value) => value === undefined;
+  bindings["js.undefinedOr.value"] = (value) => {
+    if (value === undefined) {
+      throw new TypeError("js.undefinedOr.value expects a defined value");
+    }
+    return value;
+  };
   bindings["js.nullable.null"] = () => null;
   bindings["js.nullable.of"] = (value) => value;
   bindings["js.nullable.isNull"] = (value) => value === null;

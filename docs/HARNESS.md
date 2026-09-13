@@ -218,17 +218,14 @@ For normal shell unmount/refresh and failed-setup teardown with real React and
 Lean continuation bodies, but mocked asset/package RPC:
 
 ```bash
-lake build VirInfoview vir_irpkg +ShellLifetime
-lake env .lake/build/bin/vir_irpkg \
-  build/shell-lifetime.irpkg build/shell-lifetime.report.md \
-  --target-module ShellLifetime \
-  Vir.Fixtures.ShellLifetime.createComponent Vir.Fixtures.ShellLifetime.mount
-CHROMIUM=/path/to/chromium node tests/browser/shell-lifetime.mjs
+CHROMIUM=/path/to/chromium npm run test:infoview:lifetime
 ```
 
-This checks generation isolation, retained application activity, stale guards,
-polling, failure cleanup and controlled GC. Mocked transport makes it separate
-from the actual-server checks below.
+The runner builds its fixture package and checks generation isolation, retained
+application activity, stale guards, polling, failure cleanup and controlled GC.
+A red/green control resolves a pending load after committed removal but before
+passive cleanup. Unexpected console diagnostics and unhandled rejections fail
+the checks. Transport is mocked; the actual-server checks remain separate.
 
 ### Infoview RPC and lifetime checks
 
@@ -236,8 +233,8 @@ from the actual-server checks below.
 CHROMIUM=/path/to/chromium npm run test:infoview:browser
 ```
 
-The aggregate runs support/cleanup/error-formatting units and both real-server checks
-sequentially, as in CI. Each builds its Lean fixtures and bundles current JS
+The aggregate runs support/cleanup/error-formatting units, both real-server checks
+and the shell lifetime harness sequentially, as in CI. Each browser harness builds its Lean fixtures and bundles current JS
 against official React, the pinned RPC client and a real `lake serve` process.
 They need npm dependencies and matching `web/public/vir-upstream.wasm`, but no
 site build; use `npm run build:demo` for missing or changed Wasm.

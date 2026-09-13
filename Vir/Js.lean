@@ -73,6 +73,18 @@ def ofOption {α : Type} (value : Option (Lean.Vir.Js α)) : RuntimeM (Lean.Vir.
 
 end Nullable
 
+namespace UndefinedOr
+
+/-- Inspects native absence without decoding or copying a present value. -/
+def toOption {α : Type} (value : @& Lean.Vir.Js.UndefinedOr α) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  if ← Lean.Vir.JsValue.toBool (← isUndefined value) then
+    pure none
+  else
+    some <$> get value
+
+end UndefinedOr
+
 namespace Array
 
 /-- Builds a native JavaScript array from JavaScript-owned values. -/

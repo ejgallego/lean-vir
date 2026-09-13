@@ -476,7 +476,6 @@ if (reactRenderNodeImport !== undefined) {
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
 for (const target of [
-  "js.value.react.component",
   "js.value.react.effectCallback",
 ]) {
   const entry = hostImportTarget(target);
@@ -507,12 +506,11 @@ const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
 assert.equal(reactCreateElementImport?.args[0]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[1]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[2]?.type?.type, "Js");
-for (const target of ["react.node.component", "react.node.keyedComponent"]) {
+for (const target of ["react.props.withData.make", "react.props.withData.get"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "react");
   assert.equal(entry?.args[0]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.type, "Js");
-  assert.equal(entry?.args[1]?.type?.kind, "resource");
+  assert.equal(entry?.args[0]?.type?.kind, "resource");
   assert.equal(entry?.result?.type, "Js");
 }
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find(

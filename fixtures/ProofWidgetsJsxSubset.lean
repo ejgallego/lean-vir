@@ -26,23 +26,30 @@ keys, and child / prop spreads.
 structure CardProps where
   title : String
 
-def Card : RuntimeM (Component CardProps) := Component.ofLean fun ctx =>
-  <section id="proofwidgets-jsx-card" className="pw-jsx-card"
+def Card : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData CardProps)) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+  let data ← Lean.Vir.React.Props.WithData.data nativeProps
+  let ctx ← Lean.Vir.LeanRef.fromJSL data
+  let children ← Lean.Vir.React.Props.WithData.children nativeProps
+  return ← <section id="proofwidgets-jsx-card" className="pw-jsx-card"
       {...#[Lean.Vir.React.Props.data "component" "Card"]}>
-    <h3 className="pw-jsx-card-title">{Html.text ctx.props.title}</h3>
+    <h3 className="pw-jsx-card-title">{Html.text ctx.title}</h3>
     <div id="proofwidgets-jsx-card-body" className="pw-jsx-card-body">
-      {...ctx.children}
+      {pure children}
     </div>
   </section>
 
 structure MarkdownProps where
   contents : String
 
-def MarkdownDisplay : RuntimeM (Component MarkdownProps) := Component.ofLean fun ctx =>
-  <section id="proofwidgets-jsx-markdown" className="pw-jsx-markdown"
+def MarkdownDisplay : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData MarkdownProps)) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+  let data ← Lean.Vir.React.Props.WithData.data nativeProps
+  let ctx ← Lean.Vir.LeanRef.fromJSL data
+  return ← <section id="proofwidgets-jsx-markdown" className="pw-jsx-markdown"
       {...#[Lean.Vir.React.Props.data "component" "MarkdownDisplay"]}>
     <h3 className="pw-jsx-markdown-title">MarkdownDisplay</h3>
-    <pre className="pw-jsx-markdown-source">{Html.text ctx.props.contents}</pre>
+    <pre className="pw-jsx-markdown-source">{Html.text ctx.contents}</pre>
   </section>
 
 def htmlLetters : Array Html := #[
@@ -63,7 +70,7 @@ def parrotImage : Html :=
 def spreadInterpolation : Html :=
   <b id="proofwidgets-jsx-spread">You can use {...htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
 
-def markdownExample (MarkdownDisplay : Component MarkdownProps) : Html :=
+def markdownExample (MarkdownDisplay : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData MarkdownProps)) : Html :=
   <MarkdownDisplay contents={"
   ## Hello, Markdown
   We have **bold text**, _italic text_, `example : True := by trivial`,
@@ -74,11 +81,15 @@ structure BadgeProps where
   tone : String
   label : String
 
-def Badge : RuntimeM (Component BadgeProps) := Component.ofLean fun ctx =>
-  <span id={"proofwidgets-jsx-badge-" ++ ctx.props.tone}
-      className={"pw-jsx-badge pw-jsx-badge-" ++ ctx.props.tone}
-      {...#[Lean.Vir.React.Props.data "tone" ctx.props.tone]}>
-    {Html.text ctx.props.label}{...ctx.children}
+def Badge : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData BadgeProps)) :=
+  Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
+  let data ← Lean.Vir.React.Props.WithData.data nativeProps
+  let ctx ← Lean.Vir.LeanRef.fromJSL data
+  let children ← Lean.Vir.React.Props.WithData.children nativeProps
+  return ← <span id={"proofwidgets-jsx-badge-" ++ ctx.tone}
+      className={"pw-jsx-badge pw-jsx-badge-" ++ ctx.tone}
+      {...#[Lean.Vir.React.Props.data "tone" ctx.tone]}>
+    {Html.text ctx.label}{pure children}
   </span>
 
 def row (key label value : String) : Html :=
@@ -90,13 +101,13 @@ def row (key label value : String) : Html :=
 -- Uppercase JSX tags consume these local component values during macro expansion,
 -- which Lean's unused-variable linter does not count as an explicit reference.
 set_option linter.unusedVariables false in
-def View : RuntimeM (Component Unit) := do
+def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := do
   let Card ← Card
   let MarkdownDisplay ← MarkdownDisplay
   let Badge ← Badge
-  Component.ofLean fun _ => do
+  Lean.Vir.React.FunctionComponent.ofLean fun _ => do
     let renderedRows := 3
-    let surfaceProps : Array PropEntry := #[
+    let surfaceProps : Array Lean.Vir.React.Props.Entry := #[
       Lean.Vir.React.Props.role "region",
       Lean.Vir.React.Props.ariaLabel "ProofWidgets JSX subset combinator demo"
     ]
@@ -129,8 +140,9 @@ def mount (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL (componentProps ())
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.ReactM.run Lean.Vir.React.Props.empty
+      let children ← Lean.Vir.Js.Array.ofArray #[]
+      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.functionComponent component props children)
       Lean.Vir.React.Root.render root node
       pure true
 

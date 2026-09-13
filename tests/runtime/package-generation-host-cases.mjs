@@ -380,7 +380,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
         "Vir.Fixtures.ReactExternalComponent.mount",
         "#react-external-component",
       ),
-    /host import binding not found: js\.value\.react\.component/,
+    /host import binding not found: browser\.document\.current/,
   );
   assert.equal(reactExternalRuntime.liveCallbacks.size, 0);
   reactExternalRuntime.dispose();

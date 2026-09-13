@@ -50,8 +50,8 @@ def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
   Infoview.RpcSession.call session (← js#"RpcBrowserServer.read") params
 
 /-- A native React function component; constructing it once preserves hook identity. -/
-private def ResponseView : RuntimeM (Js (React.Component (Js Reply))) := React.Component.ofLean fun reply => do
-  let reply ← LeanRef.fromJSL reply
+private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply))) := FunctionComponent.ofLean fun props => do
+  let reply ← LeanRef.fromJSL (← Props.WithData.data props)
   let count ← React.StateTuple.toState (← React.Hooks.useState (← JsValue.ofNat 0))
   let label ← message reply
   let n ← JsValue.toNat count.value
@@ -72,7 +72,7 @@ private structure ResponseState where
   status : String := "loading"
   error : String := ""
 
-private def renderView (child : Js (Component (Js Reply))) (input : Input) :
+private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (input : Input) :
     ReactM (Js Node) := do
   let response ← StateTuple.toState
     (← Hooks.useState (← LeanRef.toJSL ({} : ResponseState)))
@@ -128,7 +128,9 @@ private def renderView (child : Js (Component (Js Reply))) (input : Input) :
     else "Ready"
   let children : Array ProofWidgets.Html := match state.reply with
     | none => #[]
-    | some reply => #[do Node.component child (← LeanRef.toJSL reply)]
+    | some reply => #[do
+        Node.functionComponent child
+          (← Props.WithData.make (← LeanRef.toJSL reply)) (← Js.Array.empty)]
   return ← <section {...#[Props.bool "aria-busy" (state.status == "loading")]}>
     <p role={if state.status == "error" then "alert" else "status"}
         {...#[Props.string "data-rpc-status" state.status]}>
@@ -138,24 +140,28 @@ private def renderView (child : Js (Component (Js Reply))) (input : Input) :
   </section>
 
 /-- Construct once: native React function identity preserves parent and child state. -/
-def View : RuntimeM (Js (Component Input)) := do
+def View : RuntimeM (FunctionComponent (Props.WithData Input)) := do
   let child ← ResponseView
-  Component.ofLean fun props => do renderView child (← LeanRef.fromJSL props)
+  FunctionComponent.ofLean fun props => do
+    renderView child (← LeanRef.fromJSL (← Props.WithData.data props))
 
 /-- Submit new inputs without replacing the native component type. -/
-def render (component : Js (Component Input)) (input : Input) : ReactM (Js Node) := do
-  Node.component component (← LeanRef.toJSL input)
+def render (component : FunctionComponent (Props.WithData Input)) (input : Input) : ReactM (Js Node) := do
+  Node.functionComponent component (← Props.WithData.make (← LeanRef.toJSL input))
+    (← Js.Array.empty)
 
 /-- The standard infoview entry needs no application-authored JavaScript. -/
-def WidgetView : RuntimeM (Js (Component Infoview.Surface)) := do
+def WidgetView : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do
   let child ← ResponseView
   let query ← Js.Object.empty
   Js.Object.set query (← js#"message") (← js#"Hello from Lean")
   Js.Object.set query (← js#"fail") (← JsValue.ofBool false)
   Js.Object.set query (← js#"waitForCancellation") (← JsValue.ofBool false)
-  Component.ofLean fun props => do
-    let surface : Infoview.Surface ← LeanRef.fromJSL props
-    renderView child { session := surface.rpcSession, query, uri := surface.cursor.uri }
+  FunctionComponent.ofLean fun props => do
+    let session ← Infoview.useRpcSession
+    let pos ← Infoview.PanelWidgetProps.pos props
+    let uri ← JsValue.toString (← Infoview.PanelPosition.uri pos)
+    renderView child { session, query, uri }
 
 vir_proof_widget WidgetView
 

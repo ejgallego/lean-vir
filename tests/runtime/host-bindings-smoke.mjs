@@ -137,20 +137,21 @@ retainedCallbackRuntime.dispose();
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 0);
 assert.throws(() => retainedCallback(4n), /disposed runtime/);
 
-const nestedCallbackErrorRuntime = await createVirRuntime({
+const extraArgumentRuntime = await createVirRuntime({
   wasmBytes,
   irPackageSet: [hostPackageBytes],
   hostBindings: {
-    "test.callNatCallback": (input, callback) => callback(input, input),
+    "test.callNatCallback": (input, callback) => callback(input, 999n),
     "test.recordNat": () => undefined,
   },
 });
-assert.throws(
-  () => nestedCallbackErrorRuntime.call("HostInterop.callbackRoundTrip", 1),
-  /callback expects 1 arguments, got 2/,
+assert.equal(
+  extraArgumentRuntime.call("HostInterop.callbackRoundTrip", 1),
+  "8",
 );
-assert.equal(nestedCallbackErrorRuntime.liveCallbacks.size, 0);
-nestedCallbackErrorRuntime.dispose();
+assert.equal(extraArgumentRuntime.liveCallbacks.size, 1);
+extraArgumentRuntime.dispose();
+assert.equal(extraArgumentRuntime.liveCallbacks.size, 0);
 
 let throwingCallback = null;
 const throwingBindingRuntime = await createVirRuntime({

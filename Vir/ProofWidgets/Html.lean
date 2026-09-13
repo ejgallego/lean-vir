@@ -17,85 +17,17 @@ abbrev ReactM := Lean.Vir.React.ReactM
 /--
 ProofWidgets-style HTML value backed by a real React node construction action.
 
-This is intentionally a shallow facade over `Lean.Vir.React`: `Html.element`
+This is a shallow facade over `Lean.Vir.React`: `Html.elementWithProps`
 and `Html.text` allocate native React node resources through React's public
 APIs instead of building a second recursive structural tree.
 -/
 abbrev Html : Type :=
   ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
-/--
-Props passed to a ProofWidgets-style component.
-
-`children` stays in `Html` form so child-bearing components can decide where to
-render nested markup, matching the usual `props.children` role without adding a
-second React tree representation. Each child is a deferred React construction
-action, not an already-built node: component implementations should normally
-evaluate each selected child exactly once. Hooks belong in component render
-functions, not in arbitrary child actions whose evaluation is conditional.
--/
-structure ComponentProps (props : Type) where
-  props : props
-  children : Array Html := #[]
-
-abbrev Component (props : Type := Unit) : Type :=
-  Lean.Vir.Js (Lean.Vir.React.Component (ComponentProps props))
-
-namespace Component
-
-/-- Creates one reusable JavaScript React function for a ProofWidgets-style component. -/
-def ofLean
-    (render : ComponentProps props → ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
-    Lean.Vir.RuntimeM (Component props) :=
-  Lean.Vir.React.Component.ofLean fun props => do
-    render (← Lean.Vir.LeanRef.fromJSL props)
-
-end Component
-
-def componentProps {props : Type} (value : props) (children : Array Html := #[]) :
-    ComponentProps props :=
-  { props := value, children }
-
-abbrev Attr : Type :=
-  Lean.Vir.React.Property
-
-abbrev Handler : Type :=
-  Lean.Vir.React.EventHandler
-
-/-- Unified native React prop entry used as the lowering target for JSX. -/
-abbrev PropEntry : Type 1 :=
-  Lean.Vir.React.Props.Entry
-
-namespace PropEntry
-
-export Lean.Vir.React.Props (key property eventHandler ref)
-
-end PropEntry
-
-namespace Attr
-
-export Lean.Vir.React.Property (
-  string bool int float id className classList title role ariaLabel data dataTestId
-  tabIndex stylePairs src alt href target rel type inputValue checked
-)
-
-end Attr
-
-namespace Handler
-
-export Lean.Vir.React.EventHandler (on onClick onClickWith onInput onChange onSubmit)
-
-end Handler
-
 namespace Html
 
 def text (value : String) : Html := do
   Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString value)
-
-private def propsFrom (attrs : Array Attr) (handlers : Array Handler) :
-    Array Lean.Vir.React.Props.Entry :=
-  attrs.map Lean.Vir.React.Props.property ++
-    handlers.map Lean.Vir.React.Props.eventHandler
 
 def children (items : Array Html) :
     ReactM (Array (Lean.Vir.Js Lean.Vir.React.Node)) :=
@@ -104,7 +36,7 @@ def children (items : Array Html) :
 /-- Builds a native React element from a single unified prop array. -/
 def elementWithProps
     (tag : String)
-    (props : Array PropEntry := #[])
+    (props : Array Lean.Vir.React.Props.Entry := #[])
     (children : Array Html := #[]) :
     Html := do
   let childNodes ← Html.children children
@@ -121,128 +53,27 @@ def keyedFragment (key : String) (children : Array Html := #[]) : Html := do
     (← Lean.Vir.React.Props.fromEntries #[Lean.Vir.React.Props.key key])
     (← Lean.Vir.Js.Array.ofArray childNodes)
 
-def elementWith
-    (tag : String)
-    (attrs : Array Attr := #[])
-    (handlers : Array Handler := #[])
-    (children : Array Html := #[]) :
-    Html :=
-  elementWithProps tag (propsFrom attrs handlers) children
-
-def keyedElementWith
-    (tag key : String)
-    (attrs : Array Attr := #[])
-    (handlers : Array Handler := #[])
-    (children : Array Html := #[]) :
-    Html := do
-  let childNodes ← Html.children children
-  Lean.Vir.React.Node.keyedElementWith tag key (propsFrom attrs handlers) childNodes
-
-def element
-    (tag : String)
-    (attrs : Array Attr := #[])
-    (children : Array Html := #[]) :
-    Html :=
-  elementWith tag attrs #[] children
-
-def keyedElement
-    (tag key : String)
-    (attrs : Array Attr := #[])
-    (children : Array Html := #[]) :
-    Html :=
-  keyedElementWith tag key attrs #[] children
-
-def ofComponent
-    (component : Component props)
-    (props : props)
-    (children : Array Html := #[]) :
-    Html := do
-  Lean.Vir.React.Node.component component
-    (← Lean.Vir.LeanRef.toJSL (componentProps props children))
-
-/-- Builds a keyed native React component node without placing `key` in typed props. -/
-def keyedOfComponent
-    (key : String)
-    (component : Component props)
-    (props : props)
-    (children : Array Html := #[]) :
-    Html := do
-  Lean.Vir.React.Node.keyedComponent component
-    (← Lean.Vir.LeanRef.toJSL (componentProps props children))
-    (← Lean.Vir.JsValue.ofString key)
-
 def component
-    (component : Component props)
-    (props : props)
+    (component : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData props))
+    (data : Lean.Vir.JSL props)
     (children : Array Html := #[]) :
-    Html :=
-  ofComponent component props children
+  Html := do
+  let childNodes ← Html.children children
+  let props ← Lean.Vir.React.Props.WithData.make data
+  Lean.Vir.React.Node.functionComponent component props
+    (← Lean.Vir.Js.Array.ofArray childNodes)
 
 def keyedComponent
     (key : String)
-    (component : Component props)
-    (props : props)
+    (component : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData props))
+    (data : Lean.Vir.JSL props)
     (children : Array Html := #[]) :
-    Html :=
-  keyedOfComponent key component props children
-
-def div (children : Array Html) : Html :=
-  element "div" #[] children
-
-def divWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "div" attrs children
-
-def span (children : Array Html) : Html :=
-  element "span" #[] children
-
-def spanWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "span" attrs children
-
-def p (children : Array Html) : Html :=
-  element "p" #[] children
-
-def pWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "p" attrs children
-
-def b (children : Array Html) : Html :=
-  element "b" #[] children
-
-def bWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "b" attrs children
-
-def sectionWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "section" attrs children
-
-def ulWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "ul" attrs children
-
-def liWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "li" attrs children
-
-def h3With (attrs : Array Attr) (children : Array Html) : Html :=
-  element "h3" attrs children
-
-def strong (children : Array Html) : Html :=
-  element "strong" #[] children
-
-def strongWith (attrs : Array Attr) (children : Array Html) : Html :=
-  element "strong" attrs children
-
-def img (attrs : Array Attr := #[]) : Html :=
-  elementWith "img" attrs #[]
-
-def hr (attrs : Array Attr := #[]) : Html :=
-  elementWith "hr" attrs #[]
-
-def br (attrs : Array Attr := #[]) : Html :=
-  elementWith "br" attrs #[]
-
-def buttonWith
-    (attrs : Array Attr)
-    (handlers : Array Handler)
-    (children : Array Html) :
-    Html :=
-  elementWith "button" (#[Attr.type "button"] ++ attrs) handlers children
+  Html := do
+  let childNodes ← Html.children children
+  let props ← Lean.Vir.React.Props.WithData.make data
+  Lean.Vir.React.Props.setKey (Lean.Vir.React.Props.WithData.asProps props) key
+  Lean.Vir.React.Node.functionComponent component props
+    (← Lean.Vir.Js.Array.ofArray childNodes)
 
 end Html
 

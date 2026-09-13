@@ -23,10 +23,56 @@ const transport = {
   statGate: null,
 };
 const failures = [];
+const boundaryErrors = [];
+const consoleMessages = [];
+const unexpectedConsole = [];
+const expectedConsole = [];
 const unhandled = [];
-let lastCreated;
 let runtimeFault = null;
 let shellIntervalCount = 0;
+const inheritedContext = React.createContext(null);
+const inheritedContextValue = "outer infoview context";
+
+function RemovalLayoutProbe({ onCleanup, children }) {
+  React.useLayoutEffect(() => () => onCleanup(), [onCleanup]);
+  return children;
+}
+
+function shellWidget(config, onRemovalLayoutCleanup) {
+  const widget = React.createElement(VirInfoviewWidget, config);
+  return onRemovalLayoutCleanup === null
+    ? widget
+    : React.createElement(
+        RemovalLayoutProbe,
+        { onCleanup: onRemovalLayoutCleanup },
+        widget,
+      );
+}
+
+class ShellErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    boundaryErrors.push(String(error));
+  }
+
+  render() {
+    return this.state.error === null
+      ? this.props.children
+      : React.createElement(
+          "pre",
+          { "data-shell-error-boundary": "true" },
+          String(this.state.error),
+        );
+  }
+}
 
 function deferred() {
   let resolve, reject;
@@ -35,6 +81,74 @@ function deferred() {
     reject = no;
   });
   return { promise, resolve, reject };
+}
+
+function consoleMessage(args) {
+  return args
+    .map((value) => {
+      if (value instanceof Error) return value.stack ?? value.message;
+      try {
+        return String(value);
+      } catch {
+        return "[unprintable console value]";
+      }
+    })
+    .join(" ");
+}
+
+function allowConsoleDiagnostic(sentinel, count) {
+  expectedConsole.push({ sentinel, remaining: count });
+}
+
+function recordConsoleDiagnostic(level, args) {
+  const message = consoleMessage(args);
+  consoleMessages.push({ level, message });
+  const expected = expectedConsole.find(
+    ({ sentinel, remaining }) => remaining > 0 && message.includes(sentinel),
+  );
+  if (expected !== undefined) {
+    expected.remaining--;
+  } else {
+    unexpectedConsole.push({ level, message });
+  }
+}
+
+function observeDiagnostics() {
+  const unexpectedStart = unexpectedConsole.length;
+  const unhandledStart = unhandled.length;
+  const consoleError = console.error,
+    consoleWarn = console.warn;
+  const onUnhandled = (event) => {
+    unhandled.push(String(event.reason));
+    event.preventDefault();
+  };
+  globalThis.addEventListener("unhandledrejection", onUnhandled);
+  console.error = (...args) => {
+    recordConsoleDiagnostic("error", args);
+    consoleError(...args);
+  };
+  console.warn = (...args) => {
+    recordConsoleDiagnostic("warn", args);
+    consoleWarn(...args);
+  };
+  return () => {
+    console.error = consoleError;
+    console.warn = consoleWarn;
+    globalThis.removeEventListener("unhandledrejection", onUnhandled);
+    check(
+      unexpectedConsole.length === unexpectedStart,
+      `unexpected console diagnostic: ${unexpectedConsole
+        .slice(unexpectedStart)
+        .map(({ level, message }) => `${level}: ${message}`)
+        .join("; ")}`,
+    );
+    check(
+      unhandled.length === unhandledStart,
+      `unexpected unhandled rejection: ${unhandled
+        .slice(unhandledStart)
+        .join("; ")}`,
+    );
+  };
 }
 
 async function tick() {
@@ -50,14 +164,24 @@ async function until(predicate, label) {
   throw new Error(`shell observation timed out: ${label}`);
 }
 
+async function untilBare(predicate, label) {
+  for (let i = 0; i < 100; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (predicate()) return;
+  }
+  throw new Error(`shell observation timed out: ${label}`);
+}
+
 function fixtureState() {
   const state = {
     label: `G${states.length + 1}`,
     events: [],
     disposed: 0,
-    unmounts: 0,
+    cleanups: 0,
+    contexts: [],
     schedules: 0,
     cancellations: 0,
+    factoryCalls: 0,
     captured: null,
     ...runtimeFault,
   };
@@ -69,6 +193,8 @@ function fixtureState() {
 const harness = (globalThis.__shellTest = {
   rpc: null,
   loadedRef: null,
+  afterLoadRuntimeService: (service) => service,
+  widgetPassiveCleanup: () => {},
   runtimeOptions(options) {
     const state = fixtureState();
     // Wrap only test host observations. The actual shell still creates a fresh
@@ -82,6 +208,11 @@ const harness = (globalThis.__shellTest = {
           bindings["test.shell.label"] = () => state.label;
           bindings["test.shell.record"] = (event) => {
             state.events.push(event);
+            if (event === `cleanup:${state.label}`) {
+              state.cleanups++;
+              if (state.throwCleanup)
+                throw new Error("normal cleanup sentinel");
+            }
           };
           bindings["test.shell.capture"] = (
             success,
@@ -90,6 +221,9 @@ const harness = (globalThis.__shellTest = {
             payload,
           ) => {
             state.captured = { success, failure, schedule, payload };
+          };
+          bindings["test.shell.context"] = () => {
+            state.contexts.push(React.useContext(inheritedContext));
           };
           for (const [target, count] of [
             ["browser.timer.setTimeout", "schedules"],
@@ -120,33 +254,23 @@ const harness = (globalThis.__shellTest = {
       state.disposed++;
       return dispose();
     };
-    if (state.invalidComponent) {
-      const call = runtime.call.bind(runtime);
-      runtime.call = (...args) => {
-        const value = call(...args);
-        return args[0] === prefix + "createComponent" ? null : value;
-      };
-    }
-    lastCreated = state;
-  },
-  createdRoot(root) {
-    const state = lastCreated;
-    state.root = new WeakRef(root);
-    const unmount = root.unmount.bind(root);
-    root.unmount = () => {
-      state.unmounts++;
-      unmount();
-      if (state.throwUnmount) throw new Error("normal unmount sentinel");
-    };
-    const render = root.render.bind(root);
-    root.render = (...args) => {
-      if (state.throwRender) throw new Error("render sentinel");
-      return render(...args);
+    const call = runtime.call.bind(runtime);
+    runtime.call = (...args) => {
+      if (args[0] === prefix + "createComponent") state.factoryCalls++;
+      const value = call(...args);
+      if (state.throwComponentRender && args[0] === prefix + "createComponent") {
+        return function ThrowingComponent() {
+          throw new Error("render sentinel");
+        };
+      }
+      return state.invalidComponent && args[0] === prefix + "createComponent"
+        ? null
+        : value;
     };
   },
 });
 
-async function mountShell(props = {}) {
+async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container, {
@@ -154,14 +278,25 @@ async function mountShell(props = {}) {
   });
   const config = {
     wasmPath: "shell.wasm",
-    irPackage: { roots: [prefix + "createComponent", prefix + "mount"] },
+    irPackage: {
+      roots: [prefix + "createComponent"],
+    },
     componentEntry: prefix + "createComponent",
-    entry: prefix + "mount",
     pos: { uri: "file:///ShellLifetime.lean", line: 0, character: 0 },
     ...props,
   };
   await React.act(async () =>
-    root.render(React.createElement(VirInfoviewWidget, config)),
+    root.render(
+      React.createElement(
+        inheritedContext.Provider,
+        { value: inheritedContextValue },
+        React.createElement(
+          ShellErrorBoundary,
+          null,
+          shellWidget(config, onRemovalLayoutCleanup),
+        ),
+      ),
+    ),
   );
   return {
     container,
@@ -174,8 +309,21 @@ async function mountShell(props = {}) {
     async update(next) {
       Object.assign(config, next);
       await React.act(async () =>
-        root.render(React.createElement(VirInfoviewWidget, config)),
+        root.render(
+          React.createElement(
+            inheritedContext.Provider,
+            { value: inheritedContextValue },
+            React.createElement(
+              ShellErrorBoundary,
+              null,
+              shellWidget(config, onRemovalLayoutCleanup),
+            ),
+          ),
+        ),
       );
+    },
+    removeTransition() {
+      React.startTransition(() => root.render(null));
     },
     async unmount() {
       try {
@@ -220,6 +368,10 @@ async function normalUnmount() {
   const shell = await mountShell({ autoReloadMs: 10 });
   await shell.ready();
   const state = states.at(-1);
+  check(
+    state.contexts.includes(inheritedContextValue),
+    "Lean render node inherits the arbitrary outer React context",
+  );
   const success = pending(state),
     rejection = pending(state);
   await until(() => transport.stats > 1, "polling ran");
@@ -229,8 +381,8 @@ async function normalUnmount() {
     "normal cleanup detaches shell reference",
   );
   check(
-    state.unmounts === 1 && state.disposed === 0,
-    "normal cleanup unmounts only owned root",
+    state.cleanups === 1 && state.disposed === 0,
+    "normal cleanup runs the Lean effect once without shutdown",
   );
   check(shellIntervalCount === 0, "shell-owned polling stopped");
   const stats = transport.stats;
@@ -275,8 +427,8 @@ async function mountedRefresh() {
   );
   const fresh = states.at(-1);
   check(
-    old.unmounts === 1 && old.disposed === 0,
-    "refresh detached G1 without shutdown",
+    old.cleanups === 1 && old.disposed === 0,
+    "refresh cleans up G1 once without shutdown",
   );
   check(
     old.runtime.deref() !== fresh.runtime.deref(),
@@ -369,67 +521,73 @@ async function explicitShutdown() {
 }
 
 async function normalUnmountFailure() {
-  const shell = await mountShell();
+  let shell = await mountShell();
   await shell.ready();
   const state = states.at(-1),
     late = pending(state);
-  state.throwUnmount = true;
+  state.throwCleanup = true;
+  allowConsoleDiagnostic("normal cleanup sentinel", 2);
   const before = failures.length;
+  let cleanupError = "";
   try {
     await shell.unmount();
   } catch (error) {
+    if (!String(error).includes("normal cleanup sentinel")) throw error;
+    cleanupError = String(error);
     failures.push(String(error));
   }
   check(
-    failures.length === before + 1 &&
-      failures.at(-1).includes("normal unmount sentinel"),
-    "normal unmount error surfaced",
+    cleanupError === "Error: normal cleanup sentinel" &&
+      failures.length === before + 1 &&
+      failures.at(-1).includes("normal cleanup sentinel"),
+    "normal unmount surfaces only the injected cleanup error",
   );
   check(
-    harness.loadedRef.current === null && state.disposed === 0,
-    "throwing normal cleanup detaches without shutdown",
+    harness.loadedRef.current === null &&
+      state.cleanups === 1 &&
+      state.disposed === 0,
+    "throwing Lean cleanup records once and detaches without shutdown",
   );
   late.resolve("still callable");
   await late.completion;
   checkContinuation(state, "success", true);
   state.captured = null;
-  await collectUntil(
-    () => !state.runtime.deref(),
-    "throwing normal unmount generation released",
-  );
+  shell = null;
+  // React can retain its failed commit's fiber graph, including cleanup
+  // callbacks. Do not require stronger collection than native React here;
+  // successful cleanup and refresh have separate collection assertions.
 }
 
 async function failedCandidates() {
-  runtimeFault = { throwRender: true, throwDispose: true };
+  runtimeFault = { throwComponentRender: true };
+  allowConsoleDiagnostic("render sentinel", 2);
   const renderFailure = await mountShell();
   await until(
     () =>
       renderFailure.container.querySelector(
-        '[data-vir-infoview-state="error"]',
+        '[data-shell-error-boundary="true"]',
       ),
-    "render failure reported",
+    "factory component render failure reaches the ancestor boundary",
   );
   const rendered = states.at(-1);
   check(
-    renderFailure.container.textContent.includes("render sentinel") &&
-      renderFailure.container.textContent.includes(
-        "candidate disposal sentinel",
-      ),
-    "render and teardown errors both reported",
+    boundaryErrors.at(-1)?.includes("render sentinel") &&
+      renderFailure.container.textContent.includes("render sentinel"),
+    "factory component render failure is owned by the React error boundary",
   );
   check(
-    rendered.disposed === 1 &&
-      rendered.unmounts === 1 &&
+    rendered.disposed === 0 &&
+      rendered.cleanups === 0 &&
       harness.loadedRef.current === null,
-    "render failure hard-cleans and detaches",
+    "factory component render failure detaches without hard disposal or invented cleanup",
   );
-  let rejected = false;
-  try {
-    rendered.captured.success(undefined);
-  } catch (error) {
-    rejected = /disposed/.test(String(error));
-  }
-  check(rejected, "render failure invalidates escaped callbacks");
+  rendered.captured.success(undefined);
+  checkContinuation(rendered, "success", false);
+  check(
+    readJsl(rendered.runtime.deref(), rendered.captured.payload) ===
+      rendered.label,
+    "factory component render failure leaves captured JSL on the live generation",
+  );
   rendered.captured = null;
   await renderFailure.unmount();
 
@@ -453,6 +611,56 @@ async function failedCandidates() {
   await setupFailure.unmount();
 }
 
+function effectCount(state, event) {
+  return state.events.filter((value) => value === `${event}:${state.label}`).length;
+}
+
+async function replacementCleanupFailure() {
+  const shell = await mountShell({ autoReloadMs: 100 });
+  await shell.ready();
+  const old = states.at(-1);
+  old.throwCleanup = true;
+  allowConsoleDiagnostic("normal cleanup sentinel", 2);
+  transport.revision++;
+  await until(
+    () =>
+      shell.container.querySelector('[data-shell-error-boundary="true"]'),
+    "replacement cleanup reaches the ancestor boundary",
+  );
+  const successor = states.at(-1);
+  check(successor !== old, "refresh publishes a distinct successor generation");
+  check(
+    boundaryErrors.at(-1)?.includes("normal cleanup sentinel"),
+    "replacement cleanup failure is owned by the React error boundary",
+  );
+  check(
+    old.cleanups === 1 && effectCount(old, "cleanup") === 1 && old.disposed === 0,
+    "replaced component runs one Lean cleanup without hard disposal",
+  );
+  check(
+    successor.cleanups === effectCount(successor, "setup") &&
+      successor.disposed === 0 &&
+      harness.loadedRef.current === null,
+    "published successor has only matching React cleanup and no hard disposal",
+  );
+  old.captured.success(undefined);
+  checkContinuation(old, "success", true);
+  successor.captured.success(undefined);
+  check(
+    successor.events.includes(`body:success:${successor.label}`),
+    "published successor callback remains live after boundary recovery",
+  );
+  check(
+    readJsl(old.runtime.deref(), old.captured.payload) === old.label &&
+      readJsl(successor.runtime.deref(), successor.captured.payload) ===
+        successor.label,
+    "replacement cleanup failure retains both original JSL generations",
+  );
+  old.captured = null;
+  successor.captured = null;
+  await shell.unmount();
+}
+
 async function obsoleteCandidateAndPoll() {
   const buildGate = deferred();
   transport.buildGate = buildGate;
@@ -464,7 +672,7 @@ async function obsoleteCandidateAndPoll() {
   await until(() => states.length > before, "obsolete candidate finished");
   const obsolete = states.at(-1);
   check(
-    obsolete.disposed === 1 && obsolete.root === undefined,
+    obsolete.disposed === 1,
     "obsolete never-installed candidate hard-disposed",
   );
   check(
@@ -510,12 +718,11 @@ async function failedRefresh() {
   const candidate = states.at(-1);
   check(
     candidate !== old &&
-      candidate.disposed === 1 &&
-      candidate.root === undefined,
+      candidate.disposed === 1,
     "invalid refresh candidate hard-disposed",
   );
   check(
-    old.unmounts === 0 &&
+    old.cleanups === 0 &&
       old.disposed === 0 &&
       shell.container.textContent.includes(old.label),
     "failed refresh preserves mounted G1",
@@ -527,63 +734,69 @@ async function failedRefresh() {
   old.captured = null;
 }
 
-async function refreshUnmountFailure() {
-  const shell = await mountShell({ autoReloadMs: 100 });
+async function singlePendingRefresh() {
+  const shell = await mountShell({ autoReloadMs: 10 });
   await shell.ready();
-  const old = states.at(-1),
-    late = pending(old);
-  old.throwUnmount = true;
+  const old = states.at(-1);
+  const builds = transport.builds;
+  const gate = deferred();
+  transport.buildGate = gate;
   transport.revision++;
+  await until(() => transport.buildGate === null, "refresh build pending");
+  for (let i = 0; i < 5; i++) await tick();
+  check(
+    transport.builds === builds + 1,
+    "polling admits only one refresh while its package build is pending",
+  );
+  gate.resolve();
   await until(
-    () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
-    "refresh unmount failure status",
+    () =>
+      states.at(-1) !== old &&
+      shell.container.textContent.includes(states.at(-1).label),
+    "pending refresh eventually installs its successor",
   );
-  await shell.update({ autoReloadMs: 0 });
-  const candidate = states.at(-1);
+  const fresh = states.at(-1);
   check(
-    shell.container.textContent.includes("normal unmount sentinel"),
-    "refresh unmount error reported",
+    old.cleanups === 1 && old.disposed === 0 && fresh.disposed === 0,
+    "completed pending refresh replaces one live generation without shutdown",
   );
-  check(
-    old.disposed === 0 &&
-      candidate !== old &&
-      candidate.disposed === 1 &&
-      harness.loadedRef.current === null,
-    "refresh exception detaches old owner and hard-disposes uninstalled candidate",
-  );
-  late.resolve(undefined);
-  await late.completion;
-  checkContinuation(old, "success", true);
-  await shell.unmount();
   old.captured = null;
-  candidate.captured = null;
-  await collectUntil(
-    () => !old.runtime.deref() && !candidate.runtime.deref(),
-    "failed refresh owners released",
-  );
+  fresh.captured = null;
+  await shell.unmount();
 }
 
-globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  const onUnhandled = (event) => {
-    unhandled.push(String(event.reason));
-    event.preventDefault();
-  };
-  globalThis.addEventListener("unhandledrejection", onUnhandled);
-  const setIntervalOriginal = globalThis.setInterval,
-    clearIntervalOriginal = globalThis.clearInterval;
-  const intervals = new Set();
-  globalThis.setInterval = (...args) => {
-    const id = setIntervalOriginal(...args);
-    intervals.add(id);
-    shellIntervalCount = intervals.size;
-    return id;
-  };
-  globalThis.clearInterval = (id) => {
-    intervals.delete(id);
-    shellIntervalCount = intervals.size;
-    return clearIntervalOriginal(id);
-  };
+async function obsoleteConfigurationCandidate() {
+  const gate = deferred();
+  const before = states.length;
+  transport.buildGate = gate;
+  const shell = await mountShell({ autoReloadMs: 0 });
+  await until(() => transport.buildGate === null, "initial configuration build pending");
+  await shell.update({ wasmPath: "reconfigured-shell.wasm" });
+  await until(
+    () =>
+      states.length === before + 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "changed configuration installs its own generation",
+  );
+  const current = states.at(-1);
+  gate.resolve();
+  await until(
+    () => states.length === before + 2,
+    "obsolete configuration candidate finishes",
+  );
+  const obsolete = states.at(-1);
+  check(
+    current.disposed === 0 &&
+      obsolete.disposed === 1 &&
+      harness.loadedRef.current !== null,
+    "changed props retain their live generation and hard-dispose the obsolete candidate",
+  );
+  current.captured = null;
+  obsolete.captured = null;
+  await shell.unmount();
+}
+
+function installMockRpc(wasmBase64, packageBase64) {
   harness.rpc = {
     async call(method, params) {
       if (method.endsWith("statIRPackage")) {
@@ -629,6 +842,111 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
       };
     },
   };
+}
+
+async function pendingCandidateAfterCommittedRemoval(wasmBase64, packageBase64) {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  installMockRpc(wasmBase64, packageBase64);
+  const finishDiagnostics = observeDiagnostics();
+  const gate = deferred();
+  const timing = {
+    loadReady: false,
+    removalLayoutCleanups: 0,
+    passiveCleanups: 0,
+    passiveCleanupsAtHandoff: null,
+    shellRemovedAtHandoff: false,
+  };
+  const before = states.length;
+  let shell = null;
+  let unmounted = false;
+  harness.afterLoadRuntimeService = async (servicePromise) => {
+    const service = await servicePromise;
+    timing.loadReady = true;
+    await gate.promise;
+    timing.passiveCleanupsAtHandoff = timing.passiveCleanups;
+    timing.shellRemovedAtHandoff =
+      shell !== null &&
+      shell.container.querySelector(".vir-infoview-widget-shell") === null;
+    return service;
+  };
+  harness.widgetPassiveCleanup = () => {
+    timing.passiveCleanups = (timing.passiveCleanups ?? 0) + 1;
+  };
+  try {
+    shell = await mountShell({}, {
+      onRemovalLayoutCleanup: () => {
+        timing.removalLayoutCleanups++;
+        gate.resolve();
+      },
+    });
+    await until(() => timing.loadReady, "candidate load held at source await");
+    // Keep the root alive and let React schedule this transition normally.
+    // `act` would synchronously flush the passive cleanup we need to observe.
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    shell.removeTransition();
+    await untilBare(
+      () => timing.removalLayoutCleanups === 1,
+      "shell removal layout cleanup committed",
+    );
+    await untilBare(
+      () => timing.passiveCleanupsAtHandoff !== null,
+      "candidate source await returned during shell removal",
+    );
+    check(
+      timing.removalLayoutCleanups === 1 &&
+        timing.shellRemovedAtHandoff &&
+        timing.passiveCleanupsAtHandoff === 0,
+      "candidate source await returns after committed removal and before passive cleanup",
+    );
+    check(states.length === before + 1, "one held candidate creates one runtime");
+    const candidate = states.at(-1);
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    await shell.unmount();
+    unmounted = true;
+    return {
+      timing,
+      candidate: {
+        disposed: candidate.disposed,
+        factoryCalls: candidate.factoryCalls,
+        cleanups: candidate.cleanups,
+      },
+      loaded: harness.loadedRef.current !== null,
+    };
+  } finally {
+    harness.afterLoadRuntimeService = (service) => service;
+    harness.widgetPassiveCleanup = () => {};
+    if (shell !== null && !unmounted) {
+      // The successful unmount above has already released this root; this is
+      // only a failure-path attempt to keep the focused control isolated.
+      try {
+        await shell.unmount();
+      } catch {}
+    }
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    finishDiagnostics();
+  }
+}
+
+globalThis.runPendingCandidateAfterCommittedRemoval = pendingCandidateAfterCommittedRemoval;
+
+globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const finishDiagnostics = observeDiagnostics();
+  const setIntervalOriginal = globalThis.setInterval,
+    clearIntervalOriginal = globalThis.clearInterval;
+  const intervals = new Set();
+  globalThis.setInterval = (...args) => {
+    const id = setIntervalOriginal(...args);
+    intervals.add(id);
+    shellIntervalCount = intervals.size;
+    return id;
+  };
+  globalThis.clearInterval = (id) => {
+    intervals.delete(id);
+    shellIntervalCount = intervals.size;
+    return clearIntervalOriginal(id);
+  };
+  installMockRpc(wasmBase64, packageBase64);
   try {
     await normalUnmount();
     await mountedRefresh();
@@ -637,16 +955,14 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
     await normalUnmountFailure();
     await failedCandidates();
     await failedRefresh();
-    await refreshUnmountFailure();
+    await replacementCleanupFailure();
+    await singlePendingRefresh();
+    await obsoleteConfigurationCandidate();
     await obsoleteCandidateAndPoll();
     await tick();
     check(
-      failures.length === 1 && failures[0].includes("normal unmount sentinel"),
-      "only the injected React cleanup error is observed",
-    );
-    check(
-      unhandled.length === 0,
-      `unexpected unhandled rejection: ${unhandled.join("; ")}`,
+      failures.every((failure) => failure.includes("normal cleanup sentinel")),
+      "only the injected React cleanup error is observed when React forwards it",
     );
     return {
       ok: true,
@@ -659,6 +975,10 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
       hardShutdown: true,
       failurePaths: true,
       normalCleanupException: true,
+      renderBoundary: true,
+      singlePendingRefresh: true,
+      obsoleteConfigurationCandidate: true,
+      consoleDiagnostics: consoleMessages.length,
       obsoleteLoadAndPoll: true,
       unhandled: unhandled.length,
     };
@@ -666,7 +986,7 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
     globalThis.setInterval = setIntervalOriginal;
     globalThis.clearInterval = clearIntervalOriginal;
     for (const id of intervals) clearIntervalOriginal(id);
-    globalThis.removeEventListener("unhandledrejection", onUnhandled);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    finishDiagnostics();
   }
 };

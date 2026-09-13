@@ -19,8 +19,8 @@ open Lean.Vir.React
 def label (value : Nat) : String :=
   "react:" ++ toString value
 
-def counter : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def counter : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
     let count ← StateTuple.toState (← Hooks.useState initial)
     let countValue ← JsValue.toNat count.value
@@ -54,8 +54,9 @@ def mount (selector : String) : DomM Bool := do
   | some container => do
       let root ← Lean.Vir.React.Root.create container
       let component ← counter
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
@@ -77,20 +78,21 @@ def renderStatic (selector : String) : DomM Bool := do
       pure true
 
 def renderStaticIntoSelector (selector : String) : DomM Bool := do
-  let component ← Component.ofLean fun _ => staticTree
+  let component ← FunctionComponent.ofLean fun _ => staticTree
   let container ← Lean.Vir.Browser.Document.querySelector
     (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
   match ← Lean.Vir.Js.Nullable.toOption container with
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
-def effectProbe : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def effectProbe : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let effect ← EffectCallback.ofLean { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
     Hooks.useEffect effect (← Js.UndefinedOr.undefined)
     let dep ← JsValue.ofNat 1
@@ -109,13 +111,14 @@ def mountEffect (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
-def memoProbe : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def memoProbe : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let dep ← JsValue.ofNat 1
     let deps ← Hooks.DependencyList.ofArray #[dep]
     let calculate : ReactM (Lean.Vir.Js Nat) := do
@@ -134,13 +137,14 @@ def mountMemo (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
-def memoStableProbe : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def memoStableProbe : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
     let count ← StateTuple.toState (← Hooks.useState initial)
     let deps ← Hooks.DependencyList.empty
@@ -167,13 +171,14 @@ def mountMemoStable (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 
-def refFragmentProbe : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
     let count ← StateTuple.toState (← Hooks.useState initial)
     let lastClick ← Hooks.useRef initial
@@ -205,8 +210,9 @@ def mountRefFragment (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 

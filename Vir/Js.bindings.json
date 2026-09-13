@@ -37,6 +37,26 @@
         "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value α" } }
       },
       {
+        "id": "javascript.undefined-or.is-undefined", "group": "undefined", "target": "js.undefinedOr.isUndefined",
+        "lean": "Lean.Vir.Js.UndefinedOr.isUndefined", "marker": "vir_js",
+        "reason": "Tests for the exact JavaScript undefined value without decoding the payload or treating null as absent.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"],
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js.UndefinedOr α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value α" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.undefined-or.value", "group": "undefined", "target": "js.undefinedOr.value",
+        "lean": "Lean.Vir.Js.UndefinedOr.get", "marker": "vir_js",
+        "reason": "Returns the exact defined payload, throwing TypeError on undefined. Checks absence, not the caller-declared payload shape.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"],
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js.UndefinedOr α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value α" } }],
+        "result": { "type": { "lean": "Js α", "representation": "js-resource", "resourceInner": "α" } }
+      },
+      {
         "id": "javascript.string.of", "group": "primitive-conversions", "target": "js.string",
         "lean": "Lean.Vir.JsValue.ofString", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a Lean-owned String into a JavaScript string resource.",
@@ -467,7 +487,7 @@
     {
       "id": "undefined",
       "title": "Undefined or value",
-      "targets": ["js.undefined"],
+      "targets": ["js.undefined", "js.undefinedOr.*"],
       "lean": { "public": ["Lean.Vir.Js.UndefinedOr"] },
       "upstream": { "kind": "internal" }
     },

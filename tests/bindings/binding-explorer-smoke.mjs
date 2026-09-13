@@ -191,8 +191,8 @@ assert.ok(Object.values(report.summary.generation.activeEffects)
   .every((count) => count > 0));
 assert.equal(
   generatedOperations.find((operation) =>
-    operation.id === "infoview.clipboard.write-text")?.semantics.relation,
-  "local-contract",
+    operation.id === "infoview.editorApi.copyToClipboard")?.semantics.relation,
+  "preserving",
 );
 assert.equal(report.summary.generation.boundaries.targets, report.summary.targets);
 assert.equal(
@@ -563,21 +563,23 @@ assert.ok(canvasElement?.generatedOperations.some((operation) =>
   operation.id === "browser.canvas.fromElement" &&
   operation.typescript.kind === "protocol"));
 
-const localCommands = roots.find((root) =>
-  root.library === "infoview" && root.id === "commands");
-assert.deepEqual(localCommands?.analysis, {
-  status: "complete",
+const editor = roots.find((root) =>
+  root.library === "infoview-panel" && root.id === "editor");
+assert.deepEqual(editor?.analysis, {
+  status: "automatic",
   scope: "complete-upstream-surface",
 });
-assert.ok(localCommands?.bindings.some((binding) =>
-  binding.target === "infoview.command.insertText"));
-assert.equal(localCommands?.coverage.summary["contract-linked"], 3);
-assert.equal(localCommands?.coverage.summary.compatible, undefined);
-assert.equal(localCommands?.coverage.summary.missing, 0);
-assert.equal(localCommands?.workItems.length, 0);
-assert.ok(localCommands?.generatedOperations.every((operation) =>
-  operation.protocol.upstreamRelation.kind === "local-contract" &&
-  typeof operation.protocol.upstreamRelation.member === "string"));
+assert.ok(editor?.bindings.some((binding) =>
+  binding.target === "infoview.editorApi.insertText"));
+assert.equal(editor?.coverage.summary["contract-linked"], 0);
+assert.equal(editor?.coverage.summary["protocol-linked"], 6);
+// The position fields are provided separately by the native panel-position group.
+assert.equal(editor?.coverage.summary.missing, 3);
+assert.equal(editor?.workItems.length, 0);
+assert.ok(editor?.generatedOperations.every((operation) =>
+  operation.id === "infoview.editorContext"
+    ? operation.protocol.upstreamRelation.kind === "vir-owned"
+    : operation.protocol.upstreamRelation.kind === "upstream-adapter"));
 
 const reactDomRoot = roots.find((root) => root.library === "react" && root.id === "react-dom-root");
 assert.deepEqual(reactDomRoot?.analysis, {

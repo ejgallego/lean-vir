@@ -33,12 +33,11 @@ def callExact
   let method ← Lean.Vir.JsValue.ofString "Vir.Fixtures.InfoviewRpcPromise.echo"
   Lean.Vir.Infoview.RpcSession.call session method request
 
-/-- Read the exact RPC session carried by the ordinary infoview surface. -/
-def callSurfaceExact
-    (surface : Lean.Vir.Infoview.Surface)
+/-- Call through the exact RPC session returned by the infoview hook. -/
+def callHookExact
     (request : Lean.Vir.Js Request) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Response) :=
-  callExact surface.rpcSession request
+    Lean.Vir.React.ReactM (Lean.Vir.Js.Promise Response) := do
+  callExact (← Lean.Vir.Infoview.useRpcSession) request
 
 /--
 Call a position-specific infoview RPC session and project one response field

@@ -13,6 +13,8 @@ import { describeError, until, withCleanup } from "./rpc-test-support.js";
 
 const prefix = "Vir.Fixtures.ShellLifetime.";
 const states = [];
+const inheritedContext = React.createContext(null);
+const inheritedContextValue = { source: "outer infoview tree" };
 const check = (condition, label) => {
   if (!condition) throw new Error(label);
 };
@@ -27,11 +29,11 @@ async function post(path, body) {
 }
 
 // Test observations only. Stale state, body entry, and the conditional mutation
-// all execute in the unchanged interpreted ShellLifetime Lean fixture.
+// all execute in the interpreted ShellLifetime Lean fixture.
 globalThis.__rpcShell = {
   session: null,
   observe(options) {
-    const state = { label: `G${states.length + 1}`, events: [] };
+    const state = { label: `G${states.length + 1}`, events: [], contexts: [] };
     states.push(state);
     return {
       state,
@@ -40,6 +42,9 @@ globalThis.__rpcShell = {
         defaultHostBindings: () =>
           Object.assign(options.defaultHostBindings(), {
             "test.shell.label": () => state.label,
+            "test.shell.context": () => {
+              state.contexts.push(React.useContext(inheritedContext));
+            },
             "test.shell.record": (event) => {
               state.events.push(event);
             },
@@ -85,6 +90,14 @@ async function run() {
   });
   const onError = (event) => unexpected.push(event.error ?? event.message);
   const onUnhandled = (event) => unexpected.push(event.reason);
+  const consoleDiagnostics = [];
+  const originalConsole = { error: console.error, warn: console.warn };
+  for (const level of ["error", "warn"]) {
+    console[level] = (...args) => {
+      consoleDiagnostics.push(args.map(String).join(" "));
+      originalConsole[level].apply(console, args);
+    };
+  }
   globalThis.addEventListener("error", onError);
   globalThis.addEventListener("unhandledrejection", onUnhandled);
   const notify = (path, body) => {
@@ -103,10 +116,12 @@ async function run() {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
   async function waitFor(label, predicate) {
-    await until(label, async () => {
+    const deadline = performance.now() + 30000;
+    while (performance.now() < deadline) {
       await tick();
-      return predicate();
-    });
+      if (predicate()) return;
+    }
+    throw new Error(`timed out: ${label}`);
   }
   const gate = (action, message) => post("/gate", { action, message });
   const unmountUI = () => React.act(async () => root.render(null));
@@ -170,26 +185,25 @@ async function run() {
     root = createRoot(container, {
       onUncaughtError: (error) => unexpected.push(error),
     });
-    const roots = [prefix + "createComponent", prefix + "mount"];
+    const roots = [prefix + "createComponent"];
     function renderWidget(session, position, entries = roots, {
       autoReloadMs = 0,
       setupHint = "",
       componentEntry = prefix + "createComponent",
-      entry = prefix + "mount",
       editorConnection = editor,
     } = {}) {
       globalThis.__rpcShell.session = session;
       return React.act(async () =>
         root.render(
+          React.createElement(inheritedContext.Provider, { value: inheritedContextValue },
           React.createElement(EditorContext.Provider, { value: editorConnection }, React.createElement(VirInfoviewWidget, {
             wasmPath: "web/public/vir-upstream.wasm",
             irPackage: { roots: entries },
             componentEntry,
-            entry,
             pos: { uri: config.uri, ...position },
             autoReloadMs,
             setupHint,
-          })),
+          }))),
         ),
       );
     }
@@ -197,6 +211,7 @@ async function run() {
       const count = states.length;
       await renderWidget(session, position, entries, options);
       await waitFor("real-server shell ready", () => {
+        if (unexpected.length !== 0) throw unexpected[0];
         const error = container.querySelector(
           '[data-vir-infoview-state="error"]',
         );
@@ -320,6 +335,8 @@ async function run() {
     }
 
     const first = await mount(a, config.a);
+    check(first.contexts.length > 0 && first.contexts.every((value) => value === inheritedContextValue),
+      "Lean render inherits an arbitrary outer context without a shell bridge");
     const unmounted = await pendingPair(first, a, "unmount");
     await unmountUI();
     check(
@@ -343,7 +360,9 @@ async function run() {
       a,
       "configuration-replacement",
     );
-    const current = await mount(b, config.b, [...roots].reverse());
+    // A factory-only package has one root: reversing it no longer changes
+    // configuration. Include an existing fixture export to request a new package.
+    const current = await mount(b, config.b, [...roots, prefix + "record"]);
     check(
       previous.runtime !== current.runtime &&
         !previous.runtime.disposed &&
@@ -510,11 +529,11 @@ async function run() {
     check(!container.querySelector("[data-vir-infoview-state]"), "obsolete result cannot reinstall UI");
     const obsoleteState = states.at(-1);
 
-    // Exercise the actual shell context bridge with the all-Lean tutorial, not
-    // only a manually provided context around an independent browser root.
+    // Exercise inherited upstream context with the all-Lean tutorial in the
+    // actual shell, not a second root with a manually forwarded provider.
     packageReplyDelayMs = 0;
-    const tutorialEntries = ["RpcReferenceWidget.createComponent", "RpcReferenceWidget.mount"];
-    const tutorialOptions = { componentEntry: tutorialEntries[0], entry: tutorialEntries[1] };
+    const tutorialEntries = ["RpcReferenceWidget.createComponent"];
+    const tutorialOptions = { componentEntry: tutorialEntries[0] };
     await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
     await waitFor("all-Lean tutorial ready in actual shell", () => {
       const error = container.querySelector('[data-vir-infoview-state="error"]');
@@ -529,7 +548,7 @@ async function run() {
     const button = container.querySelector("#rpc-reference-view");
     React.act(() => button.click());
     check(subscriptions === 1 && notificationHandlers.size === 1,
-      "actual shell forwards upstream EditorContext into the Lean root");
+      "Lean component inherits upstream EditorContext through the shell");
     await renderWidget(a, config.a, tutorialEntries, tutorialOptions);
     await tick();
     check(tutorialCalls().length === tutorialFirst, "unchanged shell render does not request");
@@ -599,6 +618,7 @@ async function run() {
         events: obsoleteState.events,
       },
       allLeanEditRefresh: { requests: tutorialCalls().length, subscriptionsAfterUnmount: subscriptions },
+      consoleDiagnostics,
     };
   }, [
     [
@@ -642,6 +662,9 @@ async function run() {
         await new Promise((resolve) => setTimeout(resolve, 0));
         globalThis.removeEventListener("error", onError);
         globalThis.removeEventListener("unhandledrejection", onUnhandled);
+        Object.assign(console, originalConsole);
+        check(consoleDiagnostics.length === 0,
+          `unexpected browser diagnostics: ${JSON.stringify(consoleDiagnostics)}`);
         check(
           unexpected.length === 0,
           JSON.stringify(unexpected.map(describeError)),

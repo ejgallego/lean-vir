@@ -13,8 +13,8 @@ open Lean.Vir.React
 @[vir_js "test.react.externalBadge"]
 opaque externalBadge : ReactM (Lean.Vir.Js ElementType)
 
-def externalComponentProbe : RuntimeM (Js (Component Unit)) :=
-  Component.ofLean fun _ => do
+def externalComponentProbe : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
     let component ← externalBadge
     let initial ← JsValue.ofString "unset"
     let ref ← Hooks.useRef initial
@@ -24,15 +24,16 @@ def externalComponentProbe : RuntimeM (Js (Component Unit)) :=
     Node.createElement component props children
 
 def mount (selector : String) : DomM Bool := do
-  let component ← externalComponentProbe
   let container ← Lean.Vir.Browser.Document.querySelector
     (← Lean.Vir.Browser.Document.current) (← Lean.Vir.JsValue.ofString selector)
   match ← Lean.Vir.Js.Nullable.toOption container with
   | none => pure false
   | some container => do
+      let component ← externalComponentProbe
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.LeanRef.toJSL ()
-      let node ← Lean.Vir.React.ReactM.run (Lean.Vir.React.Node.component component props)
+      let props ← Lean.Vir.React.Props.empty
+      let node ← Lean.Vir.React.ReactM.run do
+        Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
       pure true
 

@@ -156,6 +156,9 @@ export class VirHostState {
   }
 
   callObjectsImpl(slot, argvPtr, argc) {
+    // A recorded exception belongs to the active JS call. Even if Lean catches
+    // the IO error used for propagation, it must not dispatch further host work.
+    if (this.callError !== null) throw this.callError;
     if (this.disposed) {
       throw new Error("Vir host state has been disposed");
     }

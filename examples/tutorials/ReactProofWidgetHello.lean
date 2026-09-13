@@ -11,8 +11,8 @@ public import Vir.React
 
 /-!
 A minimal live widget: the shell reuses the component factory's result and
-passes a fresh `Surface` when the cursor moves. For a complete goal and local
-context viewer, see `examples/VirNativeInfoview.lean`.
+passes native infoview panel props when the cursor moves. For a complete goal
+and local-context viewer, see `examples/VirNativeInfoview.lean`.
 -/
 
 public section
@@ -21,20 +21,25 @@ namespace ReactProofWidgetHello
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
 
-def View : RuntimeM (Js (Component Surface)) := Component.ofLean fun surface => do
-  let surface ← LeanRef.fromJSL surface
-  let heading ← Node.text (← JsValue.ofString ("Hello from " ++ surface.cursor.label))
-  let goal := match surface.goals[0]? with
-    | none => "Move the cursor into a proof to see its first goal."
-    | some goal => "⊢ " ++ goal.target
+def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
+  FunctionComponent.ofLean fun props => do
+  let position ← PanelWidgetProps.pos props
+  let uri ← JsValue.toString (← PanelPosition.uri position)
+  let heading ← Node.text (← JsValue.ofString ("Hello from " ++ uri))
+  let goals ← Js.Array.toLeanArray (← PanelWidgetProps.goals props)
+  let goal ← match goals[0]? with
+    | none => pure "Move the cursor into a proof to see its first goal."
+    | some goal =>
+      let target ← CodeWithInfos.stripTags (← InteractiveGoal.type goal)
+      pure ("⊢ " ++ (← JsValue.toString target))
   let target ← Node.text (← JsValue.ofString goal)
   Node.sectionWith #[Props.id "react-proof-hello"] #[
     ← Node.h3 #[heading],
     ← Node.pre #[target]
   ]
 
--- Derive the standard factory, mount entry, and widget configuration.
-vir_proof_widget View with mountId := "vir-react-proof-widget-hello"
+-- Derive the standard native-props factory and widget configuration.
+vir_proof_widget View
 
 end ReactProofWidgetHello
 

@@ -64,28 +64,28 @@ private def normalizeAttributeName : String → String
   | "dataTestId" => "data-testid"
   | name => name
 
-def property [AttributeValue α] (name : String) (value : α) : PropEntry :=
+def property [AttributeValue α] (name : String) (value : α) : Lean.Vir.React.Props.Entry :=
   .property <| AttributeValue.toProperty (normalizeAttributeName name) value
 
-def style (entries : Array (String × String)) : PropEntry :=
+def style (entries : Array (String × String)) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.stylePairs entries
 
-def classList (classes : Array String) : PropEntry :=
+def classList (classes : Array String) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.classList classes
 
-def key (value : String) : PropEntry :=
+def key (value : String) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.key value
 
 def ref {α : Type}
-    (value : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) : PropEntry :=
+    (value : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.ref value
 
 def event
     (name : String)
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : PropEntry :=
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.on name callback
 
-def eventUnit (name : String) (callback : Lean.Vir.Browser.DomM Unit) : PropEntry :=
+def eventUnit (name : String) (callback : Lean.Vir.Browser.DomM Unit) : Lean.Vir.React.Props.Entry :=
   Lean.Vir.React.Props.onUnit name callback
 
 -- Verbose names avoid collisions with other packages' unscoped parser categories.
@@ -287,8 +287,8 @@ private meta def transformTag
       | #[base], #[] => pure base
       | _, _ => `(term| { $bases,* with $fields,* })
     match keys[0]? with
-    | none => `(Html.ofComponent $component $props $children)
-    | some key => `(Html.keyedOfComponent $key $component $props $children)
+    | none => `(do Html.component $component (← Lean.Vir.LeanRef.toJSL $props) $children)
+    | some key => `(do Html.keyedComponent $key $component (← Lean.Vir.LeanRef.toJSL $props) $children)
   else
     let mut propParts : Array Term := #[]
     let mut propItems : Array Term := #[]
@@ -307,8 +307,10 @@ private meta def transformTag
     `(Html.elementWithProps $(quote tag) $props $children)
 
 /--
-JSX-like syntax for VIR-native HTML. Lowercase tags are React elements and
-uppercase tags are Lean `ProofWidgets.Component` values.
+JSX-like syntax for VIR-native HTML. Lowercase tags are React elements.
+Uppercase tags require `React.FunctionComponent (React.Props.WithData α)`:
+their Lean record attributes (or `Unit`) are boxed into `props.data`.
+Use `Node.functionComponent` directly for other native props shapes.
 -/
 macro_rules
   | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) =>

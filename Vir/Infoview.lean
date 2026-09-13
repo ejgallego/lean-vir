@@ -10,6 +10,6 @@ public import Vir.Infoview.Assets
 public meta import Vir.Infoview.Assets
 public import Vir.Infoview.Package
 public meta import Vir.Infoview.Package
-public import Vir.Infoview.Surface
+public import Vir.Infoview.Client
 public import Vir.Infoview.Widget
 public meta import Vir.Infoview.Widget

@@ -231,17 +231,17 @@ Each Lean source group that owns shipped bindings has a companion
 - `Vir/Common.bindings.json`
 - `Vir/Js.bindings.json`
 - `Vir/React.bindings.json`
-- `Vir/Infoview/Surface.bindings.json`
+- `Vir/Infoview/Panel.bindings.json`
+- `Vir/Infoview/Client.bindings.json`
 
 Selected upstream declarations may be pinned as small provenance-bearing
 extracts when installing the full package is unnecessary:
 
 - `Vir/Infoview/RpcSession.contract.d.ts`, from
   `@leanprover/infoview-api`
+- `Vir/Infoview/Editor.contract.d.ts`, selected editor instance/static members,
+  independently checked against the pinned infoview packages by TypeScript tests.
 
-Local host protocols use declaration syntax too:
-
-- `Vir/Infoview/Surface.contract.d.ts`
 
 Every local protocol operation names the exact declaration member it
 implements. The generator rejects missing members, while the explorer verifies

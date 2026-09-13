@@ -46,8 +46,11 @@ export async function smokeBrowserNativeInfoviewUpdates(
     )`);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value, {
-    submissions: 4, initialGoals: 3, collapsedAfterUpdate: true, finalGoals: 0,
+    submissions: 5, boundaryChecks: 5, initialGoals: 4, collapsedAfterUpdate: true, finalGoals: 0,
   });
+  const authoring = await evaluate(cdp,
+    `runProofWidgetsNativeChildren(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
+  assert.equal(authoring, true);
   return result.value;
 }
 

@@ -162,15 +162,13 @@
         {
           "module": "tutorials.ReactProofWidgetHello",
           "roots": [
-            "ReactProofWidgetHello.createComponent",
-            "ReactProofWidgetHello.mount"
+            "ReactProofWidgetHello.createComponent"
           ]
         },
         {
           "module": "VirNativeInfoview",
           "roots": [
-            "VirNativeInfoview.createComponent",
-            "VirNativeInfoview.mount"
+            "VirNativeInfoview.createComponent"
           ]
         }
       ],

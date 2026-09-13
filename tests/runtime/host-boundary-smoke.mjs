@@ -278,50 +278,6 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   hostState.dispose();
 }
 
-{
-  const calls = [];
-  const bindings = createInfoviewHostBindings({
-    commandDispatcher: {
-      insertText(...payload) {
-        calls.push(payload);
-      },
-    },
-  });
-  const position = bindings["infoview.documentPosition"](
-    "file:///Main.lean",
-    "Main.lean",
-    3n,
-    7n,
-    "Main",
-  );
-  assert.equal(
-    bindings["infoview.command.insertText"](position, "exact text"),
-    true,
-  );
-  assert.deepEqual(calls, [
-    [
-      {
-        uri: "file:///Main.lean",
-        fileName: "Main.lean",
-        line: 3,
-        character: 7,
-        label: "Main",
-      },
-      "exact text",
-    ],
-  ]);
-  assert.throws(
-    () =>
-      bindings["infoview.documentPosition"](
-        "file:///Main.lean",
-        "Main.lean",
-        -1n,
-        0n,
-        "Main",
-      ),
-    /non-negative safe-integer coordinates/,
-  );
-}
 
 {
   const lifecycle = createHostLifecycle();
@@ -336,6 +292,12 @@ import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
   assert.equal(bindings["js.nullable.value"](object), object);
   assert.equal(bindings["js.nullable.value"](undefined), undefined);
   assert.throws(() => bindings["js.nullable.value"](null), /non-null/);
+  assert.equal(bindings["js.undefinedOr.isUndefined"](undefined), true);
+  for (const value of [null, object, false, 0, "", () => {}]) {
+    assert.equal(bindings["js.undefinedOr.isUndefined"](value), false);
+    assert.equal(bindings["js.undefinedOr.value"](value), value);
+  }
+  assert.throws(() => bindings["js.undefinedOr.value"](undefined), TypeError);
   lifecycle.dispose();
 }
 

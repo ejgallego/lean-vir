@@ -19,6 +19,8 @@ await writeFile(
     "import * as React from 'react';",
     "",
     "export const EditorContext = React.createContext(null);",
+    "export const DocumentPosition = {};",
+    "export function TaggedText_stripTags() { throw new Error('unexpected smoke tagged text call'); }",
     "export function useClientNotificationEffect() { throw new Error('unexpected smoke notification hook'); }",
     "",
     "export function useRpcSession() {",
@@ -55,10 +57,6 @@ const {
   shouldReloadIRPackage,
   statIRPackage,
   statAsset,
-  surfaceCacheKey,
-  surfaceFromInfoviewProps,
-  taggedTextToPlain,
-  validateWidgetEntry,
   validateWidgetComponentEntry,
 } = await import(new URL("vir-infoview-widget-smoke.mjs", buildDir));
 
@@ -131,119 +129,17 @@ assert.equal(
     .entry,
   "VirNativeInfoview.createComponent",
 );
-assert.equal(
-  validateWidgetEntry(runtime, "VirNativeInfoview.mount").entry,
-  "VirNativeInfoview.mount",
-);
-assert.throws(
-  () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /Root -> Component -> Surface -> Unit/,
-);
-assert.throws(
-  () =>
-    validateWidgetEntry(
-      {
-        interfaceManifest: {
-          exports: [
-            {
-              entry: "WrongSurface.mount",
-              effect: "dom",
-              args: [
-                { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
-                { type: { interfaceTag: INTERFACE_TAG.RESOURCE } },
-                {
-                  type: {
-                    interfaceTag: INTERFACE_TAG.STRUCTURE,
-                    name: "Wrong.Surface",
-                  },
-                },
-              ],
-              result: { interfaceTag: INTERFACE_TAG.UNIT },
-            },
-          ],
-        },
-      },
-      "WrongSurface.mount",
-    ),
-  /Root -> Component -> Surface -> Unit/,
-);
-assert.equal(
-  taggedTextToPlain({
-    append: [{ text: "List " }, { tag: [{}, { text: "Nat" }] }],
-  }),
-  "List Nat",
-);
-const infoviewPropsFixture = {
-  pos: { uri: "file:///workspace/Example.lean", line: 6, character: 2 },
-  goals: [
-    {
-      userName: "main",
-      mvarId: { name: "m.1" },
-      type: { text: "xs.reverse.reverse = xs" },
-      hyps: [
-        {
-          names: ["xs"],
-          type: { text: "List Nat" },
-          val: null,
-        },
-      ],
-    },
-  ],
-  selectedLocations: [{ kind: "hypothesis" }],
-};
-const surfaceFixture = surfaceFromInfoviewProps(
-  infoviewPropsFixture,
-  rpcSession,
-);
-assert.deepEqual(surfaceFixture, {
-  position: "Example.lean:7:3",
-  cursor: {
-    uri: "file:///workspace/Example.lean",
-    fileName: "Example.lean",
-    line: 6,
-    character: 2,
-    label: "Example.lean:7:3",
-  },
-  goals: [
-    {
-      id: "m-1",
-      kind: "goal",
-      index: 0,
-      title: "case main",
-      userName: "main",
-      mvarId: "m.1",
-      status: "active",
-      target: "xs.reverse.reverse = xs",
-      hypotheses: [
-        {
-          id: "m-1-xs",
-          names: ["xs"],
-          fvarIds: [],
-          type: "List Nat",
-          value: null,
-        },
-      ],
-    },
-  ],
-  selectedLocations: ["hypothesis"],
-  selections: [
-    {
-      id: "hypothesis-hypothesis-0",
-      kind: "hypothesis",
-      label: "hypothesis",
-    },
-  ],
-  rpcSession,
-});
-assert.equal(surfaceFixture.goals[0].target, "xs.reverse.reverse = xs");
-assert.equal(
-  surfaceCacheKey(surfaceFixture),
-  surfaceCacheKey(
-    surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture), {
-      call: rpcSession.call,
-    }),
-  ),
-);
+const factoryEntry = validateWidgetComponentEntry(runtime, "VirNativeInfoview.createComponent");
+for (const incompatible of [
+  { ...factoryEntry, args: [{ type: { interfaceTag: INTERFACE_TAG.RESOURCE } }] },
+  { ...factoryEntry, result: { interfaceTag: INTERFACE_TAG.UNIT } },
+]) {
+  assert.throws(
+    () => validateWidgetComponentEntry({ findManifestEntry: () => incompatible }, "invalid-factory"),
+    /effectful \(\) -> Component/,
+    "root-taking mounts and void entries must not be accepted as factories",
+  );
+}
 assert.equal(
   decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2],
   "r".charCodeAt(0),
@@ -259,7 +155,6 @@ assert.equal(
       {
         roots: [
           "VirNativeInfoview.createComponent",
-          "VirNativeInfoview.mount",
         ],
       },
       { line: 0, character: 0 },
@@ -289,7 +184,6 @@ const runtimeOptions = await loadRuntimeOptions({
   irPackage: {
     roots: [
       "VirNativeInfoview.createComponent",
-      "VirNativeInfoview.mount",
     ],
   },
   position: { line: 0, character: 0 },
@@ -308,7 +202,6 @@ assert.equal(
 const reloadIRPackage = {
   roots: [
     "VirNativeInfoview.createComponent",
-    "VirNativeInfoview.mount",
   ],
 };
 const reloadPosition = { line: 0, character: 0 };
@@ -344,22 +237,14 @@ const irPackageServiceConfig = {
   irPackage: {
     roots: [
       "VirNativeInfoview.createComponent",
-      "VirNativeInfoview.mount",
     ],
   },
   componentEntry: "VirNativeInfoview.createComponent",
-  entry: "VirNativeInfoview.mount",
   position: { line: 0, character: 0 },
   setupHint: "",
 };
-const irPackageHostContext = {
-  rpcSession,
-  editorConnection: null,
-  position: { line: 0, character: 0 },
-};
 const irPackageFirstService = await loadRuntimeService({
   rpcSession,
-  hostContext: irPackageHostContext,
   config: irPackageServiceConfig,
 });
 assert.equal(

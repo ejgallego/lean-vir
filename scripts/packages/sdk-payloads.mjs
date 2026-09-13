@@ -43,6 +43,10 @@ export const SDK_PAYLOADS = [
     "web/src/host/vir-infoview-host-bindings.js",
   ],
   [
+    "js/host/vir-infoview-panel-bindings.js",
+    "web/src/host/vir-infoview-panel-bindings.js",
+  ],
+  [
     "js/host/vir-js-collection-bindings.js",
     "web/src/host/vir-js-collection-bindings.js",
   ],
