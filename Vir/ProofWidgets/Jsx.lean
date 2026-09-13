@@ -29,65 +29,6 @@ namespace Lean.Vir.ProofWidgets.Jsx
 
 open Lean Parser PrettyPrinter
 
-/-- Property values accepted by native JSX attributes. -/
-class AttributeValue (α : Type) where
-  toProperty : String → α → Lean.Vir.React.Property
-
-instance : AttributeValue String where
-  toProperty := Lean.Vir.React.Property.string
-
-instance : AttributeValue Bool where
-  toProperty := Lean.Vir.React.Property.bool
-
-instance : AttributeValue Int where
-  toProperty := Lean.Vir.React.Property.int
-
-instance : AttributeValue Nat where
-  toProperty name value := Lean.Vir.React.Property.int name (Int.ofNat value)
-
-instance : AttributeValue Float where
-  toProperty := Lean.Vir.React.Property.float
-
-private def normalizeAttributeName : String → String
-  | "inputName" | "formName" => "name"
-  | "inputValue" => "value"
-  | "ariaLabel" => "aria-label"
-  | "ariaHidden" => "aria-hidden"
-  | "ariaControls" => "aria-controls"
-  | "ariaCurrent" => "aria-current"
-  | "ariaDescribedBy" => "aria-describedby"
-  | "ariaExpanded" => "aria-expanded"
-  | "ariaLabelledBy" => "aria-labelledby"
-  | "ariaLive" => "aria-live"
-  | "ariaPressed" => "aria-pressed"
-  | "ariaSelected" => "aria-selected"
-  | "dataTestId" => "data-testid"
-  | name => name
-
-def property [AttributeValue α] (name : String) (value : α) : Lean.Vir.React.Props.Entry :=
-  .property <| AttributeValue.toProperty (normalizeAttributeName name) value
-
-def style (entries : Array (String × String)) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.stylePairs entries
-
-def classList (classes : Array String) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.classList classes
-
-def key (value : String) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.key value
-
-def ref {α : Type}
-    (value : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α))) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.ref value
-
-def event
-    (name : String)
-    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.on name callback
-
-def eventUnit (name : String) (callback : Lean.Vir.Browser.DomM Unit) : Lean.Vir.React.Props.Entry :=
-  Lean.Vir.React.Props.onUnit name callback
-
 -- Verbose names avoid collisions with other packages' unscoped parser categories.
 declare_syntax_cat virProofWidgetsJsxElement
 declare_syntax_cat virProofWidgetsJsxChild
@@ -120,8 +61,8 @@ scoped syntax jsxTag : virProofWidgetsJsxTag
 scoped syntax str : virProofWidgetsJsxAttrVal
 /-- Interpolates an expression into a JSX attribute value. -/
 scoped syntax group("{" term "}") : virProofWidgetsJsxAttrVal
-scoped syntax ident "=" virProofWidgetsJsxAttrVal : virProofWidgetsJsxAttr
-/-- Interpolates an array of props, or a base structure for component props. -/
+scoped syntax jsxTag "=" virProofWidgetsJsxAttrVal : virProofWidgetsJsxAttr
+/-- Supplies a complete native props object; cannot be combined with other attributes. -/
 scoped syntax group(" {..." term "}") : virProofWidgetsJsxAttr
 
 /-- Characters not allowed inside JSX plain text. -/
@@ -161,41 +102,6 @@ scoped syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
 
 scoped syntax:max virProofWidgetsJsxElement : term
 
-private meta def joinArrays (parts : Array Term) : MacroM Term := do
-  if parts.isEmpty then
-    return ← `(term| #[])
-  if parts.size == 1 then
-    return parts[0]!
-  return ← `(term| Array.flatten #[$parts,*])
-
-private meta def isEventName (name : String) : Bool :=
-  name.startsWith "on" && name.length > 2
-
-private meta def unitEventName (name : String) : Bool :=
-  name == "onClick" || name == "onDoubleClick" || name == "onSubmit"
-
-private meta def transformNativeAttr (attr : Ident) (value : Term) : MacroM Term := do
-  let name := attr.getId.eraseMacroScopes.toString
-  if name == "key" then
-    `(Jsx.key $value)
-  else if name == "ref" then
-    `(Jsx.ref $value)
-  else if name == "style" then
-    `(Jsx.style $value)
-  else if name == "classList" then
-    `(Jsx.classList $value)
-  else if isEventName name then
-    if name.endsWith "Unit" then
-      `(Jsx.eventUnit $(quote <| (name.dropEnd 4).toString) $value)
-    else if name.endsWith "With" then
-      `(Jsx.event $(quote <| (name.dropEnd 4).toString) $value)
-    else if unitEventName name then
-      `(Jsx.eventUnit $(quote name) $value)
-    else
-      `(Jsx.event $(quote name) $value)
-  else
-    `(Jsx.property $(quote name) $value)
-
 private meta def trailingWhitespace (stx : Syntax) : String :=
   if let .original _ _ trailing _ := stx.getTailInfo then
     trailing.toString
@@ -227,90 +133,70 @@ private meta def transformTag
   if openingName != closingName then
     Macro.throwErrorAt closing s!"expected </{openingName}>"
 
+  let propsId ← mkIdent <$> Macro.addMacroScope `props
+  let childrenId ← mkIdent <$> Macro.addMacroScope `children
+  let mut writes : Array (TSyntax `doElem) := #[]
+  let suppliedProps ← if attrs.size == 1 then
+      match attrs[0]! with
+      | `(virProofWidgetsJsxAttr| {... $value:term }) => pure (some value)
+      | _ => pure none
+    else pure none
+  match suppliedProps with
+  | some value =>
+    writes := writes.push <| ← `(doElem| let $propsId := $value)
+  | none =>
+    writes := writes.push <| ← `(doElem| let $propsId ← Lean.Vir.Js.Object.empty)
+    for attr in attrs do
+      let (name, value) ← match attr with
+        | `(virProofWidgetsJsxAttr| $name:jsxTag = $value:str) =>
+          pure (getJsxTag name, ← `(← Lean.Vir.JsValue.ofString $value))
+        | `(virProofWidgetsJsxAttr| $name:jsxTag = { $value:term }) =>
+          pure (getJsxTag name, value)
+        | `(virProofWidgetsJsxAttr| {... $_value:term }) =>
+          Macro.throwErrorAt attr "native props must be supplied alone; construct or update the object explicitly"
+        | stx => Macro.throwErrorAt stx "unknown JSX attribute syntax"
+      writes := writes.push <| ← `(doElem|
+        Lean.Vir.Js.Object.set $propsId (← Lean.Vir.JsValue.ofString $(quote name)) $value)
+  writes := writes.push <| ← `(doElem| let $childrenId ← Lean.Vir.Js.Array.empty)
   let mut whitespaceBefore := trailingWhitespace tk
-  let mut childParts : Array Term := #[]
-  let mut childItems : Array Term := #[]
   for child in childrenSyntax do
-    match child with
-    | `(virProofWidgetsJsxChild| $text:jsxText) =>
-      childItems := childItems.push <| ←
-        `(term| Html.text $(quote <| whitespaceBefore ++ getJsxText text))
-      whitespaceBefore := ""
-    | `(virProofWidgetsJsxChild| { $term }%$childToken) =>
-      childItems := childItems.push term
-      whitespaceBefore := trailingWhitespace childToken
-    | `(virProofWidgetsJsxChild| $element:virProofWidgetsJsxElement) =>
-      childItems := childItems.push <| ← `(term| $element:virProofWidgetsJsxElement)
-      whitespaceBefore := trailingWhitespace element
-    | `(virProofWidgetsJsxChild| {... $term }%$childToken) =>
-      if !childItems.isEmpty then
-        childParts := childParts.push <| ← `(term| #[$childItems,*])
-      childItems := #[]
-      childParts := childParts.push term
-      whitespaceBefore := trailingWhitespace childToken
-    | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
-  if !childItems.isEmpty then
-    childParts := childParts.push <| ← `(term| #[$childItems,*])
-  let children ← joinArrays childParts
-
-  let parsedAttrs : Array ((Ident × Term) ⊕ Term) ← attrs.mapM fun
-    | `(virProofWidgetsJsxAttr| $attr:ident = $value:str) =>
-      pure <| .inl (attr, value)
-    | `(virProofWidgetsJsxAttr| $attr:ident = { $value:term }) =>
-      pure <| .inl (attr, value)
-    | `(virProofWidgetsJsxAttr| {... $value:term }) =>
-      pure <| .inr value
-    | stx => Macro.throwErrorAt stx "unknown JSX attribute syntax"
-
-  let tag := openingName
-  if tag.front.isUpper then
-    let component ← componentIdent opening
-    let componentAttrs := parsedAttrs.filter fun
-      | .inl (attr, _) => attr.getId.eraseMacroScopes.toString != "key"
-      | .inr _ => true
-    let keys := parsedAttrs.filterMap fun
-      | .inl (attr, value) =>
-          if attr.getId.eraseMacroScopes.toString == "key" then some value else none
-      | .inr _ => none
-    if keys.size > 1 then
-      Macro.throwErrorAt opening "component JSX accepts at most one key attribute"
-    let bases : Array Term := componentAttrs.filterMap fun
-      | .inr value => some value
-      | .inl _ => none
-    let fields : Array (TSyntax `Lean.Parser.Term.structInstField) ←
-      componentAttrs.filterMapM fun
-        | .inl (attr, value) =>
-          return some <| ← `(Lean.Parser.Term.structInstField| $attr:ident := $value)
-        | .inr _ => return none
-    let props ← match bases, fields with
-      | #[], #[] => `(term| ())
-      | #[base], #[] => pure base
-      | _, _ => `(term| { $bases,* with $fields,* })
-    match keys[0]? with
-    | none => `(do Html.component $component (← Lean.Vir.LeanRef.toJSL $props) $children)
-    | some key => `(do Html.keyedComponent $key $component (← Lean.Vir.LeanRef.toJSL $props) $children)
-  else
-    let mut propParts : Array Term := #[]
-    let mut propItems : Array Term := #[]
-    for attr in parsedAttrs do
-      match attr with
-      | .inl (name, value) =>
-        propItems := propItems.push <| ← transformNativeAttr name value
-      | .inr spread =>
-        if !propItems.isEmpty then
-          propParts := propParts.push <| ← `(term| #[$propItems,*])
-        propItems := #[]
-        propParts := propParts.push spread
-    if !propItems.isEmpty then
-      propParts := propParts.push <| ← `(term| #[$propItems,*])
-    let props ← joinArrays propParts
-    `(Html.elementWithProps $(quote tag) $props $children)
+    let action ← match child with
+      | `(virProofWidgetsJsxChild| $text:jsxText) =>
+        let value := whitespaceBefore ++ getJsxText text
+        whitespaceBefore := ""
+        `(Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString $(quote value)))
+      | `(virProofWidgetsJsxChild| { $term }%$childToken) =>
+        whitespaceBefore := trailingWhitespace childToken
+        pure term
+      | `(virProofWidgetsJsxChild| $element:virProofWidgetsJsxElement) =>
+        whitespaceBefore := trailingWhitespace element
+        `($element:virProofWidgetsJsxElement)
+      | `(virProofWidgetsJsxChild| {... $term }%$childToken) =>
+        whitespaceBefore := trailingWhitespace childToken
+        writes := writes.push <| ← `(doElem|
+          for child in $term do
+            let _ ← Lean.Vir.Js.Array.push $childrenId (← child))
+        continue
+      | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
+    writes := writes.push <| ← `(doElem|
+      let _ ← Lean.Vir.Js.Array.push $childrenId (← ($action)))
+  let result ← if openingName.front.isUpper then
+      let component ← componentIdent opening
+      `(Lean.Vir.React.Node.functionComponent $component $propsId $childrenId)
+    else
+      `(Lean.Vir.React.Node.createElement
+        (← Lean.Vir.React.ElementType.tag (← Lean.Vir.JsValue.ofString $(quote openingName)))
+        $propsId $childrenId)
+  `(show Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) from do
+    $[$writes:doElem]*
+    ($result))
 
 /--
 JSX-like syntax for VIR-native HTML. Lowercase tags are React elements.
-Uppercase tags require `React.FunctionComponent (React.Props.WithData α)`:
-their Lean record attributes (or `Unit`) are boxed into `props.data`.
-Use `Node.functionComponent` directly for other native props shapes.
+Attributes interpolate exact JS values; literals convert strings.
+Uppercase tags receive native props, with no implicit JSL boxing. Supply typed
+props as the sole `{...props}` attribute. Child expressions remain construction
+actions, evaluated left-to-right after attributes.
 -/
 macro_rules
   | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) =>

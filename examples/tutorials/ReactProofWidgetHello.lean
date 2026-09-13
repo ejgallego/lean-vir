@@ -8,6 +8,7 @@ module
 
 public import Vir.Infoview
 public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 /-!
 A minimal live widget: the shell reuses the component factory's result and
@@ -20,23 +21,23 @@ public section
 namespace ReactProofWidgetHello
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
   FunctionComponent.ofLean fun props => do
   let position ← PanelWidgetProps.pos props
-  let uri ← JsValue.toString (← PanelPosition.uri position)
-  let heading ← Node.text (← JsValue.ofString ("Hello from " ++ uri))
-  let goals ← Js.Array.toLeanArray (← PanelWidgetProps.goals props)
-  let goal ← match goals[0]? with
-    | none => pure "Move the cursor into a proof to see its first goal."
-    | some goal =>
-      let target ← CodeWithInfos.stripTags (← InteractiveGoal.type goal)
-      pure ("⊢ " ++ (← JsValue.toString target))
-  let target ← Node.text (← JsValue.ofString goal)
-  Node.sectionWith #[Props.id "react-proof-hello"] #[
-    ← Node.h3 #[heading],
-    ← Node.pre #[target]
-  ]
+  let uri ← PanelPosition.uri position
+  let goals ← PanelWidgetProps.goals props
+  let goalCount ← JsValue.toFloat (← Js.Array.length goals)
+  let target : ReactM (Js Node) := if goalCount == 0 then
+      <pre>Move the cursor into a proof to see its first goal.</pre>
+    else do
+      let goal ← Js.Array.get goals (← JsValue.ofFloat 0)
+      return ← <pre>⊢ {Node.text (← CodeWithInfos.stripTags (← InteractiveGoal.type goal))}</pre>
+  return ← <section id="react-proof-hello">
+    <h3>Hello from {Node.text uri}</h3>
+    {target}
+  </section>
 
 -- Derive the standard native-props factory and widget configuration.
 vir_proof_widget View

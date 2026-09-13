@@ -29,6 +29,35 @@ namespace Js
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 
+/-- Native object construction. Field values are exact JS values; conversions are explicit. -/
+scoped syntax "js%{" (str " := " term),* "}" : term
+
+macro_rules
+  | `(js%{ $[$names:str := $values:term],* }) => do
+    let object ← Lean.Macro.addMacroScope `object
+    let object := Lean.mkIdent object
+    let writes ← names.zip values |>.mapM fun (name, value) =>
+      `(doElem| Lean.Vir.Js.Object.set $object
+          (← Lean.Vir.JsValue.ofString $name) $value)
+    `(do
+      let $object ← Lean.Vir.Js.Object.empty
+      $[$writes:doElem]*
+      pure $object)
+
+/-- Native array construction without an intermediate Lean array. -/
+scoped syntax "js#[" term,* "]" : term
+
+macro_rules
+  | `(js#[ $values:term,* ]) => do
+    let array ← Lean.Macro.addMacroScope `array
+    let array := Lean.mkIdent array
+    let writes ← values.getElems.mapM fun value =>
+      `(doElem| let _ ← Lean.Vir.Js.Array.push $array $value)
+    `(do
+      let $array ← Lean.Vir.Js.Array.empty
+      $[$writes:doElem]*
+      pure $array)
+
 /-- Expected JavaScript shape rejected by a checked cast. -/
 structure TypeConvError where
   expected : String

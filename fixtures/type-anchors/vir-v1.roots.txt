@@ -1,6 +1,5 @@
 # Review-only Lean VIR type-anchor wrappers not already present in the shipped inventory.
-Lean.Vir.TypeAnchors.reactPropertyIdentity
-Lean.Vir.TypeAnchors.reactEventHandlerIdentity
+Lean.Vir.TypeAnchors.browserEventIdentity
 Lean.Vir.TypeAnchors.reactRootIdentity
 Lean.Vir.TypeAnchors.reactRootCreateCall
 Lean.Vir.TypeAnchors.reactRootRenderCall

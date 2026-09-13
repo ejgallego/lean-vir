@@ -38,24 +38,41 @@ array, including an optional key in the props object.
 
 ### Lean HTML and JSX
 
-`Vir.React.Builders` adds pure property/event descriptions and tag helpers;
-`Props.fromEntries` is their shared effectful conversion to a native props object.
-`Vir.React` remains the convenience import for both core and builders.
+Import `Vir.ProofWidgets.Jsx` and open its scope for native construction:
 
-Optional `Vir.ProofWidgets.Html` and `Vir.ProofWidgets.Jsx` provide Lean builders
-and notation over these operations, not a serializable or alternate node tree.
-Their attribute names alias the same builder definitions. `Html` represents a
-deferred React computation, whereas `Js Node` is an already-constructed value;
-that distinction preserves when child actions run.
-`Html.component` accepts an explicitly boxed application value. Its optional
-native `Props.WithData α` shape holds that value in `data`; children are evaluated
-when constructing the element and passed as ordinary React children, not stored
-as Lean actions in a component-props record. Attributes and handlers share one
-`Props.Entry` array.
+```lean
+import Vir.ProofWidgets.Jsx
+open Lean.Vir Lean.Vir.React
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
-Uppercase JSX currently requires `FunctionComponent (Props.WithData α)` and
-boxes its Lean record attributes (or `Unit`) automatically. For components with
-other native props shapes, use `Node.functionComponent` directly.
+def greeting (name : Js String) : ReactM (Js Node) := do
+  let style ← js%{ "color" := (← js#"red") }
+  return ← <section className="greeting" style={style}>Hello, {Node.text name}</section>
+```
+
+Attributes accept exact JS values; literal strings are converted once. Use
+native names such as `aria-label` and `data-testid`. Events take native
+functions, so convert a Lean closure explicitly with `Callback.ofUnary`.
+There are no per-attribute or per-tag helper catalogues.
+
+`js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
+`Js.Object.set` assignments in source order (last duplicate wins).
+`js#[a, b]` pushes exact values into a fresh native array. Neither constructs
+an intermediate Lean property record or array. Values require explicit
+conversion; these notations do not inspect or encode arbitrary Lean data.
+
+Uppercase JSX takes a native function component. Supply an already-typed
+props object with `<Component {...props}/>`; this must be the sole attribute.
+Otherwise attributes construct ordinary `Js Props`. JSX does not invent a
+typed field contract, merge arbitrary typed props, or box a Lean record.
+Application-owned data uses explicit `Props.WithData.make (← LeanRef.toJSL data)`.
+
+`Html` is a deferred `ReactM (Js Node)`, not a serialized tree. Attributes
+are evaluated before children. Child actions run left-to-right; `{pure node}`
+inserts an existing node and `{...items}` runs an array of child actions
+directly into the native child array. `Html.text` explicitly converts Lean
+text; native strings go straight to `Node.text`. In a `do` block, use
+`return ← <...>` for a final JSX expression to avoid Lean parsing `<` as comparison.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and

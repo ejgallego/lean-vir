@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -23,18 +23,19 @@ namespace ReactCounterTutorial
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def Counter : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
   let count ← StateTuple.toState (← Hooks.useState initial)
   let value ← JsValue.toNat count.value
-  let label ← Node.text (← Lean.Vir.JsValue.ofString s!"Count: {value}")
-  Node.buttonWith #[
-    Props.onClick do
-      State.modify count fun previous => do
-        let current ← JsValue.toNat previous
-        JsValue.ofNat (current + 1)
-  ] #[label]
+  let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+    State.modify count fun previous => do
+      let current ← JsValue.toNat previous
+      JsValue.ofNat (current + 1)
+  return ← <button type="button" onClick={increment}>
+    {Node.text (← JsValue.ofString s!"Count: {value}")}
+  </button>
 
 def mount (selector : String) : DomM Bool := do
   let component ← Counter
@@ -44,7 +45,7 @@ def mount (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node

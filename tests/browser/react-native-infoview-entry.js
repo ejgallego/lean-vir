@@ -16,16 +16,54 @@ import {
 } from "../support/native-panel-fixtures.mjs";
 
 globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
+  const hostBindings = createBrowserHostBindings({
+    reactHostBindings: createBrowserReactHostBindings,
+    infoviewStripTags: code => TaggedText_stripTags(code),
+  });
+  const trace = [];
+  let traceConstruction = false;
+  const setProperty = hostBindings["js.object.set"];
+  hostBindings["js.object.set"] = (object, name, value) => {
+    if (traceConstruction) trace.push(name);
+    return setProperty(object, name, value);
+  };
+  const textNode = hostBindings["react.node.text"];
+  hostBindings["react.node.text"] = value => {
+    if (traceConstruction) trace.push("text");
+    return textNode(value);
+  };
   const runtime = await createVirRuntime({
     wasmModule: new WebAssembly.Module(new Uint8Array(wasm)),
     irPackageSet: [new Uint8Array(pkg)],
-    hostBindings: createBrowserHostBindings({ reactHostBindings: createBrowserReactHostBindings }),
+    hostBindings,
   });
   const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const previousTitle = document.title;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const containers = [];
   try {
+    const component = props => props.children;
+    const payload = { color: "red" };
+    const label = "native JSX value";
+    const callback = () => {};
+    traceConstruction = true;
+    const node = runtime.call("ProofWidgetsJsxSubset.nativeConstruction",
+      component, payload, label, callback);
+    traceConstruction = false;
+    check(JSON.stringify(trace) === JSON.stringify([
+      "label", "label", "payload", "onClick", "values", "title", "style", "onClick", "text",
+    ]), "native construction evaluates fields once in order before child actions");
+    check(node.type === component, "uppercase JSX must preserve native component identity");
+    check(node.props.label === label, "native object writes use the last duplicate field");
+    check(node.props.payload === payload && node.props.onClick === callback,
+      "native JSX props must not box, clone or convert their nested inputs");
+    check(Array.isArray(node.props.values) && node.props.values.length === 2 &&
+      node.props.values.every(value => value === label), "native array notation preserves exact values");
+    check(node.props.children.props.title === label &&
+      node.props.children.props.style === payload &&
+      node.props.children.props.onClick === callback &&
+      node.props.children.props.children === label,
+    "native attributes and text must reach official React unchanged");
     for (const [entry, id] of [["ProofWidgetsHtml.mount", "native-html"],
       ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
       const container = document.createElement("div");
@@ -45,6 +83,70 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "a single native text child remains in the Badge subtree");
     await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
     check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
+    for (const [entry, id] of [
+      ["ReactInput.mountInput", "native-input"],
+      ["ReactInput.mountCheckbox", "native-checkbox"],
+      ["ReactInput.mountSelectTextarea", "native-fields"],
+      ["ReactInput.mountAttributes", "native-attributes"],
+      ["ReactTamagotchi.mount", "native-pet"],
+    ]) {
+      const container = document.createElement("div");
+      container.id = id;
+      document.body.append(container);
+      containers.push(container);
+      await React.act(async () => check(runtime.call(entry, `#${id}`), `${entry} mounts`));
+    }
+    const input = document.querySelector("#react-name-input");
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "Ada");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    check(input.value === "Ada" && document.querySelector("#react-name-output").textContent === "Ada",
+      "input state remains native through event, props and text");
+    await React.act(async () => document.querySelector("#react-checkbox-input").click());
+    check(document.querySelector("#react-checkbox-output").textContent === "checked:true",
+      "native boolean props and callbacks survive rerendering");
+    const select = document.querySelector("#react-flavor-select");
+    await React.act(async () => {
+      select.value = "chocolate";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    check(document.querySelector("#react-select-textarea-output").textContent === "note:draft; flavor:chocolate",
+      "native select values retain existing Lean formatting");
+    const attributes = document.querySelector("#react-attributes-widget");
+    check(attributes.style.color === "rgb(1, 2, 3)" && attributes.style.marginTop === "4px" &&
+      attributes.tabIndex === 3 && attributes.dataset.case === "attributes",
+    "native style, numeric and data attributes preserve values");
+    const pet = document.querySelector("#react-pet-widget");
+    check(pet !== null && JSON.stringify([...pet.querySelectorAll(".react-pet-action-button")]
+      .map(button => button.id)) === JSON.stringify(["feed", "play", "nap", "wake", "ignore"]
+      .map(action => `react-pet-action-${action}`)),
+      "Tamagotchi retains its native action tree");
+    check(document.querySelector("#react-pet-device").dataset.art === "octopus",
+      "Tamagotchi retains its initial artwork");
+    for (const artwork of ["pet", "octopus"]) {
+      await React.act(async () => document.querySelector("#react-pet-art-toggle").click());
+      check(document.querySelector("#react-pet-device").dataset.art === artwork,
+        `Tamagotchi artwork should be ${artwork}, got ${document.querySelector("#react-pet-device").dataset.art}`);
+    }
+    const helloContainer = document.createElement("div");
+    document.body.append(helloContainer);
+    containers.push(helloContainer);
+    const helloRoot = createRoot(helloContainer);
+    try {
+      const Hello = runtime.call("ReactProofWidgetHello.createComponent");
+      const props = createNativePanelFixture();
+      for (const goals of [[], props.goals]) {
+        await React.act(async () => helloRoot.render(React.createElement(Hello, { ...props, goals })));
+        check(helloContainer.querySelector("#react-proof-hello h3")?.textContent === `Hello from ${props.pos.uri}`,
+          "both Hello branches retain the outer section and native URI text");
+        check(helloContainer.querySelector("pre")?.textContent === (goals.length === 0
+          ? "Move the cursor into a proof to see its first goal."
+          : `⊢ ${TaggedText_stripTags(goals[0].type)}`), "Hello displays only the first native goal");
+      }
+    } finally {
+      await React.act(async () => helloRoot.unmount());
+    }
     return true;
   } finally {
     try { await React.act(async () => runtime.dispose()); }

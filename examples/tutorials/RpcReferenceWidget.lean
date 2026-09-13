@@ -55,9 +55,10 @@ private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply
   let count ← React.StateTuple.toState (← React.Hooks.useState (← JsValue.ofNat 0))
   let label ← message reply
   let n ← JsValue.toNat count.value
-  return ← <button id="rpc-reference-view" onClick={do
+  let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
     React.State.modify count fun previous => do
-      JsValue.ofNat ((← JsValue.toNat previous) + 1)}>
+      JsValue.ofNat ((← JsValue.toNat previous) + 1)
+  return ← <button id="rpc-reference-view" onClick={increment}>
     {Node.text label}{ProofWidgets.Html.text s!" / local {n}"}
   </button>
 
@@ -119,8 +120,8 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
       active.set false
       AbortController.abort abort
   }
-  Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Js.Array.ofArray
-    #[Js.erase input.session, Js.erase input.query, Js.erase revision.value]))
+  Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[
+    Js.erase input.session, Js.erase input.query, Js.erase revision.value]))
   let state : ResponseState ← LeanRef.fromJSL response.value
   let previous := if state.reply.isSome then " Showing the previous response." else ""
   let status := if state.status == "loading" then s!"Loading…{previous}"
@@ -131,9 +132,9 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
     | some reply => #[do
         Node.functionComponent child
           (← Props.WithData.make (← LeanRef.toJSL reply)) (← Js.Array.empty)]
-  return ← <section {...#[Props.bool "aria-busy" (state.status == "loading")]}>
-    <p role={if state.status == "error" then "alert" else "status"}
-        {...#[Props.string "data-rpc-status" state.status]}>
+  return ← <section aria-busy={← JsValue.ofBool (state.status == "loading")}>
+    <p role={← JsValue.ofString (if state.status == "error" then "alert" else "status")}
+        data-rpc-status={← JsValue.ofString state.status}>
       {ProofWidgets.Html.text status}
     </p>
     {...children}

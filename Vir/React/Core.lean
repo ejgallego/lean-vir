@@ -11,7 +11,7 @@ import all Vir.React.Generated
 
 /-!
 Native React operations and small compositions over exact JavaScript values.
-Lean HTML/props authoring helpers live in `Vir.React.Builders`.
+Native JSX notation lives in `Vir.ProofWidgets.Jsx`.
 -/
 
 public section

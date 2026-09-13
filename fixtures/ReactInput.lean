@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -15,25 +15,17 @@ namespace ReactInput
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 /-- Uses native IDs without converting them to Lean strings or constructing IDs locally. -/
 def useIdField (caption : String) : ReactM (Js Node) := do
   let inputId ← Hooks.useId
   let hintId ← Hooks.useId
-  let labelProps ← Props.empty
-  Js.Object.set labelProps (← JsValue.ofString "htmlFor") inputId
-  let label ← Node.createElement (← ElementType.tag (← JsValue.ofString "label")) labelProps
-    (← Js.Array.ofArray #[← Node.text (← Lean.Vir.JsValue.ofString caption)])
-  let inputProps ← Props.empty
-  Js.Object.set inputProps (← JsValue.ofString "id") inputId
-  Js.Object.set inputProps (← JsValue.ofString "aria-describedby") hintId
-  let input ← Node.createElement (← ElementType.tag (← JsValue.ofString "input"))
-    inputProps (← Js.Array.empty)
-  let hintProps ← Props.empty
-  Js.Object.set hintProps (← JsValue.ofString "id") hintId
-  let hint ← Node.createElement (← ElementType.tag (← JsValue.ofString "p")) hintProps
-    (← Js.Array.ofArray #[← Node.text (← Lean.Vir.JsValue.ofString "Enter a value")])
-  Node.div #[label, input, hint]
+  return ← <div>
+    <label htmlFor={inputId}>{Node.text (← JsValue.ofString caption)}</label>
+    <input id={inputId} aria-describedby={hintId} />
+    <p id={hintId}>Enter a value</p>
+  </div>
 
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
@@ -43,195 +35,93 @@ def selectTextareaLabel (note flavor : String) : String :=
 
 def inputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let initial ← JsValue.ofString ""
-    let name ← StateTuple.toState (← Hooks.useState initial)
-    let nameValue ← JsValue.toString name.value
-    let labelText ← Node.text (← Lean.Vir.JsValue.ofString "name:")
-    let label ← Node.labelWith #[Props.htmlFor "react-name-input"] #[labelText]
-    let input ←
-      Node.input
-        #[
-          Props.id "react-name-input",
-          Props.type "text",
-          Props.inputValue nameValue,
-          Props.placeholder "name",
-          Props.onInput fun event => do
-            match ← Lean.Vir.Browser.Event.inputElement? event with
-            | none => pure ()
-            | some input => do
-                State.set name (← Lean.Vir.Browser.HTMLInputElement.getValue input)
-        ]
-    let outputText ← Node.text (← Lean.Vir.JsValue.ofString nameValue)
-    let output ← Node.spanWith #[Props.id "react-name-output"] #[outputText]
-    Node.divWith #[Props.id "react-input-widget"] #[label, input, output]
+    let name ← StateTuple.toState (← Hooks.useState (← js#""))
+    let change ← Callback.ofUnary fun event => do
+      match ← Browser.Event.inputElement? event with
+      | none => pure ()
+      | some input => State.set name (← Browser.HTMLInputElement.getValue input)
+    return ← <div id="react-input-widget">
+      <label htmlFor="react-name-input">name:</label>
+      <input id="react-name-input" type="text" value={name.value} placeholder="name" onInput={change} />
+      <span id="react-name-output">{Node.text name.value}</span>
+    </div>
 
 def changeInputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let initial ← JsValue.ofString ""
-    let value ← StateTuple.toState (← Hooks.useState initial)
-    let currentValue ← JsValue.toString value.value
-    let labelText ← Node.text (← Lean.Vir.JsValue.ofString "change:")
-    let label ← Node.labelWith #[Props.htmlFor "react-change-input"] #[labelText]
-    let input ←
-      Node.input
-        #[
-          Props.id "react-change-input",
-          Props.inputName "change",
-          Props.type "text",
-          Props.inputValue currentValue,
-          Props.placeholder "change",
-          Props.onChange fun event => do
-            Lean.Vir.Browser.Event.preventDefault event
-            Lean.Vir.Browser.Event.stopPropagation event
-            match ← Lean.Vir.Browser.Event.inputElement? event with
-            | none => pure ()
-            | some input => do
-                State.set value (← Lean.Vir.Browser.HTMLInputElement.getValue input)
-        ]
-    let outputText ← Node.text (← Lean.Vir.JsValue.ofString currentValue)
-    let output ← Node.spanWith #[Props.id "react-change-output"] #[outputText]
-    Node.formWith
-      #[
-        Props.id "react-change-widget",
-        Props.onSubmitWith fun event => do
-          Lean.Vir.Browser.Event.preventDefault event
-          Lean.Vir.Browser.Event.stopPropagation event
-      ]
-      #[label, input, output]
+    let value ← StateTuple.toState (← Hooks.useState (← js#""))
+    let change ← Callback.ofUnary fun event => do
+      Browser.Event.preventDefault event
+      Browser.Event.stopPropagation event
+      match ← Browser.Event.inputElement? event with
+      | none => pure ()
+      | some input => State.set value (← Browser.HTMLInputElement.getValue input)
+    let submit ← Callback.ofUnary fun event => do
+      Browser.Event.preventDefault event
+      Browser.Event.stopPropagation event
+    return ← <form id="react-change-widget" onSubmit={submit}>
+      <label htmlFor="react-change-input">change:</label>
+      <input id="react-change-input" name="change" type="text" value={value.value}
+        placeholder="change" onChange={change} />
+      <span id="react-change-output">{Node.text value.value}</span>
+    </form>
 
 def checkboxComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let initial ← JsValue.ofBool false
-    let checked ← StateTuple.toState (← Hooks.useState initial)
+    let checked ← StateTuple.toState (← Hooks.useState (← JsValue.ofBool false))
     let checkedValue ← JsValue.toBool checked.value
-    let input ←
-      Node.input
-        #[
-          Props.id "react-checkbox-input",
-          Props.type "checkbox",
-          Props.checked checkedValue,
-          Props.onChange fun event => do
-            match ← Lean.Vir.Browser.Event.inputElement? event with
-            | none => pure ()
-            | some input => do
-                State.set checked (← Lean.Vir.Browser.HTMLInputElement.getChecked input)
-        ]
-    let outputText ← Node.text (← Lean.Vir.JsValue.ofString (checkedLabel checkedValue))
-    let output ←
-      Node.labelWith
-        #[Props.id "react-checkbox-output", Props.htmlFor "react-checkbox-input"]
-        #[outputText]
-    Node.divWith #[Props.id "react-checkbox-widget"] #[input, output]
+    let change ← Callback.ofUnary fun event => do
+      match ← Browser.Event.inputElement? event with
+      | none => pure ()
+      | some input => State.set checked (← Browser.HTMLInputElement.getChecked input)
+    return ← <div id="react-checkbox-widget">
+      <input id="react-checkbox-input" type="checkbox" checked={checked.value} onChange={change} />
+      <label id="react-checkbox-output" htmlFor="react-checkbox-input">
+        {Node.text (← JsValue.ofString (checkedLabel checkedValue))}
+      </label>
+    </div>
 
 def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let initialNote ← JsValue.ofString "draft"
-    let note ← StateTuple.toState (← Hooks.useState initialNote)
-    let noteValue ← JsValue.toString note.value
-    let initialFlavor ← JsValue.ofString "vanilla"
-    let flavor ← StateTuple.toState (← Hooks.useState initialFlavor)
-    let flavorValue ← JsValue.toString flavor.value
-    let sectionText ← Node.text (← Lean.Vir.JsValue.ofString "fields")
-    let sectionNode ← Node.spanWith #[Props.classList #["react-select-textarea-section"]] #[sectionText]
-    let choiceText ← Node.text (← Lean.Vir.JsValue.ofString flavorValue)
-    let choice ← Node.spanWith #[Props.classList #["react-select-textarea-choice"]] #[choiceText]
-    let nav ← Node.navWith
-      #[Props.id "react-select-textarea-nav", Props.ariaLabel "React textarea fixture"]
-      #[sectionNode, choice]
-    let noteLabelText ← Node.text (← Lean.Vir.JsValue.ofString "note:")
-    let noteLabel ← Node.labelWith #[Props.htmlFor "react-note-input"] #[noteLabelText]
-    let noteInput ←
-      Node.textarea
-        #[
-          Props.id "react-note-input",
-          Props.inputName "note",
-          Props.inputValue noteValue,
-          Props.rows 3,
-          Props.cols 24,
-          Props.placeholder "note",
-          Props.onChange fun event => do
-            match ← Js.Nullable.toOption (← Lean.Vir.Browser.Event.formValueNullable event) with
-            | none => pure ()
-            | some next => State.set note next
-        ]
-    let flavorLabelText ← Node.text (← Lean.Vir.JsValue.ofString "flavor:")
-    let flavorLabel ← Node.labelWith #[Props.htmlFor "react-flavor-select"] #[flavorLabelText]
-    let vanillaText ← Node.text (← Lean.Vir.JsValue.ofString "vanilla")
-    let vanilla ← Node.keyedOptionWith "vanilla" #[Props.inputValue "vanilla"] #[vanillaText]
-    let chocolateText ← Node.text (← Lean.Vir.JsValue.ofString "chocolate")
-    let chocolate ← Node.keyedOptionWith "chocolate" #[Props.inputValue "chocolate"] #[chocolateText]
-    let strawberryText ← Node.text (← Lean.Vir.JsValue.ofString "strawberry")
-    let strawberry ← Node.keyedOptionWith "strawberry" #[Props.inputValue "strawberry"] #[strawberryText]
-    let select ←
-      Node.selectWith
-        #[
-          Props.id "react-flavor-select",
-          Props.inputName "flavor",
-          Props.inputValue flavorValue,
-          Props.onChange fun event => do
-            match ← Js.Nullable.toOption (← Lean.Vir.Browser.Event.formValueNullable event) with
-            | none => pure ()
-            | some next => State.set flavor next
-        ]
-        #[vanilla, chocolate, strawberry]
-    let outputText ← Node.text (← Lean.Vir.JsValue.ofString (selectTextareaLabel noteValue flavorValue))
-    let output ← Node.spanWith
-      #[Props.id "react-select-textarea-output"]
-      #[outputText]
-    Node.mainWith #[Props.id "react-select-textarea-widget"] #[
-      nav,
-      noteLabel,
-      noteInput,
-      flavorLabel,
-      select,
-      output
-    ]
+    let note ← StateTuple.toState (← Hooks.useState (← js#"draft"))
+    let flavor ← StateTuple.toState (← Hooks.useState (← js#"vanilla"))
+    let noteChange ← Callback.ofUnary fun event => do
+      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
+      | none => pure ()
+      | some next => State.set note next
+    let flavorChange ← Callback.ofUnary fun event => do
+      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
+      | none => pure ()
+      | some next => State.set flavor next
+    let label := selectTextareaLabel (← JsValue.toString note.value) (← JsValue.toString flavor.value)
+    return ← <main id="react-select-textarea-widget">
+      <nav id="react-select-textarea-nav" aria-label="React textarea fixture">
+        <span className="react-select-textarea-section">fields</span>
+        <span className="react-select-textarea-choice">{Node.text flavor.value}</span>
+      </nav>
+      <label htmlFor="react-note-input">note:</label>
+      <textarea id="react-note-input" name="note" value={note.value}
+        rows={← JsValue.ofFloat 3} cols={← JsValue.ofFloat 24}
+        placeholder="note" onChange={noteChange} />
+      <label htmlFor="react-flavor-select">flavor:</label>
+      <select id="react-flavor-select" name="flavor" value={flavor.value} onChange={flavorChange}>
+        <option key="vanilla" value="vanilla">vanilla</option>
+        <option key="chocolate" value="chocolate">chocolate</option>
+        <option key="strawberry" value="strawberry">strawberry</option>
+      </select>
+      <span id="react-select-textarea-output">{Node.text (← JsValue.ofString label)}</span>
+    </main>
 
-def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
+def renderAttributesInto (root : Js Root) : DomM Unit := do
   let node ← ReactM.run do
-    let labelText ← Node.text (← Lean.Vir.JsValue.ofString "attrs:")
-    let label ←
-      Node.keyedLabelWith
-        "attributes-label"
-        #[
-          Props.id "react-attributes-label",
-          Props.htmlFor "react-attributes-input"
-        ]
-        #[labelText]
-    let input ←
-      Node.keyedInput
-        "attributes-input"
-        #[
-          Props.id "react-attributes-input",
-          Props.inputName "attributes",
-          Props.type "checkbox",
-          Props.checked true,
-          Props.disabled true
-        ]
-    let outputText ← Node.text (← Lean.Vir.JsValue.ofString "attrs")
-    let output ←
-      Node.keyedSpanWith
-        "attributes-output"
-        #[
-          Props.id "react-attributes-output",
-          Props.title "attribute output"
-        ]
-        #[outputText]
-    Node.divWith
-      #[
-        Props.id "react-attributes-widget",
-        Props.role "group",
-        Props.ariaLabel "React attribute fixture",
-        Props.data "case" "attributes",
-        Props.dataTestId "react-attributes",
-        Props.tabIndex 3,
-        Props.classList #["react-attributes", "is-mounted"],
-        Props.style #[
-          StyleProperty.mk "color" "rgb(1, 2, 3)",
-          StyleProperty.mk "marginTop" "4px"
-        ]
-      ]
-      #[label, input, output]
+    let style ← js%{ "color" := (← js#"rgb(1, 2, 3)"), "marginTop" := (← js#"4px") }
+    return ← <div id="react-attributes-widget" role="group" aria-label="React attribute fixture"
+      data-case="attributes" data-testid="react-attributes" tabIndex={← JsValue.ofFloat 3}
+      className="react-attributes is-mounted" style={style}>
+      <label key="attributes-label" id="react-attributes-label" htmlFor="react-attributes-input">attrs:</label>
+      <input key="attributes-input" id="react-attributes-input" name="attributes"
+        type="checkbox" checked={← JsValue.ofBool true} disabled={← JsValue.ofBool true} />
+      <span key="attributes-output" id="react-attributes-output" title="attribute output">attrs</span>
+    </div>
   Root.render root node
 
 def mountInput (selector : String) : DomM Bool := do
@@ -242,7 +132,7 @@ def mountInput (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -256,7 +146,7 @@ def mountChangeInput (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -270,7 +160,7 @@ def mountSelectTextarea (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -284,7 +174,7 @@ def mountCheckbox (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node

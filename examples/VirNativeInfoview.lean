@@ -7,8 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.Infoview
-public import Vir.Examples.Style
-public import Vir.ProofWidgets
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -18,14 +17,15 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview
 open Lean.Vir.ProofWidgets
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 namespace Style
 
-abbrev PropEntry := Lean.Vir.React.Props.Entry
+def vscodeColor (name fallback : String) : String :=
+  "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
 
-abbrev style := Lean.Vir.Examples.Style.style
-abbrev vscodeColor := Lean.Vir.Examples.Style.vscodeColor
-abbrev border := Lean.Vir.Examples.Style.border
+def border (color : String) : String :=
+  "1px solid " ++ color
 
 def foreground : String := vscodeColor "editor-foreground" "#24292f"
 def muted : String := vscodeColor "descriptionForeground" "#57606a"
@@ -35,153 +35,101 @@ def borderColor : String := vscodeColor "panel-border" "#d0d7de"
 def accent : String := vscodeColor "textLink-foreground" "#0969da"
 def goalAccent : String := vscodeColor "symbolIcon-keywordForeground" "#8250df"
 
-def shell : PropEntry := style #[
-  ("display", "grid"),
-  ("gap", "10px"),
-  ("minWidth", "0"),
-  ("padding", "8px 10px 12px"),
-  ("background", background),
-  ("color", foreground),
-  ("colorScheme", "light dark"),
-  ("fontFamily", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
-]
+def shell : RuntimeM Js.Object := js%{
+  "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0"),
+  "padding" := (← js#"8px 10px 12px"), "background" := (← JsValue.ofString background),
+  "color" := (← JsValue.ofString foreground), "colorScheme" := (← js#"light dark"),
+  "fontFamily" := (← js#"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
+}
 
-def toolbar : PropEntry := style #[
-  ("display", "flex"),
-  ("alignItems", "baseline"),
-  ("justifyContent", "space-between"),
-  ("gap", "8px"),
-  ("flexWrap", "wrap"),
-  ("paddingBottom", "7px"),
-  ("borderBottom", border borderColor)
-]
+def toolbar : RuntimeM Js.Object := js%{
+  "display" := (← js#"flex"), "alignItems" := (← js#"baseline"),
+  "justifyContent" := (← js#"space-between"), "gap" := (← js#"8px"),
+  "flexWrap" := (← js#"wrap"), "paddingBottom" := (← js#"7px"),
+  "borderBottom" := (← JsValue.ofString (border borderColor))
+}
 
-def title : PropEntry := style #[
-  ("margin", "0"),
-  ("fontSize", "0.82rem"),
-  ("fontWeight", "760")
-]
+def title : RuntimeM Js.Object := js%{
+  "margin" := (← js#"0"), "fontSize" := (← js#"0.82rem"), "fontWeight" := (← js#"760")
+}
 
-def summary : PropEntry := style #[
-  ("margin", "0"),
-  ("color", muted),
-  ("fontSize", "0.68rem"),
-  ("fontWeight", "620")
-]
+def summary : RuntimeM Js.Object := js%{
+  "margin" := (← js#"0"), "color" := (← JsValue.ofString muted),
+  "fontSize" := (← js#"0.68rem"), "fontWeight" := (← js#"620")
+}
 
-def goalList : PropEntry := style #[
-  ("display", "grid"),
-  ("gap", "10px")
-]
+def goalList : RuntimeM Js.Object := js%{ "display" := (← js#"grid"), "gap" := (← js#"10px") }
 
-def goalCard : PropEntry := style #[
-  ("display", "grid"),
-  ("gap", "8px"),
-  ("minWidth", "0"),
-  ("padding", "9px"),
-  ("border", border borderColor),
-  ("borderLeft", "3px solid " ++ goalAccent),
-  ("borderRadius", "5px"),
-  ("background", background)
-]
+def goalCard : RuntimeM Js.Object := js%{
+  "display" := (← js#"grid"), "gap" := (← js#"8px"), "minWidth" := (← js#"0"),
+  "padding" := (← js#"9px"), "border" := (← JsValue.ofString (border borderColor)),
+  "borderLeft" := (← JsValue.ofString ("3px solid " ++ goalAccent)), "borderRadius" := (← js#"5px"),
+  "background" := (← JsValue.ofString background)
+}
 
-def goalHeader : PropEntry := style #[
-  ("display", "flex"),
-  ("alignItems", "center"),
-  ("justifyContent", "space-between"),
-  ("gap", "8px")
-]
+def goalHeader : RuntimeM Js.Object := js%{
+  "display" := (← js#"flex"), "alignItems" := (← js#"center"),
+  "justifyContent" := (← js#"space-between"), "gap" := (← js#"8px")
+}
 
-def goalHeading : PropEntry := style #[
-  ("margin", "0"),
-  ("minWidth", "0"),
-  ("fontSize", "0.76rem"),
-  ("fontWeight", "760"),
-  ("overflowWrap", "anywhere")
-]
+def goalHeading : RuntimeM Js.Object := js%{
+  "margin" := (← js#"0"), "minWidth" := (← js#"0"), "fontSize" := (← js#"0.76rem"),
+  "fontWeight" := (← js#"760"), "overflowWrap" := (← js#"anywhere")
+}
 
-def collapseButton : PropEntry := style #[
-  ("flex", "0 0 auto"),
-  ("minWidth", "25px"),
-  ("height", "24px"),
-  ("padding", "0 6px"),
-  ("border", border borderColor),
-  ("borderRadius", "4px"),
-  ("background", codeBackground),
-  ("color", foreground),
-  ("font", "inherit"),
-  ("fontSize", "0.7rem"),
-  ("cursor", "pointer")
-]
+def collapseButton : RuntimeM Js.Object := js%{
+  "flex" := (← js#"0 0 auto"), "minWidth" := (← js#"25px"), "height" := (← js#"24px"),
+  "padding" := (← js#"0 6px"), "border" := (← JsValue.ofString (border borderColor)),
+  "borderRadius" := (← js#"4px"), "background" := (← JsValue.ofString codeBackground),
+  "color" := (← JsValue.ofString foreground), "font" := (← js#"inherit"),
+  "fontSize" := (← js#"0.7rem"), "cursor" := (← js#"pointer")
+}
 
-def context : PropEntry := style #[
-  ("display", "grid"),
-  ("gap", "4px"),
-  ("margin", "0"),
-  ("padding", "0"),
-  ("listStyle", "none")
-]
+def context : RuntimeM Js.Object := js%{
+  "display" := (← js#"grid"), "gap" := (← js#"4px"), "margin" := (← js#"0"),
+  "padding" := (← js#"0"), "listStyle" := (← js#"none")
+}
 
-def hypothesis : PropEntry := style #[
-  ("display", "flex"),
-  ("alignItems", "baseline"),
-  ("gap", "5px"),
-  ("minWidth", "0"),
-  ("padding", "2px 4px"),
-  ("fontFamily", "ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
-  ("fontSize", "0.73rem"),
-  ("lineHeight", "1.4")
-]
+def hypothesis : RuntimeM Js.Object := js%{
+  "display" := (← js#"flex"), "alignItems" := (← js#"baseline"), "gap" := (← js#"5px"),
+  "minWidth" := (← js#"0"), "padding" := (← js#"2px 4px"),
+  "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
+  "fontSize" := (← js#"0.73rem"), "lineHeight" := (← js#"1.4")
+}
 
-def binder : PropEntry := style #[
-  ("flex", "0 0 auto"),
-  ("color", accent),
-  ("fontWeight", "700")
-]
+def binder : RuntimeM Js.Object := js%{
+  "flex" := (← js#"0 0 auto"), "color" := (← JsValue.ofString accent), "fontWeight" := (← js#"700")
+}
 
-def hypothesisType : PropEntry := style #[
-  ("minWidth", "0"),
-  ("overflowWrap", "anywhere")
-]
+def hypothesisType : RuntimeM Js.Object := js%{
+  "minWidth" := (← js#"0"), "overflowWrap" := (← js#"anywhere")
+}
 
-def value : PropEntry := style #[
-  ("minWidth", "0"),
-  ("color", muted),
-  ("overflowWrap", "anywhere")
-]
+def value : RuntimeM Js.Object := js%{
+  "minWidth" := (← js#"0"), "color" := (← JsValue.ofString muted), "overflowWrap" := (← js#"anywhere")
+}
 
-def target : PropEntry := style #[
-  ("display", "grid"),
-  ("gridTemplateColumns", "auto minmax(0, 1fr)"),
-  ("alignItems", "baseline"),
-  ("gap", "7px"),
-  ("padding", "7px 8px"),
-  ("borderRadius", "4px"),
-  ("background", codeBackground),
-  ("fontFamily", "ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
-  ("fontSize", "0.75rem"),
-  ("lineHeight", "1.42")
-]
+def target : RuntimeM Js.Object := js%{
+  "display" := (← js#"grid"), "gridTemplateColumns" := (← js#"auto minmax(0, 1fr)"),
+  "alignItems" := (← js#"baseline"), "gap" := (← js#"7px"), "padding" := (← js#"7px 8px"),
+  "borderRadius" := (← js#"4px"), "background" := (← JsValue.ofString codeBackground),
+  "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
+  "fontSize" := (← js#"0.75rem"), "lineHeight" := (← js#"1.42")
+}
 
-def turnstile : PropEntry := style #[
-  ("color", goalAccent),
-  ("fontWeight", "800")
-]
+def turnstile : RuntimeM Js.Object := js%{
+  "color" := (← JsValue.ofString goalAccent), "fontWeight" := (← js#"800")
+}
 
-def targetCode : PropEntry := style #[
-  ("minWidth", "0"),
-  ("overflowWrap", "anywhere"),
-  ("whiteSpace", "pre-wrap")
-]
+def targetCode : RuntimeM Js.Object := js%{
+  "minWidth" := (← js#"0"), "overflowWrap" := (← js#"anywhere"), "whiteSpace" := (← js#"pre-wrap")
+}
 
-def empty : PropEntry := style #[
-  ("margin", "0"),
-  ("padding", "12px"),
-  ("border", "1px dashed " ++ borderColor),
-  ("borderRadius", "5px"),
-  ("color", muted),
-  ("fontSize", "0.76rem")
-]
+def empty : RuntimeM Js.Object := js%{
+  "margin" := (← js#"0"), "padding" := (← js#"12px"),
+  "border" := (← JsValue.ofString ("1px dashed " ++ borderColor)), "borderRadius" := (← js#"5px"),
+  "color" := (← JsValue.ofString muted), "fontSize" := (← js#"0.76rem")
+}
 
 end Style
 
@@ -189,8 +137,8 @@ def plural (count : Nat) (one many : String) : String :=
   if count == 1 then one else many
 
 /-- Plain text is intentional in this compact demonstration; tags stay native until this call. -/
-def plainCode (code : Js CodeWithInfos) : ReactM String := do
-  JsValue.toString (← CodeWithInfos.stripTags code)
+def plainCode (code : Js CodeWithInfos) : ReactM (Js String) := do
+  CodeWithInfos.stripTags code
 
 structure HypothesisProps where
   hypothesis : Js InteractiveHypothesisBundle
@@ -212,24 +160,15 @@ def HypothesisRow : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.P
     let hypothesisType ← plainCode (← InteractiveHypothesisBundle.type hypothesis)
     let value? ← Js.UndefinedOr.toOption (← InteractiveHypothesisBundle.val hypothesis)
     let value ← value?.mapM plainCode
-    let valueNodes : Array Html := (value.map fun text => #[
-      Html.elementWithProps "span" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-hyp-value", Style.value
-      ] #[Html.text (" := " ++ text)]
+    let valueNodes : Array Html := (value.map fun value => #[do
+      <span className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {Lean.Vir.React.Node.text value}</span>
     ]).getD #[]
-    Html.elementWithProps "li" #[
-      Lean.Vir.React.Props.id ("vir-native-infoview-hyp-" ++ id),
-      Lean.Vir.React.Props.className "vir-native-infoview-hypothesis",
-      Lean.Vir.React.Props.role "listitem", Style.hypothesis
-    ] (#[
-      Html.elementWithProps "span" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-hyp-name", Style.binder
-      ] #[Html.text names],
-      Html.elementWithProps "span" #[Lean.Vir.React.Props.ariaHidden true] #[Html.text ":"],
-      Html.elementWithProps "code" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-hyp-type", Style.hypothesisType
-      ] #[Html.text hypothesisType]
-    ] ++ valueNodes)
+    return ← <li id={(← JsValue.ofString ("vir-native-infoview-hyp-" ++ id))}
+        className="vir-native-infoview-hypothesis" role="listitem" style={(← Style.hypothesis)}><span
+          className="vir-native-infoview-hyp-name" style={(← Style.binder)}>{Lean.Vir.React.Node.text
+            (← JsValue.ofString names)}</span><span aria-hidden={(← JsValue.ofBool true)}>:</span><code
+          className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{Lean.Vir.React.Node.text
+            hypothesisType}</code>{...valueNodes}</li>
 
 structure TacticGoalCardProps where
   goal : Js InteractiveGoal
@@ -280,68 +219,54 @@ def GoalCardBody
     (index : Nat)
     (hypotheses : Array (Js InteractiveHypothesisBundle))
     (target : Js CodeWithInfos)
-    (hypothesisRow : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData HypothesisProps)) : ReactM (Js Lean.Vir.React.Node) := do
+    (HypothesisRowComponent : Lean.Vir.React.FunctionComponent
+      (Lean.Vir.React.Props.WithData HypothesisProps)) : ReactM (Js Lean.Vir.React.Node) := do
   let initialCollapsed ← JsValue.ofBool false
   let collapsedState ← Lean.Vir.React.StateTuple.toState
     (← Lean.Vir.React.Hooks.useState initialCollapsed)
   let collapsed ← JsValue.toBool collapsedState.value
   let detailsId := s!"vir-native-infoview-goal-{goalId}-details"
-  let toggle : DomM Unit := do
+  let toggle ← Lean.Vir.React.Callback.ofUnary fun (_ : Js Lean.Vir.Browser.Event) => do
     let next ← JsValue.ofBool (!collapsed)
     Lean.Vir.React.State.set collapsedState next
-  let hypotheses : Array Html := hypotheses.mapIdx fun hypothesisIndex hypothesis => do
-    Html.keyedComponent s!"{goalId}-{hypothesisIndex}" hypothesisRow
+  let hypothesisNodes ← hypotheses.mapIdxM fun hypothesisIndex hypothesis => do
+    let props ← Lean.Vir.React.Props.WithData.make
       (← Lean.Vir.LeanRef.toJSL { hypothesis, goalIndex := index, index := hypothesisIndex })
-  let context : Html := if hypotheses.isEmpty then
-    Html.elementWithProps "p" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-no-hypotheses", Style.empty
-    ] #[Html.text "No local hypotheses."]
+    Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps props) (← js#"key")
+      (← JsValue.ofString s!"{goalId}-{hypothesisIndex}")
+    return ← <HypothesisRowComponent {...props}/>
+  let context : Html := if hypothesisNodes.isEmpty then
+    <p className="vir-native-infoview-no-hypotheses" style={(← Style.empty)}>No local hypotheses.</p>
   else
-    Html.elementWithProps "ul" #[
-      Lean.Vir.React.Props.id detailsId,
-      Lean.Vir.React.Props.className "vir-native-infoview-context",
-      Lean.Vir.React.Props.role "list", Lean.Vir.React.Props.ariaLabel "Local hypotheses", Style.context
-    ] hypotheses
+    <ul id={(← JsValue.ofString detailsId)} className="vir-native-infoview-context" role="list"
+        aria-label="Local hypotheses" style={(← Style.context)}>{...hypothesisNodes.map pure}</ul>
   let targetText ← plainCode target
-  let target : Html := Html.elementWithProps "div" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-target", Style.target
-    ] #[
-      Html.elementWithProps "span" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-turnstile",
-        Lean.Vir.React.Props.ariaHidden true, Style.turnstile
-      ] #[Html.text "⊢"],
-      Html.elementWithProps "code" #[
-        Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goalId}-target",
-        Lean.Vir.React.Props.className "vir-native-infoview-target-code", Style.targetCode
-      ] #[Html.text targetText]
-    ]
+  let target : Html := <div className="vir-native-infoview-target" style={(← Style.target)}><span
+      className="vir-native-infoview-turnstile" aria-hidden={(← JsValue.ofBool true)}
+      style={(← Style.turnstile)}>⊢</span><code id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-target")}
+      className="vir-native-infoview-target-code" style={(← Style.targetCode)}>{Lean.Vir.React.Node.text targetText}</code></div>
   let details : Array Html := if collapsed then #[] else #[context, target]
-  let heading : Html := Html.elementWithProps "h3" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-goal-heading", Style.goalHeading
-    ] #[Html.text title]
-  let collapseButton : Html := Html.elementWithProps "button" #[
-      Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goalId}-collapse",
-      Lean.Vir.React.Props.className "vir-native-infoview-collapse",
-      Lean.Vir.React.Props.type "button",
-      Lean.Vir.React.Props.title (if collapsed then "Expand goal" else "Collapse goal"),
-      Lean.Vir.React.Props.ariaLabel (if collapsed then "Expand goal" else "Collapse goal"),
-      Lean.Vir.React.Props.ariaExpanded (!collapsed), Lean.Vir.React.Props.ariaControls detailsId,
-      Lean.Vir.React.Props.onClick toggle, Style.collapseButton
-    ] #[Html.text (if collapsed then "+" else "−")]
-  let header : Html := Html.elementWithProps "header" #[
-      Lean.Vir.React.Props.className "vir-native-infoview-goal-header", Style.goalHeader
-    ] #[heading, collapseButton]
-  Html.elementWithProps "article" #[
-    Lean.Vir.React.Props.id s!"vir-native-infoview-goal-{goalId}",
-    Lean.Vir.React.Props.className "vir-native-infoview-goal",
-    Lean.Vir.React.Props.data "goal-id" goalId,
-    Lean.Vir.React.Props.data "goal-key" goalKey,
-    Lean.Vir.React.Props.data "goal-status" status,
-    Style.goalCard
-  ] (#[header] ++ details)
+  let heading : Html := <h3 className="vir-native-infoview-goal-heading" style={(← Style.goalHeading)}>
+    {Lean.Vir.React.Node.text (← JsValue.ofString title)}
+  </h3>
+  let collapseButton : Html := <button id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-collapse")}
+      className="vir-native-infoview-collapse" type="button"
+      title={(← JsValue.ofString (if collapsed then "Expand goal" else "Collapse goal"))}
+      aria-label={(← JsValue.ofString (if collapsed then "Expand goal" else "Collapse goal"))}
+      aria-expanded={(← JsValue.ofBool (!collapsed))} aria-controls={(← JsValue.ofString detailsId)}
+      onClick={toggle} style={(← Style.collapseButton)}>
+    {Lean.Vir.React.Node.text (← JsValue.ofString (if collapsed then "+" else "−"))}
+  </button>
+  let header : Html := <header className="vir-native-infoview-goal-header" style={(← Style.goalHeader)}>
+    {heading}{collapseButton}
+  </header>
+  return ← <article id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}")}
+      className="vir-native-infoview-goal" data-goal-id={(← JsValue.ofString goalId)}
+      data-goal-key={(← JsValue.ofString goalKey)} data-goal-status={(← JsValue.ofString status)}
+      style={(← Style.goalCard)}>{header}{...details}</article>
 
 def TacticGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData TacticGoalCardProps)) := do
-  let hypothesisRow ← HypothesisRow
+  let HypothesisRowComponent ← HypothesisRow
   Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
     let data ← Lean.Vir.React.Props.WithData.data nativeProps
     let props ← Lean.Vir.LeanRef.fromJSL data
@@ -349,20 +274,20 @@ def TacticGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.
     let status ← tacticGoalStatus props.goal
     let hypotheses ← Js.Array.toLeanArray (← InteractiveGoal.hyps props.goal)
     let target ← InteractiveGoal.type props.goal
-    GoalCardBody s!"goal-{props.index}" props.key title status props.index hypotheses target hypothesisRow
+    GoalCardBody s!"goal-{props.index}" props.key title status props.index hypotheses target HypothesisRowComponent
 
 def TermGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData TermGoalCardProps)) := do
-  let hypothesisRow ← HypothesisRow
+  let HypothesisRowComponent ← HypothesisRow
   Lean.Vir.React.FunctionComponent.ofLean fun nativeProps => do
     let data ← Lean.Vir.React.Props.WithData.data nativeProps
     let props ← Lean.Vir.LeanRef.fromJSL data
     let hypotheses ← Js.Array.toLeanArray (← InteractiveTermGoal.hyps props.goal)
     let target ← InteractiveTermGoal.type props.goal
-    GoalCardBody s!"term-{props.index}" "term" "Term goal" "term" props.index hypotheses target hypothesisRow
+    GoalCardBody s!"term-{props.index}" "term" "Term goal" "term" props.index hypotheses target HypothesisRowComponent
 
 def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
-  let tacticGoalCard ← TacticGoalCard
-  let termGoalCard ← TermGoalCard
+  let TacticGoalCardComponent ← TacticGoalCard
+  let TermGoalCardComponent ← TermGoalCard
   Lean.Vir.React.FunctionComponent.ofLean fun props => do
     let position ← PanelWidgetProps.pos props
     let captionPosition ← positionLabel position
@@ -370,39 +295,40 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
     let termGoal? ← Js.UndefinedOr.toOption (← PanelWidgetProps.termGoal props)
     let tacticNodes ← tacticGoals.mapIdxM fun index goal => do
       let key ← tacticGoalKey goal index
-      pure <| Html.keyedComponent key tacticGoalCard (← Lean.Vir.LeanRef.toJSL { goal, index, key })
+      let cardProps ← Lean.Vir.React.Props.WithData.make
+        (← Lean.Vir.LeanRef.toJSL { goal, index, key })
+      Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps cardProps) (← js#"key")
+        (← JsValue.ofString key)
+      return ← <TacticGoalCardComponent {...cardProps}/>
     let termNodes : Array Html := (termGoal?.map fun goal => #[
       (do
-        Html.keyedComponent s!"term-{tacticGoals.size}" termGoalCard
-          (← Lean.Vir.LeanRef.toJSL { goal, index := tacticGoals.size }))
+        let cardProps ← Lean.Vir.React.Props.WithData.make
+          (← Lean.Vir.LeanRef.toJSL { goal, index := tacticGoals.size })
+        Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps cardProps) (← js#"key")
+          (← JsValue.ofString s!"term-{tacticGoals.size}")
+        return ← <TermGoalCardComponent {...cardProps}/>)
     ]).getD #[]
-    let goals := tacticNodes ++ termNodes
+    let goals := tacticNodes.map pure ++ termNodes
     let goalCount := goals.size
     let body : Html := if goals.isEmpty then
-      Html.elementWithProps "p" #[
-        Lean.Vir.React.Props.id "vir-native-infoview-empty",
-        Lean.Vir.React.Props.className "vir-native-infoview-empty", Style.empty
-      ] #[Html.text ("No goals at " ++ captionPosition ++ ".")]
+      <p id="vir-native-infoview-empty" className="vir-native-infoview-empty" style={(← Style.empty)}>
+        {Lean.Vir.React.Node.text (← JsValue.ofString ("No goals at " ++ captionPosition ++ "."))}
+      </p>
     else
-      Html.elementWithProps "div" #[
-        Lean.Vir.React.Props.id "vir-native-infoview-goals",
-        Lean.Vir.React.Props.className "vir-native-infoview-goals", Style.goalList
-      ] goals
-    let heading : Html := Html.elementWithProps "h2" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-title", Style.title
-      ] #[Html.text "Goals"]
-    let summary : Html := Html.elementWithProps "p" #[
-        Lean.Vir.React.Props.id "vir-native-infoview-summary",
-        Lean.Vir.React.Props.className "vir-native-infoview-summary", Style.summary
-      ] #[Html.text <| s!"{goalCount} " ++ plural goalCount "goal" "goals" ++ " · " ++ captionPosition]
-    let toolbar : Html := Html.elementWithProps "header" #[
-        Lean.Vir.React.Props.className "vir-native-infoview-toolbar", Style.toolbar
-      ] #[heading, summary]
-    Html.elementWithProps "section" #[
-      Lean.Vir.React.Props.id "vir-native-infoview",
-      Lean.Vir.React.Props.className "vir-native-infoview",
-      Lean.Vir.React.Props.role "region", Lean.Vir.React.Props.ariaLabel "VIR native Lean goals", Style.shell
-    ] #[toolbar, body]
+      <div id="vir-native-infoview-goals" className="vir-native-infoview-goals" style={(← Style.goalList)}>
+        {...goals}
+      </div>
+    let heading : Html := <h2 className="vir-native-infoview-title" style={(← Style.title)}>Goals</h2>
+    let summary : Html := <p id="vir-native-infoview-summary" className="vir-native-infoview-summary"
+        style={(← Style.summary)}>
+      {Lean.Vir.React.Node.text (← JsValue.ofString
+        (s!"{goalCount} " ++ plural goalCount "goal" "goals" ++ " · " ++ captionPosition))}
+    </p>
+    let toolbar : Html := <header className="vir-native-infoview-toolbar" style={(← Style.toolbar)}>
+      {heading}{summary}
+    </header>
+    return ← <section id="vir-native-infoview" className="vir-native-infoview" role="region"
+        aria-label="VIR native Lean goals" style={(← Style.shell)}>{toolbar}{body}</section>
 
 vir_proof_widget View
 

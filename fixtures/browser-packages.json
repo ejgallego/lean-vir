@@ -156,7 +156,8 @@
           "module": "fixtures.ProofWidgetsJsxSubset",
           "roots": [
             "ProofWidgetsJsxSubset.mount",
-            "ProofWidgetsJsxSubset.mountDefault"
+            "ProofWidgetsJsxSubset.mountDefault",
+            "ProofWidgetsJsxSubset.nativeConstruction"
           ]
         },
         {

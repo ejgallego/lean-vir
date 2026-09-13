@@ -58,6 +58,7 @@ def createComponent : RuntimeM (FunctionComponent Lean.Vir.Infoview.PanelWidgetP
       cleanup := fun _ => do stale.set true; record ("cleanup:" ++ owner)
     }
     Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Hooks.DependencyList.empty))
-    Node.spanText owner
+    Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
+      (← Js.Object.empty) (← Js.Array.ofArray #[← Node.text (← JsValue.ofString owner)])
 
 end Vir.Fixtures.ShellLifetime

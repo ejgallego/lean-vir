@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -15,6 +15,7 @@ namespace ReactCounter
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def label (value : Nat) : String :=
   "react:" ++ toString value
@@ -25,25 +26,17 @@ def counter : RuntimeM (FunctionComponent Props) :=
     let count ← StateTuple.toState (← Hooks.useState initial)
     let countValue ← JsValue.toNat count.value
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label countValue))
-    Node.buttonWith
-      #[
-        Props.id "react-counter-button",
-        Props.onClick do
-          State.modify count fun previous => do
-            let value ← JsValue.toNat previous
-            JsValue.ofNat (value + 1)
-      ]
-      #[text]
+    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+      State.modify count fun previous => do
+        let value ← JsValue.toNat previous
+        JsValue.ofNat (value + 1)
+    return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   let node ← ReactM.run do
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label value))
-    Node.buttonWith
-      #[
-        Props.id "react-counter-button",
-        Props.onClick (renderInto root (value + 1))
-      ]
-      #[text]
+    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => renderInto root (value + 1)
+    return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
   Root.render root node
 
 def mount (selector : String) : DomM Bool := do
@@ -54,7 +47,7 @@ def mount (selector : String) : DomM Bool := do
   | some container => do
       let root ← Lean.Vir.React.Root.create container
       let component ← counter
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -65,7 +58,7 @@ def mountDefault : DomM Bool :=
 
 def staticTree : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString "react:static")
-  Node.spanWith #[Props.id "react-static-label"] #[text]
+  return ← <span id="react-static-label">{pure text}</span>
 
 def renderStatic (selector : String) : DomM Bool := do
   let container ← Lean.Vir.Browser.Document.querySelector
@@ -85,7 +78,7 @@ def renderStaticIntoSelector (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -101,7 +94,7 @@ def effectProbe : RuntimeM (FunctionComponent Props) :=
       { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
     Hooks.useEffect effectWithDeps (Js.UndefinedOr.ofJs deps)
     let text ← Node.text (← Lean.Vir.JsValue.ofString "react:effect")
-    Node.spanWith #[Props.id "react-effect-label"] #[text]
+    return ← <span id="react-effect-label">{pure text}</span>
 
 def mountEffect (selector : String) : DomM Bool := do
   let component ← effectProbe
@@ -111,7 +104,7 @@ def mountEffect (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -127,7 +120,7 @@ def memoProbe : RuntimeM (FunctionComponent Props) :=
     let value ← Hooks.useMemo calculation deps
     let memoValue ← JsValue.toNat value
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo:{memoValue}")
-    Node.spanWith #[Props.id "react-memo-label"] #[text]
+    return ← <span id="react-memo-label">{pure text}</span>
 
 def mountMemo (selector : String) : DomM Bool := do
   let component ← memoProbe
@@ -137,7 +130,7 @@ def mountMemo (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -153,15 +146,11 @@ def memoStableProbe : RuntimeM (FunctionComponent Props) :=
     let countValue ← JsValue.toNat count.value
     let cachedValue ← JsValue.toNat memoValue
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo-stable:{countValue}:{cachedValue}")
-    Node.buttonWith
-      #[
-        Props.id "react-memo-stable-button",
-        Props.onClick do
-          State.modify count fun previous => do
-            let value ← JsValue.toNat previous
-            JsValue.ofNat (value + 1)
-      ]
-      #[text]
+    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+      State.modify count fun previous => do
+        let value ← JsValue.toNat previous
+        JsValue.ofNat (value + 1)
+    return ← <button type="button" id="react-memo-stable-button" onClick={increment}>{pure text}</button>
 
 def mountMemoStable (selector : String) : DomM Bool := do
   let component ← memoStableProbe
@@ -171,7 +160,7 @@ def mountMemoStable (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -186,21 +175,16 @@ def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
     let lastValueResource ← Ref.get lastClick
     let lastValue ← JsValue.toNat lastValueResource
     let labelText ← Node.text (← Lean.Vir.JsValue.ofString s!"react:ref:{countValue}:{lastValue}")
-    let button ←
-      Node.buttonWith
-        #[
-          Props.id "react-ref-button",
-          Props.onClick do
-            State.modify count fun previous => do
-              let value ← JsValue.toNat previous
-              let next ← JsValue.ofNat (value + 1)
-              Ref.set lastClick next
-              pure next
-        ]
-        #[labelText]
+    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+      State.modify count fun previous => do
+        let value ← JsValue.toNat previous
+        let next ← JsValue.ofNat (value + 1)
+        Ref.set lastClick next
+        pure next
+    let button ← <button type="button" id="react-ref-button" onClick={increment}>{pure labelText}</button>
     let markerText ← Node.text (← Lean.Vir.JsValue.ofString "fragment child")
-    let marker ← Node.spanWith #[Props.id "react-fragment-marker"] #[markerText]
-    Node.fragment (← Props.empty) (← Js.Array.ofArray #[button, marker])
+    let marker ← <span id="react-fragment-marker">{pure markerText}</span>
+    Node.fragment (← Js.Object.empty) (← js#[button, marker])
 
 def mountRefFragment (selector : String) : DomM Bool := do
   let component ← refFragmentProbe
@@ -210,7 +194,7 @@ def mountRefFragment (selector : String) : DomM Bool := do
   | none => pure false
   | some container => do
       let root ← Lean.Vir.React.Root.create container
-      let props ← Lean.Vir.React.Props.empty
+      let props ← Js.Object.empty
       let node ← Lean.Vir.React.ReactM.run do
         Lean.Vir.React.Node.functionComponent component props (← Lean.Vir.Js.Array.empty)
       Lean.Vir.React.Root.render root node
@@ -218,12 +202,7 @@ def mountRefFragment (selector : String) : DomM Bool := do
 
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("item:" ++ toString index))
-  Node.spanWith
-    #[
-      Props.className "react-bench-text",
-      Props.data "index" (toString index)
-    ]
-    #[text]
+  return ← <span className="react-bench-text" data-index={← JsValue.ofString (toString index)}>{pure text}</span>
 
 partial def benchTextChildrenAux
     (index remaining : Nat)
@@ -240,9 +219,9 @@ def benchTextChildren (count : Nat) : ReactM (Array (Lean.Vir.Js Node)) :=
 
 def benchTextTree (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchTextChildren count
-  Node.divWith
-    #[Props.id "react-bench-text-tree", Props.className "react-bench-tree"]
-    children
+  Node.createElement (← ElementType.tag (← js#"div"))
+    (← js%{ "id" := (← js#"react-bench-text-tree"), "className" := (← js#"react-bench-tree") })
+    (← Js.Array.ofArray children)
 
 partial def renderWideTextLoopAux (root : Lean.Vir.Js Root) (width remaining acc : Nat) : DomM Nat := do
   match remaining with
@@ -264,14 +243,10 @@ def renderWideTextLoop (selector : String) (width count : Nat) : DomM Nat := do
 
 def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("callback:" ++ toString index))
-  Node.buttonWith
-    #[
-      Props.className "react-bench-callback",
-      Props.data "index" (toString index),
-      Props.onClick do
-        Root.render root (← ReactM.run (benchTextTree 1))
-    ]
-    #[text]
+  let click ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+    Root.render root (← ReactM.run (benchTextTree 1))
+  return ← <button type="button" className="react-bench-callback"
+    data-index={← JsValue.ofString (toString index)} onClick={click}>{pure text}</button>
 
 partial def benchCallbackChildrenAux
     (root : Lean.Vir.Js Root)
@@ -289,9 +264,9 @@ def benchCallbackChildren (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Arra
 
 def benchCallbackTree (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchCallbackChildren root count
-  Node.divWith
-    #[Props.id "react-bench-callback-tree", Props.className "react-bench-tree"]
-    children
+  Node.createElement (← ElementType.tag (← js#"div"))
+    (← js%{ "id" := (← js#"react-bench-callback-tree"), "className" := (← js#"react-bench-tree") })
+    (← Js.Array.ofArray children)
 
 partial def renderCallbackTreeLoopAux (root : Lean.Vir.Js Root) (width remaining acc : Nat) : DomM Nat := do
   match remaining with
@@ -348,7 +323,7 @@ def nestedDivs (depth : Nat) : ReactM (Lean.Vir.Js Node) := do
   | 0 => Node.text (← Lean.Vir.JsValue.ofString "deep")
   | n + 1 => do
       let child ← nestedDivs n
-      Node.div #[child]
+      return ← <div>{pure child}</div>
 
 def renderTooDeep (selector : String) : DomM Bool := do
   let container ← Lean.Vir.Browser.Document.querySelector

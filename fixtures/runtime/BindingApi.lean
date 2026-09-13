@@ -5,10 +5,35 @@ Author: Emilio J. Gallego Arias
 -/
 module
 
-public import Vir.React
+public import Vir.ProofWidgets.Jsx
 
 open Lean.Vir
 open Lean.Vir.Browser
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+
+-- Literal notation constructs native containers; interpolation does not encode Lean data.
+example (value : Js String) : RuntimeM Js.Object :=
+  js%{ "value" := value }
+
+example (first second : Js String) : RuntimeM (Js.Array String) :=
+  js#[first, second]
+
+example (value : Js String) : React.ReactM (Js React.Node) :=
+  <span title={value}>{React.Node.text value}</span>
+
+example (Component : React.FunctionComponent (React.Props.WithData String))
+    (props : Js (React.Props.WithData String)) : React.ReactM (Js React.Node) :=
+  <Component {...props} />
+
+example (_value : String) (_callback : DomM Unit)
+    (_component : React.FunctionComponent (React.Props.WithData String))
+    (_props : Js (React.Props.WithData Nat)) : True := by
+  fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := _value }
+  fail_if_success have _ : RuntimeM (Js.Array String) := js#[_value]
+  fail_if_success have _ : React.ReactM (Js React.Node) := <span title={_value} />
+  fail_if_success have _ : React.ReactM (Js React.Node) := <button onClick={_callback} />
+  fail_if_success have _ := React.Node.functionComponent _component _props
+  trivial
 
 -- Application data shapes cannot be silently interchanged or inferred from an object.
 example (_props : Js (React.Props.WithData String)) : True := by
