@@ -27,6 +27,15 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "javascript.string.length", "group": "string", "target": "js.string.length",
+        "lean": "Lean.Vir.Js.String.length", "marker": "vir_js",
+        "reason": "Reads native String.length as a JavaScript number of UTF-16 code units, without decoding the string or counting Unicode code points.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.length", "accessor": "get", "semantics": "preserving" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
         "id": "javascript.undefined", "group": "undefined", "target": "js.undefined",
         "lean": "Lean.Vir.Js.UndefinedOr.undefined", "marker": "vir_js",
         "reason": "Returns the exact JavaScript undefined value, with no Option encoding or object wrapper.",
@@ -372,7 +381,7 @@
         "reason": "Projects position 0 of an exact native two-element tuple, preserving the first position's type and value identity.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js α) (Lean.Vir.Js β)" } }],
+        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 α β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value α β" } }],
         "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
@@ -381,7 +390,7 @@
         "reason": "Projects position 1 of an exact native two-element tuple, preserving the second position's type and value identity.",
         "upstreamRelation": { "kind": "vir-owned" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
-        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js α) (Lean.Vir.Js β)" } }],
+        "arguments": [{ "name": "tuple", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Tuple2 α β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Tuple2.Value α β" } }],
         "result": { "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }
       },
       {
@@ -435,6 +444,11 @@
     ]
   },
   "roots": [
+    {
+      "id": "string", "title": "String properties", "targets": ["js.string.length"],
+      "lean": { "public": ["Lean.Vir.Js.String"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["String"] }
+    },
     {
       "id": "object",
       "title": "Object",

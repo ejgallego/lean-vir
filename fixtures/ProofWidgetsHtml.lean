@@ -42,8 +42,8 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
       <h3 className="pw-html-title">ProofWidgets-style Html</h3>
       <p className="pw-html-summary">This tree is written through native JSX and rendered as native React nodes.</p>
       <ul className="pw-html-stats">
-        <StatComponent {...elementsProps}/>
-        <StatComponent {...componentsProps}/>
+        <StatComponent @props={elementsProps}/>
+        <StatComponent @props={componentsProps}/>
         <li className="pw-html-stat">
           <span className="pw-html-stat-label">Text</span>
           <strong className="pw-html-stat-value">native</strong>

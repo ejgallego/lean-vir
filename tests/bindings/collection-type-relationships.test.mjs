@@ -159,6 +159,7 @@ for (const target of ["js.tuple2.first", "js.tuple2.second"]) {
   test(`${target} rejects erased or unrelated position types`, () => {
     for (const mutate of [
       (op) => { op.arguments[0].type.lean = "Lean.Vir.Js.Array Lean.Vir.Js.Any"; },
+      (op) => { op.arguments[0].type.lean = "Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)"; },
       (op) => { op.result.type.lean = "Lean.Vir.Js γ"; },
       (op) => { op.result.type.lean = target.endsWith("first") ? "Lean.Vir.Js β" : "Lean.Vir.Js α"; },
     ]) {

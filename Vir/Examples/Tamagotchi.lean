@@ -547,7 +547,7 @@ def emptySpanWith (classes : Array String) (style : Js.Object) : ReactM (Lean.Vi
     "aria-hidden" := (← JsValue.ofBool true),
     "style" := style
   }
-  return ← <span {...props}/>
+  return ← <span @props={props}/>
 
 def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) := do
   emptySpanWith classes (← Js.Object.empty)
@@ -648,7 +648,7 @@ def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
     "aria-hidden" := (← JsValue.ofBool true),
     "style" := signalStyle
   }
-  let signal ← <span {...signalProps}>{pure signalText}</span>
+  let signal ← <span @props={signalProps}>{pure signalText}</span>
   let children ←
     if artwork == "octopus" then do
       let tentacle1 ← tentacle "1" "13px" "rotate(12deg)" ink
@@ -695,7 +695,7 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
     "className" := (← js#"pet-screen"),
     "style" := (← screenStyle state)
   }
-  let screen ← <div {...screenProps}>{pure pet}{pure screenLabel}</div>
+  let screen ← <div @props={screenProps}>{pure pet}{pure screenLabel}</div>
   let leftButton ← emptySpanWith #["pet-device-button", "pet-device-button-left"]
     (← deviceButtonStyle (some "30px") none)
   let centerButton ← emptySpanWith #["pet-device-button", "pet-device-button-center"]
@@ -711,7 +711,7 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
     "data-mood" := (← JsValue.ofString moodLabel),
     "style" := (← deviceStyle state)
   }
-  return ← <div {...props}>{pure screen}{pure leftButton}{pure centerButton}{pure rightButton}</div>
+  return ← <div @props={props}>{pure screen}{pure leftButton}{pure centerButton}{pure rightButton}</div>
 
 def normalizeViewState (state : Tamagotchi.PetState) : Tamagotchi.PetState :=
   let artwork := Tamagotchi.normalizeArtwork state.artwork
@@ -821,7 +821,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     "className" := (← js#"react-pet-progress-fill"),
     "style" := (← progressFillStyle secondsLeft)
   }
-  let fill ← <div {...fillProps}/>
+  let fill ← <div @props={fillProps}/>
   let barProps ← js%{
     "id" := (← js#"react-pet-progress"),
     "className" := (← js#"react-pet-progress"),
@@ -833,7 +833,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     "aria-valuenow" := (← JsValue.ofFloat secondsLeft.toFloat),
     "style" := (← progressStyle)
   }
-  let bar ← <div {...barProps}>{pure fill}</div>
+  let bar ← <div @props={barProps}>{pure fill}</div>
   let counterText ← Node.text (← Lean.Vir.JsValue.ofString (progressLabel secondsLeft))
   let counterProps ← js%{
     "id" := (← js#"react-pet-progress-counter"),
@@ -841,12 +841,12 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
     "aria-hidden" := (← JsValue.ofBool true),
     "style" := (← progressCounterStyle)
   }
-  let counter ← <span {...counterProps}>{pure counterText}</span>
+  let counter ← <span @props={counterProps}>{pure counterText}</span>
   let wrapProps ← js%{
     "className" := (← js#"react-pet-progress-wrap"),
     "style" := (← progressWrapStyle)
   }
-  return ← <div {...wrapProps}>{pure bar}{pure counter}</div>
+  return ← <div @props={wrapProps}>{pure bar}{pure counter}</div>
 
 def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let hook ← useViewState
@@ -867,7 +867,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
       "style" := (← buttonStyle),
       "onClick" := onClick
     }
-    return ← <button {...props}>{pure text}</button>
+    return ← <button @props={props}>{pure text}</button>
   let artInput ← show ReactM (Js Node) from do
     let onChange ← Callback.ofUnary fun (event : Lean.Vir.Js Lean.Vir.Browser.Event) => do
       match ← Lean.Vir.Browser.Event.inputElement? event with
@@ -882,7 +882,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
       "checked" := (← JsValue.ofBool (state.artwork == "octopus")),
       "onChange" := onChange
     }
-    return ← <input {...props}/>
+    return ← <input @props={props}/>
   let artText ← Node.text (← Lean.Vir.JsValue.ofString "Octopus")
   let artSpan ← <span>{pure artText}</span>
   let artLabelStyle ← js%{ "display" := (← js#"inline-flex"), "alignItems" := (← js#"center"),
@@ -893,7 +893,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     "className" := (← js#"react-pet-toggle"),
     "style" := artLabelStyle
   }
-  let artLabel ← <label {...artLabelProps}>{pure artInput}{pure artSpan}</label>
+  let artLabel ← <label @props={artLabelProps}>{pure artInput}{pure artSpan}</label>
   let deviceNode ← device state
   let moodText ← Node.text (← Lean.Vir.JsValue.ofString state.mood.label)
   let moodStyle ← js%{ "fontSize" := (← js#"1.32rem"), "fontWeight" := (← js#"900"),
@@ -902,13 +902,13 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     "id" := (← js#"react-pet-mood"),
     "style" := moodStyle
   }
-  let moodValueNode ← <span {...moodProps}>{pure moodText}</span>
+  let moodValueNode ← <span @props={moodProps}>{pure moodText}</span>
   let progress ← progressBar view.secondsLeft
   let petStateProps ← js%{
     "className" := (← js#"pet-state"),
     "style" := (← petStageStyle)
   }
-  let petState ← <div {...petStateProps}>{pure deviceNode}{pure moodValueNode}{pure progress}</div>
+  let petState ← <div @props={petStateProps}>{pure deviceNode}{pure moodValueNode}{pure progress}</div>
   let actionButtons ← actions.mapM actionButton
   let actionsProps ← js%{
     "className" := (← js#"action-grid react-pet-actions"),
@@ -926,19 +926,19 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     "style" := (← resetButtonStyle),
     "onClick" := resetClick
   }
-  let reset ← <button {...resetProps}>{pure resetText}</button>
+  let reset ← <button @props={resetProps}>{pure resetText}</button>
   let controlsStyle ← js%{ "display" := (← js#"flex"), "alignItems" := (← js#"center"),
     "justifyContent" := (← js#"space-between"), "gap" := (← js#"8px") }
   let controlsProps ← js%{
     "className" := (← js#"react-pet-controls"),
     "style" := controlsStyle
   }
-  let controls ← <div {...controlsProps}>{pure artLabel}{pure reset}</div>
+  let controls ← <div @props={controlsProps}>{pure artLabel}{pure reset}</div>
   let bodyProps ← js%{
     "className" := (← js#"react-pet-body"),
     "style" := (← bodyStyle)
   }
-  let body ← <div {...bodyProps}>{pure petState}{pure actionsNode}{pure controls}</div>
+  let body ← <div @props={bodyProps}>{pure petState}{pure actionsNode}{pure controls}</div>
   let css ← widgetStyleNode
   let widgetProps ← js%{
     "id" := (← js#"react-pet-widget"),
@@ -946,7 +946,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     "data-mood" := (← JsValue.ofString state.mood.label),
     "style" := (← widgetStyle)
   }
-  return ← <div {...widgetProps}>{pure css}{pure body}</div>
+  return ← <div @props={widgetProps}>{pure css}{pure body}</div>
 
 def mount (selector : String) : DomM Bool := do
   let component ← View

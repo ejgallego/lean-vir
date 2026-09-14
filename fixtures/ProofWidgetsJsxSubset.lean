@@ -21,7 +21,7 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 /-!
 Native VIR port of the static surface from upstream
 `ProofWidgets/Demos/Jsx.lean`, including attributes, components, callbacks,
-keys, and child / prop spreads.
+keys, child iteration, and exact native props.
 -/
 
 structure CardProps where
@@ -37,7 +37,7 @@ def Card : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.With
     "className" := (← js#"pw-jsx-card"),
     "data-component" := (← js#"Card")
   }
-  return ← <section {...props}>
+  return ← <section @props={props}>
     <h3 className="pw-jsx-card-title">{Html.text ctx.title}</h3>
     <div id="proofwidgets-jsx-card-body" className="pw-jsx-card-body">
       {pure children}
@@ -56,7 +56,7 @@ def MarkdownDisplay : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React
     "className" := (← js#"pw-jsx-markdown"),
     "data-component" := (← js#"MarkdownDisplay")
   }
-  return ← <section {...props}>
+  return ← <section @props={props}>
     <h3 className="pw-jsx-markdown-title">MarkdownDisplay</h3>
     <pre className="pw-jsx-markdown-source">{Html.text ctx.contents}</pre>
   </section>
@@ -96,7 +96,7 @@ def markdownExample (MarkdownDisplay : Lean.Vir.React.FunctionComponent (Lean.Vi
   and $3*19 = \\int\\limits_0^{57}1~dx$.
 " }
     let props ← Props.WithData.make data
-    return ← <MarkdownDisplay {...props}/>
+    return ← <MarkdownDisplay @props={props}/>
 
 structure BadgeProps where
   tone : String
@@ -112,7 +112,7 @@ def Badge : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.Wit
     "className" := (← JsValue.ofString ("pw-jsx-badge pw-jsx-badge-" ++ ctx.tone)),
     "data-tone" := (← JsValue.ofString ctx.tone)
   }
-  return ← <span {...props}>
+  return ← <span @props={props}>
     {Html.text ctx.label}{pure children}
   </span>
 
@@ -149,16 +149,16 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
       "className" := (← js#"pw-jsx-action"),
       "onClick" := click
     }
-    let action ← <button {...buttonProps}>{Html.text "mark"}</button>
+    let action ← <button @props={buttonProps}>{Html.text "mark"}</button>
     let rows ← <ul id="proofwidgets-jsx-rows" className="pw-jsx-rows">
       {row "tags" "lowercase tags" "b, img, span, hr"}
       {row "components" "uppercase components" "Card, MarkdownDisplay, Badge"}
       {row "interpolation" "interpolation" s!"{renderedRows} rendered rows"}
     </ul>
-    let view : Html := <section {...surfaceProps}>
-      <Card {...cardProps}>
+    let view : Html := <section @props={surfaceProps}>
+      <Card @props={cardProps}>
         {htmlHeadline}{parrotImage}{spreadInterpolation}{pure markdown}
-        <Badge {...badgeProps}> children</Badge>
+        <Badge @props={badgeProps}> children</Badge>
         {pure action}{pure rows}
       </Card>
     </section>
@@ -190,8 +190,27 @@ def nativeConstruction
     "label" := (← js#"superseded"), "label" := label,
     "payload" := payload, "onClick" := callback, "values" := (← js#[label, label])
   }
-  return ← <Component {...props}>
+  return ← <Component @props={props}>
     <span title={label} style={payload} onClick={callback}>{Lean.Vir.React.Node.text label}</span>
   </Component>
+
+/-- A compile-time native props schema, never instantiated as a Lean record. -/
+structure NativeProps where
+  label : Js String
+  payload : Js.Object
+  onClick : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)
+  values : Js.Array String
+
+def nativeTypedConstruction
+    (Component : Lean.Vir.React.FunctionComponent NativeProps)
+    (payload : Js.Object) (label : Js String)
+    (callback : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)) : Html :=
+  <Component label={label} payload={payload} onClick={callback} values={(← js#[label, label])}/>
+
+def nativeTypedLabel (props : Js NativeProps) : RuntimeM (Js String) :=
+  js_field% props "label"
+
+def nativeStringLength (value : Js String) : RuntimeM (Js Float) :=
+  Js.String.length value
 
 end ProofWidgetsJsxSubset

@@ -194,7 +194,7 @@
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple (Lean.Vir.Js α)" } }
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple α" } }
       },
       {
         "id": "react.hooks.use-ref", "group": "hooks", "target": "react.useRef",

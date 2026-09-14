@@ -59,10 +59,10 @@ example {α : Type} (list : Js.NodeList α) : True := by
     have unwrapped : RuntimeM (Js.Array α) := Js.NodeList.toArray list
   trivial
 
-def stateValue {α : Type} (tuple : Js (StateTuple (Js α))) : RuntimeM (Js α) :=
+def stateValue {α : Type} (tuple : Js (StateTuple α)) : RuntimeM (Js α) :=
   StateTuple.value tuple
 
-def stateSetter {α : Type} (tuple : Js (StateTuple (Js α))) :
+def stateSetter {α : Type} (tuple : Js (StateTuple α)) :
     RuntimeM (Js (StateSetter (Js α))) :=
   StateTuple.setter tuple
 
@@ -107,9 +107,9 @@ example (array : Js.Array Nat) (value : Nat) : True := by
     have rawLeanValue : RuntimeM (Js Float) := Js.Array.push array value
   trivial
 
-example {α β : Type} (tuple : Js (StateTuple (Js α))) : True := by
+example {α β : Type} (tuple : Js (StateTuple α)) : True := by
   fail_if_success
-    have erased : Js (StateTuple (Js β)) := tuple
+    have erased : Js (StateTuple β) := tuple
   fail_if_success
     have wrongValue : RuntimeM (Js β) := StateTuple.value tuple
   fail_if_success
@@ -127,7 +127,7 @@ example {state action other : Type} (tuple : Js (ReducerTuple state action)) : T
     have wrongDispatch : RuntimeM (Js (ReducerDispatch state other)) := ReducerTuple.dispatch tuple
   trivial
 
-example {α β : Type} (tuple : Js.Tuple2 (Js α) (Js β)) : True := by
+example {α β : Type} (tuple : Js.Tuple2 α β) : True := by
   fail_if_success
     have wrongFirst : RuntimeM (Js β) := Js.Tuple2.first tuple
   fail_if_success

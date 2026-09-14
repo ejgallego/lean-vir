@@ -64,6 +64,30 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       node.props.children.props.onClick === callback &&
       node.props.children.props.children === label,
     "native attributes and text must reach official React unchanged");
+    trace.length = 0;
+    traceConstruction = true;
+    const typed = runtime.call("ProofWidgetsJsxSubset.nativeTypedConstruction",
+      component, payload, label, callback);
+    traceConstruction = false;
+    check(JSON.stringify(trace) === JSON.stringify(["label", "payload", "onClick", "values"]),
+      "typed JSX performs only ordered native field writes, with no Lean record encoding");
+    check(typed.type === component && typed.props.label === label &&
+      typed.props.payload === payload && typed.props.onClick === callback &&
+      typed.props.values.length === 2 && typed.props.values.every(value => value === label),
+    "typed native props preserve exact inputs");
+    let reads = 0;
+    check(runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", {
+      get label() { reads++; return label; },
+    }) === label && reads === 1, "declared-field projection performs one native property read");
+    const fieldFailure = new Error("typed field getter failed");
+    let thrown;
+    try {
+      runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", { get label() { throw fieldFailure; } });
+    } catch (error) { thrown = error; }
+    check(thrown === fieldFailure, "declared-field projection preserves native getter exceptions");
+    check(runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "") === 0 &&
+      runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "😀") === 2,
+    "native string length is UTF-16 length, not decoded Lean character count");
     for (const [entry, id] of [["ProofWidgetsHtml.mount", "native-html"],
       ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
       const container = document.createElement("div");

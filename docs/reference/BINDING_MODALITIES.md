@@ -62,8 +62,9 @@ implement `noUncheckedIndexedAccess` or turn `undefined` into `null`.
 Callers perform any desired bounds checks explicitly; numeric bounds alone do
 not detect sparse-array holes.
 
-Native two-position tuples use `Js.Tuple2`, with typed `first` and `second`
-projections instead of an unconstrained array getter. React's `StateTuple` and
+Native two-position tuples use `Js.Tuple2 α β`, with JavaScript shape parameters
+like `Js.Array α`. Typed `first` and `second` projections return `Js α` and
+`Js β`, instead of using an unconstrained array getter. React's `StateTuple` and
 `ReducerTuple` aliases retain their position types. These VIR-owned projections
 have a checked position contract and compile-time cross-type regressions; the
 React aliases are still authored, not inferred from React's TypeScript overloads.

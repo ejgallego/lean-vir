@@ -62,10 +62,40 @@ an intermediate Lean property record or array. Values require explicit
 conversion; these notations do not inspect or encode arbitrary Lean data.
 
 Uppercase JSX takes a native function component. Supply an already-typed
-props object with `<Component {...props}/>`; this must be the sole attribute.
-Otherwise attributes construct ordinary `Js Props`. JSX does not invent a
-typed field contract, merge arbitrary typed props, or box a Lean record.
+props object with `<Component @props={props}/>`; this must be the sole attribute.
+`@props` is VIR's exact-object argument, not a field named `props` or JavaScript
+object spread. It performs no copying or merging before calling React. React
+still applies its normal props construction. Attribute `{...props}` is rejected;
+child `{...items}` remains child iteration.
+With an untyped `FunctionComponent Props`, attributes construct ordinary native
+props. For a typed component, declare a flat structure whose fields are native
+`Js` values and use it only as the props shape:
+
+```lean
+structure LabelProps where
+  title : Js String
+
+def Label : RuntimeM (FunctionComponent LabelProps) :=
+  FunctionComponent.ofLean fun props => do
+    Node.text (← js_field% props "title")
+```
+
+Given `let Label ← Label`, `<Label title="Hello"/>` checks field names, required
+fields and value types at compile time. No `LabelProps` record is allocated:
+JSX still writes a fresh native object. All fields must be supplied; generic,
+dependent and inherited schemas are outside this bounded surface. The special
+`key` and `children` fields and `__proto__` are not supported schema fields.
+`js_field% props "title"` uses that declaration for one native property read;
+it does not validate an external response, require an own property, or intercept
+getters. As with typed JavaScript, untrusted inputs need an explicit check.
+
+JSX does not merge arbitrary typed props or box a Lean record.
 Application-owned data uses explicit `Props.WithData.make (← LeanRef.toJSL data)`.
+
+Native strings need not be decoded for display: use `Node.text value`.
+`Js.String.length value` reads the native UTF-16 length as `Js Float`; convert
+only that number when Lean control flow needs to test whether the text is empty.
+This differs from counting Lean string characters.
 
 `Html` is a deferred `ReactM (Js Node)`, not a serialized tree. Attributes
 are evaluated before children. Child actions run left-to-right; `{pure node}`

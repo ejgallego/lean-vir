@@ -157,7 +157,10 @@
           "roots": [
             "ProofWidgetsJsxSubset.mount",
             "ProofWidgetsJsxSubset.mountDefault",
-            "ProofWidgetsJsxSubset.nativeConstruction"
+            "ProofWidgetsJsxSubset.nativeConstruction",
+            "ProofWidgetsJsxSubset.nativeTypedConstruction",
+            "ProofWidgetsJsxSubset.nativeTypedLabel",
+            "ProofWidgetsJsxSubset.nativeStringLength"
           ]
         },
         {

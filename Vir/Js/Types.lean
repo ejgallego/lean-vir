@@ -134,7 +134,7 @@ opaque Value (α β : Type) : Type
 
 end Tuple2
 
-/-- Exact JavaScript two-element tuple; parameters describe each position's Lean view. -/
+/-- Exact JavaScript two-element tuple; parameters describe each position's JavaScript shape. -/
 abbrev Tuple2 (α β : Type) : Type :=
   Lean.Vir.Js (Tuple2.Value α β)
 

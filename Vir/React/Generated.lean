@@ -143,7 +143,7 @@ This declaration is generated; edit the binding configuration.
 opaque useState
     {α : Type}
     (initial : @& Lean.Vir.Js α) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α)))
+    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
 
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-ref`.
