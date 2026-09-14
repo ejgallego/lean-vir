@@ -13,8 +13,10 @@ export function createInfoviewPanelBindings({
   stripTags = null,
   editorContext = null,
   positionToTdpp = null,
+  interactiveCode = null,
 } = {}) {
   return {
+    "infoview.interactiveCode": () => requireUpstream(interactiveCode, "InteractiveCode"),
     "infoview.editorContext": () => {
       if (editorContext === null) {
         throw new Error("EditorContext requires the upstream infoview host");
@@ -47,15 +49,25 @@ export function createInfoviewPanelBindings({
     "infoview.interactiveGoal.mvarId": (goal) => goal.mvarId,
     "infoview.interactiveGoal.isInserted": (goal) => goal.isInserted,
     "infoview.interactiveGoal.isRemoved": (goal) => goal.isRemoved,
+    "infoview.interactiveGoal.goalPrefix": (goal) => goal.goalPrefix,
     "infoview.interactiveTermGoal.hyps": (goal) => goal.hyps,
     "infoview.interactiveTermGoal.type": (goal) => goal.type,
     "infoview.interactiveHypothesisBundle.names": (hypothesis) => hypothesis.names,
     "infoview.interactiveHypothesisBundle.type": (hypothesis) => hypothesis.type,
     "infoview.interactiveHypothesisBundle.val": (hypothesis) => hypothesis.val,
+    "infoview.interactiveHypothesisBundle.isType": (hypothesis) => hypothesis.isType,
+    "infoview.interactiveHypothesisBundle.isInstance": (hypothesis) => hypothesis.isInstance,
+    "infoview.interactiveHypothesisBundle.isInserted": (hypothesis) => hypothesis.isInserted,
+    "infoview.interactiveHypothesisBundle.isRemoved": (hypothesis) => hypothesis.isRemoved,
     "infoview.codeWithInfos.stripTags": (code) => requireUpstream(
       stripTags,
       "TaggedText_stripTags",
     )(code),
+    "infoview.codeWithInfos.text": (code) => code.text,
+    "infoview.codeWithInfos.append": (code) => code.append,
+    "infoview.codeWithInfos.tag": (code) => code.tag,
+    "infoview.infoPopup.type": (popup) => popup.type,
+    "infoview.infoPopup.exprExplicit": (popup) => popup.exprExplicit,
   };
 }
 

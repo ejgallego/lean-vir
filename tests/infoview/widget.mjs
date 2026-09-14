@@ -20,6 +20,7 @@ await writeFile(
     "",
     "export const EditorContext = React.createContext(null);",
     "export const DocumentPosition = {};",
+    "export function InteractiveCode() { throw new Error('unexpected smoke component render'); }",
     "export function TaggedText_stripTags() { throw new Error('unexpected smoke tagged text call'); }",
     "export function useClientNotificationEffect() { throw new Error('unexpected smoke notification hook'); }",
     "",
@@ -61,7 +62,7 @@ const wasmBytes = await readFile(
   new URL("web/public/vir-upstream.wasm", repoRoot),
 );
 const packageBytes = await readFile(
-  new URL("web/public/demo-host.irpkg", repoRoot),
+  new URL("web/public/native-infoview.irpkg", repoRoot),
 );
 const runtime = await createVirRuntime({
   wasmBytes,
@@ -74,7 +75,7 @@ let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
-  ["web/public/demo-host.irpkg", "package-v1"],
+  ["web/public/native-infoview.irpkg", "package-v1"],
 ]);
 const rpcSession = {
   async call(method, params) {

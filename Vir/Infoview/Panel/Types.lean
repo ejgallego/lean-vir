@@ -30,6 +30,9 @@ opaque InteractiveHypothesisBundle : Type
 /-- Exact upstream `CodeWithInfos` tagged-text value. -/
 opaque CodeWithInfos : Type
 
+/-- Exact upstream type-popup response, including nested tagged code and documentation. -/
+opaque InfoPopup : Type
+
 /-- Native infoview editor connection and API receivers. -/
 opaque EditorConnection : Type
 opaque EditorApi : Type

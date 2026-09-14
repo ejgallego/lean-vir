@@ -14,6 +14,7 @@ import * as esbuild from "esbuild";
 import { evaluate, launchChromium, openChromiumPage } from "./harness.mjs";
 import {
   hostPackageFile,
+  packageSpecs,
   wasmPublicFile,
 } from "../../scripts/packages/browser-package-config.mjs";
 
@@ -32,22 +33,23 @@ export async function smokeBrowserNativeInfoviewUpdates(
   cdp,
   artifactDirectory = fileURLToPath(new URL("../../web/public/", import.meta.url)),
 ) {
-  const [wasm, pkg, source] = await Promise.all([
+  const nativeInfoviewFile = packageSpecs.find(spec => spec.id === "native-infoview").file;
+  const [wasm, pkg, nativePkg, source] = await Promise.all([
     ...[wasmPublicFile, hostPackageFile].map((file) =>
       readFile(resolve(artifactDirectory, file))),
+    readFile(resolve(artifactDirectory, nativeInfoviewFile)),
     bundledBrowserProbe("./react-native-infoview-entry.js", "development"),
   ]);
   await evaluateBrowserProbe(cdp, source, "lean-vir-native-infoview-updates-smoke.js");
   const result = await evaluate(cdp,
-    `runVirNativeInfoviewUpdates(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])}).then(
+    `runVirNativeInfoviewUpdates(${JSON.stringify([...wasm])},${JSON.stringify([...nativePkg])}).then(
       value => ({ ok: true, value }),
       error => ({ ok: false, error: error.stack ?? String(error),
         causes: error.errors?.map(cause => cause.stack ?? String(cause)) })
     )`);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value, {
-    submissions: 5, boundaryChecks: 5, initialGoals: 4, collapsedAfterUpdate: true, finalGoals: 0,
-  });
+  assert.ok(result.value.checks >= 50, "native goals and interactive-code acceptance ran");
+  assert.deepEqual(result.value.warnings, [], "native infoview React warnings");
   const authoring = await evaluate(cdp,
     `runProofWidgetsNativeChildren(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
   assert.equal(authoring, true);
