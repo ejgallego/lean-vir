@@ -21,12 +21,12 @@ open Lean.Vir.Infoview
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def shellStyle : RuntimeM Js.Object := js%{
-  "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0")
+  "display" := js#"grid", "gap" := js#"10px", "minWidth" := js#"0"
 }
 
 def captionStyle : RuntimeM Js.Object := js%{
-  "margin" := (← js#"0"), "color" := (← js#"var(--vscode-descriptionForeground, #57606a)"),
-  "fontSize" := (← js#"0.78rem"), "fontWeight" := (← js#"700"), "overflowWrap" := (← js#"anywhere")
+  "margin" := js#"0", "color" := js#"var(--vscode-descriptionForeground, #57606a)",
+  "fontSize" := js#"0.78rem", "fontWeight" := js#"700", "overflowWrap" := js#"anywhere"
 }
 
 def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
@@ -36,15 +36,15 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
     let uri ← JsValue.toString (← PanelPosition.uri position)
     let captionText ← Node.text (← JsValue.ofString ("Shared React Tamagotchi component at " ++ uri))
     let captionProps ← js%{
-      "id" := (← js#"react-tamagotchi-widget-caption"),
+      "id" := js#"react-tamagotchi-widget-caption",
       "style" := (← captionStyle)
     }
     let caption ← <p @props={captionProps}>{pure captionText}</p>
     let pet ← Node.functionComponent petComponent (← Js.Object.empty) (← Js.Array.empty)
     let shellProps ← js%{
-      "id" := (← js#"react-tamagotchi-proof-widget"),
-      "role" := (← js#"region"),
-      "aria-label" := (← js#"Lean React Tamagotchi proof widget"),
+      "id" := js#"react-tamagotchi-proof-widget",
+      "role" := js#"region",
+      "aria-label" := js#"Lean React Tamagotchi proof widget",
       "style" := (← shellStyle)
     }
     return ← <section @props={shellProps}>{pure caption}{pure pet}</section>
