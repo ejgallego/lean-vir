@@ -57,6 +57,9 @@ There are no per-attribute or per-tag helper catalogues.
 
 `js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
 `Js.Object.set` assignments in source order (last duplicate wins).
+Literal `__proto__` keys are rejected in objects and JSX because assignment
+would invoke the inherited prototype setter. Explicit `Object.set` retains
+ordinary JavaScript assignment semantics, including setters.
 `js#[a, b]` pushes exact values into a fresh native array. Neither constructs
 an intermediate Lean property record or array. Values require explicit
 conversion; these notations do not inspect or encode arbitrary Lean data.
@@ -89,10 +92,17 @@ dependent and inherited schemas are outside this bounded surface. The special
 it does not validate an external response, require an own property, or intercept
 getters. As with typed JavaScript, untrusted inputs need an explicit check.
 
+Only declared component schemas receive these field/type checks. Lowercase
+DOM tags and `FunctionComponent Props` accept untyped native properties, not
+TypeScript's per-element attribute types. A schema is a static contract, not
+validation of an RPC reply or other external object.
+
 JSX does not merge arbitrary typed props or box a Lean record.
 Application-owned data uses explicit `Props.WithData.make (← LeanRef.toJSL data)`.
 
 Native strings need not be decoded for display: use `Node.text value`.
+`Node.text` and `ElementType.tag` only widen the native string's phantom type;
+their construction actions make no host call.
 `Js.String.length value` reads the native UTF-16 length as `Js Float`; convert
 only that number when Lean control flow needs to test whether the text is empty.
 This differs from counting Lean string characters.

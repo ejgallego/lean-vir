@@ -65,14 +65,16 @@ for (const name of ["__proto__", "constructor", "prototype"]) {
 assert.equal(Object.getPrototypeOf(props), Object.prototype);
 
 const children = [];
-const first = reactBindings["react.node.text"]("goal: ");
-const second = reactBindings["react.node.text"]("⊢ True");
+const first = "goal: ";
+const second = "⊢ True";
 children.push(first, second);
 assert.deepEqual(children, [first, second]);
 
-const tag = reactBindings["react.elementType.tag"]("section");
-assert.equal(tag, "section");
-const element = reactBindings["react.node.createElement"](tag, props, children);
+const element = reactBindings["react.node.createElement"](
+  "section",
+  props,
+  children,
+);
 assert.equal(React.isValidElement(element), true);
 assert.equal(element.type, "section");
 assert.equal(element.props.onClick, callback);

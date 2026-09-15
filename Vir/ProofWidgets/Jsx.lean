@@ -198,6 +198,8 @@ private meta def transformTag
         | `(virProofWidgetsJsxAttr| {... $_value:term }) =>
           Macro.throwErrorAt attr "JSX object spread is not implemented; use @props={value} to pass exact native props"
         | stx => Macro.throwErrorAt stx "unknown JSX attribute syntax"
+      if name == "__proto__" then
+        Macro.throwErrorAt attr "JSX attributes do not support `__proto__`; use explicit property operations for prototype semantics"
       writes := writes.push <| ← `(doElem|
         Lean.Vir.Js.Object.set $propsId (← Lean.Vir.JsValue.ofString $(quote name)) $value)
   writes := writes.push <| ← `(doElem| let $childrenId ← Lean.Vir.Js.Array.empty)
@@ -345,31 +347,26 @@ elab_rules : term
       let value ← Lean.Vir.Js.Object.get ($object : $objectType) (← Lean.Vir.JsValue.ofString $(quote name))
       pure ($sealId value))) resultType
 
-elab_rules : term
-  | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) => do
-    let tag ← Lean.Elab.liftMacroM (tagName name)
-    if tag.front.isUpper && !isExactProps attrs then
-      let component ← Lean.Elab.liftMacroM (componentIdent name)
-      if let some schema ← propsSchema? component then
-        let attrs ← typedAttributes schema attrs
-        Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM
-          (transformTag tk name name attrs #[] true)) none
-      else
-        Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM (transformTag tk name name attrs #[])) none
-    else
-      Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM (transformTag tk name name attrs #[])) none
-  | `(<$opening:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* >%$tk
-      $children*</$closing>) => do
-    let tag ← Lean.Elab.liftMacroM (tagName opening)
-    if tag.front.isUpper && !isExactProps attrs then
+private meta def elabTag
+    (tk : Syntax) (opening closing : TSyntax `virProofWidgetsJsxTag)
+    (attrs : Array (TSyntax `virProofWidgetsJsxAttr))
+    (children : Array (TSyntax `virProofWidgetsJsxChild)) : Lean.Elab.Term.TermElabM Lean.Expr := do
+  let tag ← Lean.Elab.liftMacroM (tagName opening)
+  let (attrs, sealProps) ← if tag.front.isUpper && !isExactProps attrs then do
       let component ← Lean.Elab.liftMacroM (componentIdent opening)
       if let some schema ← propsSchema? component then
-        let attrs ← typedAttributes schema attrs
-        Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM
-          (transformTag tk opening closing attrs children true)) none
+        pure (← typedAttributes schema attrs, true)
       else
-        Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM (transformTag tk opening closing attrs children)) none
-    else
-      Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM (transformTag tk opening closing attrs children)) none
+        pure (attrs, false)
+    else pure (attrs, false)
+  Lean.Elab.Term.elabTerm (← Lean.Elab.liftMacroM
+    (transformTag tk opening closing attrs children sealProps)) none
+
+elab_rules : term
+  | `(<$name:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* />%$tk) =>
+    elabTag tk name name attrs #[]
+  | `(<$opening:virProofWidgetsJsxTag $[$attrs:virProofWidgetsJsxAttr]* >%$tk
+      $children*</$closing>) =>
+    elabTag tk opening closing attrs children
 
 end Lean.Vir.ProofWidgets.Jsx

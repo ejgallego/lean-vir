@@ -27,10 +27,13 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     if (traceConstruction) trace.push(name);
     return setProperty(object, name, value);
   };
-  const textNode = hostBindings["react.node.text"];
-  hostBindings["react.node.text"] = value => {
-    if (traceConstruction) trace.push("text");
-    return textNode(value);
+  check(!Object.hasOwn(hostBindings, "react.node.text") &&
+    !Object.hasOwn(hostBindings, "react.elementType.tag"),
+  "native text and tag views need no host providers");
+  const createElement = hostBindings["react.node.createElement"];
+  hostBindings["react.node.createElement"] = (type, props, children) => {
+    if (traceConstruction) trace.push(typeof type === "string" ? `element:${type}` : "element:component");
+    return createElement(type, props, children);
   };
   const runtime = await createVirRuntime({
     wasmModule: new WebAssembly.Module(new Uint8Array(wasm)),
@@ -44,14 +47,15 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   try {
     const component = props => props.children;
     const payload = { color: "red" };
-    const label = "native JSX value";
+    const label = "native JSX value \ud800"; // A lone surrogate must not round-trip through UTF-8.
     const callback = () => {};
     traceConstruction = true;
     const node = runtime.call("ProofWidgetsJsxSubset.nativeConstruction",
       component, payload, label, callback);
     traceConstruction = false;
     check(JSON.stringify(trace) === JSON.stringify([
-      "label", "label", "payload", "onClick", "values", "title", "style", "onClick", "text",
+      "label", "label", "payload", "onClick", "values", "title", "style", "onClick",
+      "element:span", "element:component",
     ]), "native construction evaluates fields once in order before child actions");
     check(node.type === component, "uppercase JSX must preserve native component identity");
     check(node.props.label === label, "native object writes use the last duplicate field");
@@ -69,7 +73,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     const typed = runtime.call("ProofWidgetsJsxSubset.nativeTypedConstruction",
       component, payload, label, callback);
     traceConstruction = false;
-    check(JSON.stringify(trace) === JSON.stringify(["label", "payload", "onClick", "values"]),
+    check(JSON.stringify(trace) === JSON.stringify(["label", "payload", "onClick", "values", "element:component"]),
       "typed JSX performs only ordered native field writes, with no Lean record encoding");
     check(typed.type === component && typed.props.label === label &&
       typed.props.payload === payload && typed.props.onClick === callback &&

@@ -36,7 +36,9 @@ macro_rules
   | `(js%{ $[$names:str := $values:term],* }) => do
     let object ← Lean.Macro.addMacroScope `object
     let object := Lean.mkIdent object
-    let writes ← names.zip values |>.mapM fun (name, value) =>
+    let writes ← names.zip values |>.mapM fun (name, value) => do
+      if (name : Lean.TSyntax `str).getString == "__proto__" then
+        Lean.Macro.throwErrorAt name.raw "native object literals do not support `__proto__`; use explicit property operations for prototype semantics"
       `(doElem| Lean.Vir.Js.Object.set $object
           (← Lean.Vir.JsValue.ofString $name) $value)
     `(do

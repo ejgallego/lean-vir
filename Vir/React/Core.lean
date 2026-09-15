@@ -18,6 +18,21 @@ public section
 
 namespace Lean.Vir.React
 
+namespace ElementType
+
+section
+set_option backward.privateInPublic true
+
+@[inline] private unsafe def tagImpl (tag : @& Lean.Vir.Js String) :
+    ReactM (Lean.Vir.Js ElementType) := pure (unsafeCast tag)
+
+/-- Views the exact native string as an element type, without a host call. -/
+@[implemented_by tagImpl]
+axiom tag (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType)
+
+end
+end ElementType
+
 /-- Creates a native function component from a Lean render callback. -/
 def FunctionComponent.ofLean
     (render : Lean.Vir.Js props → ReactM (Lean.Vir.Js Node)) :
@@ -26,6 +41,18 @@ def FunctionComponent.ofLean
   exact Lean.Vir.Js.Function.ofLean render
 
 namespace Node
+
+section
+set_option backward.privateInPublic true
+
+@[inline] private unsafe def textImpl (value : @& Lean.Vir.Js String) :
+    ReactM (Lean.Vir.Js Node) := pure (unsafeCast value)
+
+/-- Views the exact native string as a text node, without a host call. -/
+@[implemented_by textImpl]
+axiom text (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node)
+
+end
 
 @[inline] private unsafe def componentPropsImpl {α : Type}
     (props : Lean.Vir.Js α) : Lean.Vir.Js Props := unsafeCast props

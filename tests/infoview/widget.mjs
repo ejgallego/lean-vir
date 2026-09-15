@@ -254,10 +254,11 @@ assert.equal(
   "function",
 );
 assert.equal(
-  typeof irPackageFirstService.runtime.hostState.defaultBindings[
-    "react.node.text"
-  ],
-  "function",
+  Object.hasOwn(
+    irPackageFirstService.runtime.hostState.defaultBindings,
+    "react.node.text",
+  ),
+  false,
 );
 assert.equal(
   typeof irPackageFirstService.runtime.hostState.defaultBindings[

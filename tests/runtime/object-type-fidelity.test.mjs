@@ -50,6 +50,26 @@ test("dynamic properties preserve exact values, missing undefined and getter beh
     (error) => error === failure);
 });
 
+test("explicit property assignment preserves setters and prototype semantics", () => {
+  const object = objects["js.object.empty"]();
+  const prototype = {};
+  objects["js.object.set"](object, "__proto__", prototype);
+  assert.equal(Object.getPrototypeOf(object), prototype);
+  assert.equal(Object.hasOwn(object, "__proto__"), false);
+  const value = {};
+  const calls = [];
+  Object.defineProperty(prototype, "field", {
+    set(next) { calls.push([this, next]); },
+  });
+  objects["js.object.set"](object, "field", value);
+  assert.deepEqual(calls, [[object, value]]);
+  assert.equal(Object.hasOwn(object, "field"), false);
+  const failure = new Error("setter failed");
+  Object.defineProperty(object, "reject", { set() { throw failure; } });
+  assert.throws(() => objects["js.object.set"](object, "reject", value),
+    error => error === failure);
+});
+
 test("closed String narrowing returns the exact primitive and rejects every wrong kind", () => {
   for (const value of ["", "hello", "λ🙂", "\ud800"]) assert.equal(requireString(value), value);
   let coercions = 0;

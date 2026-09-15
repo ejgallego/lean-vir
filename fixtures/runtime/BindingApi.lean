@@ -15,6 +15,22 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 example (value : Js String) : RuntimeM Js.Object :=
   js%{ "value" := value }
 
+-- Literal construction must not invoke Object.prototype's legacy setter.
+example (_value : Js.Object) (Component : React.FunctionComponent React.Props) : True := by
+  let _ := Component
+  fail_if_success have _ : RuntimeM Js.Object := js%{ "__proto__" := _value }
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div __proto__={_value}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div __proto__={_value}></div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <Component __proto__={_value}/>
+  trivial
+
+-- Other names remain ordinary properties; general assignment is still available.
+example (value : Js.Object) : RuntimeM Js.Object :=
+  js%{ "constructor" := value, "prototype" := value }
+
+example (object value : Js.Object) : RuntimeM Unit := do
+  Js.Object.set object (← js#"__proto__") value
+
 example (first second : Js String) : RuntimeM (Js.Array String) :=
   js#[first, second]
 
@@ -48,6 +64,10 @@ structure NativeProps where
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
   <Component title="native" values={(← Js.Array.empty)} ref={ref}></Component>
+
+#guard_msgs in
+example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
+  <Component title="native" values={(← Js.Array.empty)} ref={ref}/>
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (props : Js NativeProps) : React.ReactM (Js React.Node) :=
