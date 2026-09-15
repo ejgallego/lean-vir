@@ -17,6 +17,7 @@ const fixture = Object.freeze({
       { text: " suffix" },
     ] }] } }],
   selectedLocations: [],
+  termGoal: { hyps: [], type: { text: "Expected" } },
 });
 
 globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
@@ -86,6 +87,17 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
   globalThis.nativeHoverController = {
     render,
     reset: render,
+    disclosure: (key, focus = false) => {
+      const card = container.querySelector(`[data-goal-key="${key}"]`);
+      const summary = card.querySelector("summary");
+      if (focus) summary.focus();
+      const style = getComputedStyle(summary);
+      return { open: card.querySelector("details").open,
+        expanded: summary.getAttribute("aria-expanded"), bodyHidden: card.querySelector("[id]").hidden,
+        rect: rect(summary), display: style.display, border: style.borderWidth,
+        background: style.backgroundColor, font: style.fontFamily, margin: style.marginTop,
+        text: summary.textContent, bodyInstance: instance(card.querySelector("[id]")) };
+    },
     theme: dark => {
       const style = document.documentElement.style;
       for (const [name, value] of Object.entries({

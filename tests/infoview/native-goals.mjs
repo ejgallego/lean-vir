@@ -76,6 +76,17 @@ try {
   const move = (x, y) => hoverCdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
   const moveTo = rect => move(rect.left + rect.width / 2, rect.top + rect.height / 2);
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const disclosure = (key, focus = false) => evaluate(hoverCdp,
+    `nativeHoverController.disclosure(${JSON.stringify(key)}, ${focus})`);
+  const termDisclosure = await disclosure("term");
+  assert.equal(termDisclosure.display, "list-item", "expected type uses a native summary marker");
+  assert.equal(termDisclosure.border, "0px", "disclosure has no button border");
+  assert.equal(termDisclosure.background, "rgba(0, 0, 0, 0)", "disclosure has no button fill");
+  assert.equal(termDisclosure.font, "system-ui", "expected-type heading uses the UI font");
+  assert.equal(termDisclosure.margin, "8px", "expected-type heading matches upstream mv2 spacing");
+  const caseDisclosure = await disclosure("hover");
+  assert.equal(caseDisclosure.font, "monospace", "case heading keeps editor typography");
+  assert.equal(caseDisclosure.margin, "4px", "case heading matches upstream mv1 spacing");
   // The literal prefix is inside the parent tag but outside either nested tag.
   await moveTo(initial.prefixRect);
   const started = performance.now();
@@ -140,9 +151,38 @@ try {
   assert.equal((await snapshot()).popup, false, "real pointer closes portal after leave delay");
   const closeElapsed = performance.now() - closeStarted;
   assert.ok(closeElapsed >= 300 && closeElapsed < 850, `hover close timing ${closeElapsed}ms is bounded`);
+  await hoverCdp.send("Page.bringToFront");
+  await disclosure("term", true);
+  const keypress = async (key, code, virtualKey) => {
+    await hoverCdp.send("Input.dispatchKeyEvent", { type: "keyDown", key, code,
+      windowsVirtualKeyCode: virtualKey, text: key === "Enter" ? "\r" : key });
+    await hoverCdp.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: virtualKey });
+  };
+  await keypress("Enter", "Enter", 13);
+  let termState = await disclosure("term");
+  assert.equal(termState.open, false, "Enter collapses expected type");
+  assert.equal(termState.expanded, "false", "collapsed disclosure announces its state");
+  assert.equal(termState.bodyHidden, true, "collapsed body remains hidden");
+  assert.equal(termState.bodyInstance, termDisclosure.bodyInstance, "collapse retains mounted contents");
+  await keypress(" ", "Space", 32);
+  termState = await disclosure("term");
+  assert.equal(termState.open, true, "Space expands expected type");
+  assert.equal(termState.expanded, "true", "expanded disclosure announces its state");
+  const { rect: summaryRect } = await disclosure("hover");
+  const click = async () => {
+    const x = summaryRect.left + summaryRect.width / 2, y = summaryRect.top + summaryRect.height / 2;
+    await hoverCdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+    await hoverCdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+  };
+  await click();
+  assert.equal((await disclosure("hover")).open, false, "mouse click collapses case disclosure");
+  await click();
+  assert.equal((await disclosure("hover")).open, true, "second mouse click expands case disclosure");
+  assert.deepEqual((await snapshot()).tags.map(tag => tag.instance), initial.tags.map(tag => tag.instance),
+    "disclosure toggles preserve interactive term identities");
   const hoverWarnings = await evaluate(hoverCdp, "nativeHoverController.dispose()");
   assert.deepEqual(hoverWarnings, [], "real-pointer fixture emitted no React warnings");
-  console.log("Native infoview real pointer hover acceptance passed");
+  console.log("Native infoview real pointer hover and disclosure keyboard/mouse acceptance passed");
 } finally {
   hoverCdp?.close();
   await hoverChrome.close();

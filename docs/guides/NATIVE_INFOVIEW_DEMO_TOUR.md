@@ -22,6 +22,10 @@ an interactive expression to pin its popup, then close it. Expand the panel's
 settings, change presentation options, collapse a goal, and try copying it.
 The two panels have independent settings.
 
+Case and “Expected type” headings use native disclosure triangles, matching the
+upstream control style. Click the heading or focus it and press Enter/Space to
+collapse or expand it; the contents stay mounted and retain their state.
+
 In the Lean panel, pause over a term for half a second: the deepest subexpression
 highlights and its type popup floats without moving the goal text. Move into the
 popup to inspect it; leaving gives a short grace period before dismissal. Click

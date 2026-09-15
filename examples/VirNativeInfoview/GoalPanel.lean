@@ -63,7 +63,9 @@ private def Goal (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponen
     let collapsed ← StateTuple.toState (← Hooks.useState (← JsValue.ofBool false))
     let isCollapsed ← JsValue.toBool collapsed.value
     let detailsId ← Hooks.useId
-    let toggle ← Callback.ofUnary fun (_ : Js Browser.Event) =>
+    let toggle ← Callback.ofUnary fun (event : Js Browser.Event) => do
+      -- React owns open state; suppress the summary's second, native toggle.
+      Browser.Event.preventDefault event
       State.modify collapsed fun previous => do JsValue.ofBool (!(← JsValue.toBool previous))
     let visible ← visibleHypotheses props.hyps props.settings
     let hypotheses : Array Html := visible.map fun hypothesis => do
@@ -85,19 +87,28 @@ private def Goal (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponen
       then "0.7" else "1"
     let style ← js%{ "marginBottom" := (← js#"0.8em"), "whiteSpace" := (← js#"pre-wrap"),
       "opacity" := (← JsValue.ofString opacity), "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") }
-    let title := if props.term then "Expected type" else if props.name.isEmpty then ""
-      else "case " ++ props.name
-    let header : Array Html := if props.settings.hideGoalNames || title.isEmpty then #[] else #[do
-      <button type="button" className="vir-native-infoview-collapse"
+    let hideHeader := props.settings.hideGoalNames || (!props.term && props.name.isEmpty)
+    let title : Html := if props.term then Html.text "Expected type" else do
+      <span><strong className="goal-case">case </strong>{Html.text props.name}</span>
+    let header : Html := do
+      <summary className="vir-native-infoview-collapse pointer non-selectable"
+          hidden={(← JsValue.ofBool hideHeader)}
           aria-expanded={(← JsValue.ofBool (!isCollapsed))} aria-controls={detailsId}
+          style={(← js%{ "margin" := (← JsValue.ofString (if props.term then "0.5rem 0" else "0.25rem 0")),
+            "cursor" := (← js#"pointer"), "userSelect" := (← js#"none"),
+            "fontFamily" := (← JsValue.ofString (if props.term then "var(--vscode-font-family, system-ui)" else "inherit")),
+            "fontSize" := (← JsValue.ofString (if props.term then "var(--vscode-font-size, 13px)" else "inherit")),
+            "lineHeight" := (← JsValue.ofString (if props.term then "normal" else "inherit")) })}
           onClick={toggle}>
-        {Html.text ((if isCollapsed then "▸ " else "▾ ") ++ title)}
-      </button>]
+        {title}
+      </summary>
     -- Hiding the case heading shows the goal, without erasing its collapse state.
-    let hidden := isCollapsed && !props.settings.hideGoalNames && !title.isEmpty
+    let hidden := isCollapsed && !hideHeader
     return ← <article className={(← JsValue.ofString classes)} data-goal-key={(← JsValue.ofString props.key)}
         data-goal-kind={(← JsValue.ofString (if props.term then "term" else "tactic"))} style={style}>
-      {...header}<div id={detailsId} hidden={(← JsValue.ofBool hidden)}>{...body}</div>
+      <details open={(← JsValue.ofBool (!hidden))}>
+        {header}<div id={detailsId} hidden={(← JsValue.ofBool hidden)}>{...body}</div>
+      </details>
     </article>
 
 private def setting (state : State (JSL GoalSettings))
@@ -172,7 +183,9 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       <header><strong className="vir-native-infoview-summary">{Html.text summary}</strong>
         <button type="button" className="vir-native-infoview-copy" onClick={copy}>Copy goals</button>
         <span role="status">{Node.text copyState.value}</span>
-        <details className="vir-native-infoview-settings"><summary>Goal settings</summary>{...controls}</details>
+        <details className="vir-native-infoview-settings">
+          <summary className="mv2 pointer non-selectable">Goal settings</summary>{...controls}
+        </details>
       </header>
       {...cards}
     </section>

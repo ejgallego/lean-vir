@@ -164,10 +164,10 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     verify(card().querySelector("[id]").firstElementChild.className, "vir-native-infoview-target", "target first");
     await toggle("Emphasize first goal");
     verify(card("second").style.opacity, "0.7", "first-goal emphasis");
-    await React.act(async () => card().querySelector("button").click());
+    await React.act(async () => card().querySelector("summary").click());
     verify(card().querySelector("[id]").hidden, true, "collapse");
     await toggle("Hide goal names");
-    verify(card().querySelector("button"), null, "hide name");
+    verify(card().querySelector("summary").hidden, true, "hide name");
     verify(card().querySelector("[id]").hidden, false, "hidden names do not hide goals");
     await toggle("Hide goal names");
     verify(card().querySelector("[id]").hidden, true, "restore remembered collapse");
@@ -341,13 +341,13 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     replyMode = "ready";
     const termGoal = freeze({ hyps: [hyp(["local"])], type: { text: "Expected" } });
     await render({ ...fixture, termGoal });
-    verify(card("term").querySelector("button").textContent, "▾ Expected type", "expected-type heading");
+    verify(card("term").querySelector("summary").textContent, "Expected type", "expected-type heading");
     verify(card("term").querySelector(".goal-vdash").textContent, "⊢ ", "default expected-type prefix");
     verify(card("term").querySelector(".vir-native-infoview-hyp-name").textContent.trim(), "local",
       "expected-type hypotheses traverse the native bundle array");
     verify(Object.isFrozen(termGoal.hyps) && Object.isFrozen(termGoal.hyps[0].names), true,
       "expected-type traversal accepts frozen native arrays");
-    await React.act(async () => card("term").querySelector("button").click());
+    await React.act(async () => card("term").querySelector("summary").click());
     const termCard = card("term");
     await render({ ...fixture, goals: [], termGoal });
     verify(card("term") === termCard, true, "term identity survives tactic-goal removal");
