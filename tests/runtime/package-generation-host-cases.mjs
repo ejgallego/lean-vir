@@ -370,9 +370,16 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   );
   assert.equal(
     reactExternalRuntime.interfaceManifest.hostImports.find(
-      (entry) => entry.target === "js.object.set",
+      (entry) => entry.target === "js.construction.field",
     )?.effect,
     "runtime",
+  );
+  assert.equal(
+    reactExternalRuntime.interfaceManifest.hostImports.some(
+      (entry) => entry.target === "js.object.set",
+    ),
+    false,
+    "literal props must define own data properties, not use ordinary assignment",
   );
   assert.throws(
     () =>
