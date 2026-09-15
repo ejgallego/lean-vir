@@ -778,7 +778,7 @@ def reduceViewState (view : ViewState) : ViewAction → Lean.Vir.RuntimeM ViewSt
         }
 
 abbrev ViewReducerState : Type :=
-  ReducerState (Lean.Vir.LeanRef.Handle ViewState) (Lean.Vir.LeanRef.Handle ViewAction)
+  Js (ReducerTuple (Lean.Vir.LeanRef.Handle ViewState) (Lean.Vir.LeanRef.Handle ViewAction))
 
 def reduceViewStateJs
     (viewJs : Lean.Vir.JSL ViewState)
@@ -791,25 +791,25 @@ def reduceViewStateJs
 
 def useViewState (initial : ViewState := initialViewState) : ReactM ViewReducerState := do
   let initialJs ← Lean.Vir.LeanRef.toJSL (normalizeView initial)
-  let reducer ← Reducer.ofLean reduceViewStateJs
-  ReducerTuple.toState (← Hooks.useReducer reducer initialJs)
+  let reducer ← Js.Function.ofLean2 reduceViewStateJs
+  Hooks.useReducer reducer initialJs
 
 def dispatchViewAction (hook : ViewReducerState) (action : ViewAction) : DomM Unit := do
   let actionJs ← Lean.Vir.LeanRef.toJSL action
-  ReducerDispatch.dispatch hook.dispatch actionJs
+  let dispatch ← Js.Tuple2.second hook
+  Js.Function.callVoid dispatch actionJs
 
 def tick (hook : ViewReducerState) : DomM Unit :=
   dispatchViewAction hook .tick
 
 def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
-  let deps ← Hooks.DependencyList.empty
-  let effect ← EffectCallback.ofLean {
-    setup := do
-      Lean.Vir.Browser.Timer.setInterval (tick hook)
-        (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat liveTickMs.toNat).toFloat)
-    cleanup := fun interval => Lean.Vir.Browser.Timer.clearInterval interval
-  }
-  Hooks.useEffect effect (Js.UndefinedOr.ofJs deps)
+  let effect ← Js.Function.ofLean0 <| DomM.toRuntime do
+    let interval ← Lean.Vir.Browser.Timer.setInterval (tick hook)
+      (← Lean.Vir.JsValue.ofFloat (UInt64.ofNat liveTickMs.toNat).toFloat)
+    let cleanup ← Js.Function.ofLean0Void <| DomM.toRuntime do
+      Lean.Vir.Browser.Timer.clearInterval interval
+    pure (Js.UndefinedOr.ofJs cleanup)
+  Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[]))
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString widgetCss)
@@ -850,13 +850,13 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
 
 def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let hook ← useViewState
-  let view ← Lean.Vir.LeanRef.fromJSL hook.value
+  let view ← Lean.Vir.LeanRef.fromJSL (← Js.Tuple2.first hook)
   let state := normalizeViewState view.state
   useLiveTick hook
   let actionButton : Tamagotchi.Action → ReactM (Js Node) := fun action => do
     let text ← Node.text (← Lean.Vir.JsValue.ofString action.label)
-    let onClick ← Callback.ofUnary fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
-      dispatchViewAction hook (.care action)
+    let onClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
+      DomM.toRuntime (dispatchViewAction hook (.care action))
     let props ← js%{
       "key" := (← JsValue.ofString action.label),
       "id" := (← JsValue.ofString ("react-pet-action-" ++ action.label)),
@@ -869,7 +869,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     }
     return ← <button @props={props}>{pure text}</button>
   let artInput ← show ReactM (Js Node) from do
-    let onChange ← Callback.ofUnary fun (event : Lean.Vir.Js Lean.Vir.Browser.Event) => do
+    let onChange ← Js.Function.ofLeanVoid fun (event : Lean.Vir.Js Lean.Vir.Browser.Event) => DomM.toRuntime do
       match ← Lean.Vir.Browser.Event.inputElement? event with
       | none => pure ()
       | some input => do
@@ -917,8 +917,8 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
   let actionsNode ← Node.createElement
     (← ElementType.tag (← js#"div")) actionsProps (← Js.Array.ofArray actionButtons)
   let resetText ← Node.text (← Lean.Vir.JsValue.ofString "Reset")
-  let resetClick ← Callback.ofUnary fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
-    dispatchViewAction hook .reset
+  let resetClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
+    DomM.toRuntime (dispatchViewAction hook .reset)
   let resetProps ← js%{
     "id" := (← js#"react-pet-reset"),
     "className" := (← js#"react-pet-reset-button"),

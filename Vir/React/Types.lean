@@ -33,12 +33,32 @@ opaque Root : Type
 /-- React element type accepted by `React.createElement`. -/
 opaque ElementType : Type
 
-/-- React state setter function returned by `useState`. -/
+namespace SetStateAction
+
+/-- Native `S | ((previous: S) => S)`, not a Lean sum or value wrapper. -/
+opaque Value (α : Type) : Type
+
+/-- Pass the exact value as React's state action; functions retain React's updater semantics. -/
+@[inline] def ofValue (value : Lean.Vir.Js α) : Lean.Vir.Js (Value α) := by
+  unfold Lean.Vir.Js at *
+  exact value
+
+/-- Pass the exact native updater as React's state action. -/
+@[inline] def ofUpdater
+    (update : Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js α)) :
+    Lean.Vir.Js (Value α) := by
+  unfold Lean.Vir.Js.Function1 Lean.Vir.Js at *
+  exact update
+
+end SetStateAction
+
+/-- React's exact state setter, accepting either a value or a functional updater. -/
 abbrev StateSetter (α : Type) : Type :=
-  Lean.Vir.Js.Function.Unary α Unit
+  Lean.Vir.Js.Function.Unary (Lean.Vir.Js (SetStateAction.Value α)) Unit
 
 /-- Native JavaScript reducer function accepted by `React.useReducer`. -/
-opaque Reducer (state action : Type) : Type
+abbrev Reducer (state action : Type) : Type :=
+  Lean.Vir.Js.Function.Binary (Lean.Vir.Js state) (Lean.Vir.Js action) (Lean.Vir.Js state)
 
 /-- React reducer dispatch function returned by `useReducer`. -/
 abbrev ReducerDispatch (_state action : Type) : Type :=
@@ -46,22 +66,20 @@ abbrev ReducerDispatch (_state action : Type) : Type :=
 
 /-- Exact JavaScript array returned by `React.useState`. -/
 abbrev StateTuple (α : Type) : Type :=
-  Lean.Vir.Js.Tuple2.Value α (StateSetter (Lean.Vir.Js α))
+  Lean.Vir.Js.Tuple2.Value α (StateSetter α)
 
 /-- Exact JavaScript array returned by `React.useReducer`. -/
 abbrev ReducerTuple (state action : Type) : Type :=
   Lean.Vir.Js.Tuple2.Value state (ReducerDispatch state action)
 
 /-- Native JavaScript calculation function accepted by `React.useMemo`. -/
-opaque MemoCalculation (α : Type) : Type
+abbrev MemoCalculation (α : Type) : Type :=
+  Lean.Vir.Js.Function.Nullary (Lean.Vir.Js α)
 
 /-- Native JavaScript setup function accepted by `React.useEffect`. -/
-opaque EffectCallback : Type
-
-/-- Lean source value explicitly converted to React's setup-function shape. -/
-structure LeanEffect (value : Type) where
-  setup : Lean.Vir.Browser.DomM (Lean.Vir.Js value)
-  cleanup : Lean.Vir.Js value → Lean.Vir.Browser.DomM Unit
+abbrev EffectCallback : Type :=
+  Lean.Vir.Js.Function.Nullary
+    (Lean.Vir.Js.UndefinedOr (Lean.Vir.Js.Function.Nullary Unit))
 
 /-- Native unary JavaScript callback used by React and component props. -/
 abbrev Callback (α : Type) : Type :=
@@ -89,16 +107,6 @@ opaque WithData (α : Type) : Type
   exact value
 
 end Props
-
-/-- React state value and setter returned by `useState`. -/
-structure State (α : Type) where
-  value : α
-  setter : Lean.Vir.Js (StateSetter α)
-
-/-- React reducer value and dispatch function returned by `useReducer`. -/
-structure ReducerState (state action : Type) where
-  value : Lean.Vir.Js state
-  dispatch : Lean.Vir.Js (ReducerDispatch state action)
 
 /-- Native `ReactNode`: elements, text, empty values, child arrays and other
 values accepted by React, not only `ReactElement` objects. -/

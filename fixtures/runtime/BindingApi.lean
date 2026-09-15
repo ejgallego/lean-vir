@@ -5,11 +5,52 @@ Author: Emilio J. Gallego Arias
 -/
 module
 
+import all Vir.Browser.Types
 public import Vir.ProofWidgets.Jsx
 
 open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+
+-- Native function aliases preserve arity and complete result relationships.
+example (body : RuntimeM (Js String)) : RuntimeM (Js (React.MemoCalculation String)) :=
+  Js.Function.ofLean0 body
+
+-- DOM conversion is an explicit identity, not an implicit lift or a renamed effect.
+example (body : DomM Unit) :
+    DomM.toRuntime body = (by unfold DomM at body; exact body) := rfl
+
+example (_body : DomM Unit) : True := by
+  fail_if_success have _ : RuntimeM Unit := _body
+  trivial
+
+example (cleanup : RuntimeM Unit) : RuntimeM (Js React.EffectCallback) :=
+  Js.Function.ofLean0 do
+    let release ← Js.Function.ofLean0Void cleanup
+    pure (Js.UndefinedOr.ofJs release)
+
+example : RuntimeM (Js React.EffectCallback) :=
+  Js.Function.ofLean0 (Js.UndefinedOr.undefined)
+
+example (reduce : Js String → Js Bool → RuntimeM (Js String)) :
+    RuntimeM (Js (React.Reducer String Bool)) := Js.Function.ofLean2 reduce
+
+example (setter : Js (React.StateSetter String)) (value : Js String)
+    (update : Js.Function1 (Js String) (Js String)) : RuntimeM Unit := do
+  Js.Function.callVoid setter (React.SetStateAction.ofValue value)
+  Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
+
+example (_unary : Js.Function1 (Js String) (Js String))
+    (_void : Js.Function0 Unit) (_string : Js.Function0 (Js String))
+    (_wrongReducer : Js.Function2 (Js String) (Js Bool) (Js Bool))
+    (_wrongUpdate : Js.Function1 (Js String) (Js Bool)) : True := by
+  fail_if_success have _ : Js React.EffectCallback := _void
+  fail_if_success have _ : Js React.EffectCallback := _string
+  fail_if_success have _ : Js (React.MemoCalculation String) := _unary
+  fail_if_success have _ : Js (React.Reducer String Bool) := _wrongReducer
+  fail_if_success have _ : Js (React.SetStateAction.Value String) :=
+    React.SetStateAction.ofUpdater _wrongUpdate
+  trivial
 
 -- Phantom shapes remain distinct unless a cast explicitly unfolds the handle view.
 example (_value : Js String) (_values : Js.Array String) : True := by

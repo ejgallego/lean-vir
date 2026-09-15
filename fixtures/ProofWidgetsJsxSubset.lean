@@ -139,7 +139,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
     let badgeData ← LeanRef.toJSL { tone := "info", label := "component" }
     let badgeProps ← Props.WithData.make badgeData
     Js.Object.set (Props.WithData.asProps badgeProps) (← js#"key") (← js#"info-badge")
-    let click ← Callback.ofUnary fun (_ : Js Lean.Vir.Browser.Event) => do
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) => DomM.toRuntime do
       let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
       Lean.Vir.Browser.Document.setTitle
         (← Lean.Vir.Browser.Document.current) title

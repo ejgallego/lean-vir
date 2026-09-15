@@ -262,6 +262,9 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
     check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
     for (const [entry, id] of [
+      ["ReactCounter.mountEffect", "native-effect"],
+      ["ReactCounter.mountMemo", "native-memo"],
+      ["ReactCounter.mountMemoStable", "native-memo-stable"],
       ["ReactInput.mountInput", "native-input"],
       ["ReactInput.mountCheckbox", "native-checkbox"],
       ["ReactInput.mountSelectTextarea", "native-fields"],
@@ -273,6 +276,14 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       fixtures.append(container);
       await React.act(async () => check(runtime.call(entry, `#${id}`), `${entry} mounts`));
     }
+    check(query("#react-effect-label").textContent === "react:effect",
+      "generic nullary setup may return native undefined");
+    check(query("#react-memo-label").textContent === "react:memo:42",
+      "generic nullary calculation returns an exact native value");
+    const memoButton = query("#react-memo-stable-button");
+    await React.act(async () => memoButton.click());
+    check(memoButton.textContent === "react:memo-stable:1:0",
+      "native updater changes state while React retains the memo for empty dependencies");
     const input = query("#react-name-input");
     await React.act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "Ada");

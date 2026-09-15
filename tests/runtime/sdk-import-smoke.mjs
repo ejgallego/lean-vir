@@ -168,7 +168,7 @@ try {
   assert.equal(Object.hasOwn(bindings, "react.elementType.tag"), false);
   assert.equal(typeof bindings["react.node.createElement"], "function");
   assert.equal(typeof bindings["react.props.withData.make"], "function");
-  assert.equal(typeof bindings["js.value.react.effectCallback"], "function");
+  assert.equal(Object.hasOwn(bindings, "js.value.react.effectCallback"), false);
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.renderNode"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");
