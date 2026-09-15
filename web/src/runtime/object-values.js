@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirCallback, releaseCallbackRoot } from "./callbacks.js";
+import { createVirCallback } from "./callbacks.js";
 import {
   customInductiveConstructorAt,
   normalizeUint32,
@@ -16,7 +16,6 @@ import {
 } from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
-import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import {
   OBJECT_VALUE_EXPORTS,
   directJsArgumentSupported,
@@ -64,39 +63,6 @@ const leanObjectHandleFinalizer =
         }
       })
     : null;
-
-class ObjectLiftRollbackScope {
-  constructor(label) {
-    this.label = label;
-    this.cleanups = [];
-    this.closed = false;
-  }
-
-  add(cleanup) {
-    if (this.closed) {
-      throw new Error(`${this.label} rollback scope is already closed`);
-    }
-    this.cleanups.push(cleanup);
-  }
-
-  commit() {
-    this.closed = true;
-    this.cleanups.length = 0;
-  }
-
-  fail(error) {
-    this.closed = true;
-    const errors = [error instanceof Error ? error : new Error(String(error))];
-    for (let index = this.cleanups.length - 1; index >= 0; index -= 1) {
-      collectCleanupError(errors, this.cleanups[index]);
-    }
-    this.cleanups.length = 0;
-    throwCollectedErrors(
-      errors,
-      `${this.label} failed during object-lift rollback`,
-    );
-  }
-}
 
 function normalizeObjectPointer(value, label) {
   if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff) {
@@ -1438,18 +1404,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftOwnedObjectValue(type, obj, label) {
-    const rollback = new ObjectLiftRollbackScope(label);
-    try {
-      const value = this.liftObjectValue(type, obj, label, null, rollback);
-      rollback.commit();
-      return value;
-    } catch (error) {
-      rollback.fail(error);
-    }
-  }
-
-  liftObjectValue(type, obj, label, selfType = null, rollback = null) {
+  liftObjectValue(type, obj, label, selfType = null) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
@@ -1458,16 +1413,13 @@ export class ObjectValueRuntime {
             `${label} has a recursive self reference without an enclosing type`,
           );
         }
-        return this.liftObjectValue(selfType, obj, label, selfType, rollback);
+        return this.liftObjectValue(selfType, obj, label, selfType);
       case INTERFACE_TAG.UNIT:
         return undefined;
       case INTERFACE_TAG.RESOURCE:
         return this.liftObjectResource(obj, label);
-      case INTERFACE_TAG.FUNCTION: {
-        const callback = this.liftObjectFunction(type, obj, label);
-        rollback?.add(() => releaseCallbackRoot(callback));
-        return callback;
-      }
+      case INTERFACE_TAG.FUNCTION:
+        return this.liftObjectFunction(type, obj, label);
       case INTERFACE_TAG.BOOL:
         return this.readObjectScalar(obj, label) !== 0;
       case INTERFACE_TAG.UINT8:
@@ -1497,19 +1449,19 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
       case INTERFACE_TAG.ARRAY:
-        return this.liftObjectArrayValue(type, obj, label, selfType, rollback);
+        return this.liftObjectArrayValue(type, obj, label, selfType);
       case INTERFACE_TAG.LIST:
-        return this.liftObjectListValue(type, obj, label, selfType, rollback);
+        return this.liftObjectListValue(type, obj, label, selfType);
       case INTERFACE_TAG.OPTION:
-        return this.liftObjectOptionValue(type, obj, label, selfType, rollback);
+        return this.liftObjectOptionValue(type, obj, label, selfType);
       case INTERFACE_TAG.PROD:
-        return this.liftObjectProdValue(type, obj, label, selfType, rollback);
+        return this.liftObjectProdValue(type, obj, label, selfType);
       case INTERFACE_TAG.STRUCTURE:
-        return this.liftObjectStructureValue(type, obj, label, rollback);
+        return this.liftObjectStructureValue(type, obj, label);
       case INTERFACE_TAG.TAGGED_UNION:
-        return this.liftObjectTaggedUnionValue(type, obj, label, rollback);
+        return this.liftObjectTaggedUnionValue(type, obj, label);
       case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-        return this.liftObjectCustomInductiveValue(type, obj, label, rollback);
+        return this.liftObjectCustomInductiveValue(type, obj, label);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
@@ -1560,7 +1512,7 @@ export class ObjectValueRuntime {
     return createVirCallback(this, rootId, type);
   }
 
-  liftObjectArrayValue(type, obj, label, selfType, rollback) {
+  liftObjectArrayValue(type, obj, label, selfType) {
     const len = this.exports.vir_obj_array_size(obj);
     const elementType = requireTypeField(type, "element", label);
     const values = [];
@@ -1576,7 +1528,6 @@ export class ObjectValueRuntime {
             element,
             `${label}[${index}]`,
             selfType,
-            rollback,
           ),
         );
       } finally {
@@ -1586,7 +1537,7 @@ export class ObjectValueRuntime {
     return values;
   }
 
-  liftObjectListValue(type, obj, label, selfType, rollback) {
+  liftObjectListValue(type, obj, label, selfType) {
     const elementType = requireTypeField(type, "element", label);
     return this.liftObjectConstructorList(obj, label, (head, index) =>
       this.liftObjectValue(
@@ -1594,7 +1545,6 @@ export class ObjectValueRuntime {
         head,
         `${label}[${index}]`,
         selfType,
-        rollback,
       ),
     );
   }
@@ -1653,7 +1603,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectOptionValue(type, obj, label, selfType, rollback) {
+  liftObjectOptionValue(type, obj, label, selfType) {
     const tag = this.exports.vir_obj_tag(obj);
     if (tag === 0) {
       return null;
@@ -1668,14 +1618,13 @@ export class ObjectValueRuntime {
         field,
         `${label}.value`,
         selfType,
-        rollback,
       );
     } finally {
       this.exports.vir_obj_dec(field);
     }
   }
 
-  liftObjectProdValue(type, obj, label, selfType, rollback) {
+  liftObjectProdValue(type, obj, label, selfType) {
     const fst = this.ownedObjectField(obj, 0, label);
     try {
       const snd = this.ownedObjectField(obj, 1, label);
@@ -1686,14 +1635,12 @@ export class ObjectValueRuntime {
             fst,
             `${label}.fst`,
             selfType,
-            rollback,
           ),
           snd: this.liftObjectValue(
             requireTypeField(type, "snd", label),
             snd,
             `${label}.snd`,
             selfType,
-            rollback,
           ),
         };
       } finally {
@@ -1704,7 +1651,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectStructureValue(type, obj, label, rollback) {
+  liftObjectStructureValue(type, obj, label) {
     const fields = requireStructureFields(type, label);
     const trivial = trivialStructureField(type, fields);
     if (trivial !== null) {
@@ -1714,7 +1661,6 @@ export class ObjectValueRuntime {
           obj,
           `${label}.${trivial.name}`,
           type,
-          rollback,
         ),
       };
     }
@@ -1728,13 +1674,12 @@ export class ObjectValueRuntime {
         fieldPlan,
         `${label}.${field.name}`,
         type,
-        rollback,
       );
     }
     return flattenStructureSubobjects(type, values);
   }
 
-  liftObjectTaggedUnionValue(type, obj, label, rollback) {
+  liftObjectTaggedUnionValue(type, obj, label) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = taggedUnionConstructorAt(type, tag, label);
     const field = taggedUnionField(ctor);
@@ -1747,12 +1692,11 @@ export class ObjectValueRuntime {
         plan.fields[0],
         `${label}.${ctor.jsName}`,
         type,
-        rollback,
       ),
     };
   }
 
-  liftObjectCustomInductiveValue(type, obj, label, rollback) {
+  liftObjectCustomInductiveValue(type, obj, label) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = customInductiveConstructorAt(type, tag, label);
     if (ctor.fields.length === 0) {
@@ -1768,7 +1712,6 @@ export class ObjectValueRuntime {
         fieldPlan,
         `${label}.${ctor.jsName}.${field.name}`,
         type,
-        rollback,
       );
     }
     return ctor.fields.length === 1
@@ -1788,7 +1731,6 @@ export class ObjectValueRuntime {
     fieldPlan,
     label,
     selfType = owner,
-    rollback = null,
   ) {
     const field = fieldPlan.field;
     switch (fieldPlan.kind) {
@@ -1800,7 +1742,6 @@ export class ObjectValueRuntime {
             fieldObj,
             label,
             selfType,
-            rollback,
           );
         } finally {
           this.exports.vir_obj_dec(fieldObj);

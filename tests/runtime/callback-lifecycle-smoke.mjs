@@ -64,12 +64,11 @@ assert.throws(
   /host binding boom/,
 );
 assert.equal(typeof failedCallback, "function");
-assert.equal(failedRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => failedCallback(1n),
-  /disposed runtime|closure root id is not live/,
-);
+assert.equal(failedRuntime.liveCallbacks.size, 1);
+assert.equal(failedCallback(1n), 8n, "a throwing host may still retain its callback");
 failedRuntime.dispose();
+assert.equal(failedRuntime.liveCallbacks.size, 0);
+assert.throws(() => failedCallback(1n), /disposed runtime/);
 
 let extraArgumentCallback = null;
 const extraArgumentRuntime = await createVirRuntime({

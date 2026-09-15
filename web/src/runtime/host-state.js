@@ -12,7 +12,6 @@ import {
   ExternrefRoots,
 } from "../host-boundary.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
-import { releaseCallbackRoots } from "./callbacks.js";
 import {
   collectCleanupError,
   throwCollectedErrors,
@@ -186,69 +185,51 @@ export class VirHostState {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
 
-    const args = [];
-    const liftedCallbacks = new Set();
     const explicitConversionTarget =
       entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
+    const argObjects = this.readObjectArgv(argvPtr, argc);
+    if (argObjects.length !== entry.args.length) {
+      throw new Error(
+        `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+      );
+    }
+    // Lifted callbacks own their closure roots through JS reachability, even if
+    // this call fails. Explicit host effects still use transactional rollback.
+    const args = entry.args.map((arg, index) =>
+      explicitConversionTarget
+        ? this.runtime.liftObjectValue(
+            arg.type,
+            argObjects[index],
+            `${entry.target} argument ${arg.name}`,
+          )
+        : this.runtime.liftJsObjectValue(
+            arg.type,
+            argObjects[index],
+            `${entry.target} argument ${arg.name}`,
+          ),
+    );
+    const transaction = beginHostCallTransaction();
     try {
-      const argObjects = this.readObjectArgv(argvPtr, argc);
-      if (argObjects.length !== entry.args.length) {
+      const value = binding(...args);
+      if (
+        !isGenericJsResourceDescriptor(entry.result) &&
+        isPromiseLike(value)
+      ) {
         throw new Error(
-          `Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`,
+          `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,
         );
       }
-      entry.args.forEach((arg, index) => {
-        const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
-        try {
-          const value = explicitConversionTarget
-            ? this.runtime.liftObjectValue(
-                arg.type,
-                argObjects[index],
-                `${entry.target} argument ${arg.name}`,
-              )
-            : this.runtime.liftJsObjectValue(
-                arg.type,
-                argObjects[index],
-                `${entry.target} argument ${arg.name}`,
-              );
-          args.push(value);
-        } finally {
-          captureCallbacksCreatedSince(
-            this.runtime.liveCallbacks,
-            callbacksBeforeArgument,
-            liftedCallbacks,
-          );
-        }
-      });
-      const transaction = beginHostCallTransaction();
-      try {
-        const value = binding(...args);
-        if (
-          !isGenericJsResourceDescriptor(entry.result) &&
-          isPromiseLike(value)
-        ) {
-          throw new Error(
-            `Vir host import ${entry.target} returned a Promise where ${entry.result?.type ?? "the declared result"} requires a synchronously lowered value`,
-          );
-        }
-        const resultLabel = `${entry.target} result`;
-        const resultObject = explicitConversionTarget
-          ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
-          : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
-        commitHostCallTransaction(transaction);
-        return resultObject;
-      } catch (error) {
-        throwWithCleanup(
-          error,
-          () => abortHostCallTransaction(transaction),
-          `Vir host import ${entry.target} failed during transactional rollback`,
-        );
-      }
+      const resultLabel = `${entry.target} result`;
+      const resultObject = explicitConversionTarget
+        ? this.runtime.makeObjectValue(entry.result, value, resultLabel)
+        : this.runtime.makeJsObjectValue(entry.result, value, resultLabel);
+      commitHostCallTransaction(transaction);
+      return resultObject;
     } catch (error) {
       throwWithCleanup(
         error,
-        () => releaseCallbackRoots(liftedCallbacks),
-        `Vir host import ${entry.target} failed during callback cleanup`,
+        () => abortHostCallTransaction(transaction),
+        `Vir host import ${entry.target} failed during transactional rollback`,
       );
     }
   }
@@ -433,16 +414,4 @@ function isPromiseLike(value) {
     (typeof value === "object" || typeof value === "function") &&
     typeof value.then === "function"
   );
-}
-
-function captureCallbacksCreatedSince(
-  liveCallbacks,
-  callbacksBeforeArgument,
-  liftedCallbacks,
-) {
-  for (const callback of liveCallbacks) {
-    if (!callbacksBeforeArgument.has(callback)) {
-      liftedCallbacks.add(callback);
-    }
-  }
 }

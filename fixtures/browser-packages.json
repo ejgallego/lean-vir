@@ -71,6 +71,7 @@
           "roots": [
             "HostInterop.titleHandshakeLoop",
             "HostInterop.callbackRoundTrip",
+            "HostInterop.callbackResults",
             "HostInterop.floatRoundTrip",
             "HostInterop.arrayThroughLean",
             "HostInterop.nodeListThroughLean",

@@ -409,7 +409,7 @@ export class VirRuntime extends ObjectValueRuntime {
         cache,
         argObjs,
         (resultObj) =>
-          this.liftOwnedObjectValue(
+          this.liftObjectValue(
             plan.resultType,
             resultObj,
             `${entry.entry} result`,
@@ -606,7 +606,7 @@ export class VirRuntime extends ObjectValueRuntime {
       if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
-      return this.liftOwnedObjectValue(
+      return this.liftObjectValue(
         requireFunctionResult(type, "callback"),
         resultObj,
         "callback result",

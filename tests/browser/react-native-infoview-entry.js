@@ -40,6 +40,12 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     irPackageSet: [new Uint8Array(pkg)],
     hostBindings,
   });
+  const iterateCallbacks = runtime.liveCallbacks[Symbol.iterator];
+  let callbackRegistryScans = 0;
+  runtime.liveCallbacks[Symbol.iterator] = function* () {
+    callbackRegistryScans++;
+    yield* iterateCallbacks.call(this);
+  };
   const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const previousTitle = document.title;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -52,6 +58,8 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   try {
     await React.act(async () => check(runtime.call("ReactTamagotchi.mount", `#${peer.id}`),
       "peer Tamagotchi mounts"));
+    check(callbackRegistryScans === 0 && runtime.liveCallbacks.size > 0,
+      "real Lean callbacks own closure roots without a per-call registry census");
     await React.act(async () => peer.querySelector("#react-pet-art-toggle").click());
     check(peer.querySelector("#react-pet-device").dataset.art === "pet",
       "peer has different state before the authoring probe");
@@ -60,9 +68,12 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     const label = "native JSX value \ud800"; // A lone surrogate must not round-trip through UTF-8.
     const callback = () => {};
     traceConstruction = true;
+    callbackRegistryScans = 0;
     const node = runtime.call("ProofWidgetsJsxSubset.nativeConstruction",
       component, payload, label, callback);
     traceConstruction = false;
+    check(callbackRegistryScans === 0,
+      "native construction must not scan existing callbacks");
     check(JSON.stringify(trace) === JSON.stringify([
       "label", "label", "payload", "onClick", "values", "title", "style", "onClick",
       "element:span", "element:component",
@@ -186,6 +197,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "authoring interactions leave the peer widget unchanged");
     return true;
   } finally {
+    delete runtime.liveCallbacks[Symbol.iterator];
     try { await React.act(async () => runtime.dispose()); }
     finally {
       fixtures.remove();

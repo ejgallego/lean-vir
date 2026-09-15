@@ -77,6 +77,8 @@ function observations({ runtime, callback, jsl }) {
 }
 
 export async function runGenerationGcCases(createRuntime) {
+  await failedHostCallbacks(createRuntime);
+  await returnedCallbacks(createRuntime);
   // Real Wasm roots are released while the original generation stays owned.
   let acyclic = await makeGeneration(createRuntime);
   const owned = acyclic.runtime;
@@ -201,6 +203,8 @@ export async function runGenerationGcCases(createRuntime) {
     "whole generations with table-to-callback/JSL anchors",
   );
   return {
+    failedHostCallbacks: true,
+    returnedCallbacks: true,
     acyclic: true,
     retainedCallback: true,
     retainedJsl: true,
@@ -208,6 +212,107 @@ export async function runGenerationGcCases(createRuntime) {
     intervalRetention: true,
     collectedGraphs: deadGraphs.length,
   };
+}
+
+async function returnedCallbacks(createRuntime) {
+  const runtime = await createRuntime({});
+  const liftObjectFunction = runtime.liftObjectFunction;
+  const failure = new Error("second returned callback conversion failed");
+  try {
+    for (const method of ["call", "callTimed"]) {
+      // Successful composite results retain usable closures after the Lean
+      // result array is released by the owning export call.
+      let values = runtime[method]("HostInterop.callbackResults", 7);
+      // callTimed returns an envelope; call returns the value directly.
+      if (method === "callTimed") values = values.value;
+      check(values[0](4) === "11" && values[1](4) === "12",
+        "returned Lean callbacks preserve captured values");
+      values = null;
+      await collectUntil(() => runtime.liveCallbacks.size === 0,
+        "successful returned callbacks collected while runtime lives");
+
+      let first;
+      let count = 0;
+      runtime.liftObjectFunction = function (...args) {
+        if (++count === 2) throw failure;
+        const value = liftObjectFunction.apply(this, args);
+        first = new WeakRef(value);
+        return value;
+      };
+      try {
+        let caught;
+        try { runtime[method]("HostInterop.callbackResults", 7); }
+        catch (error) { caught = error; }
+        check(caught === failure && count === 2, "partial result preserves exact error");
+        check(runtime.liveCallbacks.size === 1,
+          "partial result callback is not eagerly invalidated");
+      } finally {
+        runtime.liftObjectFunction = liftObjectFunction;
+      }
+      await collectUntil(() => first.deref() === undefined && runtime.liveCallbacks.size === 0,
+        "partial result callback eligible for collection while runtime lives");
+    }
+  } finally {
+    runtime.liftObjectFunction = liftObjectFunction;
+    runtime.dispose();
+  }
+}
+
+async function failedHostCallbacks(createRuntime) {
+  const capture = { strong: null, weak: null };
+  const failure = new Error("host retained a callback before throwing");
+  const runtime = await createRuntime({
+    "test.callNatCallback": (_input, callback) => {
+      capture.strong = callback;
+      capture.weak = new WeakRef(callback);
+      throw failure;
+    },
+    "test.recordNat": () => undefined,
+  });
+  try {
+    for (const method of ["call", "callTimed"]) {
+      let caught;
+      try { runtime[method]("HostInterop.callbackRoundTrip", 3); }
+      catch (error) { caught = error; }
+      check(caught === failure, "failed host preserves exception identity");
+      await collectUntil(() => true, "escaped callback retention control");
+      check(capture.weak.deref() === capture.strong && capture.strong(4n) === 11n,
+        "failed host callback survives GC while JavaScript retains it");
+      check(runtime.liveCallbacks.size === 1, "escaped callback keeps its foreign root");
+      capture.strong = null;
+      await collectUntil(() => capture.weak.deref() === undefined && runtime.liveCallbacks.size === 0,
+        "failed host callback eligible for collection while runtime remains live");
+      check(runtime.hostState.resourceRoots.debugCounts().active === 0,
+        "failed host call releases temporary externref roots");
+    }
+    // Inject a later lifting failure after a real Lean closure was rooted but
+    // before the host receives it. The failed lift must not anchor its callback.
+    const liftObjectValue = runtime.liftObjectValue;
+    let partial;
+    runtime.liftObjectValue = function (...args) {
+      const value = liftObjectValue.apply(this, args);
+      if (typeof value === "function") {
+        partial = new WeakRef(value);
+        throw failure;
+      }
+      return value;
+    };
+    try {
+      let caught;
+      try { runtime.call("HostInterop.callbackRoundTrip", 3); }
+      catch (error) { caught = error; }
+      check(caught === failure && partial !== undefined, "partial callback lift fails as injected");
+    } finally {
+      runtime.liftObjectValue = liftObjectValue;
+    }
+    await collectUntil(() => partial.deref() === undefined && runtime.liveCallbacks.size === 0,
+      "partial lifting callback eligible for collection");
+    check(runtime.hostState.resourceRoots.debugCounts().active === 0,
+      "partial lifting failure releases temporary externref roots");
+  } finally {
+    capture.strong = null;
+    runtime.dispose();
+  }
 }
 
 async function makeAbandonedGraph(createRuntime, kind) {
