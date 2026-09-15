@@ -56,12 +56,12 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     lean: `Lean.Vir.Js.Array ${element}`,
     representation: "js-resource", resourceInner: `Lean.Vir.Js.Array.Value ${element}`,
   });
-  const callbackType = (input, output) => {
+  const ternaryCallbackType = (first, second, third, output) => {
     const group = (type) => type.includes(" ") ? `(${type})` : type;
-    const args = `${group(input)} ${group(output)}`;
+    const args = [first, second, third, output].map(group).join(" ");
     return {
-      lean: `Lean.Vir.Js.Function1 ${args}`, representation: "js-resource",
-      resourceInner: `Lean.Vir.Js.Function.Unary ${args}`,
+      lean: `Lean.Vir.Js.Function3 ${args}`, representation: "js-resource",
+      resourceInner: `Lean.Vir.Js.Function.Ternary ${args}`,
     };
   };
   const checkType = (actual, expected, position) => {
@@ -207,9 +207,11 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
         shape.result?.kind === "array" && shape.result.element?.kind === "ref" &&
         shape.result.element.id === output.name && (shape.result.element.args ?? []).length === 0,
       "upstream map<U>(value: T, index: number, array: T[], thisArg?: any): U[] must preserve T and U");
-      require(parameters.length === 2, "receiver, unary callback and result need correlated input/output parameters");
+      require(parameters.length === 2, "receiver, ternary callback and result need correlated input/output parameters");
       const [input, result] = parameters;
-      checkSignature([arrayType(input), callbackType(jsType(input).lean, jsType(result).lean)], arrayType(result));
+      checkSignature([arrayType(input), ternaryCallbackType(
+        jsType(input).lean, jsType("Float").lean, arrayType(input).lean, jsType(result).lean,
+      )], arrayType(result));
       break;
     }
     case "js.array.item":

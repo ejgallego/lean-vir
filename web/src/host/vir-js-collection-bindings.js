@@ -13,6 +13,7 @@ export function createJsCollectionHostBindings() {
     },
     "js.object.get": (object, name) => object[name],
     "js.value.function.unary": (callback) => callback,
+    "js.value.function.ternary": (callback) => callback,
     "js.value.function.unaryVoid": (callback) => callback,
     "js.function.call": (fn, argument) => fn(argument),
     "js.function.callVoid": (fn, argument) => {

@@ -160,16 +160,16 @@ def HypothesisRow : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.P
     let hypothesisType ← plainCode (← InteractiveHypothesisBundle.type hypothesis)
     let value? ← Js.UndefinedOr.toOption (← InteractiveHypothesisBundle.val hypothesis)
     let value ← value?.mapM plainCode
-    let valueNodes : ReactM (Js.Array Lean.Vir.React.Node) := match value with
-      | none => Js.Array.empty
+    let valueNode : ReactM (Js.Nullable Lean.Vir.React.Node) := match value with
+      | none => Js.Nullable.null
       | some value => do
-          js#[← <span key="value" className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {Lean.Vir.React.Node.text value}</span>]
+          Js.Nullable.ofJs (← <span className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {value}</span>)
     return ← <li id={(← JsValue.ofString ("vir-native-infoview-hyp-" ++ id))}
         className="vir-native-infoview-hypothesis" role="listitem" style={(← Style.hypothesis)}><span
           className="vir-native-infoview-hyp-name" style={(← Style.binder)}>{Lean.Vir.React.Node.text
             (← JsValue.ofString names)}</span><span aria-hidden={(← JsValue.ofBool true)}>:</span><code
           className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{Lean.Vir.React.Node.text
-            hypothesisType}</code>{valueNodes}</li>
+            hypothesisType}</code>{valueNode}</li>
 
 structure TacticGoalCardProps where
   goal : Js InteractiveGoal
@@ -231,14 +231,15 @@ def GoalCardBody
     let next ← JsValue.ofBool (!collapsed)
     Lean.Vir.React.State.set collapsedState next
   let hypothesisCount := (← JsValue.toFloat (← Js.Array.length hypotheses)).toUInt64.toNat
-  let hypothesisNodes ← Js.Array.empty
-  for hypothesisIndex in [:hypothesisCount] do
-    let hypothesis ← Js.Array.get hypotheses (← JsValue.ofFloat hypothesisIndex.toFloat)
+  let renderHypothesis ← Js.Function.ofLean3 fun (hypothesis : Js InteractiveHypothesisBundle)
+      (nativeIndex : Js Float) (_source : Js.Array InteractiveHypothesisBundle) => do
+    let hypothesisIndex := (← JsValue.toFloat nativeIndex).toUInt64.toNat
     let props ← Lean.Vir.React.Props.WithData.make
       (← Lean.Vir.LeanRef.toJSL { hypothesis, goalIndex := index, index := hypothesisIndex })
     Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps props) (← js#"key")
       (← JsValue.ofString s!"{goalId}-{hypothesisIndex}")
-    let _ ← Js.Array.push hypothesisNodes (← <HypothesisRowComponent @props={props}/>)
+    return ← <HypothesisRowComponent @props={props}/>
+  let hypothesisNodes ← hypotheses.map renderHypothesis
   let context : Html := if hypothesisCount == 0 then
     <p key="context" className="vir-native-infoview-no-hypotheses" style={(← Style.empty)}>No local hypotheses.</p>
   else
@@ -299,15 +300,16 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
     let tacticGoals ← PanelWidgetProps.goals props
     let tacticGoalCount := (← JsValue.toFloat (← Js.Array.length tacticGoals)).toUInt64.toNat
     let termGoal? ← Js.UndefinedOr.toOption (← PanelWidgetProps.termGoal props)
-    let goals ← Js.Array.empty
-    for index in [:tacticGoalCount] do
-      let goal ← Js.Array.get tacticGoals (← JsValue.ofFloat index.toFloat)
+    let renderGoal ← Js.Function.ofLean3 fun (goal : Js InteractiveGoal)
+        (nativeIndex : Js Float) (_source : Js.Array InteractiveGoal) => do
+      let index := (← JsValue.toFloat nativeIndex).toUInt64.toNat
       let key ← tacticGoalKey goal index
       let cardProps ← Lean.Vir.React.Props.WithData.make
         (← Lean.Vir.LeanRef.toJSL { goal, index, key })
       Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps cardProps) (← js#"key")
         (← JsValue.ofString key)
-      let _ ← Js.Array.push goals (← <TacticGoalCardComponent @props={cardProps}/>)
+      return ← <TacticGoalCardComponent @props={cardProps}/>
+    let goals ← tacticGoals.map renderGoal
     if let some goal := termGoal? then
       let cardProps ← Lean.Vir.React.Props.WithData.make
         (← Lean.Vir.LeanRef.toJSL { goal, index := tacticGoalCount })

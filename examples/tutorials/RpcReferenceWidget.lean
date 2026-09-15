@@ -59,7 +59,7 @@ private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply
     React.State.modify count fun previous => do
       JsValue.ofNat ((← JsValue.toNat previous) + 1)
   return ← <button id="rpc-reference-view" onClick={increment}>
-    {Node.text label}{ProofWidgets.Html.text s!" / local {n}"}
+    {label}{ProofWidgets.Html.text s!" / local {n}"}
   </button>
 
 /-- Keep the session and query identities stable until the request should change. -/
@@ -127,18 +127,17 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
   let status := if state.status == "loading" then s!"Loading…{previous}"
     else if state.status == "error" then s!"Request failed: {state.error}.{previous}"
     else "Ready"
-  let children : ReactM (Js.Array Node) := match state.reply with
-    | none => Js.Array.empty
+  let responseChild : ReactM (Js.Nullable Node) := match state.reply with
+    | none => Js.Nullable.null
     | some reply => do
         let props ← Props.WithData.make (← LeanRef.toJSL reply)
-        Js.Object.set (Props.WithData.asProps props) (← js#"key") (← js#"reply")
-        js#[← Node.functionComponent child props (← Js.Array.empty)]
+        Js.Nullable.ofJs (← Node.functionComponent child props (← Js.Array.empty))
   return ← <section aria-busy={← JsValue.ofBool (state.status == "loading")}>
     <p role={← JsValue.ofString (if state.status == "error" then "alert" else "status")}
         data-rpc-status={← JsValue.ofString state.status}>
       {ProofWidgets.Html.text status}
     </p>
-    {children}
+    {responseChild}
   </section>
 
 /-- Construct once: native React function identity preserves parent and child state. -/

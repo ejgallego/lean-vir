@@ -65,7 +65,8 @@ JavaScript boundary, but early termination of pure Lean evaluation is not guaran
 
 `Js.Function1 argument result` does not wrap a function and VIR does not
 dynamically inspect its TypeScript signature. `Js.Function.ofLean` and
-`Js.Function.ofLeanVoid` are explicit conversions from Lean closures; native
+`Js.Function.ofLeanVoid` are explicit conversions from Lean closures;
+`Js.Function3`/`ofLean3` describe and create three-argument functions. Native
 functions such as React state setters already cross as `Js.Function1` values
 and need no conversion. `Js.erase` similarly forgets only a phantom type and
 returns the exact same JavaScript value as `Js.Any`.

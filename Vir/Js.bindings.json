@@ -226,6 +226,17 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js β)" } }
       },
       {
+        "id": "javascript.function.of-lean-ternary", "group": "function", "target": "js.value.function.ternary",
+        "lean": "Lean.Vir.Js.Function.ofLean3", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean ternary callback into an ordinary JavaScript function with the same three-argument and result call shape.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β", "γ", "δ"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM (Lean.Vir.Js δ)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)" } }
+      },
+      {
         "id": "javascript.function.of-lean-unary-void", "group": "function", "target": "js.value.function.unaryVoid",
         "lean": "Lean.Vir.Js.Function.ofLeanVoid", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a transferred Lean unary callback with a discarded result into an ordinary JavaScript function.",
@@ -357,12 +368,12 @@
       {
         "id": "javascript.array.map", "group": "array", "target": "js.array.map",
         "lean": "Lean.Vir.Js.Array.map", "marker": "vir_js",
-        "reason": "Selects the unary callback, no-thisArg subset of Array<T>.map<U>. The declared Js.Function1 receives the element only, while the native Array.map call still supplies its ordinary index and source-array callback arguments. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This is not the complete TypeScript callback or thisArg signature.",
+        "reason": "Selects Array<T>.map<U>'s exact three-argument callback with no thisArg. The declared Js.Function3 receives the element, native number index and original native source array. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This does not expose the optional thisArg signature.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.map", "semantics": "preserving" },
         "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [
           { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
-          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js β)" } }
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Array β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value β" } }
       },

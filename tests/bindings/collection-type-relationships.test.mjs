@@ -18,7 +18,7 @@ const config = await loadBindingConfig(new URL("../../Vir/Js.bindings.json", imp
 const generation = {
   ...config.generation,
   protocolOperations: config.generation.protocolOperations.filter((operation) =>
-    ["array", "tuple2"].includes(operation.group) || operation.target === "js.nodeList.toArray"),
+    ["array", "function", "tuple2"].includes(operation.group) || operation.target === "js.nodeList.toArray"),
 };
 // Authority comes from the installed, pinned TypeScript declarations, not a
 // second handwritten list of what this binding configuration ought to mean.
@@ -35,7 +35,7 @@ const operation = (policy, target) => policy.protocolOperations.find((entry) => 
 test("pinned Array<T> produces correlated Lean array signatures", async () => {
   const text = render();
   assert.match(text, /opaque push\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(value : @& Lean\.Vir\.Js α\)/u);
-  assert.match(text, /opaque map\s+\{α : Type\}\s+\{β : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(callback : @& Lean\.Vir\.Js\.Function1 \(Lean\.Vir\.Js α\) \(Lean\.Vir\.Js β\)\) :\s+RuntimeM \(Lean\.Vir\.Js\.Array β\)/u);
+  assert.match(text, /opaque map\s+\{α : Type\}\s+\{β : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(callback : @& Lean\.Vir\.Js\.Function3 \(Lean\.Vir\.Js α\) \(Lean\.Vir\.Js Float\)\s+\(Lean\.Vir\.Js\.Array α\) \(Lean\.Vir\.Js β\)\) :\s+RuntimeM \(Lean\.Vir\.Js\.Array β\)/u);
   assert.match(text, /opaque get\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(index : @& Lean\.Vir\.Js Float\) :\s+RuntimeM \(Lean\.Vir\.Js α\)/u);
   assert.doesNotMatch(text, /getAs/u);
   const shipped = await readFile(new URL("../../Vir/Js/Generated.lean", import.meta.url), "utf8");
@@ -43,6 +43,8 @@ test("pinned Array<T> produces correlated Lean array signatures", async () => {
     const declaration = text.match(new RegExp(`opaque ${name}[^]*?RuntimeM \\(Lean\\.Vir\\.Js(?:\\.Array)? (?:Float|α|β)\\)`))[0];
     assert.ok(shipped.includes(declaration), `${name}: shipped Lean signature must be the validated translation`);
   }
+  assert.match(text, /opaque ofLean3\s+\{α : Type\}\s+\{β : Type\}\s+\{γ : Type\}\s+\{δ : Type\}\s+\(callback : Lean\.Vir\.Js α → Lean\.Vir\.Js β → Lean\.Vir\.Js γ → RuntimeM \(Lean\.Vir\.Js δ\)\) :\s+RuntimeM \(Lean\.Vir\.Js\.Function3 \(Lean\.Vir\.Js α\) \(Lean\.Vir\.Js β\) \(Lean\.Vir\.Js γ\) \(Lean\.Vir\.Js δ\)\)/u);
+  assert.match(shipped, /@\[vir_js_explicit_conversion "js\.value\.function\.ternary"\][^]*?opaque ofLean3/u);
 });
 
 for (const [label, target, mutate] of [
@@ -56,8 +58,10 @@ for (const [label, target, mutate] of [
   ["unrelated constructor result", "js.array.empty", (op) => { op.result.type.lean = "Lean.Vir.Js.Array β"; }],
   ["redundant element resource wrapper", "js.array.push", (op) => { op.arguments[0].type.lean = "Lean.Vir.Js.Array (Lean.Vir.Js α)"; }],
   ["map erased output", "js.array.map", (op) => { op.result.type.lean = "Lean.Vir.Js.Array Lean.Vir.Js.Any"; }],
-  ["map unrelated callback input", "js.array.map", (op) => { op.arguments[1].type.lean = "Lean.Vir.Js.Function1 (Lean.Vir.Js β) (Lean.Vir.Js β)"; }],
-  ["map unrelated callback result", "js.array.map", (op) => { op.arguments[1].type.resourceInner = "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js γ)"; }],
+  ["map unrelated callback input", "js.array.map", (op) => { op.arguments[1].type.lean = "Lean.Vir.Js.Function3 (Lean.Vir.Js β) (Lean.Vir.Js Float) (Lean.Vir.Js.Array β) (Lean.Vir.Js β)"; }],
+  ["map unrelated callback index", "js.array.map", (op) => { op.arguments[1].type.lean = "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js String) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)"; }],
+  ["map unrelated callback source", "js.array.map", (op) => { op.arguments[1].type.lean = "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array β) (Lean.Vir.Js β)"; }],
+  ["map unrelated callback result", "js.array.map", (op) => { op.arguments[1].type.resourceInner = "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js γ)"; }],
   ["map extra thisArg", "js.array.map", (op) => { op.arguments.push(structuredClone(op.arguments[0])); }],
 ]) {
   test(`array fidelity rejects ${label}, even when marked preserving`, () => {
@@ -136,9 +140,9 @@ for (const [member, original, replacement, wrapper, code] of [
   });
 }
 
-test("Array.map accepts only the pinned unary-view subset of its full native callback", () => {
+test("Array.map accepts the pinned ternary no-thisArg subset of its native callback", () => {
   const text = render();
-  assert.match(text, /Selects the unary callback, no-thisArg subset/u);
+  assert.match(text, /exact three-argument callback with no thisArg/u);
   const upstream = structuredClone(descriptor);
   const map = upstream.symbols.find((entry) => entry.id === "Array.map");
   map.shape.args[0].type.args[1].type.name = "string";
@@ -161,7 +165,7 @@ test("source-level Array.map output relationship is independently checked by Typ
       dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
     });
     assert.throws(() => render(generation, upstream), /map<U>\(value: T, index: number/u);
-    const wrapper = "export function map<T, U>(array: Array<T>, callback: (value: T) => U): U[] { return array.map(callback); }";
+    const wrapper = "export function map<T, U>(array: Array<T>, callback: (value: T, index: number, source: T[]) => U): U[] { return array.map(callback); }";
     assert.deepEqual(typeScriptDiagnostics(wrapper), []);
     assert.ok(typeScriptDiagnostics(wrapper, mutated).some((d) => d.code === 2322 && d.file?.text === wrapper),
       "the independent TS wrapper rejects the mutated map output relationship");

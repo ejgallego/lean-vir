@@ -87,11 +87,24 @@ its signature dynamically inspectable.
 -/
 opaque Unary (argument result : Type) : Type
 
+/--
+Phantom shape for an exact ternary JavaScript function.
+
+The argument and result types describe the Lean boundary views used when the
+function is called; this marker neither wraps the JavaScript function nor
+changes its native invocation arity.
+-/
+opaque Ternary (first second third result : Type) : Type
+
 end Function
 
 /-- Exact unary JavaScript function with a statically described call shape. -/
 abbrev Function1 (argument result : Type) : Type :=
   Lean.Vir.Js (Function.Unary argument result)
+
+/-- Exact ternary JavaScript function with a statically described call shape. -/
+abbrev Function3 (first second third result : Type) : Type :=
+  Lean.Vir.Js (Function.Ternary first second third result)
 
 /-- Runtime implementation of `Js.erase`; public so module importers can compile it. -/
 @[inline] unsafe def eraseImpl {α : Type}
@@ -126,6 +139,24 @@ end Array
 /-- JavaScript-owned array. Insertion and indexing use `Js α`, never a raw Lean `α`. -/
 abbrev Array (α : Type) : Type :=
   Lean.Vir.Js (Array.Value α)
+
+namespace Function
+
+/-- Public implementation symbol needed by imported code; no new JS function is created. -/
+@[inline, instance_reducible] unsafe def unaryArrayMapImpl {α β : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) (Lean.Vir.Js β)) where
+  coe function := unsafeCast function
+
+/-- The unary view of Array.map's callback, not general function subtyping.
+Only the phantom type changes; the original JS function still receives all
+arguments. Lean unary bridges ignore index/source as ordinary unary TS callbacks may. -/
+@[implemented_by unaryArrayMapImpl, instance]
+axiom instUnaryArrayMap {α β : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) (Lean.Vir.Js β))
+
+end Function
 
 namespace Tuple2
 

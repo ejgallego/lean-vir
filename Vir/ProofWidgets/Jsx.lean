@@ -59,14 +59,14 @@ called exactly once and its exception behavior is unchanged.
 private axiom sealDeclaredField {α : Type}
     (value : Lean.Vir.Js.Any) : Lean.Vir.Js α
 
-/-- React accepts the exact native array as a node; no traversal or fragment is added. -/
-@[inline] private unsafe def arrayNodeImpl
-    (value : Lean.Vir.Js.Array Lean.Vir.React.Node) : Lean.Vir.Js Lean.Vir.React.Node :=
+/-- Used only after the elaborator verifies a supported native ReactNode shape. -/
+@[inline] private unsafe def nativeNodeImpl {α : Type}
+    (value : Lean.Vir.Js α) : Lean.Vir.Js Lean.Vir.React.Node :=
   unsafeCast value
 
-@[implemented_by arrayNodeImpl]
-private axiom arrayNode
-    (value : Lean.Vir.Js.Array Lean.Vir.React.Node) : Lean.Vir.Js Lean.Vir.React.Node
+@[implemented_by nativeNodeImpl]
+private axiom nativeNode {α : Type}
+    (value : Lean.Vir.Js α) : Lean.Vir.Js Lean.Vir.React.Node
 
 end
 
@@ -151,6 +151,18 @@ scoped syntax:max virProofWidgetsJsxElement : term
 -- Internal elaboration node: only JSX interpolation inserts this syntax.
 syntax (name := nativeChild) "vir_native_child% " term : term
 
+-- The supported subset of upstream ReactNode, never arbitrary objects or Any.
+private meta partial def isNativeNodeShape (type : Lean.Expr) : Lean.MetaM Bool := do
+  let type ← Lean.Meta.whnf type
+  if #[``Lean.Vir.React.Node, ``String, ``Float, ``Nat, ``Bool,
+      ``Lean.Vir.Js.Undefined.Value].any type.isConstOf then
+    return true
+  for constructor in #[``Lean.Vir.Js.Array.Value, ``Lean.Vir.Js.Nullable.Value,
+      ``Lean.Vir.Js.UndefinedOr.Value] do
+    if type.isAppOfArity constructor 1 then
+      return ← isNativeNodeShape type.appArg!
+  return false
+
 elab_rules : term
   | `(vir_native_child% $child) => do
     let value ← Lean.Elab.Term.elabTerm child none
@@ -160,22 +172,19 @@ elab_rules : term
     let action := Lean.mkApp (Lean.mkConst ``Lean.Vir.React.ReactM) node
     let lowered ← if type.isAppOfArity ``Lean.Vir.Js 1 then do
         let shape ← Lean.Meta.whnf type.appArg!
+        unless ← isNativeNodeShape shape do
+          throwErrorAt child "JSX expects a native React node shape (node, string, number, bigint, boolean, undefined, or supported nullable/array shape)"
         if shape.isConstOf ``Lean.Vir.React.Node then
           Lean.Elab.liftMacroM `(pure $valueSyntax)
         else if shape.isConstOf ``String then
           Lean.Elab.liftMacroM `(Lean.Vir.React.Node.text $valueSyntax)
-        else if shape.isAppOfArity ``Lean.Vir.Js.Array.Value 1 then
-          unless (← Lean.Meta.whnf shape.appArg!).isConstOf ``Lean.Vir.React.Node do
-            throwErrorAt child "JSX native array children must have Node elements"
-          Lean.Elab.liftMacroM `(pure ($(mkCIdent ``arrayNode) $valueSyntax))
         else
-          throwErrorAt child "JSX expects a native Node, String or Array Node, or a node construction action"
+          Lean.Elab.liftMacroM `(pure ($(mkCIdent ``nativeNode) $valueSyntax))
       else
         let shape ← Lean.Meta.mkFreshTypeMVar
         let result := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) shape
-        let reactAction := Lean.mkApp (Lean.mkConst ``Lean.Vir.React.ReactM) result
         let runtimeAction := Lean.mkApp (Lean.mkConst ``Lean.Vir.RuntimeM) result
-        unless (← Lean.Meta.isDefEq type reactAction) || (← Lean.Meta.isDefEq type runtimeAction) do
+        unless ← Lean.Meta.isDefEq type runtimeAction do
           throwErrorAt child "JSX children must be native values or actions returning native values; Lean arrays are not supported"
         Lean.Elab.liftMacroM `(do
           let nativeValue ← ($valueSyntax)

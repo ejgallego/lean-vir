@@ -33,12 +33,12 @@ Choose the effect according to the operation:
 | --- | --- |
 | `RuntimeM` | Allocate or inspect JS values, update `RuntimeRef` cells, call state setters and perform runtime bookkeeping. |
 | `Browser.DomM` | Read or mutate the DOM, handle events, and manage React roots. |
-| `React.ReactM` | Construct React values and use component render APIs. |
+| `React.ReactM` | Transparent `RuntimeM` alias naming React construction and hooks. |
 
-`RuntimeM` lifts into both `DomM` and `ReactM`; `ReactM` also lifts into
-`DomM`. Use `RuntimeM.run` or `DomM.run` at an explicit exported `IO`
-boundary. These effects identify the intended host operations; they do not
-enforce React purity or hook ordering.
+`RuntimeM` (also spelled `ReactM`) lifts into `DomM`. Use `RuntimeM.run` or
+`DomM.run` at an explicit exported `IO` boundary. The source-level `react`
+classification remains available to tooling; it does not enforce purity or
+hook ordering, and requires no separate monad implementation.
 
 `RuntimeRef α` holds Lean-owned mutable state shared by callbacks. Its
 `new`, `get`, `set`, `modify` and `modifyGet` operations run in
@@ -133,6 +133,8 @@ Native functions need no conversion; `Js.Function.call` and `callVoid`
 invoke them. Use `Js.Function.ofLean` or `ofLeanVoid` when converting a
 Lean closure into a JavaScript function. The call-shape parameters describe
 Lean boundary views, such as `Js α` and `Unit`.
+`Js.Function3` and `ofLean3` provide the same boundary for three arguments,
+including the value/index/source callback of native `Js.Array.map`.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed

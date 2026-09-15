@@ -27,7 +27,18 @@ def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) 
   sameElement value index
 
 def mapElement {α β : Type} (array : Js.Array α)
+    (callback : Js.Function3 (Js α) (Js Float) (Js.Array α) (Js β)) : RuntimeM (Js.Array β) :=
+  Js.Array.map array callback
+
+-- A unary JavaScript function is an exact native map callback too: JavaScript
+-- supplies index/source; the native function and its arguments behavior are unchanged.
+def mapUnaryElement {α β : Type} (array : Js.Array α)
     (callback : Js.Function1 (Js α) (Js β)) : RuntimeM (Js.Array β) :=
+  Js.Array.map array callback
+
+def mapWithIndexedCallback {α β : Type} (array : Js.Array α)
+    (callback : Js α → Js Float → Js.Array α → RuntimeM (Js β)) : RuntimeM (Js.Array β) := do
+  let callback ← Js.Function.ofLean3 callback
   Js.Array.map array callback
 
 def sameNodeListElement {α : Type} (list : Js.NodeList (Js α)) : RuntimeM (Js.Array α) :=
@@ -102,12 +113,18 @@ example {α β : Type} (array : Js.Array α) (value : Js β) : True := by
   trivial
 
 example {α β γ : Type} (array : Js.Array α)
-    (callback : Js.Function1 (Js α) (Js β)) : True := by
+    (callback : Js.Function3 (Js α) (Js Float) (Js.Array α) (Js β)) : True := by
   fail_if_success
     have wrongResult : RuntimeM (Js.Array γ) := Js.Array.map array callback
   fail_if_success
     have wrongInput : RuntimeM (Js.Array β) :=
-      Js.Array.map array (show Js.Function1 (Js γ) (Js β) from callback)
+      Js.Array.map array (show Js.Function3 (Js γ) (Js Float) (Js.Array γ) (Js β) from callback)
+  fail_if_success
+    have wrongIndex : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function3 (Js α) (Js String) (Js.Array α) (Js β) from callback)
+  fail_if_success
+    have wrongSource : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function3 (Js α) (Js Float) (Js.Array γ) (Js β) from callback)
   trivial
 
 example (array : Js.Array (LeanRef.Handle String)) (index : Js Float) : True := by

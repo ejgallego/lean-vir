@@ -70,12 +70,45 @@ example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
   <div>{action}</div>
 
 example (values : Js.Array String) (render : Js.Function1 (Js String) (Js React.Node)) :
-    React.ReactM (Js React.Node) := <div>{values.map render}</div>
+    React.ReactM (Js React.Node) := <div>{values.map (β := React.Node) render}</div>
 
 example (text : RuntimeM (Js String)) (nodes : React.ReactM (Js.Array React.Node)) :
     React.ReactM (Js React.Node) := <div>{text}{nodes}</div>
 
 example : React.ReactM (Js React.Node) := <div>{js#"native text"}</div>
+
+example (nullable : Js.Nullable React.Node) (optional : Js.UndefinedOr String)
+    (absent : Js.Undefined) (flag : Js Bool) (number : Js Float) (bigint : Js Nat)
+    (nested : Js.Array (Js.Nullable.Value String)) : React.ReactM (Js React.Node) :=
+  <div>{nullable}{optional}{absent}{flag}{number}{bigint}{nested}</div>
+
+example (values : Js.Array String) : RuntimeM (Js React.Node) := do
+  let render ← Js.Function.ofLean3 fun (text : Js String) (_ : Js Float)
+      (_ : Js.Array String) => <span>{text}</span>
+  return ← <div>{values.map render}</div>
+
+example : RuntimeM (Js.Function1 (Js String) (Js React.Node)) :=
+  Js.Function.ofLean fun (text : Js String) => <span>{text}</span>
+
+example : RuntimeM (Js.Array String) := js#[js#"a", (js#"b"), ((js#"c"))]
+
+example : RuntimeM Js.Object := js%{ "value" := ((js#"native")) }
+
+example : React.ReactM (Js React.Node) := <span title={((js#"native"))}/>
+
+example (_nullable : Js.Nullable Js.Object.Value) (_any : Js.Any)
+    (_values : Js.Array Js.Any.Value) (_action : RuntimeM (Js.Array Js.Object.Value)) : True := by
+  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_nullable}</div>
+  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_any}</div>
+  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_values}</div>
+  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_action}</div>
+  trivial
+
+example (_action : RuntimeM (Js String)) : True := by
+  fail_if_success have _ : RuntimeM (Js.Array String) := js#[_action]
+  fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := (_action) }
+  fail_if_success have _ : RuntimeM (Js React.Node) := <span title={(_action)}/>
+  trivial
 
 example (_raw : Js.Object) (_nodes : Array (Js React.Node))
     (_actions : Js.Array (RuntimeM (Js React.Node)))

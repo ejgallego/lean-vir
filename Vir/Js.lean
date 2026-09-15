@@ -30,10 +30,11 @@ namespace Js
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 
 /-- Construction-only literal lifting; other expressions retain their effect semantics. -/
-meta def liftConstructionString (value : Lean.TSyntax `term) :
+meta partial def liftConstructionString (value : Lean.TSyntax `term) :
     Lean.MacroM (Lean.TSyntax `term) :=
   match value with
   | `(js# $literal:str) => `(← Lean.Vir.JsValue.ofString $literal)
+  | `(($inner:term)) => liftConstructionString inner
   | _ => pure value
 
 /-- Native object construction. Field values are exact JS values; conversions are explicit. -/
@@ -61,7 +62,8 @@ macro_rules
   | `(js#[ $values:term,* ]) => do
     let array ← Lean.Macro.addMacroScope `array
     let array := Lean.mkIdent array
-    let writes ← values.getElems.mapM fun value =>
+    let writes ← values.getElems.mapM fun value => do
+      let value ← liftConstructionString value
       `(doElem| let _ ← Lean.Vir.Js.Array.push $array $value)
     `(do
       let $array ← Lean.Vir.Js.Array.empty

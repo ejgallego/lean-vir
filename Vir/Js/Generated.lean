@@ -53,7 +53,7 @@ opaque push
 /--
 Generated binding for reviewed VIR protocol `javascript.array.map`.
 
-Selects the unary callback, no-thisArg subset of Array<T>.map<U>. The declared Js.Function1 receives the element only, while the native Array.map call still supplies its ordinary index and source-array callback arguments. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This is not the complete TypeScript callback or thisArg signature.
+Selects Array<T>.map<U>'s exact three-argument callback with no thisArg. The declared Js.Function3 receives the element, native number index and original native source array. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This does not expose the optional thisArg signature.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -66,7 +66,7 @@ opaque map
     {α : Type}
     {β : Type}
     (array : @& Lean.Vir.Js.Array α)
-    (callback : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
     RuntimeM (Lean.Vir.Js.Array β)
 
 /--
@@ -125,6 +125,26 @@ opaque ofLean
     {β : Type}
     (callback : Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)) :
     RuntimeM (Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-ternary`.
+
+Explicitly converts a transferred Lean ternary callback into an ordinary JavaScript function with the same three-argument and result call shape.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.ternary"]
+opaque ofLean3
+    {α : Type}
+    {β : Type}
+    {γ : Type}
+    {δ : Type}
+    (callback : Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM (Lean.Vir.Js δ)) :
+    RuntimeM (Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ))
 
 /--
 Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary-void`.

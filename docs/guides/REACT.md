@@ -56,11 +56,12 @@ native names such as `aria-label` and `data-testid`. Events take native
 functions, so convert a Lean closure explicitly with `Callback.ofUnary`.
 There are no per-attribute or per-tag helper catalogues.
 
-In native object fields and JSX attributes, `js#"text"` inserts its conversion
-at that position: `js%{ "title" := js#"Hello" }` and
-`<span title={js#"Hello"}/>` need no extra arrow. Outside these positions it
-remains a `RuntimeM (Js String)` action. Named property actions still require
-explicit `←`; this shorthand does not execute arbitrary property expressions.
+In native object fields, native arrays and JSX attributes, `js#"text"` inserts
+its conversion at that position: `js%{ "title" := js#"Hello" }`,
+`js#[js#"Hello"]` and `<span title={js#"Hello"}/>` need no extra arrow.
+Parentheses do not change this rule. Elsewhere it remains a `RuntimeM (Js String)`
+action. Named property/array actions still require explicit `←`; only literal
+syntax receives this treatment.
 
 `js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
 `Js.Object.set` assignments in source order (last duplicate wins).
@@ -116,23 +117,32 @@ This differs from counting Lean string characters.
 
 `Html` is a deferred `ReactM (Js Node)`, not a serialized tree. Attributes
 are evaluated before children. `{node}`, `{text}` and `{nodes}` insert an
-existing `Js Node`, `Js String` or `Js.Array Node` unchanged. A native array
+existing native value unchanged. Supported shapes are `Node`, `String`,
+`Float` (number), `Nat` (bigint), `Bool`, `Js.Undefined.Value`, and recursively
+native arrays/nullable/undefined-or unions of these. Native `null`, `undefined`
+and booleans render nothing; optional children need no empty/singleton arrays.
+Arbitrary objects and `Js.Any` are not implicitly narrowed to nodes. A native array
 occupies one child slot; JSX does not flatten it or add a fragment. Existing
-child actions still run left-to-right and may return a native node, string or
-node array. Lean arrays (including arrays of actions) are not JSX children.
+child actions still run left-to-right and may return any supported native shape.
+Lean arrays (including arrays of actions) are not JSX children.
 Use native mapping directly:
 
 ```lean
 def labels (values : Js.Array String) : ReactM (Js Node) := do
-  let render ← FunctionComponent.ofLean fun (label : Js String) =>
+  let render ← Js.Function.ofLean3 fun (label : Js String) (_ : Js Float)
+      (_ : Js.Array String) =>
     <span key={label}>{label}</span>
   return ← <div>{values.map render}</div>
 ```
 
 `Js.Array.map` calls native `array.map(callback)` with an explicitly created
-JavaScript function. Its typed surface selects a unary callback and omits
-`thisArg`; the native operation still supplies index/source arguments, skips
-holes and propagates callback exceptions. No Lean array is constructed.
+JavaScript function. `Js.Function.ofLean3` exposes `(value, index, source)`;
+the index is `Js Float` and source is the original `Js.Array`. Unary callbacks
+also work through an `Array.map`-specific type-only coercion, preserving the
+original function. When the result type is not known from context, supply it:
+`values.map (β := Node) render`. No general function-subtyping layer is implied.
+The native operation skips holes and propagates callback exceptions; `thisArg`
+is not exposed. No Lean array is constructed.
 The mapping expression runs once at its child position. Keys and component
 identity follow React's ordinary rules. For a fixed native array, use
 `js#[first, second]`; execute construction actions explicitly inside it, such
@@ -148,6 +158,11 @@ keys and handlers. This native authoring facade is distinct from upstream's
 [serialized `ProofWidgets.Html` protocol](INFOVIEW.md#optional-serialized-html).
 
 ## Components and roots
+
+`ReactM` is a transparent alias for `RuntimeM`, not a render-purity boundary.
+Generic `Js.Function.ofLean` can therefore create JSX-returning callbacks.
+`FunctionComponent.ofLean` remains an equivalent, component-specific spelling;
+neither enforces hooks, purity or replay safety beyond what React enforces.
 
 `FunctionComponent.ofLean` converts a Lean render function into one ordinary JavaScript
 function. That returned function is the React component type: reuse it to

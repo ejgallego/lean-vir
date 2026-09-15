@@ -162,7 +162,10 @@
             "ProofWidgetsJsxSubset.nativeTypedLabel",
             "ProofWidgetsJsxSubset.nativeStringLength",
             "ProofWidgetsJsxSubset.nativeChildSlots",
-            "ProofWidgetsJsxSubset.nativeMappedChildren"
+          "ProofWidgetsJsxSubset.nativeMappedChildren",
+          "ProofWidgetsJsxSubset.nativePrimitiveChildren",
+          "ProofWidgetsJsxSubset.nativeIndexedMap",
+          "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]
         },
         {

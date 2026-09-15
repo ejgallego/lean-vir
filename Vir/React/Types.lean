@@ -12,8 +12,9 @@ public section
 
 namespace Lean.Vir.React
 
-/-- Effect used by Lean-authored React render construction. -/
-@[expose, irreducible] def ReactM (α : Type) : Type :=
+/-- Source-level name for native React operations; the ordinary runtime effect,
+not a purity or hook-ordering boundary. -/
+abbrev ReactM (α : Type) : Type :=
   Lean.Vir.RuntimeM α
 
 namespace ReactM
@@ -21,36 +22,8 @@ namespace ReactM
 /-- Explicitly lowers a render-construction action at a browser/DOM boundary. -/
 def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
   by
-    unfold ReactM at action
     unfold Lean.Vir.Browser.DomM
     exact action
-
-instance : Monad ReactM where
-  pure value :=
-    by
-      unfold ReactM
-      exact pure value
-  bind action next :=
-    by
-      unfold ReactM at action
-      unfold ReactM
-      exact action >>= fun value => by
-        unfold ReactM at next
-        exact next value
-
-instance : MonadLift Lean.Vir.RuntimeM ReactM where
-  monadLift action :=
-    by
-      unfold ReactM
-      exact action
-
-instance : MonadLift ReactM Lean.Vir.Browser.DomM where
-  monadLift := ReactM.run
-
-instance : Nonempty (ReactM α) :=
-  by
-    unfold ReactM
-    infer_instance
 
 end ReactM
 

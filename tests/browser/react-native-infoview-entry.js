@@ -143,10 +143,37 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     finally { mapElementProbe = null; }
     check(thrown === mapFailure && visited.join(",") === "before,fail",
       "mapped Lean callback preserves the original error and stops subsequent elements");
+    const indexed = runtime.call("ProofWidgetsJsxSubset.nativeIndexedMap", labels);
+    check(indexed.length === 3 && !(1 in indexed) && indexed[0].index === 0 &&
+      indexed[2].index === 2 && indexed[2].value === label &&
+      indexed[0].source === labels && indexed[2].source === labels,
+    "ternary Lean callback receives the exact native index, source and value");
+    const nestedText = ["native", null];
+    const primitives = runtime.call("ProofWidgetsJsxSubset.nativePrimitiveChildren",
+      null, undefined, false, -0, 7n, nestedText);
+    const primitiveChildren = primitives.props.children;
+    check(primitiveChildren[0] === null && primitiveChildren[1] === undefined &&
+      primitiveChildren[2] === false && Object.is(primitiveChildren[3], -0) &&
+      primitiveChildren[4] === 7n && primitiveChildren[5] === nestedText,
+    "JSX preserves empty values, booleans, numbers, bigints and nested native arrays");
+    trace.length = 0;
+    traceConstruction = true;
+    const literals = runtime.call("ProofWidgetsJsxSubset.nativeLiteralConstruction");
+    traceConstruction = false;
+    check(literals.props.title === "native" && literals.props["data-props"].title === "native" &&
+      literals.props["data-props"].values.join(",") === "a,b" &&
+      trace.join(",") === "title,values,title,data-props,element:span",
+    "one literal lowering rule preserves ordered object, array and JSX construction through parentheses");
     const arrayContainer = document.createElement("div");
     fixtures.append(arrayContainer);
     const arrayRoot = createRoot(arrayContainer);
     try {
+      await React.act(async () => arrayRoot.render(primitives));
+      check(arrayContainer.textContent === "07native",
+        "official React renders native primitive/empty children without VIR formatting");
+      const present = runtime.call("ProofWidgetsJsxSubset.nativePrimitiveChildren",
+        body, undefined, true, 2, 3n, nestedText);
+      check(present.props.children[0] === body, "nullable child widening preserves the present node");
       await React.act(async () => arrayRoot.render(runtime.call(
         "ProofWidgetsJsxSubset.nativeMappedChildren", ["a", "b"])));
       const firstSpan = arrayContainer.querySelector("span");

@@ -22,6 +22,8 @@ test("typed collection providers preserve native values, identity and index abse
   assert.equal(bindings["js.tuple2.first"](tuple), item);
   assert.equal(bindings["js.tuple2.second"](tuple), callback);
   assert.deepEqual(tuple, [item, callback]);
+  const ternary = (value, index, source) => [value, index, source];
+  assert.equal(bindings["js.value.function.ternary"](ternary), ternary);
 });
 
 test("Array.map provider delegates directly to the native callback and result semantics", () => {
