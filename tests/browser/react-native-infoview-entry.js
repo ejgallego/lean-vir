@@ -43,8 +43,18 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const previousTitle = document.title;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  const containers = [];
+  // The full page suite leaves an older Tamagotchi mounted and toggled to pet.
+  const peer = document.createElement("div");
+  peer.id = "native-peer-pet";
+  const fixtures = document.createElement("div");
+  document.body.append(peer, fixtures);
+  const query = selector => fixtures.querySelector(selector);
   try {
+    await React.act(async () => check(runtime.call("ReactTamagotchi.mount", `#${peer.id}`),
+      "peer Tamagotchi mounts"));
+    await React.act(async () => peer.querySelector("#react-pet-art-toggle").click());
+    check(peer.querySelector("#react-pet-device").dataset.art === "pet",
+      "peer has different state before the authoring probe");
     const component = props => props.children;
     const payload = { color: "red" };
     const label = "native JSX value \ud800"; // A lone surrogate must not round-trip through UTF-8.
@@ -96,13 +106,12 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
       const container = document.createElement("div");
       container.id = id;
-      document.body.append(container);
-      containers.push(container);
+      fixtures.append(container);
       await React.act(async () => check(runtime.call(entry, `#${id}`), `${entry} mounts`));
     }
-    check(containers[0].querySelectorAll(".pw-html-stat").length === 3,
+    check(query("#native-html").querySelectorAll(".pw-html-stat").length === 3,
       "explicit Lean data fields must survive native React props copying");
-    const jsx = containers[1];
+    const jsx = query("#native-jsx");
     check(jsx.querySelector(".pw-jsx-card-title").textContent === "JSX-shaped combinators",
       "typed JSX props reach the native component");
     check(jsx.querySelectorAll(".pw-jsx-row").length === 3,
@@ -120,46 +129,44 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     ]) {
       const container = document.createElement("div");
       container.id = id;
-      document.body.append(container);
-      containers.push(container);
+      fixtures.append(container);
       await React.act(async () => check(runtime.call(entry, `#${id}`), `${entry} mounts`));
     }
-    const input = document.querySelector("#react-name-input");
+    const input = query("#react-name-input");
     await React.act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "Ada");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    check(input.value === "Ada" && document.querySelector("#react-name-output").textContent === "Ada",
+    check(input.value === "Ada" && query("#react-name-output").textContent === "Ada",
       "input state remains native through event, props and text");
-    await React.act(async () => document.querySelector("#react-checkbox-input").click());
-    check(document.querySelector("#react-checkbox-output").textContent === "checked:true",
+    await React.act(async () => query("#react-checkbox-input").click());
+    check(query("#react-checkbox-output").textContent === "checked:true",
       "native boolean props and callbacks survive rerendering");
-    const select = document.querySelector("#react-flavor-select");
+    const select = query("#react-flavor-select");
     await React.act(async () => {
       select.value = "chocolate";
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    check(document.querySelector("#react-select-textarea-output").textContent === "note:draft; flavor:chocolate",
+    check(query("#react-select-textarea-output").textContent === "note:draft; flavor:chocolate",
       "native select values retain existing Lean formatting");
-    const attributes = document.querySelector("#react-attributes-widget");
+    const attributes = query("#react-attributes-widget");
     check(attributes.style.color === "rgb(1, 2, 3)" && attributes.style.marginTop === "4px" &&
       attributes.tabIndex === 3 && attributes.dataset.case === "attributes",
     "native style, numeric and data attributes preserve values");
-    const pet = document.querySelector("#react-pet-widget");
+    const pet = query("#react-pet-widget");
     check(pet !== null && JSON.stringify([...pet.querySelectorAll(".react-pet-action-button")]
       .map(button => button.id)) === JSON.stringify(["feed", "play", "nap", "wake", "ignore"]
       .map(action => `react-pet-action-${action}`)),
       "Tamagotchi retains its native action tree");
-    check(document.querySelector("#react-pet-device").dataset.art === "octopus",
+    check(query("#react-pet-device").dataset.art === "octopus",
       "Tamagotchi retains its initial artwork");
     for (const artwork of ["pet", "octopus"]) {
-      await React.act(async () => document.querySelector("#react-pet-art-toggle").click());
-      check(document.querySelector("#react-pet-device").dataset.art === artwork,
-        `Tamagotchi artwork should be ${artwork}, got ${document.querySelector("#react-pet-device").dataset.art}`);
+      await React.act(async () => query("#react-pet-art-toggle").click());
+      check(query("#react-pet-device").dataset.art === artwork,
+        `Tamagotchi artwork should be ${artwork}, got ${query("#react-pet-device").dataset.art}`);
     }
     const helloContainer = document.createElement("div");
-    document.body.append(helloContainer);
-    containers.push(helloContainer);
+    fixtures.append(helloContainer);
     const helloRoot = createRoot(helloContainer);
     try {
       const Hello = runtime.call("ReactProofWidgetHello.createComponent");
@@ -175,11 +182,14 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     } finally {
       await React.act(async () => helloRoot.unmount());
     }
+    check(peer.querySelector("#react-pet-device").dataset.art === "pet",
+      "authoring interactions leave the peer widget unchanged");
     return true;
   } finally {
     try { await React.act(async () => runtime.dispose()); }
     finally {
-      containers.forEach(container => container.remove());
+      fixtures.remove();
+      peer.remove();
       document.title = previousTitle;
       globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
     }
