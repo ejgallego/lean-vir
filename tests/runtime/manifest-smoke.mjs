@@ -489,17 +489,9 @@ assert.equal(
   ),
   false,
 );
-const reactTextImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "react.node.text",
-);
-assert.equal(reactTextImport?.args[0]?.type?.type, "Js");
-const reactElementTypeTagImport =
-  hostRuntime.interfaceManifest.hostImports.find(
-    (entry) => entry.target === "react.elementType.tag",
-  );
-assert.equal(reactElementTypeTagImport?.effect, "react");
-assert.equal(reactElementTypeTagImport?.args[0]?.type?.type, "Js");
-assert.equal(reactElementTypeTagImport?.result?.type, "Js");
+for (const target of ["react.node.text", "react.elementType.tag"]) {
+  assert.equal(hostImportTarget(target), undefined);
+}
 const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
   (entry) => entry.target === "react.node.createElement",
 );

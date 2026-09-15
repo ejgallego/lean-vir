@@ -129,9 +129,9 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     require(parameters.length === 2, "each tuple position needs its own parameter");
     const [first, second] = parameters;
     checkSignature([{
-      lean: `Lean.Vir.Js.Tuple2 (Lean.Vir.Js ${first}) (Lean.Vir.Js ${second})`,
+      lean: `Lean.Vir.Js.Tuple2 ${first} ${second}`,
       representation: "js-resource",
-      resourceInner: `Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js ${first}) (Lean.Vir.Js ${second})`,
+      resourceInner: `Lean.Vir.Js.Tuple2.Value ${first} ${second}`,
     }], jsType(parameters[tuplePosition]));
     return;
   }

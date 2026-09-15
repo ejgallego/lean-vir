@@ -156,7 +156,11 @@
           "module": "fixtures.ProofWidgetsJsxSubset",
           "roots": [
             "ProofWidgetsJsxSubset.mount",
-            "ProofWidgetsJsxSubset.mountDefault"
+            "ProofWidgetsJsxSubset.mountDefault",
+            "ProofWidgetsJsxSubset.nativeConstruction",
+            "ProofWidgetsJsxSubset.nativeTypedConstruction",
+            "ProofWidgetsJsxSubset.nativeTypedLabel",
+            "ProofWidgetsJsxSubset.nativeStringLength"
           ]
         },
         {

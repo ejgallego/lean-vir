@@ -11,12 +11,27 @@ import all Vir.React.Generated
 
 /-!
 Native React operations and small compositions over exact JavaScript values.
-Lean HTML/props authoring helpers live in `Vir.React.Builders`.
+Native JSX notation lives in `Vir.ProofWidgets.Jsx`.
 -/
 
 public section
 
 namespace Lean.Vir.React
+
+namespace ElementType
+
+section
+set_option backward.privateInPublic true
+
+@[inline] private unsafe def tagImpl (tag : @& Lean.Vir.Js String) :
+    ReactM (Lean.Vir.Js ElementType) := pure (unsafeCast tag)
+
+/-- Views the exact native string as an element type, without a host call. -/
+@[implemented_by tagImpl]
+axiom tag (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType)
+
+end
+end ElementType
 
 /-- Creates a native function component from a Lean render callback. -/
 def FunctionComponent.ofLean
@@ -26,6 +41,18 @@ def FunctionComponent.ofLean
   exact Lean.Vir.Js.Function.ofLean render
 
 namespace Node
+
+section
+set_option backward.privateInPublic true
+
+@[inline] private unsafe def textImpl (value : @& Lean.Vir.Js String) :
+    ReactM (Lean.Vir.Js Node) := pure (unsafeCast value)
+
+/-- Views the exact native string as a text node, without a host call. -/
+@[implemented_by textImpl]
+axiom text (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node)
+
+end
 
 @[inline] private unsafe def componentPropsImpl {α : Type}
     (props : Lean.Vir.Js α) : Lean.Vir.Js Props := unsafeCast props
@@ -68,18 +95,18 @@ end ReducerDispatch
 namespace StateTuple
 
 def value {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    (result : @& Lean.Vir.Js (StateTuple α)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js α) :=
   Lean.Vir.Js.Tuple2.first result
 
 def setter {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    (result : @& Lean.Vir.Js (StateTuple α)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js (StateSetter (Lean.Vir.Js α))) :=
   Lean.Vir.Js.Tuple2.second result
 
 /-- Explicitly projects React's native `useState` result array into a Lean structure. -/
 def toState {α : Type}
-    (result : @& Lean.Vir.Js (StateTuple (Lean.Vir.Js α))) :
+    (result : @& Lean.Vir.Js (StateTuple α)) :
     Lean.Vir.RuntimeM (State (Lean.Vir.Js α)) := do
   let value ← StateTuple.value result
   let setter ← StateTuple.setter result

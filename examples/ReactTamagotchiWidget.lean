@@ -9,6 +9,7 @@ module
 public import Vir.Infoview
 public import Vir.Examples.Style
 public import Vir.Examples.Tamagotchi
+public import Vir.ProofWidgets.Jsx
 
 public section
 
@@ -17,43 +18,36 @@ namespace ReactTamagotchiWidget
 open Lean.Vir
 open Lean.Vir.React
 open Lean.Vir.Infoview
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
-abbrev style := Lean.Vir.Examples.Style.style
+def shellStyle : RuntimeM Js.Object := js%{
+  "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0")
+}
 
-def shellStyle : Props.Entry := style #[
-  ("display", "grid"),
-  ("gap", "10px"),
-  ("minWidth", "0")
-]
-
-def captionStyle : Props.Entry := style #[
-  ("margin", "0"),
-  ("color", "var(--vscode-descriptionForeground, #57606a)"),
-  ("fontSize", "0.78rem"),
-  ("fontWeight", "700"),
-  ("overflowWrap", "anywhere")
-]
+def captionStyle : RuntimeM Js.Object := js%{
+  "margin" := (← js#"0"), "color" := (← js#"var(--vscode-descriptionForeground, #57606a)"),
+  "fontSize" := (← js#"0.78rem"), "fontWeight" := (← js#"700"), "overflowWrap" := (← js#"anywhere")
+}
 
 def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
   let petComponent ← ReactTamagotchi.View
   FunctionComponent.ofLean fun props => do
     let position ← PanelWidgetProps.pos props
     let uri ← JsValue.toString (← PanelPosition.uri position)
-    let caption ← Node.pTextWith
-      #[
-        Props.id "react-tamagotchi-widget-caption",
-        captionStyle
-      ]
-      ("Shared React Tamagotchi component at " ++ uri)
-    let pet ← Node.functionComponent petComponent (← Props.empty) (← Js.Array.empty)
-    Node.sectionWith
-      #[
-        Props.id "react-tamagotchi-proof-widget",
-        Props.role "region",
-        Props.ariaLabel "Lean React Tamagotchi proof widget",
-        shellStyle
-      ]
-      #[caption, pet]
+    let captionText ← Node.text (← JsValue.ofString ("Shared React Tamagotchi component at " ++ uri))
+    let captionProps ← js%{
+      "id" := (← js#"react-tamagotchi-widget-caption"),
+      "style" := (← captionStyle)
+    }
+    let caption ← <p @props={captionProps}>{pure captionText}</p>
+    let pet ← Node.functionComponent petComponent (← Js.Object.empty) (← Js.Array.empty)
+    let shellProps ← js%{
+      "id" := (← js#"react-tamagotchi-proof-widget"),
+      "role" := (← js#"region"),
+      "aria-label" := (← js#"Lean React Tamagotchi proof widget"),
+      "style" := (← shellStyle)
+    }
+    return ← <section @props={shellProps}>{pure caption}{pure pet}</section>
 
 vir_proof_widget View
 

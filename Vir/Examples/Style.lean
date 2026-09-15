@@ -6,16 +6,11 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.React
+public import Vir.Js
 
 public section
 
 namespace Lean.Vir.Examples.Style
-
-open Lean.Vir.React
-
-def style (entries : Array (String × String)) : Props.Entry :=
-  Props.stylePairs entries
 
 def vscodeColor (name fallback : String) : String :=
   "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"

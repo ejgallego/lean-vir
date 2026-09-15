@@ -96,8 +96,10 @@ build_module Vir/Browser.lean
 build_module Vir/React/Types.lean
 build_module Vir/React/Generated.lean
 build_module Vir/React/Core.lean
-build_module Vir/React/Builders.lean
 build_module Vir/React.lean
+build_module Vir/ProofWidgets/Html.lean
+build_module Vir/ProofWidgets/Jsx.lean
+build_module Vir/ProofWidgets.lean
 build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
@@ -110,9 +112,6 @@ build_module Vir/GeneratePackage/Manifest/Encode.lean
 build_module Vir/GeneratePackage/Emit.lean
 build_module Vir/GeneratePackage/Report.lean
 build_module Vir/GeneratePackage/Run.lean
-build_module Vir/ProofWidgets/Html.lean
-build_module Vir/ProofWidgets/Jsx.lean
-build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean
 build_module Vir.lean
 

@@ -194,7 +194,7 @@
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α))", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple (Lean.Vir.Js α)" } }
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple α" } }
       },
       {
         "id": "react.hooks.use-ref", "group": "hooks", "target": "react.useRef",
@@ -262,24 +262,6 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
-        "id": "react.element-type.tag", "group": "element-type", "target": "react.elementType.tag",
-        "lean": "Lean.Vir.React.ElementType.tag", "marker": "vir_js",
-        "reason": "Uses the exact DOM tag string as a React ElementType value.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [{ "name": "tag", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.ElementType", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ElementType" } }
-      },
-      {
-        "id": "react.node.text", "group": "nodes", "target": "react.node.text",
-        "lean": "Lean.Vir.React.Node.text", "marker": "vir_js",
-        "reason": "Uses the exact JavaScript string as a React text node.",
-        "upstreamRelation": { "kind": "vir-owned" },
-        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [{ "name": "value", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }],
-        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
-      },
-      {
         "id": "react.node.create-element", "group": "nodes", "target": "react.node.createElement",
         "lean": "Lean.Vir.React.Node.createElement", "marker": "vir_js",
         "reason": "Calls React.createElement with the exact ElementType, props object, and child array values.",
@@ -315,18 +297,11 @@
       "upstream": { "kind": "internal" }
     },
     {
-      "id": "element-type",
-      "title": "Element types",
-      "targets": ["react.elementType.*"],
-      "lean": { "public": ["Lean.Vir.React.ElementType"] },
-      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ElementType"] }
-    },
-    {
       "id": "nodes",
       "title": "React nodes",
       "targets": ["react.node.*", "react.props.withData.*"],
-      "lean": { "public": ["Lean.Vir.React.Node"] },
-      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ReactNode", "React.createElement"] }
+      "lean": { "public": ["Lean.Vir.React.Node", "Lean.Vir.React.ElementType"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.ReactNode", "React.ElementType", "React.createElement"] }
     },
     {
       "id": "references",

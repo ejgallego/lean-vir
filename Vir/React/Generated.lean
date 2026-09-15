@@ -56,26 +56,6 @@ opaque ofLean
 
 end React.EffectCallback
 
-namespace React.ElementType
-
-/--
-Generated binding for reviewed VIR protocol `react.element-type.tag`.
-
-Uses the exact DOM tag string as a React ElementType value.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; tag js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.elementType.tag"]
-opaque tag
-    (tag : @& Lean.Vir.Js String) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)
-
-end React.ElementType
-
 namespace React.Hooks
 
 /--
@@ -143,7 +123,7 @@ This declaration is generated; edit the binding configuration.
 opaque useState
     {α : Type}
     (initial : @& Lean.Vir.Js α) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple (Lean.Vir.Js α)))
+    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
 
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-ref`.
@@ -239,22 +219,6 @@ opaque ofLean
 end React.MemoCalculation
 
 namespace React.Node
-
-/--
-Generated binding for reviewed VIR protocol `react.node.text`.
-
-Uses the exact JavaScript string as a React text node.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.node.text"]
-opaque text
-    (value : @& Lean.Vir.Js String) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
 Generated binding for reviewed VIR protocol `react.node.create-element`.

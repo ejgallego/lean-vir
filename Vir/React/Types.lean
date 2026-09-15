@@ -73,11 +73,11 @@ abbrev ReducerDispatch (_state action : Type) : Type :=
 
 /-- Exact JavaScript array returned by `React.useState`. -/
 abbrev StateTuple (α : Type) : Type :=
-  Lean.Vir.Js.Tuple2.Value α (Lean.Vir.Js (StateSetter α))
+  Lean.Vir.Js.Tuple2.Value α (StateSetter (Lean.Vir.Js α))
 
 /-- Exact JavaScript array returned by `React.useReducer`. -/
 abbrev ReducerTuple (state action : Type) : Type :=
-  Lean.Vir.Js.Tuple2.Value (Lean.Vir.Js state) (Lean.Vir.Js (ReducerDispatch state action))
+  Lean.Vir.Js.Tuple2.Value state (ReducerDispatch state action)
 
 /-- Native JavaScript calculation function accepted by `React.useMemo`. -/
 opaque MemoCalculation (α : Type) : Type
@@ -104,30 +104,6 @@ opaque Ref (α : Type) : Type
 abbrev Props : Type :=
   Lean.Vir.Js.Object.Value
 
-/-- A single React `style` object entry. Use camelCase property names. -/
-structure StyleProperty where
-  name : String
-  value : String
-
-/-- Conservative set of React property values supported by the host protocol. -/
-inductive PropValue where
-  | string (value : String)
-  | bool (value : Bool)
-  | int (value : Int)
-  | float (value : Float)
-  | style (entries : Array StyleProperty)
-  | classList (classes : Array String)
-
-/-- A non-event React property. -/
-structure Property where
-  name : String
-  value : PropValue
-
-/-- A DOM-like React event handler containing an ordinary Lean-backed JavaScript callback. -/
-structure EventHandler where
-  name : String
-  callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
-
 namespace Props
 
 /-- Native React props carrying one explicitly named Lean-backed `data` field. -/
@@ -140,15 +116,6 @@ opaque WithData (α : Type) : Type
 @[implemented_by withDataAsPropsImpl]
 axiom WithData.asProps {α : Type}
     (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props
-
-/-- One public React props entry. -/
-inductive Entry where
-  | key (value : String)
-  | ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α)))
-  | property (value : Property)
-  | eventHandler (value : EventHandler)
-  /-- An explicitly named exact JavaScript property value. -/
-  | raw {α : Type} (name : String) (value : Lean.Vir.Js α)
 
 end Props
 

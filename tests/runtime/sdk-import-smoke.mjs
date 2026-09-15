@@ -164,7 +164,8 @@ try {
     typeof reactHostBindings.createBrowserReactHostBindings,
     "function",
   );
-  assert.equal(typeof bindings["react.node.text"], "function");
+  assert.equal(Object.hasOwn(bindings, "react.node.text"), false);
+  assert.equal(Object.hasOwn(bindings, "react.elementType.tag"), false);
   assert.equal(typeof bindings["react.node.createElement"], "function");
   assert.equal(typeof bindings["react.props.withData.make"], "function");
   assert.equal(typeof bindings["js.value.react.effectCallback"], "function");

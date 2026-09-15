@@ -11,8 +11,6 @@ import { createReactRootHostBindings } from "./react/vir-react-root.js";
 export function createBrowserReactHostBindings(lifecycle) {
   return {
     ...createReactRootHostBindings(lifecycle, ReactDOMClient.createRoot),
-    "react.node.text": (value) => value,
-    "react.elementType.tag": (tag) => tag,
     "react.node.createElement": (elementType, props, children) =>
       React.createElement(elementType, props, ...children),
     "react.props.withData.make": (data) => ({ data }),

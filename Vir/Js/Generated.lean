@@ -465,6 +465,22 @@ end Js.Promise
 namespace Js.String
 
 /--
+Generated binding for reviewed VIR protocol `javascript.string.length`.
+
+Reads native String.length as a JavaScript number of UTF-16 code units, without decoding the string or counting Unicode code points.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.length"]
+opaque length
+    (value : @& Lean.Vir.Js String) :
+    RuntimeM (Lean.Vir.Js Float)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.string.from-any`.
 
 Checks for a primitive JavaScript string and returns that exact value. Throws TypeError for undefined, null, boxed strings and every other kind before typed use; never coerces or calls user conversion methods.
@@ -499,7 +515,7 @@ This declaration is generated; edit the binding configuration.
 opaque first
     {α : Type}
     {β : Type}
-    (tuple : @& Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    (tuple : @& Lean.Vir.Js.Tuple2 α β) :
     RuntimeM (Lean.Vir.Js α)
 
 /--
@@ -517,7 +533,7 @@ This declaration is generated; edit the binding configuration.
 opaque second
     {α : Type}
     {β : Type}
-    (tuple : @& Lean.Vir.Js.Tuple2 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    (tuple : @& Lean.Vir.Js.Tuple2 α β) :
     RuntimeM (Lean.Vir.Js β)
 
 end Js.Tuple2
