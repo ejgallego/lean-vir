@@ -35,11 +35,12 @@ const operation = (policy, target) => policy.protocolOperations.find((entry) => 
 test("pinned Array<T> produces correlated Lean array signatures", async () => {
   const text = render();
   assert.match(text, /opaque push\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(value : @& Lean\.Vir\.Js α\)/u);
+  assert.match(text, /opaque map\s+\{α : Type\}\s+\{β : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(callback : @& Lean\.Vir\.Js\.Function1 \(Lean\.Vir\.Js α\) \(Lean\.Vir\.Js β\)\) :\s+RuntimeM \(Lean\.Vir\.Js\.Array β\)/u);
   assert.match(text, /opaque get\s+\{α : Type\}\s+\(array : @& Lean\.Vir\.Js\.Array α\)\s+\(index : @& Lean\.Vir\.Js Float\) :\s+RuntimeM \(Lean\.Vir\.Js α\)/u);
   assert.doesNotMatch(text, /getAs/u);
   const shipped = await readFile(new URL("../../Vir/Js/Generated.lean", import.meta.url), "utf8");
-  for (const name of ["push", "get"]) {
-    const declaration = text.match(new RegExp(`opaque ${name}[^]*?RuntimeM \\(Lean\\.Vir\\.Js (?:Float|α)\\)`))[0];
+  for (const name of ["push", "get", "map"]) {
+    const declaration = text.match(new RegExp(`opaque ${name}[^]*?RuntimeM \\(Lean\\.Vir\\.Js(?:\\.Array)? (?:Float|α|β)\\)`))[0];
     assert.ok(shipped.includes(declaration), `${name}: shipped Lean signature must be the validated translation`);
   }
 });
@@ -54,6 +55,10 @@ for (const [label, target, mutate] of [
   ["extra push arity", "js.array.push", (op) => { op.arguments.push(structuredClone(op.arguments[1])); }],
   ["unrelated constructor result", "js.array.empty", (op) => { op.result.type.lean = "Lean.Vir.Js.Array β"; }],
   ["redundant element resource wrapper", "js.array.push", (op) => { op.arguments[0].type.lean = "Lean.Vir.Js.Array (Lean.Vir.Js α)"; }],
+  ["map erased output", "js.array.map", (op) => { op.result.type.lean = "Lean.Vir.Js.Array Lean.Vir.Js.Any"; }],
+  ["map unrelated callback input", "js.array.map", (op) => { op.arguments[1].type.lean = "Lean.Vir.Js.Function1 (Lean.Vir.Js β) (Lean.Vir.Js β)"; }],
+  ["map unrelated callback result", "js.array.map", (op) => { op.arguments[1].type.resourceInner = "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js γ)"; }],
+  ["map extra thisArg", "js.array.map", (op) => { op.arguments.push(structuredClone(op.arguments[0])); }],
 ]) {
   test(`array fidelity rejects ${label}, even when marked preserving`, () => {
     const policy = structuredClone(generation);
@@ -86,6 +91,9 @@ test("the relationship follows the upstream binder, not its spelling", () => {
   array.typeParameters[0].name = "Item";
   array.indexSignatures[0].result.id = "Item";
   upstream.symbols.find((entry) => entry.id === "Array.push").shape.args[0].type.element.id = "Item";
+  const mapCallback = upstream.symbols.find((entry) => entry.id === "Array.map").shape.args[0].type;
+  mapCallback.args[0].type.id = "Item";
+  mapCallback.args[2].type.element.id = "Item";
   assert.equal(render(generation, upstream), render());
 });
 
@@ -127,6 +135,40 @@ for (const [member, original, replacement, wrapper, code] of [
     }
   });
 }
+
+test("Array.map accepts only the pinned unary-view subset of its full native callback", () => {
+  const text = render();
+  assert.match(text, /Selects the unary callback, no-thisArg subset/u);
+  const upstream = structuredClone(descriptor);
+  const map = upstream.symbols.find((entry) => entry.id === "Array.map");
+  map.shape.args[0].type.args[1].type.name = "string";
+  assert.throws(() => render(generation, upstream), /map<U>\(value: T, index: number/u);
+});
+
+test("source-level Array.map output relationship is independently checked by TypeScript", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lean-vir-array-map-"));
+  try {
+    const path = join(directory, "lib.d.ts");
+    const source = await readFile(new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url), "utf8");
+    const original = "map<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): U[];";
+    const replacement = "map<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): T[];";
+    assert.ok(source.includes(original), "mutation must target the pinned Array.map declaration");
+    const mutated = source.replaceAll(original, replacement);
+    await writeFile(path, mutated);
+    const upstream = await generateDescriptorFile({
+      files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+      symbols: new Set(["Array"]), symbolFiles: [], sourceUrl: null,
+      dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
+    });
+    assert.throws(() => render(generation, upstream), /map<U>\(value: T, index: number/u);
+    const wrapper = "export function map<T, U>(array: Array<T>, callback: (value: T) => U): U[] { return array.map(callback); }";
+    assert.deepEqual(typeScriptDiagnostics(wrapper), []);
+    assert.ok(typeScriptDiagnostics(wrapper, mutated).some((d) => d.code === 2322 && d.file?.text === wrapper),
+      "the independent TS wrapper rejects the mutated map output relationship");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("source-level keyof index results cannot masquerade as the Array element", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lean-vir-array-operator-"));

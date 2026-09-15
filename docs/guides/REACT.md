@@ -24,7 +24,8 @@ def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
       (← Lean.Vir.JsValue.ofString "className")
       (← Lean.Vir.JsValue.ofString "greeting")
     let text ← Lean.Vir.JsValue.ofString s!"Hello, {name}"
-    let children ← Lean.Vir.Js.Array.ofArray #[← Node.text text]
+    let children ← Lean.Vir.Js.Array.empty
+    let _ ← Lean.Vir.Js.Array.push children (← Node.text text)
     let tag ← ElementType.tag (← Lean.Vir.JsValue.ofString "section")
     Node.createElement tag props children
 ```
@@ -47,7 +48,7 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def greeting (name : Js String) : ReactM (Js Node) := do
   let style ← js%{ "color" := js#"red" }
-  return ← <section className="greeting" style={style}>Hello, {Node.text name}</section>
+  return ← <section className="greeting" style={style}>Hello, {name}</section>
 ```
 
 Attributes accept exact JS values; literal strings are converted once. Use
@@ -58,8 +59,8 @@ There are no per-attribute or per-tag helper catalogues.
 In native object fields and JSX attributes, `js#"text"` inserts its conversion
 at that position: `js%{ "title" := js#"Hello" }` and
 `<span title={js#"Hello"}/>` need no extra arrow. Outside these positions it
-remains a `RuntimeM (Js String)` action. Named actions still require explicit
-`←`; construction never automatically executes an arbitrary expression.
+remains a `RuntimeM (Js String)` action. Named property actions still require
+explicit `←`; this shorthand does not execute arbitrary property expressions.
 
 `js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
 `Js.Object.set` assignments in source order (last duplicate wins).
@@ -114,10 +115,27 @@ only that number when Lean control flow needs to test whether the text is empty.
 This differs from counting Lean string characters.
 
 `Html` is a deferred `ReactM (Js Node)`, not a serialized tree. Attributes
-are evaluated before children. Child actions run left-to-right; `{pure node}`
-inserts an existing node and `{...items}` runs an array of child actions
-directly into the native child array. `Html.text` explicitly converts Lean
-text; native strings go straight to `Node.text`. In a `do` block, use
+are evaluated before children. `{node}`, `{text}` and `{nodes}` insert an
+existing `Js Node`, `Js String` or `Js.Array Node` unchanged. A native array
+occupies one child slot; JSX does not flatten it or add a fragment. Existing
+child actions still run left-to-right; `{...items}` runs a Lean array of child
+actions for compatibility. Prefer native mapping when the input is already native:
+
+```lean
+def labels (values : Js.Array String) : ReactM (Js Node) := do
+  let render ← FunctionComponent.ofLean fun (label : Js String) =>
+    <span key={label}>{label}</span>
+  let nodes ← Js.Array.map values render
+  return ← <div>{nodes}</div>
+```
+
+`Js.Array.map` calls native `array.map(callback)` with an explicitly created
+JavaScript function. Its typed surface selects a unary callback and omits
+`thisArg`; the native operation still supplies index/source arguments, skips
+holes and propagates callback exceptions. No Lean array is constructed.
+Keys and component identity follow React's ordinary rules.
+
+`Html.text` explicitly converts Lean text. In a `do` block, use
 `return ← <...>` for a final JSX expression to avoid Lean parsing `<` as comparison.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and

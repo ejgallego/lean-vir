@@ -23,3 +23,36 @@ test("typed collection providers preserve native values, identity and index abse
   assert.equal(bindings["js.tuple2.second"](tuple), callback);
   assert.deepEqual(tuple, [item, callback]);
 });
+
+test("Array.map provider delegates directly to the native callback and result semantics", () => {
+  const map = createJsCollectionHostBindings()["js.array.map"];
+  class Mapped extends Array {}
+  class Source extends Array {
+    static get [Symbol.species]() { return Mapped; }
+  }
+  const source = new Source(2);
+  source[1] = "present";
+  const calls = [];
+  const mapped = map(source, (value, index, callbackSource) => {
+    calls.push([value, index, callbackSource]);
+    callbackSource.push("added after initial length");
+    return `${index}:${value}`;
+  });
+  assert.ok(mapped instanceof Mapped, "native ArraySpeciesCreate chooses the result");
+  assert.equal(mapped.length, 2);
+  assert.equal(0 in mapped, false, "native holes remain holes");
+  assert.equal(mapped[1], "1:present");
+  assert.deepEqual(calls, [["present", 1, source]], "native map supplies index and source and snapshots length");
+
+  const error = new Error("native callback identity");
+  assert.throws(() => map(["value"], () => { throw error; }), (caught) => caught === error);
+  const callback = () => {};
+  const result = [];
+  const receiver = { map(fn) {
+    assert.equal(this, receiver);
+    assert.equal(fn, callback);
+    assert.equal(arguments.length, 1);
+    return result;
+  } };
+  assert.equal(map(receiver, callback), result, "no wrapper changes receiver, callback or result identity");
+});

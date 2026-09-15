@@ -355,6 +355,18 @@
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
       {
+        "id": "javascript.array.map", "group": "array", "target": "js.array.map",
+        "lean": "Lean.Vir.Js.Array.map", "marker": "vir_js",
+        "reason": "Selects the unary callback, no-thisArg subset of Array<T>.map<U>. The declared Js.Function1 receives the element only, while the native Array.map call still supplies its ordinary index and source-array callback arguments. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This is not the complete TypeScript callback or thisArg signature.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.map", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value β" } }
+      },
+      {
         "id": "javascript.array.length", "group": "array", "target": "js.array.length",
         "lean": "Lean.Vir.Js.Array.length", "marker": "vir_js",
         "reason": "Returns the exact native JavaScript Number stored in Array.length.",

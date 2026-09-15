@@ -22,6 +22,14 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   });
   const trace = [];
   let traceConstruction = false;
+  let mapElementProbe = null;
+  let lastMap;
+  const map = hostBindings["js.array.map"];
+  hostBindings["js.array.map"] = (array, callback) => {
+    const result = map(array, callback);
+    lastMap = { array, result };
+    return result;
+  };
   const setProperty = hostBindings["js.object.set"];
   hostBindings["js.object.set"] = (object, name, value) => {
     if (traceConstruction) trace.push(name);
@@ -32,6 +40,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   "native text and tag views need no host providers");
   const createElement = hostBindings["react.node.createElement"];
   hostBindings["react.node.createElement"] = (type, props, children) => {
+    mapElementProbe?.(type, props);
     if (traceConstruction) trace.push(typeof type === "string" ? `element:${type}` : "element:component");
     return createElement(type, props, children);
   };
@@ -102,6 +111,65 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     check(runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "") === 0 &&
       runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "😀") === 2,
     "native string length is UTF-16 length, not decoded Lean character count");
+    const body = React.createElement("b", null, "body");
+    const tail = React.createElement("i", null, "tail");
+    const nested = [React.createElement("span", { key: "nested" }, "nested")];
+    const slots = runtime.call("ProofWidgetsJsxSubset.nativeChildSlots", body, label, nested, tail);
+    check(slots.props.children[0] === body && slots.props.children[1] === label &&
+      slots.props.children[2] === nested && slots.props.children[3] === tail && nested.length === 1,
+    "native JSX inserts exact child values without flattening, copying or UTF-8 conversion");
+    const labels = ["first", , label];
+    const mapped = runtime.call("ProofWidgetsJsxSubset.nativeMappedChildren", labels);
+    check(lastMap.array === labels && lastMap.result === mapped.props.children &&
+      Array.isArray(mapped.props.children) && mapped.props.children.length === 3 &&
+      !(1 in mapped.props.children) && labels.length === 3 && !(1 in labels) &&
+      mapped.props.children[0].key === "first" && mapped.props.children[2].key === label &&
+      mapped.props.children[2].props.children === label,
+    "native map enters the Lean callback and preserves holes, keys, strings and the input array");
+    const mapFailure = new Error("mapped element failed");
+    const visited = [];
+    // Host bindings are installed at runtime creation; the existing spy reads this switch.
+    mapElementProbe = (type, props) => {
+      if (type !== "span") return;
+      visited.push(props.key);
+      if (props.key === "fail") throw mapFailure;
+    };
+    thrown = undefined;
+    try {
+      runtime.call("ProofWidgetsJsxSubset.nativeMappedChildren", ["before", "fail", "after"]);
+    } catch (error) { thrown = error; }
+    finally { mapElementProbe = null; }
+    check(thrown === mapFailure && visited.join(",") === "before,fail",
+      "mapped Lean callback preserves the original error and stops subsequent elements");
+    const arrayContainer = document.createElement("div");
+    fixtures.append(arrayContainer);
+    const arrayRoot = createRoot(arrayContainer);
+    try {
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeMappedChildren", ["a", "b"])));
+      const firstSpan = arrayContainer.querySelector("span");
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeMappedChildren", ["b", "a"])));
+      check(arrayContainer.querySelectorAll("span")[1] === firstSpan,
+        "keys from native map preserve DOM identity across reordering");
+      let mounts = 0;
+      function Stateful({ name }) {
+        const [identity] = React.useState(() => ++mounts);
+        return React.createElement("span", { "data-name": name }, identity);
+      }
+      const children = names => names.map(name => React.createElement(Stateful, { key: name, name }));
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeChildSlots", body, "", children(["a", "b"]), null)));
+      const a = arrayContainer.querySelector('[data-name="a"]');
+      const identity = a.textContent;
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeChildSlots", body, "", children(["b", "a"]), tail)));
+      check(mounts === 2 && arrayContainer.querySelector('[data-name="a"]') === a &&
+        a.textContent === identity,
+      "stable native array and optional sibling slots preserve keyed component state");
+    } finally {
+      await React.act(async () => arrayRoot.unmount());
+    }
     for (const [entry, id] of [["ProofWidgetsHtml.mount", "native-html"],
       ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
       const container = document.createElement("div");

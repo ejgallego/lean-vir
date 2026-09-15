@@ -213,4 +213,16 @@ def nativeTypedLabel (props : Js NativeProps) : RuntimeM (Js String) :=
 def nativeStringLength (value : Js String) : RuntimeM (Js Float) :=
   Js.String.length value
 
+/-- Existing native arrays occupy one child slot, without fragments or flattening. -/
+def nativeChildSlots (body : Js Node) (text : Js String)
+    (nodes : Js.Array Node) (tail : Js Node) : Html :=
+  <div>{body}{text}{nodes}{tail}</div>
+
+/-- Native map calls a Lean-authored JS function; no Lean child array is built. -/
+def nativeMappedChildren (labels : Js.Array String) : Html := do
+  let render ← FunctionComponent.ofLean fun (label : Js String) =>
+    <span key={label}>{label}</span>
+  let nodes ← Js.Array.map labels render
+  return ← <div>{nodes}</div>
+
 end ProofWidgetsJsxSubset

@@ -51,6 +51,25 @@ opaque push
     RuntimeM (Lean.Vir.Js Float)
 
 /--
+Generated binding for reviewed VIR protocol `javascript.array.map`.
+
+Selects the unary callback, no-thisArg subset of Array<T>.map<U>. The declared Js.Function1 receives the element only, while the native Array.map call still supplies its ordinary index and source-array callback arguments. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This is not the complete TypeScript callback or thisArg signature.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.map"]
+opaque map
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Array β)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.array.length`.
 
 Returns the exact native JavaScript Number stored in Array.length.

@@ -56,6 +56,26 @@ example (text : Js String) : RuntimeM (Js Float) := Js.String.length text
 example (value : Js String) : React.ReactM (Js React.Node) :=
   <span title={value}>{React.Node.text value}</span>
 
+-- Native children are inserted unchanged, not converted to Lean collections.
+example (node : Js React.Node) (text : Js String) (nodes : Js.Array React.Node) :
+    React.ReactM (Js React.Node) := <div>{node}{text}{nodes}</div>
+
+example (node : Js React.Node) :
+    (<div>{node}</div> : React.ReactM (Js React.Node)) = <div>{pure node}</div> := rfl
+
+example (text : Js String) :
+    (<div>{text}</div> : React.ReactM (Js React.Node)) = <div>{React.Node.text text}</div> := rfl
+
+example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
+  <div>{action}</div>
+
+example (_raw : Js.Object) (_nodes : Array (Js React.Node))
+    (_actions : Js.Array (RuntimeM (Js React.Node))) : True := by
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_raw}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_nodes}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_actions}</div>
+  trivial
+
 #guard_msgs in
 example (Component : React.FunctionComponent (React.Props.WithData String))
     (props : Js (React.Props.WithData String)) : React.ReactM (Js React.Node) :=

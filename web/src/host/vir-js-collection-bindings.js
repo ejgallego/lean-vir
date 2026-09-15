@@ -29,6 +29,7 @@ export function createJsCollectionHostBindings() {
     "js.promise.catchValue": (promise, onRejected) => promise.catch(onRejected),
     "js.array.empty": () => [],
     "js.array.push": (array, value) => array.push(value),
+    "js.array.map": (array, callback) => array.map(callback),
     "js.array.length": (array) => array.length,
     "js.array.item": (array, index) => array[index],
     "js.tuple2.first": (tuple) => tuple[0],

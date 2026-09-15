@@ -39,7 +39,7 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
       "id" := js#"react-tamagotchi-widget-caption",
       "style" := (← captionStyle)
     }
-    let caption ← <p @props={captionProps}>{pure captionText}</p>
+    let caption ← <p @props={captionProps}>{captionText}</p>
     let pet ← Node.functionComponent petComponent (← Js.Object.empty) (← Js.Array.empty)
     let shellProps ← js%{
       "id" := js#"react-tamagotchi-proof-widget",
@@ -47,7 +47,7 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
       "aria-label" := js#"Lean React Tamagotchi proof widget",
       "style" := (← shellStyle)
     }
-    return ← <section @props={shellProps}>{pure caption}{pure pet}</section>
+    return ← <section @props={shellProps}>{caption}{pet}</section>
 
 vir_proof_widget View
 

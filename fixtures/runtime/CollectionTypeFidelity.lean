@@ -26,6 +26,10 @@ def sameElement {α : Type} (value : Js α) (index : Js Float) : RuntimeM (Js α
 def sameJSL {α : Type} (value : JSL α) (index : Js Float) : RuntimeM (JSL α) :=
   sameElement value index
 
+def mapElement {α β : Type} (array : Js.Array α)
+    (callback : Js.Function1 (Js α) (Js β)) : RuntimeM (Js.Array β) :=
+  Js.Array.map array callback
+
 def sameNodeListElement {α : Type} (list : Js.NodeList (Js α)) : RuntimeM (Js.Array α) :=
   Js.NodeList.toArray list
 
@@ -95,6 +99,15 @@ example {α β : Type} (array : Js.Array α) (index : Js Float) : True := by
 example {α β : Type} (array : Js.Array α) (value : Js β) : True := by
   fail_if_success
     have wrong : RuntimeM (Js Float) := Js.Array.push array value
+  trivial
+
+example {α β γ : Type} (array : Js.Array α)
+    (callback : Js.Function1 (Js α) (Js β)) : True := by
+  fail_if_success
+    have wrongResult : RuntimeM (Js.Array γ) := Js.Array.map array callback
+  fail_if_success
+    have wrongInput : RuntimeM (Js.Array β) :=
+      Js.Array.map array (show Js.Function1 (Js γ) (Js β) from callback)
   trivial
 
 example (array : Js.Array (LeanRef.Handle String)) (index : Js Float) : True := by

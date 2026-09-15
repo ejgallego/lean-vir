@@ -59,6 +59,15 @@ called exactly once and its exception behavior is unchanged.
 private axiom sealDeclaredField {α : Type}
     (value : Lean.Vir.Js.Any) : Lean.Vir.Js α
 
+/-- React accepts the exact native array as a node; no traversal or fragment is added. -/
+@[inline] private unsafe def arrayNodeImpl
+    (value : Lean.Vir.Js.Array Lean.Vir.React.Node) : Lean.Vir.Js Lean.Vir.React.Node :=
+  unsafeCast value
+
+@[implemented_by arrayNodeImpl]
+private axiom arrayNode
+    (value : Lean.Vir.Js.Array Lean.Vir.React.Node) : Lean.Vir.Js Lean.Vir.React.Node
+
 end
 
 -- Verbose names avoid collisions with other packages' unscoped parser categories.
@@ -133,11 +142,37 @@ scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* ">" virProofWidg
 scoped syntax jsxText : virProofWidgetsJsxChild
 /-- Interpolates an array of HTML values into JSX children. -/
 scoped syntax "{..." term "}" : virProofWidgetsJsxChild
-/-- Interpolates one HTML value into JSX children. -/
+/-- Inserts a native node, string or node array, or executes one HTML action. -/
 scoped syntax "{" term "}" : virProofWidgetsJsxChild
 scoped syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
 
 scoped syntax:max virProofWidgetsJsxElement : term
+
+-- Internal elaboration node: only JSX interpolation inserts this syntax.
+syntax (name := nativeChild) "vir_native_child% " term : term
+
+elab_rules : term
+  | `(vir_native_child% $child) => do
+    let value ← Lean.Elab.Term.elabTerm child none
+    let type ← Lean.Meta.whnf (← Lean.Meta.inferType value)
+    let valueSyntax ← Lean.Elab.Term.exprToSyntax value
+    let node := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) (Lean.mkConst ``Lean.Vir.React.Node)
+    let action := Lean.mkApp (Lean.mkConst ``Lean.Vir.React.ReactM) node
+    let lowered ← if type.isAppOfArity ``Lean.Vir.Js 1 then do
+        let shape ← Lean.Meta.whnf type.appArg!
+        if shape.isConstOf ``Lean.Vir.React.Node then
+          Lean.Elab.liftMacroM `(pure $valueSyntax)
+        else if shape.isConstOf ``String then
+          Lean.Elab.liftMacroM `(Lean.Vir.React.Node.text $valueSyntax)
+        else if shape.isAppOfArity ``Lean.Vir.Js.Array.Value 1 then
+          unless (← Lean.Meta.whnf shape.appArg!).isConstOf ``Lean.Vir.React.Node do
+            throwErrorAt child "JSX native array children must have Node elements"
+          Lean.Elab.liftMacroM `(pure ($(mkCIdent ``arrayNode) $valueSyntax))
+        else
+          throwErrorAt child "JSX expects a native Node, String or Array Node, or a node construction action"
+      else
+        Lean.Elab.liftMacroM `(do return ← ($valueSyntax))
+    Lean.Elab.Term.elabTermEnsuringType lowered action
 
 private meta def trailingWhitespace (stx : Syntax) : String :=
   if let .original _ _ trailing _ := stx.getTailInfo then
@@ -212,7 +247,7 @@ private meta def transformTag
         `(Lean.Vir.React.Node.text (← Lean.Vir.JsValue.ofString $(quote value)))
       | `(virProofWidgetsJsxChild| { $term }%$childToken) =>
         whitespaceBefore := trailingWhitespace childToken
-        pure term
+        `(vir_native_child% $term)
       | `(virProofWidgetsJsxChild| $element:virProofWidgetsJsxElement) =>
         whitespaceBefore := trailingWhitespace element
         `($element:virProofWidgetsJsxElement)
