@@ -60,12 +60,15 @@ const hoverChrome = await launchChromium();
 let hoverCdp;
 try {
   hoverCdp = await openChromiumPage(hoverChrome);
-  const upstreamCss = await readFile(new URL("node_modules/@leanprover/infoview/dist/index.css", root), "utf8");
+  const iconFont = await readFile(new URL("node_modules/@leanprover/infoview/dist/codicon.ttf", root));
+  const upstreamCss = (await readFile(new URL("node_modules/@leanprover/infoview/dist/index.css", root), "utf8"))
+    .replace(/url\("\.\/codicon\.ttf[^"\n]*"\)/, `url("data:font/ttf;base64,${iconFont.toString("base64")}")`);
   await evaluate(hoverCdp, `(() => { const style = document.createElement('style');
     style.textContent = ${JSON.stringify(upstreamCss)}; document.head.append(style); })()`);
   await evaluate(hoverCdp, `${hoverBundle.outputFiles[0].text}\nvoid 0`);
   await evaluate(hoverCdp,
     `setupNativeHoverPanel(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
+  await evaluate(hoverCdp, "document.fonts.ready.then(() => true)");
   const initial = await evaluate(hoverCdp, `nativeHoverController.theme(false); nativeHoverController.snapshot()`);
   const parent = initial.tags.find(tag => tag.text.includes("prefix") && tag.text.includes("suffix"));
   const child = initial.tags.find(tag => tag.text === "child");
@@ -76,6 +79,9 @@ try {
   const move = (x, y) => hoverCdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
   const moveTo = rect => move(rect.left + rect.width / 2, rect.top + rect.height / 2);
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  assert.deepEqual(initial.copyStyle, { border: "0px", background: "rgba(0, 0, 0, 0)",
+    color: "rgb(0, 106, 177)", display: "inline-flex", label: "Copy goals" },
+    "copy is a theme-aware accessible toolbar control");
   const disclosure = (key, focus = false) => evaluate(hoverCdp,
     `nativeHoverController.disclosure(${JSON.stringify(key)}, ${focus})`);
   const termDisclosure = await disclosure("term");
@@ -108,7 +114,7 @@ try {
   assert.deepEqual(opened.tag, initial.tag, "opening portal does not shift tagged-term layout");
   assert.deepEqual(opened.popupStyle, {
     color: "rgb(51, 51, 51)", background: "rgb(243, 243, 243)", radius: "4px",
-    shadow: "rgba(0, 0, 0, 0.2) 1px 1px 5px 0px", padding: "4px 24px 4px 8px",
+    shadow: "rgba(0, 0, 0, 0.2) 1px 1px 5px 0px", padding: "4px 48px 4px 8px",
     docFont: "system-ui", codeFont: "monospace", separators: 1,
   }, "light popup uses upstream theme tokens and separates code from prose");
   const hoverScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
@@ -117,6 +123,7 @@ try {
   const dark = await snapshot();
   assert.equal(dark.popupStyle.color, "rgb(221, 221, 221)", "dark popup foreground follows theme");
   assert.equal(dark.popupStyle.background, "rgb(37, 37, 38)", "dark popup background follows theme");
+  assert.equal(dark.copyStyle.color, "rgb(77, 170, 252)", "copy foreground follows dark theme");
   assert.equal(dark.requests, opened.requests, "theme change does not restart type RPC");
   const darkScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
   await writeFile(new URL("build/native-infoview-port/hover-preview-dark.png", root), Buffer.from(darkScreenshot.data, "base64"));
@@ -180,6 +187,35 @@ try {
   assert.equal((await disclosure("hover")).open, true, "second mouse click expands case disclosure");
   assert.deepEqual((await snapshot()).tags.map(tag => tag.instance), initial.tags.map(tag => tag.instance),
     "disclosure toggles preserve interactive term identities");
+  const clickRect = async rect => {
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    await move(x, y);
+    await hoverCdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+    await hoverCdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+  };
+  await moveTo((await snapshot()).prefixRect);
+  await wait(550);
+  const beforePin = await snapshot();
+  await clickRect(beforePin.prefixRect);
+  await move(4, 4);
+  await wait(400);
+  let pinned = await snapshot();
+  assert.equal(pinned.pinned, "true", "real term click pins hover beyond the leave delay");
+  assert.equal(pinned.pinPressed, "true", "pin button shows the pressed state");
+  assert.equal(pinned.requests, beforePin.requests, "pinning does not refetch type information");
+  const pinnedScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+  await writeFile(new URL("build/native-infoview-port/pinned-preview.png", root), Buffer.from(pinnedScreenshot.data, "base64"));
+  await clickRect(pinned.pinRect);
+  assert.equal((await snapshot()).popup, false, "pin control unpins and closes");
+  await moveTo((await snapshot()).prefixRect);
+  await wait(550);
+  await clickRect((await snapshot()).pinRect);
+  await move(4, 4);
+  await wait(400);
+  assert.equal((await snapshot()).pinned, "true", "popup pin control also pins the hover");
+  await evaluate(hoverCdp, `document.querySelector('.vir-native-infoview-type-popup [aria-label="Close type information"]').focus()`);
+  await keypress(" ", "Space", 32);
+  assert.equal((await snapshot()).popup, false, "Space on Close dismisses instead of toggling the term pin handler");
   const hoverWarnings = await evaluate(hoverCdp, "nativeHoverController.dispose()");
   assert.deepEqual(hoverWarnings, [], "real-pointer fixture emitted no React warnings");
   console.log("Native infoview real pointer hover and disclosure keyboard/mouse acceptance passed");

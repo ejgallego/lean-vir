@@ -181,7 +181,16 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       s!"{goalCount} " ++ (if goalCount == 1 then "goal" else "goals")
     return ← <section className="vir-native-infoview" aria-label="VIR native Lean goals">
       <header><strong className="vir-native-infoview-summary">{Html.text summary}</strong>
-        <button type="button" className="vir-native-infoview-copy" onClick={copy}>Copy goals</button>
+        <button type="button" className="vir-native-infoview-copy link pointer dim"
+            title="Copy goals" aria-label="Copy goals" onClick={copy}
+            style={(← js%{ "display" := (← js#"inline-flex"), "alignItems" := (← js#"center"),
+              "gap" := (← js#"4px"), "marginLeft" := (← js#"8px"), "padding" := (← js#"2px 4px"),
+              "border" := (← js#"0"), "borderRadius" := (← js#"3px"),
+              "background" := (← js#"transparent"),
+              "color" := (← js#"var(--vscode-textLink-foreground, currentColor)"),
+              "font" := (← js#"inherit"), "cursor" := (← js#"pointer") })}>
+          <span className="codicon codicon-copy" aria-hidden={(← JsValue.ofBool true)}/>Copy
+        </button>
         <span role="status">{Node.text copyState.value}</span>
         <details className="vir-native-infoview-settings">
           <summary className="mv2 pointer non-selectable">Goal settings</summary>{...controls}

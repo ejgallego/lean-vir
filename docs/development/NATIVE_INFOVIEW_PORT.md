@@ -81,8 +81,13 @@ tooltip geometry/dismissal policy and Markdown/math documentation. There is no u
 persistence or screenshot-level visual parity claim. The popup now shares the
 upstream tooltip/code classes, theme colors, 4px rounded border, shadow and
 code/documentation separators. Prose uses the UI font; code uses the editor font.
-The explicit close control reserves an extra 16px of right padding. The small
+The pin/close controls reserve an extra 40px of right padding. The small
 placement implementation still omits upstream's arrow and full collision policy.
+
+Clicking a term pins its popup; a pressed pin icon exposes the same state and
+can also pin directly from the popup. Clicking the term/pin again closes it.
+Escape and the close control dismiss it. Portal keyboard handling lets native
+buttons activate without bubbling into the enclosing term's pin handler.
 
 ### Next interaction slices (assessment, not implemented)
 

@@ -108,6 +108,7 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
         "editorHoverWidget-background": dark ? "#252526" : "#f3f3f3",
         "editorHoverWidget-border": dark ? "#555" : "#ccc",
         "widget-shadow": "#0003", "editor-selectionBackground": dark ? "#264f78" : "#add6ff",
+        "textLink-foreground": dark ? "#4daafc" : "#006ab1",
       })) style.setProperty(`--vscode-${name}`, value);
       document.body.style.cssText = `font:13px system-ui;color:${dark ? "#ddd" : "#222"};background:${dark ? "#1e1e1e" : "#fff"}`;
     },
@@ -118,6 +119,8 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
       const tipStyle = tip && getComputedStyle(tip);
       const doc = tip?.querySelector(".vir-native-infoview-doc");
       const code = tip?.querySelector(".font-code");
+      const copy = container.querySelector(".vir-native-infoview-copy");
+      const copyStyle = getComputedStyle(copy);
       const tags = [...container.querySelectorAll(".vir-native-infoview-code-tag")].map(node => ({
         id: node.getAttribute("aria-controls"), instance: instance(node), text: node.textContent,
         highlighted: node.classList.contains("highlight"), rect: rect(node),
@@ -126,6 +129,12 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
         highlighted: tags.filter(value => value.highlighted).map(value => value.id), tags,
         prefixRect: textRect("prefix"), suffixRect: textRect("suffix"), tag: rect(element),
         popupRect: rect(tip),
+        pinRect: rect(tip?.querySelector(".vir-native-infoview-pin")),
+        closeRect: rect(tip?.querySelector('[aria-label="Close type information"]')),
+        pinned: tip?.getAttribute("data-pinned"),
+        pinPressed: tip?.querySelector(".vir-native-infoview-pin").getAttribute("aria-pressed"),
+        copyStyle: { border: copyStyle.borderWidth, background: copyStyle.backgroundColor,
+          color: copyStyle.color, display: copyStyle.display, label: copy.getAttribute("aria-label") },
         popupStyle: tip && {
           color: tipStyle.color, background: tipStyle.backgroundColor, radius: tipStyle.borderRadius,
           shadow: tipStyle.boxShadow, padding: tipStyle.padding,

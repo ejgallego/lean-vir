@@ -86,6 +86,12 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
     let popupEnter ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.enterPopup hover
     let popupLeave ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.leavePopup hover
     let popupOver ← Callback.ofUnary fun (event : Js Browser.Event) => Browser.Event.stopPropagation event
+    -- Portal keys must not reach the term's activation handler. Let native
+    -- buttons handle Enter/Space themselves; Escape dismisses the popup.
+    let popupKeyboard ← Callback.ofUnary fun (event : Js Browser.Event) => do
+      Browser.Event.stopPropagation event
+      if (← optionalString (← Js.Object.get event (← js#"key"))) == "Escape" then
+        Hover.close hover
     let keyboard ← Callback.ofUnary fun (event : Js Browser.Event) => do
       let key ← optionalString (← Js.Object.get event (← js#"key"))
       if key == "Escape" then
@@ -155,9 +161,10 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
       popup := do
         let node ← <div id={popupId} role="tooltip" className="vir-native-infoview-type-popup tooltip"
             onPointerEnter={popupEnter} onPointerLeave={popupLeave}
-            onPointerOver={popupOver} onPointerOut={popupOver} onKeyDown={keyboard}
+            onPointerOver={popupOver} onPointerOut={popupOver} onKeyDown={popupKeyboard}
+            data-pinned={(← JsValue.ofBool current.pinned)}
             style={(← js%{ "position" := (← js#"fixed"), "display" := (← js#"block"),
-              "visibility" := (← js#"hidden"), "padding" := (← js#"4px 24px 4px 8px"),
+              "visibility" := (← js#"hidden"), "padding" := (← js#"4px 48px 4px 8px"),
               "zIndex" := (← js#"1000"), "maxWidth" := (← js#"min(70vw, calc(100vw - 20px))"),
               "maxHeight" := (← js#"min(300px, calc(100vh - 20px))"),
               "boxSizing" := (← js#"border-box"), "overflow" := (← js#"auto"),
@@ -171,6 +178,17 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
               "border" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)"),
               "background" := (← js#"var(--vscode-editorHoverWidget-background, #eee)") })}>
           <div className="tooltip-code-content">{...contents}</div>
+          <button type="button" className="vir-native-infoview-pin link pointer dim"
+            aria-label="Pin type information" aria-pressed={(← JsValue.ofBool current.pinned)}
+            title={(← JsValue.ofString (if current.pinned then "Pinned — click to unpin and close" else "Pin type information"))}
+            onClick={toggle}
+            style={(← js%{ "position" := (← js#"absolute"), "top" := (← js#"4px"),
+              "right" := (← js#"24px"), "padding" := (← js#"0"), "margin" := (← js#"0"),
+              "border" := (← js#"0"), "background" := (← js#"transparent"),
+              "color" := (← js#"inherit"), "lineHeight" := (← js#"1") })}>
+            <span aria-hidden={(← JsValue.ofBool true)} className={(← JsValue.ofString
+              (if current.pinned then "codicon codicon-pinned" else "codicon codicon-pin"))}/>
+          </button>
           <button type="button" aria-label="Close type information" title="Close type information" onClick={close}
             style={(← js%{ "position" := (← js#"absolute"), "top" := (← js#"4px"),
               "right" := (← js#"4px"), "padding" := (← js#"0 2px"), "margin" := (← js#"0"),
@@ -182,6 +200,7 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
     return ← <span id={anchorId} className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++
         diffClass props.diff ++ (if current.highlighted then " highlight" else "")))}
         role="button" tabIndex={(← JsValue.ofFloat 0)} aria-expanded={(← JsValue.ofBool current.visible)}
+        aria-pressed={(← JsValue.ofBool current.pinned)}
         aria-controls={popupId} onPointerOver={over} onPointerOut={leave} onClick={toggle}
         onFocus={focus} onBlur={leave} onKeyDown={keyboard}>
       {props.render props.parent props.fmt}{popup}

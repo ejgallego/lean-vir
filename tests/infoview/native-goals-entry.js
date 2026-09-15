@@ -232,6 +232,9 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await React.act(async () => tag().click());
     await leave();
     verify(popup() !== null, true, "clicked popup remains pinned after pointer leaves");
+    verify(tag().getAttribute("aria-pressed"), "true", "term announces pin state");
+    verify(popup().querySelector(".vir-native-infoview-pin").getAttribute("aria-pressed"), "true",
+      "popup pin control reflects term-click pinning");
     await React.act(async () => tag().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     verify(popup(), null, "Escape closes popup");
     verify(requests[0].options.abortSignal.aborted, true, "closing cancels the request scope");

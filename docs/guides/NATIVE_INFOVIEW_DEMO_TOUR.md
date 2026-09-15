@@ -29,10 +29,13 @@ collapse or expand it; the contents stay mounted and retain their state.
 In the Lean panel, pause over a term for half a second: the deepest subexpression
 highlights and its type popup floats without moving the goal text. Move into the
 popup to inspect it; leaving gives a short grace period before dismissal. Click
-to pin, or use Escape/the close button to dismiss it.
+the term or the popup's pin icon to pin it; the icon changes to show it is pinned.
+Click again to unpin and close, or use Escape/the close button to dismiss it.
 The popup uses the editor's theme colors, with monospace code above a separator
 and UI-font documentation below. Markdown markers still display literally;
 rendered Markdown/math and selection/navigation remain separate follow-ups.
+The compact Copy control beside the goal count copies the full, unfiltered state
+and reports “Copied” or “Copy failed”.
 
 ## 2. Try the standalone Lean panel
 
