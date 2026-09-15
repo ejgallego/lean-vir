@@ -189,6 +189,17 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await React.act(async () => first.querySelector(".vir-native-infoview-copy").click());
     verify(copiedText, "case main\nα : Nat\ninst : Nat\nvisible hidden✝ : Nat\nonly✝ : Nat\nn : Nat := 2\n : Nat\n : Nat\n⊢ n = n\n\ncase second\n⊢ True",
       "copy complete unfiltered state with upstream formatting");
+    const copyEdges = freeze({ ...fixture, goals: [{ ...fixture.goals[0],
+      hyps: [hyp(["", "[anonymous]", "λ"]), hyp(["", "", "雪"]), hyp([])],
+    }] });
+    await render(copyEdges);
+    await React.act(async () => first.querySelector(".vir-native-infoview-copy").click());
+    verify(copiedText, "case main\n λ : Nat\n  雪 : Nat\n : Nat\n⊢ n = n",
+      "native name traversal preserves empty-name separators and Unicode while dropping anonymous names");
+    await render({ ...fixture, goals: [] });
+    await React.act(async () => first.querySelector(".vir-native-infoview-copy").click());
+    verify(copiedText, "", "copy callback follows the latest empty native goal array");
+    await render(fixture);
     rejectCopy = true;
     await React.act(async () => first.querySelector(".vir-native-infoview-copy").click());
     verify(first.querySelector('[role="status"]').textContent, "Copy failed", "clipboard rejection surfaced");
@@ -332,6 +343,10 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await render({ ...fixture, termGoal });
     verify(card("term").querySelector("button").textContent, "▾ Expected type", "expected-type heading");
     verify(card("term").querySelector(".goal-vdash").textContent, "⊢ ", "default expected-type prefix");
+    verify(card("term").querySelector(".vir-native-infoview-hyp-name").textContent.trim(), "local",
+      "expected-type hypotheses traverse the native bundle array");
+    verify(Object.isFrozen(termGoal.hyps) && Object.isFrozen(termGoal.hyps[0].names), true,
+      "expected-type traversal accepts frozen native arrays");
     await React.act(async () => card("term").querySelector("button").click());
     const termCard = card("term");
     await render({ ...fixture, goals: [], termGoal });

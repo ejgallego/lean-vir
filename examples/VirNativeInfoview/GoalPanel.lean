@@ -45,7 +45,7 @@ private def Hypothesis (code : Js CodeWithInfos → Html) : RuntimeM (FunctionCo
     </div>
 
 private structure GoalProps where
-  hyps : Array (Js InteractiveHypothesisBundle)
+  hyps : Js.Array InteractiveHypothesisBundle
   target : Js CodeWithInfos
   name : String
   goalPrefix : Js String
@@ -119,7 +119,8 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
     let settingsState ← StateTuple.toState (← Hooks.useState (← LeanRef.toJSL ({} : GoalSettings)))
     let copyState ← StateTuple.toState (← Hooks.useState (← js#""))
     let settings : GoalSettings ← LeanRef.fromJSL settingsState.value
-    let goals ← Js.Array.toLeanArray (← PanelWidgetProps.goals panel)
+    let goals ← PanelWidgetProps.goals panel
+    let goalCount := (← JsValue.toFloat (← Js.Array.length goals)).toUInt64.toNat
     let term? ← Js.UndefinedOr.toOption (← PanelWidgetProps.termGoal panel)
     let copy ← Callback.ofUnary fun (_ : Js Browser.Event) => do
       let pending ← EditorApi.copyToClipboard (← EditorConnection.api editor)
@@ -129,7 +130,8 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       let _ ← Js.Promise.thenVoidWithRejection pending copied failed
       pure ()
     let mut cards : Array Html := #[]
-    for (goal, index) in goals.zipIdx do
+    for index in [:goalCount] do
+      let goal ← Js.Array.get goals (← JsValue.ofFloat index.toFloat)
       let name? ← Js.UndefinedOr.toOption (← InteractiveGoal.userName goal)
       let name ← match name? with | none => pure "" | some n => JsValue.toString n
       let id? ← Js.UndefinedOr.toOption (← InteractiveGoal.mvarId goal)
@@ -139,7 +141,7 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       let prefix? ← Js.UndefinedOr.toOption (← InteractiveGoal.goalPrefix goal)
       let goalPrefix ← match prefix? with | none => js#"⊢ " | some p => pure p
       let data : GoalProps := {
-        hyps := ← Js.Array.toLeanArray (← InteractiveGoal.hyps goal)
+        hyps := ← InteractiveGoal.hyps goal
         target := ← InteractiveGoal.type goal
         inserted := ← nativeFlag (← InteractiveGoal.isInserted goal)
         removed := ← nativeFlag (← InteractiveGoal.isRemoved goal)
@@ -149,7 +151,7 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       cards := cards.push (<GoalCard @props={props}/>)
     if let some term := term? then
       let data : GoalProps := {
-        hyps := ← Js.Array.toLeanArray (← InteractiveTermGoal.hyps term)
+        hyps := ← InteractiveTermGoal.hyps term
         target := ← InteractiveTermGoal.type term
         name := "", goalPrefix := ← js#"⊢ ", key := "term", index := 0, settings, term := true }
       let props ← Props.WithData.make (← LeanRef.toJSL data)
@@ -164,8 +166,8 @@ def withCode (code : Js CodeWithInfos → Html) : RuntimeM (FunctionComponent Pa
       setting settingsState "Hide goal names" (·.hideGoalNames) fun s => { s with hideGoalNames := !s.hideGoalNames },
       setting settingsState "Emphasize first goal" (·.emphasizeFirstGoal) fun s => { s with emphasizeFirstGoal := !s.emphasizeFirstGoal }
     ]
-    let summary := if goals.isEmpty then "No goals" else
-      s!"{goals.size} " ++ (if goals.size == 1 then "goal" else "goals")
+    let summary := if goalCount == 0 then "No goals" else
+      s!"{goalCount} " ++ (if goalCount == 1 then "goal" else "goals")
     return ← <section className="vir-native-infoview" aria-label="VIR native Lean goals">
       <header><strong className="vir-native-infoview-summary">{Html.text summary}</strong>
         <button type="button" className="vir-native-infoview-copy" onClick={copy}>Copy goals</button>

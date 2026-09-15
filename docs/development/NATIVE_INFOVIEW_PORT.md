@@ -133,6 +133,14 @@ presentation state, and ordinary React component/effect lifecycles**.
 - Name filtering builds that projection in one pass; anonymous-name checks use
   substring matching without splitting strings. The empty-bundle decision still
   precedes anonymous-name removal, so anonymous-only bundles remain visible.
+- Incoming goals, hypothesis bundles (including expected-type hypotheses) and
+  names now stay in native arrays during display and clipboard traversal. There
+  are no `Js.Array.toLeanArray` calls in the example. Copy formatting accumulates
+  Lean text directly, preserving empty-name spacing and anonymous-name filtering.
+  The filtered presentation records remain Lean arrays: they contain derived
+  policy, retain original native handles and support display reversal.
+  Native traversal still spells out length/index numeric conversions; a native
+  indexed-loop surface would improve this without reintroducing array staging.
 - Names, hypotheses and goal cards compose as `Array Html` directly, without
   first executing the children and then mapping `pure` over their nodes. This
   removes intermediate staging, not the remaining Lean arrays. Native array
