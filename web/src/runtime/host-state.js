@@ -198,7 +198,9 @@ export class VirHostState {
         );
       }
       entry.args.forEach((arg, index) => {
-        const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
+        const callbacksBeforeArgument = isCallbackFreeLeaf(arg.type)
+          ? null
+          : new Set(this.runtime.liveCallbacks);
         try {
           const value = explicitConversionTarget
             ? this.runtime.liftObjectValue(
@@ -213,11 +215,13 @@ export class VirHostState {
               );
           args.push(value);
         } finally {
-          captureCallbacksCreatedSince(
-            this.runtime.liveCallbacks,
-            callbacksBeforeArgument,
-            liftedCallbacks,
-          );
+          if (callbacksBeforeArgument !== null) {
+            captureCallbacksCreatedSince(
+              this.runtime.liveCallbacks,
+              callbacksBeforeArgument,
+              liftedCallbacks,
+            );
+          }
         }
       });
       const transaction = beginHostCallTransaction();
@@ -433,6 +437,31 @@ function isPromiseLike(value) {
     (typeof value === "object" || typeof value === "function") &&
     typeof value.then === "function"
   );
+}
+
+// These liftObjectValue cases cannot create callbacks. An existing resource may
+// contain functions, but lifting it returns the exact value without traversing it.
+// Keep composites and unknown tags on the tracked path, including partial failure.
+function isCallbackFreeLeaf(type) {
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.SIMPLE_ENUM:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+      return true;
+    default:
+      return false;
+  }
 }
 
 function captureCallbacksCreatedSince(
