@@ -92,10 +92,10 @@ async function run() {
       const deadline = performance.now() + 15000;
       while (performance.now() < deadline) {
         await React.act(async () => new Promise(resolve => setTimeout(resolve, 20)));
-        const popup = tag.querySelector('[role="tooltip"]');
+        const popup = document.getElementById(tag.getAttribute("aria-controls"));
         if (popup && !popup.textContent.includes("Loading")) break;
       }
-      const popup = tag.querySelector('[role="tooltip"]');
+      const popup = document.getElementById(tag.getAttribute("aria-controls"));
       check(popup && !/Loading|Unable to load/.test(popup.textContent), "real type RPC populated native popup");
     }
     check(targets[0] !== targets[1], "cursor change updates native goals");

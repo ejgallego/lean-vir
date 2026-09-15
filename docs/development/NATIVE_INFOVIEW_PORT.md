@@ -59,6 +59,7 @@ from the port. Keeping the goal panel shared makes that difference inspectable.
 | `VirNativeInfoview/Goals.lean` | Seven presentation settings; upstream filtering order and anonymous-name behavior; unfiltered copy formatting |
 | `VirNativeInfoview/GoalPanel.lean` | Tactic goals and expected type; custom/empty prefixes; reverse order; first-goal emphasis; local collapse and settings; clipboard action |
 | `VirNativeInfoview/InteractiveCode.lean` | Native text/append/tag traversal; highlighted text and six diff tags; hover/focus type RPC; click/keyboard pinning; close/error/loading states; cancellation and late-response guard |
+| `VirNativeInfoview/Hover.lean` | Deepest-term hover highlighting; 500 ms open / 300 ms close delays; floating portal placement; nested-popup hover/pinning links; timer and geometry-observer cleanup |
 
 Goal identity and local collapse survive cursor updates and goal reordering.
 Expected-type identity does not depend on the tactic-goal count. Incoming native
@@ -66,13 +67,17 @@ objects are retained without cloning or mutation, including the exact reference
 passed to `Lean.Widget.InteractiveDiagnostics.infoToInteractive`.
 
 Pragmatic UI choices: settings use an accessible disclosure with checkboxes;
-popups render inline; documentation remains plain text; settings belong to each
-mounted panel. The upstream session, transport, editor context and widget host
-remain responsible for integration with Lean and the editor.
+documentation remains plain text; settings belong to each mounted panel. Popups
+now float in document-body React portals rather than shifting the goal text.
+Lean chooses above/below placement and clamps it to the viewport; DOM observers
+refresh placement on size changes and scroll/resize. This is not upstream's full
+Floating UI geometry/arrow implementation. The upstream session, transport,
+editor context and widget host remain responsible for integration with Lean and
+the editor.
 
 Remaining interactive-code parity is substantive: hypothesis/target/subexpression
-selection, modifier-key definition navigation, context menus, floating/nested
-tooltip geometry and Markdown/math documentation. There is no upstream config
+selection, modifier-key definition navigation, context menus, full upstream
+tooltip geometry/dismissal policy and Markdown/math documentation. There is no upstream config
 persistence or screenshot-level visual parity claim. Selection and navigation
 are the next useful API exercise, before adding further cosmetic fidelity.
 
@@ -106,6 +111,12 @@ presentation state, and ordinary React component/effect lifecycles**.
 - Stable factories are constructed once, outside render. The recursive tagged
   renderer passes a render closure to a stable tag component; it needs no mutable
   self-reference or generic component framework.
+- Hover policy remains Lean-owned. The consumer boundary adds only exact DOM
+  rectangle/keyboard-modifier access, a document-body React portal, and a small
+  resize/scroll subscription with explicit cleanup. Nested popup callbacks keep
+  ancestors open while traversing a portal and pin the ancestor chain when needed.
+  The body and popup always occupy two React child slots, even while hidden:
+  changing a sole unkeyed fragment into an array would remount nested terms.
 - Append traversal reads native children by index and pushes rendered nodes
   directly into the native output array. Only the loop bound/index cross into
   Lean; neither the input entries nor output nodes are staged in Lean arrays.
@@ -157,7 +168,7 @@ npm run test:infoview
 ```
 
 The focused command builds the Lean component and generates fresh IR, then runs
-the actual interpreter with official React in Chromium. It checks 86 behaviors:
+the actual interpreter with official React in Chromium. Its 116 behavior checks cover:
 filters, copying, state isolation/reconciliation, native identity, expected-type
 transitions, tagged text/diffs, popup interaction, cancellation, errors and null
 fields, including pinned-popup identity and request lifetime across sibling text
@@ -165,6 +176,14 @@ updates during native append traversal. React warnings are failures.
 Boundary probes also verify exact native `fmt` props without `WithData`, native
 documentation length checks and absence of documentation decoding to Lean strings.
 They also forbid hypothesis-name re-encoding and custom-prefix round trips.
+
+Hover checks include modifier suppression, fast departure before a request,
+keyboard focus, delayed dismissal, portal entry, nested/sibling highlighting and
+timer disposal. A separate CDP gate moves Chromium's actual pointer through
+parent/child/sibling text and into the floating popup, checking delays, the exact
+RPC reference, unchanged goal layout and warning-free teardown. Synthetic event
+checks alone do not establish these physical pointer transitions. Full upstream
+selection/navigation and configuration behavior remain outside this acceptance.
 
 The first conversion-reduction pass measured the same two initial panel mounts:
 `js.string.value` calls decreased from 28 to 24 and `js.string` calls from 982

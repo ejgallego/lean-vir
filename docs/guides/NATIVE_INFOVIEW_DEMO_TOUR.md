@@ -22,6 +22,11 @@ an interactive expression to pin its popup, then close it. Expand the panel's
 settings, change presentation options, collapse a goal, and try copying it.
 The two panels have independent settings.
 
+In the Lean panel, pause over a term for half a second: the deepest subexpression
+highlights and its type popup floats without moving the goal text. Move into the
+popup to inspect it; leaving gives a short grace period before dismissal. Click
+to pin, or use Escape/the close button to dismiss it.
+
 ## 2. Try the standalone Lean panel
 
 Open [VirNativeInfoview.lean](../../examples/VirNativeInfoview.lean) and move
@@ -47,7 +52,7 @@ its widget shows the current source URI and first goal.
 
 This ports the goal panel and interactive code, not the surrounding infoview
 shell. Native expression selection and modifier-click definition navigation
-are not implemented yet; native popups are inline and documentation is plain
+are not implemented yet; native popups now float, but documentation is plain
 text. The upstream checkpoint retains upstream behavior. See the
 [port assessment](../development/NATIVE_INFOVIEW_PORT.md) for exact coverage and
 the known upstream development-StrictMode popup limitation.

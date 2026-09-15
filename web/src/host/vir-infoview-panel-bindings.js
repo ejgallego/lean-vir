@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { createPortal } from "react-dom";
+
 /**
  * Upstream infoview panel-widget bindings. The supplied functions are the
  * actual React hook and tagged-text utility from `@leanprover/infoview`.
@@ -16,6 +18,23 @@ export function createInfoviewPanelBindings({
   interactiveCode = null,
 } = {}) {
   return {
+    "infoview.hover.modifier": (event, key) => event.getModifierState(key),
+    "infoview.hover.rect": element => element.getBoundingClientRect(),
+    "infoview.hover.portal": node => createPortal(node, document.body),
+    "infoview.hover.observe": (reference, popup, callback) => {
+      const view = reference.ownerDocument.defaultView;
+      const observer = new view.ResizeObserver(() => callback(undefined));
+      const update = () => callback(undefined);
+      observer.observe(reference);
+      observer.observe(popup);
+      view.addEventListener("resize", update);
+      view.addEventListener("scroll", update, true);
+      return () => {
+        observer.disconnect();
+        view.removeEventListener("resize", update);
+        view.removeEventListener("scroll", update, true);
+      };
+    },
     "infoview.interactiveCode": () => requireUpstream(interactiveCode, "InteractiveCode"),
     "infoview.editorContext": () => {
       if (editorContext === null) {

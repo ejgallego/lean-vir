@@ -41,6 +41,9 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     if (replyMode === "undefined-doc") return Promise.resolve({ type: { text: "Prop" }, doc: undefined });
     if (replyMode === "empty-doc") return Promise.resolve({ type: { text: "Prop" }, doc: "" });
     if (replyMode === "native-doc") return Promise.resolve({ type: { text: "Prop" }, doc: nativeDoc });
+    if (replyMode === "nested-popup") return Promise.resolve({
+      type: { tag: [{ info: { p: "popup-child" } }, { text: "nested response" }] }, doc: "Parent popup",
+    });
     if (replyMode === "invalid-doc") return Promise.resolve({ type: { text: "Prop" }, doc: invalidDoc });
     if (replyMode === "null-code") return Promise.resolve({ exprExplicit: null, type: null, doc: null });
     return Promise.resolve({ exprExplicit: { text: "n" }, type: { text: "Nat" }, doc: "Natural numbers" });
@@ -190,15 +193,29 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await React.act(async () => first.querySelector(".vir-native-infoview-copy").click());
     verify(first.querySelector('[role="status"]').textContent, "Copy failed", "clipboard rejection surfaced");
     const tag = () => card().querySelector(".vir-native-infoview-target-code .vir-native-infoview-code-tag");
-    const hover = async () => React.act(async () => tag().dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
-    const leave = async () => React.act(async () => tag().dispatchEvent(new PointerEvent("pointerout", {
-      bubbles: true, relatedTarget: document.body,
-    })));
-    const popup = () => tag().querySelector('[role="tooltip"]');
+    // Hover is intentionally delayed; keyboard and click activation below remain
+    // immediate.  The popup is a document portal, so aria-controls is its owner
+    // relationship rather than DOM containment.
+    const wait = ms => React.act(async () => new Promise(resolve => setTimeout(resolve, ms)));
+    const popupFor = element => document.getElementById(element.getAttribute("aria-controls"));
+    const popup = () => popupFor(tag());
+    const hover = async (element = tag()) => {
+      await React.act(async () => element.dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+      await wait(550);
+    };
+    const leave = async (element = tag(), relatedTarget = document.body) => {
+      await React.act(async () => element.dispatchEvent(new PointerEvent("pointerout", {
+        bubbles: true, relatedTarget,
+      })));
+      await wait(350);
+    };
     verify(requests.length, 0, "tagged code does not fetch before interaction");
     await hover();
+    verify(tag().classList.contains("highlight"), true, "hovered tag is highlighted");
     verify(popup().textContent.includes("n : Nat"), true, "native type popup renders tagged reply");
     verify(popup().textContent.includes("Natural numbers"), true, "popup documentation");
+    verify(popup().querySelector('button[aria-label="Close type information"]') !== null, true,
+      "portal popup retains its close control");
     verify(requests[0].method, "Lean.Widget.InteractiveDiagnostics.infoToInteractive", "official RPC method");
     verify(requests[0].info === fixture.goals[0].type.tag[0].info, true, "exact server reference passed to RPC");
     await React.act(async () => tag().click());
@@ -207,6 +224,36 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await React.act(async () => tag().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     verify(popup(), null, "Escape closes popup");
     verify(requests[0].options.abortSignal.aborted, true, "closing cancels the request scope");
+    const fastLeaveRequests = requests.length;
+    await React.act(async () => {
+      tag().dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+      tag().dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: document.body }));
+    });
+    await wait(550);
+    verify(requests.length, fastLeaveRequests, "fast hover leave does not issue RPC");
+    verify(popup(), null, "fast hover leave creates no popup");
+    for (const modifier of ["altKey", "ctrlKey", "metaKey", "shiftKey"]) {
+      await React.act(async () => tag().dispatchEvent(new PointerEvent("pointerover", { bubbles: true, [modifier]: true })));
+      await wait(550);
+      verify(popup(), null, `${modifier} suppresses delayed hover popup`);
+      verify(requests.length, fastLeaveRequests, `${modifier} suppresses delayed hover RPC`);
+    }
+    await React.act(async () => tag().dispatchEvent(new FocusEvent("focusin", { bubbles: true })));
+    verify(popup() !== null, true, "focus opens the popup immediately");
+    await React.act(async () => tag().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    await hover();
+    const heldPopup = popup();
+    await React.act(async () => {
+      tag().dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: heldPopup }));
+      heldPopup.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, relatedTarget: tag() }));
+    });
+    await wait(350);
+    verify(popup() === heldPopup, true, "entering portal popup cancels its close timer");
+    await React.act(async () => heldPopup.dispatchEvent(new PointerEvent("pointerout", {
+      bubbles: true, relatedTarget: document.body,
+    })));
+    await wait(350);
+    verify(popup(), null, "portal popup closes after its leave delay");
     replyMode = "delayed";
     await hover();
     verify(popup().textContent.includes("Loading"), true, "pending popup state");
@@ -247,6 +294,40 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await hover();
     verify(popup().querySelector(".font-code"), null, "null optional popup code is absent");
     await leave();
+    replyMode = "nested-popup";
+    await hover();
+    const parentPopup = popup();
+    const popupChild = parentPopup.querySelector(".vir-native-infoview-code-tag");
+    verify(popupChild !== null, true, "parent popup renders a nested tagged response");
+    await hover(popupChild);
+    const childPopup = popupFor(popupChild);
+    verify(childPopup !== null, true, "nested response opens a child portal popup");
+    await React.act(async () => popupChild.click());
+    await React.act(async () => {
+      popupChild.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: parentPopup }));
+      childPopup.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: parentPopup }));
+      parentPopup.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: document.body }));
+    });
+    await wait(350);
+    verify(popupFor(popupChild) === childPopup && popup() === parentPopup, true,
+      "pinning nested child keeps both popup portals after leaves");
+    await React.act(async () => popupChild.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    verify(popupFor(popupChild), null, "child Escape closes only child popup");
+    verify(popup() === parentPopup, true, "child Escape preserves pinned parent popup");
+    await React.act(async () => tag().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    verify(popup(), null, "parent Escape removes the nested popup chain");
+    await hover();
+    const unmountParentPopup = popup();
+    const unmountChild = unmountParentPopup.querySelector(".vir-native-infoview-code-tag");
+    await React.act(async () => unmountChild.dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+    const chainUnmountRequests = requests.length;
+    await render({ ...fixture, goals: [] });
+    await wait(550);
+    verify(document.querySelectorAll(".vir-native-infoview-type-popup").length, 0,
+      "unmount removes parent and nested child portals");
+    verify(requests.length, chainUnmountRequests, "unmount cancels nested popup hover timer without RPC");
+    await render(fixture);
+    replyMode = "ready";
     const termGoal = freeze({ hyps: [hyp(["local"])], type: { text: "Expected" } });
     await render({ ...fixture, termGoal });
     verify(card("term").querySelector("button").textContent, "▾ Expected type", "expected-type heading");
@@ -281,10 +362,42 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     const updatedTag = card().querySelector(".vir-native-infoview-target-code .vir-native-infoview-code-tag");
     verify(updatedTag === nestedTag && updatedTag.getAttribute("aria-controls") === nestedPopupId,
       true, "native child construction preserves tag component and popup identity");
-    verify(updatedTag.querySelector('[role="tooltip"]') !== null, true, "pinned popup survives sibling text update");
+    verify(popupFor(updatedTag) !== null, true, "pinned portal popup survives sibling text update");
     verify(requests.length, requestCount, "sibling text update does not restart popup request");
     verify(nestedRequest.options.abortSignal.aborted, false, "sibling text update preserves request lifetime");
     verify(JSON.stringify(nested), nestedSnapshot, "append traversal never mutates native input");
+    await React.act(async () => tag().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    const hoverTree = freeze({ tag: [{ info: { p: "parent" } }, { append: [
+      { text: "parent " }, { tag: [{ info: { p: "child" } }, { text: "child" }] },
+      { text: " " }, { tag: [{ info: { p: "sibling" } }, { text: "sibling" }] },
+    ] }] });
+    await render({ ...fixture, goals: [{ ...fixture.goals[0], type: hoverTree }] });
+    const hoverTags = [...card().querySelectorAll(".vir-native-infoview-target-code .vir-native-infoview-code-tag")];
+    const childBeforeParentPopup = hoverTags[1];
+    const activeHighlights = () => hoverTags.filter(element => element.classList.contains("highlight"));
+    verify(hoverTags.length, 3, "nested hover fixture renders parent, child and sibling tags");
+    await hover(hoverTags[0]);
+    verify(hoverTags[1] === childBeforeParentPopup, true, "opening parent popup preserves nested child DOM identity");
+    await React.act(async () => {
+      hoverTags[0].dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: hoverTags[1] }));
+      hoverTags[1].dispatchEvent(new PointerEvent("pointerover", { bubbles: true, relatedTarget: hoverTags[0] }));
+    });
+    await wait(550);
+    verify(activeHighlights().length, 1, "parent-to-child transition has one active highlight");
+    verify(activeHighlights()[0] === hoverTags[1], true, "child owns nested hover highlight");
+    await React.act(async () => {
+      hoverTags[1].dispatchEvent(new PointerEvent("pointerout", { bubbles: true, relatedTarget: hoverTags[2] }));
+      hoverTags[2].dispatchEvent(new PointerEvent("pointerover", { bubbles: true, relatedTarget: hoverTags[1] }));
+    });
+    await wait(550);
+    verify(activeHighlights().length, 1, "child-to-sibling transition has one active highlight");
+    verify(activeHighlights()[0] === hoverTags[2], true, "sibling owns transition highlight");
+    await leave(hoverTags[2]);
+    const unmountRequests = requests.length;
+    await React.act(async () => hoverTags[0].dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+    await render({ ...fixture, goals: [] });
+    await wait(550);
+    verify(requests.length, unmountRequests, "unmount disposes pending hover timer without RPC");
     let coercions = 0;
     const invalidDocs = [false, 42, [], new String("boxed"),
       { toString() { coercions++; return "coerced"; } }];
@@ -300,6 +413,7 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
           React.createElement(component, fixture))));
         const invalidTag = invalidContainer.querySelector(".vir-native-infoview-target-code .vir-native-infoview-code-tag");
         await React.act(async () => invalidTag.dispatchEvent(new MouseEvent("pointerover", { bubbles: true })));
+        await wait(550);
         verify(caught.length > 0 && caught.every(error => String(error).includes("expects a primitive JavaScript string")),
           true, `malformed doc ${index} fails primitive-string validation`);
         verify(invalidContainer.querySelector('[role="alert"]')?.textContent, "Invalid reply",

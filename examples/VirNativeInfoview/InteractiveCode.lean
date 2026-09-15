@@ -9,6 +9,7 @@ module
 public import Vir.Infoview.Client
 public import Vir.Infoview.Panel
 public import Vir.ProofWidgets.Jsx
+public import VirNativeInfoview.Hover
 
 public section
 
@@ -53,11 +54,8 @@ private structure TagProps where
   fmt : Js CodeWithInfos
   diff : String
   session : Js RpcSession
-  render : Js CodeWithInfos → Html
-
-private structure HoverState where
-  visible : Bool := false
-  pinned : Bool := false
+  parent : Hover.Parent
+  render : Hover.Parent → Js CodeWithInfos → Html
 
 private structure PopupState where
   reply : Option (Js InfoPopup) := none
@@ -66,38 +64,33 @@ private structure PopupState where
 private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
   FunctionComponent.ofLean fun nativeProps => do
     let props : TagProps ← LeanRef.fromJSL (← Props.WithData.data nativeProps)
-    let hover ← StateTuple.toState (← Hooks.useState (← LeanRef.toJSL ({} : HoverState)))
-    let current : HoverState ← LeanRef.fromJSL hover.value
+    let (hover, current) ← Hover.useControl props.parent
     let response ← StateTuple.toState (← Hooks.useState (← LeanRef.toJSL ({} : PopupState)))
     let popupId ← Hooks.useId
-    let over ← Callback.ofUnary fun (event : Js Browser.Event) => do
-      Browser.Event.stopPropagation event
-      State.modify hover fun previous => do
-        let previous : HoverState ← LeanRef.fromJSL previous
-        LeanRef.toJSL { previous with visible := true }
-    let leave ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-      State.modify hover fun previous => do
-        let previous : HoverState ← LeanRef.fromJSL previous
-        LeanRef.toJSL { previous with visible := previous.pinned }
+    let anchorId ← Hooks.useId
+    Hover.usePosition current.visible anchorId popupId
+    let over ← Callback.ofUnary (Hover.over hover)
+    let leave ← Callback.ofUnary (Hover.out hover)
+    let focus ← Callback.ofUnary (Hover.focus hover)
     let toggle ← Callback.ofUnary fun (event : Js Browser.Event) => do
       Browser.Event.stopPropagation event
-      State.modify hover fun previous => do
-        let previous : HoverState ← LeanRef.fromJSL previous
-        LeanRef.toJSL ({ visible := !previous.pinned, pinned := !previous.pinned } : HoverState)
+      Browser.Event.preventDefault event
+      Hover.toggle hover
     let close ← Callback.ofUnary fun (event : Js Browser.Event) => do
       Browser.Event.stopPropagation event
-      State.set hover (← LeanRef.toJSL ({} : HoverState))
+      Hover.close hover
+    let popupEnter ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.enterPopup hover
+    let popupLeave ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.leavePopup hover
+    let popupOver ← Callback.ofUnary fun (event : Js Browser.Event) => Browser.Event.stopPropagation event
     let keyboard ← Callback.ofUnary fun (event : Js Browser.Event) => do
       let key ← optionalString (← Js.Object.get event (← js#"key"))
       if key == "Escape" then
         Browser.Event.stopPropagation event
-        State.set hover (← LeanRef.toJSL ({} : HoverState))
+        Hover.close hover
       else if key == "Enter" || key == " " then
         Browser.Event.preventDefault event
         Browser.Event.stopPropagation event
-        State.modify hover fun previous => do
-          let previous : HoverState ← LeanRef.fromJSL previous
-          LeanRef.toJSL ({ visible := !previous.pinned, pinned := !previous.pinned } : HoverState)
+        Hover.toggle hover
     let effect ← EffectCallback.ofLean {
       setup := do
         let active ← RuntimeRef.new true
@@ -127,15 +120,17 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
     Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[Js.erase props.session, props.info,
       Js.erase (← JsValue.ofBool current.visible)]))
     let state : PopupState ← LeanRef.fromJSL response.value
-    let mut popup : Array Html := #[]
+    -- Keep two child slots even while hidden. Switching a sole unkeyed fragment
+    -- to an array when its popup opens would remount the nested term components.
+    let mut popup : Html := Node.text (← js#"")
     if current.visible then
       let mut contents : Array Html := #[]
       if let some reply := state.reply then
         if let some expr ← popupField (← InfoPopup.exprExplicit reply) then
-          contents := contents.push (props.render expr)
+          contents := contents.push (props.render (Hover.asParent hover) expr)
         contents := contents.push (Html.text " : ")
         if let some type ← popupField (← InfoPopup.type reply) then
-          contents := contents.push (props.render type)
+          contents := contents.push (props.render (Hover.asParent hover) type)
         if let some value ← popupField (Js.UndefinedOr.ofJs (← Js.Object.get reply (← js#"doc"))) then
           let doc ← Js.String.fromAny value
           if (← JsValue.toFloat (← Js.String.length doc)) != 0 then
@@ -145,22 +140,32 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
         if !props.diff.isEmpty then contents := contents.push (do
           <span className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</span>)
       else contents := #[Html.text state.status]
-      popup := #[do
-        <span id={popupId} role="tooltip" className="vir-native-infoview-type-popup"
-            style={(← js%{ "display" := (← js#"inline-block"), "padding" := (← js#"0.5em"),
+      popup := do
+        let node ← <span id={popupId} role="tooltip" className="vir-native-infoview-type-popup"
+            onPointerEnter={popupEnter} onPointerLeave={popupLeave}
+            onPointerOver={popupOver} onPointerOut={popupOver} onKeyDown={keyboard}
+            style={(← js%{ "position" := (← js#"fixed"), "display" := (← js#"block"),
+              "visibility" := (← js#"hidden"), "padding" := (← js#"0.5em"),
+              "zIndex" := (← js#"1000"), "maxWidth" := (← js#"min(480px, calc(100vw - 20px))"),
+              "maxHeight" := (← js#"min(300px, calc(100vh - 20px))"),
+              "boxSizing" := (← js#"border-box"), "overflow" := (← js#"auto"),
+              "whiteSpace" := (← js#"pre-wrap"),
+              "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)"),
               "border" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)"),
               "background" := (← js#"var(--vscode-editorHoverWidget-background, #eee)") })}>
           {...contents}<button type="button" aria-label="Close type information" onClick={close}>×</button>
-        </span>]
-    return ← <span className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++ diffClass props.diff))}
+          </span>
+        HoverDom.portal node
+    return ← <span id={anchorId} className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++
+        diffClass props.diff ++ (if current.highlighted then " highlight" else "")))}
         role="button" tabIndex={(← JsValue.ofFloat 0)} aria-expanded={(← JsValue.ofBool current.visible)}
-        aria-controls={popupId} onPointerOver={over} onPointerLeave={leave} onClick={toggle}
-        onFocus={over} onBlur={leave} onKeyDown={keyboard}>
-      {props.render props.fmt}{...popup}
+        aria-controls={popupId} onPointerOver={over} onPointerOut={leave} onClick={toggle}
+        onFocus={focus} onBlur={leave} onKeyDown={keyboard}>
+      {props.render props.parent props.fmt}{popup}
     </span>
 
 private partial def renderTaggedText (TagComponent : FunctionComponent (Props.WithData TagProps))
-    (session : Js RpcSession) (fmt : Js CodeWithInfos) : Html := do
+    (session : Js RpcSession) (parent : Hover.Parent) (fmt : Js CodeWithInfos) : Html := do
   if let some text ← Js.UndefinedOr.toOption (← CodeWithInfos.text fmt) then
     return ← Node.text text
   if let some append ← Js.UndefinedOr.toOption (← CodeWithInfos.append fmt) then
@@ -168,7 +173,7 @@ private partial def renderTaggedText (TagComponent : FunctionComponent (Props.Wi
     let size := (← JsValue.toFloat (← Js.Array.length append)).toUInt64.toNat
     for index in [:size] do
       let child ← Js.Array.get append (← JsValue.ofFloat index.toFloat)
-      let _ ← Js.Array.push children (← renderTaggedText TagComponent session child)
+      let _ ← Js.Array.push children (← renderTaggedText TagComponent session parent child)
     return ← Node.fragment (← Js.Object.empty) children
   if let some tag ← Js.UndefinedOr.toOption (← CodeWithInfos.tag fmt) then
     let data ← Js.Tuple2.first tag
@@ -176,11 +181,11 @@ private partial def renderTaggedText (TagComponent : FunctionComponent (Props.Wi
     let info ← Js.Object.get data (← js#"info")
     if ← JsValue.toBool (← Js.UndefinedOr.isUndefined (Js.UndefinedOr.ofJs info)) then
       if (← JsValue.toString (← Js.String.fromAny data)) == "highlighted" then
-        return ← <span className="highlighted-text">{renderTaggedText TagComponent session body}</span>
+        return ← <span className="highlighted-text">{renderTaggedText TagComponent session parent body}</span>
       else return ← malformed
     let diff ← optionalString (← Js.Object.get data (← js#"diffStatus"))
     let props ← Props.WithData.make (← LeanRef.toJSL ({
-      info, fmt := body, diff, session, render := renderTaggedText TagComponent session } : TagProps))
+      info, fmt := body, diff, session, parent, render := renderTaggedText TagComponent session } : TagProps))
     return ← <TagComponent @props={props}/>
   malformed
 
@@ -194,6 +199,6 @@ def View : RuntimeM (FunctionComponent CodeProps) := do
   FunctionComponent.ofLean fun props => do
     let fmt ← js_field% props "fmt"
     let session ← useRpcSession
-    return ← <span className="font-code">{renderTaggedText tag session fmt}</span>
+    return ← <span className="font-code">{renderTaggedText tag session {} fmt}</span>
 
 end VirNativeInfoview.InteractiveCode

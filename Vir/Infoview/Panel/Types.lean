@@ -33,6 +33,14 @@ opaque CodeWithInfos : Type
 /-- Exact upstream type-popup response, including nested tagged code and documentation. -/
 opaque InfoPopup : Type
 
+/-- Compile-time schema for the browser's exact DOMRect object. -/
+structure HoverRect where
+  left : Js Float
+  top : Js Float
+  bottom : Js Float
+  width : Js Float
+  height : Js Float
+
 /-- Native infoview editor connection and API receivers. -/
 opaque EditorConnection : Type
 opaque EditorApi : Type

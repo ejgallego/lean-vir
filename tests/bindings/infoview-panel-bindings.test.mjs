@@ -10,6 +10,62 @@ import { typeScriptDiagnostics } from "../support/typescript-probe.mjs";
 
 import { createInfoviewPanelBindings } from "../../web/src/host/vir-infoview-panel-bindings.js";
 
+test("hover primitives preserve DOM values and disconnect geometry observers", () => {
+  const bindings = createInfoviewPanelBindings();
+  const bounds = { left: 20, top: 30, width: 10, height: 12 };
+  const reference = { getBoundingClientRect() { assert.equal(this, reference); return bounds; } };
+  assert.equal(bindings["infoview.hover.rect"](reference), bounds);
+  const event = { getModifierState(key) { assert.equal(this, event); return key === "Control"; } };
+  assert.equal(bindings["infoview.hover.modifier"](event, "Control"), true);
+  assert.equal(bindings["infoview.hover.modifier"](event, "Shift"), false);
+
+  const listeners = [];
+  const observed = [];
+  let resize;
+  let disconnected = false;
+  let calls = 0;
+  const view = {
+    ResizeObserver: class {
+      constructor(callback) { resize = callback; }
+      observe(element) { observed.push(element); }
+      disconnect() { disconnected = true; }
+    },
+    addEventListener(...args) { listeners.push(args); },
+    removeEventListener(...args) {
+      const index = listeners.findIndex(entry => entry.every((value, i) => value === args[i]));
+      assert.notEqual(index, -1, "removal uses the original callback and capture flag");
+      listeners.splice(index, 1);
+    },
+  };
+  reference.ownerDocument = { defaultView: view };
+  const popup = {};
+  const cleanup = bindings["infoview.hover.observe"](reference, popup, value => {
+    assert.equal(value, undefined);
+    calls++;
+  });
+  assert.deepEqual(observed, [reference, popup]);
+  assert.equal(listeners[1][2], true, "scroll observation includes nested scroll containers");
+  resize();
+  listeners[0][1]();
+  assert.equal(calls, 2);
+  cleanup();
+  assert.equal(disconnected, true);
+  assert.deepEqual(listeners, []);
+
+  const original = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const body = { nodeType: 1 };
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { body } });
+  try {
+    const children = ["exact", " nodes"];
+    const portal = bindings["infoview.hover.portal"](children);
+    assert.equal(portal.children, children);
+    assert.equal(portal.containerInfo, body);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "document", original);
+    else delete globalThis.document;
+  }
+});
+
 test("panel projections match the pinned upstream TypeScript shapes", () => {
   const diagnostics = typeScriptDiagnostics(`
     import { PanelWidgetProps } from '../../node_modules/@leanprover/infoview/dist/infoview/userWidget';

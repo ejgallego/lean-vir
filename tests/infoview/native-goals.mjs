@@ -20,6 +20,11 @@ const [wasm, pkg, bundle] = await Promise.all([
     bundle: true, write: false, format: "iife", platform: "browser",
     define: { "process.env.NODE_ENV": '"development"' } }),
 ]);
+const hoverBundle = await build({
+  entryPoints: [fileURLToPath(new URL("native-hover-entry.js", import.meta.url))],
+  bundle: true, write: false, format: "iife", platform: "browser",
+  define: { "process.env.NODE_ENV": '"development"' },
+});
 const chrome = await launchChromium();
 let cdp;
 try {
@@ -46,6 +51,84 @@ try {
 } finally {
   cdp?.close();
   await chrome.close();
+}
+
+// This is the browser-level gate: CDP moves the real pointer through the
+// actual Wasm/React renderer.  Synthetic events above remain useful for the
+// dense state matrix, but cannot prove the portal transition geometry.
+const hoverChrome = await launchChromium();
+let hoverCdp;
+try {
+  hoverCdp = await openChromiumPage(hoverChrome);
+  await evaluate(hoverCdp, `${hoverBundle.outputFiles[0].text}\nvoid 0`);
+  const initial = await evaluate(hoverCdp,
+    `setupNativeHoverPanel(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
+  const parent = initial.tags.find(tag => tag.text.includes("prefix") && tag.text.includes("suffix"));
+  const child = initial.tags.find(tag => tag.text === "child");
+  const sibling = initial.tags.find(tag => tag.text === "sibling");
+  assert.ok(parent && child && sibling && initial.prefixRect && initial.suffixRect,
+    "real-pointer fixture rendered nested parent, child and sibling terms");
+  const snapshot = () => evaluate(hoverCdp, "nativeHoverController.snapshot()");
+  const move = (x, y) => hoverCdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  const moveTo = rect => move(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // The literal prefix is inside the parent tag but outside either nested tag.
+  await moveTo(initial.prefixRect);
+  const started = performance.now();
+  await wait(460);
+  const beforeOpen = await snapshot();
+  assert.equal(beforeOpen.popup, false, "real pointer does not open hover early");
+  assert.equal(beforeOpen.requests, 0, "real pointer does not request type early");
+  await wait(130);
+  let opened = await snapshot();
+  const elapsed = performance.now() - started;
+  assert.deepEqual(opened.highlighted, [parent.id], "literal parent area highlights only parent");
+  assert.equal(opened.requests, 1, "real pointer issues one parent type RPC after hover delay");
+  assert.deepEqual(opened.refs, ["parent"], "parent hover preserves its exact RPC reference");
+  assert.deepEqual(opened.tags.map(tag => tag.instance), initial.tags.map(tag => tag.instance),
+    "opening parent portal preserves nested tag DOM identities");
+  assert.ok(elapsed >= 500 && elapsed < 850, `hover open timing ${elapsed}ms is bounded`);
+  assert.equal(opened.portal, true, "type popup is appended to document.body");
+  assert.equal(opened.popupPosition, "fixed", "type popup uses fixed portal positioning");
+  assert.deepEqual(opened.tag, initial.tag, "opening portal does not shift tagged-term layout");
+  const hoverScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+  await writeFile(new URL("build/native-infoview-port/hover-preview.png", root), Buffer.from(hoverScreenshot.data, "base64"));
+  await moveTo(child.rect);
+  await wait(460);
+  let transitioned = await snapshot();
+  assert.deepEqual(transitioned.highlighted, [child.id], "real pointer parent-to-child has one deepest highlight");
+  assert.equal(transitioned.requests, 1, "child transition waits before issuing its RPC");
+  await wait(130);
+  transitioned = await snapshot();
+  assert.deepEqual(transitioned.highlighted, [child.id], "child remains the sole active highlight");
+  assert.deepEqual(transitioned.refs, ["parent", "child"], "child transition uses its exact RPC reference");
+  await moveTo(sibling.rect);
+  await wait(460);
+  transitioned = await snapshot();
+  assert.deepEqual(transitioned.highlighted, [sibling.id], "real pointer child-to-sibling has one deepest highlight");
+  assert.equal(transitioned.requests, 2, "sibling transition waits before issuing its RPC");
+  await wait(130);
+  opened = await snapshot();
+  assert.deepEqual(opened.highlighted, [sibling.id], "sibling remains the sole active highlight");
+  assert.deepEqual(opened.refs, ["parent", "child", "sibling"],
+    "sibling transition uses its exact RPC reference after delay");
+  await move(opened.popupRect.left + opened.popupRect.width / 2, opened.popupRect.top + opened.popupRect.height / 2);
+  await wait(350);
+  assert.equal((await snapshot()).popup, true, "moving pointer into popup keeps it open");
+  const closeStarted = performance.now();
+  await move(4, 4);
+  await wait(240);
+  assert.equal((await snapshot()).popup, true, "real pointer close delay has not elapsed early");
+  await wait(130);
+  assert.equal((await snapshot()).popup, false, "real pointer closes portal after leave delay");
+  const closeElapsed = performance.now() - closeStarted;
+  assert.ok(closeElapsed >= 300 && closeElapsed < 850, `hover close timing ${closeElapsed}ms is bounded`);
+  const hoverWarnings = await evaluate(hoverCdp, "nativeHoverController.dispose()");
+  assert.deepEqual(hoverWarnings, [], "real-pointer fixture emitted no React warnings");
+  console.log("Native infoview real pointer hover acceptance passed");
+} finally {
+  hoverCdp?.close();
+  await hoverChrome.close();
 }
 
 const liveBundle = await build({

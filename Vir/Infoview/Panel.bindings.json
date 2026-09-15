@@ -30,6 +30,51 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "infoview.hover.modifier", "group": "hover-dom", "target": "infoview.hover.modifier",
+        "lean": "Lean.Vir.Infoview.HoverDom.modifier", "marker": "vir_js",
+        "reason": "Forwards a PointerEvent or KeyboardEvent receiver and key to getModifierState.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"MouseEvent.getModifierState","semantics":"preserving"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [
+          {"name":"event","type":{"lean":"Lean.Vir.Js Browser.Event","representation":"js-resource","resourceInner":"Browser.Event"}},
+          {"name":"key","type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
+        "id": "infoview.hover.rect", "group": "hover-dom", "target": "infoview.hover.rect",
+        "lean": "Lean.Vir.Infoview.HoverDom.rect", "marker": "vir_js",
+        "reason": "Returns the exact DOMRect from Element.getBoundingClientRect; placement policy remains in Lean.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"Element.getBoundingClientRect","semantics":"preserving"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [{"name":"element","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Infoview.HoverRect","representation":"js-resource","resourceInner":"Infoview.HoverRect"}}
+      },
+      {
+        "id": "infoview.hover.portal", "group": "hover-dom", "target": "infoview.hover.portal",
+        "lean": "Lean.Vir.Infoview.HoverDom.portal", "marker": "vir_js",
+        "reason": "Calls ReactDOM.createPortal with the exact node and the embedding document.body as the selected container; no hover behavior is implemented by the host.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"createPortal","semantics":"preserving"},
+        "effect": {"id":"react","lean":"Lean.Vir.React.ReactM"},
+        "arguments": [
+          {"name":"node","type":{"lean":"Lean.Vir.Js React.Node","representation":"js-resource","resourceInner":"React.Node"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js React.Node","representation":"js-resource","resourceInner":"React.Node"}}
+      },
+      {
+        "id": "infoview.hover.observe", "group": "hover-dom", "target": "infoview.hover.observe",
+        "lean": "Lean.Vir.Infoview.HoverDom.observe", "marker": "vir_js",
+        "reason": "Observes reference/popup size and viewport scroll/resize. The exact callback performs Lean placement; returned native cleanup disconnects observers/listeners.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"dom","lean":"Lean.Vir.Browser.DomM"},
+        "arguments": [
+          {"name":"reference","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}},
+          {"name":"popup","type":{"lean":"Lean.Vir.Js Browser.Element","representation":"js-resource","resourceInner":"Browser.Element"}},
+          {"name":"callback","type":{"lean":"Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Unit"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Function1 Lean.Vir.Js.Any Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Unit"}}
+      },
+      {
         "id": "infoview.interactiveCode", "group": "components", "target": "infoview.interactiveCode",
         "lean": "Lean.Vir.Infoview.interactiveCode", "marker": "vir_js",
         "reason": "Returns the exact public upstream InteractiveCode function for React composition, not a Lean-callable render action. Supply native props with the required fmt field; the enclosing infoview owns its contexts.",
@@ -391,6 +436,14 @@
     ]
   },
   "roots": [
+    {
+      "id": "hover-dom", "title": "Native hover DOM primitives",
+      "targets": ["infoview.hover.*"],
+      "lean": {"public": ["Lean.Vir.Infoview.HoverDom"]},
+      "upstream": {"kind":"typescript", "package":"typescript",
+        "declarations":["node_modules/typescript/lib/lib.dom.d.ts", "node_modules/@types/react-dom/index.d.ts"],
+        "roots":["Element", "MouseEvent", "ResizeObserver", "createPortal"]}
+    },
     {
       "id": "components", "title": "Upstream React components",
       "targets": ["infoview.interactiveCode"],
