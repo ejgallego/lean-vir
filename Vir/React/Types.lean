@@ -82,13 +82,11 @@ namespace Props
 /-- Native React props carrying one explicitly named Lean-backed `data` field. -/
 opaque WithData (α : Type) : Type
 
-@[inline] unsafe def withDataAsPropsImpl {α : Type}
-    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props := unsafeCast value
-
 /-- Forget only the declared `data` field shape, preserving the native object. -/
-@[implemented_by withDataAsPropsImpl]
-axiom WithData.asProps {α : Type}
-    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props
+@[inline] def WithData.asProps {α : Type}
+    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props := by
+  unfold Lean.Vir.Js at *
+  exact value
 
 end Props
 
@@ -117,13 +115,10 @@ Views a function component as the `React.ElementType` accepted by
 `React.createElement`. This changes only the Lean phantom type: React receives
 the exact same function object, so its component identity is preserved.
 -/
-@[inline] unsafe def asElementTypeImpl {props : Type}
-    (component : FunctionComponent props) : Lean.Vir.Js ElementType :=
-  unsafeCast component
-
-@[implemented_by asElementTypeImpl]
-axiom asElementType {props : Type}
-    (component : FunctionComponent props) : Lean.Vir.Js ElementType
+@[inline] def asElementType {props : Type}
+    (component : FunctionComponent props) : Lean.Vir.Js ElementType := by
+  unfold FunctionComponent Lean.Vir.Js.Function1 Lean.Vir.Js at *
+  exact component
 
 end FunctionComponent
 

@@ -29,46 +29,13 @@ namespace Lean.Vir.ProofWidgets.Jsx
 
 open Lean Parser PrettyPrinter
 
--- Generated client terms need these private constants in the imported kernel
--- environment. Keep the compatibility option local; no public cast is added.
-section
-set_option backward.privateInPublic true
-
-/--
-The JSX elaborator alone mints this phantom view of a freshly allocated native
-object after it has checked every field against a props schema.  It preserves
-the JavaScript object, its identity, and its lifetime; this is not a general
-purpose props cast.
--/
-@[inline] private unsafe def sealFreshPropsImpl {props : Type}
-    (value : Lean.Vir.Js.Object) : Lean.Vir.Js props := unsafeCast value
-
-@[implemented_by sealFreshPropsImpl]
-private axiom sealFreshProps {props : Type}
-    (value : Lean.Vir.Js.Object) : Lean.Vir.Js props
-
-/--
-The JSX elaborator alone narrows a property read after checking its literal
-name against the receiver's declared props schema.  The native getter is still
-called exactly once and its exception behavior is unchanged.
--/
-@[inline] private unsafe def sealDeclaredFieldImpl {α : Type}
-    (value : Lean.Vir.Js.Any) : Lean.Vir.Js α := unsafeCast value
-
-@[implemented_by sealDeclaredFieldImpl]
-private axiom sealDeclaredField {α : Type}
-    (value : Lean.Vir.Js.Any) : Lean.Vir.Js α
-
-/-- Used only after the elaborator verifies a supported native ReactNode shape. -/
-@[inline] private unsafe def nativeNodeImpl {α : Type}
-    (value : Lean.Vir.Js α) : Lean.Vir.Js Lean.Vir.React.Node :=
-  unsafeCast value
-
-@[implemented_by nativeNodeImpl]
-private axiom nativeNode {α : Type}
-    (value : Lean.Vir.Js α) : Lean.Vir.Js Lean.Vir.React.Node
-
-end
+/-- Emit an ordinary identity term after checking the relevant child/props shape.
+No private runtime constant or unsafe implementation must escape this module. -/
+private meta def phantomCast (value : Term) : MacroM Term :=
+  `((fun (nativeValue : Lean.Vir.Js _) =>
+      (show Lean.Vir.Js _ from by
+        unfold Lean.Vir.Js at *
+        exact nativeValue)) $value)
 
 -- Verbose names avoid collisions with other packages' unscoped parser categories.
 declare_syntax_cat virProofWidgetsJsxElement
@@ -199,7 +166,7 @@ elab_rules : term
         else if shape.isConstOf ``String then
           Lean.Elab.liftMacroM `(Lean.Vir.React.Node.text $valueSyntax)
         else
-          Lean.Elab.liftMacroM `(pure ($(mkCIdent ``nativeNode) $valueSyntax))
+          Lean.Elab.liftMacroM do `(pure $(← phantomCast valueSyntax))
       else
         let shape ← Lean.Meta.mkFreshTypeMVar
         let result := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) shape
@@ -297,7 +264,7 @@ private meta def transformTag
       let component ← componentIdent opening
       let closingComponent ← componentIdent closing
       let props ← if sealProps then
-          `($(mkCIdent ``sealFreshProps) $propsId)
+          phantomCast propsId
         else pure (propsId : Term)
       `(Lean.Vir.React.Node.functionComponent
         (with_annotate_term $closingComponent $component) $props $childrenId)
@@ -415,10 +382,11 @@ elab_rules : term
     let resultType := Lean.mkApp (Lean.mkConst ``Lean.Vir.RuntimeM) fieldType
     let objectType ← Lean.Elab.Term.exprToSyntax
       (Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) (Lean.mkConst schema))
-    let sealId := mkCIdent ``sealDeclaredField
+    let valueId ← Lean.Elab.liftMacroM (mkIdent <$> Macro.addMacroScope `value)
+    let narrowed ← Lean.Elab.liftMacroM (phantomCast valueId)
     Lean.Elab.Term.elabTermEnsuringType (← Lean.Elab.liftMacroM `(term| do
-      let value ← Lean.Vir.Js.Object.get ($object : $objectType) (← Lean.Vir.JsValue.ofString $(quote name))
-      pure ($sealId value))) resultType
+      let $valueId ← Lean.Vir.Js.Object.get ($object : $objectType) (← Lean.Vir.JsValue.ofString $(quote name))
+      pure $narrowed)) resultType
 
 private meta def elabTag
     (tk : Syntax) (opening closing : TSyntax `virProofWidgetsJsxTag)

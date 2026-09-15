@@ -56,6 +56,12 @@ the expected shape; it neither decodes that value as Lean `α` nor validates
 an arbitrary incoming value. DOM markers therefore appear as `Js Element`
 or `Js Event`, rather than naked Lean marker types.
 
+`Js α` is an irreducible phantom alias over one opaque handle type. Ordinary
+type checking keeps shapes distinct; explicit casts unfold the alias and return
+the same handle. The built-in widenings and JSX-generated casts use these
+identity terms, without cast axioms, unsafe implementations or runtime wrappers.
+This is static API discipline, not a proof of a JavaScript value's shape.
+
 Use `JSL α` when JavaScript should store an opaque Lean-owned value.
 `LeanRef.toJSL` creates this carrier and `LeanRef.fromJSL` recovers the
 Lean value. `JSL α` abbreviates `Js (LeanRef.Handle α)`: a `JSL String`

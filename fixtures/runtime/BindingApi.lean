@@ -11,6 +11,18 @@ open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
+-- Phantom shapes remain distinct unless a cast explicitly unfolds the handle view.
+example (_value : Js String) (_values : Js.Array String) : True := by
+  fail_if_success have _ : Js Bool := _value
+  fail_if_success have _ : Js.Array Bool := _values
+  fail_if_success have _ : Js String = Js Bool := rfl
+  trivial
+
+-- An explicit cast needs only the identity term, even in an importing module.
+example {α β : Type} (value : Js α) : Js β := by
+  unfold Js at *
+  exact value
+
 -- Literal notation constructs native containers; interpolation does not encode Lean data.
 example (value : Js String) : RuntimeM Js.Object :=
   js%{ "value" := value }
