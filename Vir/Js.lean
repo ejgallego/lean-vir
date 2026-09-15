@@ -29,6 +29,13 @@ namespace Js
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 
+/-- Construction-only literal lifting; other expressions retain their effect semantics. -/
+meta def liftConstructionString (value : Lean.TSyntax `term) :
+    Lean.MacroM (Lean.TSyntax `term) :=
+  match value with
+  | `(js# $literal:str) => `(← Lean.Vir.JsValue.ofString $literal)
+  | _ => pure value
+
 /-- Native object construction. Field values are exact JS values; conversions are explicit. -/
 scoped syntax "js%{" (str " := " term),* "}" : term
 
@@ -39,6 +46,7 @@ macro_rules
     let writes ← names.zip values |>.mapM fun (name, value) => do
       if (name : Lean.TSyntax `str).getString == "__proto__" then
         Lean.Macro.throwErrorAt name.raw "native object literals do not support `__proto__`; use explicit property operations for prototype semantics"
+      let value ← liftConstructionString value
       `(doElem| Lean.Vir.Js.Object.set $object
           (← Lean.Vir.JsValue.ofString $name) $value)
     `(do

@@ -187,7 +187,7 @@ def nativeConstruction
     (payload : Js.Object) (label : Js String)
     (callback : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)) : Html := do
   let props ← js%{
-    "label" := (← js#"superseded"), "label" := label,
+    "label" := js#"superseded", "label" := label,
     "payload" := payload, "onClick" := callback, "values" := (← js#[label, label])
   }
   return ← <Component @props={props}>

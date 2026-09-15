@@ -46,7 +46,7 @@ open Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def greeting (name : Js String) : ReactM (Js Node) := do
-  let style ← js%{ "color" := (← js#"red") }
+  let style ← js%{ "color" := js#"red" }
   return ← <section className="greeting" style={style}>Hello, {Node.text name}</section>
 ```
 
@@ -54,6 +54,12 @@ Attributes accept exact JS values; literal strings are converted once. Use
 native names such as `aria-label` and `data-testid`. Events take native
 functions, so convert a Lean closure explicitly with `Callback.ofUnary`.
 There are no per-attribute or per-tag helper catalogues.
+
+In native object fields and JSX attributes, `js#"text"` inserts its conversion
+at that position: `js%{ "title" := js#"Hello" }` and
+`<span title={js#"Hello"}/>` need no extra arrow. Outside these positions it
+remains a `RuntimeM (Js String)` action. Named actions still require explicit
+`←`; construction never automatically executes an arbitrary expression.
 
 `js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
 `Js.Object.set` assignments in source order (last duplicate wins).

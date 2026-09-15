@@ -192,7 +192,7 @@ private meta def transformTag
         | `(virProofWidgetsJsxAttr| $name:jsxTag = $value:str) =>
           pure (getJsxTag name, ← `(← Lean.Vir.JsValue.ofString $value))
         | `(virProofWidgetsJsxAttr| $name:jsxTag = { $value:term }) =>
-          pure (getJsxTag name, value)
+          pure (getJsxTag name, ← Lean.Vir.Js.liftConstructionString value)
         | `(virProofWidgetsJsxAttr| @props={ $_value:term }) =>
           Macro.throwErrorAt attr "@props must be supplied alone; construct or update the object explicitly"
         | `(virProofWidgetsJsxAttr| {... $_value:term }) =>
@@ -290,7 +290,7 @@ private meta def typedAttributes
       | `(virProofWidgetsJsxAttr| $name:jsxTag = $value:str) =>
         pure (name, ← Lean.Elab.liftMacroM `(← Lean.Vir.JsValue.ofString $value))
       | `(virProofWidgetsJsxAttr| $name:jsxTag = { $value:term }) =>
-        pure (name, value)
+        pure (name, ← Lean.Elab.liftMacroM (Lean.Vir.Js.liftConstructionString value))
       | `(virProofWidgetsJsxAttr| @props={ $_value:term }) =>
         throwErrorAt attr "`@props` is an exact native-props escape hatch and must be supplied alone"
       | `(virProofWidgetsJsxAttr| {... $_value:term }) =>

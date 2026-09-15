@@ -15,6 +15,23 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 example (value : Js String) : RuntimeM Js.Object :=
   js%{ "value" := value }
 
+-- Only explicit string literals are lifted in construction positions.
+example : RuntimeM Js.Object := js%{ "value" := js#"native" }
+example : React.ReactM (Js React.Node) := <span title={js#"native"}/>
+example : RuntimeM (Js String) := js#"still an action"
+example (action : RuntimeM (Js String)) : RuntimeM Js.Object :=
+  js%{ "value" := (← action) }
+-- Definitional equality verifies order and multiplicity, not only the result type.
+example (action : RuntimeM (Js String)) :
+    (js%{ "first" := js#"a", "middle" := (← action), "last" := js#"b" }) =
+    (js%{ "first" := (← js#"a"), "middle" := (← action), "last" := (← js#"b") }) := rfl
+example : (<span title={js#"native"}/> : React.ReactM (Js React.Node)) =
+    <span title={(← js#"native")}/> := rfl
+example (_action : RuntimeM (Js String)) : True := by
+  fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := _action }
+  fail_if_success have _ : React.ReactM (Js React.Node) := <span title={_action}/>
+  trivial
+
 -- Literal construction must not invoke Object.prototype's legacy setter.
 example (_value : Js.Object) (Component : React.FunctionComponent React.Props) : True := by
   let _ := Component
@@ -68,6 +85,20 @@ example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
   <Component title="native" values={(← Js.Array.empty)} ref={ref}/>
+
+#guard_msgs in
+example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
+  <Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/>
+
+example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) :
+    (<Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/> : React.ReactM (Js React.Node)) =
+    <Component title={(← js#"native")} values={(← Js.Array.empty)} ref={ref}/> := rfl
+
+example (Component : React.FunctionComponent NativeProps) (_ref : Js.Any) : True := by
+  let _ := Component
+  fail_if_success have _ : React.ReactM (Js React.Node) :=
+    <Component title={js#"native"} values={js#"not an array"} ref={_ref}/>
+  trivial
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (props : Js NativeProps) : React.ReactM (Js React.Node) :=
