@@ -75,8 +75,8 @@ Uppercase JSX takes a native function component. Supply an already-typed
 props object with `<Component @props={props}/>`; this must be the sole attribute.
 `@props` is VIR's exact-object argument, not a field named `props` or JavaScript
 object spread. It performs no copying or merging before calling React. React
-still applies its normal props construction. Attribute `{...props}` is rejected;
-child `{...items}` remains child iteration.
+still applies its normal props construction. Both attribute `{...props}` and
+child `{...items}` spreads are rejected; insert native child arrays with `{items}`.
 With an untyped `FunctionComponent Props`, attributes construct ordinary native
 props. For a typed component, declare a flat structure whose fields are native
 `Js` values and use it only as the props shape:
@@ -118,29 +118,32 @@ This differs from counting Lean string characters.
 are evaluated before children. `{node}`, `{text}` and `{nodes}` insert an
 existing `Js Node`, `Js String` or `Js.Array Node` unchanged. A native array
 occupies one child slot; JSX does not flatten it or add a fragment. Existing
-child actions still run left-to-right; `{...items}` runs a Lean array of child
-actions for compatibility. Prefer native mapping when the input is already native:
+child actions still run left-to-right and may return a native node, string or
+node array. Lean arrays (including arrays of actions) are not JSX children.
+Use native mapping directly:
 
 ```lean
 def labels (values : Js.Array String) : ReactM (Js Node) := do
   let render ← FunctionComponent.ofLean fun (label : Js String) =>
     <span key={label}>{label}</span>
-  let nodes ← Js.Array.map values render
-  return ← <div>{nodes}</div>
+  return ← <div>{values.map render}</div>
 ```
 
 `Js.Array.map` calls native `array.map(callback)` with an explicitly created
 JavaScript function. Its typed surface selects a unary callback and omits
 `thisArg`; the native operation still supplies index/source arguments, skips
 holes and propagates callback exceptions. No Lean array is constructed.
-Keys and component identity follow React's ordinary rules.
+The mapping expression runs once at its child position. Keys and component
+identity follow React's ordinary rules. For a fixed native array, use
+`js#[first, second]`; execute construction actions explicitly inside it, such
+as `js#[← <span key="first">First</span>, ← <span key="second">Second</span>]`.
 
 `Html.text` explicitly converts Lean text. In a `do` block, use
 `return ← <...>` for a final JSX expression to avoid Lean parsing `<` as comparison.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
-interpolated attributes, text/child spreads, uppercase components, typed props,
+interpolated attributes, native child arrays, uppercase components, typed props,
 keys and handlers. This native authoring facade is distinct from upstream's
 [serialized `ProofWidgets.Html` protocol](INFOVIEW.md#optional-serialized-html).
 

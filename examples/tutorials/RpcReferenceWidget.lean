@@ -127,17 +127,18 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
   let status := if state.status == "loading" then s!"Loading…{previous}"
     else if state.status == "error" then s!"Request failed: {state.error}.{previous}"
     else "Ready"
-  let children : Array ProofWidgets.Html := match state.reply with
-    | none => #[]
-    | some reply => #[do
-        Node.functionComponent child
-          (← Props.WithData.make (← LeanRef.toJSL reply)) (← Js.Array.empty)]
+  let children : ReactM (Js.Array Node) := match state.reply with
+    | none => Js.Array.empty
+    | some reply => do
+        let props ← Props.WithData.make (← LeanRef.toJSL reply)
+        Js.Object.set (Props.WithData.asProps props) (← js#"key") (← js#"reply")
+        js#[← Node.functionComponent child props (← Js.Array.empty)]
   return ← <section aria-busy={← JsValue.ofBool (state.status == "loading")}>
     <p role={← JsValue.ofString (if state.status == "error" then "alert" else "status")}
         data-rpc-status={← JsValue.ofString state.status}>
       {ProofWidgets.Html.text status}
     </p>
-    {...children}
+    {children}
   </section>
 
 /-- Construct once: native React function identity preserves parent and child state. -/

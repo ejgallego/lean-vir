@@ -140,7 +140,7 @@ scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* ">" virProofWidg
   virProofWidgetsJsxElement
 
 scoped syntax jsxText : virProofWidgetsJsxChild
-/-- Interpolates an array of HTML values into JSX children. -/
+/-- Retained only to diagnose the removed Lean-array child spread. -/
 scoped syntax "{..." term "}" : virProofWidgetsJsxChild
 /-- Inserts a native node, string or node array, or executes one HTML action. -/
 scoped syntax "{" term "}" : virProofWidgetsJsxChild
@@ -171,7 +171,15 @@ elab_rules : term
         else
           throwErrorAt child "JSX expects a native Node, String or Array Node, or a node construction action"
       else
-        Lean.Elab.liftMacroM `(do return ← ($valueSyntax))
+        let shape ← Lean.Meta.mkFreshTypeMVar
+        let result := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) shape
+        let reactAction := Lean.mkApp (Lean.mkConst ``Lean.Vir.React.ReactM) result
+        let runtimeAction := Lean.mkApp (Lean.mkConst ``Lean.Vir.RuntimeM) result
+        unless (← Lean.Meta.isDefEq type reactAction) || (← Lean.Meta.isDefEq type runtimeAction) do
+          throwErrorAt child "JSX children must be native values or actions returning native values; Lean arrays are not supported"
+        Lean.Elab.liftMacroM `(do
+          let nativeValue ← ($valueSyntax)
+          vir_native_child% nativeValue)
     Lean.Elab.Term.elabTermEnsuringType lowered action
 
 private meta def trailingWhitespace (stx : Syntax) : String :=
@@ -251,12 +259,8 @@ private meta def transformTag
       | `(virProofWidgetsJsxChild| $element:virProofWidgetsJsxElement) =>
         whitespaceBefore := trailingWhitespace element
         `($element:virProofWidgetsJsxElement)
-      | `(virProofWidgetsJsxChild| {... $term }%$childToken) =>
-        whitespaceBefore := trailingWhitespace childToken
-        writes := writes.push <| ← `(doElem|
-          for child in $term do
-            let _ ← Lean.Vir.Js.Array.push $childrenId (← child))
-        continue
+      | `(virProofWidgetsJsxChild| {... $_term }%$childToken) =>
+        Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native Js.Array Node with {children}"
       | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
     writes := writes.push <| ← `(doElem|
       let _ ← Lean.Vir.Js.Array.push $childrenId (← ($action)))

@@ -69,11 +69,25 @@ example (text : Js String) :
 example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
   <div>{action}</div>
 
+example (values : Js.Array String) (render : Js.Function1 (Js String) (Js React.Node)) :
+    React.ReactM (Js React.Node) := <div>{values.map render}</div>
+
+example (text : RuntimeM (Js String)) (nodes : React.ReactM (Js.Array React.Node)) :
+    React.ReactM (Js React.Node) := <div>{text}{nodes}</div>
+
+example : React.ReactM (Js React.Node) := <div>{js#"native text"}</div>
+
 example (_raw : Js.Object) (_nodes : Array (Js React.Node))
-    (_actions : Js.Array (RuntimeM (Js React.Node))) : True := by
+    (_actions : Js.Array (RuntimeM (Js React.Node)))
+    (_leanActions : Array (React.ReactM (Js React.Node)))
+    (_arrayAction : RuntimeM (Array (Js React.Node))) : True := by
   fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_raw}</div>
   fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_nodes}</div>
   fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_actions}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_leanActions}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_arrayAction}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{..._nodes}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{..._leanActions}</div>
   trivial
 
 #guard_msgs in

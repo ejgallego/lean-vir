@@ -61,20 +61,19 @@ def MarkdownDisplay : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React
     <pre className="pw-jsx-markdown-source">{Html.text ctx.contents}</pre>
   </section>
 
-def htmlLetters : Array Html := #[
-  do
+def htmlLetters : Lean.Vir.React.ReactM (Js.Array Node) := do
+  js#[← (do
     let style ← js%{ "color" := (← js#"red") }
-    return ← <span id="proofwidgets-jsx-letter-h" style={style}>H</span>,
-  do
+    return ← <span key="h" id="proofwidgets-jsx-letter-h" style={style}>H</span>),
+  ← (do
     let style ← js%{ "color" := (← js#"yellow") }
-    return ← <span id="proofwidgets-jsx-letter-t" style={style}>T</span>,
-  do
+    return ← <span key="t" id="proofwidgets-jsx-letter-t" style={style}>T</span>),
+  ← (do
     let style ← js%{ "color" := (← js#"green") }
-    return ← <span id="proofwidgets-jsx-letter-m" style={style}>M</span>,
-  do
+    return ← <span key="m" id="proofwidgets-jsx-letter-m" style={style}>M</span>),
+  ← (do
     let style ← js%{ "color" := (← js#"blue") }
-    return ← <span id="proofwidgets-jsx-letter-l" style={style}>L</span>
-]
+    return ← <span key="l" id="proofwidgets-jsx-letter-l" style={style}>L</span>)]
 
 def htmlHeadline : Html :=
   <b id="proofwidgets-jsx-headline">What, HTML in Lean?!</b>
@@ -84,8 +83,8 @@ def parrotImage : Html :=
     src={← JsValue.ofString ("https://" ++ "upload.wikimedia.org/wikipedia/commons/a/a5/Parrot_montage.jpg")}
     alt="Six photos of parrots arranged in a grid." />
 
-def spreadInterpolation : Html :=
-  <b id="proofwidgets-jsx-spread">You can use {...htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
+def arrayInterpolation : Html :=
+  <b id="proofwidgets-jsx-array">You can use {htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
 
 def markdownExample (MarkdownDisplay : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData MarkdownProps)) : Html :=
   do
@@ -157,7 +156,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
     </ul>
     let view : Html := <section @props={surfaceProps}>
       <Card @props={cardProps}>
-        {htmlHeadline}{parrotImage}{spreadInterpolation}{pure markdown}
+        {htmlHeadline}{parrotImage}{arrayInterpolation}{pure markdown}
         <Badge @props={badgeProps}> children</Badge>
         {pure action}{pure rows}
       </Card>
@@ -222,7 +221,6 @@ def nativeChildSlots (body : Js Node) (text : Js String)
 def nativeMappedChildren (labels : Js.Array String) : Html := do
   let render ← FunctionComponent.ofLean fun (label : Js String) =>
     <span key={label}>{label}</span>
-  let nodes ← Js.Array.map labels render
-  return ← <div>{nodes}</div>
+  return ← <div>{labels.map render}</div>
 
 end ProofWidgetsJsxSubset

@@ -24,8 +24,10 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   let traceConstruction = false;
   let mapElementProbe = null;
   let lastMap;
+  let mapCalls = 0;
   const map = hostBindings["js.array.map"];
   hostBindings["js.array.map"] = (array, callback) => {
+    mapCalls++;
     const result = map(array, callback);
     lastMap = { array, result };
     return result;
@@ -120,7 +122,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     "native JSX inserts exact child values without flattening, copying or UTF-8 conversion");
     const labels = ["first", , label];
     const mapped = runtime.call("ProofWidgetsJsxSubset.nativeMappedChildren", labels);
-    check(lastMap.array === labels && lastMap.result === mapped.props.children &&
+    check(mapCalls === 1 && lastMap.array === labels && lastMap.result === mapped.props.children &&
       Array.isArray(mapped.props.children) && mapped.props.children.length === 3 &&
       !(1 in mapped.props.children) && labels.length === 3 && !(1 in labels) &&
       mapped.props.children[0].key === "first" && mapped.props.children[2].key === label &&
