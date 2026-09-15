@@ -14,6 +14,7 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
   const arrayOperation = new Map([
     ["js.array.empty", "Array"],
     ["js.array.push", "Array.push"],
+    ["js.array.map", "Array.map"],
     ["js.array.length", "Array.length"],
     ["js.array.item", "Array"],
   ]).get(protocol.target);
@@ -55,6 +56,14 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     lean: `Lean.Vir.Js.Array ${element}`,
     representation: "js-resource", resourceInner: `Lean.Vir.Js.Array.Value ${element}`,
   });
+  const ternaryCallbackType = (first, second, third, output) => {
+    const group = (type) => type.includes(" ") ? `(${type})` : type;
+    const args = [first, second, third, output].map(group).join(" ");
+    return {
+      lean: `Lean.Vir.Js.Function3 ${args}`, representation: "js-resource",
+      resourceInner: `Lean.Vir.Js.Function.Ternary ${args}`,
+    };
+  };
   const checkType = (actual, expected, position) => {
     for (const [key, value] of Object.entries(expected)) {
       require(actual?.[key] === value, `${position} ${key} must be ${value}, got ${actual?.[key]}`);
@@ -153,7 +162,10 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     indexer.args.length === 1 && number(indexer.args[0].type) &&
     !indexer.args[0].optional && !indexer.args[0].rest && element(indexer.result),
   "upstream [n: number]: T must return the receiver's T (unchecked-index lane)");
-  require(parameters.length === 1, "receiver/item/result must share one parameter, never independent parameters");
+  require(parameters.length === (protocol.target === "js.array.map" ? 2 : 1),
+    protocol.target === "js.array.map"
+      ? "receiver, callback and result must use exactly correlated input/output parameters"
+      : "receiver/item/result must share one parameter, never independent parameters");
   const [leanElement] = parameters;
   const receiver = arrayType(leanElement);
   const value = jsType(leanElement);
@@ -172,6 +184,34 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
         shape.args[0].type.kind === "array" && element(shape.args[0].type.element) && number(shape.result),
       "upstream push(...items: T[]): number must use the receiver's T; only one-item arity is supported");
       checkSignature([receiver, value], jsNumber);
+      break;
+    }
+    case "js.array.map": {
+      const map = symbols.get("Array.map");
+      const [output] = map?.typeParameters ?? [];
+      const shape = map?.shape;
+      require(map?.optional !== true, "upstream Array.map must not be optional");
+      require(map?.kind === "method" && map.typeParameters?.length === 1 &&
+        output.constraint === undefined && output.default === undefined && output.name !== parameter.name,
+      "upstream Array.map must introduce one unconstrained output parameter");
+      const callback = shape?.args?.[0]?.type;
+      require(shape?.kind === "function" && shape.effect === "pure" && shape.args.length === 2 &&
+        !shape.args[0].optional && !shape.args[0].rest && callback?.kind === "function" &&
+        callback.effect === "pure" && callback.args.length === 3 &&
+        !callback.args.some((argument) => argument.optional || argument.rest) &&
+        element(callback.args[0].type) && number(callback.args[1].type) &&
+        callback.args[2].type?.kind === "array" && element(callback.args[2].type.element) &&
+        callback.result?.kind === "ref" && callback.result.id === output.name &&
+        (callback.result.args ?? []).length === 0 && shape.args[1].optional && !shape.args[1].rest &&
+        shape.args[1].type?.kind === "opaque" && shape.args[1].type.name === "any" &&
+        shape.result?.kind === "array" && shape.result.element?.kind === "ref" &&
+        shape.result.element.id === output.name && (shape.result.element.args ?? []).length === 0,
+      "upstream map<U>(value: T, index: number, array: T[], thisArg?: any): U[] must preserve T and U");
+      require(parameters.length === 2, "receiver, ternary callback and result need correlated input/output parameters");
+      const [input, result] = parameters;
+      checkSignature([arrayType(input), ternaryCallbackType(
+        jsType(input).lean, jsType("Float").lean, arrayType(input).lean, jsType(result).lean,
+      )], arrayType(result));
       break;
     }
     case "js.array.item":
