@@ -230,9 +230,16 @@ terminates the newly created activity. A Promise declared as an exact `Js`
 result is simply rooted and commits like any other JavaScript object. This
 transaction is out of band and does not alter the returned value.
 
-If argument lifting or the host call fails, callbacks created for that failed
-call are released. A synchronous host exception is rethrown by the owning export
-or callback call before any placeholder interpreter result is treated as success.
+Callbacks created while lifting arguments follow JavaScript reachability even
+when argument lifting, the host call or result lowering fails. A host may retain
+a callback before throwing; it remains usable while its runtime is live. VIR
+does not keep a per-call callback census or invalidate these escaped values.
+Unretained callbacks become eligible for collection; reclamation timing belongs
+to the garbage collector, with explicit runtime disposal as the deterministic
+fallback. This does not waive responsibility for accidental retention by VIR.
+
+A synchronous host exception is rethrown by the owning export or callback call
+before any placeholder interpreter result is treated as success.
 
 Custom binding maps may expose `[VIR_HOST_DISPOSE]()` for their own active
 resources. Runtime disposal attempts every binding hook, active resource, Lean

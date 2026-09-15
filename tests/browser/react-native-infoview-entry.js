@@ -58,8 +58,8 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   try {
     await React.act(async () => check(runtime.call("ReactTamagotchi.mount", `#${peer.id}`),
       "peer Tamagotchi mounts"));
-    check(callbackRegistryScans > 0 && runtime.liveCallbacks.size > 0,
-      "real Lean callback lifting keeps the tracked registry path");
+    check(callbackRegistryScans === 0 && runtime.liveCallbacks.size > 0,
+      "real Lean callbacks own closure roots without a per-call registry census");
     await React.act(async () => peer.querySelector("#react-pet-art-toggle").click());
     check(peer.querySelector("#react-pet-device").dataset.art === "pet",
       "peer has different state before the authoring probe");

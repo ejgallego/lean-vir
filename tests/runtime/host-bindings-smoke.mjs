@@ -169,12 +169,11 @@ assert.throws(
   () => throwingBindingRuntime.callTimed("HostInterop.callbackRoundTrip", 1),
   /host binding boom/,
 );
-assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => throwingCallback(1n),
-  /closure root id is not live|disposed runtime/,
-);
+assert.equal(throwingBindingRuntime.liveCallbacks.size, 1);
+assert.equal(throwingCallback(1n), 8n);
 throwingBindingRuntime.dispose();
+assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
+assert.throws(() => throwingCallback(1n), /disposed runtime/);
 
 let bindingDisposals = 0;
 const reloadRuntime = await createVirRuntime({

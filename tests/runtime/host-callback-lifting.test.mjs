@@ -112,13 +112,13 @@ test("callback-free scalar/string/unit descriptors skip tracking on conversion c
   assert.deepEqual(h.released, []);
 });
 
-test("functions and nested composites still track, and successful calls retain callbacks", t => {
+test("functions and nested composites retain callbacks without a registry census", t => {
   const h = harness(t);
   h.objects.set(1, [2]).set(2, [3]);
   let received;
   h.call([callback, array(array(callback))], [4, 1], (...args) => { received = args; },
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
-  assert.equal(h.runtime.liveCallbacks.scans, 4);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
   assert.equal(h.runtime.liveCallbacks.size, 58);
   assert.equal(received[0](), 57);
   assert.equal(received[1][0][0](), 58);
@@ -126,37 +126,37 @@ test("functions and nested composites still track, and successful calls retain c
   assert.deepEqual(h.released, []);
 });
 
-test("even callback-free composites keep the conservative tracked path", t => {
+test("callback-free composites need no registry census either", t => {
   const h = harness(t);
   h.objects.set(1, [2]);
   h.call([array(unit)], [1], values => assert.deepEqual(values, [undefined]),
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION);
-  assert.equal(h.runtime.liveCallbacks.scans, 2);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
   assert.deepEqual(h.released, []);
 });
 
-test("partial composite lifting captures callbacks even when a later element is missing", t => {
+test("partial composite failure releases temporary objects without a callback census", t => {
   const h = harness(t);
   h.objects.set(1, [2, 0]);
   assert.throws(() => h.call([callback, array(callback)], [3, 1], () => assert.fail("host entered"),
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION), /\[1\] is unavailable/);
-  assert.equal(h.runtime.liveCallbacks.scans, 4);
-  assert.deepEqual(h.released, [57, 58]);
-  assert.equal(h.runtime.liveCallbacks.size, 56);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
+  assert.deepEqual(h.released, []);
+  assert.equal(h.runtime.liveCallbacks.size, 58, "foreign roots await GC or explicit disposal");
   assert.deepEqual(h.decremented, [2]);
 });
 
-test("later leaf lifting failure releases earlier callbacks without a leaf scan", t => {
+test("later lifting failure leaves callback reclamation to reachability", t => {
   const h = harness(t);
   assert.throws(() => h.call([callback, resource], [1, 404], () => assert.fail("host entered")),
     /did not lift to a live host resource/);
-  assert.equal(h.runtime.liveCallbacks.scans, 2);
-  assert.deepEqual(h.released, [57]);
-  assert.equal(h.runtime.liveCallbacks.size, 56);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
+  assert.deepEqual(h.released, []);
+  assert.equal(h.runtime.liveCallbacks.size, 57);
 });
 
 for (const stage of ["host", "result"]) {
-  test(`${stage} error rolls back and releases earlier callbacks after leaf arguments`, t => {
+  test(`${stage} error rolls back effects without invalidating escaped callbacks`, t => {
     const error = new Error(stage);
     const h = harness(t, { lower: () => { if (stage === "result") throw error; return 1; } });
     h.objects.set(1, {});
@@ -168,10 +168,14 @@ for (const stage of ["host", "result"]) {
       if (stage === "host") throw error;
     }), e => e === error);
     assert.deepEqual(events, ["rollback"]);
-    assert.equal(h.runtime.liveCallbacks.scans, 2);
-    assert.deepEqual(h.released, [57]);
-    assert.throws(() => retained(), /disposed runtime/);
+    assert.equal(h.runtime.liveCallbacks.scans, 0);
+    assert.deepEqual(h.released, []);
+    assert.equal(retained(), 57);
     assert.equal(h.existing[0](), 1);
+    h.runtime.releaseLiveCallbacks();
+    assert.throws(() => retained(), /disposed runtime/);
+    assert.equal(h.runtime.liveCallbacks.size, 0);
+    assert.equal(new Set(h.released).size, 57);
   });
 }
 
@@ -190,16 +194,16 @@ test("reentrant successful calls retain their own callbacks when the outer host 
     throw failure;
   }), error => error === failure);
   assert.deepEqual(events, ["outer"]);
-  assert.equal(h.runtime.liveCallbacks.scans, 4);
-  assert.deepEqual(h.released, [57]);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
+  assert.deepEqual(h.released, []);
   assert.equal(innerCallback(), 58);
-  assert.equal(h.runtime.liveCallbacks.size, 57);
+  assert.equal(h.runtime.liveCallbacks.size, 58);
 });
 
-test("unknown descriptors keep tracked failure cleanup", t => {
+test("unknown descriptors still reject without a callback census", t => {
   const h = harness(t);
   assert.throws(() => h.call([callback, { interfaceTag: 999 }], [1, 2], () => assert.fail("host entered"),
     HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION), /unsupported object ABI result type/);
-  assert.equal(h.runtime.liveCallbacks.scans, 4);
-  assert.deepEqual(h.released, [57]);
+  assert.equal(h.runtime.liveCallbacks.scans, 0);
+  assert.deepEqual(h.released, []);
 });
