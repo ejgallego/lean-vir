@@ -8,6 +8,39 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 
+test("literal construction defines own data properties; ordinary assignment and push stay native", () => {
+  const b = createJsCollectionHostBindings();
+  const prototype = {};
+  let calls = 0;
+  Object.defineProperty(prototype, "field", { set() { calls++; }, configurable: true });
+  const object = Object.create(prototype);
+  b["js.object.set"](object, "field", "assigned");
+  assert.equal(calls, 1);
+  assert.equal(Object.hasOwn(object, "field"), false);
+  b["js.construction.field"](object, "field", "first");
+  b["js.construction.field"](object, "field", "last");
+  assert.equal(calls, 1);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(object, "field"), {
+    value: "last", writable: true, enumerable: true, configurable: true,
+  });
+  const arrayPrototype = Object.create(Array.prototype);
+  Object.defineProperty(arrayPrototype, "0", { set() { calls++; }, configurable: true });
+  const assigned = Object.setPrototypeOf([], arrayPrototype);
+  b["js.array.push"](assigned, "assigned");
+  assert.equal(calls, 2);
+  assert.equal(Object.hasOwn(assigned, "0"), false);
+  const array = Object.setPrototypeOf([], arrayPrototype);
+  array.push = () => { throw new Error("literal must not call push"); };
+  b["js.construction.element"](array, "first");
+  b["js.construction.element"](array, "second");
+  assert.equal(calls, 2);
+  assert.equal(array.length, 2);
+  assert.equal(array[0], "first");
+  assert.equal(array[1], "second");
+  assert.throws(() => b["js.construction.field"](Object.freeze({}), "field", "x"), TypeError);
+  assert.throws(() => b["js.construction.element"](Object.freeze([]), "x"), TypeError);
+});
+
 test("typed collection providers preserve native values, identity and index absence", () => {
   const bindings = createJsCollectionHostBindings();
   const array = bindings["js.array.empty"]();

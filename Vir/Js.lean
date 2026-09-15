@@ -48,7 +48,7 @@ macro_rules
       if (name : Lean.TSyntax `str).getString == "__proto__" then
         Lean.Macro.throwErrorAt name.raw "native object literals do not support `__proto__`; use explicit property operations for prototype semantics"
       let value ← liftConstructionString value
-      `(doElem| Lean.Vir.Js.Object.set $object
+      `(doElem| Lean.Vir.Js.Construction.field $object
           (← Lean.Vir.JsValue.ofString $name) $value)
     `(do
       let $object ← Lean.Vir.Js.Object.empty
@@ -64,7 +64,7 @@ macro_rules
     let array := Lean.mkIdent array
     let writes ← values.getElems.mapM fun value => do
       let value ← liftConstructionString value
-      `(doElem| let _ ← Lean.Vir.Js.Array.push $array $value)
+      `(doElem| Lean.Vir.Js.Construction.element $array $value)
     `(do
       let $array ← Lean.Vir.Js.Array.empty
       $[$writes:doElem]*

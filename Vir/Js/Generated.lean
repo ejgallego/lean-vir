@@ -106,6 +106,47 @@ opaque get
 
 end Js.Array
 
+namespace Js.Construction
+
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.field`.
+
+Compiler lowering for native object/JSX literals: CreateDataPropertyOrThrow semantics, defining an own writable enumerable configurable property without invoking inherited setters. Not ordinary assignment or the full Object.defineProperty API.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.construction.field"]
+opaque field
+    {α : Type}
+    (object : @& Lean.Vir.Js.Object)
+    (name : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.element`.
+
+Compiler lowering for dense native array/JSX child-argument literals: defines the next own data property at array.length without calling push or inherited setters. The element shape remains correlated with the array shape. Not the general Array.push API.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.construction.element"]
+opaque element
+    {α : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+end Js.Construction
+
 namespace Js.Function
 
 /--

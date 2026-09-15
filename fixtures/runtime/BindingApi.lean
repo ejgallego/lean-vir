@@ -145,6 +145,36 @@ structure NativeProps where
   values : Js.Array String
   ref : Js.Any
 
+example (Component : React.FunctionComponent NativeProps) (ref : Js.Any)
+    (key : Js String) (number : Js Float) (bigint : Js Nat)
+    (optional : Js.UndefinedOr String) (nullable : Js.Nullable String) : RuntimeM Unit := do
+  let _ ← <Component key={key} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← <Component key={number} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← <Component key={bigint} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← <Component key={optional} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← <Component key={nullable} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← <Component key={js#"literal"} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  pure ()
+
+example (Component : React.FunctionComponent NativeProps) (ref : Js.Any)
+    (_key : Js Bool) (_object : Js.Object) (_any : Js.Any) : True := by
+  let _ := Component
+  let _ := ref
+  fail_if_success have _ : React.ReactM (Js React.Node) :=
+    <Component key={_key} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) :=
+    <Component key={_object} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) :=
+    <Component key={_any} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) :=
+    <Component key="a" key="b" title="x" values={(← Js.Array.empty)} ref={ref}/>
+  trivial
+
+example (_text : Js String) (_number : Js Float) : True := by
+  fail_if_success have _ : RuntimeM (Js.Array String) := js#[_text, _number]
+  fail_if_success have _ : RuntimeM (Js.Array String) := js#[_number]
+  trivial
+
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
   <Component title="native" values={(← Js.Array.empty)} ref={ref}></Component>

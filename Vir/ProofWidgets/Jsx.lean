@@ -142,7 +142,7 @@ scoped syntax "<" virProofWidgetsJsxTag virProofWidgetsJsxAttr* ">" virProofWidg
 scoped syntax jsxText : virProofWidgetsJsxChild
 /-- Retained only to diagnose the removed Lean-array child spread. -/
 scoped syntax "{..." term "}" : virProofWidgetsJsxChild
-/-- Inserts a native node, string or node array, or executes one HTML action. -/
+/-- Inserts a supported native React child value, or executes its construction action. -/
 scoped syntax "{" term "}" : virProofWidgetsJsxChild
 scoped syntax virProofWidgetsJsxElement : virProofWidgetsJsxChild
 
@@ -150,6 +150,26 @@ scoped syntax:max virProofWidgetsJsxElement : term
 
 -- Internal elaboration node: only JSX interpolation inserts this syntax.
 syntax (name := nativeChild) "vir_native_child% " term : term
+
+-- React's key is element metadata, not a field in the component's props schema.
+syntax (name := nativeKey) "vir_native_key% " term : term
+
+private meta partial def isNativeKeyShape (type : Lean.Expr) : Lean.MetaM Bool := do
+  let type ← Lean.Meta.whnf type
+  if #[``String, ``Float, ``Nat, ``Lean.Vir.Js.Undefined.Value].any type.isConstOf then
+    return true
+  for constructor in #[``Lean.Vir.Js.Nullable.Value, ``Lean.Vir.Js.UndefinedOr.Value] do
+    if type.isAppOfArity constructor 1 then
+      return ← isNativeKeyShape type.appArg!
+  return false
+
+elab_rules : term
+  | `(vir_native_key% $key) => do
+    let value ← Lean.Elab.Term.elabTerm key none
+    let type ← Lean.Meta.whnf (← Lean.Meta.inferType value)
+    unless type.isAppOfArity ``Lean.Vir.Js 1 && (← isNativeKeyShape type.appArg!) do
+      throwErrorAt key "JSX key expects a native string, number or bigint, optionally null or undefined"
+    return value
 
 -- The supported subset of upstream ReactNode, never arbitrary objects or Any.
 private meta partial def isNativeNodeShape (type : Lean.Expr) : Lean.MetaM Bool := do
@@ -253,7 +273,7 @@ private meta def transformTag
       if name == "__proto__" then
         Macro.throwErrorAt attr "JSX attributes do not support `__proto__`; use explicit property operations for prototype semantics"
       writes := writes.push <| ← `(doElem|
-        Lean.Vir.Js.Object.set $propsId (← Lean.Vir.JsValue.ofString $(quote name)) $value)
+        Lean.Vir.Js.Construction.field $propsId (← Lean.Vir.JsValue.ofString $(quote name)) $value)
   writes := writes.push <| ← `(doElem| let $childrenId ← Lean.Vir.Js.Array.empty)
   let mut whitespaceBefore := trailingWhitespace tk
   for child in childrenSyntax do
@@ -269,10 +289,10 @@ private meta def transformTag
         whitespaceBefore := trailingWhitespace element
         `($element:virProofWidgetsJsxElement)
       | `(virProofWidgetsJsxChild| {... $_term }%$childToken) =>
-        Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native Js.Array Node with {children}"
+        Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native array of supported React child values with {children}"
       | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
     writes := writes.push <| ← `(doElem|
-      let _ ← Lean.Vir.Js.Array.push $childrenId (← ($action)))
+      Lean.Vir.Js.Construction.element $childrenId (← ($action)))
   let result ← if openingName.front.isUpper then
       let component ← componentIdent opening
       let closingComponent ← componentIdent closing
@@ -345,10 +365,15 @@ private meta def typedAttributes
         throwErrorAt attr "JSX object spread is not implemented; use the exact native-props syntax"
       | _ => throwErrorAt attr "unknown JSX attribute syntax"
     let name := getJsxTag nameSyntax
-    if name == "key" || name == "children" then
-      throwErrorAt attr s!"`{name}` is a React-reserved prop; use the native exact-props escape hatch"
     if names.contains name then
       throwErrorAt attr s!"duplicate JSX prop `{name}`"
+    if name == "key" then
+      checked := checked.push (← Lean.Elab.liftMacroM
+        `(virProofWidgetsJsxAttr| $nameSyntax:jsxTag = { vir_native_key% $value }))
+      names := names.push name
+      continue
+    if name == "children" then
+      throwErrorAt attr "supply children between the JSX tags, or use the native exact-props escape hatch"
     let some (_, expected) := fields.find? fun (field, _) => field == name |
       throwErrorAt attr s!"unknown JSX prop `{name}` for schema `{schema}`"
     -- Constrain the actual emitted expression, including monadic lifts. A

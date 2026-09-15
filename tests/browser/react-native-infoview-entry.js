@@ -32,11 +32,31 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     lastMap = { array, result };
     return result;
   };
-  const setProperty = hostBindings["js.object.set"];
-  hostBindings["js.object.set"] = (object, name, value) => {
+  const setProperty = hostBindings["js.construction.field"];
+  let literalWrites = 0;
+  const withInheritedSetter = (object, name, value, write) => {
+    const original = Object.getPrototypeOf(object);
+    const inherited = Object.create(original);
+    let setterCalls = 0;
+    Object.defineProperty(inherited, name, { set() { setterCalls++; }, configurable: true });
+    Object.setPrototypeOf(object, inherited);
+    try { write(); } finally { Object.setPrototypeOf(object, original); }
+    const descriptor = Object.getOwnPropertyDescriptor(object, name);
+    check(setterCalls === 0 && descriptor?.value === value && descriptor.writable &&
+      descriptor.enumerable && descriptor.configurable,
+    "real Lean literal lowering defines own data properties without inherited setters");
+    literalWrites++;
+  };
+  hostBindings["js.construction.field"] = (object, name, value) => {
     if (traceConstruction) trace.push(name);
+    if (traceConstruction) return withInheritedSetter(object, name, value,
+      () => setProperty(object, name, value));
     return setProperty(object, name, value);
   };
+  const appendElement = hostBindings["js.construction.element"];
+  hostBindings["js.construction.element"] = (array, value) => traceConstruction
+    ? withInheritedSetter(array, String(array.length), value, () => appendElement(array, value))
+    : appendElement(array, value);
   check(!Object.hasOwn(hostBindings, "react.node.text") &&
     !Object.hasOwn(hostBindings, "react.elementType.tag"),
   "native text and tag views need no host providers");
@@ -100,6 +120,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       typed.props.payload === payload && typed.props.onClick === callback &&
       typed.props.values.length === 2 && typed.props.values.every(value => value === label),
     "typed native props preserve exact inputs");
+    check(literalWrites > 10, "own-property regression exercises object, array and typed JSX lowering");
     let reads = 0;
     check(runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", {
       get label() { reads++; return label; },
@@ -196,6 +217,18 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       check(mounts === 2 && arrayContainer.querySelector('[data-name="a"]') === a &&
         a.textContent === identity,
       "stable native array and optional sibling slots preserve keyed component state");
+      const keyed = names => runtime.call("ProofWidgetsJsxSubset.nativeKeyedChildren", Stateful, names);
+      const keyedNode = keyed(["a", "b"]);
+      check(keyedNode.props.children[0].key === "a" &&
+        keyedNode.props.children[0].props.name === "a" &&
+        Object.getOwnPropertyDescriptor(keyedNode.props.children[0].props, "key")?.value === undefined,
+      "typed JSX key belongs to React element metadata, not component data");
+      await React.act(async () => arrayRoot.render(keyedNode));
+      const keyedA = arrayContainer.querySelector('[data-name="a"]');
+      const keyedMounts = mounts;
+      await React.act(async () => arrayRoot.render(keyed(["b", "a"])));
+      check(mounts === keyedMounts && arrayContainer.querySelectorAll("span")[1] === keyedA,
+        "typed JSX keys preserve component state and DOM identity across native map reorder");
     } finally {
       await React.act(async () => arrayRoot.unmount());
     }

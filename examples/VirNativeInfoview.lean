@@ -36,99 +36,99 @@ def accent : String := vscodeColor "textLink-foreground" "#0969da"
 def goalAccent : String := vscodeColor "symbolIcon-keywordForeground" "#8250df"
 
 def shell : RuntimeM Js.Object := js%{
-  "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0"),
-  "padding" := (← js#"8px 10px 12px"), "background" := (← JsValue.ofString background),
-  "color" := (← JsValue.ofString foreground), "colorScheme" := (← js#"light dark"),
-  "fontFamily" := (← js#"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
+  "display" := js#"grid", "gap" := js#"10px", "minWidth" := js#"0",
+  "padding" := js#"8px 10px 12px", "background" := (← JsValue.ofString background),
+  "color" := (← JsValue.ofString foreground), "colorScheme" := js#"light dark",
+  "fontFamily" := js#"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
 }
 
 def toolbar : RuntimeM Js.Object := js%{
-  "display" := (← js#"flex"), "alignItems" := (← js#"baseline"),
-  "justifyContent" := (← js#"space-between"), "gap" := (← js#"8px"),
-  "flexWrap" := (← js#"wrap"), "paddingBottom" := (← js#"7px"),
+  "display" := js#"flex", "alignItems" := js#"baseline",
+  "justifyContent" := js#"space-between", "gap" := js#"8px",
+  "flexWrap" := js#"wrap", "paddingBottom" := js#"7px",
   "borderBottom" := (← JsValue.ofString (border borderColor))
 }
 
 def title : RuntimeM Js.Object := js%{
-  "margin" := (← js#"0"), "fontSize" := (← js#"0.82rem"), "fontWeight" := (← js#"760")
+  "margin" := js#"0", "fontSize" := js#"0.82rem", "fontWeight" := js#"760"
 }
 
 def summary : RuntimeM Js.Object := js%{
-  "margin" := (← js#"0"), "color" := (← JsValue.ofString muted),
-  "fontSize" := (← js#"0.68rem"), "fontWeight" := (← js#"620")
+  "margin" := js#"0", "color" := (← JsValue.ofString muted),
+  "fontSize" := js#"0.68rem", "fontWeight" := js#"620"
 }
 
-def goalList : RuntimeM Js.Object := js%{ "display" := (← js#"grid"), "gap" := (← js#"10px") }
+def goalList : RuntimeM Js.Object := js%{ "display" := js#"grid", "gap" := js#"10px" }
 
 def goalCard : RuntimeM Js.Object := js%{
-  "display" := (← js#"grid"), "gap" := (← js#"8px"), "minWidth" := (← js#"0"),
-  "padding" := (← js#"9px"), "border" := (← JsValue.ofString (border borderColor)),
-  "borderLeft" := (← JsValue.ofString ("3px solid " ++ goalAccent)), "borderRadius" := (← js#"5px"),
+  "display" := js#"grid", "gap" := js#"8px", "minWidth" := js#"0",
+  "padding" := js#"9px", "border" := (← JsValue.ofString (border borderColor)),
+  "borderLeft" := (← JsValue.ofString ("3px solid " ++ goalAccent)), "borderRadius" := js#"5px",
   "background" := (← JsValue.ofString background)
 }
 
 def goalHeader : RuntimeM Js.Object := js%{
-  "display" := (← js#"flex"), "alignItems" := (← js#"center"),
-  "justifyContent" := (← js#"space-between"), "gap" := (← js#"8px")
+  "display" := js#"flex", "alignItems" := js#"center",
+  "justifyContent" := js#"space-between", "gap" := js#"8px"
 }
 
 def goalHeading : RuntimeM Js.Object := js%{
-  "margin" := (← js#"0"), "minWidth" := (← js#"0"), "fontSize" := (← js#"0.76rem"),
-  "fontWeight" := (← js#"760"), "overflowWrap" := (← js#"anywhere")
+  "margin" := js#"0", "minWidth" := js#"0", "fontSize" := js#"0.76rem",
+  "fontWeight" := js#"760", "overflowWrap" := js#"anywhere"
 }
 
 def collapseButton : RuntimeM Js.Object := js%{
-  "flex" := (← js#"0 0 auto"), "minWidth" := (← js#"25px"), "height" := (← js#"24px"),
-  "padding" := (← js#"0 6px"), "border" := (← JsValue.ofString (border borderColor)),
-  "borderRadius" := (← js#"4px"), "background" := (← JsValue.ofString codeBackground),
-  "color" := (← JsValue.ofString foreground), "font" := (← js#"inherit"),
-  "fontSize" := (← js#"0.7rem"), "cursor" := (← js#"pointer")
+  "flex" := js#"0 0 auto", "minWidth" := js#"25px", "height" := js#"24px",
+  "padding" := js#"0 6px", "border" := (← JsValue.ofString (border borderColor)),
+  "borderRadius" := js#"4px", "background" := (← JsValue.ofString codeBackground),
+  "color" := (← JsValue.ofString foreground), "font" := js#"inherit",
+  "fontSize" := js#"0.7rem", "cursor" := js#"pointer"
 }
 
 def context : RuntimeM Js.Object := js%{
-  "display" := (← js#"grid"), "gap" := (← js#"4px"), "margin" := (← js#"0"),
-  "padding" := (← js#"0"), "listStyle" := (← js#"none")
+  "display" := js#"grid", "gap" := js#"4px", "margin" := js#"0",
+  "padding" := js#"0", "listStyle" := js#"none"
 }
 
 def hypothesis : RuntimeM Js.Object := js%{
-  "display" := (← js#"flex"), "alignItems" := (← js#"baseline"), "gap" := (← js#"5px"),
-  "minWidth" := (← js#"0"), "padding" := (← js#"2px 4px"),
-  "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
-  "fontSize" := (← js#"0.73rem"), "lineHeight" := (← js#"1.4")
+  "display" := js#"flex", "alignItems" := js#"baseline", "gap" := js#"5px",
+  "minWidth" := js#"0", "padding" := js#"2px 4px",
+  "fontFamily" := js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace",
+  "fontSize" := js#"0.73rem", "lineHeight" := js#"1.4"
 }
 
 def binder : RuntimeM Js.Object := js%{
-  "flex" := (← js#"0 0 auto"), "color" := (← JsValue.ofString accent), "fontWeight" := (← js#"700")
+  "flex" := js#"0 0 auto", "color" := (← JsValue.ofString accent), "fontWeight" := js#"700"
 }
 
 def hypothesisType : RuntimeM Js.Object := js%{
-  "minWidth" := (← js#"0"), "overflowWrap" := (← js#"anywhere")
+  "minWidth" := js#"0", "overflowWrap" := js#"anywhere"
 }
 
 def value : RuntimeM Js.Object := js%{
-  "minWidth" := (← js#"0"), "color" := (← JsValue.ofString muted), "overflowWrap" := (← js#"anywhere")
+  "minWidth" := js#"0", "color" := (← JsValue.ofString muted), "overflowWrap" := js#"anywhere"
 }
 
 def target : RuntimeM Js.Object := js%{
-  "display" := (← js#"grid"), "gridTemplateColumns" := (← js#"auto minmax(0, 1fr)"),
-  "alignItems" := (← js#"baseline"), "gap" := (← js#"7px"), "padding" := (← js#"7px 8px"),
-  "borderRadius" := (← js#"4px"), "background" := (← JsValue.ofString codeBackground),
-  "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
-  "fontSize" := (← js#"0.75rem"), "lineHeight" := (← js#"1.42")
+  "display" := js#"grid", "gridTemplateColumns" := js#"auto minmax(0, 1fr)",
+  "alignItems" := js#"baseline", "gap" := js#"7px", "padding" := js#"7px 8px",
+  "borderRadius" := js#"4px", "background" := (← JsValue.ofString codeBackground),
+  "fontFamily" := js#"ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace",
+  "fontSize" := js#"0.75rem", "lineHeight" := js#"1.42"
 }
 
 def turnstile : RuntimeM Js.Object := js%{
-  "color" := (← JsValue.ofString goalAccent), "fontWeight" := (← js#"800")
+  "color" := (← JsValue.ofString goalAccent), "fontWeight" := js#"800"
 }
 
 def targetCode : RuntimeM Js.Object := js%{
-  "minWidth" := (← js#"0"), "overflowWrap" := (← js#"anywhere"), "whiteSpace" := (← js#"pre-wrap")
+  "minWidth" := js#"0", "overflowWrap" := js#"anywhere", "whiteSpace" := js#"pre-wrap"
 }
 
 def empty : RuntimeM Js.Object := js%{
-  "margin" := (← js#"0"), "padding" := (← js#"12px"),
-  "border" := (← JsValue.ofString ("1px dashed " ++ borderColor)), "borderRadius" := (← js#"5px"),
-  "color" := (← JsValue.ofString muted), "fontSize" := (← js#"0.76rem")
+  "margin" := js#"0", "padding" := js#"12px",
+  "border" := (← JsValue.ofString ("1px dashed " ++ borderColor)), "borderRadius" := js#"5px",
+  "color" := (← JsValue.ofString muted), "fontSize" := js#"0.76rem"
 }
 
 end Style
@@ -166,10 +166,8 @@ def HypothesisRow : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.P
           Js.Nullable.ofJs (← <span className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {value}</span>)
     return ← <li id={(← JsValue.ofString ("vir-native-infoview-hyp-" ++ id))}
         className="vir-native-infoview-hypothesis" role="listitem" style={(← Style.hypothesis)}><span
-          className="vir-native-infoview-hyp-name" style={(← Style.binder)}>{Lean.Vir.React.Node.text
-            (← JsValue.ofString names)}</span><span aria-hidden={(← JsValue.ofBool true)}>:</span><code
-          className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{Lean.Vir.React.Node.text
-            hypothesisType}</code>{valueNode}</li>
+          className="vir-native-infoview-hyp-name" style={(← Style.binder)}>{JsValue.ofString names}</span><span aria-hidden={(← JsValue.ofBool true)}>:</span><code
+          className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{hypothesisType}</code>{valueNode}</li>
 
 structure TacticGoalCardProps where
   goal : Js InteractiveGoal
@@ -249,11 +247,11 @@ def GoalCardBody
   let target : Html := <div key="target" className="vir-native-infoview-target" style={(← Style.target)}><span
       className="vir-native-infoview-turnstile" aria-hidden={(← JsValue.ofBool true)}
       style={(← Style.turnstile)}>⊢</span><code id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-target")}
-      className="vir-native-infoview-target-code" style={(← Style.targetCode)}>{Lean.Vir.React.Node.text targetText}</code></div>
+      className="vir-native-infoview-target-code" style={(← Style.targetCode)}>{targetText}</code></div>
   let details : ReactM (Js.Array Lean.Vir.React.Node) := do
     if collapsed then Js.Array.empty else js#[← context, ← target]
   let heading : Html := <h3 className="vir-native-infoview-goal-heading" style={(← Style.goalHeading)}>
-    {Lean.Vir.React.Node.text (← JsValue.ofString title)}
+    {JsValue.ofString title}
   </h3>
   let collapseButton : Html := <button id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-collapse")}
       className="vir-native-infoview-collapse" type="button"
@@ -261,7 +259,7 @@ def GoalCardBody
       aria-label={(← JsValue.ofString (if collapsed then "Expand goal" else "Collapse goal"))}
       aria-expanded={(← JsValue.ofBool (!collapsed))} aria-controls={(← JsValue.ofString detailsId)}
       onClick={toggle} style={(← Style.collapseButton)}>
-    {Lean.Vir.React.Node.text (← JsValue.ofString (if collapsed then "+" else "−"))}
+    {JsValue.ofString (if collapsed then "+" else "−")}
   </button>
   let header : Html := <header className="vir-native-infoview-goal-header" style={(← Style.goalHeader)}>
     {heading}{collapseButton}
@@ -319,7 +317,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
     let goalCount := (← JsValue.toFloat (← Js.Array.length goals)).toUInt64.toNat
     let body : Html := if goalCount == 0 then
       <p id="vir-native-infoview-empty" className="vir-native-infoview-empty" style={(← Style.empty)}>
-        {Lean.Vir.React.Node.text (← JsValue.ofString ("No goals at " ++ captionPosition ++ "."))}
+        {JsValue.ofString ("No goals at " ++ captionPosition ++ ".")}
       </p>
     else
       <div id="vir-native-infoview-goals" className="vir-native-infoview-goals" style={(← Style.goalList)}>
@@ -328,8 +326,8 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
     let heading : Html := <h2 className="vir-native-infoview-title" style={(← Style.title)}>Goals</h2>
     let summary : Html := <p id="vir-native-infoview-summary" className="vir-native-infoview-summary"
         style={(← Style.summary)}>
-      {Lean.Vir.React.Node.text (← JsValue.ofString
-        (s!"{goalCount} " ++ plural goalCount "goal" "goals" ++ " · " ++ captionPosition))}
+      {JsValue.ofString
+        (s!"{goalCount} " ++ plural goalCount "goal" "goals" ++ " · " ++ captionPosition)}
     </p>
     let toolbar : Html := <header className="vir-native-infoview-toolbar" style={(← Style.toolbar)}>
       {heading}{summary}

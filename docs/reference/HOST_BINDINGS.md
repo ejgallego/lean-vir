@@ -16,6 +16,13 @@ would receive, and it returns the same value the corresponding JavaScript API
 returns. VIR does not place resource, ownership-lease, or alias wrappers
 around JavaScript values.
 
+The `js.construction.*` imports are compiler primitives for literals, not alternate
+assignment APIs. They implement [CreateDataPropertyOrThrow](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-createdatapropertyorthrow)
+using `Object.defineProperty` with own writable/enumerable/configurable fields.
+Object fields and dense array elements share this implementation; the two typed
+entry points keep array element types correlated. General `Object.set` and
+`Array.push` bindings retain their native behavior.
+
 For example:
 
 ```js

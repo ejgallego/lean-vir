@@ -209,6 +209,15 @@ def nativeTypedConstruction
 def nativeTypedLabel (props : Js NativeProps) : RuntimeM (Js String) :=
   js_field% props "label"
 
+structure KeyedProps where
+  name : Js String
+
+def nativeKeyedChildren (Component : Lean.Vir.React.FunctionComponent KeyedProps)
+    (names : Js.Array String) : Html := do
+  let render ← Js.Function.ofLean3 fun (name : Js String) (_ : Js Float)
+      (_ : Js.Array String) => <Component key={name} name={name}/>
+  return ← <div>{names.map render}</div>
+
 def nativeStringLength (value : Js String) : RuntimeM (Js Float) :=
   Js.String.length value
 

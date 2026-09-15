@@ -160,12 +160,13 @@
             "ProofWidgetsJsxSubset.nativeConstruction",
             "ProofWidgetsJsxSubset.nativeTypedConstruction",
             "ProofWidgetsJsxSubset.nativeTypedLabel",
+            "ProofWidgetsJsxSubset.nativeKeyedChildren",
             "ProofWidgetsJsxSubset.nativeStringLength",
             "ProofWidgetsJsxSubset.nativeChildSlots",
-          "ProofWidgetsJsxSubset.nativeMappedChildren",
-          "ProofWidgetsJsxSubset.nativePrimitiveChildren",
-          "ProofWidgetsJsxSubset.nativeIndexedMap",
-          "ProofWidgetsJsxSubset.nativeLiteralConstruction"
+            "ProofWidgetsJsxSubset.nativeMappedChildren",
+            "ProofWidgetsJsxSubset.nativePrimitiveChildren",
+            "ProofWidgetsJsxSubset.nativeIndexedMap",
+            "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]
         },
         {

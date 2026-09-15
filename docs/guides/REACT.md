@@ -63,8 +63,10 @@ Parentheses do not change this rule. Elsewhere it remains a `RuntimeM (Js String
 action. Named property/array actions still require explicit `←`; only literal
 syntax receives this treatment.
 
-`js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
-`Js.Object.set` assignments in source order (last duplicate wins).
+`js%{ "field" := value }` creates a fresh ordinary object and defines own data
+properties in source order (last duplicate wins). Array literals and JSX use the
+same own-property construction semantics, without invoking inherited setters.
+Ordinary `Js.Object.set` and `Js.Array.push` remain native assignment/push operations.
 Literal `__proto__` keys are rejected in objects and JSX because assignment
 would invoke the inherited prototype setter. Explicit `Object.set` retains
 ordinary JavaScript assignment semantics, including setters.
@@ -96,6 +98,9 @@ fields and value types at compile time. No `LabelProps` record is allocated:
 JSX still writes a fresh native object. All fields must be supplied; generic,
 dependent and inherited schemas are outside this bounded surface. The special
 `key` and `children` fields and `__proto__` are not supported schema fields.
+Supply `key` separately, for example `<Label key={id} title="Hello"/>`: it accepts
+native string/number/bigint keys, optionally null or undefined. React consumes it
+as element metadata; it is not readable through the component's props schema.
 `js_field% props "title"` uses that declaration for one native property read;
 it does not validate an external response, require an own property, or intercept
 getters. As with typed JavaScript, untrusted inputs need an explicit check.

@@ -4,9 +4,19 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+// ECMA-262 CreateDataPropertyOrThrow, used by literal lowering, not assignment.
+// A null-prototype descriptor cannot inherit getter/setter descriptor fields.
+function defineLiteralProperty(object, name, value) {
+  Object.defineProperty(object, name, {
+    __proto__: null, value, writable: true, enumerable: true, configurable: true,
+  });
+}
+
 export function createJsCollectionHostBindings() {
   return {
     "js.object.empty": () => ({}),
+    "js.construction.field": defineLiteralProperty,
+    "js.construction.element": (array, value) => defineLiteralProperty(array, array.length, value),
     "js.object.set": (object, name, value) => {
       object[name] = value;
       return undefined;
