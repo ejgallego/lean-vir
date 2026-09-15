@@ -73,7 +73,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       component, payload, label, callback);
     traceConstruction = false;
     check(callbackRegistryScans === 0,
-      "native construction must not scan existing callbacks for leaf arguments");
+      "native construction must not scan existing callbacks");
     check(JSON.stringify(trace) === JSON.stringify([
       "label", "label", "payload", "onClick", "values", "title", "style", "onClick",
       "element:span", "element:component",

@@ -78,6 +78,7 @@ function observations({ runtime, callback, jsl }) {
 
 export async function runGenerationGcCases(createRuntime) {
   await failedHostCallbacks(createRuntime);
+  await returnedCallbacks(createRuntime);
   // Real Wasm roots are released while the original generation stays owned.
   let acyclic = await makeGeneration(createRuntime);
   const owned = acyclic.runtime;
@@ -203,6 +204,7 @@ export async function runGenerationGcCases(createRuntime) {
   );
   return {
     failedHostCallbacks: true,
+    returnedCallbacks: true,
     acyclic: true,
     retainedCallback: true,
     retainedJsl: true,
@@ -210,6 +212,50 @@ export async function runGenerationGcCases(createRuntime) {
     intervalRetention: true,
     collectedGraphs: deadGraphs.length,
   };
+}
+
+async function returnedCallbacks(createRuntime) {
+  const runtime = await createRuntime({});
+  const liftObjectFunction = runtime.liftObjectFunction;
+  const failure = new Error("second returned callback conversion failed");
+  try {
+    for (const method of ["call", "callTimed"]) {
+      // Successful composite results retain usable closures after the Lean
+      // result array is released by the owning export call.
+      let values = runtime[method]("HostInterop.callbackResults", 7);
+      // callTimed returns an envelope; call returns the value directly.
+      if (method === "callTimed") values = values.value;
+      check(values[0](4) === "11" && values[1](4) === "12",
+        "returned Lean callbacks preserve captured values");
+      values = null;
+      await collectUntil(() => runtime.liveCallbacks.size === 0,
+        "successful returned callbacks collected while runtime lives");
+
+      let first;
+      let count = 0;
+      runtime.liftObjectFunction = function (...args) {
+        if (++count === 2) throw failure;
+        const value = liftObjectFunction.apply(this, args);
+        first = new WeakRef(value);
+        return value;
+      };
+      try {
+        let caught;
+        try { runtime[method]("HostInterop.callbackResults", 7); }
+        catch (error) { caught = error; }
+        check(caught === failure && count === 2, "partial result preserves exact error");
+        check(runtime.liveCallbacks.size === 1,
+          "partial result callback is not eagerly invalidated");
+      } finally {
+        runtime.liftObjectFunction = liftObjectFunction;
+      }
+      await collectUntil(() => first.deref() === undefined && runtime.liveCallbacks.size === 0,
+        "partial result callback eligible for collection while runtime lives");
+    }
+  } finally {
+    runtime.liftObjectFunction = liftObjectFunction;
+    runtime.dispose();
+  }
 }
 
 async function failedHostCallbacks(createRuntime) {

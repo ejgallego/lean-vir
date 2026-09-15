@@ -230,13 +230,15 @@ terminates the newly created activity. A Promise declared as an exact `Js`
 result is simply rooted and commits like any other JavaScript object. This
 transaction is out of band and does not alter the returned value.
 
-Callbacks created while lifting arguments follow JavaScript reachability even
-when argument lifting, the host call or result lowering fails. A host may retain
-a callback before throwing; it remains usable while its runtime is live. VIR
-does not keep a per-call callback census or invalidate these escaped values.
+Converted callbacks follow JavaScript reachability, including callbacks in
+structural export or callback results. Failed argument/result conversion or a
+throwing host does not revoke a callback retained by JavaScript. VIR does not
+keep a per-call callback census or a result-conversion cleanup list.
 Unretained callbacks become eligible for collection; reclamation timing belongs
 to the garbage collector, with explicit runtime disposal as the deterministic
 fallback. This does not waive responsibility for accidental retention by VIR.
+Temporary Lean references are still released on success and failure; active
+host effects still use the transaction rollback described above.
 
 A synchronous host exception is rethrown by the owning export or callback call
 before any placeholder interpreter result is treated as success.

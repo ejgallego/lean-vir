@@ -83,14 +83,14 @@ test("three existing resources do not traverse any of 56 callback roots", t => {
   assert.equal(h.runtime.liveCallbacks.visits, 0);
   assert.equal(h.runtime.liveCallbacks.size, 56);
   assert.deepEqual(h.released, []);
-  const failure = new Error("leaf host failure");
+  const failure = new Error("host failure");
   assert.throws(() => h.call([resource], [3], () => { throw failure; }), e => e === failure);
   assert.equal(h.runtime.liveCallbacks.scans, 0);
   assert.deepEqual(h.released, []);
   assert.equal(h.existing[0](), 1, "host failure must not release borrowed callback resources");
 });
 
-test("callback-free scalar/string/unit descriptors skip tracking on conversion calls", t => {
+test("explicit scalar conversions do not traverse callback roots", t => {
   const h = harness(t);
   Object.assign(h.runtime, {
     readObjectScalar: () => 1,
@@ -199,6 +199,23 @@ test("reentrant successful calls retain their own callbacks when the outer host 
   assert.equal(innerCallback(), 58);
   assert.equal(h.runtime.liveCallbacks.size, 58);
 });
+
+for (const fail of [false, true]) {
+  test(`callback result conversion ${fail ? "failure" : "success"} releases Lean temporaries, not functions`, t => {
+    const h = harness(t);
+    h.objects.set(1, fail ? [2, 0] : [2]);
+    h.runtime.exports.vir_closure_call_objects = () => 1;
+    const invoke = () => h.runtime.callClosureObjects(1, { result: array(callback) }, []);
+    if (fail) {
+      assert.throws(invoke, /\[1\] is unavailable/);
+    } else {
+      assert.equal(invoke()[0](), 57);
+    }
+    assert.deepEqual(h.decremented, [2, 1], "element and outer result each released once");
+    assert.deepEqual(h.released, [], "foreign closure follows reachability, not result success");
+    assert.equal(h.runtime.liveCallbacks.size, 57);
+  });
+}
 
 test("unknown descriptors still reject without a callback census", t => {
   const h = harness(t);
