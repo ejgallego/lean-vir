@@ -75,22 +75,22 @@ example {α : Type} (list : Js.NodeList α) : True := by
   trivial
 
 def stateValue {α : Type} (tuple : Js (StateTuple α)) : RuntimeM (Js α) :=
-  StateTuple.value tuple
+  Js.Tuple2.first tuple
 
 def stateSetter {α : Type} (tuple : Js (StateTuple α)) :
-    RuntimeM (Js (StateSetter (Js α))) :=
-  StateTuple.setter tuple
+    RuntimeM (Js (StateSetter α)) :=
+  Js.Tuple2.second tuple
 
 def reducerValue {state action : Type} (tuple : Js (ReducerTuple state action)) :
     RuntimeM (Js state) :=
-  ReducerTuple.value tuple
+  Js.Tuple2.first tuple
 
 def reducerDispatch {state action : Type} (tuple : Js (ReducerTuple state action)) :
     RuntimeM (Js (ReducerDispatch state action)) :=
-  ReducerTuple.dispatch tuple
+  Js.Tuple2.second tuple
 
 def sameCallbackInput {α : Type} (value : JSL α) : RuntimeM Unit := do
-  let callback ← Callback.ofUnary fun (_ : JSL α) => pure ()
+  let callback ← Js.Function.ofLeanVoid fun (_ : JSL α) => pure ()
   Js.Function.callVoid callback value
 
 -- Unary callbacks preserve their argument type independently of collection
@@ -98,7 +98,7 @@ def sameCallbackInput {α : Type} (value : JSL α) : RuntimeM Unit := do
 example (value : JSL String) : True := by
   fail_if_success
     have wrongCallbackInput : RuntimeM Unit := do
-      let callback ← Callback.ofUnary fun (_ : JSL Nat) => pure ()
+      let callback ← Js.Function.ofLeanVoid fun (_ : JSL Nat) => pure ()
       Js.Function.callVoid callback value
   trivial
 
@@ -141,9 +141,9 @@ example {α β : Type} (tuple : Js (StateTuple α)) : True := by
   fail_if_success
     have erased : Js (StateTuple β) := tuple
   fail_if_success
-    have wrongValue : RuntimeM (Js β) := StateTuple.value tuple
+    have wrongValue : RuntimeM (Js β) := Js.Tuple2.first tuple
   fail_if_success
-    have wrongSetter : RuntimeM (Js (StateSetter (Js β))) := StateTuple.setter tuple
+    have wrongSetter : RuntimeM (Js (StateSetter β)) := Js.Tuple2.second tuple
   trivial
 
 example {state action other : Type} (tuple : Js (ReducerTuple state action)) : True := by
@@ -152,9 +152,9 @@ example {state action other : Type} (tuple : Js (ReducerTuple state action)) : T
   fail_if_success
     have erasedAction : Js (ReducerTuple state other) := tuple
   fail_if_success
-    have wrongValue : RuntimeM (Js other) := ReducerTuple.value tuple
+    have wrongValue : RuntimeM (Js other) := Js.Tuple2.first tuple
   fail_if_success
-    have wrongDispatch : RuntimeM (Js (ReducerDispatch state other)) := ReducerTuple.dispatch tuple
+    have wrongDispatch : RuntimeM (Js (ReducerDispatch state other)) := Js.Tuple2.second tuple
   trivial
 
 example {α β : Type} (tuple : Js.Tuple2 α β) : True := by

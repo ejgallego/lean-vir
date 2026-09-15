@@ -304,8 +304,8 @@ assert.equal(reactUseMemoImports[0]?.args[1]?.type?.type, "Js");
 assert.equal(reactUseMemoImports[0]?.args[1]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseMemoImports[0]?.result?.type, "Js");
 for (const target of [
-  "js.value.react.reducer",
-  "js.value.react.memoCalculation",
+  "js.value.function.binary",
+  "js.value.function.nullary",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.boundary, "explicitConversion");
@@ -366,7 +366,7 @@ assert.deepEqual(
     .sort(),
   ["js.leanRef", "js.leanRef.value"],
 );
-for (const target of ["react.state.modify"]) {
+for (const target of ["js.function.callVoid"]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "hostResource");
@@ -476,7 +476,7 @@ if (reactRenderNodeImport !== undefined) {
   assert.equal(reactRenderNodeImport.result?.type, "Unit");
 }
 for (const target of [
-  "js.value.react.effectCallback",
+  "js.value.function.nullaryVoid",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");

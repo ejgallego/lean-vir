@@ -23,19 +23,21 @@ def label (value : Nat) : String :=
 def counter : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← StateTuple.toState (← Hooks.useState initial)
-    let countValue ← JsValue.toNat count.value
+    let count ← Hooks.useState initial
+    let countValue ← JsValue.toNat (← Js.Tuple2.first count)
+    let countSetter ← Js.Tuple2.second count
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label countValue))
-    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-      State.modify count fun previous => do
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+      let update ← Js.Function.ofLean fun previous => do
         let value ← JsValue.toNat previous
         JsValue.ofNat (value + 1)
+      Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
     return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   let node ← ReactM.run do
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label value))
-    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => renderInto root (value + 1)
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => DomM.toRuntime (renderInto root (value + 1))
     return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
   Root.render root node
 
@@ -86,13 +88,13 @@ def renderStaticIntoSelector (selector : String) : DomM Bool := do
 
 def effectProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let effect ← EffectCallback.ofLean { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
+    let effect ← Js.Function.ofLean0 do
+      Js.UndefinedOr.undefined
     Hooks.useEffect effect (← Js.UndefinedOr.undefined)
     let dep ← JsValue.ofNat 1
-    let deps ← Hooks.DependencyList.ofArray #[dep]
-    let effectWithDeps ← EffectCallback.ofLean
-      { setup := JsValue.ofNat 0, cleanup := fun _ => pure () }
-    Hooks.useEffect effectWithDeps (Js.UndefinedOr.ofJs deps)
+    let effectWithDeps ← Js.Function.ofLean0 do
+      Js.UndefinedOr.undefined
+    Hooks.useEffect effectWithDeps (Js.UndefinedOr.ofJs (← js#[Js.erase dep]))
     let text ← Node.text (← Lean.Vir.JsValue.ofString "react:effect")
     return ← <span id="react-effect-label">{pure text}</span>
 
@@ -113,11 +115,10 @@ def mountEffect (selector : String) : DomM Bool := do
 def memoProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let dep ← JsValue.ofNat 1
-    let deps ← Hooks.DependencyList.ofArray #[dep]
     let calculate : ReactM (Lean.Vir.Js Nat) := do
       JsValue.ofNat 42
-    let calculation ← MemoCalculation.ofLean calculate
-    let value ← Hooks.useMemo calculation deps
+    let calculation ← Js.Function.ofLean0 calculate
+    let value ← Hooks.useMemo calculation (← js#[Js.erase dep])
     let memoValue ← JsValue.toNat value
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo:{memoValue}")
     return ← <span id="react-memo-label">{pure text}</span>
@@ -139,17 +140,19 @@ def mountMemo (selector : String) : DomM Bool := do
 def memoStableProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← StateTuple.toState (← Hooks.useState initial)
-    let deps ← Hooks.DependencyList.empty
-    let calculation ← MemoCalculation.ofLean (pure count.value)
-    let memoValue ← Hooks.useMemo calculation deps
-    let countValue ← JsValue.toNat count.value
+    let count ← Hooks.useState initial
+    let countValueJs ← Js.Tuple2.first count
+    let countSetter ← Js.Tuple2.second count
+    let calculation ← Js.Function.ofLean0 (pure countValueJs)
+    let memoValue ← Hooks.useMemo calculation (← js#[])
+    let countValue ← JsValue.toNat countValueJs
     let cachedValue ← JsValue.toNat memoValue
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo-stable:{countValue}:{cachedValue}")
-    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-      State.modify count fun previous => do
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+      let update ← Js.Function.ofLean fun previous => do
         let value ← JsValue.toNat previous
         JsValue.ofNat (value + 1)
+      Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
     return ← <button type="button" id="react-memo-stable-button" onClick={increment}>{pure text}</button>
 
 def mountMemoStable (selector : String) : DomM Bool := do
@@ -169,18 +172,21 @@ def mountMemoStable (selector : String) : DomM Bool := do
 def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← StateTuple.toState (← Hooks.useState initial)
+    let count ← Hooks.useState initial
+    let countValueJs ← Js.Tuple2.first count
+    let countSetter ← Js.Tuple2.second count
     let lastClick ← Hooks.useRef initial
-    let countValue ← JsValue.toNat count.value
+    let countValue ← JsValue.toNat countValueJs
     let lastValueResource ← Ref.get lastClick
     let lastValue ← JsValue.toNat lastValueResource
     let labelText ← Node.text (← Lean.Vir.JsValue.ofString s!"react:ref:{countValue}:{lastValue}")
-    let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-      State.modify count fun previous => do
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+      let update ← Js.Function.ofLean fun previous => do
         let value ← JsValue.toNat previous
         let next ← JsValue.ofNat (value + 1)
         Ref.set lastClick next
         pure next
+      Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
     let button ← <button type="button" id="react-ref-button" onClick={increment}>{pure labelText}</button>
     let markerText ← Node.text (← Lean.Vir.JsValue.ofString "fragment child")
     let marker ← <span id="react-fragment-marker">{pure markerText}</span>
@@ -243,7 +249,7 @@ def renderWideTextLoop (selector : String) (width count : Nat) : DomM Nat := do
 
 def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("callback:" ++ toString index))
-  let click ← Callback.ofUnary fun (_ : Js Browser.Event) => do
+  let click ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => DomM.toRuntime do
     Root.render root (← ReactM.run (benchTextTree 1))
   return ← <button type="button" className="react-bench-callback"
     data-index={← JsValue.ofString (toString index)} onClick={click}>{pure text}</button>

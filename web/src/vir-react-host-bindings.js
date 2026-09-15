@@ -32,13 +32,5 @@ export function createBrowserReactHostBindings(lifecycle) {
       ref.current = value;
       return undefined;
     },
-    "react.state.modify": (setter, update) => setter(update),
-    "js.value.react.reducer": (reducer) => reducer,
-    "js.value.react.memoCalculation": (calculate) => calculate,
-    "js.value.react.callback": (callback) => callback,
-    "js.value.react.effectCallback": (effect) => () => {
-      const value = effect.setup();
-      return () => effect.cleanup(value);
-    },
   };
 }

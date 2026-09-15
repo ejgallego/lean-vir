@@ -240,6 +240,39 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } }
       },
       {
+        "id": "javascript.function.of-lean-nullary", "group": "function", "target": "js.value.function.nullary",
+        "lean": "Lean.Vir.Js.Function.ofLean0", "marker": "vir_js_explicit_conversion",
+        "reason": "Converts a Lean action to an exact zero-argument JavaScript function returning its native result.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": ["α"], "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [
+          {"name":"callback","role":"callback","passing":"owned","retention":"until-release","type":{"lean":"RuntimeM (Lean.Vir.Js α)","representation":"callback"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Function0 (Lean.Vir.Js α)","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Nullary (Lean.Vir.Js α)"}}
+      },
+      {
+        "id": "javascript.function.of-lean-nullaryVoid", "group": "function", "target": "js.value.function.nullaryVoid",
+        "lean": "Lean.Vir.Js.Function.ofLean0Void", "marker": "vir_js_explicit_conversion",
+        "reason": "Converts a Lean action to an exact zero-argument JavaScript function returning undefined.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": [], "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [
+          {"name":"callback","role":"callback","passing":"owned","retention":"until-release","type":{"lean":"RuntimeM Unit","representation":"callback"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Function0 Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Nullary Unit"}}
+      },
+      {
+        "id": "javascript.function.of-lean-binary", "group": "function", "target": "js.value.function.binary",
+        "lean": "Lean.Vir.Js.Function.ofLean2", "marker": "vir_js_explicit_conversion",
+        "reason": "Converts a Lean binary callback to an exact JavaScript function with the same argument and result shapes.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": ["α","β","γ"], "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [
+          {"name":"callback","role":"callback","passing":"owned","retention":"until-release","type":{"lean":"Lean.Vir.Js α → Lean.Vir.Js β → RuntimeM (Lean.Vir.Js γ)","representation":"callback"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ)","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Binary (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ)"}}
+      },
+      {
         "id": "javascript.function.of-lean-unary", "group": "function", "target": "js.value.function.unary",
         "lean": "Lean.Vir.Js.Function.ofLean", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a transferred Lean unary callback into an ordinary JavaScript function with the same call shape.",

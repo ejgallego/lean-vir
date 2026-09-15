@@ -52,12 +52,15 @@ def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
 /-- A native React function component; constructing it once preserves hook identity. -/
 private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply))) := FunctionComponent.ofLean fun props => do
   let reply ← LeanRef.fromJSL (← Props.WithData.data props)
-  let count ← React.StateTuple.toState (← React.Hooks.useState (← JsValue.ofNat 0))
+  let count ← React.Hooks.useState (← JsValue.ofNat 0)
+  let countValue ← Js.Tuple2.first count
+  let countSetter ← Js.Tuple2.second count
   let label ← message reply
-  let n ← JsValue.toNat count.value
-  let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-    React.State.modify count fun previous => do
+  let n ← JsValue.toNat countValue
+  let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+    let update ← Js.Function.ofLean fun previous => do
       JsValue.ofNat ((← JsValue.toNat previous) + 1)
+    Js.Function.callVoid countSetter (React.SetStateAction.ofUpdater update)
   return ← <button id="rpc-reference-view" onClick={increment}>
     {label}{ProofWidgets.Html.text s!" / local {n}"}
   </button>
@@ -75,54 +78,58 @@ private structure ResponseState where
 
 private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (input : Input) :
     ReactM (Js Node) := do
-  let response ← StateTuple.toState
-    (← Hooks.useState (← LeanRef.toJSL ({} : ResponseState)))
-  let revision ← StateTuple.toState (← Hooks.useState (← JsValue.ofNat 0))
+  let response ← Hooks.useState (← LeanRef.toJSL ({} : ResponseState))
+  let responseValue ← Js.Tuple2.first response
+  let responseSetter ← Js.Tuple2.second response
+  let revision ← Hooks.useState (← JsValue.ofNat 0)
+  let revisionValue ← Js.Tuple2.first revision
+  let revisionSetter ← Js.Tuple2.second revision
   let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do
     let document ← Js.Object.get params (← js#"textDocument")
     let uri ← Js.String.fromAny (← Js.Object.get document (← js#"uri"))
     if (← JsValue.toString uri) == input.uri then
-      State.modify revision fun previous => do JsValue.ofNat ((← JsValue.toNat previous) + 1)
+      let update ← Js.Function.ofLean fun previous => do
+        JsValue.ofNat ((← JsValue.toNat previous) + 1)
+      Js.Function.callVoid revisionSetter (React.SetStateAction.ofUpdater update)
   -- Undefined dependencies also follow replacement of the upstream editor context.
   Infoview.useClientNotificationEffect (← js#"textDocument/didChange") changed
     (← Js.UndefinedOr.undefined)
-  let effect ← EffectCallback.ofLean {
-    setup := do
-      let active ← RuntimeRef.new true
-      let abort ← AbortController.create
-      let options ← Infoview.ClientRequestOptions.empty
-      Infoview.ClientRequestOptions.setAbortSignal options (← AbortController.getSignal abort)
-      State.modify response fun previous => do
-        let previous : ResponseState ← LeanRef.fromJSL previous
-        LeanRef.toJSL { previous with status := "loading", error := "" }
-      let pending ← request input.session (← js#"RpcBrowserServer.create")
-        input.query options
-      let succeed ← Js.Function.ofLeanVoid fun (reply : Js Reply) => do
-        if ← active.get then
-          -- Validate before publication; a bad message rejects this Promise chain.
-          let _ ← message reply
-          State.set response (← LeanRef.toJSL {
-            reply := some reply, status := "ready" : ResponseState })
-      let fail ← Js.Function.ofLeanVoid fun (_error : Js.Any) => do
-        if ← active.get then
-          State.modify response fun previous => do
-            let previous : ResponseState ← LeanRef.fromJSL previous
-            LeanRef.toJSL { previous with
-              status := "error"
-              error := "The request or response handler failed" }
-      let handled ← Js.Promise.thenVoid pending succeed
-      let ignore ← Js.Function.ofLeanVoid fun (_ : Js.Undefined) => pure ()
-      -- Handles both request rejection and exceptions in the fulfillment handler.
-      let _ ← Js.Promise.thenVoidWithRejection handled ignore fail
-      LeanRef.toJSL (active, abort)
-    cleanup := fun resource => do
-      let (active, abort) : RuntimeRef Bool × Js AbortController ← LeanRef.fromJSL resource
+  let effect ← Js.Function.ofLean0 <| Browser.DomM.toRuntime do
+    let active ← RuntimeRef.new true
+    let abort ← AbortController.create
+    let options ← Infoview.ClientRequestOptions.empty
+    Infoview.ClientRequestOptions.setAbortSignal options (← AbortController.getSignal abort)
+    let loading ← Js.Function.ofLean fun previous => do
+      let previous : ResponseState ← LeanRef.fromJSL previous
+      LeanRef.toJSL { previous with status := "loading", error := "" }
+    Js.Function.callVoid responseSetter (React.SetStateAction.ofUpdater loading)
+    let pending ← request input.session (← js#"RpcBrowserServer.create")
+      input.query options
+    let succeed ← Js.Function.ofLeanVoid fun (reply : Js Reply) => do
+      if ← active.get then
+        -- Validate before publication; a bad message rejects this Promise chain.
+        let _ ← message reply
+        Js.Function.callVoid responseSetter (React.SetStateAction.ofValue (← LeanRef.toJSL {
+          reply := some reply, status := "ready" : ResponseState }))
+    let fail ← Js.Function.ofLeanVoid fun (_error : Js.Any) => do
+      if ← active.get then
+        let failed ← Js.Function.ofLean fun previous => do
+          let previous : ResponseState ← LeanRef.fromJSL previous
+          LeanRef.toJSL { previous with
+            status := "error"
+            error := "The request or response handler failed" }
+        Js.Function.callVoid responseSetter (React.SetStateAction.ofUpdater failed)
+    let handled ← Js.Promise.thenVoid pending succeed
+    let ignore ← Js.Function.ofLeanVoid fun (_ : Js.Undefined) => pure ()
+    -- Handles both request rejection and exceptions in the fulfillment handler.
+    let _ ← Js.Promise.thenVoidWithRejection handled ignore fail
+    let cleanup ← Js.Function.ofLean0Void <| Browser.DomM.toRuntime do
       active.set false
       AbortController.abort abort
-  }
+    pure (Js.UndefinedOr.ofJs cleanup)
   Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[
-    Js.erase input.session, Js.erase input.query, Js.erase revision.value]))
-  let state : ResponseState ← LeanRef.fromJSL response.value
+    Js.erase input.session, Js.erase input.query, Js.erase revisionValue]))
+  let state : ResponseState ← LeanRef.fromJSL responseValue
   let previous := if state.reply.isSome then " Showing the previous response." else ""
   let status := if state.status == "loading" then s!"Loading…{previous}"
     else if state.status == "error" then s!"Request failed: {state.error}.{previous}"

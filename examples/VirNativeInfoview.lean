@@ -221,13 +221,14 @@ def GoalCardBody
     (HypothesisRowComponent : Lean.Vir.React.FunctionComponent
       (Lean.Vir.React.Props.WithData HypothesisProps)) : ReactM (Js Lean.Vir.React.Node) := do
   let initialCollapsed ← JsValue.ofBool false
-  let collapsedState ← Lean.Vir.React.StateTuple.toState
-    (← Lean.Vir.React.Hooks.useState initialCollapsed)
-  let collapsed ← JsValue.toBool collapsedState.value
+  let collapsedState ← Lean.Vir.React.Hooks.useState initialCollapsed
+  let collapsedValue ← Js.Tuple2.first collapsedState
+  let collapsedSetter ← Js.Tuple2.second collapsedState
+  let collapsed ← JsValue.toBool collapsedValue
   let detailsId := s!"vir-native-infoview-goal-{goalId}-details"
-  let toggle ← Lean.Vir.React.Callback.ofUnary fun (_ : Js Lean.Vir.Browser.Event) => do
+  let toggle ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) => do
     let next ← JsValue.ofBool (!collapsed)
-    Lean.Vir.React.State.set collapsedState next
+    Js.Function.callVoid collapsedSetter (Lean.Vir.React.SetStateAction.ofValue next)
   let hypothesisCount := (← JsValue.toFloat (← Js.Array.length hypotheses)).toUInt64.toNat
   let renderHypothesis ← Js.Function.ofLean3 fun (hypothesis : Js InteractiveHypothesisBundle)
       (nativeIndex : Js Float) (_source : Js.Array InteractiveHypothesisBundle) => do
