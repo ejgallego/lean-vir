@@ -292,7 +292,7 @@ export async function runNativeGoalPanel(wasm, pkg, entry = "VirNativeInfoview.c
     await leave();
     replyMode = "null-code";
     await hover();
-    verify(popup().querySelector(".font-code"), null, "null optional popup code is absent");
+    verify(popup().querySelector(".font-code").textContent, " : ", "null optional popup code is absent");
     await leave();
     replyMode = "nested-popup";
     await hover();

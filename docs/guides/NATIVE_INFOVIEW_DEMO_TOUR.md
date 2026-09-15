@@ -26,6 +26,9 @@ In the Lean panel, pause over a term for half a second: the deepest subexpressio
 highlights and its type popup floats without moving the goal text. Move into the
 popup to inspect it; leaving gives a short grace period before dismissal. Click
 to pin, or use Escape/the close button to dismiss it.
+The popup uses the editor's theme colors, with monospace code above a separator
+and UI-font documentation below. Markdown markers still display literally;
+rendered Markdown/math and selection/navigation remain separate follow-ups.
 
 ## 2. Try the standalone Lean panel
 

@@ -45,7 +45,7 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
       infoviewUseRpcSession: () => session }),
   });
   const container = document.createElement("div");
-  container.style.cssText = "margin:80px;font:16px system-ui";
+  container.style.cssText = "margin:80px";
   document.body.append(container);
   const root = createRoot(container);
   const component = runtime.call("VirNativeInfoview.createComponent");
@@ -86,10 +86,26 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
   globalThis.nativeHoverController = {
     render,
     reset: render,
+    theme: dark => {
+      const style = document.documentElement.style;
+      for (const [name, value] of Object.entries({
+        "font-family": "system-ui", "font-size": "13px",
+        "editor-font-family": "monospace", "editor-font-size": "14px",
+        "editor-line-height": "21px", "editor-foreground": dark ? "#ddd" : "#222",
+        "editorHoverWidget-foreground": dark ? "#ddd" : "#333",
+        "editorHoverWidget-background": dark ? "#252526" : "#f3f3f3",
+        "editorHoverWidget-border": dark ? "#555" : "#ccc",
+        "widget-shadow": "#0003", "editor-selectionBackground": dark ? "#264f78" : "#add6ff",
+      })) style.setProperty(`--vscode-${name}`, value);
+      document.body.style.cssText = `font:13px system-ui;color:${dark ? "#ddd" : "#222"};background:${dark ? "#1e1e1e" : "#fff"}`;
+    },
     requests: () => requests.length,
     snapshot: () => {
       const element = tag();
       const tip = popup();
+      const tipStyle = tip && getComputedStyle(tip);
+      const doc = tip?.querySelector(".vir-native-infoview-doc");
+      const code = tip?.querySelector(".font-code");
       const tags = [...container.querySelectorAll(".vir-native-infoview-code-tag")].map(node => ({
         id: node.getAttribute("aria-controls"), instance: instance(node), text: node.textContent,
         highlighted: node.classList.contains("highlight"), rect: rect(node),
@@ -98,6 +114,13 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
         highlighted: tags.filter(value => value.highlighted).map(value => value.id), tags,
         prefixRect: textRect("prefix"), suffixRect: textRect("suffix"), tag: rect(element),
         popupRect: rect(tip),
+        popupStyle: tip && {
+          color: tipStyle.color, background: tipStyle.backgroundColor, radius: tipStyle.borderRadius,
+          shadow: tipStyle.boxShadow, padding: tipStyle.padding,
+          docFont: doc && getComputedStyle(doc).fontFamily,
+          codeFont: code && getComputedStyle(code).fontFamily,
+          separators: tip.querySelectorAll("hr").length,
+        },
         popupPosition: tip && getComputedStyle(tip).position, portal: tip?.parentElement === document.body };
     },
     dispose: async () => {

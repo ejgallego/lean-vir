@@ -60,9 +60,13 @@ const hoverChrome = await launchChromium();
 let hoverCdp;
 try {
   hoverCdp = await openChromiumPage(hoverChrome);
+  const upstreamCss = await readFile(new URL("node_modules/@leanprover/infoview/dist/index.css", root), "utf8");
+  await evaluate(hoverCdp, `(() => { const style = document.createElement('style');
+    style.textContent = ${JSON.stringify(upstreamCss)}; document.head.append(style); })()`);
   await evaluate(hoverCdp, `${hoverBundle.outputFiles[0].text}\nvoid 0`);
-  const initial = await evaluate(hoverCdp,
+  await evaluate(hoverCdp,
     `setupNativeHoverPanel(${JSON.stringify([...wasm])},${JSON.stringify([...pkg])})`);
+  const initial = await evaluate(hoverCdp, `nativeHoverController.theme(false); nativeHoverController.snapshot()`);
   const parent = initial.tags.find(tag => tag.text.includes("prefix") && tag.text.includes("suffix"));
   const child = initial.tags.find(tag => tag.text === "child");
   const sibling = initial.tags.find(tag => tag.text === "sibling");
@@ -91,8 +95,21 @@ try {
   assert.equal(opened.portal, true, "type popup is appended to document.body");
   assert.equal(opened.popupPosition, "fixed", "type popup uses fixed portal positioning");
   assert.deepEqual(opened.tag, initial.tag, "opening portal does not shift tagged-term layout");
+  assert.deepEqual(opened.popupStyle, {
+    color: "rgb(51, 51, 51)", background: "rgb(243, 243, 243)", radius: "4px",
+    shadow: "rgba(0, 0, 0, 0.2) 1px 1px 5px 0px", padding: "4px 24px 4px 8px",
+    docFont: "system-ui", codeFont: "monospace", separators: 1,
+  }, "light popup uses upstream theme tokens and separates code from prose");
   const hoverScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
   await writeFile(new URL("build/native-infoview-port/hover-preview.png", root), Buffer.from(hoverScreenshot.data, "base64"));
+  await evaluate(hoverCdp, "nativeHoverController.theme(true)");
+  const dark = await snapshot();
+  assert.equal(dark.popupStyle.color, "rgb(221, 221, 221)", "dark popup foreground follows theme");
+  assert.equal(dark.popupStyle.background, "rgb(37, 37, 38)", "dark popup background follows theme");
+  assert.equal(dark.requests, opened.requests, "theme change does not restart type RPC");
+  const darkScreenshot = await hoverCdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+  await writeFile(new URL("build/native-infoview-port/hover-preview-dark.png", root), Buffer.from(darkScreenshot.data, "base64"));
+  await evaluate(hoverCdp, "nativeHoverController.theme(false)");
   await moveTo(child.rect);
   await wait(460);
   let transitioned = await snapshot();

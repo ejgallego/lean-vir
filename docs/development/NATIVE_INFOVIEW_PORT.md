@@ -78,8 +78,38 @@ the editor.
 Remaining interactive-code parity is substantive: hypothesis/target/subexpression
 selection, modifier-key definition navigation, context menus, full upstream
 tooltip geometry/dismissal policy and Markdown/math documentation. There is no upstream config
-persistence or screenshot-level visual parity claim. Selection and navigation
-are the next useful API exercise, before adding further cosmetic fidelity.
+persistence or screenshot-level visual parity claim. The popup now shares the
+upstream tooltip/code classes, theme colors, 4px rounded border, shadow and
+code/documentation separators. Prose uses the UI font; code uses the editor font.
+The explicit close control reserves an extra 16px of right padding. The small
+placement implementation still omits upstream's arrow and full collision policy.
+
+### Next interaction slices (assessment, not implemented)
+
+**Selection/navigation:** definition navigation is the smaller independent slice.
+The existing native RPC session and `EditorConnection.revealPosition` binding
+cover transport and editor movement. Missing Lean policy is modifier-key
+handling, `getGoToLocation`'s definition request/result projection, caching and
+stale-response protection, underline feedback and the no-definition case.
+This does not require porting the infoview shell.
+
+Shift-click selection needs more plumbing: carry goal ID, hypothesis ID and
+`subexprPos` through the renderer, distinguish hypothesis names/types/values from
+targets, and connect selected-state updates to the host's location context.
+Highlighting, pointer/text-selection arbitration and VS Code context-menu
+metadata then consume that state. Incoming selected locations alone are not a
+complete read/write selection integration. Start with one target-subexpression
+case to establish the contract; menus and exhaustive interaction polish can wait.
+
+**Markdown:** the pinned `@leanprover/infoview` 0.13.0 publicly exports `Markdown`.
+Its implementation composes `react-markdown`, `remark-math`, `rehype-mathjax` and
+Lean-aware syntax highlighting. An external renderer checkpoint is feasible using
+the same native component-composition boundary as `InteractiveCode`; it is not
+implemented here. For the all-Lean infoview-specific port, Lean could own the
+renderer configuration and compose those generic libraries without rewriting a
+Markdown parser or MathJax. That still needs dependency/host wiring, code-renderer
+callbacks, link handling and safety checks, plus actual Markdown/math fixtures.
+Current documentation deliberately remains literal native text (including markup).
 
 ## API assessment
 

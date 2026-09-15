@@ -61,6 +61,10 @@ private structure PopupState where
   reply : Option (Js InfoPopup) := none
   status : String := "Loading…"
 
+private def separator : Html := do
+  <hr style={(← js%{ "margin" := (← js#"4px 0"), "border" := (← js#"0"),
+    "borderTop" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)") })}/>
+
 private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
   FunctionComponent.ofLean fun nativeProps => do
     let props : TagProps ← LeanRef.fromJSL (← Props.WithData.data nativeProps)
@@ -131,30 +135,49 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
         contents := contents.push (Html.text " : ")
         if let some type ← popupField (← InfoPopup.type reply) then
           contents := contents.push (props.render (Hover.asParent hover) type)
+        let code := contents
+        contents := #[(do
+          <div className="font-code tl pre-wrap" style={(← js%{
+            "whiteSpace" := (← js#"pre-wrap"),
+            "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") })}>{...code}</div>)]
         if let some value ← popupField (Js.UndefinedOr.ofJs (← Js.Object.get reply (← js#"doc"))) then
           let doc ← Js.String.fromAny value
           if (← JsValue.toFloat (← Js.String.length doc)) != 0 then
+            contents := contents.push separator
             contents := contents.push (do
               <span className="vir-native-infoview-doc" style={(← js%{
                 "display" := (← js#"block"), "whiteSpace" := (← js#"pre-wrap") })}>{Node.text doc}</span>)
-        if !props.diff.isEmpty then contents := contents.push (do
-          <span className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</span>)
+        if !props.diff.isEmpty then
+          contents := contents.push separator
+          contents := contents.push (do
+            <div className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</div>)
       else contents := #[Html.text state.status]
       popup := do
-        let node ← <span id={popupId} role="tooltip" className="vir-native-infoview-type-popup"
+        let node ← <div id={popupId} role="tooltip" className="vir-native-infoview-type-popup tooltip"
             onPointerEnter={popupEnter} onPointerLeave={popupLeave}
             onPointerOver={popupOver} onPointerOut={popupOver} onKeyDown={keyboard}
             style={(← js%{ "position" := (← js#"fixed"), "display" := (← js#"block"),
-              "visibility" := (← js#"hidden"), "padding" := (← js#"0.5em"),
-              "zIndex" := (← js#"1000"), "maxWidth" := (← js#"min(480px, calc(100vw - 20px))"),
+              "visibility" := (← js#"hidden"), "padding" := (← js#"4px 24px 4px 8px"),
+              "zIndex" := (← js#"1000"), "maxWidth" := (← js#"min(70vw, calc(100vw - 20px))"),
               "maxHeight" := (← js#"min(300px, calc(100vh - 20px))"),
               "boxSizing" := (← js#"border-box"), "overflow" := (← js#"auto"),
-              "whiteSpace" := (← js#"pre-wrap"),
-              "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)"),
+              "overscrollBehavior" := (← js#"contain"), "whiteSpace" := (← js#"normal"),
+              "fontFamily" := (← js#"var(--vscode-font-family, system-ui)"),
+              "fontSize" := (← js#"var(--vscode-font-size, 13px)"),
+              "lineHeight" := (← js#"var(--vscode-editor-line-height, 1.5)"),
+              "color" := (← js#"var(--vscode-editorHoverWidget-foreground, #333)"),
+              "borderRadius" := (← js#"4px"),
+              "boxShadow" := (← js#"1px 1px 5px var(--vscode-widget-shadow, #0003)"),
               "border" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)"),
               "background" := (← js#"var(--vscode-editorHoverWidget-background, #eee)") })}>
-          {...contents}<button type="button" aria-label="Close type information" onClick={close}>×</button>
-          </span>
+          <div className="tooltip-code-content">{...contents}</div>
+          <button type="button" aria-label="Close type information" title="Close type information" onClick={close}
+            style={(← js%{ "position" := (← js#"absolute"), "top" := (← js#"4px"),
+              "right" := (← js#"4px"), "padding" := (← js#"0 2px"), "margin" := (← js#"0"),
+              "border" := (← js#"0"), "background" := (← js#"transparent"),
+              "color" := (← js#"inherit"), "font" := (← js#"inherit"),
+              "lineHeight" := (← js#"1"), "cursor" := (← js#"pointer") })}>×</button>
+          </div>
         HoverDom.portal node
     return ← <span id={anchorId} className={(← JsValue.ofString ("vir-native-infoview-code-tag " ++
         diffClass props.diff ++ (if current.highlighted then " highlight" else "")))}
