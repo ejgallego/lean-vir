@@ -173,14 +173,14 @@
       {
         "id": "react.hooks.use-callback", "group": "hooks", "target": "react.useCallback",
         "lean": "Lean.Vir.React.Hooks.useCallback", "marker": "vir_js",
-        "reason": "Passes the caller's native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function.",
+        "reason": "Passes a caller-selected supported native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function without erasing its exact call shape.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useCallback", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.Js.Function.Shape α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "callback", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } },
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } },
           { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
         "id": "react.hooks.use-context", "group": "hooks", "target": "react.useContext",

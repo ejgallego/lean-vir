@@ -33,6 +33,21 @@ export function createJsCollectionHostBindings() {
       fn(argument);
       return undefined;
     },
+    "js.function.call0": (fn) => fn(),
+    "js.function.call0Void": (fn) => {
+      fn();
+      return undefined;
+    },
+    "js.function.call2": (fn, first, second) => fn(first, second),
+    "js.function.call2Void": (fn, first, second) => {
+      fn(first, second);
+      return undefined;
+    },
+    "js.function.call3": (fn, first, second, third) => fn(first, second, third),
+    "js.function.call3Void": (fn, first, second, third) => {
+      fn(first, second, third);
+      return undefined;
+    },
     "js.promise.thenValue": (promise, onFulfilled) => promise.then(onFulfilled),
     "js.promise.thenPromise": (promise, onFulfilled) => promise.then(onFulfilled),
     "js.promise.thenVoid": (promise, onFulfilled) => promise.then(onFulfilled),

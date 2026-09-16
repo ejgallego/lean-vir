@@ -103,3 +103,29 @@ test("native function subsets match pinned React effect, reducer and state-actio
     [],
   );
 });
+
+test("useCallback preserves supported function signatures and rejects objects", async () => {
+  const diagnostics = typeScriptDiagnostics(`
+    import { useCallback } from "react";
+    declare const nullary: () => string;
+    declare const unary: (value: string) => number;
+    declare const binary: (left: string, right: number) => boolean;
+    declare const ternary: (first: string, second: number, third: boolean) => symbol;
+    const selectedNullary: () => string = useCallback(nullary, []);
+    const selectedUnary: (value: string) => number = useCallback(unary, []);
+    const selectedBinary: (left: string, right: number) => boolean = useCallback(binary, []);
+    const selectedTernary: (first: string, second: number, third: boolean) => symbol = useCallback(ternary, []);
+    // @ts-expect-error useCallback only accepts callable values
+    useCallback({ invoke: unary }, []);
+  `);
+  assert.deepEqual(diagnostics.map((d) => d.messageText), []);
+
+  const config = JSON.parse(await readFile(new URL("../../Vir/React.bindings.json", import.meta.url)));
+  const operation = config.generation.protocolOperations.find(op => op.target === "react.useCallback");
+  assert.deepEqual(operation.typeParameters, ["α"]);
+  assert.deepEqual(operation.proofParameters, ["Lean.Vir.Js.Function.Shape α"]);
+  assert.equal(operation.arguments[0].type.lean, "Lean.Vir.Js α");
+  assert.equal(operation.arguments[0].type.resourceInner, "α");
+  assert.equal(operation.result.type.lean, "Lean.Vir.Js α");
+  assert.equal(operation.result.type.resourceInner, "α");
+});
