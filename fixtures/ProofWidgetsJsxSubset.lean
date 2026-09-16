@@ -33,14 +33,14 @@ def Card : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.With
   let ctx ← Lean.Vir.LeanRef.fromJSL data
   let children ← Lean.Vir.React.Props.WithData.children nativeProps
   let props ← js%{
-    "id" := (← js#"proofwidgets-jsx-card"),
-    "className" := (← js#"pw-jsx-card"),
-    "data-component" := (← js#"Card")
+    "id" := js#"proofwidgets-jsx-card",
+    "className" := js#"pw-jsx-card",
+    "data-component" := js#"Card"
   }
   return ← <section @props={props}>
     <h3 className="pw-jsx-card-title">{Html.text ctx.title}</h3>
     <div id="proofwidgets-jsx-card-body" className="pw-jsx-card-body">
-      {pure children}
+      {children}
     </div>
   </section>
 
@@ -52,29 +52,28 @@ def MarkdownDisplay : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React
   let data ← Lean.Vir.React.Props.WithData.data nativeProps
   let ctx ← Lean.Vir.LeanRef.fromJSL data
   let props ← js%{
-    "id" := (← js#"proofwidgets-jsx-markdown"),
-    "className" := (← js#"pw-jsx-markdown"),
-    "data-component" := (← js#"MarkdownDisplay")
+    "id" := js#"proofwidgets-jsx-markdown",
+    "className" := js#"pw-jsx-markdown",
+    "data-component" := js#"MarkdownDisplay"
   }
   return ← <section @props={props}>
     <h3 className="pw-jsx-markdown-title">MarkdownDisplay</h3>
     <pre className="pw-jsx-markdown-source">{Html.text ctx.contents}</pre>
   </section>
 
-def htmlLetters : Array Html := #[
-  do
-    let style ← js%{ "color" := (← js#"red") }
-    return ← <span id="proofwidgets-jsx-letter-h" style={style}>H</span>,
-  do
-    let style ← js%{ "color" := (← js#"yellow") }
-    return ← <span id="proofwidgets-jsx-letter-t" style={style}>T</span>,
-  do
-    let style ← js%{ "color" := (← js#"green") }
-    return ← <span id="proofwidgets-jsx-letter-m" style={style}>M</span>,
-  do
-    let style ← js%{ "color" := (← js#"blue") }
-    return ← <span id="proofwidgets-jsx-letter-l" style={style}>L</span>
-]
+def htmlLetters : Lean.Vir.React.ReactM (Js.Array Node) := do
+  js#[← (do
+    let style ← js%{ "color" := js#"red" }
+    return ← <span key="h" id="proofwidgets-jsx-letter-h" style={style}>H</span>),
+  ← (do
+    let style ← js%{ "color" := js#"yellow" }
+    return ← <span key="t" id="proofwidgets-jsx-letter-t" style={style}>T</span>),
+  ← (do
+    let style ← js%{ "color" := js#"green" }
+    return ← <span key="m" id="proofwidgets-jsx-letter-m" style={style}>M</span>),
+  ← (do
+    let style ← js%{ "color" := js#"blue" }
+    return ← <span key="l" id="proofwidgets-jsx-letter-l" style={style}>L</span>)]
 
 def htmlHeadline : Html :=
   <b id="proofwidgets-jsx-headline">What, HTML in Lean?!</b>
@@ -84,8 +83,8 @@ def parrotImage : Html :=
     src={← JsValue.ofString ("https://" ++ "upload.wikimedia.org/wikipedia/commons/a/a5/Parrot_montage.jpg")}
     alt="Six photos of parrots arranged in a grid." />
 
-def spreadInterpolation : Html :=
-  <b id="proofwidgets-jsx-spread">You can use {...htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
+def arrayInterpolation : Html :=
+  <b id="proofwidgets-jsx-array">You can use {htmlLetters} in Lean {Html.text s!"{1 + 3}! "}<hr id="proofwidgets-jsx-divider" /></b>
 
 def markdownExample (MarkdownDisplay : Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData MarkdownProps)) : Html :=
   do
@@ -113,7 +112,7 @@ def Badge : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.Wit
     "data-tone" := (← JsValue.ofString ctx.tone)
   }
   return ← <span @props={props}>
-    {Html.text ctx.label}{pure children}
+    {Html.text ctx.label}{children}
   </span>
 
 def row (key label value : String) : Html :=
@@ -129,10 +128,10 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
   Lean.Vir.React.FunctionComponent.ofLean fun _ => do
     let renderedRows := 3
     let surfaceProps ← js%{
-      "id" := (← js#"proofwidgets-jsx-subset"),
-      "data-testid" := (← js#"proofwidgets-jsx-subset"),
-      "role" := (← js#"region"),
-      "aria-label" := (← js#"ProofWidgets JSX subset combinator demo")
+      "id" := js#"proofwidgets-jsx-subset",
+      "data-testid" := js#"proofwidgets-jsx-subset",
+      "role" := js#"region",
+      "aria-label" := js#"ProofWidgets JSX subset combinator demo"
     }
     let cardData ← LeanRef.toJSL { title := "JSX-shaped combinators" }
     let cardProps ← Props.WithData.make cardData
@@ -145,8 +144,8 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
       Lean.Vir.Browser.Document.setTitle
         (← Lean.Vir.Browser.Document.current) title
     let buttonProps ← js%{
-      "id" := (← js#"proofwidgets-jsx-action"),
-      "className" := (← js#"pw-jsx-action"),
+      "id" := js#"proofwidgets-jsx-action",
+      "className" := js#"pw-jsx-action",
       "onClick" := click
     }
     let action ← <button @props={buttonProps}>{Html.text "mark"}</button>
@@ -157,9 +156,9 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
     </ul>
     let view : Html := <section @props={surfaceProps}>
       <Card @props={cardProps}>
-        {htmlHeadline}{parrotImage}{spreadInterpolation}{pure markdown}
+        {htmlHeadline}{parrotImage}{arrayInterpolation}{markdown}
         <Badge @props={badgeProps}> children</Badge>
-        {pure action}{pure rows}
+        {action}{rows}
       </Card>
     </section>
     view
@@ -187,11 +186,11 @@ def nativeConstruction
     (payload : Js.Object) (label : Js String)
     (callback : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)) : Html := do
   let props ← js%{
-    "label" := (← js#"superseded"), "label" := label,
+    "label" := js#"superseded", "label" := label,
     "payload" := payload, "onClick" := callback, "values" := (← js#[label, label])
   }
   return ← <Component @props={props}>
-    <span title={label} style={payload} onClick={callback}>{Lean.Vir.React.Node.text label}</span>
+    <span title={label} style={payload} onClick={callback}>{label}</span>
   </Component>
 
 /-- A compile-time native props schema, never instantiated as a Lean record. -/
@@ -210,7 +209,43 @@ def nativeTypedConstruction
 def nativeTypedLabel (props : Js NativeProps) : RuntimeM (Js String) :=
   js_field% props "label"
 
+structure KeyedProps where
+  name : Js String
+
+def nativeKeyedChildren (Component : Lean.Vir.React.FunctionComponent KeyedProps)
+    (names : Js.Array String) : Html := do
+  let render ← Js.Function.ofLean3 fun (name : Js String) (_ : Js Float)
+      (_ : Js.Array String) => <Component key={name} name={name}/>
+  return ← <div>{names.map render}</div>
+
 def nativeStringLength (value : Js String) : RuntimeM (Js Float) :=
   Js.String.length value
+
+/-- Existing native arrays occupy one child slot, without fragments or flattening. -/
+def nativeChildSlots (body : Js Node) (text : Js String)
+    (nodes : Js.Array Node) (tail : Js Node) : Html :=
+  <div>{body}{text}{nodes}{tail}</div>
+
+/-- Native map calls a Lean-authored JS function; no Lean child array is built. -/
+def nativeMappedChildren (labels : Js.Array String) : Html := do
+  let render ← Js.Function.ofLean fun (label : Js String) =>
+    <span key={label}>{label}</span>
+  return ← <div>{labels.map (β := Node) render}</div>
+
+/-- Native primitive/optional children require no arrays or payload conversions. -/
+def nativePrimitiveChildren (node : Js.Nullable Node) (absent : Js.Undefined)
+    (flag : Js Bool) (number : Js Float) (bigint : Js Nat)
+    (nested : Js.Array (Js.Nullable.Value String)) : Html :=
+  <div>{node}{absent}{flag}{number}{bigint}{nested}</div>
+
+/-- Native map exposes its original index and source array without a callback envelope. -/
+def nativeIndexedMap (values : Js.Array String) : RuntimeM (Js.Array Js.Object.Value) := do
+  let render ← Js.Function.ofLean3 fun (value : Js String) (index : Js Float)
+      (source : Js.Array String) => js%{ "value" := value, "index" := index, "source" := source }
+  values.map render
+
+def nativeLiteralConstruction : Html := do
+  let props ← js%{ "title" := ((js#"native")), "values" := (← js#[js#"a", (js#"b")]) }
+  return ← <span title={((js#"native"))} data-props={props}/>
 
 end ProofWidgetsJsxSubset

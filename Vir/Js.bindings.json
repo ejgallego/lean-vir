@@ -190,6 +190,31 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Object", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Object.Value" } }
       },
       {
+        "id": "javascript.construction.field", "group": "construction", "target": "js.construction.field",
+        "lean": "Lean.Vir.Js.Construction.field", "marker": "vir_js",
+        "reason": "Compiler lowering for native object/JSX literals: CreateDataPropertyOrThrow semantics, defining an own writable enumerable configurable property without invoking inherited setters. Not ordinary assignment or the full Object.defineProperty API.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "object", "type": { "lean": "Lean.Vir.Js.Object", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Object.Value" } },
+          { "name": "name", "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } },
+          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.construction.element", "group": "construction", "target": "js.construction.element",
+        "lean": "Lean.Vir.Js.Construction.element", "marker": "vir_js",
+        "reason": "Compiler lowering for dense native array/JSX child-argument literals: defines the next own data property at array.length without calling push or inherited setters. The element shape remains correlated with the array shape. Not the general Array.push API.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "value", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
         "id": "javascript.object.set", "group": "object", "target": "js.object.set",
         "lean": "Lean.Vir.Js.Object.set", "marker": "vir_js",
         "reason": "Assigns the exact JavaScript value to the exact property name on an ordinary JavaScript object.",
@@ -224,6 +249,17 @@
           { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)", "representation": "callback" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary (Lean.Vir.Js α) (Lean.Vir.Js β)" } }
+      },
+      {
+        "id": "javascript.function.of-lean-ternary", "group": "function", "target": "js.value.function.ternary",
+        "lean": "Lean.Vir.Js.Function.ofLean3", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean ternary callback into an ordinary JavaScript function with the same three-argument and result call shape.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β", "γ", "δ"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM (Lean.Vir.Js δ)", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)" } }
       },
       {
         "id": "javascript.function.of-lean-unary-void", "group": "function", "target": "js.value.function.unaryVoid",
@@ -355,6 +391,18 @@
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
       {
+        "id": "javascript.array.map", "group": "array", "target": "js.array.map",
+        "lean": "Lean.Vir.Js.Array.map", "marker": "vir_js",
+        "reason": "Selects Array<T>.map<U>'s exact three-argument callback with no thisArg. The declared Js.Function3 receives the element, native number index and original native source array. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This does not expose the optional thisArg signature.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.map", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value β" } }
+      },
+      {
         "id": "javascript.array.length", "group": "array", "target": "js.array.length",
         "lean": "Lean.Vir.Js.Array.length", "marker": "vir_js",
         "reason": "Returns the exact native JavaScript Number stored in Array.length.",
@@ -444,6 +492,12 @@
     ]
   },
   "roots": [
+    {
+      "id": "construction", "title": "Literal compiler primitives",
+      "targets": ["js.construction.*"],
+      "lean": { "public": ["Lean.Vir.Js.Construction"] },
+      "upstream": { "kind": "internal" }
+    },
     {
       "id": "string", "title": "String properties", "targets": ["js.string.length"],
       "lean": { "public": ["Lean.Vir.Js.String"] },

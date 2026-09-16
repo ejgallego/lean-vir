@@ -51,6 +51,25 @@ opaque push
     RuntimeM (Lean.Vir.Js Float)
 
 /--
+Generated binding for reviewed VIR protocol `javascript.array.map`.
+
+Selects Array<T>.map<U>'s exact three-argument callback with no thisArg. The declared Js.Function3 receives the element, native number index and original native source array. The provider calls array.map(callback) directly: holes, species construction, the initial iteration bound, mutations during iteration, callback errors and result identity remain native. This does not expose the optional thisArg signature.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.map"]
+opaque map
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Array β)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.array.length`.
 
 Returns the exact native JavaScript Number stored in Array.length.
@@ -87,6 +106,47 @@ opaque get
 
 end Js.Array
 
+namespace Js.Construction
+
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.field`.
+
+Compiler lowering for native object/JSX literals: CreateDataPropertyOrThrow semantics, defining an own writable enumerable configurable property without invoking inherited setters. Not ordinary assignment or the full Object.defineProperty API.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; object js-resource/borrowed/call; name js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.construction.field"]
+opaque field
+    {α : Type}
+    (object : @& Lean.Vir.Js.Object)
+    (name : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.element`.
+
+Compiler lowering for dense native array/JSX child-argument literals: defines the next own data property at array.length without calling push or inherited setters. The element shape remains correlated with the array shape. Not the general Array.push API.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; value js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.construction.element"]
+opaque element
+    {α : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM Unit
+
+end Js.Construction
+
 namespace Js.Function
 
 /--
@@ -106,6 +166,26 @@ opaque ofLean
     {β : Type}
     (callback : Lean.Vir.Js α → RuntimeM (Lean.Vir.Js β)) :
     RuntimeM (Lean.Vir.Js.Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-ternary`.
+
+Explicitly converts a transferred Lean ternary callback into an ordinary JavaScript function with the same three-argument and result call shape.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.ternary"]
+opaque ofLean3
+    {α : Type}
+    {β : Type}
+    {γ : Type}
+    {δ : Type}
+    (callback : Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM (Lean.Vir.Js δ)) :
+    RuntimeM (Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ))
 
 /--
 Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary-void`.

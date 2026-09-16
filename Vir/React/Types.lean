@@ -12,8 +12,9 @@ public section
 
 namespace Lean.Vir.React
 
-/-- Effect used by Lean-authored React render construction. -/
-@[expose, irreducible] def ReactM (α : Type) : Type :=
+/-- Source-level name for native React operations; the ordinary runtime effect,
+not a purity or hook-ordering boundary. -/
+abbrev ReactM (α : Type) : Type :=
   Lean.Vir.RuntimeM α
 
 namespace ReactM
@@ -21,36 +22,8 @@ namespace ReactM
 /-- Explicitly lowers a render-construction action at a browser/DOM boundary. -/
 def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
   by
-    unfold ReactM at action
     unfold Lean.Vir.Browser.DomM
     exact action
-
-instance : Monad ReactM where
-  pure value :=
-    by
-      unfold ReactM
-      exact pure value
-  bind action next :=
-    by
-      unfold ReactM at action
-      unfold ReactM
-      exact action >>= fun value => by
-        unfold ReactM at next
-        exact next value
-
-instance : MonadLift Lean.Vir.RuntimeM ReactM where
-  monadLift action :=
-    by
-      unfold ReactM
-      exact action
-
-instance : MonadLift ReactM Lean.Vir.Browser.DomM where
-  monadLift := ReactM.run
-
-instance : Nonempty (ReactM α) :=
-  by
-    unfold ReactM
-    infer_instance
 
 end ReactM
 
@@ -109,13 +82,11 @@ namespace Props
 /-- Native React props carrying one explicitly named Lean-backed `data` field. -/
 opaque WithData (α : Type) : Type
 
-@[inline] unsafe def withDataAsPropsImpl {α : Type}
-    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props := unsafeCast value
-
 /-- Forget only the declared `data` field shape, preserving the native object. -/
-@[implemented_by withDataAsPropsImpl]
-axiom WithData.asProps {α : Type}
-    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props
+@[inline] def WithData.asProps {α : Type}
+    (value : Lean.Vir.Js (WithData α)) : Lean.Vir.Js Props := by
+  unfold Lean.Vir.Js at *
+  exact value
 
 end Props
 
@@ -144,13 +115,10 @@ Views a function component as the `React.ElementType` accepted by
 `React.createElement`. This changes only the Lean phantom type: React receives
 the exact same function object, so its component identity is preserved.
 -/
-@[inline] unsafe def asElementTypeImpl {props : Type}
-    (component : FunctionComponent props) : Lean.Vir.Js ElementType :=
-  unsafeCast component
-
-@[implemented_by asElementTypeImpl]
-axiom asElementType {props : Type}
-    (component : FunctionComponent props) : Lean.Vir.Js ElementType
+@[inline] def asElementType {props : Type}
+    (component : FunctionComponent props) : Lean.Vir.Js ElementType := by
+  unfold FunctionComponent Lean.Vir.Js.Function1 Lean.Vir.Js at *
+  exact component
 
 end FunctionComponent
 

@@ -151,6 +151,7 @@ run_elab do
     expect "preserved beta head"
       ((← reduceTypeAliases (mkApp (.lam `key (mkConst ``Nat) ty .default) (.bvar 0))) == ty)
   let element := mkConst ``Lean.Vir.Browser.Element
+  rejected "naked internal handle" (mkConst ``Lean.Vir.JsHandle)
   rejected "naked resource marker" (project (mkApp (mkConst ``Carrier.mk) element))
   let jsElement := mkApp (mkConst ``Lean.Vir.Js) element
   expectType "projected resource"

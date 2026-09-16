@@ -24,7 +24,8 @@ def greeting (name : String) : ReactM (Lean.Vir.Js Node) :=
       (← Lean.Vir.JsValue.ofString "className")
       (← Lean.Vir.JsValue.ofString "greeting")
     let text ← Lean.Vir.JsValue.ofString s!"Hello, {name}"
-    let children ← Lean.Vir.Js.Array.ofArray #[← Node.text text]
+    let children ← Lean.Vir.Js.Array.empty
+    let _ ← Lean.Vir.Js.Array.push children (← Node.text text)
     let tag ← ElementType.tag (← Lean.Vir.JsValue.ofString "section")
     Node.createElement tag props children
 ```
@@ -46,8 +47,8 @@ open Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def greeting (name : Js String) : ReactM (Js Node) := do
-  let style ← js%{ "color" := (← js#"red") }
-  return ← <section className="greeting" style={style}>Hello, {Node.text name}</section>
+  let style ← js%{ "color" := js#"red" }
+  return ← <section className="greeting" style={style}>Hello, {name}</section>
 ```
 
 Attributes accept exact JS values; literal strings are converted once. Use
@@ -55,8 +56,17 @@ native names such as `aria-label` and `data-testid`. Events take native
 functions, so convert a Lean closure explicitly with `Callback.ofUnary`.
 There are no per-attribute or per-tag helper catalogues.
 
-`js%{ "field" := value }` expands to a fresh `Js.Object.empty` followed by
-`Js.Object.set` assignments in source order (last duplicate wins).
+In native object fields, native arrays and JSX attributes, `js#"text"` inserts
+its conversion at that position: `js%{ "title" := js#"Hello" }`,
+`js#[js#"Hello"]` and `<span title={js#"Hello"}/>` need no extra arrow.
+Parentheses do not change this rule. Elsewhere it remains a `RuntimeM (Js String)`
+action. Named property/array actions still require explicit `←`; only literal
+syntax receives this treatment.
+
+`js%{ "field" := value }` creates a fresh ordinary object and defines own data
+properties in source order (last duplicate wins). Array literals and JSX use the
+same own-property construction semantics, without invoking inherited setters.
+Ordinary `Js.Object.set` and `Js.Array.push` remain native assignment/push operations.
 Literal `__proto__` keys are rejected in objects and JSX because assignment
 would invoke the inherited prototype setter. Explicit `Object.set` retains
 ordinary JavaScript assignment semantics, including setters.
@@ -68,8 +78,8 @@ Uppercase JSX takes a native function component. Supply an already-typed
 props object with `<Component @props={props}/>`; this must be the sole attribute.
 `@props` is VIR's exact-object argument, not a field named `props` or JavaScript
 object spread. It performs no copying or merging before calling React. React
-still applies its normal props construction. Attribute `{...props}` is rejected;
-child `{...items}` remains child iteration.
+still applies its normal props construction. Both attribute `{...props}` and
+child `{...items}` spreads are rejected; insert native child arrays with `{items}`.
 With an untyped `FunctionComponent Props`, attributes construct ordinary native
 props. For a typed component, declare a flat structure whose fields are native
 `Js` values and use it only as the props shape:
@@ -88,6 +98,9 @@ fields and value types at compile time. No `LabelProps` record is allocated:
 JSX still writes a fresh native object. All fields must be supplied; generic,
 dependent and inherited schemas are outside this bounded surface. The special
 `key` and `children` fields and `__proto__` are not supported schema fields.
+Supply `key` separately, for example `<Label key={id} title="Hello"/>`: it accepts
+native string/number/bigint keys, optionally null or undefined. React consumes it
+as element metadata; it is not readable through the component's props schema.
 `js_field% props "title"` uses that declaration for one native property read;
 it does not validate an external response, require an own property, or intercept
 getters. As with typed JavaScript, untrusted inputs need an explicit check.
@@ -108,19 +121,53 @@ only that number when Lean control flow needs to test whether the text is empty.
 This differs from counting Lean string characters.
 
 `Html` is a deferred `ReactM (Js Node)`, not a serialized tree. Attributes
-are evaluated before children. Child actions run left-to-right; `{pure node}`
-inserts an existing node and `{...items}` runs an array of child actions
-directly into the native child array. `Html.text` explicitly converts Lean
-text; native strings go straight to `Node.text`. In a `do` block, use
+are evaluated before children. `{node}`, `{text}` and `{nodes}` insert an
+existing native value unchanged. Supported shapes are `Node`, `String`,
+`Float` (number), `Nat` (bigint), `Bool`, `Js.Undefined.Value`, and recursively
+native arrays/nullable/undefined-or unions of these. Native `null`, `undefined`
+and booleans render nothing; optional children need no empty/singleton arrays.
+Arbitrary objects and `Js.Any` are not implicitly narrowed to nodes. A native array
+occupies one child slot; JSX does not flatten it or add a fragment. Existing
+child actions still run left-to-right and may return any supported native shape.
+Lean arrays (including arrays of actions) are not JSX children.
+Use native mapping directly:
+
+```lean
+def labels (values : Js.Array String) : ReactM (Js Node) := do
+  let render ← Js.Function.ofLean3 fun (label : Js String) (_ : Js Float)
+      (_ : Js.Array String) =>
+    <span key={label}>{label}</span>
+  return ← <div>{values.map render}</div>
+```
+
+`Js.Array.map` calls native `array.map(callback)` with an explicitly created
+JavaScript function. `Js.Function.ofLean3` exposes `(value, index, source)`;
+the index is `Js Float` and source is the original `Js.Array`. Unary callbacks
+also work through an `Array.map`-specific type-only coercion, preserving the
+original function. When the result type is not known from context, supply it:
+`values.map (β := Node) render`. No general function-subtyping layer is implied.
+The native operation skips holes and propagates callback exceptions; `thisArg`
+is not exposed. No Lean array is constructed.
+The mapping expression runs once at its child position. Keys and component
+identity follow React's ordinary rules. For a fixed native array, use
+`js#[first, second]`; execute construction actions explicitly inside it, such
+as `js#[← <span key="first">First</span>, ← <span key="second">Second</span>]`.
+
+`Html.text` explicitly converts Lean text. In a `do` block, use
 `return ← <...>` for a final JSX expression to avoid Lean parsing `<` as comparison.
 
 The [HTML fixture](../../fixtures/ProofWidgetsHtml.lean) and
 [JSX fixture](../../fixtures/ProofWidgetsJsxSubset.lean) exercise tags, string and
-interpolated attributes, text/child spreads, uppercase components, typed props,
+interpolated attributes, native child arrays, uppercase components, typed props,
 keys and handlers. This native authoring facade is distinct from upstream's
 [serialized `ProofWidgets.Html` protocol](INFOVIEW.md#optional-serialized-html).
 
 ## Components and roots
+
+`ReactM` is a transparent alias for `RuntimeM`, not a render-purity boundary.
+Generic `Js.Function.ofLean` can therefore create JSX-returning callbacks.
+`FunctionComponent.ofLean` remains an equivalent, component-specific spelling;
+neither enforces hooks, purity or replay safety beyond what React enforces.
 
 `FunctionComponent.ofLean` converts a Lean render function into one ordinary JavaScript
 function. That returned function is the React component type: reuse it to

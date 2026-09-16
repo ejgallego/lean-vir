@@ -22,16 +22,47 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   });
   const trace = [];
   let traceConstruction = false;
-  const setProperty = hostBindings["js.object.set"];
-  hostBindings["js.object.set"] = (object, name, value) => {
+  let mapElementProbe = null;
+  let lastMap;
+  let mapCalls = 0;
+  const map = hostBindings["js.array.map"];
+  hostBindings["js.array.map"] = (array, callback) => {
+    mapCalls++;
+    const result = map(array, callback);
+    lastMap = { array, result };
+    return result;
+  };
+  const setProperty = hostBindings["js.construction.field"];
+  let literalWrites = 0;
+  const withInheritedSetter = (object, name, value, write) => {
+    const original = Object.getPrototypeOf(object);
+    const inherited = Object.create(original);
+    let setterCalls = 0;
+    Object.defineProperty(inherited, name, { set() { setterCalls++; }, configurable: true });
+    Object.setPrototypeOf(object, inherited);
+    try { write(); } finally { Object.setPrototypeOf(object, original); }
+    const descriptor = Object.getOwnPropertyDescriptor(object, name);
+    check(setterCalls === 0 && descriptor?.value === value && descriptor.writable &&
+      descriptor.enumerable && descriptor.configurable,
+    "real Lean literal lowering defines own data properties without inherited setters");
+    literalWrites++;
+  };
+  hostBindings["js.construction.field"] = (object, name, value) => {
     if (traceConstruction) trace.push(name);
+    if (traceConstruction) return withInheritedSetter(object, name, value,
+      () => setProperty(object, name, value));
     return setProperty(object, name, value);
   };
+  const appendElement = hostBindings["js.construction.element"];
+  hostBindings["js.construction.element"] = (array, value) => traceConstruction
+    ? withInheritedSetter(array, String(array.length), value, () => appendElement(array, value))
+    : appendElement(array, value);
   check(!Object.hasOwn(hostBindings, "react.node.text") &&
     !Object.hasOwn(hostBindings, "react.elementType.tag"),
   "native text and tag views need no host providers");
   const createElement = hostBindings["react.node.createElement"];
   hostBindings["react.node.createElement"] = (type, props, children) => {
+    mapElementProbe?.(type, props);
     if (traceConstruction) trace.push(typeof type === "string" ? `element:${type}` : "element:component");
     return createElement(type, props, children);
   };
@@ -100,6 +131,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       typed.props.payload === payload && typed.props.onClick === callback &&
       typed.props.values.length === 2 && typed.props.values.every(value => value === label),
     "typed native props preserve exact inputs");
+    check(literalWrites > 10, "own-property regression exercises object, array and typed JSX lowering");
     let reads = 0;
     check(runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", {
       get label() { reads++; return label; },
@@ -113,6 +145,104 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     check(runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "") === 0 &&
       runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "😀") === 2,
     "native string length is UTF-16 length, not decoded Lean character count");
+    const body = React.createElement("b", null, "body");
+    const tail = React.createElement("i", null, "tail");
+    const nested = [React.createElement("span", { key: "nested" }, "nested")];
+    const slots = runtime.call("ProofWidgetsJsxSubset.nativeChildSlots", body, label, nested, tail);
+    check(slots.props.children[0] === body && slots.props.children[1] === label &&
+      slots.props.children[2] === nested && slots.props.children[3] === tail && nested.length === 1,
+    "native JSX inserts exact child values without flattening, copying or UTF-8 conversion");
+    const labels = ["first", , label];
+    const mapped = runtime.call("ProofWidgetsJsxSubset.nativeMappedChildren", labels);
+    check(mapCalls === 1 && lastMap.array === labels && lastMap.result === mapped.props.children &&
+      Array.isArray(mapped.props.children) && mapped.props.children.length === 3 &&
+      !(1 in mapped.props.children) && labels.length === 3 && !(1 in labels) &&
+      mapped.props.children[0].key === "first" && mapped.props.children[2].key === label &&
+      mapped.props.children[2].props.children === label,
+    "native map enters the Lean callback and preserves holes, keys, strings and the input array");
+    const mapFailure = new Error("mapped element failed");
+    const visited = [];
+    // Host bindings are installed at runtime creation; the existing spy reads this switch.
+    mapElementProbe = (type, props) => {
+      if (type !== "span") return;
+      visited.push(props.key);
+      if (props.key === "fail") throw mapFailure;
+    };
+    thrown = undefined;
+    try {
+      runtime.call("ProofWidgetsJsxSubset.nativeMappedChildren", ["before", "fail", "after"]);
+    } catch (error) { thrown = error; }
+    finally { mapElementProbe = null; }
+    check(thrown === mapFailure && visited.join(",") === "before,fail",
+      "mapped Lean callback preserves the original error and stops subsequent elements");
+    const indexed = runtime.call("ProofWidgetsJsxSubset.nativeIndexedMap", labels);
+    check(indexed.length === 3 && !(1 in indexed) && indexed[0].index === 0 &&
+      indexed[2].index === 2 && indexed[2].value === label &&
+      indexed[0].source === labels && indexed[2].source === labels,
+    "ternary Lean callback receives the exact native index, source and value");
+    const nestedText = ["native", null];
+    const primitives = runtime.call("ProofWidgetsJsxSubset.nativePrimitiveChildren",
+      null, undefined, false, -0, 7n, nestedText);
+    const primitiveChildren = primitives.props.children;
+    check(primitiveChildren[0] === null && primitiveChildren[1] === undefined &&
+      primitiveChildren[2] === false && Object.is(primitiveChildren[3], -0) &&
+      primitiveChildren[4] === 7n && primitiveChildren[5] === nestedText,
+    "JSX preserves empty values, booleans, numbers, bigints and nested native arrays");
+    trace.length = 0;
+    traceConstruction = true;
+    const literals = runtime.call("ProofWidgetsJsxSubset.nativeLiteralConstruction");
+    traceConstruction = false;
+    check(literals.props.title === "native" && literals.props["data-props"].title === "native" &&
+      literals.props["data-props"].values.join(",") === "a,b" &&
+      trace.join(",") === "title,values,title,data-props,element:span",
+    "one literal lowering rule preserves ordered object, array and JSX construction through parentheses");
+    const arrayContainer = document.createElement("div");
+    fixtures.append(arrayContainer);
+    const arrayRoot = createRoot(arrayContainer);
+    try {
+      await React.act(async () => arrayRoot.render(primitives));
+      check(arrayContainer.textContent === "07native",
+        "official React renders native primitive/empty children without VIR formatting");
+      const present = runtime.call("ProofWidgetsJsxSubset.nativePrimitiveChildren",
+        body, undefined, true, 2, 3n, nestedText);
+      check(present.props.children[0] === body, "nullable child widening preserves the present node");
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeMappedChildren", ["a", "b"])));
+      const firstSpan = arrayContainer.querySelector("span");
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeMappedChildren", ["b", "a"])));
+      check(arrayContainer.querySelectorAll("span")[1] === firstSpan,
+        "keys from native map preserve DOM identity across reordering");
+      let mounts = 0;
+      function Stateful({ name }) {
+        const [identity] = React.useState(() => ++mounts);
+        return React.createElement("span", { "data-name": name }, identity);
+      }
+      const children = names => names.map(name => React.createElement(Stateful, { key: name, name }));
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeChildSlots", body, "", children(["a", "b"]), null)));
+      const a = arrayContainer.querySelector('[data-name="a"]');
+      const identity = a.textContent;
+      await React.act(async () => arrayRoot.render(runtime.call(
+        "ProofWidgetsJsxSubset.nativeChildSlots", body, "", children(["b", "a"]), tail)));
+      check(mounts === 2 && arrayContainer.querySelector('[data-name="a"]') === a &&
+        a.textContent === identity,
+      "stable native array and optional sibling slots preserve keyed component state");
+      const keyed = names => runtime.call("ProofWidgetsJsxSubset.nativeKeyedChildren", Stateful, names);
+      const keyedNode = keyed(["a", "b"]);
+      check(keyedNode.props.children[0].key === "a" &&
+        keyedNode.props.children[0].props.name === "a" &&
+        Object.getOwnPropertyDescriptor(keyedNode.props.children[0].props, "key")?.value === undefined,
+      "typed JSX key belongs to React element metadata, not component data");
+      await React.act(async () => arrayRoot.render(keyedNode));
+      const keyedA = arrayContainer.querySelector('[data-name="a"]');
+      const keyedMounts = mounts;
+      await React.act(async () => arrayRoot.render(keyed(["b", "a"])));
+      check(mounts === keyedMounts && arrayContainer.querySelectorAll("span")[1] === keyedA,
+        "typed JSX keys preserve component state and DOM identity across native map reorder");
+    } finally {
+      await React.act(async () => arrayRoot.unmount());
+    }
     for (const [entry, id] of [["ProofWidgetsHtml.mount", "native-html"],
       ["ProofWidgetsJsxSubset.mount", "native-jsx"]]) {
       const container = document.createElement("div");
