@@ -39,10 +39,6 @@ export function createVirCallback(runtime, rootId, type) {
   return callback;
 }
 
-export function releaseCallbackRoot(callbackOrRoot) {
-  return releaseVirCallbackRoot(requireCallbackRoot(callbackOrRoot));
-}
-
 export function releaseCallbackRoots(callbacks) {
   const roots = new Set(Array.from(callbacks, requireCallbackRoot));
   if (Array.isArray(callbacks)) callbacks.length = 0;

@@ -250,7 +250,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
-| `useState(initial)` | Returns the exact state/setter array; project with `Js.Tuple2` and call the setter with a native `SetStateAction`. |
+| `useState(initial)` | Exact state/setter array for a non-function initial value; the typed lazy-initializer form is not exposed (see below). Project with `Js.Tuple2` and call the setter with a native `SetStateAction`. |
 | `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
 | `dispatch(action)` | `Js.Function.callVoid` passes the exact action to the native dispatch function. |
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |
@@ -260,8 +260,15 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `useContext(context)` | Exact consumer context; context creation/provider bindings are not exposed. |
 | `useId()` | `Hooks.useId : ReactM (Js String)` returns React's exact accessibility ID, without string conversion or a VIR ID registry. |
 
-Dependencies can contain arbitrary `Js` values; `DependencyList` helpers
-explicitly build the JavaScript array. React compares its entries as usual.
+The current `useState` signature takes `Js α` and returns state of shape `α`;
+it does not represent TypeScript's `S | (() => S)` initializer relationship.
+React still invokes a function passed as the initial argument, so its stored
+result need not match that function's phantom type. Use a non-function initial
+value with this surface; typed lazy initialization and function-valued
+initialization are not currently exposed.
+
+Dependencies are native arrays of arbitrary `Js` values, constructed with
+`js#[...]`. React compares their entries as usual.
 Root options, reducer initialization and broader context/external-library
 bindings are not exposed. External components use the host's React instance.
 
@@ -274,8 +281,9 @@ options such as `identifierPrefix`.
 `lean-vir/react-host-bindings` installs the official browser React/ReactDOM
 providers separately from the generic runtime. The code in
 [`web/src/react/`](../../web/src/react) calls public React APIs; it contains no
-copied reconciler or hook implementation. Its extra JS implements explicit
-explicit application-data property access, effect conversion and browser-root lifecycle.
+copied reconciler or hook implementation. Additional providers implement
+application-data property access and browser-root lifecycle. Lean closure
+conversion belongs to the generic function bridge, not a React effect adapter.
 The [object ABI](../reference/OBJECT_ABI.md#externref-and-foreign-values) explains the Wasm
 transport; it is not another React API.
 
