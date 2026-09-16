@@ -36,6 +36,27 @@ def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
       {← Js.Tuple2.first eagerState}{value}
     </button>
 
+/-- Exercises the closed generic callback shapes without wrapping their native values. -/
+def callbackShapeProbe
+    (nullary : Js.Function0 (Js String))
+    (unary : Js.Function1 (Js String) (Js String))
+    (binary : Js.Function2 (Js String) (Js String) (Js String))
+    (ternary : Js.Function3 (Js String) (Js String) (Js String) (Js String)) :
+    RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
+    let deps ← js#[]
+    let selectedNullary ← Hooks.useCallback nullary deps
+    let selectedUnary ← Hooks.useCallback unary deps
+    let selectedBinary ← Hooks.useCallback binary deps
+    let selectedTernary ← Hooks.useCallback ternary deps
+    let nullaryResult ← Js.Function.call0 selectedNullary
+    let unaryResult ← Js.Function.call selectedUnary (← js#"one")
+    let binaryResult ← Js.Function.call2 selectedBinary (← js#"two") (← js#"three")
+    let ternaryResult ← Js.Function.call3 selectedTernary
+      (← js#"four") (← js#"five") (← js#"six")
+    return ← <div id="react-callback-shapes">{nullaryResult}{unaryResult}
+      {binaryResult}{ternaryResult}</div>
+
 def counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
   let one ← JsValue.ofNat 1

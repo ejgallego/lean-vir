@@ -44,8 +44,8 @@ test("Nat.add records the bounded VIR-owned bigint operator contract", async () 
   });
   assert.deepEqual(config.roots.find(root => root.id === "numeric-operations"), {
     id: "numeric-operations",
-    title: "Native numeric operations",
-    targets: ["js.nat.add"],
+    title: "Native Nat operations",
+    targets: ["js.nat.add", "js.nat.mul", "js.nat.equal", "js.nat.lt", "js.nat.le"],
     lean: { public: ["Lean.Vir.Js.Nat"] },
     upstream: { kind: "internal" },
   });

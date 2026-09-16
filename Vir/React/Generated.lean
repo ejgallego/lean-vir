@@ -123,7 +123,7 @@ opaque useMemo
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-callback`.
 
-Passes the caller's native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function.
+Passes a caller-selected supported native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function without erasing its exact call shape.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -134,9 +134,10 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "react.useCallback"]
 opaque useCallback
     {α : Type}
-    (callback : @& Lean.Vir.Js (Lean.Vir.React.Callback α))
+    [Lean.Vir.Js.Function.Shape α]
+    (callback : @& Lean.Vir.Js α)
     (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Callback α))
+    Lean.Vir.React.ReactM (Lean.Vir.Js α)
 
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-context`.

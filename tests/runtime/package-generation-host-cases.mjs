@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { runNativeValuesSmoke } from "./native-values-cases.mjs";
 import {
   readIrPackageInfo,
   replaceIrPackageManifest,
@@ -18,6 +19,7 @@ import {
 } from "./shared.mjs";
 
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
+  await runNativeValuesSmoke({ freshDir, wasmBytes });
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
   await writeRuntimeFixture(hostSource, "FreshHost.lean");

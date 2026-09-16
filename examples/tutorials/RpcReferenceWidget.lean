@@ -68,7 +68,7 @@ private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply
 structure Input where
   session : Js Infoview.RpcSession
   query : Js.Object
-  uri : String
+  uri : Js String
 
 private structure ResponseState where
   reply : Option (Js Reply) := none
@@ -84,7 +84,7 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
   let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do
     let document ← Js.Object.get params (← js#"textDocument")
     let uri ← Js.String.fromAny (← Js.Object.get document (← js#"uri"))
-    if (← JsValue.toString uri) == input.uri then
+    if ← JsValue.toBool (← Js.String.equal uri input.uri) then
       let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
       Js.Function.callVoid revisionSetter (React.SetStateAction.ofUpdater update)
   -- Undefined dependencies also follow replacement of the upstream editor context.
@@ -164,7 +164,7 @@ def WidgetView : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do
   FunctionComponent.ofLean fun props => do
     let session ← Infoview.useRpcSession
     let pos ← Infoview.PanelWidgetProps.pos props
-    let uri ← JsValue.toString (← Infoview.PanelPosition.uri pos)
+    let uri ← Infoview.PanelPosition.uri pos
     renderView child { session, query, uri }
 
 vir_proof_widget WidgetView

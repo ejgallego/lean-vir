@@ -26,6 +26,36 @@ def JsValue.ofNatNumber? (value : Nat) : RuntimeM (Option (Js Float)) := do
 
 namespace Js
 
+namespace Function
+
+-- These identity-only instantiations avoid passing erased type parameters to
+-- the six-argument host ABI. They do not wrap the native function or its values.
+/-- Plain binary invocation with exact native arguments and result. -/
+@[inline] def call2 {α β γ : Type}
+    (fn : Js.Function2 (Js α) (Js β) (Js γ)) (a : Js α) (b : Js β) :
+    RuntimeM (Js γ) := by
+  have invoke := Internal.call2
+  unfold Js.Function2 Js.Any Js at *
+  exact invoke fn a b
+
+/-- Plain ternary invocation with exact native arguments and result. -/
+@[inline] def call3 {α β γ δ : Type}
+    (fn : Js.Function3 (Js α) (Js β) (Js γ) (Js δ))
+    (a : Js α) (b : Js β) (c : Js γ) : RuntimeM (Js δ) := by
+  have invoke := Internal.call3
+  unfold Js.Function3 Js.Any Js at *
+  exact invoke fn a b c
+
+/-- Plain ternary invocation, discarding its native return value. -/
+@[inline] def call3Void {α β γ : Type}
+    (fn : Js.Function3 (Js α) (Js β) (Js γ) Unit)
+    (a : Js α) (b : Js β) (c : Js γ) : RuntimeM Unit := by
+  have invoke := Internal.call3Void
+  unfold Js.Function3 Js.Any Js at *
+  exact invoke fn a b c
+
+end Function
+
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 

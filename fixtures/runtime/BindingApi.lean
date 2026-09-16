@@ -557,6 +557,53 @@ example (_setup : Js React.EffectCallback) (_deps : Js React.DependencyList)
 open scoped Lean.Vir.Js in
 example : RuntimeM (Js String) := js#"native string"
 
+-- useCallback preserves the supported native call shape, including its result.
+example (f : Js.Function0 (Js String)) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function0 (Js String)) := React.Hooks.useCallback f deps
+
+example (f : Js.Function1 (Js Float) (Js String)) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function1 (Js Float) (Js String)) := React.Hooks.useCallback f deps
+
+example (f : Js.Function2 Js.Any (Js String) Unit) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function2 Js.Any (Js String) Unit) := React.Hooks.useCallback f deps
+
+example (f : Js.Function3 Js.Any (Js Float) (Js String) Js.Any)
+    (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function3 Js.Any (Js Float) (Js String) Js.Any) :=
+  React.Hooks.useCallback f deps
+
+example (_s : Js String) (_o : Js.Object) (_a : Js.Any) (_deps : Js React.DependencyList) : True := by
+  fail_if_success have _ := React.Hooks.useCallback _s _deps
+  fail_if_success have _ := React.Hooks.useCallback _o _deps
+  fail_if_success have _ := React.Hooks.useCallback _a _deps
+  trivial
+
+example (f : Js.Function2 (Js String) (Js Float) (Js Bool)) (s : Js String) (n : Js Float) :
+    RuntimeM (Js Bool) := Js.Function.call2 f s n
+
+example (_f : Js.Function2 (Js String) (Js Float) (Js Bool))
+    (_s : Js String) (_n : Js Float) (_void : Js.Function0 Unit) : True := by
+  fail_if_success have _ := Js.Function.call _f _s
+  fail_if_success have _ := Js.Function.call2 _f _n _s
+  fail_if_success have _ := Js.Function.call2Void _f _s _n
+  fail_if_success have _ := Js.Function.call0 _void
+  trivial
+
+example (s : Js String) (n : Js Float) (end_ : Js.UndefinedOr Float) : RuntimeM (Js String) :=
+  Js.String.slice s n end_
+
+example (a b : Js Float) : RuntimeM (Js Bool) := Js.Number.equal a b
+example (a b : Js Nat) : RuntimeM (Js Nat) := Js.Nat.mul a b
+example (a b : Js String) : RuntimeM (Js Bool) := Js.String.equal a b
+example (b : Js Bool) : RuntimeM (Js Bool) := Js.Boolean.not b
+
+example (_n : Js Nat) (_f : Js Float) (_s : String) : True := by
+  fail_if_success have _ := Js.Number.add _n _n
+  fail_if_success have _ := Js.Nat.mul _f _f
+  fail_if_success have _ := Js.String.equal _s _s
+  fail_if_success have _ : RuntimeM Bool := Js.Number.equal _f _f
+  trivial
+
 example (_console : Js Console) (_message : String) : True := by
   fail_if_success have _ := Console.log _console _message
   trivial

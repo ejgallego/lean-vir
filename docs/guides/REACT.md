@@ -314,7 +314,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |
 | `useEffect(setup, dependencies?)` | Exact setup function, with omitted or exact JS dependency array. Lean setup/cleanup conversion is separate. |
 | `useMemo(calculate, deps)` | Exact calculation and dependency array; returns React's selected value. |
-| `useCallback(fn, deps)` | Exact callback and dependency array; returns React's selected function. |
+| `useCallback(fn, deps)` | Exact callback and dependency array; preserves the selected `Js.Function0`–`Js.Function3` signature, including value/void result. Closed `Js.Function.Shape` evidence excludes non-functions without adding a runtime wrapper. |
 | `useContext(context)` | Exact consumer context; context creation/provider bindings are not exposed. |
 | `useId()` | `Hooks.useId : ReactM (Js String)` returns React's exact accessibility ID, without string conversion or a VIR ID registry. |
 

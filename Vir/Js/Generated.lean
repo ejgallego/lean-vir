@@ -106,6 +106,43 @@ opaque get
 
 end Js.Array
 
+namespace Js.Boolean
+
+/--
+Generated binding for reviewed VIR protocol `javascript.boolean.not`.
+
+VIR-owned native JavaScript ! operator for boolean resources, without a Lean Bool conversion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.boolean.not"]
+opaque not
+    (value : @& Js Bool) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.boolean.equal`.
+
+VIR-owned native JavaScript boolean strict-equality operator, without a Lean Bool conversion or eager logical operation.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.boolean.equal"]
+opaque equal
+    (left : @& Js Bool)
+    (right : @& Js Bool) :
+    RuntimeM (Js Bool)
+
+end Js.Boolean
+
 namespace Js.Construction
 
 /--
@@ -293,7 +330,120 @@ opaque callVoid
     (argument : @& Lean.Vir.Js α) :
     RuntimeM Unit
 
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call0`.
+
+Calls the exact JavaScript function with 0 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call0"]
+opaque call0
+    {α : Type}
+    (function : @& Lean.Vir.Js.Function0 (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js α)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call0-void`.
+
+Calls the exact JavaScript function with 0 exact arguments and discards its void return; this is a plain call without a receiver.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call0Void"]
+opaque call0Void
+    (function : @& Lean.Vir.Js.Function0 Unit) :
+    RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call2-void`.
+
+Calls the exact JavaScript function with 2 exact arguments and discards its void return; this is a plain call without a receiver.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument1 js-resource/borrowed/call; argument2 js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call2Void"]
+opaque call2Void
+    {α : Type}
+    {β : Type}
+    (function : @& Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) Unit)
+    (argument1 : @& Lean.Vir.Js α)
+    (argument2 : @& Lean.Vir.Js β) :
+    RuntimeM Unit
+
 end Js.Function
+
+namespace Js.Function.Internal
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call2`.
+
+Calls the exact JavaScript function with 2 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument1 js-resource/borrowed/call; argument2 js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call2"]
+opaque call2
+    (function : @& Lean.Vir.Js.Function2 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any)
+    (argument1 : @& Lean.Vir.Js.Any)
+    (argument2 : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js.Any)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call3`.
+
+Calls the exact JavaScript function with 3 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument1 js-resource/borrowed/call; argument2 js-resource/borrowed/call; argument3 js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call3"]
+opaque call3
+    (function : @& Lean.Vir.Js.Function3 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any)
+    (argument1 : @& Lean.Vir.Js.Any)
+    (argument2 : @& Lean.Vir.Js.Any)
+    (argument3 : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js.Any)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.call3-void`.
+
+Calls the exact JavaScript function with 3 exact arguments and discards its void return; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; function js-resource/borrowed/call; argument1 js-resource/borrowed/call; argument2 js-resource/borrowed/call; argument3 js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.function.call3Void"]
+opaque call3Void
+    (function : @& Lean.Vir.Js.Function3 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Unit)
+    (argument1 : @& Lean.Vir.Js.Any)
+    (argument2 : @& Lean.Vir.Js.Any)
+    (argument3 : @& Lean.Vir.Js.Any) :
+    RuntimeM Unit
+
+end Js.Function.Internal
 
 namespace Js.Nat
 
@@ -313,6 +463,74 @@ opaque add
     (left : @& Js Nat)
     (right : @& Js Nat) :
     RuntimeM (Js Nat)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.mul`.
+
+VIR-owned native JavaScript bigint * operator for the nonnegative bigint Nat subset, without decoding, coercion, or checks.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.mul"]
+opaque mul
+    (left : @& Js Nat)
+    (right : @& Js Nat) :
+    RuntimeM (Js Nat)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.equal`.
+
+VIR-owned native JavaScript bigint strict-equality operator for the nonnegative bigint Nat subset, without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.equal"]
+opaque equal
+    (left : @& Js Nat)
+    (right : @& Js Nat) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.lt`.
+
+VIR-owned native JavaScript bigint < operator for the nonnegative bigint Nat subset, without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.lt"]
+opaque lt
+    (left : @& Js Nat)
+    (right : @& Js Nat) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.le`.
+
+VIR-owned native JavaScript bigint <= operator for the nonnegative bigint Nat subset, without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.le"]
+opaque le
+    (left : @& Js Nat)
+    (right : @& Js Nat) :
+    RuntimeM (Js Bool)
 
 end Js.Nat
 
@@ -442,6 +660,210 @@ opaque get
     RuntimeM (Lean.Vir.Js α)
 
 end Js.Nullable
+
+namespace Js.Number
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.add`.
+
+VIR-owned native JavaScript number + operator, with native IEEE-754 semantics and no coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.add"]
+opaque add
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.sub`.
+
+VIR-owned native JavaScript number - operator, with native IEEE-754 semantics and no coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.sub"]
+opaque sub
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.mul`.
+
+VIR-owned native JavaScript number * operator, with native IEEE-754 semantics and no coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.mul"]
+opaque mul
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.div`.
+
+VIR-owned native JavaScript number / operator, including native zero-divisor behavior, without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.div"]
+opaque div
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.rem`.
+
+VIR-owned native JavaScript number % operator, with native IEEE-754 semantics and no coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.rem"]
+opaque rem
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.neg`.
+
+VIR-owned native JavaScript unary - operator, preserving native IEEE-754 signed-zero and NaN behavior.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.neg"]
+opaque neg
+    (value : @& Js Float) :
+    RuntimeM (Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.equal`.
+
+VIR-owned native JavaScript number strict-equality operator, preserving NaN and signed-zero behavior without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.equal"]
+opaque equal
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.lt`.
+
+VIR-owned native JavaScript number < operator, preserving NaN behavior without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.lt"]
+opaque lt
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.le`.
+
+VIR-owned native JavaScript number <= operator, preserving NaN behavior without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.le"]
+opaque le
+    (left : @& Js Float)
+    (right : @& Js Float) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.is-nan`.
+
+Forwards Number.isNaN without coercion or conversion to a Lean Bool.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.isNaN"]
+opaque isNaN
+    (value : @& Js Float) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.is-finite`.
+
+Forwards Number.isFinite without coercion or conversion to a Lean Bool.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.isFinite"]
+opaque isFinite
+    (value : @& Js Float) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.is-integer`.
+
+Forwards Number.isInteger without coercion or conversion to a Lean Bool.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.isInteger"]
+opaque isInteger
+    (value : @& Js Float) :
+    RuntimeM (Js Bool)
+
+end Js.Number
 
 namespace Js.Object
 
@@ -632,6 +1054,157 @@ This declaration is generated; edit the binding configuration.
 opaque length
     (value : @& Lean.Vir.Js String) :
     RuntimeM (Lean.Vir.Js Float)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.equal`.
+
+VIR-owned native JavaScript strict-equality operator for string resources, preserving UTF-16 code-unit identity without decoding or coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.equal"]
+opaque equal
+    (left : @& Js String)
+    (right : @& Js String) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.concat`.
+
+Forwards one JavaScript string argument to String.prototype.concat without decoding, coercion, or a variadic adapter.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; suffix js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.concat"]
+opaque concat
+    (value : @& Js String)
+    (suffix : @& Js String) :
+    RuntimeM (Js String)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.slice`.
+
+Forwards String.prototype.slice's selected start and optional end arguments, preserving native UTF-16 indexing and JavaScript coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; start js-resource/borrowed/call; «end» js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.slice"]
+opaque slice
+    (value : @& Js String)
+    (start : @& Js Float)
+    («end» : @& Lean.Vir.Js.UndefinedOr Float) :
+    RuntimeM (Js String)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.includes`.
+
+Forwards one search string to String.prototype.includes and leaves its position at the native default.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; search js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.includes"]
+opaque includes
+    (value : @& Js String)
+    (search : @& Js String) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.starts-with`.
+
+Forwards one search string to String.prototype.startsWith and leaves its position at the native default.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; search js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.startsWith"]
+opaque startsWith
+    (value : @& Js String)
+    (search : @& Js String) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.ends-with`.
+
+Forwards one search string to String.prototype.endsWith and leaves its position at the native default.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; search js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.endsWith"]
+opaque endsWith
+    (value : @& Js String)
+    (search : @& Js String) :
+    RuntimeM (Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.trim`.
+
+Forwards String.prototype.trim on the native receiver without decoding or replacement whitespace semantics.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.trim"]
+opaque trim
+    (value : @& Js String) :
+    RuntimeM (Js String)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.to-lower-case`.
+
+Forwards String.prototype.toLowerCase on the native receiver without decoding or locale-specific replacement semantics.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.toLowerCase"]
+opaque toLowerCase
+    (value : @& Js String) :
+    RuntimeM (Js String)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.to-upper-case`.
+
+Forwards String.prototype.toUpperCase on the native receiver without decoding or locale-specific replacement semantics.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.toUpperCase"]
+opaque toUpperCase
+    (value : @& Js String) :
+    RuntimeM (Js String)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.string.from-any`.

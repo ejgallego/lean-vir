@@ -36,6 +36,78 @@
         "result": { "type": { "lean": "Lean.Vir.Js Float", "representation": "js-resource", "resourceInner": "Float" } }
       },
       {
+        "id": "javascript.string.equal", "group": "string", "target": "js.string.equal",
+        "lean": "Lean.Vir.Js.String.equal", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript strict-equality operator for string resources, preserving UTF-16 code-unit identity without decoding or coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "right", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.string.concat", "group": "string", "target": "js.string.concat",
+        "lean": "Lean.Vir.Js.String.concat", "marker": "vir_js",
+        "reason": "Forwards one JavaScript string argument to String.prototype.concat without decoding, coercion, or a variadic adapter.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.concat", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "suffix", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "javascript.string.slice", "group": "string", "target": "js.string.slice",
+        "lean": "Lean.Vir.Js.String.slice", "marker": "vir_js",
+        "reason": "Forwards String.prototype.slice's selected start and optional end arguments, preserving native UTF-16 indexing and JavaScript coercion.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.slice", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "start", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "end", "type": { "lean": "Lean.Vir.Js.UndefinedOr Float", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value Float" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "javascript.string.includes", "group": "string", "target": "js.string.includes",
+        "lean": "Lean.Vir.Js.String.includes", "marker": "vir_js",
+        "reason": "Forwards one search string to String.prototype.includes and leaves its position at the native default.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.includes", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "search", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.string.starts-with", "group": "string", "target": "js.string.startsWith",
+        "lean": "Lean.Vir.Js.String.startsWith", "marker": "vir_js",
+        "reason": "Forwards one search string to String.prototype.startsWith and leaves its position at the native default.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.startsWith", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "search", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.string.ends-with", "group": "string", "target": "js.string.endsWith",
+        "lean": "Lean.Vir.Js.String.endsWith", "marker": "vir_js",
+        "reason": "Forwards one search string to String.prototype.endsWith and leaves its position at the native default.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.endsWith", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }, { "name": "search", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.string.trim", "group": "string", "target": "js.string.trim",
+        "lean": "Lean.Vir.Js.String.trim", "marker": "vir_js",
+        "reason": "Forwards String.prototype.trim on the native receiver without decoding or replacement whitespace semantics.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.trim", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "javascript.string.to-lower-case", "group": "string", "target": "js.string.toLowerCase",
+        "lean": "Lean.Vir.Js.String.toLowerCase", "marker": "vir_js",
+        "reason": "Forwards String.prototype.toLowerCase on the native receiver without decoding or locale-specific replacement semantics.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.toLowerCase", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
+        "id": "javascript.string.to-upper-case", "group": "string", "target": "js.string.toUpperCase",
+        "lean": "Lean.Vir.Js.String.toUpperCase", "marker": "vir_js",
+        "reason": "Forwards String.prototype.toUpperCase on the native receiver without decoding or locale-specific replacement semantics.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "String.toUpperCase", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "role": "receiver", "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }],
+        "result": { "type": { "lean": "Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
         "id": "javascript.undefined", "group": "undefined", "target": "js.undefined",
         "lean": "Lean.Vir.Js.UndefinedOr.undefined", "marker": "vir_js",
         "reason": "Returns the exact JavaScript undefined value, with no Option encoding or object wrapper.",
@@ -123,6 +195,104 @@
         "result": { "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
       },
       {
+        "id": "javascript.nat.mul", "group": "numeric-operations", "target": "js.nat.mul",
+        "lean": "Lean.Vir.Js.Nat.mul", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript bigint * operator for the nonnegative bigint Nat subset, without decoding, coercion, or checks.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }, { "name": "right", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
+        "result": { "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      },
+      {
+        "id": "javascript.nat.equal", "group": "numeric-operations", "target": "js.nat.equal",
+        "lean": "Lean.Vir.Js.Nat.equal", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript bigint strict-equality operator for the nonnegative bigint Nat subset, without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }, { "name": "right", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.nat.lt", "group": "numeric-operations", "target": "js.nat.lt",
+        "lean": "Lean.Vir.Js.Nat.lt", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript bigint < operator for the nonnegative bigint Nat subset, without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }, { "name": "right", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.nat.le", "group": "numeric-operations", "target": "js.nat.le",
+        "lean": "Lean.Vir.Js.Nat.le", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript bigint <= operator for the nonnegative bigint Nat subset, without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }, { "name": "right", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.add", "group": "number", "target": "js.number.add",
+        "lean": "Lean.Vir.Js.Number.add", "marker": "vir_js", "reason": "VIR-owned native JavaScript number + operator, with native IEEE-754 semantics and no coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.sub", "group": "number", "target": "js.number.sub",
+        "lean": "Lean.Vir.Js.Number.sub", "marker": "vir_js", "reason": "VIR-owned native JavaScript number - operator, with native IEEE-754 semantics and no coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.mul", "group": "number", "target": "js.number.mul",
+        "lean": "Lean.Vir.Js.Number.mul", "marker": "vir_js", "reason": "VIR-owned native JavaScript number * operator, with native IEEE-754 semantics and no coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.div", "group": "number", "target": "js.number.div",
+        "lean": "Lean.Vir.Js.Number.div", "marker": "vir_js", "reason": "VIR-owned native JavaScript number / operator, including native zero-divisor behavior, without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.rem", "group": "number", "target": "js.number.rem",
+        "lean": "Lean.Vir.Js.Number.rem", "marker": "vir_js", "reason": "VIR-owned native JavaScript number % operator, with native IEEE-754 semantics and no coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.neg", "group": "number", "target": "js.number.neg",
+        "lean": "Lean.Vir.Js.Number.neg", "marker": "vir_js", "reason": "VIR-owned native JavaScript unary - operator, preserving native IEEE-754 signed-zero and NaN behavior.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }
+      },
+      {
+        "id": "javascript.number.equal", "group": "number", "target": "js.number.equal",
+        "lean": "Lean.Vir.Js.Number.equal", "marker": "vir_js", "reason": "VIR-owned native JavaScript number strict-equality operator, preserving NaN and signed-zero behavior without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.lt", "group": "number", "target": "js.number.lt",
+        "lean": "Lean.Vir.Js.Number.lt", "marker": "vir_js", "reason": "VIR-owned native JavaScript number < operator, preserving NaN behavior without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.le", "group": "number", "target": "js.number.le",
+        "lean": "Lean.Vir.Js.Number.le", "marker": "vir_js", "reason": "VIR-owned native JavaScript number <= operator, preserving NaN behavior without coercion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "left", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }, { "name": "right", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.is-nan", "group": "number", "target": "js.number.isNaN",
+        "lean": "Lean.Vir.Js.Number.isNaN", "marker": "vir_js", "reason": "Forwards Number.isNaN without coercion or conversion to a Lean Bool.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NumberConstructor.isNaN", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "value", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.is-finite", "group": "number", "target": "js.number.isFinite",
+        "lean": "Lean.Vir.Js.Number.isFinite", "marker": "vir_js", "reason": "Forwards Number.isFinite without coercion or conversion to a Lean Bool.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NumberConstructor.isFinite", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "value", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.number.is-integer", "group": "number", "target": "js.number.isInteger",
+        "lean": "Lean.Vir.Js.Number.isInteger", "marker": "vir_js", "reason": "Forwards Number.isInteger without coercion or conversion to a Lean Bool.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "NumberConstructor.isInteger", "semantics": "preserving" }, "effect": { "id": "runtime", "lean": "RuntimeM" }, "arguments": [{ "name": "value", "type": { "lean": "Js Float", "representation": "js-resource", "resourceInner": "Float" } }], "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
         "id": "javascript.bool.of", "group": "primitive-conversions", "target": "js.bool",
         "lean": "Lean.Vir.JsValue.ofBool", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a Lean Bool into a JavaScript boolean resource.",
@@ -139,6 +309,22 @@
         "effect": { "id": "runtime", "lean": "RuntimeM" },
         "arguments": [{ "name": "value", "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }],
         "result": { "type": { "lean": "Bool", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.boolean.not", "group": "boolean", "target": "js.boolean.not",
+        "lean": "Lean.Vir.Js.Boolean.not", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript ! operator for boolean resources, without a Lean Bool conversion.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "value", "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.boolean.equal", "group": "boolean", "target": "js.boolean.equal",
+        "lean": "Lean.Vir.Js.Boolean.equal", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript boolean strict-equality operator, without a Lean Bool conversion or eager logical operation.",
+        "upstreamRelation": { "kind": "vir-owned" }, "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "left", "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }, { "name": "right", "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }],
+        "result": { "type": { "lean": "Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
       },
       {
         "id": "javascript.float.of", "group": "primitive-conversions", "target": "js.float",
@@ -340,6 +526,82 @@
           { "name": "argument", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
         ],
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.function.call0", "group": "function", "target": "js.function.call0",
+        "lean": "Lean.Vir.Js.Function.call0", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 0 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function0 (Lean.Vir.Js α)","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Nullary (Lean.Vir.Js α)"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js α","representation":"js-resource","resourceInner":"α"}}
+      },
+      {
+        "id": "javascript.function.call0-void", "group": "function", "target": "js.function.call0Void",
+        "lean": "Lean.Vir.Js.Function.call0Void", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 0 exact arguments and discards its void return; this is a plain call without a receiver.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function0 Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Nullary Unit"}}
+        ],
+        "result": {"type":{"lean":"Unit","representation":"immediate"}}
+      },
+      {
+        "id": "javascript.function.call2", "group": "function", "target": "js.function.call2",
+        "lean": "Lean.Vir.Js.Function.Internal.call2", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 2 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function2 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Binary Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any"}},
+          {"name":"argument1","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}},
+          {"name":"argument2","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}
+      },
+      {
+        "id": "javascript.function.call2-void", "group": "function", "target": "js.function.call2Void",
+        "lean": "Lean.Vir.Js.Function.call2Void", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 2 exact arguments and discards its void return; this is a plain call without a receiver.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α","β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Binary (Lean.Vir.Js α) (Lean.Vir.Js β) Unit"}},
+          {"name":"argument1","type":{"lean":"Lean.Vir.Js α","representation":"js-resource","resourceInner":"α"}},
+          {"name":"argument2","type":{"lean":"Lean.Vir.Js β","representation":"js-resource","resourceInner":"β"}}
+        ],
+        "result": {"type":{"lean":"Unit","representation":"immediate"}}
+      },
+      {
+        "id": "javascript.function.call3", "group": "function", "target": "js.function.call3",
+        "lean": "Lean.Vir.Js.Function.Internal.call3", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 3 exact arguments and returns its exact JavaScript result; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function3 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Ternary Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any"}},
+          {"name":"argument1","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}},
+          {"name":"argument2","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}},
+          {"name":"argument3","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}
+        ],
+        "result": {"type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}
+      },
+      {
+        "id": "javascript.function.call3-void", "group": "function", "target": "js.function.call3Void",
+        "lean": "Lean.Vir.Js.Function.Internal.call3Void", "marker": "vir_js",
+        "reason": "Calls the exact JavaScript function with 3 exact arguments and discards its void return; this is a plain call without a receiver. Internal monomorphic import keeps erased Lean type parameters out of the fixed-arity host ABI; the public inline declaration preserves the call's argument/result relationships.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          {"name":"function","role":"receiver","type":{"lean":"Lean.Vir.Js.Function3 Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Unit","representation":"js-resource","resourceInner":"Lean.Vir.Js.Function.Ternary Lean.Vir.Js.Any Lean.Vir.Js.Any Lean.Vir.Js.Any Unit"}},
+          {"name":"argument1","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}},
+          {"name":"argument2","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}},
+          {"name":"argument3","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}
+        ],
+        "result": {"type":{"lean":"Unit","representation":"immediate"}}
       },
       {
         "id": "javascript.promise.then-value", "group": "promise", "target": "js.promise.thenValue",
@@ -544,9 +806,9 @@
       "upstream": { "kind": "internal" }
     },
     {
-      "id": "string", "title": "String properties", "targets": ["js.string.length"],
+      "id": "string", "title": "String operations", "targets": ["js.string.length", "js.string.equal", "js.string.concat", "js.string.slice", "js.string.includes", "js.string.startsWith", "js.string.endsWith", "js.string.trim", "js.string.toLowerCase", "js.string.toUpperCase"],
       "lean": { "public": ["Lean.Vir.Js.String"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["String"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["String"] }
     },
     {
       "id": "object",
@@ -613,9 +875,19 @@
     },
     {
       "id": "numeric-operations",
-      "title": "Native numeric operations",
-      "targets": ["js.nat.add"],
+      "title": "Native Nat operations",
+      "targets": ["js.nat.add", "js.nat.mul", "js.nat.equal", "js.nat.lt", "js.nat.le"],
       "lean": { "public": ["Lean.Vir.Js.Nat"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "number", "title": "Number operations", "targets": ["js.number.*"],
+      "lean": { "public": ["Lean.Vir.Js.Number"] },
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["NumberConstructor"] }
+    },
+    {
+      "id": "boolean", "title": "Native boolean operations", "targets": ["js.boolean.*"],
+      "lean": { "public": ["Lean.Vir.Js.Boolean"] },
       "upstream": { "kind": "internal" }
     },
     {

@@ -124,6 +124,7 @@
           "roots": [
             "ReactCounter.mount",
             "ReactCounter.initialProbe",
+            "ReactCounter.callbackShapeProbe",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
             "ReactCounter.renderStaticIntoSelector",

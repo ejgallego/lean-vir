@@ -366,6 +366,56 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
         await React.act(async () => root.unmount());
       }
     }
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      const calls = [];
+      const nullary = function () { "use strict"; calls.push(["nullary", [...arguments], this]); return "zero:"; };
+      const unary = function (value) { "use strict"; calls.push(["unary", [...arguments], this]); return `${value}:`; };
+      const binary = function (first, second) {
+        "use strict";
+        calls.push(["binary", [...arguments], this]); return `${first}/${second}:`;
+      };
+      const ternary = function (first, second, third) {
+        "use strict";
+        calls.push(["ternary", [...arguments], this]); return `${first}/${second}/${third}`;
+      };
+      const nativeCallbacks = [nullary, unary, binary, ternary];
+      const useCallback = hostBindings["react.useCallback"];
+      const selected = [];
+      hostBindings["react.useCallback"] = (callback, deps) => {
+        const result = useCallback(callback, deps);
+        selected.push({ callback, deps, result });
+        return result;
+      };
+      const component = runtime.call("ReactCounter.callbackShapeProbe", ...nativeCallbacks);
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = calls.length;
+        check(mountCalls === (strict ? 8 : 4) && container.textContent === "zero:one:two/three:four/five/six",
+          "generic useCallback invokes all native function arities with their exact results");
+        check(selected.length === mountCalls && selected.every(({ callback, deps, result }, index) =>
+          callback === nativeCallbacks[index % 4] && result === callback && Array.isArray(deps) && deps.length === 0),
+        "useCallback preserves each native function identity and native empty dependencies");
+        for (const [index, expected] of [["nullary", []], ["unary", ["one"]],
+          ["binary", ["two", "three"]], ["ternary", ["four", "five", "six"]]].entries()) {
+          const observed = calls[index];
+          check(observed[0] === expected[0] && JSON.stringify(observed[1]) === JSON.stringify(expected[1]) &&
+            observed[2] === undefined, `${expected[0]} has exact plain-call arguments and no receiver`);
+        }
+        await React.act(async () => root.render(render(1)));
+        const updateCalls = strict ? 8 : 4;
+        check(calls.length === mountCalls + updateCalls && selected.slice(-updateCalls).every(({ callback, result }, index) =>
+          callback === nativeCallbacks[index % 4] && result === callback),
+        "native callback identity survives a component rerender");
+      } finally {
+        hostBindings["react.useCallback"] = useCallback;
+        await React.act(async () => root.unmount());
+      }
+    }
     const counterContainer = document.createElement("div");
     counterContainer.id = "native-counter-test";
     fixtures.append(counterContainer);

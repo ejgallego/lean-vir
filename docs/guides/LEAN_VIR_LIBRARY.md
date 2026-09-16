@@ -134,13 +134,46 @@ For a primitive string, `Js.String.fromAny` checks the exact value and throws
 `Js.Nullable.toOption` and `ofOption` explicitly convert that view at the
 Lean API edge.
 
-`Js.Function1 argument result` describes an exact unary JavaScript function.
-Native functions need no conversion; `Js.Function.call` and `callVoid`
-invoke them. Use `Js.Function.ofLean` or `ofLeanVoid` when converting a
-Lean closure into a JavaScript function. The call-shape parameters describe
-Lean boundary views, such as `Js α` and `Unit`.
-`Js.Function3` and `ofLean3` provide the same boundary for three arguments,
-including the value/index/source callback of native `Js.Array.map`.
+`Js.Function0` through `Js.Function3` describe exact JavaScript functions.
+`Js.Function.call0`, `call`, `call2`, and `call3` invoke those arities directly,
+without a `this` receiver. Their `Void` variants discard the native return;
+a value-returning call can instead return a rooted JavaScript `undefined`.
+The shape parameters describe full Lean boundary views, such as `Js α` and
+`Unit`, not just the inner JavaScript shape. Lean-closure conversion is
+explicit: `ofLean`/`ofLeanVoid` (unary), `ofLean0`/`ofLean0Void` (nullary),
+and the value-returning `ofLean2`/`ofLean3`. The ternary constructor supports
+native `Js.Array.map`'s value/index/source callback.
+
+`call2`, `call3` and `call3Void` use inline identity-only instantiations of
+monomorphic `Function.Internal` imports: otherwise erased type parameters
+would exceed the current host ABI's six-argument limit. They add no JavaScript
+wrapper, argument array or value conversion.
+
+## Native Primitive Operations
+
+These operations keep their inputs and results native; they do not decode
+values into Lean or add coercions beyond the selected JavaScript operation.
+
+| Surface | JavaScript domain | Operations |
+| --- | --- | --- |
+| `Js.String` on `Js String` | UTF-16 string | `equal`, `concat`, `slice`, `includes`, `startsWith`, `endsWith`, `trim`, `toLowerCase`, `toUpperCase` |
+| `Js.Number` on `Js Float` | Number | `add`, `sub`, `mul`, `div`, `rem`, `neg`, `equal`, `lt`, `le`, `isNaN`, `isFinite`, `isInteger` |
+| `Js.Nat` on `Js Nat` | Nonnegative bigint | `add`, `mul`, `equal`, `lt`, `le` |
+| `Js.Boolean` on `Js Bool` | Boolean | `not`, `equal` |
+
+Predicates return `Js Bool`; use `JsValue.toBool` only where Lean control flow
+needs a `Bool`. Equality is JavaScript `===`, so `NaN` is unequal to itself
+and positive and negative zero compare equal. Number arithmetic preserves
+infinities, negative zero and `NaN`; `rem` is `%`, not mathematical modulo.
+The bigint surface intentionally excludes operations such as subtraction
+that would leave its nonnegative domain.
+
+String methods preserve UTF-16 code units, including lone surrogates.
+`slice` takes native number indices and an explicit `Js.UndefinedOr Float`
+end. `concat` takes one string; search predicates use the native default
+position. These are selected native arities, not implementations of every
+TypeScript overload. Boolean short-circuiting remains control flow, not an
+eager host function.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed
