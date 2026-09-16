@@ -25,6 +25,12 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   let mapElementProbe = null;
   let lastMap;
   let mapCalls = 0;
+  let fragmentChildren;
+  const fragment = hostBindings["react.node.fragment"];
+  hostBindings["react.node.fragment"] = (props, children) => {
+    fragmentChildren = children;
+    return fragment(props, children);
+  };
   const map = hostBindings["js.array.map"];
   hostBindings["js.array.map"] = (array, callback) => {
     mapCalls++;
@@ -98,6 +104,37 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     const payload = { color: "red" };
     const label = "native JSX value \ud800"; // A lone surrogate must not round-trip through UTF-8.
     const callback = () => {};
+    const tupleTrace = [];
+    const tupleNode = React.createElement("span", null, "tuple");
+    const tupleSource = () => {
+      tupleTrace.push("source");
+      return {
+        get 0() { tupleTrace.push(0); return tupleNode; },
+        get 1() { tupleTrace.push(1); return label; },
+        [Symbol.iterator]() { throw new Error("indexed notation must not iterate"); },
+      };
+    };
+    check(runtime.call("ProofWidgetsJsxSubset.nativeTuple", tupleSource, label) === tupleNode &&
+      JSON.stringify(tupleTrace) === JSON.stringify(["source", 0, 1]),
+    "tuple notation evaluates its source once, then reads exact positions in order");
+    for (const failureAt of ["source", 0, 1]) {
+      tupleTrace.length = 0;
+      const failure = new Error(`tuple failure at ${failureAt}`);
+      const read = key => {
+        tupleTrace.push(key);
+        if (key === failureAt) throw failure;
+      };
+      let caught;
+      try {
+        runtime.call("ProofWidgetsJsxSubset.nativeTuple", () => {
+          read("source");
+          return { get 0() { read(0); return tupleNode; }, get 1() { read(1); return label; } };
+        }, label);
+      } catch (error) { caught = error; }
+      const expected = ["source", 0, 1].slice(0, ["source", 0, 1].indexOf(failureAt) + 1);
+      check(caught === failure && JSON.stringify(tupleTrace) === JSON.stringify(expected),
+        "tuple projection preserves error identity and stops at the first failure");
+    }
     traceConstruction = true;
     callbackRegistryScans = 0;
     const node = runtime.call("ProofWidgetsJsxSubset.nativeConstruction",
@@ -142,6 +179,47 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", { get label() { throw fieldFailure; } });
     } catch (error) { thrown = error; }
     check(thrown === fieldFailure, "declared-field projection preserves native getter exceptions");
+    const optionalPrefix = "Vir.Fixtures.OptionalProps.";
+    for (const [entry, args, hasTitle, title, projector] of [
+      ["omitted", [], false, undefined, "readTitle"],
+      ["present", [label], true, label, "readTitle"],
+      ["requiredUndefined", [undefined], true, undefined, "readUndefinedTitle"],
+      ["optionalUndefined", [undefined], true, undefined, "readUndefinedTitle"],
+      ["optionalUndefined", [label], true, label, "readUndefinedTitle"],
+      ["omittedUndefined", [], false, undefined, "readUndefinedTitle"],
+      ["nullable", [null], true, null, "readNullableTitle"],
+      ["nullable", [label], true, label, "readNullableTitle"],
+      ["omittedNullable", [], false, undefined, "readNullableTitle"],
+    ]) {
+      const optionalNode = runtime.call(optionalPrefix + entry, component, ...args);
+      check(optionalNode.type === component && Object.hasOwn(optionalNode.props, "title") === hasTitle &&
+        optionalNode.props.title === title,
+      `${entry} preserves component identity and distinguishes omitted, undefined and null props`);
+      check(runtime.call(optionalPrefix + projector, optionalNode.props) === title,
+        `${projector} reads the exact present or absent native value`);
+      let optionalReads = 0;
+      check(runtime.call(optionalPrefix + projector, {
+        get title() { optionalReads++; return title; },
+      }) === title && optionalReads === 1,
+      `${projector} performs exactly one native getter read`);
+    }
+    const optionalContainer = document.createElement("div");
+    fixtures.append(optionalContainer);
+    const optionalRoot = createRoot(optionalContainer);
+    const optionalComponent = runtime.call(optionalPrefix + "component");
+    try {
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "omitted", optionalComponent)));
+      const span = optionalContainer.querySelector("span");
+      check(span && span.textContent === "", "the Lean optional-prop component renders an absent title");
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "present", optionalComponent, label)));
+      check(optionalContainer.querySelector("span") === span && span.textContent === label,
+        "the Lean optional-prop component renders the exact supplied string without remounting");
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "omitted", optionalComponent)));
+      check(optionalContainer.querySelector("span") === span && span.textContent === "",
+        "omitting a previously supplied prop removes its rendered value");
+    } finally {
+      await React.act(async () => optionalRoot.unmount());
+    }
     check(runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "") === 0 &&
       runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "😀") === 2,
     "native string length is UTF-16 length, not decoded Lean character count");
@@ -200,6 +278,29 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     fixtures.append(arrayContainer);
     const arrayRoot = createRoot(arrayContainer);
     try {
+      const directValues = Object.freeze(["direct", null, , undefined, " array"]);
+      const directNode = runtime.call("ProofWidgetsJsxSubset.nativeNodeArray", directValues);
+      check(directNode === directValues && !(2 in directValues),
+        "explicit Node.ofJs preserves the exact frozen native array and holes");
+      const unread = new Proxy([], { get() { throw new Error("node widening read its payload"); } });
+      check(runtime.call("ProofWidgetsJsxSubset.nativeNodeArray", unread) === unread,
+        "explicit Node.ofJs does not traverse or inspect native arrays");
+      await React.act(async () => arrayRoot.render(directNode));
+      check(arrayContainer.textContent === "direct array",
+        "official React accepts the widened array directly outside JSX");
+      const directRoot = { render(value) {
+        check(this === directRoot && value === directValues,
+          "constrained Root.render preserves receiver and exact array argument");
+        arrayRoot.render(value);
+      } };
+      await React.act(async () => runtime.call("ProofWidgetsJsxSubset.nativeRender", directRoot, directValues));
+      check(arrayContainer.textContent === "direct array",
+        "constrained Lean Root.render reaches official React with no client cast");
+      const textChildren = Object.freeze(["a", "b"]);
+      const textFragment = runtime.call("ProofWidgetsJsxSubset.nativeTextFragment", {}, textChildren);
+      check(fragmentChildren === textChildren && textFragment.type === React.Fragment &&
+        textFragment.props.children.join("") === "ab",
+        "constrained fragment accepts native string children without text wrappers");
       await React.act(async () => arrayRoot.render(primitives));
       check(arrayContainer.textContent === "07native",
         "official React renders native primitive/empty children without VIR formatting");
@@ -261,11 +362,226 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "a single native text child remains in the Badge subtree");
     await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
     check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      const initial = { text: "initialized" };
+      const action = ":updated";
+      const initialized = [];
+      const reduced = [];
+      const initializer = function (argument) {
+        "use strict";
+        initialized.push({ argument, args: [...arguments], receiver: this });
+        return argument.text;
+      };
+      const reducer = function (state, next) {
+        "use strict";
+        reduced.push({ state, action: next, args: [...arguments], receiver: this });
+        return state + next;
+      };
+      const component = runtime.call("ReactCounter.reducerInitializerProbe", reducer, initial, initializer, action);
+      const useReducer = hostBindings["react.useReducerWithInit"];
+      const seen = [];
+      hostBindings["react.useReducerWithInit"] = (receivedReducer, receivedInitial, receivedInitializer) => {
+        const result = useReducer(receivedReducer, receivedInitial, receivedInitializer);
+        seen.push({ reducer: receivedReducer, initial: receivedInitial, initializer: receivedInitializer, result });
+        return result;
+      };
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = initialized.length;
+        const button = container.querySelector("button");
+        check(mountCalls === (strict ? 2 : 1) && button.textContent === "initialized" && reduced.length === 0,
+          "React owns reducer initialization and StrictMode replay at mount");
+        check(initialized.every(call => call.argument === initial && call.args.length === 1 &&
+          call.receiver === undefined), "reducer initializer receives the exact argument once per React invocation");
+        initial.text = "not reinitialized";
+        await React.act(async () => root.render(render(1)));
+        check(initialized.length === mountCalls && container.querySelector("button") === button &&
+          button.textContent === "initialized", "ordinary rerenders do not reinitialize reducer state");
+        await React.act(async () => button.click());
+        check(button.textContent === "initialized:updated" && initialized.length === mountCalls &&
+          reduced.length > 0 && reduced.every(call => call.state === "initialized" &&
+            call.action === action && call.args.length === 2 && call.receiver === undefined),
+        "Lean dispatch forwards the exact action and React updates reducer state without reinitializing");
+        const dispatch = seen[0].result[1];
+        check(seen.length >= 3 && seen.every(call => call.reducer === reducer && call.initial === initial &&
+          call.initializer === initializer && call.result[1] === dispatch),
+        "reducer hook inputs and React dispatch identity survive rerenders and state updates");
+      } finally {
+        hostBindings["react.useReducerWithInit"] = useReducer;
+        await React.act(async () => root.unmount());
+      }
+    }
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      let calls = 0;
+      let initial = "lazy";
+      const initializer = () => { calls++; return initial; };
+      const clicks = [];
+      const handler = value => { clicks.push(value); };
+      const component = runtime.call("ReactCounter.initialProbe", "eager:", initializer, handler);
+      const useState = hostBindings["react.useState"];
+      const seen = [];
+      hostBindings["react.useState"] = argument => {
+        const result = useState(argument);
+        seen.push({ argument, value: result[0] });
+        return result;
+      };
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = calls;
+        check(mountCalls === (strict ? 2 : 1), "React owns lazy initializer replay");
+        const button = container.querySelector("button");
+        check(button.textContent === "eager:lazy" && clicks.length === 0,
+          "initialization stores values and does not call the function-valued state");
+        initial = "changed";
+        await React.act(async () => root.render(render(1)));
+        check(calls === mountCalls && container.querySelector("button") === button &&
+          button.textContent === "eager:lazy", "rerenders preserve state without calling initializers");
+        check(seen.length >= 6 && seen.length % 3 === 0, "each render forwards three native state inputs");
+        for (let index = 0; index < seen.length; index += 3) {
+          check(seen[index].argument === "eager:" && seen[index + 1].argument === initializer,
+            "union membership passes exact eager value and native initializer");
+          check(seen[index + 2].argument !== handler &&
+            typeof seen[index + 2].argument === "function" && seen[index + 2].value === handler,
+          "Lean explicitly constructs a thunk; React stores the original handler");
+        }
+        await React.act(async () => button.click());
+        check(clicks.length === 1 && clicks[0] === "lazy", "stored native function is callable after rerender");
+      } finally {
+        hostBindings["react.useState"] = useState;
+        await React.act(async () => root.unmount());
+      }
+    }
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      const calls = [];
+      const nullary = function () { "use strict"; calls.push(["nullary", [...arguments], this]); return "zero:"; };
+      const unary = function (value) { "use strict"; calls.push(["unary", [...arguments], this]); return `${value}:`; };
+      const binary = function (first, second) {
+        "use strict";
+        calls.push(["binary", [...arguments], this]); return `${first}/${second}:`;
+      };
+      const ternary = function (first, second, third) {
+        "use strict";
+        calls.push(["ternary", [...arguments], this]); return `${first}/${second}/${third}`;
+      };
+      const nativeCallbacks = [nullary, unary, binary, ternary];
+      const useCallback = hostBindings["react.useCallback"];
+      const selected = [];
+      hostBindings["react.useCallback"] = (callback, deps) => {
+        const result = useCallback(callback, deps);
+        selected.push({ callback, deps, result });
+        return result;
+      };
+      const component = runtime.call("ReactCounter.callbackShapeProbe", ...nativeCallbacks);
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = calls.length;
+        check(mountCalls === (strict ? 8 : 4) && container.textContent === "zero:one:two/three:four/five/six",
+          "generic useCallback invokes all native function arities with their exact results");
+        check(selected.length === mountCalls && selected.every(({ callback, deps, result }, index) =>
+          callback === nativeCallbacks[index % 4] && result === callback && Array.isArray(deps) && deps.length === 0),
+        "useCallback preserves each native function identity and native empty dependencies");
+        for (const [index, expected] of [["nullary", []], ["unary", ["one"]],
+          ["binary", ["two", "three"]], ["ternary", ["four", "five", "six"]]].entries()) {
+          const observed = calls[index];
+          check(observed[0] === expected[0] && JSON.stringify(observed[1]) === JSON.stringify(expected[1]) &&
+            observed[2] === undefined, `${expected[0]} has exact plain-call arguments and no receiver`);
+        }
+        await React.act(async () => root.render(render(1)));
+        const updateCalls = strict ? 8 : 4;
+        check(calls.length === mountCalls + updateCalls && selected.slice(-updateCalls).every(({ callback, result }, index) =>
+          callback === nativeCallbacks[index % 4] && result === callback),
+        "native callback identity survives a component rerender");
+      } finally {
+        hostBindings["react.useCallback"] = useCallback;
+        await React.act(async () => root.unmount());
+      }
+    }
+    const eventContainer = document.createElement("div");
+    fixtures.append(eventContainer);
+    const eventRoot = createRoot(eventContainer);
+    const eventCalls = [];
+    const eventProviders = new Map();
+    for (const member of ["nativeEvent", "currentTarget", "preventDefault", "stopPropagation"]) {
+      const key = `react.syntheticEvent.${member}`;
+      const provider = hostBindings[key];
+      eventProviders.set(key, provider);
+      hostBindings[key] = event => {
+        const result = provider(event);
+        eventCalls.push({ member, event, result });
+        return result;
+      };
+    }
+    let receivedEvent;
+    let eventParents = 0;
+    const eventComponent = runtime.call("ReactCounter.eventProbe", event => {
+      receivedEvent = event;
+      check(event.currentTarget === eventContainer.querySelector("button"),
+        "React currentTarget is the handler element during the Lean callback");
+    });
+    try {
+      await React.act(async () => eventRoot.render(React.createElement("div", {
+        onClick: () => { eventParents++; },
+      }, React.createElement(eventComponent))));
+      const nativeEvent = new MouseEvent("click", { bubbles: true, cancelable: true });
+      const target = eventContainer.querySelector("span");
+      let accepted;
+      await React.act(async () => { accepted = target.dispatchEvent(nativeEvent); });
+      check(receivedEvent !== nativeEvent && !(receivedEvent instanceof Event) &&
+        receivedEvent.nativeEvent === nativeEvent && receivedEvent.target === target,
+      "the Lean callback receives React's exact synthetic event, distinct from nativeEvent");
+      check(eventCalls.length === 4 && eventCalls.every(call => call.event === receivedEvent) &&
+        eventCalls[0].result === nativeEvent &&
+        eventCalls[1].result === eventContainer.querySelector("button"),
+      "real Wasm forwards the exact event and returns its native event/current target unchanged");
+      check(accepted === false && nativeEvent.defaultPrevented && receivedEvent.defaultPrevented &&
+        eventParents === 0, "Lean invokes React's prevention and propagation methods");
+      check(receivedEvent.currentTarget === null,
+        "retaining the event does not extend currentTarget's dispatch-scoped validity");
+    } finally {
+      for (const [key, provider] of eventProviders) hostBindings[key] = provider;
+      await React.act(async () => eventRoot.unmount());
+    }
+    const counterContainer = document.createElement("div");
+    counterContainer.id = "native-counter-test";
+    fixtures.append(counterContainer);
+    const decodeNat = hostBindings["js.nat.value"];
+    const encodeNat = hostBindings["js.nat"];
+    let encodes = 0;
+    hostBindings["js.nat.value"] = () => { throw new Error("native counter decoded its state"); };
+    hostBindings["js.nat"] = value => { encodes++; return encodeNat(value); };
+    try {
+      await React.act(async () => runtime.call("ReactCounter.mount", "#native-counter-test"));
+      const initialEncodes = encodes;
+      const button = counterContainer.querySelector("button");
+      check(button.textContent === "react:0", "native bigint initial state renders directly");
+      await React.act(async () => { button.click(); button.click(); button.click(); });
+      check(button.textContent === "react:3" && encodes === initialEncodes,
+        "batched functional updates retain bigint state without decoding or re-encoding");
+    } finally {
+      hostBindings["js.nat.value"] = decodeNat;
+      hostBindings["js.nat"] = encodeNat;
+    }
     for (const [entry, id] of [
       ["ReactCounter.mountEffect", "native-effect"],
       ["ReactCounter.mountMemo", "native-memo"],
       ["ReactCounter.mountMemoStable", "native-memo-stable"],
       ["ReactInput.mountInput", "native-input"],
+      ["ReactInput.mountChangeInput", "native-change-input"],
       ["ReactInput.mountCheckbox", "native-checkbox"],
       ["ReactInput.mountSelectTextarea", "native-fields"],
       ["ReactInput.mountAttributes", "native-attributes"],
@@ -291,6 +607,16 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     });
     check(input.value === "Ada" && query("#react-name-output").textContent === "Ada",
       "input state remains native through event, props and text");
+    const changeInput = query("#react-change-input");
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(changeInput, "Grace");
+      changeInput.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    });
+    check(query("#react-change-output").textContent === "Grace",
+      "synthetic onChange preserves input state after preventing the native event");
+    const submit = new Event("submit", { bubbles: true, cancelable: true });
+    await React.act(async () => query("#react-change-widget").dispatchEvent(submit));
+    check(submit.defaultPrevented, "synthetic onSubmit cancels the native submit");
     await React.act(async () => query("#react-checkbox-input").click());
     check(query("#react-checkbox-output").textContent === "checked:true",
       "native boolean props and callbacks survive rerendering");
@@ -301,6 +627,13 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     });
     check(query("#react-select-textarea-output").textContent === "note:draft; flavor:chocolate",
       "native select values retain existing Lean formatting");
+    const textarea = query("#react-note-input");
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, "revised");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    check(query("#react-select-textarea-output").textContent === "note:revised; flavor:chocolate",
+      "textarea reads the control value through its explicit nativeEvent");
     const attributes = query("#react-attributes-widget");
     check(attributes.style.color === "rgb(1, 2, 3)" && attributes.style.marginTop === "4px" &&
       attributes.tabIndex === 3 && attributes.dataset.case === "attributes",

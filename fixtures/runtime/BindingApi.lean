@@ -6,11 +6,156 @@ Author: Emilio J. Gallego Arias
 module
 
 import all Vir.Browser.Types
+import all Vir.Js.Types
+import all Vir.React.Types
 public import Vir.ProofWidgets.Jsx
 
 open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+
+-- Tuple notation keeps native position types and a hygienic temporary.
+example (tuple : Js.Tuple2 String Bool) : RuntimeM (Js Bool) := do
+  js#let (text, flag) := tuple
+  let _ : Js String := text
+  return flag
+
+example (source : RuntimeM (Js.Tuple2 String Bool)) : RuntimeM (Js String) := do
+  js#let (tuple, flag) ← source
+  let _ : Js Bool := flag
+  return tuple
+
+example (_tuple : Js.Tuple2 String Bool) (_pair : Js String × Js Bool)
+    (_array : Js.Array String) : True := by
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _tuple
+      return flag
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _pair
+      return text
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _array
+      return text
+  trivial
+
+-- Default inference is initializer-first; result annotations still take priority.
+private def inferredValue (value : Js String) := React.Hooks.useState (React.Initial.ofValue value)
+private def inferredInitializer (value : Js.Function0 (Js String)) := React.Hooks.useState value
+private def inferredFunction (value : Js.Function0 (Js.Function0 (Js String))) :=
+  React.Hooks.useState value
+private def inferredGeneric (value : Js α) := React.Hooks.useState (React.Initial.ofValue value)
+private def inferredUnion (value : Js (React.Initial.Value α)) := React.Hooks.useState value
+private def inferredVoidThunk (value : Js.Function0 (Js.Function0 Unit)) := React.Hooks.useState value
+private def inferredUnaryThunk (value : Js.Function0 (Js.Function1 (Js String) Unit)) :=
+  React.Hooks.useState value
+
+example : Js String → React.ReactM (Js (React.StateTuple String)) := inferredValue
+example : Js.Function0 (Js String) → React.ReactM (Js (React.StateTuple String)) := inferredInitializer
+example : Js.Function0 (Js.Function0 (Js String)) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary (Js String)))) := inferredFunction
+example : Js α → React.ReactM (Js (React.StateTuple α)) := inferredGeneric
+example : Js (React.Initial.Value α) → React.ReactM (Js (React.StateTuple α)) := inferredUnion
+example : Js.Function0 (Js.Function0 Unit) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary Unit))) := inferredVoidThunk
+example : Js.Function0 (Js.Function1 (Js String) Unit) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) Unit))) := inferredUnaryThunk
+
+example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState value
+
+example (value : Js.Function0 (Js String)) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary (Js String)))) :=
+  React.Hooks.useState value
+
+example (value : Js.Function0 (Js String)) :=
+  React.Hooks.useState (α := Js.Function.Nullary (Js String)) value
+
+example (value : Js.Function0 Unit) :=
+  React.Hooks.useState (α := Js.Function.Nullary Unit) value
+
+example (value : Js.Function1 (Js String) (Js String)) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) (Js String)))) :=
+  React.Hooks.useState value
+
+-- Explicit union widenings remain available, without changing callable semantics.
+example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState (React.Initial.ofValue value)
+
+example (initializer : Js.Function0 (Js String)) :
+    React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState (React.Initial.ofInitializer initializer)
+
+example (handler : Js.Function1 (Js String) Unit) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) Unit))) := do
+  let initializer ← Js.Function.ofLean0 (pure handler)
+  React.Hooks.useState (React.Initial.ofInitializer initializer)
+
+example (value : Js String) :
+    Js.erase (React.Initial.ofValue value) = Js.erase value := rfl
+
+example (initializer : Js.Function0 (Js String)) :
+    Js.erase (React.Initial.ofInitializer initializer) = Js.erase initializer := rfl
+
+example (_value : Js String) (_initializer : Js.Function0 (Js String))
+    (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js String)) : True := by
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) := React.Hooks.useState _value
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) := React.Hooks.useState _initializer
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) :=
+    React.Hooks.useState (React.Initial.ofInitializer _initializer)
+  fail_if_success have _ := React.Initial.ofInitializer _void
+  fail_if_success have _ := React.Initial.ofInitializer _unary
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple String)) := React.Hooks.useState _void
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple String)) := React.Hooks.useState _unary
+  fail_if_success have _ := React.Hooks.useStateNative
+  fail_if_success have _ := React.Root.renderNative
+  fail_if_success have _ := React.Node.createElementNative
+  fail_if_success have _ := React.Node.fragmentNative
+  trivial
+
+-- No contextual state type: no universal default may silently accept callables.
+example (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js String))
+    (_binary : Js.Function2 (Js String) (Js String) (Js String))
+    (_ternary : Js.Function3 (Js String) (Js String) (Js String) Unit)
+    (_decoded : Js.Function0 String) (_value : Js String) (_generic : Js α) : True := by
+  fail_if_success have _ := React.Hooks.useState _void
+  fail_if_success have _ := React.Hooks.useState _unary
+  fail_if_success have _ := React.Hooks.useState _binary
+  fail_if_success have _ := React.Hooks.useState _ternary
+  fail_if_success have _ := React.Hooks.useState _decoded
+  fail_if_success have _ := React.Hooks.useState _value
+  fail_if_success have _ := React.Hooks.useState _generic
+  trivial
+
+example : React.ReactM (Js React.Node) := do
+  let values : Js.Array React.Node ← Js.Array.empty
+  let state ← React.Hooks.useState (React.Initial.ofValue values)
+  return ← <div>{← Js.Tuple2.first state}</div>
+
+-- Host-import proofs are checked in their telescope and excluded from JS args.
+private noncomputable opaque proofPrefixSignature {α : Type} [React.Node.Shape α] (_h : True)
+    (value : @& Js α) : RuntimeM (Js α)
+private noncomputable opaque propositionPrefixSignature {p : Prop} (_h : p)
+    (value : @& Js String) : RuntimeM (Js String)
+private noncomputable opaque dataInstanceSignature {α : Type} [evidence : Inhabited α]
+    (value : @& Js α) : RuntimeM (Js α)
+private noncomputable opaque lateProofSignature (value : @& Js String) (_h : True) : RuntimeM (Js String)
+
+run_cmd Lean.Elab.Command.liftCoreM do
+  for (name, expectedPrefix) in [( ``proofPrefixSignature, 3), (``propositionPrefixSignature, 2)] do
+    let type := (← Lean.getConstInfo name).type
+    let .ok signature ← Vir.Interface.classifyHostImportSignature type
+      | throwError "proof-prefix signature rejected"
+    unless signature.erasedPrefixArgs == expectedPrefix && signature.args.size == 1 do
+      throwError "proof prefix leaked into host arguments"
+  let dataType := (← Lean.getConstInfo ``dataInstanceSignature).type
+  let .error (.implicitOrInstanceArgument _) ← Vir.Interface.classifyHostImportSignature dataType
+    | throwError "data-carrying instance accepted as a proof"
+  let lateType := (← Lean.getConstInfo ``lateProofSignature).type
+  let .error (.runtimeErasedParameterAfterArguments _) ← Vir.Interface.classifyHostImportSignature lateType
+    | throwError "proof after runtime argument accepted"
 
 -- Native function aliases preserve arity and complete result relationships.
 example (body : RuntimeM (Js String)) : RuntimeM (Js (React.MemoCalculation String)) :=
@@ -110,14 +255,68 @@ example (value : Js String) : React.ReactM (Js React.Node) :=
   <span title={value}>{React.Node.text value}</span>
 
 -- Native children are inserted unchanged, not converted to Lean collections.
+example [React.Node.Shape α] (value : Js α) : Js React.Node := React.Node.ofJs value
+
+example [React.Node.Shape α] (value : Js α) :
+    Js.erase (React.Node.ofJs value) = Js.erase value := rfl
+
+example (root : Js React.Root) (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) :
+    DomM Unit := React.Root.render root values
+
+example (tag : Js React.ElementType) (props : Js React.Props) (values : Js.Array String) :
+    React.ReactM (Js React.Node) := React.Node.createElement tag props values
+
+example (props : Js React.Props) (values : Js.Array String) :
+    React.ReactM (Js React.Node) := React.Node.fragment props values
+
+example (props : Js React.Props) : React.ReactM (Js React.Node) := do
+  React.Node.fragment props (← Js.Array.empty)
+
+example (_root : Js React.Root) (_props : Js React.Props) (_object : Js.Object)
+    (_values : Js.Array Js.Any.Value) : True := by
+  fail_if_success have _ := React.Root.render _root _object
+  fail_if_success have _ := React.Node.fragment _props _values
+  trivial
+
+example (node : Js React.Node) (text : Js String) (number : Js Float) (bigint : Js Nat)
+    (flag : Js Bool) (absent : Js.Undefined) : True := by
+  have _ := React.Node.ofJs node
+  have _ := React.Node.ofJs text
+  have _ := React.Node.ofJs number
+  have _ := React.Node.ofJs bigint
+  have _ := React.Node.ofJs flag
+  have _ := React.Node.ofJs absent
+  trivial
+
+example (_object : Js.Object) (_any : Js.Any) (_lean : JSL String)
+    (_pending : Js.Promise String) (_fn : Js.Function0 (Js String))
+    (_values : Array (Js React.Node)) (_action : RuntimeM (Js String)) : True := by
+  fail_if_success have _ := React.Node.ofJs _object
+  fail_if_success have _ := React.Node.ofJs _any
+  fail_if_success have _ := React.Node.ofJs _lean
+  fail_if_success have _ := React.Node.ofJs _pending
+  fail_if_success have _ := React.Node.ofJs _fn
+  fail_if_success have _ := React.Node.ofJs _values
+  fail_if_success have _ := React.Node.ofJs _action
+  trivial
+
+example : True := by
+  fail_if_success have _ : React.Node.Shape Js.Object.Value := inferInstance
+  trivial
+
 example (node : Js React.Node) (text : Js String) (nodes : Js.Array React.Node) :
     React.ReactM (Js React.Node) := <div>{node}{text}{nodes}</div>
 
 example (node : Js React.Node) :
-    (<div>{node}</div> : React.ReactM (Js React.Node)) = <div>{pure node}</div> := rfl
+    (<div>{node}</div> : React.ReactM (Js React.Node)) =
+      <div>{React.Node.ofJs node}</div> := rfl
 
 example (text : Js String) :
-    (<div>{text}</div> : React.ReactM (Js React.Node)) = <div>{React.Node.text text}</div> := rfl
+    (<div>{text}</div> : React.ReactM (Js React.Node)) =
+      <div>{React.Node.ofJs text}</div> := rfl
+
+example [React.Node.Shape α] (value : Js α) : React.ReactM (Js React.Node) :=
+  <div>{value}</div>
 
 example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
   <div>{action}</div>
@@ -357,6 +556,106 @@ example (_setup : Js React.EffectCallback) (_deps : Js React.DependencyList)
 
 open scoped Lean.Vir.Js in
 example : RuntimeM (Js String) := js#"native string"
+
+example (s : Js String) (n : Js Float) (b : Js Bool) : RuntimeM (Js String) :=
+  js#!"name={s}, number={n}, flag={b}"
+
+example (value : Js.Any) : RuntimeM (Option (Js String)) := Js.cast? value
+example (value : Js.Any) : RuntimeM (Option (Js Float)) := Js.cast? value
+example (value : Js.Any) : RuntimeM (Except Js.TypeConvError (Js Bool)) := Js.cast value
+
+example (_value : Js.Any) : True := by
+  fail_if_success have _ : RuntimeM (Js String) := Js.Number.fromAny _value
+  fail_if_success have _ : RuntimeM (Js Nat) := Js.Number.fromAny _value
+  fail_if_success have _ : RuntimeM (Js Float) := Js.Boolean.fromAny _value
+  trivial
+
+example (_event : Js React.SyntheticEvent) : True := by
+  fail_if_success have _ : DomM Unit := Browser.Event.preventDefault _event
+  trivial
+
+example (event : Js React.SyntheticEvent) : RuntimeM (Js Browser.Event) :=
+  React.SyntheticEvent.nativeEvent event
+
+example (_s : String) : True := by
+  fail_if_success have _ : RuntimeM (Js String) := js#!"{_s}"
+  trivial
+
+example (values : Js.Array String) (p : Js.Function1 (Js String) (Js Bool)) :
+    RuntimeM (Js.Array String) := Js.Array.filter (β := Bool) values p
+
+example (values : Js.Array String) (p : Js.Function1 (Js String) (Js Float)) :
+    RuntimeM (Js Bool) := Js.Array.some (β := Float) values p
+
+example (values : Js.Array String) (f : Js.Function1 (Js String) Unit) :
+    RuntimeM Unit := Js.Array.forEach values f
+
+example (_values : Js.Array String) (_p : Js.Function1 (Js Float) (Js Bool)) : True := by
+  fail_if_success have _ := Js.Array.filter _values _p
+  trivial
+
+example (reducer : Js (React.Reducer String Bool)) (initial : Js Float)
+    (init : Js.Function1 (Js Float) (Js String)) :
+    React.ReactM (Js (React.ReducerTuple String Bool)) :=
+  React.Hooks.useReducerWithInit reducer initial init
+
+example (_reducer : Js (React.Reducer String Bool)) (_initial : Js Float)
+    (_initialize : Js.Function1 (Js String) (Js Float)) : True := by
+  fail_if_success have _ := React.Hooks.useReducerWithInit _reducer _initial _initialize
+  trivial
+
+example (initial : Js.Nullable Element) :
+    React.ReactM (Js (React.Ref (Js.Nullable Element))) := React.Hooks.useRef initial
+
+example (initial : Js.UndefinedOr Element) :
+    React.ReactM (Js (React.Ref (Js.UndefinedOr Element))) := React.Hooks.useRef initial
+
+-- useCallback preserves the supported native call shape, including its result.
+example (f : Js.Function0 (Js String)) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function0 (Js String)) := React.Hooks.useCallback f deps
+
+example (f : Js.Function1 (Js Float) (Js String)) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function1 (Js Float) (Js String)) := React.Hooks.useCallback f deps
+
+example (f : Js.Function2 Js.Any (Js String) Unit) (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function2 Js.Any (Js String) Unit) := React.Hooks.useCallback f deps
+
+example (f : Js.Function3 Js.Any (Js Float) (Js String) Js.Any)
+    (deps : Js React.DependencyList) :
+    React.ReactM (Js.Function3 Js.Any (Js Float) (Js String) Js.Any) :=
+  React.Hooks.useCallback f deps
+
+example (_s : Js String) (_o : Js.Object) (_a : Js.Any) (_deps : Js React.DependencyList) : True := by
+  fail_if_success have _ := React.Hooks.useCallback _s _deps
+  fail_if_success have _ := React.Hooks.useCallback _o _deps
+  fail_if_success have _ := React.Hooks.useCallback _a _deps
+  trivial
+
+example (f : Js.Function2 (Js String) (Js Float) (Js Bool)) (s : Js String) (n : Js Float) :
+    RuntimeM (Js Bool) := Js.Function.call2 f s n
+
+example (_f : Js.Function2 (Js String) (Js Float) (Js Bool))
+    (_s : Js String) (_n : Js Float) (_void : Js.Function0 Unit) : True := by
+  fail_if_success have _ := Js.Function.call _f _s
+  fail_if_success have _ := Js.Function.call2 _f _n _s
+  fail_if_success have _ := Js.Function.call2Void _f _s _n
+  fail_if_success have _ := Js.Function.call0 _void
+  trivial
+
+example (s : Js String) (n : Js Float) (end_ : Js.UndefinedOr Float) : RuntimeM (Js String) :=
+  Js.String.slice s n end_
+
+example (a b : Js Float) : RuntimeM (Js Bool) := Js.Number.equal a b
+example (a b : Js Nat) : RuntimeM (Js Nat) := Js.Nat.mul a b
+example (a b : Js String) : RuntimeM (Js Bool) := Js.String.equal a b
+example (b : Js Bool) : RuntimeM (Js Bool) := Js.Boolean.not b
+
+example (_n : Js Nat) (_f : Js Float) (_s : String) : True := by
+  fail_if_success have _ := Js.Number.add _n _n
+  fail_if_success have _ := Js.Nat.mul _f _f
+  fail_if_success have _ := Js.String.equal _s _s
+  fail_if_success have _ : RuntimeM Bool := Js.Number.equal _f _f
+  trivial
 
 example (_console : Js Console) (_message : String) : True := by
   fail_if_success have _ := Console.log _console _message

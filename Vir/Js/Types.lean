@@ -103,6 +103,19 @@ changes its native invocation arity.
 -/
 opaque Ternary (first second third result : Type) : Type
 
+/--
+Closed evidence for the JavaScript function shapes VIR can invoke directly.
+The proposition is erased; it neither validates a JavaScript value nor changes
+its native call signature.
+-/
+class inductive Shape : Type → Prop where
+  | nullary (result : Type) : Shape (Nullary result)
+  | unary (argument result : Type) : Shape (Unary argument result)
+  | binary (first second result : Type) : Shape (Binary first second result)
+  | ternary (first second third result : Type) : Shape (Ternary first second third result)
+
+attribute [instance] Shape.nullary Shape.unary Shape.binary Shape.ternary
+
 end Function
 
 /-- Exact zero-argument JavaScript function with a statically described result. -/
@@ -159,6 +172,15 @@ arguments. Lean unary bridges ignore index/source as ordinary unary TS callbacks
 @[inline] instance instUnaryArrayMap {α β : Type} :
     CoeHead (Function1 (Lean.Vir.Js α) (Lean.Vir.Js β))
       (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) (Lean.Vir.Js β)) where
+  coe value := by
+    unfold Function1 Function3 Lean.Vir.Js at *
+    exact value
+
+/-- The native unary-void subset of an Array.forEach callback. The callback
+still receives all native arguments; the Lean bridge ignores unused ones. -/
+@[inline] instance instUnaryArrayForEach {α : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) Unit)
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) Unit) where
   coe value := by
     unfold Function1 Function3 Lean.Vir.Js at *
     exact value

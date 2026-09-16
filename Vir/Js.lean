@@ -26,14 +26,84 @@ def JsValue.ofNatNumber? (value : Nat) : RuntimeM (Option (Js Float)) := do
 
 namespace Js
 
+namespace Function
+
+-- These identity-only instantiations avoid passing erased type parameters to
+-- the six-argument host ABI. They do not wrap the native function or its values.
+/-- Plain binary invocation with exact native arguments and result. -/
+@[inline] def call2 {α β γ : Type}
+    (fn : Js.Function2 (Js α) (Js β) (Js γ)) (a : Js α) (b : Js β) :
+    RuntimeM (Js γ) := by
+  have invoke := Internal.call2
+  unfold Js.Function2 Js.Any Js at *
+  exact invoke fn a b
+
+/-- Plain ternary invocation with exact native arguments and result. -/
+@[inline] def call3 {α β γ δ : Type}
+    (fn : Js.Function3 (Js α) (Js β) (Js γ) (Js δ))
+    (a : Js α) (b : Js β) (c : Js γ) : RuntimeM (Js δ) := by
+  have invoke := Internal.call3
+  unfold Js.Function3 Js.Any Js at *
+  exact invoke fn a b c
+
+/-- Plain ternary invocation, discarding its native return value. -/
+@[inline] def call3Void {α β γ : Type}
+    (fn : Js.Function3 (Js α) (Js β) (Js γ) Unit)
+    (a : Js α) (b : Js β) (c : Js γ) : RuntimeM Unit := by
+  have invoke := Internal.call3Void
+  unfold Js.Function3 Js.Any Js at *
+  exact invoke fn a b c
+
+end Function
+
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
+
+/-- Native template interpolation: embedded Js values undergo JavaScript ToString
+left-to-right, once each. Literal syntax uses Lean's interpolation escapes. -/
+scoped syntax:max "js#!" interpolatedStr(term) : term
+
+macro_rules
+  | `(js#! $text:interpolatedStr) => do
+    let mut result ← `(Lean.Vir.JsValue.ofString "")
+    let mut started := false
+    for chunk in text.raw.getArgs do
+      match chunk.isInterpolatedStrLit? with
+      | some literal =>
+          if literal.isEmpty then continue
+          let literal ← `(Lean.Vir.JsValue.ofString $(Lean.quote literal))
+          if !started then
+            result := literal
+          else
+            result ← `(do
+              let text ← ($result)
+              Lean.Vir.Js.String.concat text (← ($literal)))
+          started := true
+      | none =>
+          let value : Lean.TSyntax `term := ⟨chunk⟩
+          result ← `(do
+            let text ← ($result)
+            Lean.Vir.Js.String.interpolate text $value)
+          started := true
+    return result
+
+/-- Binds the two native tuple entries, evaluating the source once and projecting
+indices 0 then 1. This is indexed projection, not JavaScript iterator destructuring. -/
+scoped macro "js#let" "(" first:ident "," second:ident ")" " ← " value:term : doElem =>
+  `(doElem| do
+    let tuple ← ($value)
+    let $first ← Lean.Vir.Js.Tuple2.first tuple
+    let $second ← Lean.Vir.Js.Tuple2.second tuple)
+
+scoped macro "js#let" "(" first:ident "," second:ident ")" " := " value:term : doElem =>
+  `(doElem| js#let ($first, $second) ← pure $value)
 
 /-- Construction-only literal lifting; other expressions retain their effect semantics. -/
 meta partial def liftConstructionString (value : Lean.TSyntax `term) :
     Lean.MacroM (Lean.TSyntax `term) :=
   match value with
   | `(js# $literal:str) => `(← Lean.Vir.JsValue.ofString $literal)
+  | `(js#! $text:interpolatedStr) => `(← js#! $text)
   | `(($inner:term)) => liftConstructionString inner
   | _ => pure value
 
@@ -98,6 +168,28 @@ def cast [Monad m] [Cast m target]
   match ← cast? value with
   | some result => pure (.ok result)
   | none => pure (.error { expected := Cast.expected (m := m) (target := target) })
+
+/-- Checked native primitive narrowing. Identity casts occur only after typeof. -/
+instance : Cast RuntimeM String where
+  expected := "string"
+  check value := do
+    if ← JsValue.toBool (← String.isString value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
+
+instance : Cast RuntimeM Float where
+  expected := "number"
+  check value := do
+    if ← JsValue.toBool (← Number.isNumber value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
+
+instance : Cast RuntimeM Bool where
+  expected := "boolean"
+  check value := do
+    if ← JsValue.toBool (← Boolean.isBoolean value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
 
 namespace Nullable
 

@@ -69,7 +69,7 @@ opaque useReducer
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-state`.
 
-Passes the initial value unchanged to React.useState and returns React's exact result array.
+Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -80,7 +80,9 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "react.useState"]
 opaque useState
     {α : Type}
-    (initial : @& Lean.Vir.Js α) :
+    {β : Type}
+    [Lean.Vir.React.Initial.Accepts β α]
+    (initial : @& Lean.Vir.Js β) :
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
 
 /--
@@ -121,7 +123,7 @@ opaque useMemo
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-callback`.
 
-Passes the caller's native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function.
+Passes a caller-selected supported native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function without erasing its exact call shape.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -132,9 +134,10 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "react.useCallback"]
 opaque useCallback
     {α : Type}
-    (callback : @& Lean.Vir.Js (Lean.Vir.React.Callback α))
+    [Lean.Vir.Js.Function.Shape α]
+    (callback : @& Lean.Vir.Js α)
     (deps : @& Lean.Vir.Js Lean.Vir.React.DependencyList) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Callback α))
+    Lean.Vir.React.ReactM (Lean.Vir.Js α)
 
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-context`.
@@ -155,6 +158,28 @@ opaque useContext
 
 end React.Hooks
 
+namespace React.Hooks.Internal
+
+/--
+Generated binding for reviewed VIR protocol `react.hooks.use-reducer-with-init`.
+
+Selects React.useReducer's three-argument initializer overload with one action argument. The typed inline public declaration relates input, state and action; the monomorphic import avoids erased parameters exceeding the host ABI. All three native values and the returned tuple cross unchanged.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; reducer js-resource/borrowed/call; initial js-resource/borrowed/call; init js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.useReducerWithInit"]
+opaque useReducerWithInit
+    (reducer : @& Lean.Vir.Js (Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value))
+    (initial : @& Lean.Vir.Js.Any)
+    (init : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js.Any) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value))
+
+end React.Hooks.Internal
+
 namespace React.Node
 
 /--
@@ -170,9 +195,11 @@ This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.createElement"]
 opaque createElement
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (elementType : @& Lean.Vir.Js Lean.Vir.React.ElementType)
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js.Array α) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
@@ -188,8 +215,10 @@ This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.fragment"]
 opaque fragment
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js.Array α) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 end React.Node
@@ -303,8 +332,10 @@ This declaration is generated; edit the TypeScript source or binding configurati
 -/
 @[vir_js "react.root.renderNode"]
 opaque render
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (children : @& Lean.Vir.Js Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js α) :
     Lean.Vir.Browser.DomM Unit
 
 /--
@@ -342,5 +373,105 @@ opaque create
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
 end React.Root
+
+namespace React.SyntheticEvent
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.native-event`.
+
+Reads the exact underlying browser event from the supported React.SyntheticEvent<EventTarget, Event> view. The synthetic event itself is not a browser Event.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.nativeEvent"]
+opaque nativeEvent
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.Event)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.target`.
+
+Reads the exact originating EventTarget; it can differ from the current listener target and is not assumed to be an Element.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.target"]
+opaque target
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.EventTarget)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.current-target`.
+
+Reads the exact current listener EventTarget without an element-subtype claim. The nonnullable TypeScript view is valid during dispatch; React clears this field afterward. No snapshot or lifetime extension is inserted.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.currentTarget"]
+opaque currentTarget
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.EventTarget)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.default-prevented`.
+
+Reads the exact native boolean reporting whether the synthetic event's default action was prevented.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.defaultPrevented"]
+opaque defaultPrevented
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.prevent-default`.
+
+Invokes the native synthetic event's preventDefault method with its original receiver and no arguments.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.preventDefault"]
+opaque preventDefault
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM Unit
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.stop-propagation`.
+
+Invokes the native synthetic event's stopPropagation method with its original receiver and no arguments.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.stopPropagation"]
+opaque stopPropagation
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM Unit
+
+end React.SyntheticEvent
 
 end Lean.Vir

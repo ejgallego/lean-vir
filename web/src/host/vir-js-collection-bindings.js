@@ -27,10 +27,27 @@ export function createJsCollectionHostBindings() {
     "js.value.function.nullaryVoid": (callback) => callback,
     "js.value.function.binary": (callback) => callback,
     "js.value.function.ternary": (callback) => callback,
+    "js.value.function.binaryVoid": (callback) => callback,
+    "js.value.function.ternaryVoid": (callback) => callback,
     "js.value.function.unaryVoid": (callback) => callback,
     "js.function.call": (fn, argument) => fn(argument),
     "js.function.callVoid": (fn, argument) => {
       fn(argument);
+      return undefined;
+    },
+    "js.function.call0": (fn) => fn(),
+    "js.function.call0Void": (fn) => {
+      fn();
+      return undefined;
+    },
+    "js.function.call2": (fn, first, second) => fn(first, second),
+    "js.function.call2Void": (fn, first, second) => {
+      fn(first, second);
+      return undefined;
+    },
+    "js.function.call3": (fn, first, second, third) => fn(first, second, third),
+    "js.function.call3Void": (fn, first, second, third) => {
+      fn(first, second, third);
       return undefined;
     },
     "js.promise.thenValue": (promise, onFulfilled) => promise.then(onFulfilled),
@@ -44,6 +61,12 @@ export function createJsCollectionHostBindings() {
     "js.array.empty": () => [],
     "js.array.push": (array, value) => array.push(value),
     "js.array.map": (array, callback) => array.map(callback),
+    "js.array.filter": (array, callback) => array.filter(callback),
+    "js.array.find": (array, callback) => array.find(callback),
+    "js.array.some": (array, callback) => array.some(callback),
+    "js.array.every": (array, callback) => array.every(callback),
+    "js.array.forEach": (array, callback) => array.forEach(callback),
+    "js.array.join": (array, separator) => array.join(separator),
     "js.array.length": (array) => array.length,
     "js.array.item": (array, index) => array[index],
     "js.tuple2.first": (tuple) => tuple[0],

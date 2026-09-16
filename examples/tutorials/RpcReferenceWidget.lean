@@ -50,26 +50,25 @@ def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
   Infoview.RpcSession.call session (← js#"RpcBrowserServer.read") params
 
 /-- A native React function component; constructing it once preserves hook identity. -/
-private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply))) := FunctionComponent.ofLean fun props => do
-  let reply ← LeanRef.fromJSL (← Props.WithData.data props)
-  let count ← React.Hooks.useState (← JsValue.ofNat 0)
-  let countValue ← Js.Tuple2.first count
-  let countSetter ← Js.Tuple2.second count
-  let label ← message reply
-  let n ← JsValue.toNat countValue
-  let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
-    let update ← Js.Function.ofLean fun previous => do
-      JsValue.ofNat ((← JsValue.toNat previous) + 1)
-    Js.Function.callVoid countSetter (React.SetStateAction.ofUpdater update)
-  return ← <button id="rpc-reference-view" onClick={increment}>
-    {label}{ProofWidgets.Html.text s!" / local {n}"}
-  </button>
+private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply))) := do
+  let initial ← JsValue.ofNat 0
+  let one ← JsValue.ofNat 1
+  let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
+  FunctionComponent.ofLean fun props => do
+    let reply ← LeanRef.fromJSL (← Props.WithData.data props)
+    js#let (count, setCount) ← Hooks.useState (α := Nat) initial
+    let label ← message reply
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
+      Js.Function.callVoid setCount (SetStateAction.ofUpdater update)
+    return ← <button id="rpc-reference-view" onClick={increment}>
+      {label} / local {count}
+    </button>
 
 /-- Keep the session and query identities stable until the request should change. -/
 structure Input where
   session : Js Infoview.RpcSession
   query : Js.Object
-  uri : String
+  uri : Js String
 
 private structure ResponseState where
   reply : Option (Js Reply) := none
@@ -78,18 +77,15 @@ private structure ResponseState where
 
 private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (input : Input) :
     ReactM (Js Node) := do
-  let response ← Hooks.useState (← LeanRef.toJSL ({} : ResponseState))
-  let responseValue ← Js.Tuple2.first response
-  let responseSetter ← Js.Tuple2.second response
-  let revision ← Hooks.useState (← JsValue.ofNat 0)
-  let revisionValue ← Js.Tuple2.first revision
-  let revisionSetter ← Js.Tuple2.second revision
+  let initializer ← Js.Function.ofLean0 (LeanRef.toJSL ({} : ResponseState))
+  js#let (responseValue, responseSetter) ← Hooks.useState initializer
+  js#let (revisionValue, revisionSetter) ← Hooks.useState (α := Nat) (← JsValue.ofNat 0)
+  let one ← JsValue.ofNat 1
   let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do
     let document ← Js.Object.get params (← js#"textDocument")
     let uri ← Js.String.fromAny (← Js.Object.get document (← js#"uri"))
-    if (← JsValue.toString uri) == input.uri then
-      let update ← Js.Function.ofLean fun previous => do
-        JsValue.ofNat ((← JsValue.toNat previous) + 1)
+    if ← JsValue.toBool (← Js.String.equal uri input.uri) then
+      let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
       Js.Function.callVoid revisionSetter (React.SetStateAction.ofUpdater update)
   -- Undefined dependencies also follow replacement of the upstream editor context.
   Infoview.useClientNotificationEffect (← js#"textDocument/didChange") changed
@@ -168,7 +164,7 @@ def WidgetView : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do
   FunctionComponent.ofLean fun props => do
     let session ← Infoview.useRpcSession
     let pos ← Infoview.PanelWidgetProps.pos props
-    let uri ← JsValue.toString (← Infoview.PanelPosition.uri pos)
+    let uri ← Infoview.PanelPosition.uri pos
     renderView child { session, query, uri }
 
 vir_proof_widget WidgetView

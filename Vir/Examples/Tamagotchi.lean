@@ -855,7 +855,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
   useLiveTick hook
   let actionButton : Tamagotchi.Action → ReactM (Js Node) := fun action => do
     let text ← Node.text (← Lean.Vir.JsValue.ofString action.label)
-    let onClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
+    let onClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.React.SyntheticEvent) =>
       DomM.toRuntime (dispatchViewAction hook (.care action))
     let props ← js%{
       "key" := (← JsValue.ofString action.label),
@@ -869,8 +869,12 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
     }
     return ← <button @props={props}>{pure text}</button>
   let artInput ← show ReactM (Js Node) from do
-    let onChange ← Js.Function.ofLeanVoid fun (event : Lean.Vir.Js Lean.Vir.Browser.Event) => DomM.toRuntime do
-      match ← Lean.Vir.Browser.Event.inputElement? event with
+    let onChange ← Js.Function.ofLeanVoid fun (event : Lean.Vir.Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime do
+      let target ← ReactM.run (Lean.Vir.React.SyntheticEvent.currentTarget event)
+      let input ← match ← Lean.Vir.Browser.EventTarget.asElement target with
+        | none => pure none
+        | some element => Lean.Vir.Browser.HTMLInputElement.fromElement element
+      match input with
       | none => pure ()
       | some input => do
           let checked ← Lean.Vir.JsValue.toBool
@@ -917,7 +921,7 @@ def View : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ 
   let actionsNode ← Node.createElement
     (← ElementType.tag (← js#"div")) actionsProps (← Js.Array.ofArray actionButtons)
   let resetText ← Node.text (← Lean.Vir.JsValue.ofString "Reset")
-  let resetClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.Browser.Event) =>
+  let resetClick ← Js.Function.ofLeanVoid fun (_ : Lean.Vir.Js Lean.Vir.React.SyntheticEvent) =>
     DomM.toRuntime (dispatchViewAction hook .reset)
   let resetProps ← js%{
     "id" := (← js#"react-pet-reset"),

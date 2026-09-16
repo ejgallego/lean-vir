@@ -139,7 +139,7 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent Lean.Vir.React.Props) := d
     let badgeData ← LeanRef.toJSL { tone := "info", label := "component" }
     let badgeProps ← Props.WithData.make badgeData
     Js.Object.set (Props.WithData.asProps badgeProps) (← js#"key") (← js#"info-badge")
-    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) => DomM.toRuntime do
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime do
       let title ← Lean.Vir.JsValue.ofString "ProofWidgets JSX subset clicked"
       Lean.Vir.Browser.Document.setTitle
         (← Lean.Vir.Browser.Document.current) title
@@ -184,7 +184,7 @@ def mountDefault : DomM Bool :=
 def nativeConstruction
     (Component : Lean.Vir.React.FunctionComponent Lean.Vir.React.Props)
     (payload : Js.Object) (label : Js String)
-    (callback : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)) : Html := do
+    (callback : Js (Lean.Vir.React.Callback Lean.Vir.React.SyntheticEvent)) : Html := do
   let props ← js%{
     "label" := js#"superseded", "label" := label,
     "payload" := payload, "onClick" := callback, "values" := (← js#[label, label])
@@ -197,13 +197,13 @@ def nativeConstruction
 structure NativeProps where
   label : Js String
   payload : Js.Object
-  onClick : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)
+  onClick : Js (Lean.Vir.React.Callback Lean.Vir.React.SyntheticEvent)
   values : Js.Array String
 
 def nativeTypedConstruction
     (Component : Lean.Vir.React.FunctionComponent NativeProps)
     (payload : Js.Object) (label : Js String)
-    (callback : Js (Lean.Vir.React.Callback Lean.Vir.Browser.Event)) : Html :=
+    (callback : Js (Lean.Vir.React.Callback Lean.Vir.React.SyntheticEvent)) : Html :=
   <Component label={label} payload={payload} onClick={callback} values={(← js#[label, label])}/>
 
 def nativeTypedLabel (props : Js NativeProps) : RuntimeM (Js String) :=
@@ -237,6 +237,24 @@ def nativePrimitiveChildren (node : Js.Nullable Node) (absent : Js.Undefined)
     (flag : Js Bool) (number : Js Float) (bigint : Js Nat)
     (nested : Js.Array (Js.Nullable.Value String)) : Html :=
   <div>{node}{absent}{flag}{number}{bigint}{nested}</div>
+
+/-- Ordinary calls share JSX's node membership without inspecting native arrays. -/
+def nativeNodeArray (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) :
+    Js Node := Node.ofJs values
+
+def nativeRender (root : Js Root)
+    (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) : DomM Unit :=
+  Root.render root values
+
+def nativeTextFragment (props : Js Props) (values : Js.Array String) : Html :=
+  Node.fragment props values
+
+/-- Exercise indexed tuple notation with an observable source and property reads. -/
+def nativeTuple (source : Js.Function1 (Js String) (Js.Tuple2 Node String))
+    (input : Js String) : RuntimeM (Js Node) := do
+  js#let (node, label) ← Js.Function.call source input
+  let _ : Js String := label
+  return node
 
 /-- Native map exposes its original index and source array without a callback envelope. -/
 def nativeIndexedMap (values : Js.Array String) : RuntimeM (Js.Array Js.Object.Value) := do

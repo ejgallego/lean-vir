@@ -95,7 +95,12 @@ def Label : RuntimeM (FunctionComponent LabelProps) :=
 
 Given `let Label ← Label`, `<Label title="Hello"/>` checks field names, required
 fields and value types at compile time. No `LabelProps` record is allocated:
-JSX still writes a fresh native object. All fields must be supplied; generic,
+JSX still writes a fresh native object. Fields must be supplied unless their
+projection is tagged `attribute [js_optional] LabelProps.title`. Such a field
+may be omitted entirely (no property is written); if supplied, it must match
+the declared type. Its `js_field%` read returns `Js.UndefinedOr String`.
+A field declared `Js.UndefinedOr String` without the tag remains required;
+explicit `undefined` and omission are distinct. Generic,
 dependent and inherited schemas are outside this bounded surface. The special
 `key` and `children` fields and `__proto__` are not supported schema fields.
 Supply `key` separately, for example `<Label key={id} title="Hello"/>`: it accepts
@@ -130,6 +135,23 @@ Arbitrary objects and `Js.Any` are not implicitly narrowed to nodes. A native ar
 occupies one child slot; JSX does not flatten it or add a fragment. Existing
 child actions still run left-to-right and may return any supported native shape.
 Lean arrays (including arrays of actions) are not JSX children.
+Ordinary node-taking calls use the same closed membership rule:
+
+```lean
+def renderLabels (root : Js Root) (values : Js.Array String) : DomM Unit :=
+  Root.render root values
+```
+
+`Root.render` accepts `Js α` with `[Node.Shape α]`; `Node.createElement`,
+`Node.fragment` and `Node.functionComponent` accept native child arrays with that
+element constraint. Otherwise unconstrained empty child arrays default to `Node`.
+`Node.ofJs` remains an explicit inline identity when a `Js Node` value is needed.
+The evidence is erased; casts make no host call and never copy or traverse arrays.
+JSX uses the same rule. No global coercion is introduced.
+This checks declared shapes, not foreign payloads
+or later mutations through aliases. Promises and arbitrary iterables from the
+broader TypeScript `ReactNode` union are not included in this subset.
+
 Use native mapping directly:
 
 ```lean
@@ -200,8 +222,49 @@ failed unmount remains available for runtime cleanup. See
 ## Hooks, refs and events
 
 Hooks receive exact JavaScript inputs and return React's chosen values.
-Project native state/reducer tuples with `Js.Tuple2.first` and `second`; no Lean
-state record is constructed. Invoke their native functions with
+`Hooks.useState value` checks the closed `Initial.Accepts input state` relation.
+Explicit `(α := S)` and contextual state types take precedence. Otherwise state
+is inferred only from `Initial.ofValue value`, an existing `Initial.Value S`, or
+a supported `Js.Function0 (Js S)` initializer. Only one function layer is removed.
+For a plain value use `Hooks.useState (α := String) text` or
+`Hooks.useState (Initial.ofValue text)`; generic `Js T` values follow the same rule.
+There is no universal value fallback: it would silently misclassify unsupported
+functions as stored state. Void-returning or argument-taking functions therefore
+need an explicit state choice or a supported initializer returning the function.
+This is deliberately less automatic than TypeScript inference.
+For example, initialize Lean-backed state only when React calls the initializer:
+
+```lean
+let initializer ← Js.Function.ofLean0 (LeanRef.toJSL initialState)
+let state ← Hooks.useState initializer
+```
+
+React can replay initializers in development Strict Mode. To store a native
+function `handler`, pass an initializer returning it, such as
+`Js.Function.ofLean0 (pure handler)`. `Initial.ofValue handler` does not protect
+a function from React's initializer semantics. Nor does explicitly requesting
+function-valued state: annotations change types, not React's callable test.
+`Initial.ofValue` and `Initial.ofInitializer` remain explicit identity widenings
+for generic code. There is no automatic thunk insertion or input conversion.
+
+These constrained operations are direct generated host imports. Their leading
+type and proof arguments are erased slots skipped by the host boundary, not
+runtime dictionaries or JavaScript arguments. No forwarding functions are needed.
+
+Bind native state/reducer tuple entries with `js#let` (in scope `Lean.Vir.Js`):
+
+```lean
+js#let (value, setter) ← Hooks.useState (α := Nat) initial
+```
+
+`js#let (value, setter) := tuple` also accepts an existing native tuple. Both
+forms evaluate the source once, then call `Js.Tuple2.first` and `second` in
+order, without constructing a Lean pair. This is indexed projection, not JS
+iterator destructuring; custom iterators are not consulted.
+Native bigint counters can use `Js.Nat.add` and interpolate the resulting
+`Js Nat` directly in JSX, without decoding and re-encoding the count. This
+preserves arbitrary precision; it does not produce a JSON number.
+Invoke native functions with
 `Js.Function.callVoid`. A state setter accepts `SetStateAction.ofValue value`
 or `SetStateAction.ofUpdater update`: both are identity widenings of the native
 value or function. Passing a function as a value still follows React's updater
@@ -229,8 +292,14 @@ it does not schedule, wrap or execute the callback.
 
 Refs are the actual callback or `{ current }` object; React can write a DOM node
 or `null` to `current`. Event props store the exact handler function and receive
-the browser/React event unchanged. Event validity after a handler returns is
-determined by that API, not by a VIR callback scope.
+the React event unchanged, typed as `Js React.SyntheticEvent`, not
+`Js Browser.Event`. `SyntheticEvent.nativeEvent` exposes the underlying DOM
+event explicitly. `target`, `currentTarget`, `defaultPrevented`,
+`preventDefault` and `stopPropagation` access the native React object directly.
+The supported type is TypeScript's `SyntheticEvent<EventTarget, Event>`;
+narrow an event target explicitly before accessing element-specific members.
+As in TypeScript, read `currentTarget` during dispatch: React can clear it after
+the handler returns. VIR does not extend event validity or retain a copy.
 
 Purity, hook order, dependency completeness, effect discipline and replay-safe
 reducers remain programmer responsibilities, just as in TypeScript React.
@@ -250,22 +319,15 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
-| `useState(initial)` | Exact state/setter array for a non-function initial value; the typed lazy-initializer form is not exposed (see below). Project with `Js.Tuple2` and call the setter with a native `SetStateAction`. |
-| `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
+| `useState(initial)` | Closed membership with initializer-first default inference; explicit/contextual state types are preserved. The no-argument overload is not exposed. |
+| `useReducer(reducer, initialArg, init?)` | `Hooks.useReducer` passes state directly; `Hooks.useReducerWithInit` passes the exact input and initializer. Both return the native tuple; the supported reducer takes one action. |
 | `dispatch(action)` | `Js.Function.callVoid` passes the exact action to the native dispatch function. |
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |
 | `useEffect(setup, dependencies?)` | Exact setup function, with omitted or exact JS dependency array. Lean setup/cleanup conversion is separate. |
 | `useMemo(calculate, deps)` | Exact calculation and dependency array; returns React's selected value. |
-| `useCallback(fn, deps)` | Exact callback and dependency array; returns React's selected function. |
+| `useCallback(fn, deps)` | Exact callback and dependency array; preserves the selected `Js.Function0`–`Js.Function3` signature, including value/void result. Closed `Js.Function.Shape` evidence excludes non-functions without adding a runtime wrapper. |
 | `useContext(context)` | Exact consumer context; context creation/provider bindings are not exposed. |
 | `useId()` | `Hooks.useId : ReactM (Js String)` returns React's exact accessibility ID, without string conversion or a VIR ID registry. |
-
-The current `useState` signature takes `Js α` and returns state of shape `α`;
-it does not represent TypeScript's `S | (() => S)` initializer relationship.
-React still invokes a function passed as the initial argument, so its stored
-result need not match that function's phantom type. Use a non-function initial
-value with this surface; typed lazy initialization and function-valued
-initialization are not currently exposed.
 
 Dependencies are native arrays of arbitrary `Js` values, constructed with
 `js#[...]`. React compares their entries as usual.

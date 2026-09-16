@@ -33,6 +33,52 @@ opaque Root : Type
 /-- React element type accepted by `React.createElement`. -/
 opaque ElementType : Type
 
+/-- Native React synthetic event, distinct from its underlying browser event.
+The supported view is `React.SyntheticEvent<EventTarget, Event>`: target fields
+do not promise an element subtype. The nonnullable `currentTarget` view follows
+TypeScript and is valid during dispatch; React clears it afterward. Retaining
+this handle does not freeze its fields or extend the dispatch lifetime. -/
+opaque SyntheticEvent : Type
+
+namespace Initial
+
+/-- Native `S | (() => S)`, with no tag or wrapper around the JavaScript value. -/
+opaque Value (α : Type) : Type
+
+/-- Closed membership in React's `S | (() => S)` parameter. Known state types
+are checked directly; defaults prefer an initializer's result over the function
+itself. Functions always keep React's native initializer semantics. -/
+class inductive Accepts : Type → Type → Prop where
+  | value (α : Type) : Accepts α α
+  | initializer (α : Type) : Accepts (Lean.Vir.Js.Function.Nullary (Lean.Vir.Js α)) α
+  | union (α : Type) : Accepts (Value α) α
+
+attribute [instance] Accepts.value Accepts.initializer Accepts.union
+
+-- Defaults preserve a widened union or unwrap one supported initializer layer.
+-- There is deliberately no universal value default: it would also match void
+-- and argument-taking functions that React invokes rather than stores.
+attribute [default_instance 300] Accepts.union
+attribute [default_instance 200] Accepts.initializer
+
+/-- Identity widening justified by closed initial-parameter membership. -/
+@[inline] def ofJs {α β : Type} [Accepts β α]
+    (initial : @& Lean.Vir.Js β) : Lean.Vir.Js (Value α) := by
+  unfold Lean.Vir.Js at *
+  exact initial
+
+/-- Passes the exact value; callable values retain React's initializer semantics. -/
+@[inline] def ofValue (value : Lean.Vir.Js α) : Lean.Vir.Js (Value α) := by
+  exact ofJs value
+
+/-- Passes the exact initializer without invoking it. React chooses when to call it. -/
+@[inline] def ofInitializer
+    (initializer : Lean.Vir.Js.Function0 (Lean.Vir.Js α)) :
+    Lean.Vir.Js (Value α) :=
+  ofJs initializer
+
+end Initial
+
 namespace SetStateAction
 
 /-- Native `S | ((previous: S) => S)`, not a Lean sum or value wrapper. -/
@@ -111,6 +157,38 @@ end Props
 /-- Native `ReactNode`: elements, text, empty values, child arrays and other
 values accepted by React, not only `ReactElement` objects. -/
 opaque Node : Type
+
+namespace Node
+
+/-- Closed evidence for the supported native `ReactNode` shapes. This proposition
+is erased; it neither validates a JavaScript value nor converts a Lean value. -/
+class inductive Shape : Type → Prop where
+  | node : Shape Node
+  | string : Shape String
+  | number : Shape Float
+  | bigint : Shape Nat
+  | boolean : Shape Bool
+  | undefined : Shape Lean.Vir.Js.Undefined.Value
+  | array {α : Type} : Shape α → Shape (Lean.Vir.Js.Array.Value α)
+  | nullable {α : Type} : Shape α → Shape (Lean.Vir.Js.Nullable.Value α)
+  | optional {α : Type} : Shape α → Shape (Lean.Vir.Js.UndefinedOr.Value α)
+
+attribute [instance] Shape.node Shape.string Shape.number Shape.bigint Shape.boolean Shape.undefined
+
+-- Only default otherwise unconstrained child arrays after state inference has run.
+attribute [default_instance 0] Shape.node
+
+instance [shape : Shape α] : Shape (Lean.Vir.Js.Array.Value α) := .array shape
+instance [shape : Shape α] : Shape (Lean.Vir.Js.Nullable.Value α) := .nullable shape
+instance [shape : Shape α] : Shape (Lean.Vir.Js.UndefinedOr.Value α) := .optional shape
+
+/-- Widens a supported native value to `ReactNode` without changing its identity,
+allocating, or traversing arrays. There is no implicit coercion. -/
+@[inline] def ofJs [Shape α] (value : @& Lean.Vir.Js α) : Lean.Vir.Js Node := by
+  unfold Lean.Vir.Js at *
+  exact value
+
+end Node
 
 /-- A native function component receiving JavaScript props directly from React. -/
 abbrev FunctionComponent (props : Type) :=

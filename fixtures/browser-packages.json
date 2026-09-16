@@ -120,9 +120,24 @@
           ]
         },
         {
+          "module": "OptionalProps",
+          "roots": [
+            "Vir.Fixtures.OptionalProps.omitted", "Vir.Fixtures.OptionalProps.present",
+            "Vir.Fixtures.OptionalProps.readTitle", "Vir.Fixtures.OptionalProps.requiredUndefined",
+            "Vir.Fixtures.OptionalProps.optionalUndefined", "Vir.Fixtures.OptionalProps.omittedUndefined",
+            "Vir.Fixtures.OptionalProps.readUndefinedTitle", "Vir.Fixtures.OptionalProps.nullable",
+            "Vir.Fixtures.OptionalProps.omittedNullable", "Vir.Fixtures.OptionalProps.readNullableTitle",
+            "Vir.Fixtures.OptionalProps.component"
+          ]
+        },
+        {
           "module": "fixtures.ReactCounter",
           "roots": [
             "ReactCounter.mount",
+            "ReactCounter.initialProbe",
+            "ReactCounter.callbackShapeProbe",
+            "ReactCounter.reducerInitializerProbe",
+            "ReactCounter.eventProbe",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
             "ReactCounter.renderStaticIntoSelector",
@@ -166,6 +181,10 @@
             "ProofWidgetsJsxSubset.nativeChildSlots",
             "ProofWidgetsJsxSubset.nativeMappedChildren",
             "ProofWidgetsJsxSubset.nativePrimitiveChildren",
+            "ProofWidgetsJsxSubset.nativeNodeArray",
+            "ProofWidgetsJsxSubset.nativeRender",
+            "ProofWidgetsJsxSubset.nativeTextFragment",
+            "ProofWidgetsJsxSubset.nativeTuple",
             "ProofWidgetsJsxSubset.nativeIndexedMap",
             "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]

@@ -174,7 +174,7 @@ public def InterfaceClassifierError.toMessageData : InterfaceClassifierError →
   | .jsMarkerOutsideResource marker =>
       m!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
   | .runtimeErasedParameterAfterArguments name =>
-      m!"unsupported runtime-erased type parameter `{name}` after runtime arguments"
+      m!"unsupported runtime-erased type or proof parameter `{name}` after runtime arguments"
   | .implicitOrInstanceArgument name =>
       m!"implicit or instance argument `{name}` is not supported; \
         declare a wrapper with only explicit arguments"

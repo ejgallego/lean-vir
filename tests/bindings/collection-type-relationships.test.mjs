@@ -23,7 +23,10 @@ const generation = {
 // Authority comes from the installed, pinned TypeScript declarations, not a
 // second handwritten list of what this binding configuration ought to mean.
 const descriptor = await generateDescriptorFile({
-  files: [new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url).pathname],
+  files: [
+    new URL("../../node_modules/typescript/lib/lib.es5.d.ts", import.meta.url).pathname,
+    new URL("../../node_modules/typescript/lib/lib.es2015.core.d.ts", import.meta.url).pathname,
+  ],
   anchors: null, anchorsData: { version: 1, anchors: [] },
   symbols: new Set(["Array"]), symbolFiles: [], sourceUrl: null,
   dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
@@ -93,16 +96,17 @@ test("the relationship follows the upstream binder, not its spelling", () => {
   const upstream = structuredClone(descriptor);
   const array = upstream.symbols.find((entry) => entry.id === "Array");
   array.typeParameters[0].name = "Item";
-  array.indexSignatures[0].result.id = "Item";
-  upstream.symbols.find((entry) => entry.id === "Array.push").shape.args[0].type.element.id = "Item";
-  const mapCallback = upstream.symbols.find((entry) => entry.id === "Array.map").shape.args[0].type;
-  mapCallback.args[0].type.id = "Item";
-  mapCallback.args[2].type.element.id = "Item";
+  const rename = (value) => {
+    if (value === null || typeof value !== "object") return;
+    if (value.kind === "ref" && value.id === "T") value.id = "Item";
+    for (const child of Object.values(value)) rename(child);
+  };
+  rename(upstream.symbols);
   assert.equal(render(generation, upstream), render());
 });
 
 test("Lean element parameters cannot shadow fixed primitive types", () => {
-  for (const name of ["Float", "String", "Unit"]) {
+  for (const name of ["Float", "String", "Bool", "Unit"]) {
     const policy = JSON.parse(JSON.stringify(generation).replaceAll("α", name));
     assert.throws(() => render(policy), /type parameter .* shadows a fixed Lean type/u);
   }
@@ -125,7 +129,8 @@ for (const [member, original, replacement, wrapper, code] of [
       const mutated = source.replaceAll(original, replacement);
       await writeFile(path, mutated);
       const upstream = await generateDescriptorFile({
-        files: [path], anchors: null, anchorsData: { version: 1, anchors: [] },
+        files: [path, new URL("../../node_modules/typescript/lib/lib.es2015.core.d.ts", import.meta.url).pathname],
+        anchors: null, anchorsData: { version: 1, anchors: [] },
         symbols: new Set(["Array"]), symbolFiles: [], sourceUrl: null,
         dependencyDepth: 0, dependencyPolicy: null, dependencyPolicyData: null,
       });
@@ -147,6 +152,34 @@ test("Array.map accepts the pinned ternary no-thisArg subset of its native callb
   const map = upstream.symbols.find((entry) => entry.id === "Array.map");
   map.shape.args[0].type.args[1].type.name = "string";
   assert.throws(() => render(generation, upstream), /map<U>\(value: T, index: number/u);
+});
+
+test("ordinary Array predicates fail closed on source index, source-array and result mutations", () => {
+  const ordinary = (upstream, member) => {
+    const shape = upstream.symbols.find((entry) => entry.id === member).shape;
+    return (shape.kind === "union" ? shape.options : [shape]).find((candidate) =>
+      candidate.args[0].type.result?.kind === "opaque" && candidate.args[0].type.result.name === "unknown");
+  };
+  for (const [label, member, mutate] of [
+    ["index", "Array.filter", (shape) => { shape.args[0].type.args[1].type.name = "string"; }],
+    ["source array", "Array.some", (shape) => { shape.args[0].type.args[2].type.element.id = "Unrelated"; }],
+    ["result", "Array.every", (shape) => { shape.result.name = "string"; }],
+  ]) {
+    const upstream = structuredClone(descriptor);
+    mutate(ordinary(upstream, member));
+    assert.throws(() => render(generation, upstream), /TypeScript Array<T> element relationship violated/u,
+      `${label} mutation must not be accepted as the selected ordinary predicate contract`);
+  }
+});
+
+test("ordinary predicate contracts preserve generic native truthiness rather than Bool-only callbacks", () => {
+  for (const target of ["js.array.filter", "js.array.find", "js.array.some", "js.array.every"]) {
+    const policy = structuredClone(generation);
+    const predicate = operation(policy, target).arguments[1].type;
+    predicate.lean = predicate.lean.replace("(Lean.Vir.Js β)", "(Lean.Vir.Js Bool)");
+    predicate.resourceInner = predicate.resourceInner.replace("(Lean.Vir.Js β)", "(Lean.Vir.Js Bool)");
+    assert.throws(() => render(policy), /argument 1 lean must be .*Lean\.Vir\.Js β/u);
+  }
 });
 
 test("source-level Array.map output relationship is independently checked by TypeScript", async () => {

@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { runNativeValuesSmoke } from "./native-values-cases.mjs";
 import {
   readIrPackageInfo,
   replaceIrPackageManifest,
@@ -18,6 +19,7 @@ import {
 } from "./shared.mjs";
 
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
+  await runNativeValuesSmoke({ freshDir, wasmBytes });
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
   await writeRuntimeFixture(hostSource, "FreshHost.lean");
@@ -237,11 +239,24 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
   await writeRuntimeFixture(jsObjectSource, "FreshJsObject.lean");
   await generateIrPackage("FreshJsObject", jsObjectSource, jsObjectPackage);
+  const proofFailure = new Error("proof-prefix host failure");
+  let proofCalls = 0;
+  let failProofCall = false;
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
       "test.js.id": (value) => value,
       "test.js.length": (value) => BigInt(value.length),
+      "test.js.proofId": (...args) => {
+        assert.equal(args.length, 1, "type and proof slots must not reach JS");
+        proofCalls++;
+        if (failProofCall) throw proofFailure;
+        return args[0];
+      },
+      "test.js.pureProofId": (...args) => {
+        assert.equal(args.length, 1, "pure imports also skip the proof prefix");
+        return args[0];
+      },
     },
   }).createRuntime({ irPackageSet: [await readFile(jsObjectPackage)] });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find(
@@ -268,6 +283,27 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(jsArrayAlias, jsArray);
   assert.deepEqual(jsArray, [10, 20, 30]);
   assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), "3");
+  for (const [target, prefix, arity, effect] of [
+    ["test.js.proofId", 3, 5, "runtime"],
+    ["test.js.pureProofId", 2, 3, "pure"],
+  ]) {
+    const entry = jsObjectRuntime.interfaceManifest.hostImports.find(entry => entry.target === target);
+    assert.equal(entry?.erasedPrefixArgs, prefix);
+    assert.equal(entry?.arity, arity, "opaque IR retains the erased prefix slots");
+    assert.equal(entry?.args.length, 1);
+    assert.equal(entry?.effect, effect);
+  }
+  // Identity and error transport are independent of the phantom payload shape.
+  const proofValue = Object.freeze({ exact: true });
+  assert.equal(jsObjectRuntime.call("freshProofId", proofValue), proofValue);
+  assert.equal(jsObjectRuntime.call("freshPureProofId", proofValue), proofValue);
+  assert.equal(jsObjectRuntime.call("freshProofContinuation", proofValue), proofValue);
+  assert.equal(proofCalls, 3);
+  failProofCall = true;
+  assert.throws(() => jsObjectRuntime.call("freshProofContinuation", proofValue), error => error === proofFailure);
+  assert.equal(proofCalls, 4, "IO failure must skip the second host call");
+  failProofCall = false;
+  assert.equal(jsObjectRuntime.call("freshProofId", proofValue), proofValue);
 
   const leanRefSource = join(freshDir, "FreshLeanRef.lean");
   const leanRefPackage = join(freshDir, "lean-ref.irpkg");

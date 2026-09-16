@@ -47,6 +47,10 @@
       }
     },
     "methodPolicies": {
+      "Root.render": {
+        "typeParameters": ["α"],
+        "proofParameters": ["Lean.Vir.React.Node.Shape α"]
+      },
       "React.useEffect": {
         "forwardedOptionalParameters": ["deps"],
         "parameterRenames": { "effect": "setup" },
@@ -75,6 +79,9 @@
         "reason": "Root rendering is a DOM effect; the exact ReactNode JavaScript value is forwarded without conversion.",
         "semantics": "preserving",
         "activeEffect": "use",
+        "arguments": {
+          "children": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
       },
       "react.root.unmount": {
@@ -86,6 +93,60 @@
       }
     },
     "protocolOperations": [
+      {
+        "id": "react.synthetic-event.native-event", "group": "events", "target": "react.syntheticEvent.nativeEvent",
+        "lean": "Lean.Vir.React.SyntheticEvent.nativeEvent", "marker": "vir_js",
+        "reason": "Reads the exact underlying browser event from the supported React.SyntheticEvent<EventTarget, Event> view. The synthetic event itself is not a browser Event.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.nativeEvent", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.Event", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.Event" } }
+      },
+      {
+        "id": "react.synthetic-event.target", "group": "events", "target": "react.syntheticEvent.target",
+        "lean": "Lean.Vir.React.SyntheticEvent.target", "marker": "vir_js",
+        "reason": "Reads the exact originating EventTarget; it can differ from the current listener target and is not assumed to be an Element.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.target", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.EventTarget", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.EventTarget" } }
+      },
+      {
+        "id": "react.synthetic-event.current-target", "group": "events", "target": "react.syntheticEvent.currentTarget",
+        "lean": "Lean.Vir.React.SyntheticEvent.currentTarget", "marker": "vir_js",
+        "reason": "Reads the exact current listener EventTarget without an element-subtype claim. The nonnullable TypeScript view is valid during dispatch; React clears this field afterward. No snapshot or lifetime extension is inserted.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.currentTarget", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.EventTarget", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.EventTarget" } }
+      },
+      {
+        "id": "react.synthetic-event.default-prevented", "group": "events", "target": "react.syntheticEvent.defaultPrevented",
+        "lean": "Lean.Vir.React.SyntheticEvent.defaultPrevented", "marker": "vir_js",
+        "reason": "Reads the exact native boolean reporting whether the synthetic event's default action was prevented.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.defaultPrevented", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "react.synthetic-event.prevent-default", "group": "events", "target": "react.syntheticEvent.preventDefault",
+        "lean": "Lean.Vir.React.SyntheticEvent.preventDefault", "marker": "vir_js",
+        "reason": "Invokes the native synthetic event's preventDefault method with its original receiver and no arguments.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.preventDefault", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "react.synthetic-event.stop-propagation", "group": "events", "target": "react.syntheticEvent.stopPropagation",
+        "lean": "Lean.Vir.React.SyntheticEvent.stopPropagation", "marker": "vir_js",
+        "reason": "Invokes the native synthetic event's stopPropagation method with its original receiver and no arguments.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.stopPropagation", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
       {
         "id": "react.props.with-data.children", "group": "nodes", "target": "react.props.withData.children",
         "lean": "Lean.Vir.React.Props.WithData.children", "marker": "vir_js",
@@ -132,12 +193,27 @@
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple state action" } }
       },
       {
+        "id": "react.hooks.use-reducer-with-init", "group": "hooks", "target": "react.useReducerWithInit",
+        "lean": "Lean.Vir.React.Hooks.Internal.useReducerWithInit", "marker": "vir_js",
+        "reason": "Selects React.useReducer's three-argument initializer overload with one action argument. The typed inline public declaration relates input, state and action; the monomorphic import avoids erased parameters exceeding the host ABI. All three native values and the returned tuple cross unchanged.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useReducer", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "reducer", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value" } },
+          { "name": "initial", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } },
+          { "name": "init", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Lean.Vir.Js.Any" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value" } }
+      },
+      {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
         "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
-        "reason": "Passes the initial value unchanged to React.useState and returns React's exact result array.",
+        "reason": "Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
+        "typeParameters": ["α", "β"],
+        "proofParameters": ["Lean.Vir.React.Initial.Accepts β α"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple α" } }
       },
       {
@@ -164,14 +240,14 @@
       {
         "id": "react.hooks.use-callback", "group": "hooks", "target": "react.useCallback",
         "lean": "Lean.Vir.React.Hooks.useCallback", "marker": "vir_js",
-        "reason": "Passes the caller's native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function.",
+        "reason": "Passes a caller-selected supported native JavaScript function and dependency array unchanged to React.useCallback and returns React's selected function without erasing its exact call shape.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useCallback", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.Js.Function.Shape α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
-          { "name": "callback", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } },
+          { "name": "callback", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } },
           { "name": "deps", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.DependencyList", "representation": "js-resource", "resourceInner": "Lean.Vir.React.DependencyList" } }
         ],
-        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Callback α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Callback α" } }
+        "result": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
       },
       {
         "id": "react.hooks.use-context", "group": "hooks", "target": "react.useContext",
@@ -208,31 +284,41 @@
       {
         "id": "react.node.create-element", "group": "nodes", "target": "react.node.createElement",
         "lean": "Lean.Vir.React.Node.createElement", "marker": "vir_js",
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.React.Node.Shape α"],
         "reason": "Calls React.createElement with the exact ElementType, props object, and child array values.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.createElement", "semantics": "preserving" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "elementType", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.ElementType", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ElementType" } },
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
         "id": "react.node.fragment", "group": "nodes", "target": "react.node.fragment",
         "lean": "Lean.Vir.React.Node.fragment", "marker": "vir_js",
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.React.Node.Shape α"],
         "reason": "Calls React.createElement with React.Fragment, the exact props object, and child array values.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       }
     ]
   },
   "roots": [
+    {
+      "id": "events",
+      "title": "Synthetic events",
+      "description": "Base native React synthetic events with dispatch-scoped EventTarget views, distinct from their underlying browser events.",
+      "targets": ["react.syntheticEvent.*"],
+      "lean": { "public": ["Lean.Vir.React.SyntheticEvent"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.BaseSyntheticEvent", "React.SyntheticEvent"] }
+    },
     {
       "id": "nodes",
       "title": "React nodes",
@@ -306,7 +392,7 @@
       "id": "hooks",
       "title": "Hooks",
       "targets": ["react.use*"],
-      "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.StateSetter", "Lean.Vir.React.SetStateAction", "Lean.Vir.React.StateTuple"] },
+      "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.Initial", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.StateSetter", "Lean.Vir.React.SetStateAction", "Lean.Vir.React.StateTuple"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useId", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] },
       "mappings": [
         {

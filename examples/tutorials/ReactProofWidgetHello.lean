@@ -28,14 +28,15 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
   let position ← PanelWidgetProps.pos props
   let uri ← PanelPosition.uri position
   let goals ← PanelWidgetProps.goals props
-  let goalCount ← JsValue.toFloat (← Js.Array.length goals)
-  let target : ReactM (Js Node) := if goalCount == 0 then
+  let zero ← JsValue.ofFloat 0
+  let isEmpty ← Js.Number.equal (← Js.Array.length goals) zero
+  let target : ReactM (Js Node) := if ← JsValue.toBool isEmpty then
       <pre>Move the cursor into a proof to see its first goal.</pre>
     else do
-      let goal ← Js.Array.get goals (← JsValue.ofFloat 0)
-      return ← <pre>⊢ {Node.text (← CodeWithInfos.stripTags (← InteractiveGoal.type goal))}</pre>
+      let goal ← Js.Array.get goals zero
+      return ← <pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>
   return ← <section id="react-proof-hello">
-    <h3>Hello from {Node.text uri}</h3>
+    <h3>{← js#!"Hello from {uri}"}</h3>
     {target}
   </section>
 

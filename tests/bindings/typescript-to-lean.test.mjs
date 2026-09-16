@@ -259,6 +259,7 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     reason: "The host retains the callback until the subscription is released.",
     upstreamRelation: { kind: "upstream-adapter", member: "Widget.getAttribute" },
     typeParameters: ["α"],
+    proofParameters: ["Lean.Vir.Demo.Widget.Shape α"],
     effect: { id: "dom", lean: "DomM" },
     arguments: [{
       name: "widget",
@@ -286,7 +287,7 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   const output = renderLeanBindings(config, protocolGeneration, descriptors);
   const [operation] = buildGeneratedOperations(config, protocolGeneration, descriptors);
 
-  assert.match(output, /opaque subscribe\n    \{α : Type\}\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(callback : Lean\.Vir\.Js α → DomM Unit\)/u);
+  assert.match(output, /opaque subscribe\n    \{α : Type\}\n    \[Lean\.Vir\.Demo\.Widget\.Shape α\]\n    \(widget : @& Lean\.Vir\.Js Widget\)\n    \(callback : Lean\.Vir\.Js α → DomM Unit\)/u);
   assert.deepEqual(operation.arguments[1].modalities, {
     representation: "callback",
     passing: "owned",
@@ -302,6 +303,7 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
   );
   assert.equal(operation.exception, undefined);
   assert.deepEqual(operation.typeParameters, ["α"]);
+  assert.deepEqual(operation.proofParameters, ["Lean.Vir.Demo.Widget.Shape α"]);
 
   assert.deepEqual(operation.protocol.upstreamRelation, {
     kind: "upstream-adapter",
@@ -352,6 +354,51 @@ test("reviewed protocols generate polymorphic declarations with explicit callbac
     () => buildGeneratedOperations(localConfig, localProtocol, new Map()),
     /references missing local contract member Widget\.getAttribute/u,
   );
+});
+
+test("method policies specialize type and proof parameters without generated Lean escape hatches", () => {
+  const specialized = structuredClone(generation);
+  specialized.methodPolicies["Widget.getAttribute"] = {
+    typeParameters: ["α"],
+    proofParameters: ["Lean.Vir.Demo.Widget.Shape α"],
+  };
+  const operation = buildGeneratedOperations(config, specialized, descriptors)
+    .find((candidate) => candidate.id === "demo.widget.getAttribute");
+  const output = renderLeanBindings(config, specialized, descriptors);
+
+  assert.deepEqual(operation.typeParameters, ["α"]);
+  assert.deepEqual(operation.proofParameters, ["Lean.Vir.Demo.Widget.Shape α"]);
+  assert.deepEqual(operation.typescript.signaturePolicy.typeParameters, ["α"]);
+  assert.deepEqual(operation.typescript.signaturePolicy.proofParameters, ["Lean.Vir.Demo.Widget.Shape α"]);
+  assert.deepEqual(operation.semantics, {
+    relation: "unreviewed",
+    evidence: "method-policy",
+    detail: "The method policy changes overload selection or the exposed call surface without a semantic classification.",
+  });
+  assert.match(output, /opaque getAttribute\n    \{α : Type\}\n    \[Lean\.Vir\.Demo\.Widget\.Shape α\]\n    \(widget/u);
+
+  const reviewed = structuredClone(specialized);
+  reviewed.methodPolicies["Widget.getAttribute"].semantics = "preserving";
+  reviewed.methodPolicies["Widget.getAttribute"].reason =
+    "The constrained generic host import preserves the reviewed native call boundary.";
+  assert.deepEqual(
+    buildGeneratedOperations(config, reviewed, descriptors)
+      .find((candidate) => candidate.id === "demo.widget.getAttribute").semantics,
+    {
+      relation: "preserving",
+      evidence: "reviewed-method-policy",
+      detail: reviewed.methodPolicies["Widget.getAttribute"].reason,
+    },
+  );
+
+  const undeclared = structuredClone(specialized);
+  undeclared.methodPolicies["Widget.getAttribute"].proofParameters = ["Lean.Vir.Demo.Widget.Shape β"];
+  assert.throws(() => renderLeanBindings(config, undeclared, descriptors),
+    /proof type argument "β" is not a declared type parameter/u);
+  const injected = structuredClone(specialized);
+  injected.methodPolicies["Widget.getAttribute"].proofParameters = ["Lean.Vir.Demo.Widget.Shape α := by trivial"];
+  assert.throws(() => renderLeanBindings(config, injected, descriptors),
+    /proof type argument ":=" is not a declared type parameter/u);
 });
 
 test("a unique TypeScript signature generates faithful methods and documentation", () => {

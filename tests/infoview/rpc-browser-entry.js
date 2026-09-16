@@ -162,6 +162,11 @@ async function run() {
             if (key === "message" && object?.ref) renderedReply = object;
             return get(object, key);
           };
+          const decodeString = bindings["js.string.value"];
+          bindings["js.string.value"] = value => {
+            check(value !== config.uri, "notification URI stays a native string");
+            return decodeString(value);
+          };
           return bindings;
         },
       });

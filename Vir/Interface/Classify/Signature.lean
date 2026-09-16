@@ -74,6 +74,7 @@ public def analyzeExportInterface (type : Lean.Expr) :
 
 private partial def classifyHostImportSignatureLoop
     (type : Lean.Expr)
+    (proofBinders : Array Bool)
     (argIndex : Nat)
     (args : Array InterfaceArg)
     (erasedPrefixArgs : Nat) :
@@ -81,9 +82,9 @@ private partial def classifyHostImportSignatureLoop
   let type := stripMData type
   match type with
   | .forallE name domain body binderInfo =>
-      if isRuntimeErasedTypeBinder domain then
+      if isRuntimeErasedTypeBinder domain || proofBinders[erasedPrefixArgs + args.size]?.getD false then
         if args.isEmpty then
-          classifyHostImportSignatureLoop body argIndex args (erasedPrefixArgs + 1)
+          classifyHostImportSignatureLoop body proofBinders argIndex args (erasedPrefixArgs + 1)
         else
           return .error (.runtimeErasedParameterAfterArguments name)
       else if binderInfo != .default then
@@ -93,15 +94,19 @@ private partial def classifyHostImportSignatureLoop
         | .error error => return .error (.inContext (.signatureArgument domain) error)
         | .ok argType =>
             let arg := { name := binderArgName argIndex name, type := argType }
-            classifyHostImportSignatureLoop body (argIndex + 1) (args.push arg) erasedPrefixArgs
+            classifyHostImportSignatureLoop body proofBinders (argIndex + 1) (args.push arg) erasedPrefixArgs
   | result =>
       match ← classifyResult result with
       | .error error => return .error error
       | .ok (result, effect) => return .ok { args, result, effect, erasedPrefixArgs }
 
-/-- Classify a JavaScript host import signature and its runtime-erased prefix. -/
+/-- Classify a JavaScript host import signature and its leading type/proof slots.
+Proof classification uses the elaborated telescope, never an instance's name or
+binder syntax. Data-carrying instances remain unsupported. -/
 def classifyHostImportSignature (type : Lean.Expr) :
-    CoreM (Except InterfaceClassifierError ClassifiedSignature) :=
-  classifyHostImportSignatureLoop type 1 #[] 0
+    CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
+  let proofs ← Meta.MetaM.run' <| Meta.forallTelescope type fun binders _ =>
+    binders.mapM Meta.isProof
+  classifyHostImportSignatureLoop type proofs 1 #[] 0
 
 end Vir.Interface

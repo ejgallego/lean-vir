@@ -25,19 +25,15 @@ open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
-def Counter : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
+def Counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
-  let count ← Hooks.useState initial
-  let value ← JsValue.toNat (← Js.Tuple2.first count)
-  let setter ← Js.Tuple2.second count
-  let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
-    let update ← Js.Function.ofLean fun previous => do
-      let current ← JsValue.toNat previous
-      JsValue.ofNat (current + 1)
-    Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
-  return ← <button type="button" onClick={increment}>
-    {Node.text (← JsValue.ofString s!"Count: {value}")}
-  </button>
+  let one ← JsValue.ofNat 1
+  let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
+  FunctionComponent.ofLean fun _ => do
+    js#let (value, setter) ← Hooks.useState (α := Nat) initial
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
+      Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
+    return ← <button type="button" onClick={increment}>Count: {value}</button>
 
 def mount (selector : String) : DomM Bool := do
   let component ← Counter
