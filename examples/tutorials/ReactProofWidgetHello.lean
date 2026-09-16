@@ -33,9 +33,9 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
       <pre>Move the cursor into a proof to see its first goal.</pre>
     else do
       let goal ← Js.Array.get goals (← JsValue.ofFloat 0)
-      return ← <pre>⊢ {Node.text (← CodeWithInfos.stripTags (← InteractiveGoal.type goal))}</pre>
+      return ← <pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>
   return ← <section id="react-proof-hello">
-    <h3>Hello from {Node.text uri}</h3>
+    <h3>Hello from {uri}</h3>
     {target}
   </section>
 

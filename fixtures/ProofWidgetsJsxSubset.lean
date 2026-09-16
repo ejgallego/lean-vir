@@ -249,6 +249,13 @@ def nativeRender (root : Js Root)
 def nativeTextFragment (props : Js Props) (values : Js.Array String) : Html :=
   Node.fragment props values
 
+/-- Exercise indexed tuple notation with an observable source and property reads. -/
+def nativeTuple (source : Js.Function1 (Js String) (Js.Tuple2 Node String))
+    (input : Js String) : RuntimeM (Js Node) := do
+  js#let (node, label) ← Js.Function.call source input
+  let _ : Js String := label
+  return node
+
 /-- Native map exposes its original index and source array without a callback envelope. -/
 def nativeIndexedMap (values : Js.Array String) : RuntimeM (Js.Array Js.Object.Value) := do
   let render ← Js.Function.ofLean3 fun (value : Js String) (index : Js Float)

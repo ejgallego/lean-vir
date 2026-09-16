@@ -104,6 +104,37 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     const payload = { color: "red" };
     const label = "native JSX value \ud800"; // A lone surrogate must not round-trip through UTF-8.
     const callback = () => {};
+    const tupleTrace = [];
+    const tupleNode = React.createElement("span", null, "tuple");
+    const tupleSource = () => {
+      tupleTrace.push("source");
+      return {
+        get 0() { tupleTrace.push(0); return tupleNode; },
+        get 1() { tupleTrace.push(1); return label; },
+        [Symbol.iterator]() { throw new Error("indexed notation must not iterate"); },
+      };
+    };
+    check(runtime.call("ProofWidgetsJsxSubset.nativeTuple", tupleSource, label) === tupleNode &&
+      JSON.stringify(tupleTrace) === JSON.stringify(["source", 0, 1]),
+    "tuple notation evaluates its source once, then reads exact positions in order");
+    for (const failureAt of ["source", 0, 1]) {
+      tupleTrace.length = 0;
+      const failure = new Error(`tuple failure at ${failureAt}`);
+      const read = key => {
+        tupleTrace.push(key);
+        if (key === failureAt) throw failure;
+      };
+      let caught;
+      try {
+        runtime.call("ProofWidgetsJsxSubset.nativeTuple", () => {
+          read("source");
+          return { get 0() { read(0); return tupleNode; }, get 1() { read(1); return label; } };
+        }, label);
+      } catch (error) { caught = error; }
+      const expected = ["source", 0, 1].slice(0, ["source", 0, 1].indexOf(failureAt) + 1);
+      check(caught === failure && JSON.stringify(tupleTrace) === JSON.stringify(expected),
+        "tuple projection preserves error identity and stops at the first failure");
+    }
     traceConstruction = true;
     callbackRegistryScans = 0;
     const node = runtime.call("ProofWidgetsJsxSubset.nativeConstruction",
@@ -334,6 +365,26 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
         hostBindings["react.useState"] = useState;
         await React.act(async () => root.unmount());
       }
+    }
+    const counterContainer = document.createElement("div");
+    counterContainer.id = "native-counter-test";
+    fixtures.append(counterContainer);
+    const decodeNat = hostBindings["js.nat.value"];
+    const encodeNat = hostBindings["js.nat"];
+    let encodes = 0;
+    hostBindings["js.nat.value"] = () => { throw new Error("native counter decoded its state"); };
+    hostBindings["js.nat"] = value => { encodes++; return encodeNat(value); };
+    try {
+      await React.act(async () => runtime.call("ReactCounter.mount", "#native-counter-test"));
+      const initialEncodes = encodes;
+      const button = counterContainer.querySelector("button");
+      check(button.textContent === "react:0", "native bigint initial state renders directly");
+      await React.act(async () => { button.click(); button.click(); button.click(); });
+      check(button.textContent === "react:3" && encodes === initialEncodes,
+        "batched functional updates retain bigint state without decoding or re-encoding");
+    } finally {
+      hostBindings["js.nat.value"] = decodeNat;
+      hostBindings["js.nat"] = encodeNat;
     }
     for (const [entry, id] of [
       ["ReactCounter.mountEffect", "native-effect"],

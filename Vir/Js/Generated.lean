@@ -295,6 +295,27 @@ opaque callVoid
 
 end Js.Function
 
+namespace Js.Nat
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.add`.
+
+VIR-owned native JavaScript bigint + operator for nonnegative bigint resources. TypeScript does not declare operators; addition closes the Nat subset without decoding, coercion, or checks.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; left js-resource/borrowed/call; right js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.add"]
+opaque add
+    (left : @& Js Nat)
+    (right : @& Js Nat) :
+    RuntimeM (Js Nat)
+
+end Js.Nat
+
 namespace Js.NodeList
 
 /--

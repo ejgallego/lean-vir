@@ -29,6 +29,17 @@ namespace Js
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 
+/-- Binds the two native tuple entries, evaluating the source once and projecting
+indices 0 then 1. This is indexed projection, not JavaScript iterator destructuring. -/
+scoped macro "js#let" "(" first:ident "," second:ident ")" " ← " value:term : doElem =>
+  `(doElem| do
+    let tuple ← ($value)
+    let $first ← Lean.Vir.Js.Tuple2.first tuple
+    let $second ← Lean.Vir.Js.Tuple2.second tuple)
+
+scoped macro "js#let" "(" first:ident "," second:ident ")" " := " value:term : doElem =>
+  `(doElem| js#let ($first, $second) ← pure $value)
+
 /-- Construction-only literal lifting; other expressions retain their effect semantics. -/
 meta partial def liftConstructionString (value : Lean.TSyntax `term) :
     Lean.MacroM (Lean.TSyntax `term) :=

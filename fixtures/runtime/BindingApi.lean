@@ -14,6 +14,33 @@ open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
+-- Tuple notation keeps native position types and a hygienic temporary.
+example (tuple : Js.Tuple2 String Bool) : RuntimeM (Js Bool) := do
+  js#let (text, flag) := tuple
+  let _ : Js String := text
+  return flag
+
+example (source : RuntimeM (Js.Tuple2 String Bool)) : RuntimeM (Js String) := do
+  js#let (tuple, flag) ← source
+  let _ : Js Bool := flag
+  return tuple
+
+example (_tuple : Js.Tuple2 String Bool) (_pair : Js String × Js Bool)
+    (_array : Js.Array String) : True := by
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _tuple
+      return flag
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _pair
+      return text
+  fail_if_success
+    have _ : RuntimeM (Js String) := do
+      js#let (text, flag) := _array
+      return text
+  trivial
+
 -- Default inference is initializer-first; result annotations still take priority.
 private def inferredValue (value : Js String) := React.Hooks.useState (React.Initial.ofValue value)
 private def inferredInitializer (value : Js.Function0 (Js String)) := React.Hooks.useState value

@@ -36,19 +36,15 @@ def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
       {← Js.Tuple2.first eagerState}{value}
     </button>
 
-def counter : RuntimeM (FunctionComponent Props) :=
+def counter : RuntimeM (FunctionComponent Props) := do
+  let initial ← JsValue.ofNat 0
+  let one ← JsValue.ofNat 1
+  let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
   FunctionComponent.ofLean fun _ => do
-    let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState (α := Nat) initial
-    let countValue ← JsValue.toNat (← Js.Tuple2.first count)
-    let countSetter ← Js.Tuple2.second count
-    let text ← Node.text (← Lean.Vir.JsValue.ofString (label countValue))
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
-      let update ← Js.Function.ofLean fun previous => do
-        let value ← JsValue.toNat previous
-        JsValue.ofNat (value + 1)
+    js#let (countValue, countSetter) ← Hooks.useState (α := Nat) initial
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
       Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
-    return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
+    return ← <button type="button" id="react-counter-button" onClick={increment}>react:{countValue}</button>
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   let node ← ReactM.run do

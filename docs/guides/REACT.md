@@ -246,8 +246,20 @@ These constrained operations are direct generated host imports. Their leading
 type and proof arguments are erased slots skipped by the host boundary, not
 runtime dictionaries or JavaScript arguments. No forwarding functions are needed.
 
-Project native state/reducer tuples with `Js.Tuple2.first` and `second`; no Lean
-state record is constructed. Invoke their native functions with
+Bind native state/reducer tuple entries with `js#let` (in scope `Lean.Vir.Js`):
+
+```lean
+js#let (value, setter) ← Hooks.useState (α := Nat) initial
+```
+
+`js#let (value, setter) := tuple` also accepts an existing native tuple. Both
+forms evaluate the source once, then call `Js.Tuple2.first` and `second` in
+order, without constructing a Lean pair. This is indexed projection, not JS
+iterator destructuring; custom iterators are not consulted.
+Native bigint counters can use `Js.Nat.add` and interpolate the resulting
+`Js Nat` directly in JSX, without decoding and re-encoding the count. This
+preserves arbitrary precision; it does not produce a JSON number.
+Invoke native functions with
 `Js.Function.callVoid`. A state setter accepts `SetStateAction.ofValue value`
 or `SetStateAction.ofUpdater update`: both are identity widenings of the native
 value or function. Passing a function as a value still follows React's updater

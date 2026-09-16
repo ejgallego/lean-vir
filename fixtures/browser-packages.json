@@ -170,6 +170,7 @@
             "ProofWidgetsJsxSubset.nativeNodeArray",
             "ProofWidgetsJsxSubset.nativeRender",
             "ProofWidgetsJsxSubset.nativeTextFragment",
+            "ProofWidgetsJsxSubset.nativeTuple",
             "ProofWidgetsJsxSubset.nativeIndexedMap",
             "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]

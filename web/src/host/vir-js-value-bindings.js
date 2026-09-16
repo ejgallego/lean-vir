@@ -12,6 +12,7 @@ export function createJsValueHostBindings() {
   }
   bindings["js.string.owned"] = jsStringValue;
   bindings["js.string.length"] = (value) => value.length;
+  bindings["js.nat.add"] = (left, right) => left + right;
   bindings["js.string.fromAny"] = (value) => {
     if (typeof value !== "string") {
       throw new TypeError("js.string.fromAny expects a primitive JavaScript string");

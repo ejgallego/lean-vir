@@ -111,6 +111,18 @@
         "result": { "type": { "lean": "Nat", "representation": "immediate" } }
       },
       {
+        "id": "javascript.nat.add", "group": "numeric-operations", "target": "js.nat.add",
+        "lean": "Lean.Vir.Js.Nat.add", "marker": "vir_js",
+        "reason": "VIR-owned native JavaScript bigint + operator for nonnegative bigint resources. TypeScript does not declare operators; addition closes the Nat subset without decoding, coercion, or checks.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "left", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } },
+          { "name": "right", "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+        ],
+        "result": { "type": { "lean": "Js Nat", "representation": "js-resource", "resourceInner": "Nat" } }
+      },
+      {
         "id": "javascript.bool.of", "group": "primitive-conversions", "target": "js.bool",
         "lean": "Lean.Vir.JsValue.ofBool", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a Lean Bool into a JavaScript boolean resource.",
@@ -597,6 +609,13 @@
       "title": "Retained Lean references",
       "targets": ["js.leanRef*"],
       "lean": { "public": ["Lean.Vir.LeanRef"] },
+      "upstream": { "kind": "internal" }
+    },
+    {
+      "id": "numeric-operations",
+      "title": "Native numeric operations",
+      "targets": ["js.nat.add"],
+      "lean": { "public": ["Lean.Vir.Js.Nat"] },
       "upstream": { "kind": "internal" }
     },
     {
