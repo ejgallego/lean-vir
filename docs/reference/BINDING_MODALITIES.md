@@ -348,6 +348,13 @@ declarations. Protocol records carry their type parameters, complete Lean
 types, representation, passing, retention, effect, target, and justification.
 The generator emits them through the same declaration and modality pipeline.
 
+Protocols and method policies may declare `proofParameters`, such as
+`["Lean.Vir.React.Node.Shape α"]`, after their `typeParameters`. Each names a
+Lean class applied to declared type parameters. Lean validates that these are
+propositions; data-carrying instances are rejected. They constrain the public
+signature without adding JavaScript arguments. See
+[host boundary types](HOST_BINDINGS.md#lean-boundary-types).
+
 Every protocol also declares exactly one `upstreamRelation`:
 
 - `upstream-adapter` names the TypeScript member whose behavior it adapts;

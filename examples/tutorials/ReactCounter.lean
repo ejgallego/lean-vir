@@ -27,7 +27,7 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def Counter : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
-  let count ← Hooks.useState initial
+  let count ← Hooks.useState (α := Nat) initial
   let value ← JsValue.toNat (← Js.Tuple2.first count)
   let setter ← Js.Tuple2.second count
   let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do

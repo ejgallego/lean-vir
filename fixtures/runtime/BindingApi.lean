@@ -15,12 +15,15 @@ open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 -- Default inference is initializer-first; result annotations still take priority.
-private def inferredValue (value : Js String) := React.Hooks.useState value
+private def inferredValue (value : Js String) := React.Hooks.useState (React.Initial.ofValue value)
 private def inferredInitializer (value : Js.Function0 (Js String)) := React.Hooks.useState value
 private def inferredFunction (value : Js.Function0 (Js.Function0 (Js String))) :=
   React.Hooks.useState value
-private def inferredGeneric (value : Js α) := React.Hooks.useState value
+private def inferredGeneric (value : Js α) := React.Hooks.useState (React.Initial.ofValue value)
 private def inferredUnion (value : Js (React.Initial.Value α)) := React.Hooks.useState value
+private def inferredVoidThunk (value : Js.Function0 (Js.Function0 Unit)) := React.Hooks.useState value
+private def inferredUnaryThunk (value : Js.Function0 (Js.Function1 (Js String) Unit)) :=
+  React.Hooks.useState value
 
 example : Js String → React.ReactM (Js (React.StateTuple String)) := inferredValue
 example : Js.Function0 (Js String) → React.ReactM (Js (React.StateTuple String)) := inferredInitializer
@@ -28,6 +31,10 @@ example : Js.Function0 (Js.Function0 (Js String)) →
     React.ReactM (Js (React.StateTuple (Js.Function.Nullary (Js String)))) := inferredFunction
 example : Js α → React.ReactM (Js (React.StateTuple α)) := inferredGeneric
 example : Js (React.Initial.Value α) → React.ReactM (Js (React.StateTuple α)) := inferredUnion
+example : Js.Function0 (Js.Function0 Unit) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary Unit))) := inferredVoidThunk
+example : Js.Function0 (Js.Function1 (Js String) Unit) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) Unit))) := inferredUnaryThunk
 
 example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
   React.Hooks.useState value
@@ -38,6 +45,13 @@ example (value : Js.Function0 (Js String)) :
 
 example (value : Js.Function0 (Js String)) :=
   React.Hooks.useState (α := Js.Function.Nullary (Js String)) value
+
+example (value : Js.Function0 Unit) :=
+  React.Hooks.useState (α := Js.Function.Nullary Unit) value
+
+example (value : Js.Function1 (Js String) (Js String)) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) (Js String)))) :=
+  React.Hooks.useState value
 
 -- Explicit union widenings remain available, without changing callable semantics.
 example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
@@ -73,6 +87,48 @@ example (_value : Js String) (_initializer : Js.Function0 (Js String))
   fail_if_success have _ := React.Node.createElementNative
   fail_if_success have _ := React.Node.fragmentNative
   trivial
+
+-- No contextual state type: no universal default may silently accept callables.
+example (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js String))
+    (_binary : Js.Function2 (Js String) (Js String) (Js String))
+    (_ternary : Js.Function3 (Js String) (Js String) (Js String) Unit)
+    (_decoded : Js.Function0 String) (_value : Js String) (_generic : Js α) : True := by
+  fail_if_success have _ := React.Hooks.useState _void
+  fail_if_success have _ := React.Hooks.useState _unary
+  fail_if_success have _ := React.Hooks.useState _binary
+  fail_if_success have _ := React.Hooks.useState _ternary
+  fail_if_success have _ := React.Hooks.useState _decoded
+  fail_if_success have _ := React.Hooks.useState _value
+  fail_if_success have _ := React.Hooks.useState _generic
+  trivial
+
+example : React.ReactM (Js React.Node) := do
+  let values : Js.Array React.Node ← Js.Array.empty
+  let state ← React.Hooks.useState (React.Initial.ofValue values)
+  return ← <div>{← Js.Tuple2.first state}</div>
+
+-- Host-import proofs are checked in their telescope and excluded from JS args.
+private noncomputable opaque proofPrefixSignature {α : Type} [React.Node.Shape α] (_h : True)
+    (value : @& Js α) : RuntimeM (Js α)
+private noncomputable opaque propositionPrefixSignature {p : Prop} (_h : p)
+    (value : @& Js String) : RuntimeM (Js String)
+private noncomputable opaque dataInstanceSignature {α : Type} [evidence : Inhabited α]
+    (value : @& Js α) : RuntimeM (Js α)
+private noncomputable opaque lateProofSignature (value : @& Js String) (_h : True) : RuntimeM (Js String)
+
+run_cmd Lean.Elab.Command.liftCoreM do
+  for (name, expectedPrefix) in [( ``proofPrefixSignature, 3), (``propositionPrefixSignature, 2)] do
+    let type := (← Lean.getConstInfo name).type
+    let .ok signature ← Vir.Interface.classifyHostImportSignature type
+      | throwError "proof-prefix signature rejected"
+    unless signature.erasedPrefixArgs == expectedPrefix && signature.args.size == 1 do
+      throwError "proof prefix leaked into host arguments"
+  let dataType := (← Lean.getConstInfo ``dataInstanceSignature).type
+  let .error (.implicitOrInstanceArgument _) ← Vir.Interface.classifyHostImportSignature dataType
+    | throwError "data-carrying instance accepted as a proof"
+  let lateType := (← Lean.getConstInfo ``lateProofSignature).type
+  let .error (.runtimeErasedParameterAfterArguments _) ← Vir.Interface.classifyHostImportSignature lateType
+    | throwError "proof after runtime argument accepted"
 
 -- Native function aliases preserve arity and complete result relationships.
 example (body : RuntimeM (Js String)) : RuntimeM (Js (React.MemoCalculation String)) :=

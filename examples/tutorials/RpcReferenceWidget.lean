@@ -52,7 +52,7 @@ def readReference (session : Js Infoview.RpcSession) (reply : Js Reply) :
 /-- A native React function component; constructing it once preserves hook identity. -/
 private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply))) := FunctionComponent.ofLean fun props => do
   let reply ← LeanRef.fromJSL (← Props.WithData.data props)
-  let count ← React.Hooks.useState (← JsValue.ofNat 0)
+  let count ← React.Hooks.useState (α := Nat) (← JsValue.ofNat 0)
   let countValue ← Js.Tuple2.first count
   let countSetter ← Js.Tuple2.second count
   let label ← message reply
@@ -82,7 +82,7 @@ private def renderView (child : FunctionComponent (Props.WithData (Js Reply))) (
   let response ← Hooks.useState initializer
   let responseValue ← Js.Tuple2.first response
   let responseSetter ← Js.Tuple2.second response
-  let revision ← Hooks.useState (← JsValue.ofNat 0)
+  let revision ← Hooks.useState (α := Nat) (← JsValue.ofNat 0)
   let revisionValue ← Js.Tuple2.first revision
   let revisionSetter ← Js.Tuple2.second revision
   let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do

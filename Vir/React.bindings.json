@@ -47,7 +47,10 @@
       }
     },
     "methodPolicies": {
-      "Root.render": { "visibility": "private" },
+      "Root.render": {
+        "typeParameters": ["α"],
+        "proofParameters": ["Lean.Vir.React.Node.Shape α"]
+      },
       "React.useEffect": {
         "forwardedOptionalParameters": ["deps"],
         "parameterRenames": { "effect": "setup" },
@@ -76,6 +79,9 @@
         "reason": "Root rendering is a DOM effect; the exact ReactNode JavaScript value is forwarded without conversion.",
         "semantics": "preserving",
         "activeEffect": "use",
+        "arguments": {
+          "children": { "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }
+        },
         "effect": { "id": "dom", "lean": "Lean.Vir.Browser.DomM" }
       },
       "react.root.unmount": {
@@ -134,11 +140,13 @@
       },
       {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
-        "lean": "Lean.Vir.React.Hooks.useStateNative", "marker": "vir_js", "visibility": "private",
+        "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
         "reason": "Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
-        "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Initial.Value α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Initial.Value α" } }],
+        "typeParameters": ["α", "β"],
+        "proofParameters": ["Lean.Vir.React.Initial.Accepts β α"],
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js β", "representation": "js-resource", "resourceInner": "β" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple α" } }
       },
       {
@@ -208,26 +216,28 @@
       },
       {
         "id": "react.node.create-element", "group": "nodes", "target": "react.node.createElement",
-        "lean": "Lean.Vir.React.Node.createElementNative", "marker": "vir_js", "visibility": "private",
+        "lean": "Lean.Vir.React.Node.createElement", "marker": "vir_js",
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.React.Node.Shape α"],
         "reason": "Calls React.createElement with the exact ElementType, props object, and child array values.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.createElement", "semantics": "preserving" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "elementType", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.ElementType", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ElementType" } },
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       },
       {
         "id": "react.node.fragment", "group": "nodes", "target": "react.node.fragment",
-        "lean": "Lean.Vir.React.Node.fragmentNative", "marker": "vir_js", "visibility": "private",
+        "lean": "Lean.Vir.React.Node.fragment", "marker": "vir_js",
+        "typeParameters": ["α"], "proofParameters": ["Lean.Vir.React.Node.Shape α"],
         "reason": "Calls React.createElement with React.Fragment, the exact props object, and child array values.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
         "arguments": [
           { "name": "props", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Props", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Props" } },
-          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value Lean.Vir.React.Node" } }
+          { "name": "children", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
         ],
         "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.React.Node", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Node" } }
       }
@@ -289,7 +299,7 @@
         {
           "typescript": "Root.render",
           "targets": ["react.root.renderNode"],
-          "lean": ["Lean.Vir.React.Root.renderNative"]
+          "lean": ["Lean.Vir.React.Root.render"]
         },
         {
           "typescript": "Root.unmount",

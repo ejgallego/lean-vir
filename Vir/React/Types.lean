@@ -48,12 +48,11 @@ class inductive Accepts : Type → Type → Prop where
 
 attribute [instance] Accepts.value Accepts.initializer Accepts.union
 
--- Default synthesis runs after ordinary contextual constraints. A widened
--- union carries its state type; otherwise unwrap one nullary initializer layer
--- before falling back to the declared value shape (including abstract types).
+-- Defaults preserve a widened union or unwrap one supported initializer layer.
+-- There is deliberately no universal value default: it would also match void
+-- and argument-taking functions that React invokes rather than stores.
 attribute [default_instance 300] Accepts.union
 attribute [default_instance 200] Accepts.initializer
-attribute [default_instance 100] Accepts.value
 
 /-- Identity widening justified by closed initial-parameter membership. -/
 @[inline] def ofJs {α β : Type} [Accepts β α]
@@ -63,15 +62,13 @@ attribute [default_instance 100] Accepts.value
 
 /-- Passes the exact value; callable values retain React's initializer semantics. -/
 @[inline] def ofValue (value : Lean.Vir.Js α) : Lean.Vir.Js (Value α) := by
-  unfold Lean.Vir.Js at *
-  exact value
+  exact ofJs value
 
 /-- Passes the exact initializer without invoking it. React chooses when to call it. -/
 @[inline] def ofInitializer
     (initializer : Lean.Vir.Js.Function0 (Lean.Vir.Js α)) :
-    Lean.Vir.Js (Value α) := by
-  unfold Lean.Vir.Js.Function0 Lean.Vir.Js at *
-  exact initializer
+    Lean.Vir.Js (Value α) :=
+  ofJs initializer
 
 end Initial
 

@@ -43,6 +43,15 @@ test("useState preserves inferred and explicit initial-value/initializer relatio
     const eagerText: string = useState("hello")[0];
     const inferredText: string = useState(makeText)[0];
     const storedFunction: () => string = useState(() => makeText)[0];
+    declare const doNothing: () => void;
+    declare const unary: (value: string) => string;
+    const voidState: void = useState(doNothing)[0];
+    const storedVoid: () => void = useState(() => doNothing)[0];
+    const storedUnary: (value: string) => string = useState(() => unary)[0];
+    // @ts-expect-error an argument-taking function is not a nullary initializer
+    useState(unary);
+    const explicitUnary = useState<typeof unary>(unary);
+    const emptyNodes = useState<Array<import("react").ReactNode>>([]);
     function generic<T>(value: T): T { return useState(value)[0]; }
     const genericFunction: () => string = generic(makeText);
     const [text]: [string, Dispatch<SetStateAction<string>>] = useState(initialFunction(makeText));
@@ -56,10 +65,11 @@ test("useState preserves inferred and explicit initial-value/initializer relatio
   assert.deepEqual(diagnostics.map(d => d.messageText), []);
   const config = JSON.parse(await readFile(new URL("../../Vir/React.bindings.json", import.meta.url)));
   const operation = config.generation.protocolOperations.find(op => op.target === "react.useState");
-  assert.deepEqual(operation.typeParameters, ["α"]);
-  assert.equal(operation.visibility, "private");
-  assert.equal(operation.lean, "Lean.Vir.React.Hooks.useStateNative");
-  assert.equal(operation.arguments[0].type.lean, "Lean.Vir.Js (Lean.Vir.React.Initial.Value α)");
+  assert.deepEqual(operation.typeParameters, ["α", "β"]);
+  assert.deepEqual(operation.proofParameters, ["Lean.Vir.React.Initial.Accepts β α"]);
+  assert.notEqual(operation.visibility, "private");
+  assert.equal(operation.lean, "Lean.Vir.React.Hooks.useState");
+  assert.equal(operation.arguments[0].type.lean, "Lean.Vir.Js β");
   assert.equal(operation.result.type.lean, "Lean.Vir.Js (Lean.Vir.React.StateTuple α)");
 });
 

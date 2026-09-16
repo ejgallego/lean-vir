@@ -48,6 +48,12 @@ separately named and documented as adapters.
 
 Ordinary host imports use a deliberately narrow type surface:
 
+Leading type parameters and `Prop` proof parameters (including proposition-valued
+typeclass instances) are allowed. The compiler retains erased slots in an opaque
+import's IR arity; package validation checks that arity, and the host trampoline
+skips the prefix. No proof or type dictionary reaches JavaScript. Proofs after
+runtime arguments and data-carrying instances are not supported.
+
 | Lean type                | JavaScript value                                                | Purpose                                   |
 | ------------------------ | --------------------------------------------------------------- | ----------------------------------------- |
 | `Lean.Vir.Js α`          | The exact JavaScript value                                      | Phantom-typed JavaScript value.           |

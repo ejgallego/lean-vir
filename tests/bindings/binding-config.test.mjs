@@ -201,6 +201,18 @@ test("method policies are selected and schema checked", async () => {
     validateBindingConfig(vague, browserPath),
     /methodPolicies\/CanvasRenderingContext2D\.arc\/signature.*must/u,
   );
+
+  const constrained = structuredClone(browser);
+  constrained.generation.methodPolicies["CanvasRenderingContext2D.arc"].typeParameters = ["α"];
+  constrained.generation.methodPolicies["CanvasRenderingContext2D.arc"].proofParameters = ["Lean.Vir.Browser.Canvas.Shape α"];
+  await assert.doesNotReject(validateBindingConfig(constrained, browserPath));
+
+  const malformedProof = structuredClone(constrained);
+  malformedProof.generation.methodPolicies["CanvasRenderingContext2D.arc"].proofParameters = ["Lean.Vir.Browser.Canvas.Shape β"];
+  await assert.rejects(
+    validateBindingConfig(malformedProof, browserPath),
+    /proof type argument "β" is not a declared type parameter/u,
+  );
 });
 
 test("reviewed protocols require a machine-readable upstream relation", async () => {

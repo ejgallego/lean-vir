@@ -218,12 +218,15 @@ failed unmount remains available for runtime cleanup. See
 
 Hooks receive exact JavaScript inputs and return React's chosen values.
 `Hooks.useState value` checks the closed `Initial.Accepts input state` relation.
-Explicit `(α := S)` and contextual state types take precedence. Otherwise default
-inference uses an existing `Initial.Value S` union's state type, then the result
-of a supported `Js.Function0 (Js S)` initializer, then the declared input shape.
-Only one function layer is removed. For an abstract `Js T`, the fallback is `T`;
-this does not prove the eventual JavaScript payload is non-callable. These are
-bounded Lean inference rules, not a reproduction of all TypeScript inference.
+Explicit `(α := S)` and contextual state types take precedence. Otherwise state
+is inferred only from `Initial.ofValue value`, an existing `Initial.Value S`, or
+a supported `Js.Function0 (Js S)` initializer. Only one function layer is removed.
+For a plain value use `Hooks.useState (α := String) text` or
+`Hooks.useState (Initial.ofValue text)`; generic `Js T` values follow the same rule.
+There is no universal value fallback: it would silently misclassify unsupported
+functions as stored state. Void-returning or argument-taking functions therefore
+need an explicit state choice or a supported initializer returning the function.
+This is deliberately less automatic than TypeScript inference.
 For example, initialize Lean-backed state only when React calls the initializer:
 
 ```lean
@@ -239,10 +242,9 @@ function-valued state: annotations change types, not React's callable test.
 `Initial.ofValue` and `Initial.ofInitializer` remain explicit identity widenings
 for generic code. There is no automatic thunk insertion or input conversion.
 
-The four constrained entry points (`useState`, `Root.render`, `createElement`,
-`fragment`) currently forward through non-inlined Lean definitions to private
-generated imports. This adds a Lean call, not a JS call or runtime dictionary;
-the casts and membership proofs erase.
+These constrained operations are direct generated host imports. Their leading
+type and proof arguments are erased slots skipped by the host boundary, not
+runtime dictionaries or JavaScript arguments. No forwarding functions are needed.
 
 Project native state/reducer tuples with `Js.Tuple2.first` and `second`; no Lean
 state record is constructed. Invoke their native functions with

@@ -221,7 +221,7 @@ def GoalCardBody
     (HypothesisRowComponent : Lean.Vir.React.FunctionComponent
       (Lean.Vir.React.Props.WithData HypothesisProps)) : ReactM (Js Lean.Vir.React.Node) := do
   let initialCollapsed ← JsValue.ofBool false
-  let collapsedState ← Lean.Vir.React.Hooks.useState initialCollapsed
+  let collapsedState ← Lean.Vir.React.Hooks.useState (α := Bool) initialCollapsed
   let collapsedValue ← Js.Tuple2.first collapsedState
   let collapsedSetter ← Js.Tuple2.second collapsedState
   let collapsed ← JsValue.toBool collapsedValue

@@ -78,9 +78,11 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; in
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.useState"]
-private opaque useStateNative
+opaque useState
     {α : Type}
-    (initial : @& Lean.Vir.Js (Lean.Vir.React.Initial.Value α)) :
+    {β : Type}
+    [Lean.Vir.React.Initial.Accepts β α]
+    (initial : @& Lean.Vir.Js β) :
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
 
 /--
@@ -169,10 +171,12 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; el
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.createElement"]
-private opaque createElementNative
+opaque createElement
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (elementType : @& Lean.Vir.Js Lean.Vir.React.ElementType)
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js.Array α) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 /--
@@ -187,9 +191,11 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; pr
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.fragment"]
-private opaque fragmentNative
+opaque fragment
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
-    (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js.Array α) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
 end React.Node
@@ -302,9 +308,11 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): root js-resource/
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.root.renderNode"]
-private opaque renderNative
+opaque render
+    {α : Type}
+    [Lean.Vir.React.Node.Shape α]
     (root : @& Lean.Vir.Js Lean.Vir.React.Root)
-    (children : @& Lean.Vir.Js Lean.Vir.React.Node) :
+    (children : @& Lean.Vir.Js α) :
     Lean.Vir.Browser.DomM Unit
 
 /--
