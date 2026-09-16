@@ -35,9 +35,8 @@ def FunctionComponent.ofLean
 namespace Node
 
 /-- Views the exact native string as a text node, without a host call. -/
-@[inline] def text (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node) := by
-  unfold Lean.Vir.Js at *
-  exact pure value
+@[inline] def text (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node) :=
+  pure (ofJs value)
 
 @[inline] private def componentProps {α : Type}
     (props : Lean.Vir.Js α) : Lean.Vir.Js Props := by

@@ -141,14 +141,53 @@ example (value : Js String) : React.ReactM (Js React.Node) :=
   <span title={value}>{React.Node.text value}</span>
 
 -- Native children are inserted unchanged, not converted to Lean collections.
+example [React.Node.Shape α] (value : Js α) : Js React.Node := React.Node.ofJs value
+
+example [React.Node.Shape α] (value : Js α) :
+    Js.erase (React.Node.ofJs value) = Js.erase value := rfl
+
+example (root : Js React.Root) (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) :
+    DomM Unit := React.Root.render root (React.Node.ofJs values)
+
+example (node : Js React.Node) (text : Js String) (number : Js Float) (bigint : Js Nat)
+    (flag : Js Bool) (absent : Js.Undefined) : True := by
+  have _ := React.Node.ofJs node
+  have _ := React.Node.ofJs text
+  have _ := React.Node.ofJs number
+  have _ := React.Node.ofJs bigint
+  have _ := React.Node.ofJs flag
+  have _ := React.Node.ofJs absent
+  trivial
+
+example (_object : Js.Object) (_any : Js.Any) (_lean : JSL String)
+    (_pending : Js.Promise String) (_fn : Js.Function0 (Js String))
+    (_values : Array (Js React.Node)) (_action : RuntimeM (Js String)) : True := by
+  fail_if_success have _ := React.Node.ofJs _object
+  fail_if_success have _ := React.Node.ofJs _any
+  fail_if_success have _ := React.Node.ofJs _lean
+  fail_if_success have _ := React.Node.ofJs _pending
+  fail_if_success have _ := React.Node.ofJs _fn
+  fail_if_success have _ := React.Node.ofJs _values
+  fail_if_success have _ := React.Node.ofJs _action
+  trivial
+
+example : True := by
+  fail_if_success have _ : React.Node.Shape Js.Object.Value := inferInstance
+  trivial
+
 example (node : Js React.Node) (text : Js String) (nodes : Js.Array React.Node) :
     React.ReactM (Js React.Node) := <div>{node}{text}{nodes}</div>
 
 example (node : Js React.Node) :
-    (<div>{node}</div> : React.ReactM (Js React.Node)) = <div>{pure node}</div> := rfl
+    (<div>{node}</div> : React.ReactM (Js React.Node)) =
+      <div>{React.Node.ofJs node}</div> := rfl
 
 example (text : Js String) :
-    (<div>{text}</div> : React.ReactM (Js React.Node)) = <div>{React.Node.text text}</div> := rfl
+    (<div>{text}</div> : React.ReactM (Js React.Node)) =
+      <div>{React.Node.ofJs text}</div> := rfl
+
+example [React.Node.Shape α] (value : Js α) : React.ReactM (Js React.Node) :=
+  <div>{value}</div>
 
 example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
   <div>{action}</div>

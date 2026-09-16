@@ -238,6 +238,10 @@ def nativePrimitiveChildren (node : Js.Nullable Node) (absent : Js.Undefined)
     (nested : Js.Array (Js.Nullable.Value String)) : Html :=
   <div>{node}{absent}{flag}{number}{bigint}{nested}</div>
 
+/-- Ordinary calls share JSX's node membership without inspecting native arrays. -/
+def nativeNodeArray (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) :
+    Js Node := Node.ofJs values
+
 /-- Native map exposes its original index and source array without a callback envelope. -/
 def nativeIndexedMap (values : Js.Array String) : RuntimeM (Js.Array Js.Object.Value) := do
   let render ← Js.Function.ofLean3 fun (value : Js String) (index : Js Float)

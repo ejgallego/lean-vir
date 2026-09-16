@@ -8,6 +8,26 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { typeScriptDiagnostics } from "../support/typescript-probe.mjs";
 
+test("supported explicit node shapes are a subset of pinned ReactNode", () => {
+  const diagnostics = typeScriptDiagnostics(`
+    import type { ReactNode } from "react";
+    declare const node: ReactNode;
+    declare const text: string;
+    declare const number: number;
+    declare const bigint: bigint;
+    declare const flag: boolean;
+    declare const values: Array<Array<string | null> | undefined>;
+    const nodes: ReactNode[] = [node, text, number, bigint, flag, null, undefined, values];
+    // @ts-expect-error arbitrary objects are not nodes
+    const object: ReactNode = { label: "not a node" };
+    // @ts-expect-error unknown requires narrowing
+    const unknown: ReactNode = {} as unknown;
+    // @ts-expect-error a render function is not its result
+    const fn: ReactNode = () => "not a node";
+  `);
+  assert.deepEqual(diagnostics.map(d => d.messageText), []);
+});
+
 test("useState preserves the explicit initial-value/initializer result relationship", async () => {
   const diagnostics = typeScriptDiagnostics(`
     import { useState, type Dispatch, type SetStateAction } from "react";

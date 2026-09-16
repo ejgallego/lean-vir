@@ -138,18 +138,6 @@ elab_rules : term
       throwErrorAt key "JSX key expects a native string, number or bigint, optionally null or undefined"
     return value
 
--- The supported subset of upstream ReactNode, never arbitrary objects or Any.
-private meta partial def isNativeNodeShape (type : Lean.Expr) : Lean.MetaM Bool := do
-  let type ← Lean.Meta.whnf type
-  if #[``Lean.Vir.React.Node, ``String, ``Float, ``Nat, ``Bool,
-      ``Lean.Vir.Js.Undefined.Value].any type.isConstOf then
-    return true
-  for constructor in #[``Lean.Vir.Js.Array.Value, ``Lean.Vir.Js.Nullable.Value,
-      ``Lean.Vir.Js.UndefinedOr.Value] do
-    if type.isAppOfArity constructor 1 then
-      return ← isNativeNodeShape type.appArg!
-  return false
-
 elab_rules : term
   | `(vir_native_child% $child) => do
     let value ← Lean.Elab.Term.elabTerm child none
@@ -158,15 +146,7 @@ elab_rules : term
     let node := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) (Lean.mkConst ``Lean.Vir.React.Node)
     let action := Lean.mkApp (Lean.mkConst ``Lean.Vir.React.ReactM) node
     let lowered ← if type.isAppOfArity ``Lean.Vir.Js 1 then do
-        let shape ← Lean.Meta.whnf type.appArg!
-        unless ← isNativeNodeShape shape do
-          throwErrorAt child "JSX expects a native React node shape (node, string, number, bigint, boolean, undefined, or supported nullable/array shape)"
-        if shape.isConstOf ``Lean.Vir.React.Node then
-          Lean.Elab.liftMacroM `(pure $valueSyntax)
-        else if shape.isConstOf ``String then
-          Lean.Elab.liftMacroM `(Lean.Vir.React.Node.text $valueSyntax)
-        else
-          Lean.Elab.liftMacroM do `(pure $(← phantomCast valueSyntax))
+        Lean.Elab.liftMacroM `(pure (Lean.Vir.React.Node.ofJs $valueSyntax))
       else
         let shape ← Lean.Meta.mkFreshTypeMVar
         let result := Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) shape

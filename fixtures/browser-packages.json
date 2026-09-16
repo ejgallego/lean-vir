@@ -167,6 +167,7 @@
             "ProofWidgetsJsxSubset.nativeChildSlots",
             "ProofWidgetsJsxSubset.nativeMappedChildren",
             "ProofWidgetsJsxSubset.nativePrimitiveChildren",
+            "ProofWidgetsJsxSubset.nativeNodeArray",
             "ProofWidgetsJsxSubset.nativeIndexedMap",
             "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]

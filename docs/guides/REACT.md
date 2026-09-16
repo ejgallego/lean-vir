@@ -130,6 +130,20 @@ Arbitrary objects and `Js.Any` are not implicitly narrowed to nodes. A native ar
 occupies one child slot; JSX does not flatten it or add a fragment. Existing
 child actions still run left-to-right and may return any supported native shape.
 Lean arrays (including arrays of actions) are not JSX children.
+Ordinary calls use the same membership rule explicitly:
+
+```lean
+def renderLabels (root : Js Root) (values : Js.Array String) : DomM Unit :=
+  Root.render root (Node.ofJs values)
+```
+
+`Node.ofJs` is an inline identity with closed, erased `Node.Shape` evidence;
+it makes no host call and does not copy or traverse arrays. JSX uses this same
+rule. Generic code can require `[Node.Shape α]`; no implicit coercion or general
+union inference is introduced. This checks declared shapes, not foreign payloads
+or later mutations through aliases. Promises and arbitrary iterables from the
+broader TypeScript `ReactNode` union are not included in this subset.
+
 Use native mapping directly:
 
 ```lean

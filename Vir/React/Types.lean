@@ -131,6 +131,35 @@ end Props
 values accepted by React, not only `ReactElement` objects. -/
 opaque Node : Type
 
+namespace Node
+
+/-- Closed evidence for the supported native `ReactNode` shapes. This proposition
+is erased; it neither validates a JavaScript value nor converts a Lean value. -/
+class inductive Shape : Type → Prop where
+  | node : Shape Node
+  | string : Shape String
+  | number : Shape Float
+  | bigint : Shape Nat
+  | boolean : Shape Bool
+  | undefined : Shape Lean.Vir.Js.Undefined.Value
+  | array {α : Type} : Shape α → Shape (Lean.Vir.Js.Array.Value α)
+  | nullable {α : Type} : Shape α → Shape (Lean.Vir.Js.Nullable.Value α)
+  | optional {α : Type} : Shape α → Shape (Lean.Vir.Js.UndefinedOr.Value α)
+
+attribute [instance] Shape.node Shape.string Shape.number Shape.bigint Shape.boolean Shape.undefined
+
+instance [shape : Shape α] : Shape (Lean.Vir.Js.Array.Value α) := .array shape
+instance [shape : Shape α] : Shape (Lean.Vir.Js.Nullable.Value α) := .nullable shape
+instance [shape : Shape α] : Shape (Lean.Vir.Js.UndefinedOr.Value α) := .optional shape
+
+/-- Widens a supported native value to `ReactNode` without changing its identity,
+allocating, or traversing arrays. There is no implicit coercion. -/
+@[inline] def ofJs [Shape α] (value : @& Lean.Vir.Js α) : Lean.Vir.Js Node := by
+  unfold Lean.Vir.Js at *
+  exact value
+
+end Node
+
 /-- A native function component receiving JavaScript props directly from React. -/
 abbrev FunctionComponent (props : Type) :=
   Lean.Vir.Js.Function1 (Lean.Vir.Js props) (Lean.Vir.Js Node)

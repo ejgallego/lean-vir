@@ -200,6 +200,16 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     fixtures.append(arrayContainer);
     const arrayRoot = createRoot(arrayContainer);
     try {
+      const directValues = Object.freeze(["direct", null, , undefined, " array"]);
+      const directNode = runtime.call("ProofWidgetsJsxSubset.nativeNodeArray", directValues);
+      check(directNode === directValues && !(2 in directValues),
+        "explicit Node.ofJs preserves the exact frozen native array and holes");
+      const unread = new Proxy([], { get() { throw new Error("node widening read its payload"); } });
+      check(runtime.call("ProofWidgetsJsxSubset.nativeNodeArray", unread) === unread,
+        "explicit Node.ofJs does not traverse or inspect native arrays");
+      await React.act(async () => arrayRoot.render(directNode));
+      check(arrayContainer.textContent === "direct array",
+        "official React accepts the widened array directly outside JSX");
       await React.act(async () => arrayRoot.render(primitives));
       check(arrayContainer.textContent === "07native",
         "official React renders native primitive/empty children without VIR formatting");
