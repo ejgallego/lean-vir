@@ -106,7 +106,7 @@ test("the relationship follows the upstream binder, not its spelling", () => {
 });
 
 test("Lean element parameters cannot shadow fixed primitive types", () => {
-  for (const name of ["Float", "String", "Unit"]) {
+  for (const name of ["Float", "String", "Bool", "Unit"]) {
     const policy = JSON.parse(JSON.stringify(generation).replaceAll("α", name));
     assert.throws(() => render(policy), /type parameter .* shadows a fixed Lean type/u);
   }

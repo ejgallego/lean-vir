@@ -52,7 +52,7 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
   // Reject capture before textual comparison; renaming a binder to Float must
   // not turn Array.push's numeric result into its caller-selected element type.
   for (const parameter of parameters) {
-    require(!["Float", "String", "Unit"].includes(parameter),
+    require(!["Float", "String", "Bool", "Unit"].includes(parameter),
       `type parameter ${parameter} shadows a fixed Lean type; choose a distinct name`);
   }
   const jsType = (inner) => ({
