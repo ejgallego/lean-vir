@@ -19,6 +19,8 @@ test("native function subsets match pinned React effect, reducer and state-actio
     const nativeReducer: Reducer<string, boolean> = reducer;
     setter("next");
     setter(update);
+    declare const pending: Promise<string>;
+    pending.then(setter);
     const empty: EffectCallback = () => undefined;
     const withCleanup: EffectCallback = () => cleanup;
     // @ts-expect-error setup cannot return a string

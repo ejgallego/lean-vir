@@ -159,7 +159,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /nakedReactRootIdentity/,
     /JavaScript object marker `Lean\.Vir\.React\.Root` must appear under `Lean\.Vir\.Js`/,
     /nakedStateSetterIdentity/,
-    /unsupported type `Lean\.Vir\.Js\.Function\.Unary Nat Unit`/,
+    /unsupported type `Lean\.Vir\.Js\.Function\.Unary \(Lean\.Vir\.Js \(Lean\.Vir\.React\.SetStateAction\.Value Nat\)\) Unit`/,
     /nakedPropsIdentity/,
     /unsupported type `Lean\.Vir\.Js\.Object\.Value`/,
   ], [
