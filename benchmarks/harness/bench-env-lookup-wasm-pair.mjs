@@ -98,7 +98,13 @@ const packageLoad = sampleBenchmarkCandidates({
 
 for (const state of states) state.runtime.dispose();
 if (!execution.passed || !packageLoad.passed) {
-  throw new Error("paired environment lookup checksum parity failed");
+  const failures = Object.entries({ execution, packageLoad })
+    .filter(([, sample]) => !sample.passed)
+    .flatMap(([phase, sample]) => Object.values(sample.candidates).map(
+      ({ id, checksum, stable, errors }) =>
+        `${phase}/${id}: ${JSON.stringify({ checksum, stable, errors })}`,
+    ));
+  throw new Error(`paired environment lookup checksum parity failed\n${failures.join("\n")}`);
 }
 const runtimeEnvironmentIdentity = {
   node: process.version,
@@ -293,7 +299,7 @@ function callRaw(runtime, entry, slot) {
   const resultObj = runtime.exports.vir_call_resolved_objects(slot, 0, 0);
   if (resultObj === 0) throw new Error(runtime.lastCallError() || `${entryName} failed`);
   try {
-    return Number(runtime.liftOwnedObjectValue(entry.result, resultObj, `${entryName} result`));
+    return Number(runtime.liftObjectValue(entry.result, resultObj, `${entryName} result`));
   } finally {
     runtime.exports.vir_obj_dec(resultObj);
   }

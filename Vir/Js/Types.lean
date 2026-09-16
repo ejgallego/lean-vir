@@ -79,6 +79,12 @@ end UndefinedOr
 
 namespace Function
 
+/-- Exact zero-argument JavaScript function; `result` is its Lean boundary view. -/
+opaque Nullary (result : Type) : Type
+
+/-- Exact binary JavaScript function; parameters describe Lean boundary views. -/
+opaque Binary (first second result : Type) : Type
+
 /--
 Phantom shape for an exact unary JavaScript function.
 
@@ -98,6 +104,14 @@ changes its native invocation arity.
 opaque Ternary (first second third result : Type) : Type
 
 end Function
+
+/-- Exact zero-argument JavaScript function with a statically described result. -/
+abbrev Function0 (result : Type) : Type :=
+  Lean.Vir.Js (Function.Nullary result)
+
+/-- Exact binary JavaScript function with statically described arguments and result. -/
+abbrev Function2 (first second result : Type) : Type :=
+  Lean.Vir.Js (Function.Binary first second result)
 
 /-- Exact unary JavaScript function with a statically described call shape. -/
 abbrev Function1 (argument result : Type) : Type :=

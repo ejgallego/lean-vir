@@ -10,6 +10,7 @@ import * as React from "react";
 import { createHostLifecycle } from "../../web/src/host/vir-active-host-bindings.js";
 import { createReactRootHostBindings } from "../../web/src/react/vir-react-root.js";
 import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
+import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
 
 const lifecycle = createHostLifecycle();
 const reactBindings = createBrowserReactHostBindings(lifecycle);
@@ -87,29 +88,36 @@ assert.equal(React.isValidElement(fragment), true);
 assert.equal(fragment.type, React.Fragment);
 
 {
-  const conversions = reactBindings;
+  const conversions = createJsCollectionHostBindings();
   const property = { name: "title", value: { kind: "string", value: "proof" } };
   const reducer = (state, action) => ({ state, action });
   const calculate = () => property;
-  assert.equal(conversions["js.value.react.reducer"](reducer), reducer);
+  assert.equal(conversions["js.value.function.binary"](reducer), reducer);
   assert.equal(
-    conversions["js.value.react.memoCalculation"](calculate),
+    conversions["js.value.function.nullary"](calculate),
     calculate,
   );
-  assert.equal(conversions["js.value.react.callback"](callback), callback);
-  const setup = () => property;
-  const cleanup = (value) => value;
-  const effect = conversions["js.value.react.effectCallback"]({
-    setup,
-    cleanup,
-  });
-  assert.equal(effect()(), property);
+  assert.equal(conversions["js.value.function.unaryVoid"](callback), callback);
+  let cleaned;
+  const cleanup = conversions["js.value.function.nullaryVoid"](() => { cleaned = property; });
+  const setup = () => cleanup;
+  const effect = conversions["js.value.function.nullary"](setup);
+  assert.equal(effect, setup);
+  assert.equal(effect(), cleanup, "setup returns the exact cleanup function");
+  assert.equal(effect()(), undefined);
+  assert.equal(cleaned, property);
+  const noCleanup = () => undefined;
+  assert.equal(conversions["js.value.function.nullary"](noCleanup)(), undefined);
+  for (const target of ["js.value.react.reducer", "js.value.react.memoCalculation",
+    "js.value.react.callback", "js.value.react.effectCallback", "react.state.modify"]) {
+    assert.equal(Object.hasOwn(reactBindings, target), false);
+  }
 }
 
 {
   let queuedUpdate = null;
   const update = (previous) => ({ previous });
-  reactBindings["react.state.modify"]((action) => {
+  createJsCollectionHostBindings()["js.function.callVoid"]((action) => {
     queuedUpdate = action;
   }, update);
   assert.equal(

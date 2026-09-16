@@ -9,33 +9,38 @@ import test from "node:test";
 
 import { createBenchmarkHostBindings } from "../../benchmarks/harness/bench-host-bindings.mjs";
 
-test("benchmark callbacks use the exact self-owning function contract", () => {
-  const released = [];
-  const bindings = createBenchmarkHostBindings((callback) =>
-    released.push(callback),
-  );
+test("benchmark callbacks remain ordinary callable functions", () => {
+  const bindings = createBenchmarkHostBindings();
   const callback = Object.freeze((value) => value + 7n);
 
   assert.equal(bindings["test.callNatCallback"](5n, callback), 12n);
-  assert.deepEqual(released, [callback]);
+  assert.equal(callback(6n), 13n);
   assert.deepEqual(Object.keys(callback), []);
   assert.equal(Object.hasOwn(callback, "release"), false);
 });
 
-test("benchmark callbacks release their root after failure", () => {
-  const released = [];
-  const bindings = createBenchmarkHostBindings((callback) =>
-    released.push(callback),
-  );
+test("benchmark callbacks preserve thrown values without a release protocol", () => {
+  const bindings = createBenchmarkHostBindings();
+  const failure = { reason: "callback failed" };
   const callback = () => {
-    throw new Error("callback failed");
+    throw failure;
   };
 
   assert.throws(
     () => bindings["test.callNatCallback"](5n, callback),
-    /callback failed/,
+    error => error === failure,
   );
-  assert.deepEqual(released, [callback]);
+  assert.throws(callback, error => error === failure);
+});
+
+test("benchmark callbacks preserve native argument and result identity", () => {
+  const bindings = createBenchmarkHostBindings();
+  const input = {};
+  const result = {};
+  assert.equal(bindings["test.callNatCallback"](input, value => {
+    assert.equal(value, input);
+    return result;
+  }), result);
 });
 
 test("the benchmark no-op host binding preserves undefined", () => {

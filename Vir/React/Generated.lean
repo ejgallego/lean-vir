@@ -14,48 +14,6 @@ public section
 
 namespace Lean.Vir
 
-namespace React.Callback
-
-/--
-Generated binding for reviewed VIR protocol `react.callback.of-unary`.
-
-Explicitly converts a transferred Lean unary callback into an ordinary JavaScript function.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.callback"]
-opaque ofUnary
-    {α : Type}
-    (callback : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Callback α))
-
-end React.Callback
-
-namespace React.EffectCallback
-
-/--
-Generated binding for reviewed VIR protocol `react.effect-callback.of-lean`.
-
-Explicitly converts separate transferred Lean setup and cleanup callbacks into the ordinary JavaScript setup function shape accepted by React.useEffect.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; effect lean-owned/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.effectCallback"]
-opaque ofLean
-    {α : Type}
-    (effect : Lean.Vir.React.LeanEffect α) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js Lean.Vir.React.EffectCallback)
-
-end React.EffectCallback
-
 namespace React.Hooks
 
 /--
@@ -197,27 +155,6 @@ opaque useContext
 
 end React.Hooks
 
-namespace React.MemoCalculation
-
-/--
-Generated binding for reviewed VIR protocol `react.memo-calculation.of-lean`.
-
-Explicitly converts a transferred Lean calculation into an ordinary zero-argument JavaScript function.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; calculate callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.memoCalculation"]
-opaque ofLean
-    {α : Type}
-    (calculate : Lean.Vir.React.ReactM (Lean.Vir.Js α)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.MemoCalculation α))
-
-end React.MemoCalculation
-
 namespace React.Node
 
 /--
@@ -312,28 +249,6 @@ opaque data
 
 end React.Props.WithData
 
-namespace React.Reducer
-
-/--
-Generated binding for reviewed VIR protocol `react.reducer.of-lean`.
-
-Explicitly converts a transferred Lean reducer callback into an ordinary JavaScript function; React remains responsible for invocation and replay semantics.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; reducer callback/owned/until-release; result js-resource/owned.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js_explicit_conversion "js.value.react.reducer"]
-opaque ofLean
-    {state : Type}
-    {action : Type}
-    (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js (Lean.Vir.React.Reducer state action))
-
-end React.Reducer
-
 namespace React.Ref
 
 /--
@@ -427,27 +342,5 @@ opaque create
     Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)
 
 end React.Root
-
-namespace React.StateSetter
-
-/--
-Generated binding for reviewed VIR protocol `react.state.modify`.
-
-Passes the Lean updater as React's functional state action; React may invoke it according to normal updater semantics.
-
-Binding contract: `generation.protocolOperations`.
-
-ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; setter js-resource/borrowed/call; update callback/owned/until-release; result immediate/value.
-
-This declaration is generated; edit the binding configuration.
--/
-@[vir_js "react.state.modify"]
-opaque modify
-    {α : Type}
-    (setter : @& Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js α)))
-    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
-    Lean.Vir.RuntimeM Unit
-
-end React.StateSetter
 
 end Lean.Vir

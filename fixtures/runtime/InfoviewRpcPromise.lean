@@ -69,9 +69,13 @@ def recover
 /-- Pass an exact native state-setter-shaped function to native `Promise.then`. -/
 def settleIntoState
     (pending : Lean.Vir.Js.Promise Response)
-    (setter : Lean.Vir.Js (Lean.Vir.React.StateSetter (Lean.Vir.Js Response))) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value) :=
-  Lean.Vir.Js.Promise.thenVoid pending setter
+    (setter : Lean.Vir.Js (Lean.Vir.React.StateSetter Response)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js.Promise Lean.Vir.Js.Undefined.Value) := do
+  -- A React setter accepts values or updaters; this Promise supplies only values.
+  let fulfill : Lean.Vir.Js.Function1 (Lean.Vir.Js Response) Unit := by
+    unfold Lean.Vir.Js.Function1 Lean.Vir.React.StateSetter Lean.Vir.Js at *
+    exact setter
+  Lean.Vir.Js.Promise.thenVoid pending fulfill
 
 /-- Expose native Promise assimilation without a VIR scheduler or wrapper. -/
 def thenPromiseExact

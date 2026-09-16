@@ -27,12 +27,14 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 def Counter : RuntimeM (FunctionComponent Props) := FunctionComponent.ofLean fun _ => do
   let initial ← JsValue.ofNat 0
-  let count ← StateTuple.toState (← Hooks.useState initial)
-  let value ← JsValue.toNat count.value
-  let increment ← Callback.ofUnary fun (_ : Js Browser.Event) => do
-    State.modify count fun previous => do
+  let count ← Hooks.useState initial
+  let value ← JsValue.toNat (← Js.Tuple2.first count)
+  let setter ← Js.Tuple2.second count
+  let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+    let update ← Js.Function.ofLean fun previous => do
       let current ← JsValue.toNat previous
       JsValue.ofNat (current + 1)
+    Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
   return ← <button type="button" onClick={increment}>
     {Node.text (← JsValue.ofString s!"Count: {value}")}
   </button>

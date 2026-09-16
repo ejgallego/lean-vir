@@ -13,6 +13,7 @@ public section
 namespace Vir.Fixtures.ShellLifetime
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Browser
+open scoped Lean.Vir.Js
 
 -- Test-only host observations. The state and stale branch live in Lean.
 @[vir_js "test.shell.label"]
@@ -53,11 +54,13 @@ def createComponent : RuntimeM (FunctionComponent Lean.Vir.Infoview.PanelWidgetP
     (← EventListener.ofLean (schedule owner)) (← LeanRef.toJSL owner)
   FunctionComponent.ofLean fun _ => do
     context
-    let effect ← EffectCallback.ofLean {
-      setup := do record ("setup:" ++ owner); JsValue.ofString owner
-      cleanup := fun _ => do stale.set true; record ("cleanup:" ++ owner)
-    }
-    Hooks.useEffect effect (Js.UndefinedOr.ofJs (← Hooks.DependencyList.empty))
+    let effect ← Js.Function.ofLean0 do
+      record ("setup:" ++ owner)
+      let cleanup ← Js.Function.ofLean0Void do
+        stale.set true
+        record ("cleanup:" ++ owner)
+      pure (Js.UndefinedOr.ofJs cleanup)
+    Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[]))
     Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
       (← Js.Object.empty) (← Js.Array.ofArray #[← Node.text (← JsValue.ofString owner)])
 

@@ -150,6 +150,58 @@ end Js.Construction
 namespace Js.Function
 
 /--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-nullary`.
+
+Converts a Lean action to an exact zero-argument JavaScript function returning its native result.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.nullary"]
+opaque ofLean0
+    {α : Type}
+    (callback : RuntimeM (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js.Function0 (Lean.Vir.Js α))
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-nullaryVoid`.
+
+Converts a Lean action to an exact zero-argument JavaScript function returning undefined.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.nullaryVoid"]
+opaque ofLean0Void
+    (callback : RuntimeM Unit) :
+    RuntimeM (Lean.Vir.Js.Function0 Unit)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-binary`.
+
+Converts a Lean binary callback to an exact JavaScript function with the same argument and result shapes.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.binary"]
+opaque ofLean2
+    {α : Type}
+    {β : Type}
+    {γ : Type}
+    (callback : Lean.Vir.Js α → Lean.Vir.Js β → RuntimeM (Lean.Vir.Js γ)) :
+    RuntimeM (Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ))
+
+/--
 Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary`.
 
 Explicitly converts a transferred Lean unary callback into an ordinary JavaScript function with the same call shape.

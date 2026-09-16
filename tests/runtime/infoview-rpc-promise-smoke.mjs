@@ -230,12 +230,17 @@ try {
     const latePromise = new Promise((resolve) => {
       resolveAfterDispose = resolve;
     });
+    const nativeSetter = (value) => {
+      stateUpdates.push(value);
+    };
+    latePromise.then = function (...args) {
+      assert.equal(args[0], nativeSetter, "setter narrowing must preserve function identity");
+      return Reflect.apply(Promise.prototype.then, this, args);
+    };
     const lateChain = runtime.call(
       "Vir.Fixtures.InfoviewRpcPromise.settleIntoState",
       latePromise,
-      (value) => {
-        stateUpdates.push(value);
-      },
+      nativeSetter,
     );
     // Contrast native continuations with explicitly converted Lean closures.
     // Disposal invalidates the Lean closure before it could inspect a stale flag.

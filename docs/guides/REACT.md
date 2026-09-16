@@ -53,7 +53,7 @@ def greeting (name : Js String) : ReactM (Js Node) := do
 
 Attributes accept exact JS values; literal strings are converted once. Use
 native names such as `aria-label` and `data-testid`. Events take native
-functions, so convert a Lean closure explicitly with `Callback.ofUnary`.
+functions, so convert a Lean closure explicitly with `Js.Function.ofLeanVoid`.
 There are no per-attribute or per-tag helper catalogues.
 
 In native object fields, native arrays and JSX attributes, `js#"text"` inserts
@@ -200,20 +200,32 @@ failed unmount remains available for runtime cleanup. See
 ## Hooks, refs and events
 
 Hooks receive exact JavaScript inputs and return React's chosen values.
-`StateTuple.toState` and `ReducerTuple.toState` are explicit Lean projections of
-the native result arrays, not alternative state implementations. State setters
-and reducer dispatchers remain React's functions.
+Project native state/reducer tuples with `Js.Tuple2.first` and `second`; no Lean
+state record is constructed. Invoke their native functions with
+`Js.Function.callVoid`. A state setter accepts `SetStateAction.ofValue value`
+or `SetStateAction.ofUpdater update`: both are identity widenings of the native
+value or function. Passing a function as a value still follows React's updater
+semantics; to store a function, return it from an updater.
 
-Convert Lean closures explicitly with `Reducer.ofLean`, `MemoCalculation.ofLean`
-or `Callback.ofUnary`. `EffectCallback.ofLean` creates React's setup function
-from a `{ setup, cleanup }` record. Pass that function to `Hooks.useEffect`;
-a native function needs no conversion. Its dependency argument is
+Convert Lean functions with the generic `Js.Function.ofLean0`, `ofLean2` and
+`ofLeanVoid` operations for calculations, reducers and event callbacks.
+An effect setup is a zero-argument function returning native `undefined` or a
+zero-argument cleanup function. Construct the latter with `ofLean0Void`, close
+over setup locals directly, and widen it with `Js.UndefinedOr.ofJs`; there is no
+split setup/cleanup record or intermediate JSL payload. Native functions need
+no conversion. The `Hooks.useEffect` dependency argument is
 `Js.UndefinedOr React.DependencyList`, the native `DependencyList | undefined`
 union, not a Lean `Option`. Pass `(← Js.UndefinedOr.undefined)` to run after
 each commit, or `Js.UndefinedOr.ofJs deps` for the exact array. An empty array
 does not request reruns on updates; development Strict Mode can replay setup.
 `DependencyList` corresponds to TypeScript's `readonly unknown[]`; VIR uses the
 native JS array shape, so callers must not mutate it while React retains it.
+Construct dependency arrays directly with `js#[Js.erase value, ...]`, without
+an intermediate Lean array.
+
+For callback bodies using the opaque browser effect, `DomM.toRuntime` explicitly
+views the browser action as a generic runtime action. It is an inline identity;
+it does not schedule, wrap or execute the callback.
 
 Refs are the actual callback or `{ current }` object; React can write a DOM node
 or `null` to `current`. Event props store the exact handler function and receive
@@ -238,9 +250,9 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
-| `useState(initial)` | Returns the exact state/setter array; `State.set` and `State.modify` offer value and functional-update conveniences. |
+| `useState(initial)` | Exact state/setter array for a non-function initial value; the typed lazy-initializer form is not exposed (see below). Project with `Js.Tuple2` and call the setter with a native `SetStateAction`. |
 | `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
-| `dispatch(action)` | `ReducerDispatch.dispatch` passes the exact action. |
+| `dispatch(action)` | `Js.Function.callVoid` passes the exact action to the native dispatch function. |
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |
 | `useEffect(setup, dependencies?)` | Exact setup function, with omitted or exact JS dependency array. Lean setup/cleanup conversion is separate. |
 | `useMemo(calculate, deps)` | Exact calculation and dependency array; returns React's selected value. |
@@ -248,8 +260,15 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `useContext(context)` | Exact consumer context; context creation/provider bindings are not exposed. |
 | `useId()` | `Hooks.useId : ReactM (Js String)` returns React's exact accessibility ID, without string conversion or a VIR ID registry. |
 
-Dependencies can contain arbitrary `Js` values; `DependencyList` helpers
-explicitly build the JavaScript array. React compares its entries as usual.
+The current `useState` signature takes `Js α` and returns state of shape `α`;
+it does not represent TypeScript's `S | (() => S)` initializer relationship.
+React still invokes a function passed as the initial argument, so its stored
+result need not match that function's phantom type. Use a non-function initial
+value with this surface; typed lazy initialization and function-valued
+initialization are not currently exposed.
+
+Dependencies are native arrays of arbitrary `Js` values, constructed with
+`js#[...]`. React compares their entries as usual.
 Root options, reducer initialization and broader context/external-library
 bindings are not exposed. External components use the host's React instance.
 
@@ -262,8 +281,9 @@ options such as `identifierPrefix`.
 `lean-vir/react-host-bindings` installs the official browser React/ReactDOM
 providers separately from the generic runtime. The code in
 [`web/src/react/`](../../web/src/react) calls public React APIs; it contains no
-copied reconciler or hook implementation. Its extra JS implements explicit
-explicit application-data property access, effect conversion and browser-root lifecycle.
+copied reconciler or hook implementation. Additional providers implement
+application-data property access and browser-root lifecycle. Lean closure
+conversion belongs to the generic function bridge, not a React effect adapter.
 The [object ABI](../reference/OBJECT_ABI.md#externref-and-foreign-values) explains the Wasm
 transport; it is not another React API.
 

@@ -35,75 +35,91 @@ def selectTextareaLabel (note flavor : String) : String :=
 
 def inputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let name ← StateTuple.toState (← Hooks.useState (← js#""))
-    let change ← Callback.ofUnary fun event => do
+    let name ← Hooks.useState (← js#"")
+    let nameValue ← Js.Tuple2.first name
+    let nameSetter ← Js.Tuple2.second name
+    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       match ← Browser.Event.inputElement? event with
       | none => pure ()
-      | some input => State.set name (← Browser.HTMLInputElement.getValue input)
+      | some input => do
+        Js.Function.callVoid nameSetter
+          (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getValue input))
     return ← <div id="react-input-widget">
       <label htmlFor="react-name-input">name:</label>
-      <input id="react-name-input" type="text" value={name.value} placeholder="name" onInput={change} />
-      <span id="react-name-output">{Node.text name.value}</span>
+      <input id="react-name-input" type="text" value={nameValue} placeholder="name" onInput={change} />
+      <span id="react-name-output">{Node.text nameValue}</span>
     </div>
 
 def changeInputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let value ← StateTuple.toState (← Hooks.useState (← js#""))
-    let change ← Callback.ofUnary fun event => do
+    let value ← Hooks.useState (← js#"")
+    let valueValue ← Js.Tuple2.first value
+    let valueSetter ← Js.Tuple2.second value
+    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       Browser.Event.preventDefault event
       Browser.Event.stopPropagation event
       match ← Browser.Event.inputElement? event with
       | none => pure ()
-      | some input => State.set value (← Browser.HTMLInputElement.getValue input)
-    let submit ← Callback.ofUnary fun event => do
+      | some input => do
+        Js.Function.callVoid valueSetter
+          (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getValue input))
+    let submit ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       Browser.Event.preventDefault event
       Browser.Event.stopPropagation event
     return ← <form id="react-change-widget" onSubmit={submit}>
       <label htmlFor="react-change-input">change:</label>
-      <input id="react-change-input" name="change" type="text" value={value.value}
+      <input id="react-change-input" name="change" type="text" value={valueValue}
         placeholder="change" onChange={change} />
-      <span id="react-change-output">{Node.text value.value}</span>
+      <span id="react-change-output">{Node.text valueValue}</span>
     </form>
 
 def checkboxComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let checked ← StateTuple.toState (← Hooks.useState (← JsValue.ofBool false))
-    let checkedValue ← JsValue.toBool checked.value
-    let change ← Callback.ofUnary fun event => do
+    let checked ← Hooks.useState (← JsValue.ofBool false)
+    let checkedValue ← Js.Tuple2.first checked
+    let checkedSetter ← Js.Tuple2.second checked
+    let checkedLabelValue ← JsValue.toBool checkedValue
+    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       match ← Browser.Event.inputElement? event with
       | none => pure ()
-      | some input => State.set checked (← Browser.HTMLInputElement.getChecked input)
+      | some input => do
+        Js.Function.callVoid checkedSetter
+          (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getChecked input))
     return ← <div id="react-checkbox-widget">
-      <input id="react-checkbox-input" type="checkbox" checked={checked.value} onChange={change} />
+      <input id="react-checkbox-input" type="checkbox" checked={checkedValue} onChange={change} />
       <label id="react-checkbox-output" htmlFor="react-checkbox-input">
-        {Node.text (← JsValue.ofString (checkedLabel checkedValue))}
+        {Node.text (← JsValue.ofString (checkedLabel checkedLabelValue))}
       </label>
     </div>
 
 def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let note ← StateTuple.toState (← Hooks.useState (← js#"draft"))
-    let flavor ← StateTuple.toState (← Hooks.useState (← js#"vanilla"))
-    let noteChange ← Callback.ofUnary fun event => do
+    let note ← Hooks.useState (← js#"draft")
+    let noteValue ← Js.Tuple2.first note
+    let noteSetter ← Js.Tuple2.second note
+    let flavor ← Hooks.useState (← js#"vanilla")
+    let flavorValue ← Js.Tuple2.first flavor
+    let flavorSetter ← Js.Tuple2.second flavor
+    let noteChange ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
       | none => pure ()
-      | some next => State.set note next
-    let flavorChange ← Callback.ofUnary fun event => do
+      | some next => Js.Function.callVoid noteSetter (React.SetStateAction.ofValue next)
+    let flavorChange ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
       match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
       | none => pure ()
-      | some next => State.set flavor next
-    let label := selectTextareaLabel (← JsValue.toString note.value) (← JsValue.toString flavor.value)
+      | some next => Js.Function.callVoid flavorSetter (React.SetStateAction.ofValue next)
+    let label := selectTextareaLabel (← JsValue.toString noteValue) (← JsValue.toString flavorValue)
     return ← <main id="react-select-textarea-widget">
       <nav id="react-select-textarea-nav" aria-label="React textarea fixture">
         <span className="react-select-textarea-section">fields</span>
-        <span className="react-select-textarea-choice">{Node.text flavor.value}</span>
+        <span className="react-select-textarea-choice">{Node.text flavorValue}</span>
       </nav>
       <label htmlFor="react-note-input">note:</label>
-      <textarea id="react-note-input" name="note" value={note.value}
+      <textarea id="react-note-input" name="note" value={noteValue}
         rows={← JsValue.ofFloat 3} cols={← JsValue.ofFloat 24}
         placeholder="note" onChange={noteChange} />
       <label htmlFor="react-flavor-select">flavor:</label>
-      <select id="react-flavor-select" name="flavor" value={flavor.value} onChange={flavorChange}>
+      <select id="react-flavor-select" name="flavor" value={flavorValue} onChange={flavorChange}>
         <option key="vanilla" value="vanilla">vanilla</option>
         <option key="chocolate" value="chocolate">chocolate</option>
         <option key="strawberry" value="strawberry">strawberry</option>
