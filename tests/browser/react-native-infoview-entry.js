@@ -261,6 +261,51 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "a single native text child remains in the Badge subtree");
     await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
     check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      let calls = 0;
+      let initial = "lazy";
+      const initializer = () => { calls++; return initial; };
+      const clicks = [];
+      const handler = value => { clicks.push(value); };
+      const component = runtime.call("ReactCounter.initialProbe", "eager:", initializer, handler);
+      const useState = hostBindings["react.useState"];
+      const seen = [];
+      hostBindings["react.useState"] = argument => {
+        const result = useState(argument);
+        seen.push({ argument, value: result[0] });
+        return result;
+      };
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = calls;
+        check(mountCalls === (strict ? 2 : 1), "React owns lazy initializer replay");
+        const button = container.querySelector("button");
+        check(button.textContent === "eager:lazy" && clicks.length === 0,
+          "initialization stores values and does not call the function-valued state");
+        initial = "changed";
+        await React.act(async () => root.render(render(1)));
+        check(calls === mountCalls && container.querySelector("button") === button &&
+          button.textContent === "eager:lazy", "rerenders preserve state without calling initializers");
+        check(seen.length >= 6 && seen.length % 3 === 0, "each render forwards three native state inputs");
+        for (let index = 0; index < seen.length; index += 3) {
+          check(seen[index].argument === "eager:" && seen[index + 1].argument === initializer,
+            "union membership passes exact eager value and native initializer");
+          check(seen[index + 2].argument !== handler &&
+            typeof seen[index + 2].argument === "function" && seen[index + 2].value === handler,
+          "Lean explicitly constructs a thunk; React stores the original handler");
+        }
+        await React.act(async () => button.click());
+        check(clicks.length === 1 && clicks[0] === "lazy", "stored native function is callable after rerender");
+      } finally {
+        hostBindings["react.useState"] = useState;
+        await React.act(async () => root.unmount());
+      }
+    }
     for (const [entry, id] of [
       ["ReactCounter.mountEffect", "native-effect"],
       ["ReactCounter.mountMemo", "native-memo"],

@@ -33,6 +33,25 @@ opaque Root : Type
 /-- React element type accepted by `React.createElement`. -/
 opaque ElementType : Type
 
+namespace Initial
+
+/-- Native `S | (() => S)`, with no tag or wrapper around the JavaScript value. -/
+opaque Value (α : Type) : Type
+
+/-- Passes the exact value; callable values retain React's initializer semantics. -/
+@[inline] def ofValue (value : Lean.Vir.Js α) : Lean.Vir.Js (Value α) := by
+  unfold Lean.Vir.Js at *
+  exact value
+
+/-- Passes the exact initializer without invoking it. React chooses when to call it. -/
+@[inline] def ofInitializer
+    (initializer : Lean.Vir.Js.Function0 (Lean.Vir.Js α)) :
+    Lean.Vir.Js (Value α) := by
+  unfold Lean.Vir.Js.Function0 Lean.Vir.Js at *
+  exact initializer
+
+end Initial
+
 namespace SetStateAction
 
 /-- Native `S | ((previous: S) => S)`, not a Lean sum or value wrapper. -/

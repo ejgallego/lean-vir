@@ -134,10 +134,10 @@
       {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
         "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
-        "reason": "Passes the initial value unchanged to React.useState and returns React's exact result array.",
+        "reason": "Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
-        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js α", "representation": "js-resource", "resourceInner": "α" } }],
+        "arguments": [{ "name": "initial", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Initial.Value α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Initial.Value α" } }],
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.StateTuple α)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.StateTuple α" } }
       },
       {
@@ -306,7 +306,7 @@
       "id": "hooks",
       "title": "Hooks",
       "targets": ["react.use*"],
-      "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.StateSetter", "Lean.Vir.React.SetStateAction", "Lean.Vir.React.StateTuple"] },
+      "lean": { "public": ["Lean.Vir.React.Hooks", "Lean.Vir.React.Initial", "Lean.Vir.React.ReducerDispatch", "Lean.Vir.React.ReducerTuple", "Lean.Vir.React.StateSetter", "Lean.Vir.React.SetStateAction", "Lean.Vir.React.StateTuple"] },
       "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.DependencyList", "React.Dispatch", "React.Reducer", "React.SetStateAction", "React.useCallback", "React.useContext", "React.useEffect", "React.useId", "React.useMemo", "React.useReducer", "React.useRef", "React.useState"] },
       "mappings": [
         {

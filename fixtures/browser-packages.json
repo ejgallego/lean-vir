@@ -123,6 +123,7 @@
           "module": "fixtures.ReactCounter",
           "roots": [
             "ReactCounter.mount",
+            "ReactCounter.initialProbe",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
             "ReactCounter.renderStaticIntoSelector",

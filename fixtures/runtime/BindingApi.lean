@@ -6,11 +6,42 @@ Author: Emilio J. Gallego Arias
 module
 
 import all Vir.Browser.Types
+import all Vir.Js.Types
+import all Vir.React.Types
 public import Vir.ProofWidgets.Jsx
 
 open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+
+-- Explicit initial-union membership determines state shape without coercions.
+example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState (React.Initial.ofValue value)
+
+example (initializer : Js.Function0 (Js String)) :
+    React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState (React.Initial.ofInitializer initializer)
+
+example (handler : Js.Function1 (Js String) Unit) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Unary (Js String) Unit))) := do
+  let initializer ← Js.Function.ofLean0 (pure handler)
+  React.Hooks.useState (React.Initial.ofInitializer initializer)
+
+example (value : Js String) :
+    Js.erase (React.Initial.ofValue value) = Js.erase value := rfl
+
+example (initializer : Js.Function0 (Js String)) :
+    Js.erase (React.Initial.ofInitializer initializer) = Js.erase initializer := rfl
+
+example (_value : Js String) (_initializer : Js.Function0 (Js String))
+    (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js String)) : True := by
+  fail_if_success have _ := React.Hooks.useState _value
+  fail_if_success have _ := React.Hooks.useState _initializer
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) :=
+    React.Hooks.useState (React.Initial.ofInitializer _initializer)
+  fail_if_success have _ := React.Initial.ofInitializer _void
+  fail_if_success have _ := React.Initial.ofInitializer _unary
+  trivial
 
 -- Native function aliases preserve arity and complete result relationships.
 example (body : RuntimeM (Js String)) : RuntimeM (Js (React.MemoCalculation String)) :=

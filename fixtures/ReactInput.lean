@@ -35,7 +35,7 @@ def selectTextareaLabel (note flavor : String) : String :=
 
 def inputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let name ← Hooks.useState (← js#"")
+    let name ← Hooks.useState (Initial.ofValue (← js#""))
     let nameValue ← Js.Tuple2.first name
     let nameSetter ← Js.Tuple2.second name
     let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
@@ -52,7 +52,7 @@ def inputComponent : RuntimeM (FunctionComponent Props) :=
 
 def changeInputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let value ← Hooks.useState (← js#"")
+    let value ← Hooks.useState (Initial.ofValue (← js#""))
     let valueValue ← Js.Tuple2.first value
     let valueSetter ← Js.Tuple2.second value
     let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
@@ -75,7 +75,7 @@ def changeInputComponent : RuntimeM (FunctionComponent Props) :=
 
 def checkboxComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let checked ← Hooks.useState (← JsValue.ofBool false)
+    let checked ← Hooks.useState (Initial.ofValue (← JsValue.ofBool false))
     let checkedValue ← Js.Tuple2.first checked
     let checkedSetter ← Js.Tuple2.second checked
     let checkedLabelValue ← JsValue.toBool checkedValue
@@ -94,10 +94,10 @@ def checkboxComponent : RuntimeM (FunctionComponent Props) :=
 
 def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let note ← Hooks.useState (← js#"draft")
+    let note ← Hooks.useState (Initial.ofValue (← js#"draft"))
     let noteValue ← Js.Tuple2.first note
     let noteSetter ← Js.Tuple2.second note
-    let flavor ← Hooks.useState (← js#"vanilla")
+    let flavor ← Hooks.useState (Initial.ofValue (← js#"vanilla"))
     let flavorValue ← Js.Tuple2.first flavor
     let flavorSetter ← Js.Tuple2.second flavor
     let noteChange ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do

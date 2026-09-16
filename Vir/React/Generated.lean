@@ -69,7 +69,7 @@ opaque useReducer
 /--
 Generated binding for reviewed VIR protocol `react.hooks.use-state`.
 
-Passes the initial value unchanged to React.useState and returns React's exact result array.
+Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.
 
 Binding contract: `generation.protocolOperations`.
 
@@ -80,7 +80,7 @@ This declaration is generated; edit the binding configuration.
 @[vir_js "react.useState"]
 opaque useState
     {α : Type}
-    (initial : @& Lean.Vir.Js α) :
+    (initial : @& Lean.Vir.Js (Lean.Vir.React.Initial.Value α)) :
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
 
 /--

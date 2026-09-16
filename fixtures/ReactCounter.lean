@@ -20,10 +20,26 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 def label (value : Nat) : String :=
   "react:" ++ toString value
 
+/-- Exercise exact eager values, native initializers, and a Lean thunk storing a function. -/
+def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
+    (handler : Js.Function1 (Js String) Unit) : RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
+    let eagerState ← Hooks.useState (Initial.ofValue eager)
+    let lazyState ← Hooks.useState (Initial.ofInitializer initializer)
+    let thunk ← Js.Function.ofLean0 (pure handler)
+    let functionState ← Hooks.useState (Initial.ofInitializer thunk)
+    let stored ← Js.Tuple2.first functionState
+    let value ← Js.Tuple2.first lazyState
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
+      Js.Function.callVoid stored value
+    return ← <button id="react-initial-probe" onClick={click}>
+      {← Js.Tuple2.first eagerState}{value}
+    </button>
+
 def counter : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← Hooks.useState (Initial.ofValue initial)
     let countValue ← JsValue.toNat (← Js.Tuple2.first count)
     let countSetter ← Js.Tuple2.second count
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label countValue))
@@ -140,7 +156,7 @@ def mountMemo (selector : String) : DomM Bool := do
 def memoStableProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← Hooks.useState (Initial.ofValue initial)
     let countValueJs ← Js.Tuple2.first count
     let countSetter ← Js.Tuple2.second count
     let calculation ← Js.Function.ofLean0 (pure countValueJs)
@@ -172,7 +188,7 @@ def mountMemoStable (selector : String) : DomM Bool := do
 def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState initial
+    let count ← Hooks.useState (Initial.ofValue initial)
     let countValueJs ← Js.Tuple2.first count
     let countSetter ← Js.Tuple2.second count
     let lastClick ← Hooks.useRef initial
