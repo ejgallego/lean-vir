@@ -25,6 +25,12 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   let mapElementProbe = null;
   let lastMap;
   let mapCalls = 0;
+  let fragmentChildren;
+  const fragment = hostBindings["react.node.fragment"];
+  hostBindings["react.node.fragment"] = (props, children) => {
+    fragmentChildren = children;
+    return fragment(props, children);
+  };
   const map = hostBindings["js.array.map"];
   hostBindings["js.array.map"] = (array, callback) => {
     mapCalls++;
@@ -210,6 +216,19 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       await React.act(async () => arrayRoot.render(directNode));
       check(arrayContainer.textContent === "direct array",
         "official React accepts the widened array directly outside JSX");
+      const directRoot = { render(value) {
+        check(this === directRoot && value === directValues,
+          "constrained Root.render preserves receiver and exact array argument");
+        arrayRoot.render(value);
+      } };
+      await React.act(async () => runtime.call("ProofWidgetsJsxSubset.nativeRender", directRoot, directValues));
+      check(arrayContainer.textContent === "direct array",
+        "constrained Lean Root.render reaches official React with no client cast");
+      const textChildren = Object.freeze(["a", "b"]);
+      const textFragment = runtime.call("ProofWidgetsJsxSubset.nativeTextFragment", {}, textChildren);
+      check(fragmentChildren === textChildren && textFragment.type === React.Fragment &&
+        textFragment.props.children.join("") === "ab",
+        "constrained fragment accepts native string children without text wrappers");
       await React.act(async () => arrayRoot.render(primitives));
       check(arrayContainer.textContent === "07native",
         "official React renders native primitive/empty children without VIR formatting");

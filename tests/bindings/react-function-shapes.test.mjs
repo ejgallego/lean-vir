@@ -28,7 +28,7 @@ test("supported explicit node shapes are a subset of pinned ReactNode", () => {
   assert.deepEqual(diagnostics.map(d => d.messageText), []);
 });
 
-test("useState preserves the explicit initial-value/initializer result relationship", async () => {
+test("useState preserves inferred and explicit initial-value/initializer relationships", async () => {
   const diagnostics = typeScriptDiagnostics(`
     import { useState, type Dispatch, type SetStateAction } from "react";
     function initialValue<S>(value: S): S | (() => S) { return value; }
@@ -40,6 +40,11 @@ test("useState preserves the explicit initial-value/initializer result relations
       return useState<S>(initialFunction(initializer));
     }
     declare const makeText: () => string;
+    const eagerText: string = useState("hello")[0];
+    const inferredText: string = useState(makeText)[0];
+    const storedFunction: () => string = useState(() => makeText)[0];
+    function generic<T>(value: T): T { return useState(value)[0]; }
+    const genericFunction: () => string = generic(makeText);
     const [text]: [string, Dispatch<SetStateAction<string>>] = useState(initialFunction(makeText));
     const [fn]: [() => string, Dispatch<SetStateAction<() => string>>] =
       useState<() => string>(initialFunction(() => makeText));
@@ -52,6 +57,8 @@ test("useState preserves the explicit initial-value/initializer result relations
   const config = JSON.parse(await readFile(new URL("../../Vir/React.bindings.json", import.meta.url)));
   const operation = config.generation.protocolOperations.find(op => op.target === "react.useState");
   assert.deepEqual(operation.typeParameters, ["α"]);
+  assert.equal(operation.visibility, "private");
+  assert.equal(operation.lean, "Lean.Vir.React.Hooks.useStateNative");
   assert.equal(operation.arguments[0].type.lean, "Lean.Vir.Js (Lean.Vir.React.Initial.Value α)");
   assert.equal(operation.result.type.lean, "Lean.Vir.Js (Lean.Vir.React.StateTuple α)");
 });

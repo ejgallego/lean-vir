@@ -14,7 +14,32 @@ open Lean.Vir
 open Lean.Vir.Browser
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
--- Explicit initial-union membership determines state shape without coercions.
+-- Default inference is initializer-first; result annotations still take priority.
+private def inferredValue (value : Js String) := React.Hooks.useState value
+private def inferredInitializer (value : Js.Function0 (Js String)) := React.Hooks.useState value
+private def inferredFunction (value : Js.Function0 (Js.Function0 (Js String))) :=
+  React.Hooks.useState value
+private def inferredGeneric (value : Js α) := React.Hooks.useState value
+private def inferredUnion (value : Js (React.Initial.Value α)) := React.Hooks.useState value
+
+example : Js String → React.ReactM (Js (React.StateTuple String)) := inferredValue
+example : Js.Function0 (Js String) → React.ReactM (Js (React.StateTuple String)) := inferredInitializer
+example : Js.Function0 (Js.Function0 (Js String)) →
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary (Js String)))) := inferredFunction
+example : Js α → React.ReactM (Js (React.StateTuple α)) := inferredGeneric
+example : Js (React.Initial.Value α) → React.ReactM (Js (React.StateTuple α)) := inferredUnion
+
+example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
+  React.Hooks.useState value
+
+example (value : Js.Function0 (Js String)) :
+    React.ReactM (Js (React.StateTuple (Js.Function.Nullary (Js String)))) :=
+  React.Hooks.useState value
+
+example (value : Js.Function0 (Js String)) :=
+  React.Hooks.useState (α := Js.Function.Nullary (Js String)) value
+
+-- Explicit union widenings remain available, without changing callable semantics.
 example (value : Js String) : React.ReactM (Js (React.StateTuple String)) :=
   React.Hooks.useState (React.Initial.ofValue value)
 
@@ -35,12 +60,18 @@ example (initializer : Js.Function0 (Js String)) :
 
 example (_value : Js String) (_initializer : Js.Function0 (Js String))
     (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js String)) : True := by
-  fail_if_success have _ := React.Hooks.useState _value
-  fail_if_success have _ := React.Hooks.useState _initializer
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) := React.Hooks.useState _value
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) := React.Hooks.useState _initializer
   fail_if_success have _ : React.ReactM (Js (React.StateTuple Bool)) :=
     React.Hooks.useState (React.Initial.ofInitializer _initializer)
   fail_if_success have _ := React.Initial.ofInitializer _void
   fail_if_success have _ := React.Initial.ofInitializer _unary
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple String)) := React.Hooks.useState _void
+  fail_if_success have _ : React.ReactM (Js (React.StateTuple String)) := React.Hooks.useState _unary
+  fail_if_success have _ := React.Hooks.useStateNative
+  fail_if_success have _ := React.Root.renderNative
+  fail_if_success have _ := React.Node.createElementNative
+  fail_if_success have _ := React.Node.fragmentNative
   trivial
 
 -- Native function aliases preserve arity and complete result relationships.
@@ -147,7 +178,22 @@ example [React.Node.Shape α] (value : Js α) :
     Js.erase (React.Node.ofJs value) = Js.erase value := rfl
 
 example (root : Js React.Root) (values : Js.Array (Js.UndefinedOr.Value (Js.Nullable.Value String))) :
-    DomM Unit := React.Root.render root (React.Node.ofJs values)
+    DomM Unit := React.Root.render root values
+
+example (tag : Js React.ElementType) (props : Js React.Props) (values : Js.Array String) :
+    React.ReactM (Js React.Node) := React.Node.createElement tag props values
+
+example (props : Js React.Props) (values : Js.Array String) :
+    React.ReactM (Js React.Node) := React.Node.fragment props values
+
+example (props : Js React.Props) : React.ReactM (Js React.Node) := do
+  React.Node.fragment props (← Js.Array.empty)
+
+example (_root : Js React.Root) (_props : Js React.Props) (_object : Js.Object)
+    (_values : Js.Array Js.Any.Value) : True := by
+  fail_if_success have _ := React.Root.render _root _object
+  fail_if_success have _ := React.Node.fragment _props _values
+  trivial
 
 example (node : Js React.Node) (text : Js String) (number : Js Float) (bigint : Js Nat)
     (flag : Js Bool) (absent : Js.Undefined) : True := by

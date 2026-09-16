@@ -47,6 +47,7 @@
       }
     },
     "methodPolicies": {
+      "Root.render": { "visibility": "private" },
       "React.useEffect": {
         "forwardedOptionalParameters": ["deps"],
         "parameterRenames": { "effect": "setup" },
@@ -133,7 +134,7 @@
       },
       {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
-        "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Hooks.useStateNative", "marker": "vir_js", "visibility": "private",
         "reason": "Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useState", "semantics": "preserving" },
         "typeParameters": ["α"], "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -207,7 +208,7 @@
       },
       {
         "id": "react.node.create-element", "group": "nodes", "target": "react.node.createElement",
-        "lean": "Lean.Vir.React.Node.createElement", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.createElementNative", "marker": "vir_js", "visibility": "private",
         "reason": "Calls React.createElement with the exact ElementType, props object, and child array values.",
         "upstreamRelation": { "kind": "upstream-adapter", "member": "React.createElement", "semantics": "preserving" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -220,7 +221,7 @@
       },
       {
         "id": "react.node.fragment", "group": "nodes", "target": "react.node.fragment",
-        "lean": "Lean.Vir.React.Node.fragment", "marker": "vir_js",
+        "lean": "Lean.Vir.React.Node.fragmentNative", "marker": "vir_js", "visibility": "private",
         "reason": "Calls React.createElement with React.Fragment, the exact props object, and child array values.",
         "upstreamRelation": { "kind": "vir-owned" },
         "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
@@ -288,7 +289,7 @@
         {
           "typescript": "Root.render",
           "targets": ["react.root.renderNode"],
-          "lean": ["Lean.Vir.React.Root.render"]
+          "lean": ["Lean.Vir.React.Root.renderNative"]
         },
         {
           "typescript": "Root.unmount",

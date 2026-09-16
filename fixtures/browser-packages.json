@@ -168,6 +168,8 @@
             "ProofWidgetsJsxSubset.nativeMappedChildren",
             "ProofWidgetsJsxSubset.nativePrimitiveChildren",
             "ProofWidgetsJsxSubset.nativeNodeArray",
+            "ProofWidgetsJsxSubset.nativeRender",
+            "ProofWidgetsJsxSubset.nativeTextFragment",
             "ProofWidgetsJsxSubset.nativeIndexedMap",
             "ProofWidgetsJsxSubset.nativeLiteralConstruction"
           ]

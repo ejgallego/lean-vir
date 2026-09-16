@@ -130,17 +130,20 @@ Arbitrary objects and `Js.Any` are not implicitly narrowed to nodes. A native ar
 occupies one child slot; JSX does not flatten it or add a fragment. Existing
 child actions still run left-to-right and may return any supported native shape.
 Lean arrays (including arrays of actions) are not JSX children.
-Ordinary calls use the same membership rule explicitly:
+Ordinary node-taking calls use the same closed membership rule:
 
 ```lean
 def renderLabels (root : Js Root) (values : Js.Array String) : DomM Unit :=
-  Root.render root (Node.ofJs values)
+  Root.render root values
 ```
 
-`Node.ofJs` is an inline identity with closed, erased `Node.Shape` evidence;
-it makes no host call and does not copy or traverse arrays. JSX uses this same
-rule. Generic code can require `[Node.Shape α]`; no implicit coercion or general
-union inference is introduced. This checks declared shapes, not foreign payloads
+`Root.render` accepts `Js α` with `[Node.Shape α]`; `Node.createElement`,
+`Node.fragment` and `Node.functionComponent` accept native child arrays with that
+element constraint. Otherwise unconstrained empty child arrays default to `Node`.
+`Node.ofJs` remains an explicit inline identity when a `Js Node` value is needed.
+The evidence is erased; casts make no host call and never copy or traverse arrays.
+JSX uses the same rule. No global coercion is introduced.
+This checks declared shapes, not foreign payloads
 or later mutations through aliases. Promises and arbitrary iterables from the
 broader TypeScript `ReactNode` union are not included in this subset.
 
@@ -214,21 +217,32 @@ failed unmount remains available for runtime cleanup. See
 ## Hooks, refs and events
 
 Hooks receive exact JavaScript inputs and return React's chosen values.
-Pass `Initial.ofValue value` or `Initial.ofInitializer initializer` to
-`Hooks.useState`. Both widen the native value's type without wrapping or invoking
-it. An initializer has type `Js.Function0 (Js S)` and determines state shape `S`.
+`Hooks.useState value` checks the closed `Initial.Accepts input state` relation.
+Explicit `(α := S)` and contextual state types take precedence. Otherwise default
+inference uses an existing `Initial.Value S` union's state type, then the result
+of a supported `Js.Function0 (Js S)` initializer, then the declared input shape.
+Only one function layer is removed. For an abstract `Js T`, the fallback is `T`;
+this does not prove the eventual JavaScript payload is non-callable. These are
+bounded Lean inference rules, not a reproduction of all TypeScript inference.
 For example, initialize Lean-backed state only when React calls the initializer:
 
 ```lean
 let initializer ← Js.Function.ofLean0 (LeanRef.toJSL initialState)
-let state ← Hooks.useState (Initial.ofInitializer initializer)
+let state ← Hooks.useState initializer
 ```
 
 React can replay initializers in development Strict Mode. To store a native
 function `handler`, pass an initializer returning it, such as
 `Js.Function.ofLean0 (pure handler)`. `Initial.ofValue handler` does not protect
-a function from React's initializer semantics. There are no implicit coercions
-or automatic thunk insertion.
+a function from React's initializer semantics. Nor does explicitly requesting
+function-valued state: annotations change types, not React's callable test.
+`Initial.ofValue` and `Initial.ofInitializer` remain explicit identity widenings
+for generic code. There is no automatic thunk insertion or input conversion.
+
+The four constrained entry points (`useState`, `Root.render`, `createElement`,
+`fragment`) currently forward through non-inlined Lean definitions to private
+generated imports. This adds a Lean call, not a JS call or runtime dictionary;
+the casts and membership proofs erase.
 
 Project native state/reducer tuples with `Js.Tuple2.first` and `second`; no Lean
 state record is constructed. Invoke their native functions with
@@ -280,7 +294,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `Fragment` | `Node.fragment props children` takes exact props and a JS child array. |
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
-| `useState(initial)` | `Initial.ofValue` / `Initial.ofInitializer` select native union membership; the exact result tuple retains the state type. The no-argument overload is not exposed. |
+| `useState(initial)` | Closed membership with initializer-first default inference; explicit/contextual state types are preserved. The no-argument overload is not exposed. |
 | `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
 | `dispatch(action)` | `Js.Function.callVoid` passes the exact action to the native dispatch function. |
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |

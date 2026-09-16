@@ -78,7 +78,7 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; in
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.useState"]
-opaque useState
+private opaque useStateNative
     {α : Type}
     (initial : @& Lean.Vir.Js (Lean.Vir.React.Initial.Value α)) :
     Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.StateTuple α))
@@ -169,7 +169,7 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; el
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.createElement"]
-opaque createElement
+private opaque createElementNative
     (elementType : @& Lean.Vir.Js Lean.Vir.React.ElementType)
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
     (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
@@ -187,7 +187,7 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; pr
 This declaration is generated; edit the binding configuration.
 -/
 @[vir_js "react.node.fragment"]
-opaque fragment
+private opaque fragmentNative
     (props : @& Lean.Vir.Js Lean.Vir.React.Props)
     (children : @& Lean.Vir.Js.Array Lean.Vir.React.Node) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)
@@ -302,7 +302,7 @@ ABI profile `vir-react-protocol-v1` (bridge-handle retention): root js-resource/
 This declaration is generated; edit the TypeScript source or binding configuration.
 -/
 @[vir_js "react.root.renderNode"]
-opaque render
+private opaque renderNative
     (root : @& Lean.Vir.Js Lean.Vir.React.Root)
     (children : @& Lean.Vir.Js Lean.Vir.React.Node) :
     Lean.Vir.Browser.DomM Unit

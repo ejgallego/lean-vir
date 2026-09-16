@@ -24,10 +24,10 @@ def label (value : Nat) : String :=
 def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
     (handler : Js.Function1 (Js String) Unit) : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
-    let eagerState ← Hooks.useState (Initial.ofValue eager)
-    let lazyState ← Hooks.useState (Initial.ofInitializer initializer)
+    let eagerState ← Hooks.useState eager
+    let lazyState ← Hooks.useState initializer
     let thunk ← Js.Function.ofLean0 (pure handler)
-    let functionState ← Hooks.useState (Initial.ofInitializer thunk)
+    let functionState ← Hooks.useState thunk
     let stored ← Js.Tuple2.first functionState
     let value ← Js.Tuple2.first lazyState
     let click ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
@@ -39,7 +39,7 @@ def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
 def counter : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState (Initial.ofValue initial)
+    let count ← Hooks.useState initial
     let countValue ← JsValue.toNat (← Js.Tuple2.first count)
     let countSetter ← Js.Tuple2.second count
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label countValue))
@@ -156,7 +156,7 @@ def mountMemo (selector : String) : DomM Bool := do
 def memoStableProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState (Initial.ofValue initial)
+    let count ← Hooks.useState initial
     let countValueJs ← Js.Tuple2.first count
     let countSetter ← Js.Tuple2.second count
     let calculation ← Js.Function.ofLean0 (pure countValueJs)
@@ -188,7 +188,7 @@ def mountMemoStable (selector : String) : DomM Bool := do
 def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     let initial ← JsValue.ofNat 0
-    let count ← Hooks.useState (Initial.ofValue initial)
+    let count ← Hooks.useState initial
     let countValueJs ← Js.Tuple2.first count
     let countSetter ← Js.Tuple2.second count
     let lastClick ← Hooks.useRef initial
