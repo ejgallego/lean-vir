@@ -179,6 +179,47 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", { get label() { throw fieldFailure; } });
     } catch (error) { thrown = error; }
     check(thrown === fieldFailure, "declared-field projection preserves native getter exceptions");
+    const optionalPrefix = "Vir.Fixtures.OptionalProps.";
+    for (const [entry, args, hasTitle, title, projector] of [
+      ["omitted", [], false, undefined, "readTitle"],
+      ["present", [label], true, label, "readTitle"],
+      ["requiredUndefined", [undefined], true, undefined, "readUndefinedTitle"],
+      ["optionalUndefined", [undefined], true, undefined, "readUndefinedTitle"],
+      ["optionalUndefined", [label], true, label, "readUndefinedTitle"],
+      ["omittedUndefined", [], false, undefined, "readUndefinedTitle"],
+      ["nullable", [null], true, null, "readNullableTitle"],
+      ["nullable", [label], true, label, "readNullableTitle"],
+      ["omittedNullable", [], false, undefined, "readNullableTitle"],
+    ]) {
+      const optionalNode = runtime.call(optionalPrefix + entry, component, ...args);
+      check(optionalNode.type === component && Object.hasOwn(optionalNode.props, "title") === hasTitle &&
+        optionalNode.props.title === title,
+      `${entry} preserves component identity and distinguishes omitted, undefined and null props`);
+      check(runtime.call(optionalPrefix + projector, optionalNode.props) === title,
+        `${projector} reads the exact present or absent native value`);
+      let optionalReads = 0;
+      check(runtime.call(optionalPrefix + projector, {
+        get title() { optionalReads++; return title; },
+      }) === title && optionalReads === 1,
+      `${projector} performs exactly one native getter read`);
+    }
+    const optionalContainer = document.createElement("div");
+    fixtures.append(optionalContainer);
+    const optionalRoot = createRoot(optionalContainer);
+    const optionalComponent = runtime.call(optionalPrefix + "component");
+    try {
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "omitted", optionalComponent)));
+      const span = optionalContainer.querySelector("span");
+      check(span && span.textContent === "", "the Lean optional-prop component renders an absent title");
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "present", optionalComponent, label)));
+      check(optionalContainer.querySelector("span") === span && span.textContent === label,
+        "the Lean optional-prop component renders the exact supplied string without remounting");
+      await React.act(async () => optionalRoot.render(runtime.call(optionalPrefix + "omitted", optionalComponent)));
+      check(optionalContainer.querySelector("span") === span && span.textContent === "",
+        "omitting a previously supplied prop removes its rendered value");
+    } finally {
+      await React.act(async () => optionalRoot.unmount());
+    }
     check(runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "") === 0 &&
       runtime.call("ProofWidgetsJsxSubset.nativeStringLength", "😀") === 2,
     "native string length is UTF-16 length, not decoded Lean character count");
@@ -321,6 +362,60 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       "a single native text child remains in the Badge subtree");
     await React.act(async () => jsx.querySelector("#proofwidgets-jsx-action").click());
     check(document.title === "ProofWidgets JSX subset clicked", "nested child callback enters Lean");
+    for (const strict of [false, true]) {
+      const container = document.createElement("div");
+      fixtures.append(container);
+      const root = createRoot(container);
+      const initial = { text: "initialized" };
+      const action = ":updated";
+      const initialized = [];
+      const reduced = [];
+      const initializer = function (argument) {
+        "use strict";
+        initialized.push({ argument, args: [...arguments], receiver: this });
+        return argument.text;
+      };
+      const reducer = function (state, next) {
+        "use strict";
+        reduced.push({ state, action: next, args: [...arguments], receiver: this });
+        return state + next;
+      };
+      const component = runtime.call("ReactCounter.reducerInitializerProbe", reducer, initial, initializer, action);
+      const useReducer = hostBindings["react.useReducerWithInit"];
+      const seen = [];
+      hostBindings["react.useReducerWithInit"] = (receivedReducer, receivedInitial, receivedInitializer) => {
+        const result = useReducer(receivedReducer, receivedInitial, receivedInitializer);
+        seen.push({ reducer: receivedReducer, initial: receivedInitial, initializer: receivedInitializer, result });
+        return result;
+      };
+      const render = tick => React.createElement(strict ? React.StrictMode : React.Fragment,
+        null, React.createElement(component, { tick }));
+      try {
+        await React.act(async () => root.render(render(0)));
+        const mountCalls = initialized.length;
+        const button = container.querySelector("button");
+        check(mountCalls === (strict ? 2 : 1) && button.textContent === "initialized" && reduced.length === 0,
+          "React owns reducer initialization and StrictMode replay at mount");
+        check(initialized.every(call => call.argument === initial && call.args.length === 1 &&
+          call.receiver === undefined), "reducer initializer receives the exact argument once per React invocation");
+        initial.text = "not reinitialized";
+        await React.act(async () => root.render(render(1)));
+        check(initialized.length === mountCalls && container.querySelector("button") === button &&
+          button.textContent === "initialized", "ordinary rerenders do not reinitialize reducer state");
+        await React.act(async () => button.click());
+        check(button.textContent === "initialized:updated" && initialized.length === mountCalls &&
+          reduced.length > 0 && reduced.every(call => call.state === "initialized" &&
+            call.action === action && call.args.length === 2 && call.receiver === undefined),
+        "Lean dispatch forwards the exact action and React updates reducer state without reinitializing");
+        const dispatch = seen[0].result[1];
+        check(seen.length >= 3 && seen.every(call => call.reducer === reducer && call.initial === initial &&
+          call.initializer === initializer && call.result[1] === dispatch),
+        "reducer hook inputs and React dispatch identity survive rerenders and state updates");
+      } finally {
+        hostBindings["react.useReducerWithInit"] = useReducer;
+        await React.act(async () => root.unmount());
+      }
+    }
     for (const strict of [false, true]) {
       const container = document.createElement("div");
       fixtures.append(container);

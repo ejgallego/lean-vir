@@ -57,6 +57,15 @@ def callbackShapeProbe
     return ← <div id="react-callback-shapes">{nullaryResult}{unaryResult}
       {binaryResult}{ternaryResult}</div>
 
+def reducerInitializerProbe (reducer : Js (Reducer String String)) (initial : Js.Any)
+    (init : Js.Function1 Js.Any (Js String)) (action : Js String) :
+    RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
+    js#let (value, dispatch) ← Hooks.useReducerWithInit reducer initial init
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) =>
+      Js.Function.callVoid dispatch action
+    return ← <button onClick={click}>{value}</button>
+
 def counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
   let one ← JsValue.ofNat 1

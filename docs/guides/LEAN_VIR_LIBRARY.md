@@ -90,6 +90,17 @@ index and returns `Js.Nullable`; convert its result explicitly with
 `Js.Nullable.toOption` when a Lean `Option` is needed. Collection lengths are
 JavaScript numbers too.
 
+`Js.Array.filter`, `find`, `some` and `every` forward native predicates. Their
+results may have any JS shape: JavaScript truthiness decides the match.
+Callbacks receive value, number index and the original array; unary native
+functions can be used with an explicit predicate-result shape, for example
+`Js.Array.filter (β := Bool) values predicate`. `find` returns `Js.UndefinedOr α` and visits
+holes; the other predicates and `forEach` skip them. `forEach` takes a void
+callback. `join` takes a `Js.UndefinedOr String` separator (`undefined` uses
+the native comma default). No intermediate Lean array is constructed.
+These signatures select ordinary predicates, not TypeScript type-guard
+narrowing overloads, and leave `thisArg` at its native default.
+
 ## Explicit Conversions
 
 `JsValue` converts between Lean values and their JavaScript representations.
@@ -141,8 +152,9 @@ a value-returning call can instead return a rooted JavaScript `undefined`.
 The shape parameters describe full Lean boundary views, such as `Js α` and
 `Unit`, not just the inner JavaScript shape. Lean-closure conversion is
 explicit: `ofLean`/`ofLeanVoid` (unary), `ofLean0`/`ofLean0Void` (nullary),
-and the value-returning `ofLean2`/`ofLean3`. The ternary constructor supports
-native `Js.Array.map`'s value/index/source callback.
+and `ofLean2`/`ofLean2Void`, `ofLean3`/`ofLean3Void`. A void callback's Lean
+`Unit` result becomes JavaScript `undefined`, not a transported unit object.
+The ternary constructors support native array value/index/source callbacks.
 
 `call2`, `call3` and `call3Void` use inline identity-only instantiations of
 monomorphic `Function.Internal` imports: otherwise erased type parameters
@@ -157,8 +169,8 @@ values into Lean or add coercions beyond the selected JavaScript operation.
 | Surface | JavaScript domain | Operations |
 | --- | --- | --- |
 | `Js.String` on `Js String` | UTF-16 string | `equal`, `concat`, `slice`, `includes`, `startsWith`, `endsWith`, `trim`, `toLowerCase`, `toUpperCase` |
-| `Js.Number` on `Js Float` | Number | `add`, `sub`, `mul`, `div`, `rem`, `neg`, `equal`, `lt`, `le`, `isNaN`, `isFinite`, `isInteger` |
-| `Js.Nat` on `Js Nat` | Nonnegative bigint | `add`, `mul`, `equal`, `lt`, `le` |
+| `Js.Number` on `Js Float` | Number | `add`, `sub`, `mul`, `div`, `rem`, `neg`, `equal`, `lt`, `le`, `isNaN`, `isFinite`, `isInteger`, `toString` |
+| `Js.Nat` on `Js Nat` | Nonnegative bigint | `add`, `mul`, `equal`, `lt`, `le`, `toString` |
 | `Js.Boolean` on `Js Bool` | Boolean | `not`, `equal` |
 
 Predicates return `Js Bool`; use `JsValue.toBool` only where Lean control flow
@@ -174,6 +186,18 @@ end. `concat` takes one string; search predicates use the native default
 position. These are selected native arities, not implementations of every
 TypeScript overload. Boolean short-circuiting remains control flow, not an
 eager host function.
+
+`Js.Number.toString` and `Js.Nat.toString` return native strings and accept
+an explicit `Js.UndefinedOr Float` radix. They use the native method, including
+its range errors. Unlike `JsValue.toString`, they do not decode into Lean.
+
+With `open scoped Lean.Vir.Js`, `js#!"Count: {count}"` interpolates native
+`Js` values using JavaScript template-string conversion. Holes evaluate and
+convert once, left-to-right; exceptions propagate (including Symbol rejection).
+Use `{← action}` for an effectful hole. Literal text uses Lean interpolation
+escapes; no Lean `ToString` instance is used. Like `js#"text"`, this notation
+is an action, automatically lifted in native object/array construction and JSX
+attributes; elsewhere write `← js#!"Count: {count}"`.
 
 `Js.Promise.catchValue` receives a `Js.Any` rejection value and recovers
 to the original Promise's result type. Check rejection values before typed

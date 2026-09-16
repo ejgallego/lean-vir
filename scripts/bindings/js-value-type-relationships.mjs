@@ -15,6 +15,12 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     ["js.array.empty", "Array"],
     ["js.array.push", "Array.push"],
     ["js.array.map", "Array.map"],
+    ["js.array.filter", "Array.filter"],
+    ["js.array.find", "Array.find"],
+    ["js.array.some", "Array.some"],
+    ["js.array.every", "Array.every"],
+    ["js.array.forEach", "Array.forEach"],
+    ["js.array.join", "Array.join"],
     ["js.array.length", "Array.length"],
     ["js.array.item", "Array"],
   ]).get(protocol.target);
@@ -64,6 +70,10 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       resourceInner: `Lean.Vir.Js.Function.Ternary ${args}`,
     };
   };
+  const undefinedOrType = (inner) => ({
+    lean: `Lean.Vir.Js.UndefinedOr ${inner}`, representation: "js-resource",
+    resourceInner: `Lean.Vir.Js.UndefinedOr.Value ${inner}`,
+  });
   const checkType = (actual, expected, position) => {
     for (const [key, value] of Object.entries(expected)) {
       require(actual?.[key] === value, `${position} ${key} must be ${value}, got ${actual?.[key]}`);
@@ -162,8 +172,11 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
     indexer.args.length === 1 && number(indexer.args[0].type) &&
     !indexer.args[0].optional && !indexer.args[0].rest && element(indexer.result),
   "upstream [n: number]: T must return the receiver's T (unchecked-index lane)");
-  require(parameters.length === (protocol.target === "js.array.map" ? 2 : 1),
-    protocol.target === "js.array.map"
+  const genericPredicate = new Set([
+    "js.array.map", "js.array.filter", "js.array.find", "js.array.some", "js.array.every",
+  ]);
+  require(parameters.length === (genericPredicate.has(protocol.target) ? 2 : 1),
+    genericPredicate.has(protocol.target)
       ? "receiver, callback and result must use exactly correlated input/output parameters"
       : "receiver/item/result must share one parameter, never independent parameters");
   const [leanElement] = parameters;
@@ -212,6 +225,76 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       checkSignature([arrayType(input), ternaryCallbackType(
         jsType(input).lean, jsType("Float").lean, arrayType(input).lean, jsType(result).lean,
       )], arrayType(result));
+      break;
+    }
+    case "js.array.filter":
+    case "js.array.find":
+    case "js.array.some":
+    case "js.array.every": {
+      const method = symbols.get(arrayOperation);
+      require(method?.optional !== true, `upstream ${arrayOperation} must not be optional`);
+      const shapes = method?.shape?.kind === "union" ? method.shape.options : [method?.shape];
+      const ordinary = shapes.filter((shape) => {
+        const callback = shape?.args?.[0]?.type;
+        return shape?.kind === "function" && shape.effect === "pure" && shape.args.length === 2 &&
+          !shape.args[0].optional && !shape.args[0].rest && callback?.kind === "function" &&
+          callback.effect === "pure" && callback.args.length === 3 &&
+          !callback.args.some((argument) => argument.optional || argument.rest) &&
+          element(callback.args[0].type) && number(callback.args[1].type) &&
+          callback.args[2].type?.kind === "array" && element(callback.args[2].type.element) &&
+          callback.result?.kind === "opaque" && callback.result.name === "unknown" &&
+          shape.args[1].optional && !shape.args[1].rest &&
+          shape.args[1].type?.kind === "opaque" && shape.args[1].type.name === "any";
+      });
+      require(ordinary.length === 1,
+        `upstream ${arrayOperation} must have exactly one ordinary three-argument unknown-result predicate overload`);
+      const [input, callbackResult] = parameters;
+      const callback = ternaryCallbackType(
+        jsType(input).lean, jsType("Float").lean, arrayType(input).lean, jsType(callbackResult).lean,
+      );
+      const shape = ordinary[0];
+      if (protocol.target === "js.array.filter") {
+        require(shape.result?.kind === "array" && element(shape.result.element),
+          "upstream filter ordinary overload must return T[]");
+        checkSignature([arrayType(input), callback], arrayType(input));
+      } else if (protocol.target === "js.array.find") {
+        require(shape.result?.kind === "option" && shape.result.absence === "undefined" && element(shape.result.element),
+          "upstream find ordinary overload must return T | undefined");
+        checkSignature([arrayType(input), callback], undefinedOrType(input));
+      } else {
+        require(shape.result?.kind === "primitive" && shape.result.name === "boolean",
+          `upstream ${arrayOperation} ordinary overload must return boolean`);
+        checkSignature([arrayType(input), callback], jsType("Bool"));
+      }
+      break;
+    }
+    case "js.array.forEach": {
+      const method = symbols.get("Array.forEach");
+      const shape = method?.shape;
+      const callback = shape?.args?.[0]?.type;
+      require(method?.optional !== true && shape?.kind === "function" && shape.effect === "pure" &&
+        shape.args.length === 2 && !shape.args[0].optional && !shape.args[0].rest &&
+        callback?.kind === "function" && callback.effect === "pure" && callback.args.length === 3 &&
+        !callback.args.some((argument) => argument.optional || argument.rest) &&
+        element(callback.args[0].type) && number(callback.args[1].type) &&
+        callback.args[2].type?.kind === "array" && element(callback.args[2].type.element) &&
+        callback.result?.kind === "primitive" && callback.result.name === "void" &&
+        shape.args[1].optional && !shape.args[1].rest && shape.args[1].type?.kind === "opaque" &&
+        shape.args[1].type.name === "any" && shape.result?.kind === "primitive" && shape.result.name === "void",
+      "upstream forEach(callback: (value: T, index: number, array: T[]) => void, thisArg?: any): void must preserve T");
+      checkSignature([receiver, ternaryCallbackType(value.lean, jsNumber.lean, receiver.lean, "Unit")],
+        { lean: "Unit", representation: "immediate" });
+      break;
+    }
+    case "js.array.join": {
+      const method = symbols.get("Array.join");
+      const shape = method?.shape;
+      require(method?.optional !== true && method?.typeParameters?.length === 0 &&
+        shape?.kind === "function" && shape.effect === "pure" && shape.args.length === 1 &&
+        shape.args[0].optional && !shape.args[0].rest && shape.args[0].type?.kind === "primitive" &&
+        shape.args[0].type.name === "string" && shape.result?.kind === "primitive" && shape.result.name === "string",
+      "upstream join(separator?: string): string must retain its optional string separator");
+      checkSignature([receiver, undefinedOrType("String")], jsType("String"));
       break;
     }
     case "js.array.item":

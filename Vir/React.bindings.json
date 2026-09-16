@@ -139,6 +139,19 @@
         "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple state action)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple state action" } }
       },
       {
+        "id": "react.hooks.use-reducer-with-init", "group": "hooks", "target": "react.useReducerWithInit",
+        "lean": "Lean.Vir.React.Hooks.Internal.useReducerWithInit", "marker": "vir_js",
+        "reason": "Selects React.useReducer's three-argument initializer overload with one action argument. The typed inline public declaration relates input, state and action; the monomorphic import avoids erased parameters exceeding the host ABI. All three native values and the returned tuple cross unchanged.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.useReducer", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [
+          { "name": "reducer", "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value" } },
+          { "name": "initial", "type": { "lean": "Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Any.Value" } },
+          { "name": "init", "type": { "lean": "Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js.Any", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Unary Lean.Vir.Js.Any Lean.Vir.Js.Any" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js (Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value)", "representation": "js-resource", "resourceInner": "Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value" } }
+      },
+      {
         "id": "react.hooks.use-state", "group": "hooks", "target": "react.useState",
         "lean": "Lean.Vir.React.Hooks.useState", "marker": "vir_js",
         "reason": "Passes the exact native initial value or nullary initializer to React.useState and returns React's state/setter array with the initializer result type. Union membership does not change React's interpretation of functions.",

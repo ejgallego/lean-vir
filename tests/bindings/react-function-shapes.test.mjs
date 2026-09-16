@@ -73,6 +73,24 @@ test("useState preserves inferred and explicit initial-value/initializer relatio
   assert.equal(operation.result.type.lean, "Lean.Vir.Js (Lean.Vir.React.StateTuple α)");
 });
 
+test("reducer initialization and nullable refs preserve pinned React relationships", () => {
+  const diagnostics = typeScriptDiagnostics(`
+    import { useReducer, useRef, type Dispatch } from "react";
+    function initialized<S, A, I>(reducer: (s: S, a: A) => S, input: I, init: (i: I) => S):
+        [S, Dispatch<A>] { return useReducer(reducer, input, init); }
+    const [state, dispatch] = initialized((s: string, a: boolean) => a ? s : "", 42, n => n.toString());
+    const text: string = state;
+    dispatch(true);
+    // @ts-expect-error action must match the reducer
+    dispatch("wrong");
+    // @ts-expect-error initializer must return the reducer state
+    initialized((s: string, a: boolean) => s, 42, n => n);
+    const nullable: HTMLElement | null = useRef<HTMLElement | null>(null).current;
+    const optional: HTMLElement | undefined = useRef<HTMLElement | undefined>(undefined).current;
+  `);
+  assert.deepEqual(diagnostics.map(d => d.messageText), []);
+});
+
 test("native function subsets match pinned React effect, reducer and state-action types", () => {
   const diagnostics = typeScriptDiagnostics(`
     import type { EffectCallback, Reducer, Dispatch, SetStateAction } from "react";

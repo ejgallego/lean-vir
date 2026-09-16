@@ -17,6 +17,16 @@ public section
 
 namespace Lean.Vir.React
 
+/-- React's initializer overload, with exact input, initializer and reducer.
+The identity-only definition keeps erased types out of the fixed-arity host ABI. -/
+@[inline] def Hooks.useReducerWithInit {state action input : Type}
+    (reducer : Lean.Vir.Js (Reducer state action)) (initial : Lean.Vir.Js input)
+    (init : Lean.Vir.Js.Function1 (Lean.Vir.Js input) (Lean.Vir.Js state)) :
+    ReactM (Lean.Vir.Js (ReducerTuple state action)) := by
+  have invoke := Hooks.Internal.useReducerWithInit
+  unfold Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js at *
+  exact invoke reducer initial init
+
 namespace ElementType
 
 /-- Views the exact native string as an element type, without a host call. -/

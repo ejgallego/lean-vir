@@ -29,6 +29,14 @@ namespace Lean.Vir.ProofWidgets.Jsx
 
 open Lean Parser PrettyPrinter
 
+/-- Marks a schema projection as optional in JSX. Its declared type describes
+present values; reading it with `js_field%` additionally admits `undefined`.
+This is schema metadata only: omitted fields are not written or defaulted. -/
+meta initialize jsOptionalAttr : TagAttribute ←
+  registerTagAttribute `js_optional "optional native JSX props schema field" fun name => do
+    unless (← getEnv).getProjectionFnInfo? name |>.isSome do
+      throwError "`js_optional` applies only to a props schema field projection"
+
 /-- Emit an ordinary identity term after checking the relevant child/props shape.
 No private runtime constant or unsafe implementation must escape this module. -/
 private meta def phantomCast (value : Term) : MacroM Term :=
@@ -275,7 +283,8 @@ private meta def propsSchema? (component : Ident) : Lean.Elab.Term.TermElabM (Op
     return none
   return some name
 
-private meta def schemaFields (schema : Name) : Lean.Elab.Term.TermElabM (Array (String × Lean.Expr)) := do
+private meta def schemaFields (schema : Name) :
+    Lean.Elab.Term.TermElabM (Array (String × Lean.Expr × Bool)) := do
   let info := Lean.getStructureInfo (← Lean.getEnv) schema
   unless info.parentInfo.isEmpty do
     throwError "JSX props schemas do not support inherited fields"
@@ -292,7 +301,7 @@ private meta def schemaFields (schema : Name) : Lean.Elab.Term.TermElabM (Array 
         throwError "JSX props schema `{schema}` has dependent field `{field}`; dependent schemas are unsupported"
       if !result.isAppOfArity ``Lean.Vir.Js 1 then
         throwError "JSX props schema `{schema}` field `{field}` must have type `Lean.Vir.Js α`"
-      pure (field.getString!, result)
+      pure (field.getString!, result, jsOptionalAttr.hasTag (← Lean.getEnv) projection)
 
 private meta def typedAttributes
     (schema : Name) (attrs : Array (TSyntax `virProofWidgetsJsxAttr)) :
@@ -321,7 +330,7 @@ private meta def typedAttributes
       continue
     if name == "children" then
       throwErrorAt attr "supply children between the JSX tags, or use the native exact-props escape hatch"
-    let some (_, expected) := fields.find? fun (field, _) => field == name |
+    let some (_, expected, _) := fields.find? fun (field, _, _) => field == name |
       throwErrorAt attr s!"unknown JSX prop `{name}` for schema `{schema}`"
     -- Constrain the actual emitted expression, including monadic lifts. A
     -- separate preflight elaboration could choose different implicit types.
@@ -329,8 +338,8 @@ private meta def typedAttributes
     checked := checked.push (← Lean.Elab.liftMacroM
       `(virProofWidgetsJsxAttr| $nameSyntax:jsxTag = { ($value : $expectedSyntax) }))
     names := names.push name
-  for (field, _) in fields do
-    unless names.contains field do
+  for (field, _, isOptional) in fields do
+    unless isOptional || names.contains field do
       throwError "missing required JSX prop `{field}` for schema `{schema}`"
   return checked
 private meta def isExactProps (attrs : Array (TSyntax `virProofWidgetsJsxAttr)) : Bool :=
@@ -357,8 +366,13 @@ elab_rules : term
     let schema ← schemaOfObject object
     let name := field.getString
     let fields ← schemaFields schema
-    let some (_, fieldType) := fields.find? fun (candidate, _) => candidate == name |
+    let some (_, fieldType, isOptional) := fields.find? fun (candidate, _, _) => candidate == name |
       throwErrorAt field s!"unknown declared JSX prop `{name}` for schema `{schema}`"
+    let shape ← Lean.Meta.whnf fieldType.appArg!
+    let fieldType := if isOptional && !shape.isAppOfArity ``Lean.Vir.Js.UndefinedOr.Value 1 then
+        Lean.mkApp (Lean.mkConst ``Lean.Vir.Js)
+          (Lean.mkApp (Lean.mkConst ``Lean.Vir.Js.UndefinedOr.Value) fieldType.appArg!)
+      else fieldType
     let resultType := Lean.mkApp (Lean.mkConst ``Lean.Vir.RuntimeM) fieldType
     let objectType ← Lean.Elab.Term.exprToSyntax
       (Lean.mkApp (Lean.mkConst ``Lean.Vir.Js) (Lean.mkConst schema))

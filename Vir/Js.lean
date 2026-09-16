@@ -59,6 +59,34 @@ end Function
 /-- An effectful JS string literal; expands to the explicit UTF-8 string conversion. -/
 scoped macro "js#" value:str : term => `(Lean.Vir.JsValue.ofString $value)
 
+/-- Native template interpolation: embedded Js values undergo JavaScript ToString
+left-to-right, once each. Literal syntax uses Lean's interpolation escapes. -/
+scoped syntax:max "js#!" interpolatedStr(term) : term
+
+macro_rules
+  | `(js#! $text:interpolatedStr) => do
+    let mut result ← `(Lean.Vir.JsValue.ofString "")
+    let mut started := false
+    for chunk in text.raw.getArgs do
+      match chunk.isInterpolatedStrLit? with
+      | some literal =>
+          if literal.isEmpty then continue
+          let literal ← `(Lean.Vir.JsValue.ofString $(Lean.quote literal))
+          if !started then
+            result := literal
+          else
+            result ← `(do
+              let text ← ($result)
+              Lean.Vir.Js.String.concat text (← ($literal)))
+          started := true
+      | none =>
+          let value : Lean.TSyntax `term := ⟨chunk⟩
+          result ← `(do
+            let text ← ($result)
+            Lean.Vir.Js.String.interpolate text $value)
+          started := true
+    return result
+
 /-- Binds the two native tuple entries, evaluating the source once and projecting
 indices 0 then 1. This is indexed projection, not JavaScript iterator destructuring. -/
 scoped macro "js#let" "(" first:ident "," second:ident ")" " ← " value:term : doElem =>
@@ -75,6 +103,7 @@ meta partial def liftConstructionString (value : Lean.TSyntax `term) :
     Lean.MacroM (Lean.TSyntax `term) :=
   match value with
   | `(js# $literal:str) => `(← Lean.Vir.JsValue.ofString $literal)
+  | `(js#! $text:interpolatedStr) => `(← js#! $text)
   | `(($inner:term)) => liftConstructionString inner
   | _ => pure value
 

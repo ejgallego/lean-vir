@@ -557,6 +557,42 @@ example (_setup : Js React.EffectCallback) (_deps : Js React.DependencyList)
 open scoped Lean.Vir.Js in
 example : RuntimeM (Js String) := js#"native string"
 
+example (s : Js String) (n : Js Float) (b : Js Bool) : RuntimeM (Js String) :=
+  js#!"name={s}, number={n}, flag={b}"
+
+example (_s : String) : True := by
+  fail_if_success have _ : RuntimeM (Js String) := js#!"{_s}"
+  trivial
+
+example (values : Js.Array String) (p : Js.Function1 (Js String) (Js Bool)) :
+    RuntimeM (Js.Array String) := Js.Array.filter (β := Bool) values p
+
+example (values : Js.Array String) (p : Js.Function1 (Js String) (Js Float)) :
+    RuntimeM (Js Bool) := Js.Array.some (β := Float) values p
+
+example (values : Js.Array String) (f : Js.Function1 (Js String) Unit) :
+    RuntimeM Unit := Js.Array.forEach values f
+
+example (_values : Js.Array String) (_p : Js.Function1 (Js Float) (Js Bool)) : True := by
+  fail_if_success have _ := Js.Array.filter _values _p
+  trivial
+
+example (reducer : Js (React.Reducer String Bool)) (initial : Js Float)
+    (init : Js.Function1 (Js Float) (Js String)) :
+    React.ReactM (Js (React.ReducerTuple String Bool)) :=
+  React.Hooks.useReducerWithInit reducer initial init
+
+example (_reducer : Js (React.Reducer String Bool)) (_initial : Js Float)
+    (_initialize : Js.Function1 (Js String) (Js Float)) : True := by
+  fail_if_success have _ := React.Hooks.useReducerWithInit _reducer _initial _initialize
+  trivial
+
+example (initial : Js.Nullable Element) :
+    React.ReactM (Js (React.Ref (Js.Nullable Element))) := React.Hooks.useRef initial
+
+example (initial : Js.UndefinedOr Element) :
+    React.ReactM (Js (React.Ref (Js.UndefinedOr Element))) := React.Hooks.useRef initial
+
 -- useCallback preserves the supported native call shape, including its result.
 example (f : Js.Function0 (Js String)) (deps : Js React.DependencyList) :
     React.ReactM (Js.Function0 (Js String)) := React.Hooks.useCallback f deps

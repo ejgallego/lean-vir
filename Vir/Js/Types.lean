@@ -176,6 +176,15 @@ arguments. Lean unary bridges ignore index/source as ordinary unary TS callbacks
     unfold Function1 Function3 Lean.Vir.Js at *
     exact value
 
+/-- The native unary-void subset of an Array.forEach callback. The callback
+still receives all native arguments; the Lean bridge ignores unused ones. -/
+@[inline] instance instUnaryArrayForEach {α : Type} :
+    CoeHead (Function1 (Lean.Vir.Js α) Unit)
+      (Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Array α) Unit) where
+  coe value := by
+    unfold Function1 Function3 Lean.Vir.Js at *
+    exact value
+
 end Function
 
 namespace Tuple2

@@ -82,5 +82,5 @@ test("primitive operation metadata distinguishes native methods from VIR-owned o
   assert.ok(config.roots.find(root => root.id === "string").upstream.declarations.includes("node_modules/typescript/lib/lib.es2015.core.d.ts"));
   const numberRoot = config.roots.find(root => root.id === "number").upstream;
   assert.ok(numberRoot.declarations.includes("node_modules/typescript/lib/lib.es2015.core.d.ts"));
-  assert.deepEqual(numberRoot.roots, ["NumberConstructor"]);
+  assert.deepEqual(numberRoot.roots, ["Number", "NumberConstructor"]);
 });

@@ -27,6 +27,34 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "javascript.string.interpolate", "group": "string", "target": "js.string.interpolate",
+        "lean": "Lean.Vir.Js.String.interpolate", "marker": "vir_js",
+        "reason": "VIR-owned untagged native template interpolation step: appends JavaScript ToString(value) to the native prefix, including native coercion order, Symbol rejection and exceptions. No Lean ToString is used.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "typeParameters": ["α"],
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"text","type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}},{"name":"value","type":{"lean":"Lean.Vir.Js α","representation":"js-resource","resourceInner":"α"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+      },
+      {
+        "id": "javascript.number.to-string", "group": "number", "target": "js.number.toString",
+        "lean": "Lean.Vir.Js.Number.toString", "marker": "vir_js",
+        "reason": "Calls the native numeric toString method with an explicit value-or-undefined radix; formatting, range errors and radix conversion remain native.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"Number.toString","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","role":"receiver","type":{"lean":"Lean.Vir.Js Float","representation":"js-resource","resourceInner":"Float"}},{"name":"radix","type":{"lean":"Lean.Vir.Js.UndefinedOr Float","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Float"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+      },
+      {
+        "id": "javascript.nat.to-string", "group": "numeric-operations", "target": "js.nat.toString",
+        "lean": "Lean.Vir.Js.Nat.toString", "marker": "vir_js",
+        "reason": "Calls the native numeric toString method with an explicit value-or-undefined radix; formatting, range errors and radix conversion remain native.",
+        "upstreamRelation": {"kind":"upstream-adapter","member":"BigInt.toString","semantics":"preserving"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","role":"receiver","type":{"lean":"Lean.Vir.Js Nat","representation":"js-resource","resourceInner":"Nat"}},{"name":"radix","type":{"lean":"Lean.Vir.Js.UndefinedOr Float","representation":"js-resource","resourceInner":"Lean.Vir.Js.UndefinedOr.Value Float"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js String","representation":"js-resource","resourceInner":"String"}}
+      },
+      {
         "id": "javascript.string.length", "group": "string", "target": "js.string.length",
         "lean": "Lean.Vir.Js.String.length", "marker": "vir_js",
         "reason": "Reads native String.length as a JavaScript number of UTF-16 code units, without decoding the string or counting Unicode code points.",
@@ -493,6 +521,28 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ)" } }
       },
       {
+        "id": "javascript.function.of-lean-binary-void", "group": "function", "target": "js.value.function.binaryVoid",
+        "lean": "Lean.Vir.Js.Function.ofLean2Void", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean binary callback with a discarded result into an ordinary JavaScript function.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.Js β → RuntimeM Unit", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Binary (Lean.Vir.Js α) (Lean.Vir.Js β) Unit" } }
+      },
+      {
+        "id": "javascript.function.of-lean-ternary-void", "group": "function", "target": "js.value.function.ternaryVoid",
+        "lean": "Lean.Vir.Js.Function.ofLean3Void", "marker": "vir_js_explicit_conversion",
+        "reason": "Explicitly converts a transferred Lean ternary callback with a discarded result into an ordinary JavaScript function.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α", "β", "γ"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "callback", "role": "callback", "passing": "owned", "retention": "until-release", "type": { "lean": "Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM Unit", "representation": "callback" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) Unit" } }
+      },
+      {
         "id": "javascript.function.of-lean-unary-void", "group": "function", "target": "js.value.function.unaryVoid",
         "lean": "Lean.Vir.Js.Function.ofLeanVoid", "marker": "vir_js_explicit_conversion",
         "reason": "Explicitly converts a transferred Lean unary callback with a discarded result into an ordinary JavaScript function.",
@@ -710,6 +760,78 @@
         "result": { "type": { "lean": "Lean.Vir.Js.Array β", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value β" } }
       },
       {
+        "id": "javascript.array.filter", "group": "array", "target": "js.array.filter",
+        "lean": "Lean.Vir.Js.Array.filter", "marker": "vir_js",
+        "reason": "Selects Array<T>.filter's ordinary predicate overload with no thisArg and no type-guard narrowing. The three-argument callback receives the native element, number index and original native source array; its generic native result uses JavaScript truthiness. The provider calls array.filter(callback) directly, preserving holes, species construction, the initial iteration bound, mutations, short-circuiting and callback errors.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.filter", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
+      },
+      {
+        "id": "javascript.array.find", "group": "array", "target": "js.array.find",
+        "lean": "Lean.Vir.Js.Array.find", "marker": "vir_js",
+        "reason": "Selects Array<T>.find's ordinary predicate overload with no thisArg and no type-guard narrowing. The three-argument callback receives the native value, number index and original native source array; its generic native result uses JavaScript truthiness. The provider calls array.find(callback) directly, preserving native hole visits, the initial iteration bound, mutations, short-circuiting and callback errors.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.find", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js.UndefinedOr α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value α" } }
+      },
+      {
+        "id": "javascript.array.some", "group": "array", "target": "js.array.some",
+        "lean": "Lean.Vir.Js.Array.some", "marker": "vir_js",
+        "reason": "Selects Array<T>.some's ordinary three-argument predicate with no thisArg. Its generic native result uses JavaScript truthiness, rather than restricting the callback to Bool; native short-circuiting, holes, mutations and callback errors are preserved by array.some(callback).",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.some", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.array.every", "group": "array", "target": "js.array.every",
+        "lean": "Lean.Vir.Js.Array.every", "marker": "vir_js",
+        "reason": "Selects Array<T>.every's ordinary predicate overload with no thisArg and no type-guard narrowing. Its generic native result uses JavaScript truthiness, rather than restricting the callback to Bool; native short-circuiting, holes, mutations and callback errors are preserved by array.every(callback).",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.every", "semantics": "preserving" },
+        "typeParameters": ["α", "β"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "javascript.array.for-each", "group": "array", "target": "js.array.forEach",
+        "lean": "Lean.Vir.Js.Array.forEach", "marker": "vir_js",
+        "reason": "Selects Array<T>.forEach's exact three-argument void callback with no thisArg. The provider calls array.forEach(callback) directly, preserving holes, the initial iteration bound, mutations and callback errors.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.forEach", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "callback", "role": "callback", "type": { "lean": "Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) Unit", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Function.Ternary (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) Unit" } }
+        ],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "javascript.array.join", "group": "array", "target": "js.array.join",
+        "lean": "Lean.Vir.Js.Array.join", "marker": "vir_js",
+        "reason": "Selects Array<T>.join's optional separator as an explicit JavaScript UndefinedOr String. The provider calls array.join(separator) directly, preserving native coercion of values, null, undefined and holes without a Lean-side conversion.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "Array.join", "semantics": "preserving" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [
+          { "name": "array", "role": "receiver", "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } },
+          { "name": "separator", "type": { "lean": "Lean.Vir.Js.UndefinedOr String", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.UndefinedOr.Value String" } }
+        ],
+        "result": { "type": { "lean": "Lean.Vir.Js String", "representation": "js-resource", "resourceInner": "String" } }
+      },
+      {
         "id": "javascript.array.length", "group": "array", "target": "js.array.length",
         "lean": "Lean.Vir.Js.Array.length", "marker": "vir_js",
         "reason": "Returns the exact native JavaScript Number stored in Array.length.",
@@ -806,7 +928,7 @@
       "upstream": { "kind": "internal" }
     },
     {
-      "id": "string", "title": "String operations", "targets": ["js.string.length", "js.string.equal", "js.string.concat", "js.string.slice", "js.string.includes", "js.string.startsWith", "js.string.endsWith", "js.string.trim", "js.string.toLowerCase", "js.string.toUpperCase"],
+      "id": "string", "title": "String operations", "targets": ["js.string.length", "js.string.equal", "js.string.concat", "js.string.interpolate", "js.string.slice", "js.string.includes", "js.string.startsWith", "js.string.endsWith", "js.string.trim", "js.string.toLowerCase", "js.string.toUpperCase"],
       "lean": { "public": ["Lean.Vir.Js.String"] },
       "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["String"] }
     },
@@ -836,7 +958,7 @@
       "title": "Array",
       "targets": ["js.array.*"],
       "lean": { "public": ["Lean.Vir.Js.Array"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts"], "roots": ["Array"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["Array"] }
     },
     {
       "id": "tuple2",
@@ -876,14 +998,14 @@
     {
       "id": "numeric-operations",
       "title": "Native Nat operations",
-      "targets": ["js.nat.add", "js.nat.mul", "js.nat.equal", "js.nat.lt", "js.nat.le"],
+      "targets": ["js.nat.add", "js.nat.mul", "js.nat.equal", "js.nat.lt", "js.nat.le", "js.nat.toString"],
       "lean": { "public": ["Lean.Vir.Js.Nat"] },
-      "upstream": { "kind": "internal" }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es2020.bigint.d.ts"], "roots": ["BigInt"] }
     },
     {
       "id": "number", "title": "Number operations", "targets": ["js.number.*"],
       "lean": { "public": ["Lean.Vir.Js.Number"] },
-      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["NumberConstructor"] }
+      "upstream": { "kind": "typescript", "package": "typescript", "declarations": ["node_modules/typescript/lib/lib.es5.d.ts", "node_modules/typescript/lib/lib.es2015.core.d.ts"], "roots": ["Number", "NumberConstructor"] }
     },
     {
       "id": "boolean", "title": "Native boolean operations", "targets": ["js.boolean.*"],

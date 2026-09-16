@@ -14,6 +14,9 @@ export function createJsValueHostBindings() {
   bindings["js.string.length"] = (value) => value.length;
   bindings["js.string.equal"] = (left, right) => left === right;
   bindings["js.string.concat"] = (value, suffix) => value.concat(suffix);
+  bindings["js.string.interpolate"] = (prefix, value) => `${prefix}${value}`;
+  bindings["js.number.toString"] = (value, radix) => value.toString(radix);
+  bindings["js.nat.toString"] = (value, radix) => value.toString(radix);
   bindings["js.string.slice"] = (value, start, end) => value.slice(start, end);
   bindings["js.string.includes"] = (value, search) => value.includes(search);
   bindings["js.string.startsWith"] = (value, search) => value.startsWith(search);

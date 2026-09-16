@@ -158,6 +158,28 @@ opaque useContext
 
 end React.Hooks
 
+namespace React.Hooks.Internal
+
+/--
+Generated binding for reviewed VIR protocol `react.hooks.use-reducer-with-init`.
+
+Selects React.useReducer's three-argument initializer overload with one action argument. The typed inline public declaration relates input, state and action; the monomorphic import avoids erased parameters exceeding the host ABI. All three native values and the returned tuple cross unchanged.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; reducer js-resource/borrowed/call; initial js-resource/borrowed/call; init js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.useReducerWithInit"]
+opaque useReducerWithInit
+    (reducer : @& Lean.Vir.Js (Lean.Vir.React.Reducer Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value))
+    (initial : @& Lean.Vir.Js.Any)
+    (init : @& Lean.Vir.Js.Function1 Lean.Vir.Js.Any Lean.Vir.Js.Any) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.ReducerTuple Lean.Vir.Js.Any.Value Lean.Vir.Js.Any.Value))
+
+end React.Hooks.Internal
+
 namespace React.Node
 
 /--

@@ -21,6 +21,8 @@ export function createBrowserReactHostBindings(lifecycle) {
     "react.useState": (initial) => React.useState(initial),
     "react.useReducer": (reducer, initial) =>
       React.useReducer(reducer, initial),
+    "react.useReducerWithInit": (reducer, initial, initialize) =>
+      React.useReducer(reducer, initial, initialize),
     "react.useRef": (initial) => React.useRef(initial),
     "react.useId": () => React.useId(),
     "react.useMemo": (calculate, deps) => React.useMemo(calculate, deps),

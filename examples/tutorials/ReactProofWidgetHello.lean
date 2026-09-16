@@ -36,7 +36,7 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
       let goal ← Js.Array.get goals zero
       return ← <pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>
   return ← <section id="react-proof-hello">
-    <h3>Hello from {uri}</h3>
+    <h3>{← js#!"Hello from {uri}"}</h3>
     {target}
   </section>
 

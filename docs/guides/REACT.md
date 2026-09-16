@@ -95,7 +95,12 @@ def Label : RuntimeM (FunctionComponent LabelProps) :=
 
 Given `let Label ← Label`, `<Label title="Hello"/>` checks field names, required
 fields and value types at compile time. No `LabelProps` record is allocated:
-JSX still writes a fresh native object. All fields must be supplied; generic,
+JSX still writes a fresh native object. Fields must be supplied unless their
+projection is tagged `attribute [js_optional] LabelProps.title`. Such a field
+may be omitted entirely (no property is written); if supplied, it must match
+the declared type. Its `js_field%` read returns `Js.UndefinedOr String`.
+A field declared `Js.UndefinedOr String` without the tag remains required;
+explicit `undefined` and omission are distinct. Generic,
 dependent and inherited schemas are outside this bounded surface. The special
 `key` and `children` fields and `__proto__` are not supported schema fields.
 Supply `key` separately, for example `<Label key={id} title="Hello"/>`: it accepts
@@ -309,7 +314,7 @@ baseline is the [React 19.2 public reference](https://react.dev/reference/react)
 | `createRoot(container, options?)` | `Root.create` selects an `Element` container and default options; other container types and root options are not exposed. |
 | `root.render(node)` / `root.unmount()` | `Root.render` / `Root.unmount` call the native methods. |
 | `useState(initial)` | Closed membership with initializer-first default inference; explicit/contextual state types are preserved. The no-argument overload is not exposed. |
-| `useReducer(reducer, initialArg, init?)` | Exact reducer, initial value and result tuple; the initializer overload is not exposed. |
+| `useReducer(reducer, initialArg, init?)` | `Hooks.useReducer` passes state directly; `Hooks.useReducerWithInit` passes the exact input and initializer. Both return the native tuple; the supported reducer takes one action. |
 | `dispatch(action)` | `Js.Function.callVoid` passes the exact action to the native dispatch function. |
 | `useRef(initial)` | Exact ref object; `Ref.get` / `Ref.set` access `current`. |
 | `useEffect(setup, dependencies?)` | Exact setup function, with omitted or exact JS dependency array. Lean setup/cleanup conversion is separate. |

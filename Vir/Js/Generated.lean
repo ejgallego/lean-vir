@@ -70,6 +70,118 @@ opaque map
     RuntimeM (Lean.Vir.Js.Array β)
 
 /--
+Generated binding for reviewed VIR protocol `javascript.array.filter`.
+
+Selects Array<T>.filter's ordinary predicate overload with no thisArg and no type-guard narrowing. The three-argument callback receives the native element, number index and original native source array; its generic native result uses JavaScript truthiness. The provider calls array.filter(callback) directly, preserving holes, species construction, the initial iteration bound, mutations, short-circuiting and callback errors.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.filter"]
+opaque filter
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.Array α)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.find`.
+
+Selects Array<T>.find's ordinary predicate overload with no thisArg and no type-guard narrowing. The three-argument callback receives the native value, number index and original native source array; its generic native result uses JavaScript truthiness. The provider calls array.find(callback) directly, preserving native hole visits, the initial iteration bound, mutations, short-circuiting and callback errors.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.find"]
+opaque find
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js.UndefinedOr α)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.some`.
+
+Selects Array<T>.some's ordinary three-argument predicate with no thisArg. Its generic native result uses JavaScript truthiness, rather than restricting the callback to Bool; native short-circuiting, holes, mutations and callback errors are preserved by array.some(callback).
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.some"]
+opaque some
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.every`.
+
+Selects Array<T>.every's ordinary predicate overload with no thisArg and no type-guard narrowing. Its generic native result uses JavaScript truthiness, rather than restricting the callback to Bool; native short-circuiting, holes, mutations and callback errors are preserved by array.every(callback).
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.every"]
+opaque every
+    {α : Type}
+    {β : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) (Lean.Vir.Js β)) :
+    RuntimeM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.for-each`.
+
+Selects Array<T>.forEach's exact three-argument void callback with no thisArg. The provider calls array.forEach(callback) directly, preserving holes, the initial iteration bound, mutations and callback errors.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; callback js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.forEach"]
+opaque forEach
+    {α : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (callback : @& Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js Float) (Lean.Vir.Js.Array α) Unit) :
+    RuntimeM Unit
+
+/--
+Generated binding for reviewed VIR protocol `javascript.array.join`.
+
+Selects Array<T>.join's optional separator as an explicit JavaScript UndefinedOr String. The provider calls array.join(separator) directly, preserving native coercion of values, null, undefined and holes without a Lean-side conversion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; array js-resource/borrowed/call; separator js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.array.join"]
+opaque join
+    {α : Type}
+    (array : @& Lean.Vir.Js.Array α)
+    (separator : @& Lean.Vir.Js.UndefinedOr String) :
+    RuntimeM (Lean.Vir.Js String)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.array.length`.
 
 Returns the exact native JavaScript Number stored in Array.length.
@@ -277,6 +389,43 @@ opaque ofLean3
     RuntimeM (Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) (Lean.Vir.Js δ))
 
 /--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-binary-void`.
+
+Explicitly converts a transferred Lean binary callback with a discarded result into an ordinary JavaScript function.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.binaryVoid"]
+opaque ofLean2Void
+    {α : Type}
+    {β : Type}
+    (callback : Lean.Vir.Js α → Lean.Vir.Js β → RuntimeM Unit) :
+    RuntimeM (Lean.Vir.Js.Function2 (Lean.Vir.Js α) (Lean.Vir.Js β) Unit)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.function.of-lean-ternary-void`.
+
+Explicitly converts a transferred Lean ternary callback with a discarded result into an ordinary JavaScript function.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; callback callback/owned/until-release; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.value.function.ternaryVoid"]
+opaque ofLean3Void
+    {α : Type}
+    {β : Type}
+    {γ : Type}
+    (callback : Lean.Vir.Js α → Lean.Vir.Js β → Lean.Vir.Js γ → RuntimeM Unit) :
+    RuntimeM (Lean.Vir.Js.Function3 (Lean.Vir.Js α) (Lean.Vir.Js β) (Lean.Vir.Js γ) Unit)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.function.of-lean-unary-void`.
 
 Explicitly converts a transferred Lean unary callback with a discarded result into an ordinary JavaScript function.
@@ -446,6 +595,23 @@ opaque call3Void
 end Js.Function.Internal
 
 namespace Js.Nat
+
+/--
+Generated binding for reviewed VIR protocol `javascript.nat.to-string`.
+
+Calls the native numeric toString method with an explicit value-or-undefined radix; formatting, range errors and radix conversion remain native.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; radix js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.nat.toString"]
+opaque toString
+    (value : @& Lean.Vir.Js Nat)
+    (radix : @& Lean.Vir.Js.UndefinedOr Float) :
+    RuntimeM (Lean.Vir.Js String)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.nat.add`.
@@ -662,6 +828,23 @@ opaque get
 end Js.Nullable
 
 namespace Js.Number
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.to-string`.
+
+Calls the native numeric toString method with an explicit value-or-undefined radix; formatting, range errors and radix conversion remain native.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; radix js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.toString"]
+opaque toString
+    (value : @& Lean.Vir.Js Float)
+    (radix : @& Lean.Vir.Js.UndefinedOr Float) :
+    RuntimeM (Lean.Vir.Js String)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.number.add`.
@@ -1038,6 +1221,24 @@ opaque catchValue
 end Js.Promise
 
 namespace Js.String
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.interpolate`.
+
+VIR-owned untagged native template interpolation step: appends JavaScript ToString(value) to the native prefix, including native coercion order, Symbol rejection and exceptions. No Lean ToString is used.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; text js-resource/borrowed/call; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.interpolate"]
+opaque interpolate
+    {α : Type}
+    (text : @& Lean.Vir.Js String)
+    (value : @& Lean.Vir.Js α) :
+    RuntimeM (Lean.Vir.Js String)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.string.length`.

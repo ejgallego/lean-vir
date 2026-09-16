@@ -9,6 +9,36 @@ public import Vir.Js
 
 public section
 open Lean.Vir
+open scoped Lean.Vir.Js
+
+def numberString := Js.Number.toString
+def natString := Js.Nat.toString
+def interpolate (value : Js.Any) : RuntimeM (Js String) := js#!"value:{value}!"
+def interpolateSequence (first second : Js.Function0 Js.Any) : RuntimeM (Js String) :=
+  js#!"{← Js.Function.call0 first}|{← Js.Function.call0 second}"
+
+def arrayFilter (values : Js.Array Js.Any.Value)
+    (predicate : Js.Function3 Js.Any (Js Float) (Js.Array Js.Any.Value) Js.Any) :=
+  Js.Array.filter values predicate
+def arrayFind (values : Js.Array Js.Any.Value)
+    (predicate : Js.Function3 Js.Any (Js Float) (Js.Array Js.Any.Value) Js.Any) :=
+  Js.Array.find values predicate
+def arraySome (values : Js.Array Js.Any.Value)
+    (predicate : Js.Function3 Js.Any (Js Float) (Js.Array Js.Any.Value) Js.Any) :=
+  Js.Array.some values predicate
+def arrayEvery (values : Js.Array Js.Any.Value)
+    (predicate : Js.Function3 Js.Any (Js Float) (Js.Array Js.Any.Value) Js.Any) :=
+  Js.Array.every values predicate
+def arrayJoin (values : Js.Array Js.Any.Value) (separator : Js.UndefinedOr String) :=
+  Js.Array.join values separator
+def arrayForEach (values : Js.Array Js.Any.Value)
+    (visit : Js.Function3 Js.Any (Js Float) (Js.Array Js.Any.Value) Unit) : RuntimeM Unit := do
+  let visit ← Js.Function.ofLean3Void fun value index source =>
+    Js.Function.call3Void visit value index source
+  Js.Array.forEach values visit
+def binaryVoid (visit : Js.Function2 Js.Any Js.Any Unit) (a b : Js.Any) : RuntimeM Unit := do
+  let visit ← Js.Function.ofLean2Void fun a b => Js.Function.call2Void visit a b
+  Js.Function.call2Void visit a b
 
 def stringEqual := Js.String.equal
 def stringConcat := Js.String.concat
