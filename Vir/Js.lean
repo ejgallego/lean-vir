@@ -169,6 +169,28 @@ def cast [Monad m] [Cast m target]
   | some result => pure (.ok result)
   | none => pure (.error { expected := Cast.expected (m := m) (target := target) })
 
+/-- Checked native primitive narrowing. Identity casts occur only after typeof. -/
+instance : Cast RuntimeM String where
+  expected := "string"
+  check value := do
+    if ← JsValue.toBool (← String.isString value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
+
+instance : Cast RuntimeM Float where
+  expected := "number"
+  check value := do
+    if ← JsValue.toBool (← Number.isNumber value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
+
+instance : Cast RuntimeM Bool where
+  expected := "boolean"
+  check value := do
+    if ← JsValue.toBool (← Boolean.isBoolean value) then
+      return some (by unfold Any Lean.Vir.Js at *; exact value)
+    else return none
+
 namespace Nullable
 
 def toOption {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM (Option (Lean.Vir.Js α)) := do

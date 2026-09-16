@@ -30,7 +30,7 @@ def initialProbe (eager : Js String) (initializer : Js.Function0 (Js String))
     let functionState ← Hooks.useState thunk
     let stored ← Js.Tuple2.first functionState
     let value ← Js.Tuple2.first lazyState
-    let click ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid stored value
     return ← <button id="react-initial-probe" onClick={click}>
       {← Js.Tuple2.first eagerState}{value}
@@ -62,9 +62,20 @@ def reducerInitializerProbe (reducer : Js (Reducer String String)) (initial : Js
     RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
     js#let (value, dispatch) ← Hooks.useReducerWithInit reducer initial init
-    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) =>
+    let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid dispatch action
     return ← <button onClick={click}>{value}</button>
+
+def eventProbe (record : Js.Function1 (Js SyntheticEvent) Unit) :
+    RuntimeM (FunctionComponent Props) :=
+  FunctionComponent.ofLean fun _ => do
+    let click ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => do
+      let _ ← SyntheticEvent.nativeEvent event
+      let _ ← SyntheticEvent.currentTarget event
+      SyntheticEvent.preventDefault event
+      SyntheticEvent.stopPropagation event
+      Js.Function.callVoid record event
+    return ← <button onClick={click}><span>event target</span></button>
 
 def counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
@@ -72,14 +83,14 @@ def counter : RuntimeM (FunctionComponent Props) := do
   let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
   FunctionComponent.ofLean fun _ => do
     js#let (countValue, countSetter) ← Hooks.useState (α := Nat) initial
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid countSetter (SetStateAction.ofUpdater update)
     return ← <button type="button" id="react-counter-button" onClick={increment}>react:{countValue}</button>
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   let node ← ReactM.run do
     let text ← Node.text (← Lean.Vir.JsValue.ofString (label value))
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => DomM.toRuntime (renderInto root (value + 1))
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime (renderInto root (value + 1))
     return ← <button type="button" id="react-counter-button" onClick={increment}>{pure text}</button>
   Root.render root node
 
@@ -190,7 +201,7 @@ def memoStableProbe : RuntimeM (FunctionComponent Props) :=
     let countValue ← JsValue.toNat countValueJs
     let cachedValue ← JsValue.toNat memoValue
     let text ← Node.text (← Lean.Vir.JsValue.ofString s!"react:memo-stable:{countValue}:{cachedValue}")
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => do
       let update ← Js.Function.ofLean fun previous => do
         let value ← JsValue.toNat previous
         JsValue.ofNat (value + 1)
@@ -222,7 +233,7 @@ def refFragmentProbe : RuntimeM (FunctionComponent Props) :=
     let lastValueResource ← Ref.get lastClick
     let lastValue ← JsValue.toNat lastValueResource
     let labelText ← Node.text (← Lean.Vir.JsValue.ofString s!"react:ref:{countValue}:{lastValue}")
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => do
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => do
       let update ← Js.Function.ofLean fun previous => do
         let value ← JsValue.toNat previous
         let next ← JsValue.ofNat (value + 1)
@@ -291,7 +302,7 @@ def renderWideTextLoop (selector : String) (width count : Nat) : DomM Nat := do
 
 def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text (← Lean.Vir.JsValue.ofString ("callback:" ++ toString index))
-  let click ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => DomM.toRuntime do
+  let click ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => DomM.toRuntime do
     Root.render root (← ReactM.run (benchTextTree 1))
   return ← <button type="button" className="react-bench-callback"
     data-index={← JsValue.ofString (toString index)} onClick={click}>{pure text}</button>

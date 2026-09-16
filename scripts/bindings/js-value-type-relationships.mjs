@@ -36,6 +36,11 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
   const dynamicContract = {
     "js.object.get": "dynamic property result",
     "js.string.fromAny": "closed String narrowing",
+    "js.number.fromAny": "closed Number narrowing",
+    "js.boolean.fromAny": "closed Boolean narrowing",
+    "js.string.isString": "closed String predicate",
+    "js.number.isNumber": "closed Number predicate",
+    "js.boolean.isBoolean": "closed Boolean predicate",
   }[protocol.target];
   const nodeListConversion = protocol.target === "js.nodeList.toArray";
   if (arrayOperation === undefined && tuplePosition === undefined && dynamicContract === undefined &&
@@ -138,8 +143,9 @@ export function validateJsValueTypeRelationships(protocol, symbols) {
       require(parameters.length === 1, "only the receiver may be polymorphic; a dynamic key cannot determine a result parameter");
       checkSignature([jsType(parameters[0]), jsType("String")], any);
     } else {
-      require(parameters.length === 0, "the predicate checks String only, never an arbitrary phantom");
-      checkSignature([any], jsType("String"), false);
+      require(parameters.length === 0, "the predicate checks a fixed primitive only, never an arbitrary phantom");
+      const result = { "js.string.fromAny": "String", "js.number.fromAny": "Float" }[protocol.target] ?? "Bool";
+      checkSignature([any], jsType(result), false);
     }
     return;
   }

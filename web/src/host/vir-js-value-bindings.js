@@ -43,6 +43,17 @@ export function createJsValueHostBindings() {
   bindings["js.number.isInteger"] = (value) => Number.isInteger(value);
   bindings["js.boolean.not"] = (value) => !value;
   bindings["js.boolean.equal"] = (left, right) => left === right;
+  bindings["js.string.isString"] = (value) => typeof value === "string";
+  bindings["js.number.isNumber"] = (value) => typeof value === "number";
+  bindings["js.boolean.isBoolean"] = (value) => typeof value === "boolean";
+  bindings["js.number.fromAny"] = (value) => {
+    if (typeof value !== "number") throw new TypeError("js.number.fromAny expects a primitive JavaScript number");
+    return value;
+  };
+  bindings["js.boolean.fromAny"] = (value) => {
+    if (typeof value !== "boolean") throw new TypeError("js.boolean.fromAny expects a primitive JavaScript boolean");
+    return value;
+  };
   bindings["js.string.fromAny"] = (value) => {
     if (typeof value !== "string") {
       throw new TypeError("js.string.fromAny expects a primitive JavaScript string");

@@ -31,7 +31,7 @@ def Counter : RuntimeM (FunctionComponent Props) := do
   let update ← Js.Function.ofLean fun previous => Js.Nat.add previous one
   FunctionComponent.ofLean fun _ => do
     js#let (value, setter) ← Hooks.useState (α := Nat) initial
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
     return ← <button type="button" onClick={increment}>Count: {value}</button>
 

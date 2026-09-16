@@ -137,6 +137,7 @@
             "ReactCounter.initialProbe",
             "ReactCounter.callbackShapeProbe",
             "ReactCounter.reducerInitializerProbe",
+            "ReactCounter.eventProbe",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
             "ReactCounter.renderStaticIntoSelector",

@@ -398,9 +398,21 @@ assert.equal(keyboardEventNarrowingImport?.result?.type, "Js");
 const keyboardEventKeyImport = hostImportTarget("browser.keyboardEvent.getKey");
 assert.equal(keyboardEventKeyImport?.args[0]?.type?.type, "KeyboardEvent");
 assert.equal(keyboardEventKeyImport?.result?.type, "Js");
-const eventTargetImport = hostImportTarget("browser.event.target");
-assert.equal(eventTargetImport?.args[0]?.type?.type, "Event");
+const eventTargetImport = hostImportTarget("react.syntheticEvent.currentTarget");
+assert.equal(eventTargetImport?.args[0]?.type?.type, "Js");
 assert.equal(eventTargetImport?.result?.type, "Js");
+const nativeEventImport = hostImportTarget("react.syntheticEvent.nativeEvent");
+assert.equal(nativeEventImport?.args[0]?.type?.type, "Js");
+assert.equal(nativeEventImport?.result?.type, "Event");
+for (const member of ["preventDefault", "stopPropagation"]) {
+  const entry = hostImportTarget(`react.syntheticEvent.${member}`);
+  assert.equal(entry?.effect, "react");
+  assert.equal(entry?.args[0]?.type?.type, "Js");
+  assert.equal(entry?.result?.type, "Unit");
+}
+for (const member of ["target", "currentTarget", "preventDefault", "stopPropagation"])
+  assert.equal(hostImportTarget(`browser.event.${member}`), undefined,
+    "React fixtures no longer import DOM event operations for synthetic events");
 const eventTargetNarrowingImport = hostImportTarget(
   "browser.eventTarget.asElement",
 );

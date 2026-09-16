@@ -511,6 +511,51 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
         await React.act(async () => root.unmount());
       }
     }
+    const eventContainer = document.createElement("div");
+    fixtures.append(eventContainer);
+    const eventRoot = createRoot(eventContainer);
+    const eventCalls = [];
+    const eventProviders = new Map();
+    for (const member of ["nativeEvent", "currentTarget", "preventDefault", "stopPropagation"]) {
+      const key = `react.syntheticEvent.${member}`;
+      const provider = hostBindings[key];
+      eventProviders.set(key, provider);
+      hostBindings[key] = event => {
+        const result = provider(event);
+        eventCalls.push({ member, event, result });
+        return result;
+      };
+    }
+    let receivedEvent;
+    let eventParents = 0;
+    const eventComponent = runtime.call("ReactCounter.eventProbe", event => {
+      receivedEvent = event;
+      check(event.currentTarget === eventContainer.querySelector("button"),
+        "React currentTarget is the handler element during the Lean callback");
+    });
+    try {
+      await React.act(async () => eventRoot.render(React.createElement("div", {
+        onClick: () => { eventParents++; },
+      }, React.createElement(eventComponent))));
+      const nativeEvent = new MouseEvent("click", { bubbles: true, cancelable: true });
+      const target = eventContainer.querySelector("span");
+      let accepted;
+      await React.act(async () => { accepted = target.dispatchEvent(nativeEvent); });
+      check(receivedEvent !== nativeEvent && !(receivedEvent instanceof Event) &&
+        receivedEvent.nativeEvent === nativeEvent && receivedEvent.target === target,
+      "the Lean callback receives React's exact synthetic event, distinct from nativeEvent");
+      check(eventCalls.length === 4 && eventCalls.every(call => call.event === receivedEvent) &&
+        eventCalls[0].result === nativeEvent &&
+        eventCalls[1].result === eventContainer.querySelector("button"),
+      "real Wasm forwards the exact event and returns its native event/current target unchanged");
+      check(accepted === false && nativeEvent.defaultPrevented && receivedEvent.defaultPrevented &&
+        eventParents === 0, "Lean invokes React's prevention and propagation methods");
+      check(receivedEvent.currentTarget === null,
+        "retaining the event does not extend currentTarget's dispatch-scoped validity");
+    } finally {
+      for (const [key, provider] of eventProviders) hostBindings[key] = provider;
+      await React.act(async () => eventRoot.unmount());
+    }
     const counterContainer = document.createElement("div");
     counterContainer.id = "native-counter-test";
     fixtures.append(counterContainer);
@@ -536,6 +581,7 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       ["ReactCounter.mountMemo", "native-memo"],
       ["ReactCounter.mountMemoStable", "native-memo-stable"],
       ["ReactInput.mountInput", "native-input"],
+      ["ReactInput.mountChangeInput", "native-change-input"],
       ["ReactInput.mountCheckbox", "native-checkbox"],
       ["ReactInput.mountSelectTextarea", "native-fields"],
       ["ReactInput.mountAttributes", "native-attributes"],
@@ -561,6 +607,16 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     });
     check(input.value === "Ada" && query("#react-name-output").textContent === "Ada",
       "input state remains native through event, props and text");
+    const changeInput = query("#react-change-input");
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(changeInput, "Grace");
+      changeInput.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    });
+    check(query("#react-change-output").textContent === "Grace",
+      "synthetic onChange preserves input state after preventing the native event");
+    const submit = new Event("submit", { bubbles: true, cancelable: true });
+    await React.act(async () => query("#react-change-widget").dispatchEvent(submit));
+    check(submit.defaultPrevented, "synthetic onSubmit cancels the native submit");
     await React.act(async () => query("#react-checkbox-input").click());
     check(query("#react-checkbox-output").textContent === "checked:true",
       "native boolean props and callbacks survive rerendering");
@@ -571,6 +627,13 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     });
     check(query("#react-select-textarea-output").textContent === "note:draft; flavor:chocolate",
       "native select values retain existing Lean formatting");
+    const textarea = query("#react-note-input");
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, "revised");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    check(query("#react-select-textarea-output").textContent === "note:revised; flavor:chocolate",
+      "textarea reads the control value through its explicit nativeEvent");
     const attributes = query("#react-attributes-widget");
     check(attributes.style.color === "rgb(1, 2, 3)" && attributes.style.marginTop === "4px" &&
       attributes.tabIndex === 3 && attributes.dataset.case === "attributes",

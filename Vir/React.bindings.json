@@ -94,6 +94,60 @@
     },
     "protocolOperations": [
       {
+        "id": "react.synthetic-event.native-event", "group": "events", "target": "react.syntheticEvent.nativeEvent",
+        "lean": "Lean.Vir.React.SyntheticEvent.nativeEvent", "marker": "vir_js",
+        "reason": "Reads the exact underlying browser event from the supported React.SyntheticEvent<EventTarget, Event> view. The synthetic event itself is not a browser Event.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.nativeEvent", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.Event", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.Event" } }
+      },
+      {
+        "id": "react.synthetic-event.target", "group": "events", "target": "react.syntheticEvent.target",
+        "lean": "Lean.Vir.React.SyntheticEvent.target", "marker": "vir_js",
+        "reason": "Reads the exact originating EventTarget; it can differ from the current listener target and is not assumed to be an Element.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.target", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.EventTarget", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.EventTarget" } }
+      },
+      {
+        "id": "react.synthetic-event.current-target", "group": "events", "target": "react.syntheticEvent.currentTarget",
+        "lean": "Lean.Vir.React.SyntheticEvent.currentTarget", "marker": "vir_js",
+        "reason": "Reads the exact current listener EventTarget without an element-subtype claim. The nonnullable TypeScript view is valid during dispatch; React clears this field afterward. No snapshot or lifetime extension is inserted.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.currentTarget", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Lean.Vir.Browser.EventTarget", "representation": "js-resource", "resourceInner": "Lean.Vir.Browser.EventTarget" } }
+      },
+      {
+        "id": "react.synthetic-event.default-prevented", "group": "events", "target": "react.syntheticEvent.defaultPrevented",
+        "lean": "Lean.Vir.React.SyntheticEvent.defaultPrevented", "marker": "vir_js",
+        "reason": "Reads the exact native boolean reporting whether the synthetic event's default action was prevented.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.defaultPrevented", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js Bool", "representation": "js-resource", "resourceInner": "Bool" } }
+      },
+      {
+        "id": "react.synthetic-event.prevent-default", "group": "events", "target": "react.syntheticEvent.preventDefault",
+        "lean": "Lean.Vir.React.SyntheticEvent.preventDefault", "marker": "vir_js",
+        "reason": "Invokes the native synthetic event's preventDefault method with its original receiver and no arguments.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.preventDefault", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
+        "id": "react.synthetic-event.stop-propagation", "group": "events", "target": "react.syntheticEvent.stopPropagation",
+        "lean": "Lean.Vir.React.SyntheticEvent.stopPropagation", "marker": "vir_js",
+        "reason": "Invokes the native synthetic event's stopPropagation method with its original receiver and no arguments.",
+        "upstreamRelation": { "kind": "upstream-adapter", "member": "React.BaseSyntheticEvent.stopPropagation", "semantics": "preserving" },
+        "effect": { "id": "react", "lean": "Lean.Vir.React.ReactM" },
+        "arguments": [{ "name": "event", "role": "receiver", "type": { "lean": "Lean.Vir.Js Lean.Vir.React.SyntheticEvent", "representation": "js-resource", "resourceInner": "Lean.Vir.React.SyntheticEvent" } }],
+        "result": { "type": { "lean": "Unit", "representation": "immediate" } }
+      },
+      {
         "id": "react.props.with-data.children", "group": "nodes", "target": "react.props.withData.children",
         "lean": "Lean.Vir.React.Props.WithData.children", "marker": "vir_js",
         "reason": "Returns the exact native props.children ReactNode, including undefined, a single node or an array. Does not normalize or evaluate children.",
@@ -257,6 +311,14 @@
     ]
   },
   "roots": [
+    {
+      "id": "events",
+      "title": "Synthetic events",
+      "description": "Base native React synthetic events with dispatch-scoped EventTarget views, distinct from their underlying browser events.",
+      "targets": ["react.syntheticEvent.*"],
+      "lean": { "public": ["Lean.Vir.React.SyntheticEvent"] },
+      "upstream": { "kind": "typescript", "package": "@types/react", "version": "19.2.18", "declarations": ["node_modules/@types/react/index.d.ts"], "roots": ["React.BaseSyntheticEvent", "React.SyntheticEvent"] }
+    },
     {
       "id": "nodes",
       "title": "React nodes",

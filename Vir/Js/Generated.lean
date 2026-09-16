@@ -221,6 +221,38 @@ end Js.Array
 namespace Js.Boolean
 
 /--
+Generated binding for reviewed VIR protocol `javascript.boolean.is-boolean`.
+
+Native typeof boolean test, preserving false and rejecting boxed Boolean values without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.boolean.isBoolean"]
+opaque isBoolean
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.boolean.from-any`.
+
+Checks typeof boolean and returns the exact value, including false. Throws TypeError on other kinds without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.boolean.fromAny"]
+opaque fromAny
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js Bool)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.boolean.not`.
 
 VIR-owned native JavaScript ! operator for boolean resources, without a Lean Bool conversion.
@@ -830,6 +862,38 @@ end Js.Nullable
 namespace Js.Number
 
 /--
+Generated binding for reviewed VIR protocol `javascript.number.is-number`.
+
+Native typeof number test, including NaN, infinities and negative zero; boxed numbers are not numbers.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.isNumber"]
+opaque isNumber
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.number.from-any`.
+
+Checks typeof number and returns the exact value, including NaN, infinities and negative zero. Throws TypeError on other kinds without coercion.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.number.fromAny"]
+opaque fromAny
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js Float)
+
+/--
 Generated binding for reviewed VIR protocol `javascript.number.to-string`.
 
 Calls the native numeric toString method with an explicit value-or-undefined radix; formatting, range errors and radix conversion remain native.
@@ -1221,6 +1285,22 @@ opaque catchValue
 end Js.Promise
 
 namespace Js.String
+
+/--
+Generated binding for reviewed VIR protocol `javascript.string.is-string`.
+
+Native typeof string test without coercion, boxing or schema validation.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; value js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "js.string.isString"]
+opaque isString
+    (value : @& Lean.Vir.Js.Any) :
+    RuntimeM (Lean.Vir.Js Bool)
 
 /--
 Generated binding for reviewed VIR protocol `javascript.string.interpolate`.

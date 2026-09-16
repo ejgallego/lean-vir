@@ -138,8 +138,19 @@ effect. A successful check preserves identity.
 
 Dynamic `Js.Object.get` returns `Js.Any`, including `undefined` for a
 missing property. Prefer a generated getter for a known field contract.
-For a primitive string, `Js.String.fromAny` checks the exact value and throws
-`TypeError` on other kinds, including boxed strings; it does not coerce.
+`Js.String.fromAny`, `Js.Number.fromAny` and `Js.Boolean.fromAny` check the
+primitive kind and return the exact value, throwing `TypeError` for other
+kinds. They do not coerce or accept boxed primitives. Their `isString`,
+`isNumber` and `isBoolean` predicates return native `Js Bool` values.
+The corresponding `Js.Cast RuntimeM` instances support `Js.cast?` and
+`Js.cast` when absence or a Lean error value is preferable to an exception:
+
+```lean
+let number : Option (Js Float) ← Js.cast? unknown
+```
+
+These checks establish only the JavaScript primitive kind: `NaN`, infinities
+and negative zero are all numbers and remain unchanged.
 
 `Js.Nullable α` represents native `null` or a `Js α` value.
 `Js.Nullable.toOption` and `ofOption` explicitly convert that view at the

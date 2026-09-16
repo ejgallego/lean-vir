@@ -292,8 +292,14 @@ it does not schedule, wrap or execute the callback.
 
 Refs are the actual callback or `{ current }` object; React can write a DOM node
 or `null` to `current`. Event props store the exact handler function and receive
-the browser/React event unchanged. Event validity after a handler returns is
-determined by that API, not by a VIR callback scope.
+the React event unchanged, typed as `Js React.SyntheticEvent`, not
+`Js Browser.Event`. `SyntheticEvent.nativeEvent` exposes the underlying DOM
+event explicitly. `target`, `currentTarget`, `defaultPrevented`,
+`preventDefault` and `stopPropagation` access the native React object directly.
+The supported type is TypeScript's `SyntheticEvent<EventTarget, Event>`;
+narrow an event target explicitly before accessing element-specific members.
+As in TypeScript, read `currentTarget` during dispatch: React can clear it after
+the handler returns. VIR does not extend event validity or retain a copy.
 
 Purity, hook order, dependency completeness, effect discipline and replay-safe
 reducers remain programmer responsibilities, just as in TypeScript React.

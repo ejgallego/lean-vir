@@ -560,6 +560,23 @@ example : RuntimeM (Js String) := js#"native string"
 example (s : Js String) (n : Js Float) (b : Js Bool) : RuntimeM (Js String) :=
   js#!"name={s}, number={n}, flag={b}"
 
+example (value : Js.Any) : RuntimeM (Option (Js String)) := Js.cast? value
+example (value : Js.Any) : RuntimeM (Option (Js Float)) := Js.cast? value
+example (value : Js.Any) : RuntimeM (Except Js.TypeConvError (Js Bool)) := Js.cast value
+
+example (_value : Js.Any) : True := by
+  fail_if_success have _ : RuntimeM (Js String) := Js.Number.fromAny _value
+  fail_if_success have _ : RuntimeM (Js Nat) := Js.Number.fromAny _value
+  fail_if_success have _ : RuntimeM (Js Float) := Js.Boolean.fromAny _value
+  trivial
+
+example (_event : Js React.SyntheticEvent) : True := by
+  fail_if_success have _ : DomM Unit := Browser.Event.preventDefault _event
+  trivial
+
+example (event : Js React.SyntheticEvent) : RuntimeM (Js Browser.Event) :=
+  React.SyntheticEvent.nativeEvent event
+
 example (_s : String) : True := by
   fail_if_success have _ : RuntimeM (Js String) := js#!"{_s}"
   trivial

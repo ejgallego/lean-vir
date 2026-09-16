@@ -38,8 +38,12 @@ def inputComponent : RuntimeM (FunctionComponent Props) :=
     let name ← Hooks.useState (α := String) (← js#"")
     let nameValue ← Js.Tuple2.first name
     let nameSetter ← Js.Tuple2.second name
-    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      match ← Browser.Event.inputElement? event with
+    let change ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => Browser.DomM.toRuntime do
+      let target ← ReactM.run (SyntheticEvent.currentTarget event)
+      let input ← match ← Browser.EventTarget.asElement target with
+        | none => pure none
+        | some element => Browser.HTMLInputElement.fromElement element
+      match input with
       | none => pure ()
       | some input => do
         Js.Function.callVoid nameSetter
@@ -55,17 +59,21 @@ def changeInputComponent : RuntimeM (FunctionComponent Props) :=
     let value ← Hooks.useState (α := String) (← js#"")
     let valueValue ← Js.Tuple2.first value
     let valueSetter ← Js.Tuple2.second value
-    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      Browser.Event.preventDefault event
-      Browser.Event.stopPropagation event
-      match ← Browser.Event.inputElement? event with
+    let change ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => Browser.DomM.toRuntime do
+      ReactM.run (SyntheticEvent.preventDefault event)
+      ReactM.run (SyntheticEvent.stopPropagation event)
+      let target ← ReactM.run (SyntheticEvent.currentTarget event)
+      let input ← match ← Browser.EventTarget.asElement target with
+        | none => pure none
+        | some element => Browser.HTMLInputElement.fromElement element
+      match input with
       | none => pure ()
       | some input => do
         Js.Function.callVoid valueSetter
           (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getValue input))
-    let submit ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      Browser.Event.preventDefault event
-      Browser.Event.stopPropagation event
+    let submit ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => do
+      SyntheticEvent.preventDefault event
+      SyntheticEvent.stopPropagation event
     return ← <form id="react-change-widget" onSubmit={submit}>
       <label htmlFor="react-change-input">change:</label>
       <input id="react-change-input" name="change" type="text" value={valueValue}
@@ -79,8 +87,12 @@ def checkboxComponent : RuntimeM (FunctionComponent Props) :=
     let checkedValue ← Js.Tuple2.first checked
     let checkedSetter ← Js.Tuple2.second checked
     let checkedLabelValue ← JsValue.toBool checkedValue
-    let change ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      match ← Browser.Event.inputElement? event with
+    let change ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => Browser.DomM.toRuntime do
+      let target ← ReactM.run (SyntheticEvent.currentTarget event)
+      let input ← match ← Browser.EventTarget.asElement target with
+        | none => pure none
+        | some element => Browser.HTMLInputElement.fromElement element
+      match input with
       | none => pure ()
       | some input => do
         Js.Function.callVoid checkedSetter
@@ -100,12 +112,14 @@ def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
     let flavor ← Hooks.useState (α := String) (← js#"vanilla")
     let flavorValue ← Js.Tuple2.first flavor
     let flavorSetter ← Js.Tuple2.second flavor
-    let noteChange ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
+    let noteChange ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => Browser.DomM.toRuntime do
+      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable
+          (← ReactM.run (SyntheticEvent.nativeEvent event))) with
       | none => pure ()
       | some next => Js.Function.callVoid noteSetter (React.SetStateAction.ofValue next)
-    let flavorChange ← Js.Function.ofLeanVoid fun event => Browser.DomM.toRuntime do
-      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable event) with
+    let flavorChange ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => Browser.DomM.toRuntime do
+      match ← Js.Nullable.toOption (← Browser.Event.formValueNullable
+          (← ReactM.run (SyntheticEvent.nativeEvent event))) with
       | none => pure ()
       | some next => Js.Function.callVoid flavorSetter (React.SetStateAction.ofValue next)
     let label := selectTextareaLabel (← JsValue.toString noteValue) (← JsValue.toString flavorValue)

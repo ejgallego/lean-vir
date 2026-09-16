@@ -58,7 +58,7 @@ private def ResponseView : RuntimeM (FunctionComponent (Props.WithData (Js Reply
     let reply ← LeanRef.fromJSL (← Props.WithData.data props)
     js#let (count, setCount) ← Hooks.useState (α := Nat) initial
     let label ← message reply
-    let increment ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) =>
+    let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid setCount (SetStateAction.ofUpdater update)
     return ← <button id="rpc-reference-view" onClick={increment}>
       {label} / local {count}

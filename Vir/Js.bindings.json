@@ -27,6 +27,51 @@
     "resources": {},
     "protocolOperations": [
       {
+        "id": "javascript.string.is-string", "group": "primitive-conversions", "target": "js.string.isString",
+        "lean": "Lean.Vir.Js.String.isString", "marker": "vir_js",
+        "reason": "Native typeof string test without coercion, boxing or schema validation.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
+        "id": "javascript.number.is-number", "group": "number", "target": "js.number.isNumber",
+        "lean": "Lean.Vir.Js.Number.isNumber", "marker": "vir_js",
+        "reason": "Native typeof number test, including NaN, infinities and negative zero; boxed numbers are not numbers.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
+        "id": "javascript.boolean.is-boolean", "group": "boolean", "target": "js.boolean.isBoolean",
+        "lean": "Lean.Vir.Js.Boolean.isBoolean", "marker": "vir_js",
+        "reason": "Native typeof boolean test, preserving false and rejecting boxed Boolean values without coercion.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
+        "id": "javascript.number.from-any", "group": "number", "target": "js.number.fromAny",
+        "lean": "Lean.Vir.Js.Number.fromAny", "marker": "vir_js",
+        "reason": "Checks typeof number and returns the exact value, including NaN, infinities and negative zero. Throws TypeError on other kinds without coercion.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Float","representation":"js-resource","resourceInner":"Float"}}
+      },
+      {
+        "id": "javascript.boolean.from-any", "group": "boolean", "target": "js.boolean.fromAny",
+        "lean": "Lean.Vir.Js.Boolean.fromAny", "marker": "vir_js",
+        "reason": "Checks typeof boolean and returns the exact value, including false. Throws TypeError on other kinds without coercion.",
+        "upstreamRelation": {"kind":"vir-owned"},
+        "effect": {"id":"runtime","lean":"RuntimeM"},
+        "arguments": [{"name":"value","type":{"lean":"Lean.Vir.Js.Any","representation":"js-resource","resourceInner":"Lean.Vir.Js.Any.Value"}}],
+        "result": {"type":{"lean":"Lean.Vir.Js Bool","representation":"js-resource","resourceInner":"Bool"}}
+      },
+      {
         "id": "javascript.string.interpolate", "group": "string", "target": "js.string.interpolate",
         "lean": "Lean.Vir.Js.String.interpolate", "marker": "vir_js",
         "reason": "VIR-owned untagged native template interpolation step: appends JavaScript ToString(value) to the native prefix, including native coercion order, Symbol rejection and exceptions. No Lean ToString is used.",
@@ -1015,7 +1060,7 @@
     {
       "id": "primitive-conversions",
       "title": "Primitive conversions",
-      "targets": ["js.bool", "js.bool.value", "js.float", "js.float.value", "js.nat", "js.nat.value", "js.string", "js.string.value", "js.string.fromAny"],
+      "targets": ["js.bool", "js.bool.value", "js.float", "js.float.value", "js.nat", "js.nat.value", "js.string", "js.string.value", "js.string.fromAny", "js.string.isString"],
       "lean": { "public": ["Lean.Vir.JsValue", "Lean.Vir.Js.String"] },
       "upstream": { "kind": "internal" }
     }

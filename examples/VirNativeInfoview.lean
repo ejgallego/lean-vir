@@ -226,7 +226,7 @@ def GoalCardBody
   let collapsedSetter ← Js.Tuple2.second collapsedState
   let collapsed ← JsValue.toBool collapsedValue
   let detailsId := s!"vir-native-infoview-goal-{goalId}-details"
-  let toggle ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.Browser.Event) => do
+  let toggle ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) => do
     let next ← JsValue.ofBool (!collapsed)
     Js.Function.callVoid collapsedSetter (Lean.Vir.React.SetStateAction.ofValue next)
   let hypothesisCount := (← JsValue.toFloat (← Js.Array.length hypotheses)).toUInt64.toNat

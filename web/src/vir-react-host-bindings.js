@@ -18,6 +18,12 @@ export function createBrowserReactHostBindings(lifecycle) {
     "react.props.withData.children": (props) => props.children,
     "react.node.fragment": (props, children) =>
       React.createElement(React.Fragment, props, ...children),
+    "react.syntheticEvent.nativeEvent": (event) => event.nativeEvent,
+    "react.syntheticEvent.target": (event) => event.target,
+    "react.syntheticEvent.currentTarget": (event) => event.currentTarget,
+    "react.syntheticEvent.defaultPrevented": (event) => event.defaultPrevented,
+    "react.syntheticEvent.preventDefault": (event) => event.preventDefault(),
+    "react.syntheticEvent.stopPropagation": (event) => event.stopPropagation(),
     "react.useState": (initial) => React.useState(initial),
     "react.useReducer": (reducer, initial) =>
       React.useReducer(reducer, initial),

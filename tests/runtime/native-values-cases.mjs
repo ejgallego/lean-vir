@@ -62,6 +62,45 @@ export async function runNativeValuesSmoke({ freshDir, wasmBytes }) {
     assert.equal(secondInterpolationCalls, 0, "a failing first ToPrimitive prevents the second callback");
     assert.throws(() => runtime.call("interpolate", Symbol("native symbol")), TypeError);
 
+    for (const value of ["", "\ud800"]) {
+      assert.equal(runtime.call("isString", value), true);
+      assert.equal(runtime.call("narrowString", value), value);
+      assert.equal(runtime.call("castString", value), value);
+    }
+    for (const value of [-0, NaN, Infinity, -Infinity]) {
+      assert.equal(runtime.call("isNumber", value), true);
+      assert.ok(Object.is(runtime.call("narrowNumber", value), value));
+      assert.ok(Object.is(runtime.call("castNumber", value), value));
+    }
+    for (const value of [false, true]) {
+      assert.equal(runtime.call("isBoolean", value), true);
+      assert.equal(runtime.call("narrowBoolean", value), value);
+      assert.equal(runtime.call("castBoolean", value), value);
+    }
+    let failedNarrowingConversions = 0;
+    const failedNarrowingValue = {
+      valueOf() { failedNarrowingConversions++; return 1; },
+      toString() { failedNarrowingConversions++; return "text"; },
+      [Symbol.toPrimitive]() { failedNarrowingConversions++; return true; },
+    };
+    const failedNarrowingProxy = new Proxy(failedNarrowingValue, {
+      get() { throw new Error("narrowing must not enter a proxy trap"); },
+    });
+    for (const value of [new String("text"), new Number(1), new Boolean(false), null, undefined,
+      failedNarrowingValue, failedNarrowingProxy]) {
+      for (const [predicate, narrow, cast] of [
+        ["isString", "narrowString", "castString"],
+        ["isNumber", "narrowNumber", "castNumber"],
+        ["isBoolean", "narrowBoolean", "castBoolean"],
+      ]) {
+        assert.equal(runtime.call(predicate, value), false);
+        assert.equal(runtime.call(cast, value), null);
+        assert.throws(() => runtime.call(narrow, value), TypeError);
+      }
+    }
+    assert.equal(failedNarrowingConversions, 0,
+      "failed narrowings and casts preserve the exact object without coercion or property access");
+
     const sparse = [, "present"];
     const findVisits = [];
     assert.equal(runtime.call("arrayFind", sparse, (value, index, source) => {

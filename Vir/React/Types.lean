@@ -33,6 +33,13 @@ opaque Root : Type
 /-- React element type accepted by `React.createElement`. -/
 opaque ElementType : Type
 
+/-- Native React synthetic event, distinct from its underlying browser event.
+The supported view is `React.SyntheticEvent<EventTarget, Event>`: target fields
+do not promise an element subtype. The nonnullable `currentTarget` view follows
+TypeScript and is valid during dispatch; React clears it afterward. Retaining
+this handle does not freeze its fields or extend the dispatch lifetime. -/
+opaque SyntheticEvent : Type
+
 namespace Initial
 
 /-- Native `S | (() => S)`, with no tag or wrapper around the JavaScript value. -/

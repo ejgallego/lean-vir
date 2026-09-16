@@ -11,6 +11,19 @@ public section
 open Lean.Vir
 open scoped Lean.Vir.Js
 
+def narrowString := Js.String.fromAny
+def narrowNumber := Js.Number.fromAny
+def narrowBoolean := Js.Boolean.fromAny
+def isString := Js.String.isString
+def isNumber := Js.Number.isNumber
+def isBoolean := Js.Boolean.isBoolean
+def castString (value : Js.Any) : RuntimeM (Js.Nullable String) := do
+  Js.Nullable.ofOption (← Js.cast? value)
+def castNumber (value : Js.Any) : RuntimeM (Js.Nullable Float) := do
+  Js.Nullable.ofOption (← Js.cast? value)
+def castBoolean (value : Js.Any) : RuntimeM (Js.Nullable Bool) := do
+  Js.Nullable.ofOption (← Js.cast? value)
+
 def numberString := Js.Number.toString
 def natString := Js.Nat.toString
 def interpolate (value : Js.Any) : RuntimeM (Js String) := js#!"value:{value}!"

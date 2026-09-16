@@ -374,4 +374,104 @@ opaque create
 
 end React.Root
 
+namespace React.SyntheticEvent
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.native-event`.
+
+Reads the exact underlying browser event from the supported React.SyntheticEvent<EventTarget, Event> view. The synthetic event itself is not a browser Event.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.nativeEvent"]
+opaque nativeEvent
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.Event)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.target`.
+
+Reads the exact originating EventTarget; it can differ from the current listener target and is not assumed to be an Element.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.target"]
+opaque target
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.EventTarget)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.current-target`.
+
+Reads the exact current listener EventTarget without an element-subtype claim. The nonnullable TypeScript view is valid during dispatch; React clears this field afterward. No snapshot or lifetime extension is inserted.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.currentTarget"]
+opaque currentTarget
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.Browser.EventTarget)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.default-prevented`.
+
+Reads the exact native boolean reporting whether the synthetic event's default action was prevented.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.defaultPrevented"]
+opaque defaultPrevented
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM (Lean.Vir.Js Bool)
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.prevent-default`.
+
+Invokes the native synthetic event's preventDefault method with its original receiver and no arguments.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.preventDefault"]
+opaque preventDefault
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM Unit
+
+/--
+Generated binding for reviewed VIR protocol `react.synthetic-event.stop-propagation`.
+
+Invokes the native synthetic event's stopPropagation method with its original receiver and no arguments.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-react-protocol-v1` (bridge-handle retention): receiver none; event js-resource/borrowed/call; result immediate/value.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js "react.syntheticEvent.stopPropagation"]
+opaque stopPropagation
+    (event : @& Lean.Vir.Js Lean.Vir.React.SyntheticEvent) :
+    Lean.Vir.React.ReactM Unit
+
+end React.SyntheticEvent
+
 end Lean.Vir
