@@ -32,6 +32,15 @@ def denseLookup (index : Nat) : UInt8 :=
 def denseTableHandle : Lean.Vir.RuntimeM (Lean.Vir.JSL ByteArray) :=
   Lean.Vir.LeanRef.toJSL denseTable
 
+@[vir_js "test.retainDenseTableCallback"]
+opaque retainDenseTableCallback
+    (callback : Lean.Vir.Js Nat → Lean.Vir.RuntimeM (Lean.Vir.JSL ByteArray)) :
+    Lean.Vir.RuntimeM Unit
+
+@[vir_export]
+def installDenseTableCallback : Lean.Vir.RuntimeM Unit :=
+  retainDenseTableCallback fun _ => denseTableHandle
+
 @[vir_export]
 def denseLookupValue (index : Nat) : Nat :=
   (denseLookup index).toNat

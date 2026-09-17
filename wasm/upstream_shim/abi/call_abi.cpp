@@ -96,6 +96,10 @@ extern "C" lean::object * vir_call_resolved_objects(
         args.push_back(lean_io_mk_world());
     }
     lean::object * result = lean::vir::run_interpreter_function(fn_obj, args.size(), args.data());
+    if (result == nullptr) {
+        lean::vir::g_call_error = lean::vir::package_interpreter_entry_error();
+        return nullptr;
+    }
     if (summary.is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
