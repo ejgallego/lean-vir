@@ -8,6 +8,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { releaseCallbackRoots } from "../../web/src/runtime/callbacks.js";
 import {
   publicArtifactPath,
   wasmPublicFile,
@@ -21,12 +22,62 @@ import {
 } from "./shared.mjs";
 
 const wasmBytes = await readFile(
-  new URL(`../../${publicArtifactPath(wasmPublicFile)}`, import.meta.url),
+  process.argv[2] ??
+    new URL(`../../${publicArtifactPath(wasmPublicFile)}`, import.meta.url),
 );
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-constant-cache-"));
 const source = join(freshDir, "InterpreterConstantCache.lean");
 const packagePath = join(freshDir, "interpreter-constant-cache.irpkg");
 let runtime = null;
+const callbacks = [];
+
+function assertCallbackCache(label) {
+  const install =
+    "Vir.Fixtures.InterpreterConstantCache.installDenseTableCallback";
+  runtime.call(install);
+  runtime.call(install);
+  assert.equal(callbacks.length, 2);
+  const first = callbacks[0](0n);
+  const second = callbacks[1](0n);
+  const firstCell = liveObjectCell(first, `${label} first callback result`);
+  const secondCell = liveObjectCell(second, `${label} second callback result`);
+  const pointer = firstCell.object;
+  assert.equal(
+    secondCell.object,
+    pointer,
+    `${label} independent callbacks share the cached constant`,
+  );
+
+  // Explicit internal releases make this deterministic; no GC timing claim.
+  runtime.releaseLeanObjectHandleCell(firstCell);
+  runtime.releaseLeanObjectHandleCell(secondCell);
+  releaseCallbackRoots([callbacks.shift()]);
+  assert.equal(runtime.liveCallbacks.size, 1);
+  const surviving = callbacks[0](0n);
+  const survivingCell = liveObjectCell(
+    surviving,
+    `${label} surviving callback result`,
+  );
+  assert.equal(
+    survivingCell.object,
+    pointer,
+    `${label} releasing results and one callback preserves the cache`,
+  );
+  releaseCallbackRoots(callbacks);
+  runtime.releaseLeanObjectHandleCell(survivingCell);
+  assert.equal(runtime.liveCallbacks.size, 0);
+  const named = runtime.call(
+    "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
+  );
+  const namedCell = liveObjectCell(named, `${label} named result after callbacks`);
+  assert.equal(
+    namedCell.object,
+    pointer,
+    `${label} named entry shares the callback-populated cache`,
+  );
+  runtime.releaseLeanObjectHandleCell(namedCell);
+  assert.equal(runtime.hostState.leanObjectHandleCells.size, 0);
+}
 
 function liveObjectCell(resource, label) {
   assert.ok(resource !== null, `${label} must be a live JSL value`);
@@ -56,9 +107,20 @@ try {
   await writeRuntimeFixture(source, "InterpreterConstantCache.lean");
   await generateIrPackage("InterpreterConstantCache", source, packagePath, "marked");
   const packageBytes = await readFile(packagePath);
-  runtime = await createVirRuntimeFactory({ wasmBytes }).createRuntime({
+  runtime = await createVirRuntimeFactory({
+    wasmBytes,
+    hostBindings: {
+      "test.retainDenseTableCallback": callback => {
+        callbacks.push(callback);
+      },
+    },
+  }).createRuntime({
     irPackageSet: [packageBytes],
   });
+
+  assertCallbackCache("initial package");
+  // Start cold again for the existing named-entry timing control.
+  runtime.loadIrPackageSetBytes([packageBytes]);
 
   const first = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
@@ -93,6 +155,9 @@ try {
     "replacement must release the old second cell",
   );
 
+  assertCallbackCache("replacement package");
+  runtime.loadIrPackageSetBytes([packageBytes]);
+
   const replacementFirst = runtime.callTimed(
     "Vir.Fixtures.InterpreterConstantCache.denseTableHandle",
   );
@@ -102,14 +167,19 @@ try {
   assertWarmCache(replacementFirst, replacementSecond, "replacement package");
 
   console.log(
-    "interpreter constant cache smoke ok: " +
+    "interpreter constant cache smoke ok: callback identity/release/replacement; " +
       `initial=${first.timings.executeMs.toFixed(3)}/${second.timings.executeMs.toFixed(3)}ms ` +
       `replacement=${replacementFirst.timings.executeMs.toFixed(3)}/` +
       `${replacementSecond.timings.executeMs.toFixed(3)}ms`,
   );
 } finally {
   try {
+    const hostState = runtime?.hostState;
     runtime?.dispose();
+    if (runtime !== null) {
+      assert.equal(runtime.liveCallbacks.size, 0);
+      assert.equal(hostState.leanObjectHandleCells.size, 0);
+    }
   } finally {
     await rm(freshDir, { recursive: true, force: true });
   }

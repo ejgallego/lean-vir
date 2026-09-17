@@ -117,9 +117,17 @@ does not change the current package format or interpreter lifetime.
 
 Upstream has instance-wide native-symbol/initialized-global caches and
 per-interpreter declaration/evaluated-nullary caches. VIR keeps one interpreter
-session per loaded package set, preserving lazy nullary evaluation across public
-calls. `@[implemented_by]` closures use that same cache; initializer globals
-retain their explicit metadata and `lean_run_init` path.
+session per loaded package set. Initializers, named calls and JavaScript-entered
+Lean callbacks share its declaration and lazy nullary caches, including
+`@[implemented_by]` closures. Initializers retain their explicit metadata and
+use upstream `interpreter::run_init` within that session.
+
+Supported package execution uses a fixed environment/options pair. Entry with
+a foreign active interpreter or a pending reset fails before evaluation;
+owned arguments are consumed once. Reset during an active entry is deferred
+until the outer entry unwinds. Arbitrary foreign captured closures supplied by
+raw native callers are outside this contract; upstream's captured-context
+selection remains unchanged.
 
 The session adapter includes the pinned interpreter implementation unchanged
 because its class is implementation-private. It discards the session on caught
@@ -150,7 +158,8 @@ The package-set transaction inside the fresh instance is:
    `vir_validate_package_contract` before installing its host-import manifest.
    That check compares ordered binary export/host-import fields with one manifest
    projection.
-5. `vir_finish_ir_package_set` runs the initializer table through `lean_run_init`
+5. `vir_finish_ir_package_set` runs the initializer table through the package
+   interpreter's upstream `run_init`
    once for a successful set. Generated descriptors order members dependency-first,
    with each member retaining its owning initializer metadata.
 

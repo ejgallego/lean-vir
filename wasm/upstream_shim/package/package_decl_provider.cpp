@@ -20,13 +20,6 @@ Author: Emilio J. Gallego Arias
 #include "util/name.h"
 #include "util/name_hash_map.h"
 
-extern "C" lean::object * lean_run_init(
-    lean::object * env,
-    lean::object * opts,
-    lean::object * decl,
-    lean::object * init_decl,
-    lean::object * world);
-
 extern "C" uint8_t l_Lean_isIdFirst(uint32_t c);
 extern "C" uint8_t l_Lean_isIdRest(uint32_t c);
 
@@ -302,7 +295,7 @@ public:
 };
 
 static bool run_init_global(init_global_entry const & entry) {
-    object * result = lean_run_init(lean_box(0), lean_box(0), entry.name, entry.init_name, lean_box(0));
+    object * result = run_package_interpreter_initializer(entry.name, entry.init_name);
     if (lean_io_result_is_ok(result)) {
         lean_dec(result);
         return true;

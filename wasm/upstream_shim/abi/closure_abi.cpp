@@ -11,6 +11,7 @@ Author: Emilio J. Gallego Arias
 
 #include "runtime/io.h"
 #include "runtime/object.h"
+#include "interpreter/interpreter_bridge.h"
 
 namespace lean {
 namespace {
@@ -108,7 +109,11 @@ extern "C" object * vir_closure_call_objects(uint32_t root_id, object ** argv, u
         args.push_back(lean_io_mk_world());
     }
     lean_inc(fn);
-    object * result = apply_n(fn, static_cast<unsigned>(args.size()), args.data());
+    object * result = vir::apply_package_closure(fn, static_cast<unsigned>(args.size()), args.data());
+    if (result == nullptr) {
+        g_closure_call_error = vir::package_interpreter_entry_error();
+        return nullptr;
+    }
     if (is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
