@@ -18,6 +18,9 @@ const source = await readFile(
   "utf8",
 );
 function extract(start) {
+  // Deliberately limited to these simple definitions, not a C++ parser. Braces
+  // in comments/string literals or preprocessor branches require revisiting this
+  // harness; it does not validate the real interpreter class or Wasm traps.
   const begin = source.indexOf(start);
   assert.ok(begin >= 0, start);
   let end = source.indexOf("{", begin),

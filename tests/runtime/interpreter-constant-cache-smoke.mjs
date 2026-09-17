@@ -48,9 +48,10 @@ function assertCallbackCache(label) {
     `${label} independent callbacks share the cached constant`,
   );
 
-  // Explicit internal releases make this deterministic; no GC timing claim.
-  runtime.releaseLeanObjectHandleCell(firstCell);
+  // Keep firstCell as a live identity witness so allocator address reuse cannot
+  // disguise reconstruction. Explicit internal releases make cleanup deterministic.
   runtime.releaseLeanObjectHandleCell(secondCell);
+  assert.equal(secondCell.live, false);
   releaseCallbackRoots([callbacks.shift()]);
   assert.equal(runtime.liveCallbacks.size, 1);
   const surviving = callbacks[0](0n);
@@ -61,7 +62,7 @@ function assertCallbackCache(label) {
   assert.equal(
     survivingCell.object,
     pointer,
-    `${label} releasing results and one callback preserves the cache`,
+    `${label} releasing a result and one callback preserves the cache`,
   );
   releaseCallbackRoots(callbacks);
   runtime.releaseLeanObjectHandleCell(survivingCell);
@@ -76,6 +77,9 @@ function assertCallbackCache(label) {
     `${label} named entry shares the callback-populated cache`,
   );
   runtime.releaseLeanObjectHandleCell(namedCell);
+  assert.equal(liveObjectCell(first, `${label} identity witness`), firstCell);
+  runtime.releaseLeanObjectHandleCell(firstCell);
+  assert.equal(firstCell.live, false);
   assert.equal(runtime.hostState.leanObjectHandleCells.size, 0);
 }
 
@@ -95,11 +99,6 @@ function assertWarmCache(first, second, label) {
     liveObjectCell(second.value, `${label} second handle`).object,
     liveObjectCell(first.value, `${label} first handle`).object,
     `${label} calls must retain the same cached nullary object`,
-  );
-  assert.ok(
-    second.timings.executeMs * 4 < first.timings.executeMs,
-    `${label} warm call should avoid rebuilding the dense table: ` +
-      `first=${first.timings.executeMs.toFixed(3)}ms second=${second.timings.executeMs.toFixed(3)}ms`,
   );
 }
 

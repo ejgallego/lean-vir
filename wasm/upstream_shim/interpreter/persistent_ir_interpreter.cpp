@@ -40,9 +40,6 @@ public:
     object * apply(object * fn, unsigned argc, object ** args) {
         // Supported package closures capture this session's fixed env/options.
         // Keep the package interpreter active across C/JS callback boundaries.
-        if (ir::g_interpreter != nullptr) {
-            return apply_n(fn, argc, args);
-        }
         flet<ir::interpreter *> interpreter_scope(ir::g_interpreter, &m_interpreter);
         return apply_n(fn, argc, args);
     }
