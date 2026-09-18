@@ -59,7 +59,7 @@ try {
 }
 
 const generator = prepareVirIrpkgSync({
-  lakeTargets: [...new Set(packages.map((config) => `+${config.module}`))],
+  modules: [...new Set(packages.map((config) => config.module))],
 });
 if (!generator.ok) {
   console.error(`error: ${irpkgGeneratorFailureMessage(generator)}`);
@@ -75,6 +75,7 @@ for (const packageConfig of packages) {
       [
         packageConfig.packagePath,
         packageConfig.reportPath,
+        ...generator.inputArgs,
         ...packageConfig.targetArgs,
       ],
       { cwd: repositoryRoot, env: generator.env },
@@ -99,8 +100,7 @@ const packagesSeconds = packageTimings.reduce(
   0,
 );
 console.log(
-  `irpkg timing: lean-lib=${formatSeconds(generator.libSeconds)}s ` +
-    `generator=${formatSeconds(generator.generatorSeconds)}s ` +
+  `irpkg timing: generator=${formatSeconds(generator.generatorSeconds)}s ` +
     `${packages.length === 1 ? "package" : "packages"}=${formatSeconds(packagesSeconds)}s ` +
     `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
 );
