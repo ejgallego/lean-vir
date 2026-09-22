@@ -146,11 +146,17 @@ presentation state, and ordinary React component/effect lifecycles**.
   policy, retain original native handles and support display reversal.
   Native traversal still spells out length/index numeric conversions; a native
   indexed-loop surface would improve this without reintroducing array staging.
-- Names, hypotheses and goal cards compose as `Array Html` directly, without
-  first executing the children and then mapping `pure` over their nodes. This
-  removes intermediate staging, not the remaining Lean arrays. Native array
-  literals already use `js#[]`; easier native iteration, mapping and JSX splicing
-  remain API follow-ups, including the proposed `js%[]` authoring surface.
+- JSX now accepts native child arrays directly. Names, hypotheses, goal cards,
+  settings controls and popup contents are built as `Js.Array Node`; `js#[]`
+  handles fixed groups, and `{children}` passes them through without a Lean-array
+  spread or a second node conversion. React keys are explicit on dynamic children.
+  Native indexed iteration and a more compact native array literal remain useful
+  authoring follow-ups.
+- React state uses native `useState` tuples, native setters and native function
+  callbacks. Effect setup returns a nullable native cleanup function; DOM work
+  in event/effect callbacks crosses the explicit `Browser.DomM.toRuntime`
+  boundary. This removes the former React-specific state and callback adapters
+  while keeping hover ownership and cleanup in Lean.
 - Stable factories are constructed once, outside render. The recursive tagged
   renderer passes a render closure to a stable tag component; it needs no mutable
   self-reference or generic component framework.
