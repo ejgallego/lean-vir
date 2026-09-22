@@ -56,6 +56,12 @@ native names such as `aria-label` and `data-testid`. Events take native
 functions, so convert a Lean closure explicitly with `Js.Function.ofLeanVoid`.
 There are no per-attribute or per-tag helper catalogues.
 
+JSX batches construction: it evaluates all attribute actions before defining
+props, then all child actions before filling the native child array. Effects
+remain in source order, but a property-definition failure can occur after more
+actions than with per-field construction. See the
+[host binding contract](../reference/HOST_BINDINGS.md#semantic-fidelity).
+
 In native object fields, native arrays and JSX attributes, `js#"text"` inserts
 its conversion at that position: `js%{ "title" := js#"Hello" }`,
 `js#[js#"Hello"]` and `<span title={js#"Hello"}/>` need no extra arrow.

@@ -40,6 +40,8 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   };
   const setProperty = hostBindings["js.construction.field"];
   let literalWrites = 0;
+  let loweredObjects = 0;
+  let loweredArrays = 0;
   const withInheritedSetter = (object, name, value, write) => {
     const original = Object.getPrototypeOf(object);
     const inherited = Object.create(original);
@@ -63,6 +65,35 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   hostBindings["js.construction.element"] = (array, value) => traceConstruction
     ? withInheritedSetter(array, String(array.length), value, () => appendElement(array, value))
     : appendElement(array, value);
+  const objectFromFields = hostBindings["js.construction.objectFromFields"];
+  let objectCallCount = 0;
+  hostBindings["js.construction.objectFromFields"] = fields => {
+    objectCallCount++;
+    const result = objectFromFields(fields);
+    if (traceConstruction) {
+      loweredObjects++;
+      for (const { fst: name, snd: value } of fields) {
+        trace.push(name);
+        const descriptor = Object.getOwnPropertyDescriptor(result, name);
+        check(descriptor?.value === value && descriptor.writable && descriptor.enumerable &&
+          descriptor.configurable, "batched JSX props are own data properties");
+      }
+    }
+    return result;
+  };
+  const arrayFromValues = hostBindings["js.construction.arrayFromValues"];
+  let arrayCallCount = 0;
+  hostBindings["js.construction.arrayFromValues"] = values => {
+    arrayCallCount++;
+    const result = arrayFromValues(values);
+    if (traceConstruction) {
+      loweredArrays++;
+      check(result === values && values.every((value, index) =>
+        Object.getOwnPropertyDescriptor(values, index)?.value === value),
+      "batched JSX children retain their own dense native array");
+    }
+    return result;
+  };
   check(!Object.hasOwn(hostBindings, "react.node.text") &&
     !Object.hasOwn(hostBindings, "react.elementType.tag"),
   "native text and tag views need no host providers");
@@ -168,7 +199,79 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       typed.props.payload === payload && typed.props.onClick === callback &&
       typed.props.values.length === 2 && typed.props.values.every(value => value === label),
     "typed native props preserve exact inputs");
-    check(literalWrites > 10, "own-property regression exercises object, array and typed JSX lowering");
+    const order = [];
+    const orderEntry = "ProofWidgetsJsxSubset.nativeConstructionOrder";
+    const ordered = runtime.call(orderEntry, value => order.push(value), "first", "second", "child");
+    check(JSON.stringify(order) === JSON.stringify(["first", "second", "child"]) &&
+      ordered.props["data-first"] === "first" && ordered.props["data-second"] === "second" &&
+      ordered.props.children === "child",
+    "JSX evaluates attributes in order, then children after defining props");
+    const beforeAttributeFailure = objectCallCount;
+    const attributeFailure = new Error("JSX attribute evaluation failed");
+    let caught;
+    try {
+      runtime.call(orderEntry, value => {
+        order.push(value);
+        throw attributeFailure;
+      }, "first", "second", "child");
+    } catch (error) { caught = error; }
+    check(caught === attributeFailure && order.at(-1) === "first" &&
+      objectCallCount === beforeAttributeFailure,
+    "a failing attribute prevents props construction and child evaluation");
+    const definitionFailure = new Error("JSX property definition failed");
+    const defineProperty = Object.defineProperty;
+    const beforeDefinitionFailure = objectCallCount;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (name === "data-first") throw definitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      caught = undefined;
+      try {
+        runtime.call(orderEntry, value => order.push(value), "first", "second", "child");
+      } catch (error) { caught = error; }
+    } finally { Object.defineProperty = defineProperty; }
+    check(caught === definitionFailure &&
+      JSON.stringify(order.slice(-2)) === JSON.stringify(["first", "second"]) &&
+      objectCallCount === beforeDefinitionFailure + 1,
+    "definition failure follows all attribute effects but prevents child effects");
+    const childEntry = "ProofWidgetsJsxSubset.nativeChildConstructionOrder";
+    const childOrder = [];
+    const twoChildren = runtime.call(childEntry, value => childOrder.push(value), "first", "second");
+    check(JSON.stringify(childOrder) === JSON.stringify(["first", "second"]) &&
+      JSON.stringify(twoChildren.props.children) === JSON.stringify(["first", "second"]),
+    "JSX evaluates two child actions once and preserves their order");
+    const beforeChildExpressionFailure = arrayCallCount;
+    const childExpressionFailure = new Error("JSX child evaluation failed");
+    caught = undefined;
+    try {
+      runtime.call(childEntry, value => {
+        childOrder.push(value);
+        if (value === "first") throw childExpressionFailure;
+      }, "first", "second");
+    } catch (error) { caught = error; }
+    check(caught === childExpressionFailure && childOrder.at(-1) === "first" &&
+      arrayCallCount === beforeChildExpressionFailure,
+    "a failing first child prevents later child effects and array publication");
+    const childDefinitionFailure = new Error("JSX child array definition failed");
+    const beforeChildDefinitionFailure = arrayCallCount;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (Array.isArray(target) && name === 0 && descriptor.value === "first")
+          throw childDefinitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      caught = undefined;
+      try {
+        runtime.call(childEntry, value => childOrder.push(value), "first", "second");
+      } catch (error) { caught = error; }
+    } finally { Object.defineProperty = defineProperty; }
+    check(caught === childDefinitionFailure &&
+      JSON.stringify(childOrder.slice(-2)) === JSON.stringify(["first", "second"]) &&
+      arrayCallCount === beforeChildDefinitionFailure,
+    "array definition failure follows both child effects and prevents publication");
+    check(literalWrites > 5 && loweredObjects >= 2 && loweredArrays >= 2,
+      "own-property regression exercises literal and batched JSX lowering");
     let reads = 0;
     check(runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", {
       get label() { reads++; return label; },

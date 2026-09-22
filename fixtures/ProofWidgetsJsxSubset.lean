@@ -193,6 +193,28 @@ def nativeConstruction
     <span title={label} style={payload} onClick={callback}>{label}</span>
   </Component>
 
+/-- Exercises JSX's attribute-effects, props-definition, child-effects order. -/
+def nativeConstructionOrder
+    (observe : Js.Function1 (Js String) Unit)
+    (first second child : Js String) : Html := do
+  return ← <span data-first={(← do
+    Js.Function.callVoid observe first
+    pure first)} data-second={(← do
+    Js.Function.callVoid observe second
+    pure second)}>{(do
+    Js.Function.callVoid observe child
+    pure child)}</span>
+
+/-- Two child effects expose the batched array's failure ordering. -/
+def nativeChildConstructionOrder
+    (observe : Js.Function1 (Js String) Unit)
+    (first second : Js String) : Html := do
+  return ← <span>{(do
+    Js.Function.callVoid observe first
+    pure first)}{(do
+    Js.Function.callVoid observe second
+    pure second)}</span>
+
 /-- A compile-time native props schema, never instantiated as a Lean record. -/
 structure NativeProps where
   label : Js String

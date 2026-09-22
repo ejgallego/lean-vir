@@ -17,11 +17,24 @@ returns. VIR does not place resource, ownership-lease, or alias wrappers
 around JavaScript values.
 
 The `js.construction.*` imports are compiler primitives for literals, not alternate
-assignment APIs. They implement [CreateDataPropertyOrThrow](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-createdatapropertyorthrow)
-using `Object.defineProperty` with own writable/enumerable/configurable fields.
-Object fields and dense array elements share this implementation; the two typed
-entry points keep array element types correlated. General `Object.set` and
-`Array.push` bindings retain their native behavior.
+assignment APIs. For ordinary fresh objects and arrays, `Object.defineProperty`
+produces the same own writable/enumerable/configurable data properties as
+[CreateDataPropertyOrThrow](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-createdatapropertyorthrow).
+It is **not** that internal operation: the global `Object.defineProperty` function
+is replaceable, so application instrumentation can observe or interrupt VIR
+construction while a JavaScript literal would not call that function. Dense
+structural arrays also use it to avoid inherited numeric setters. General
+`Object.set` and `Array.push` retain their native assignment/push behavior.
+
+JSX batches prop and child construction to reduce host calls. Attribute actions
+run left-to-right before any props are defined; after successful props construction,
+child actions run left-to-right before any child-array indices are defined. A
+definition failure can therefore occur after later actions have already run,
+unlike the former per-field/per-child lowering. Attribute-action failure prevents
+props construction; props-definition failure prevents child actions; child-action
+failure prevents array publication. An exact `@props={props}` bypasses props
+construction. This failure ordering and replaceable-intrinsic dependency are the
+limits of the batching optimization, not guarantees of React or native JS literals.
 
 For example:
 

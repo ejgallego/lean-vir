@@ -4,7 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-// ECMA-262 CreateDataPropertyOrThrow, used by literal lowering, not assignment.
+// Literal lowering needs own data properties, not assignment through inherited
+// setters. This uses the mutable JS Object.defineProperty function, not the
+// unobservable ECMA-262 CreateDataPropertyOrThrow abstract operation: a caller
+// that replaces the function can observe or interrupt construction.
 // A null-prototype descriptor cannot inherit getter/setter descriptor fields.
 function defineLiteralProperty(object, name, value) {
   Object.defineProperty(object, name, {
@@ -12,11 +15,33 @@ function defineLiteralProperty(object, name, value) {
   });
 }
 
+// JSX compiler lowering only. Structural argument lifting creates the fresh
+// dense native array after all child actions; publishing it makes no copy.
+// A lifting failure can therefore follow effects from later children than in
+// the former per-child construction path.
+function arrayFromLiteralValues(values) {
+  return values;
+}
+
+function objectFromLiteralFields(fields) {
+  const object = {};
+  // The compiler-owned buffer is dense. Do not use for...of: a replaced
+  // Array.prototype iterator must not omit/reorder props that a JS object
+  // literal would define without consulting an array iterator.
+  for (let index = 0; index < fields.length; index++) {
+    const { fst: name, snd: value } = fields[index];
+    defineLiteralProperty(object, name, value);
+  }
+  return object;
+}
+
 export function createJsCollectionHostBindings() {
   return {
     "js.object.empty": () => ({}),
     "js.construction.field": defineLiteralProperty,
     "js.construction.element": (array, value) => defineLiteralProperty(array, array.length, value),
+    "js.construction.arrayFromValues": arrayFromLiteralValues,
+    "js.construction.objectFromFields": objectFromLiteralFields,
     "js.object.set": (object, name, value) => {
       object[name] = value;
       return undefined;

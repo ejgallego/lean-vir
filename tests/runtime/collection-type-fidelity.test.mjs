@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createJsCollectionHostBindings } from "../../web/src/host/vir-js-collection-bindings.js";
+import { ObjectValueRuntime } from "../../web/src/runtime/object-values.js";
 
 test("literal construction defines own data properties; ordinary assignment and push stay native", () => {
   const b = createJsCollectionHostBindings();
@@ -39,6 +40,115 @@ test("literal construction defines own data properties; ordinary assignment and 
   assert.equal(array[1], "second");
   assert.throws(() => b["js.construction.field"](Object.freeze({}), "field", "x"), TypeError);
   assert.throws(() => b["js.construction.element"](Object.freeze([]), "x"), TypeError);
+});
+
+test("one-call JSX constructors publish exact dense arrays and fresh own-data props", () => {
+  const bindings = createJsCollectionHostBindings();
+  const array = [undefined, null, {}];
+  assert.equal(bindings["js.construction.arrayFromValues"](array), array,
+    "the structural lift already created the native array");
+  const value = {};
+  const first = bindings["js.construction.objectFromFields"]([
+    { fst: "__proto__", snd: value },
+    { fst: "name", snd: undefined },
+    { fst: "name", snd: value },
+  ]);
+  const second = bindings["js.construction.objectFromFields"]([]);
+  assert.notEqual(first, second);
+  assert.equal(Object.getPrototypeOf(first), Object.prototype);
+  assert.equal(Object.getPrototypeOf(second), Object.prototype);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(first, "__proto__"), {
+    value, writable: true, enumerable: true, configurable: true,
+  });
+  assert.deepEqual(Object.getOwnPropertyDescriptor(first, "name"), {
+    value, writable: true, enumerable: true, configurable: true,
+  });
+  assert.deepEqual(Object.keys(first), ["__proto__", "name"]);
+  const presentUndefined = bindings["js.construction.objectFromFields"]([
+    { fst: "name", snd: undefined },
+  ]);
+  assert.equal(Object.hasOwn(presentUndefined, "name"), true);
+  assert.equal(Object.hasOwn(second, "name"), false);
+});
+
+test("batched JSX props do not consult a mutable array iterator", () => {
+  const construct = createJsCollectionHostBindings()["js.construction.objectFromFields"];
+  const iterate = Array.prototype[Symbol.iterator];
+  let props;
+  try {
+    Array.prototype[Symbol.iterator] = function* () {
+      if (this[0]?.fst === "title") return;
+      yield* iterate.call(this);
+    };
+    props = construct([{ fst: "title", snd: "expected" }]);
+  } finally {
+    Array.prototype[Symbol.iterator] = iterate;
+  }
+  assert.equal(props.title, "expected",
+    "compiler-owned fields must be visited by index, as object literals do not use array iteration");
+});
+
+test("structural array lifting creates dense own elements and releases borrowed fields on failure", () => {
+  const released = [];
+  const pointers = new Map([[1, [11, 12, 13]]]);
+  const runtime = Object.create(ObjectValueRuntime.prototype);
+  runtime.exports = {
+    vir_obj_array_size: pointer => pointers.get(pointer).length,
+    vir_obj_array_get: (pointer, index) => pointers.get(pointer)[index],
+    vir_obj_dec: pointer => Object.defineProperty(released, released.length, {
+      __proto__: null, value: pointer, writable: true, enumerable: true, configurable: true,
+    }),
+  };
+  const type = { element: { interfaceTag: 1 } };
+  const originalLift = runtime.liftObjectValue;
+  const previous = Object.getOwnPropertyDescriptor(Array.prototype, "0");
+  let setterCalls = 0;
+  try {
+    Object.defineProperty(Array.prototype, "0", {
+      configurable: true, set() { setterCalls++; },
+    });
+    runtime.liftObjectValue = (_type, pointer) => pointer;
+    const values = runtime.liftObjectArrayValue(type, 1, "test");
+    assert.deepEqual(values, [11, 12, 13]);
+    assert.equal(setterCalls, 0);
+    assert.equal(values.length, 3);
+    for (let index = 0; index < 3; index++) {
+      assert.deepEqual(Object.getOwnPropertyDescriptor(values, String(index)), {
+        value: 11 + index, writable: true, enumerable: true, configurable: true,
+      });
+    }
+    assert.deepEqual(released, [11, 12, 13]);
+    const sentinel = new Error("structural lift failed");
+    runtime.liftObjectValue = (_type, pointer) => {
+      if (pointer === 12) throw sentinel;
+      return pointer;
+    };
+    assert.throws(() => runtime.liftObjectArrayValue(type, 1, "test"),
+      error => error === sentinel);
+    assert.deepEqual(released, [11, 12, 13, 11, 12],
+      "the failing field is released once; later fields are not read");
+    const defineProperty = Object.defineProperty;
+    const definitionFailure = new Error("structural array definition failed");
+    runtime.liftObjectValue = (_type, pointer) => pointer;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (target !== released && Array.isArray(target) && name === 1 && descriptor.value === 12)
+          throw definitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      assert.throws(() => runtime.liftObjectArrayValue(type, 1, "test"),
+        error => error === definitionFailure);
+    } finally {
+      Object.defineProperty = defineProperty;
+    }
+    assert.deepEqual(released, [11, 12, 13, 11, 12, 11, 12],
+      "the failed definition releases its borrowed element once; later elements are not read");
+    assert.equal(setterCalls, 0);
+  } finally {
+    runtime.liftObjectValue = originalLift;
+    if (previous) Object.defineProperty(Array.prototype, "0", previous);
+    else delete Array.prototype["0"];
+  }
 });
 
 test("typed collection providers preserve native values, identity and index absence", () => {

@@ -213,7 +213,7 @@ private meta def transformTag
   | some value =>
     writes := writes.push <| ← `(doElem| let $propsId := $value)
   | none =>
-    writes := writes.push <| ← `(doElem| let $propsId ← Lean.Vir.Js.Object.empty)
+    let mut fields : Array Term := #[]
     for attr in attrs do
       let (name, value) ← match attr with
         | `(virProofWidgetsJsxAttr| $name:jsxTag = $value:str) =>
@@ -227,9 +227,13 @@ private meta def transformTag
         | stx => Macro.throwErrorAt stx "unknown JSX attribute syntax"
       if name == "__proto__" then
         Macro.throwErrorAt attr "JSX attributes do not support `__proto__`; use explicit property operations for prototype semantics"
-      writes := writes.push <| ← `(doElem|
-        Lean.Vir.Js.Construction.field $propsId (← Lean.Vir.JsValue.ofString $(quote name)) $value)
-  writes := writes.push <| ← `(doElem| let $childrenId ← Lean.Vir.Js.Array.empty)
+      fields := fields.push (← `(term| ($(quote name), Lean.Vir.Js.erase $value)))
+    -- One host call batches construction, but changes failure ordering:
+    -- all attribute effects run before any field is defined. If definition
+    -- fails, later attribute effects have already run; children have not.
+    writes := writes.push <| ← `(doElem|
+      let $propsId ← Lean.Vir.Js.Construction.objectFromFields #[$[$fields],*])
+  let mut childValues : Array Term := #[]
   let mut whitespaceBefore := trailingWhitespace tk
   for child in childrenSyntax do
     let action ← match child with
@@ -246,8 +250,12 @@ private meta def transformTag
       | `(virProofWidgetsJsxChild| {... $_term }%$childToken) =>
         Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native array of supported React child values with {children}"
       | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
-    writes := writes.push <| ← `(doElem|
-      Lean.Vir.Js.Construction.element $childrenId (← ($action)))
+    childValues := childValues.push (← `(← ($action)))
+  -- Likewise, all child effects run before structural lifting defines any
+  -- child-array index. A lifting failure can follow later child effects than
+  -- the former per-child path. Keep this policy explicit in JSX tests.
+  writes := writes.push <| ← `(doElem|
+    let $childrenId ← Lean.Vir.Js.Construction.arrayFromValues #[$[$childValues],*])
   let result ← if openingName.front.isUpper then
       let component ← componentIdent opening
       let closingComponent ← componentIdent closing
