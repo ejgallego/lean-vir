@@ -66,7 +66,9 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     ? withInheritedSetter(array, String(array.length), value, () => appendElement(array, value))
     : appendElement(array, value);
   const objectFromFields = hostBindings["js.construction.objectFromFields"];
+  let objectCallCount = 0;
   hostBindings["js.construction.objectFromFields"] = fields => {
+    objectCallCount++;
     const result = objectFromFields(fields);
     if (traceConstruction) {
       loweredObjects++;
@@ -195,6 +197,42 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       typed.props.payload === payload && typed.props.onClick === callback &&
       typed.props.values.length === 2 && typed.props.values.every(value => value === label),
     "typed native props preserve exact inputs");
+    const order = [];
+    const orderEntry = "ProofWidgetsJsxSubset.nativeConstructionOrder";
+    const ordered = runtime.call(orderEntry, value => order.push(value), "first", "second", "child");
+    check(JSON.stringify(order) === JSON.stringify(["first", "second", "child"]) &&
+      ordered.props["data-first"] === "first" && ordered.props["data-second"] === "second" &&
+      ordered.props.children === "child",
+    "JSX evaluates attributes in order, then children after defining props");
+    const beforeAttributeFailure = objectCallCount;
+    const attributeFailure = new Error("JSX attribute evaluation failed");
+    let caught;
+    try {
+      runtime.call(orderEntry, value => {
+        order.push(value);
+        throw attributeFailure;
+      }, "first", "second", "child");
+    } catch (error) { caught = error; }
+    check(caught === attributeFailure && order.at(-1) === "first" &&
+      objectCallCount === beforeAttributeFailure,
+    "a failing attribute prevents props construction and child evaluation");
+    const definitionFailure = new Error("JSX property definition failed");
+    const defineProperty = Object.defineProperty;
+    const beforeDefinitionFailure = objectCallCount;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (name === "data-first") throw definitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      caught = undefined;
+      try {
+        runtime.call(orderEntry, value => order.push(value), "first", "second", "child");
+      } catch (error) { caught = error; }
+    } finally { Object.defineProperty = defineProperty; }
+    check(caught === definitionFailure &&
+      JSON.stringify(order.slice(-2)) === JSON.stringify(["first", "second"]) &&
+      objectCallCount === beforeDefinitionFailure + 1,
+    "definition failure follows all attribute effects but prevents child effects");
     check(literalWrites > 5 && loweredObjects >= 2 && loweredArrays >= 2,
       "own-property regression exercises literal and batched JSX lowering");
     let reads = 0;
