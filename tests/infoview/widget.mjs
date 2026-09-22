@@ -53,7 +53,6 @@ const {
   loadAssetBytes,
   loadRuntimeService,
   loadWasmModule,
-  shouldReloadIRPackage,
   statIRPackage,
   statAsset,
   validateWidgetComponentEntry,
@@ -186,26 +185,16 @@ const reloadPosition = { line: 0, character: 0 };
 const reloadStatCount = irPackageStatCount;
 const reloadBuildCount = irPackageBuildCount;
 assert.equal(
-  await shouldReloadIRPackage({
-    rpcSession,
-    irPackage: reloadIRPackage,
-    position: reloadPosition,
-    currentRevision: "ir-package-v1",
-  }),
-  false,
+  (await statIRPackage(rpcSession, reloadIRPackage, reloadPosition)).revision,
+  "ir-package-v1",
 );
 assert.equal(irPackageBuildCount, reloadBuildCount);
 assert.ok(irPackageStatCount > reloadStatCount);
 irPackageRevision = "ir-package-v2";
 const changedReloadStatCount = irPackageStatCount;
 assert.equal(
-  await shouldReloadIRPackage({
-    rpcSession,
-    irPackage: reloadIRPackage,
-    position: reloadPosition,
-    currentRevision: "ir-package-v1",
-  }),
-  true,
+  (await statIRPackage(rpcSession, reloadIRPackage, reloadPosition)).revision,
+  "ir-package-v2",
 );
 assert.equal(irPackageBuildCount, reloadBuildCount);
 assert.ok(irPackageStatCount > changedReloadStatCount);
@@ -267,7 +256,7 @@ assert.notEqual(
   "independent runtimes own separate browser bindings",
 );
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-assert.ok(irPackageStatCount > firstIRPackageStatCount);
+assert.equal(irPackageStatCount, firstIRPackageStatCount, "loading does not stat the package");
 const firstWasmModule = irPackageFirstService.runtime.module;
 assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;
@@ -316,21 +305,25 @@ assert.equal(
   currentModule,
 );
 assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
-await assert.rejects(
-  loadRuntimeService({
-    rpcSession: {
-      async call(method, params) {
-        const response = await rpcSession.call(method, params);
-        return method.endsWith("buildIRPackage")
-          ? { ...response, revision: "different-snapshot" }
-          : response;
-      },
+const latestSnapshot = await loadRuntimeService({
+  rpcSession: {
+    async call(method, params) {
+      assert.notEqual(method, "Lean.Vir.Infoview.statIRPackage",
+        "package build response is authoritative; no pre-build observation");
+      const response = await rpcSession.call(method, params);
+      return method.endsWith("buildIRPackage")
+        ? { ...response, revision: "newer-build-snapshot" }
+        : response;
     },
-    config: irPackageServiceConfig,
-  }),
-  /IR package changed while loading/,
-  "a package from a different snapshot cannot create a runtime",
+  },
+  config: irPackageServiceConfig,
+});
+assert.equal(latestSnapshot.packageRevision, "newer-build-snapshot");
+assert.equal(
+  validateWidgetComponentEntry(latestSnapshot.runtime, irPackageServiceConfig.componentEntry).entry,
+  irPackageServiceConfig.componentEntry,
 );
+latestSnapshot.runtime.dispose();
 irPackageRevision = "ir-package-v2";
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,

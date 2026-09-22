@@ -43,7 +43,7 @@ export default function VirInfoviewWidget(props) {
   });
   const loadedRef = React.useRef(null);
   const [loaded, setLoaded] = React.useState(null);
-  const [reloadToken, setReloadToken] = React.useState(0);
+  const [reloadRevision, setReloadRevision] = React.useState(null);
   const refreshGenerationRef = React.useRef(0);
   const loadingGenerationRef = React.useRef(null);
   const irPackageKey =
@@ -110,7 +110,7 @@ export default function VirInfoviewWidget(props) {
       loadedRef.current = next;
       setLoaded(next);
       service = null;
-      setReloadToken(0);
+      setReloadRevision(null);
       setStatus({ kind: "ready", message: componentEntry.entry });
     } catch (error) {
       const errors = [error];
@@ -153,7 +153,7 @@ export default function VirInfoviewWidget(props) {
   ]);
 
   React.useEffect(() => {
-    if (reloadToken === 0) {
+    if (reloadRevision === null) {
       return undefined;
     }
     let disposed = false;
@@ -168,7 +168,7 @@ export default function VirInfoviewWidget(props) {
     props.wasmPath,
     irPackageKey,
     props.componentEntry,
-    reloadToken,
+    reloadRevision,
   ]);
 
   React.useEffect(() => {
@@ -179,21 +179,28 @@ export default function VirInfoviewWidget(props) {
       const config = widgetRuntimeConfigFromProps(props);
       if (config.autoReloadMs > 0) {
         intervalId = setInterval(() => {
-          // The first package has no installed revision yet. Polling here can
-          // continually supersede a slow initial load before it can mount.
-          if (inFlight || loadedRef.current === null || loadingGenerationRef.current !== null) {
+          // Let a slow load finish, but keep observing edits after a failed
+          // initial load, when there is no installed component yet.
+          if (inFlight || loadingGenerationRef.current !== null) {
             return;
           }
           inFlight = true;
-          shouldReloadIRPackage({
-            rpcSession: hostContextRef.current.rpcSession,
-            irPackage: config.irPackage,
-            position: hostContextRef.current.position,
-            currentRevision: loadedRef.current.service.packageRevision,
-          })
-            .then((shouldReload) => {
-              if (!disposed && shouldReload) {
-                setReloadToken((token) => token + 1);
+          statIRPackage(
+            hostContextRef.current.rpcSession,
+            config.irPackage,
+            hostContextRef.current.position,
+          )
+            .then(({ revision }) => {
+              if (disposed) return;
+              if (revision === loadedRef.current?.service.packageRevision) {
+                // Fixing an edit can restore the already installed program.
+                setReloadRevision(null);
+                setStatus((current) => current.kind === "ready" ? current
+                  : { kind: "ready", message: config.componentEntry });
+              } else {
+                // An unchanged failing generation needs another source edit,
+                // not a new build on every polling interval.
+                setReloadRevision(revision);
               }
             })
             .catch((error) => {
@@ -353,14 +360,10 @@ export async function loadRuntimeService({ rpcSession, config }) {
     throw new Error("VIR widget irPackage requires an infoview position");
   }
   const wasmInfo = await statAsset(rpcSession, wasmPath);
-  const packageInfo = await statIRPackage(rpcSession, irPackage, position);
   const wasmModule = await loadWasmModule(rpcSession, wasmPath, wasmInfo.revision);
   const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
-  if (builtPackage.revision !== packageInfo.revision) {
-    throw new Error(
-      "VIR IR package changed while loading; reload the widget to use the latest Lean snapshot",
-    );
-  }
+  // The server returns bytes and revision from one prepared snapshot. A prior
+  // stat describes an earlier observation, not a prerequisite for this build.
   const runtime = await createBundledVirRuntime({
     wasmModule,
     irPackageSet: [decodeBase64Bytes(builtPackage.dataBase64)],
@@ -375,16 +378,6 @@ export async function loadRuntimeService({ rpcSession, config }) {
     }),
   });
   return { runtime, packageRevision: builtPackage.revision };
-}
-
-export async function shouldReloadIRPackage({
-  rpcSession,
-  irPackage,
-  position,
-  currentRevision,
-}) {
-  const info = await statIRPackage(rpcSession, irPackage, position);
-  return info.revision !== currentRevision;
 }
 
 export async function loadWasmModule(rpcSession, path, revision) {

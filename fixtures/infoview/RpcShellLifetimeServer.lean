@@ -7,8 +7,29 @@ Author: Emilio J. Gallego Arias
 module
 
 meta import fixtures.infoview.RpcBrowserServer
-import ShellLifetime
+public import ShellLifetime
 import tutorials.RpcReferenceWidget
+
+public section
+
+namespace Vir.Fixtures.RpcShellLifetime
+
+open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
+
+-- This factory is deliberately local to the open document. The browser edits
+-- this literal through the real textDocument/didChange path, so a changed DOM
+-- label proves that the package was rebuilt from unsaved source.
+def implementationLabel : String := "implementation-v1"
+
+def createEditableComponent : RuntimeM (FunctionComponent PanelWidgetProps) :=
+  FunctionComponent.ofLean fun _ => do
+    let label ← Node.text (← JsValue.ofString implementationLabel)
+    let props ← Js.Object.empty
+    Js.Object.set props (← JsValue.ofString "id") (← JsValue.ofString "rpc-live-edit")
+    Node.createElement (← ElementType.tag (← JsValue.ofString "span"))
+      props (← Js.Array.ofArray #[label])
+
+end Vir.Fixtures.RpcShellLifetime
 
 -- Reuse the actual RPC methods and Lean stale-guard component unchanged.
 -- The browser asks the server to package these roots from this live snapshot.

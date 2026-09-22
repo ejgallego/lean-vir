@@ -714,7 +714,6 @@ async function failedRefresh() {
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "failed refresh status",
   );
-  await shell.update({ autoReloadMs: 0 });
   const candidate = states.at(-1);
   check(
     candidate !== old &&
@@ -729,7 +728,27 @@ async function failedRefresh() {
   );
   old.captured.success(undefined);
   checkContinuation(old, "success", false);
+  const failedBuilds = transport.builds;
+  const failedStats = transport.stats;
+  await until(() => transport.stats >= failedStats + 3, "polling after failed refresh");
+  check(transport.builds === failedBuilds, "unchanged failed generation is not rebuilt");
+  transport.revision--;
+  await until(
+    () => shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "restoring installed source clears failed build status",
+  );
+  check(transport.builds === failedBuilds && old.cleanups === 0,
+    "restoring installed source preserves its component");
+  transport.revision++;
+  await until(
+    () => old.cleanups === 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "source edit recovers failed refresh automatically",
+  );
+  const fresh = states.at(-1);
+  check(fresh !== candidate && old.cleanups === 1, "fixed edit replaces the old component");
   await shell.unmount();
+  fresh.captured = null;
   candidate.captured = null;
   old.captured = null;
 }

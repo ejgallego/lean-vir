@@ -49,6 +49,14 @@ ranges; imported changes become visible when the snapshot contains them. See
 defaults to 1000 ms, and manually constructed `WidgetProps` defaults to zero.
 Cursor movement alone does not request package replacement.
 
+The package build response supplies both bytes and their revision. Loading does
+not require a preceding stat result to match; an intervening edit can legitimately
+produce a newer build. Polling observes subsequent changes once loading settles.
+A failed refresh leaves the last working widget mounted; a later valid edit can
+recover automatically, including after an initial failure with no mounted widget.
+An unchanged failed generation is not rebuilt on every polling interval. Restoring
+the installed source clears the failed edit's error without replacing the component.
+
 Build the optional widget module with `lake build VirInfoview`; see
 [setup](../HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen
 an already-open example after rebuilding that module. The shell bundle leaves

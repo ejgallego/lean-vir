@@ -28,7 +28,7 @@ inherited without a shell bridge or second React root.
 
 | Candidate | Decision | Behavior or decision that bounds removal |
 | --- | --- | --- |
-| Infoview source-kind dispatch, source records, options forwarding and service constructor | **Remove now** (this patch) | One direct stat/load/build/create path; retain RPC order and snapshot/revision comparison. |
+| Infoview source-kind dispatch, source records, options forwarding and service constructor | **Remove now** | One direct asset/load/build/create path; retain response validation and candidate publication checks. |
 | Service disposal flag/wrapper and manifest scan fallback | **Remove now** (this patch) | Concrete runtime supplies idempotent `dispose` and `findManifestEntry`; no named compatibility consumer was found. |
 | `replaceIrPackageManifest`, `encodeInvalidMagicPackage` | **Remove now** from execution responsibilities (separate patch) | Migrate actual tooling/test imports; retain execution accessors and writers. This patch does not relocate them. |
 | Descriptor equality/round-trip tooling | **Remove after changing a supported contract** | Execution does not call these helpers, but `tests/runtime/sdk-import-smoke.mjs` explicitly requires their codec exports. Separate tooling placement from the SDK export decision. |
@@ -38,7 +38,7 @@ inherited without a shell bridge or second React root.
 | Historical manifest versions and option variants | **Remove after changing a supported contract** | Name supported released artifacts and consumers before narrowing compatibility. |
 | Widget error presentation and JSON-input classifications | **Remove now** from general runtime responsibilities (separate patch) | Preserve application diagnostics and actual consumers; moving code alone is not a simplification claim. |
 | Repeated validation of owned package bytes | **Keep because it protects a specific behavior**, pending an ownership audit | Shape, physical layout and backend metadata checks are distinct. Remove duplicate parsing only after a private immutable validated result can cross the existing internal boundary. |
-| Wasm cache, polling/stat/build protocol, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, retry after failure, snapshot coherence, bounded polling and prevention of stale publication. |
+| Wasm cache, change polling, obsolete-candidate checks and failed-load cleanup | **Keep because it protects a specific behavior** | Shared compilation, failed cache eviction, snapshot coherence, bounded polling and prevention of stale publication. The package build response replaces the separate pre-build stat/equality gate. |
 | Thin native providers, rooting/refcounts, closure/handle retention and cleanup-error collection | **Keep because it protects a specific behavior** | Receiver/property semantics, cross-heap lifetime, partial-construction cleanup and independent teardown after an error. |
 | Structural conversion, including Expr/Level support | **Keep because it protects a specific behavior** | Existing explicit conversion clients; first avoid unnecessary round trips in document/widget paths and establish the specialized consumers. |
 
@@ -54,6 +54,13 @@ exports used by the smoke test change: `loadRuntimeOptions` is removed and
 is not an entry in the npm exports map; no repository application imports those
 helpers. Its default widget export and props remain unchanged.
 
+The acquisition follow-up uses the package build's own revision and bytes. Stat
+is only for live refresh, whose state records the requested revision rather than
+a numeric reload counter. An unchanged failed revision does not start repeated
+builds; a subsequent edit can recover, including after an initial failure.
+The now redundant internal `shouldReloadIRPackage` wrapper is removed. The server
+RPC schemas, widget props and runtime lifetime contracts remain unchanged.
+
 Next, establish one small Verso document example with two independent Lean DOM
 interactions, generated bootstrap wiring, no required React, and a shared page
 package load. Record asset requests and startup work using existing tooling.
@@ -65,12 +72,12 @@ is inferred from source reduction.
 
 Acceptance reuses `tests/infoview/widget.mjs`,
 `tests/browser/shell-lifetime.mjs` and `tests/infoview/rpc-shell-lifetime.mjs`:
-cache reuse/retry, revision mismatch, out-of-order replies, failed refreshes,
-removal during loading, inherited context, prop updates and old native Promise
-continuations after replacement. The real-server edit case appends a comment
-and checks notification/RPC refresh without replacing the runtime. Generation
-replacement is exercised separately by the browser suite. These checks do not
-establish changed-implementation replacement in a live editor or arbitrary state
-migration. The current mismatch diagnostic asks for a widget reload, but the
-intended acquisition contract must handle ordinary edit races without that user
-action. A Retry button is explicitly excluded; repair the protocol/lifecycle.
+cache reuse/retry, authoritative build revisions, out-of-order replies, failed
+refreshes, removal during loading, inherited context, prop updates and old native
+Promise continuations after replacement. The real-server suite edits the open
+document through `textDocument/didChange`: comment edits preserve hook state;
+implementation edits replace the visible component; delayed package replies
+converge to the latest source; broken source preserves old UI and recovers when
+fixed, including after an initial failure. This exercises Chromium and the Lean
+server, not an actual editor window or arbitrary state migration. A Retry button
+is explicitly excluded; ordinary edit races are protocol/lifecycle bugs to fix.

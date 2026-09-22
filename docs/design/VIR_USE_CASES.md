@@ -49,8 +49,8 @@ automatic transfer of React state or internal Lean values between generations.
 | --- | --- | --- |
 | Document with two Lean-authored DOM interactions | One page package set may serve both elements; events reuse its runtime, ordinary DOM objects and independent element state. No required React or handwritten per-element bootstrap. | Proposed Verso baseline: still to be built. Existing browser providers alone do not prove this integration. |
 | Infoview props, goals, position or context update | Reuse the component/runtime when code and configuration are unchanged; inherit upstream React context and preserve ordinary hook state. | `tests/infoview/rpc-shell-lifetime-entry.js` checks context and notification-driven RPC updates. |
-| Infoview implementation edit | With live refresh enabled, prepare fresh code, publish only the current successful component, and allow its React state to reset. Ordinary edit races must settle without a user Retry action when source is valid and transport remains available. Explicitly disabling live refresh remains a valid host choice. | `tests/browser/shell-lifetime-entry.js` covers generation replacement/races. Snapshot-mismatch convergence and real changed-implementation editor acceptance remain open; the RPC edit test changes a comment. |
-| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. A failure of an older cache promise must not erase a newer entry. | Browser lifetime suite and `tests/infoview/widget.mjs`. |
+| Infoview implementation edit | With live refresh enabled, prepare fresh code, publish only the current successful component, and allow its React state to reset. Ordinary edit races must settle without a user Retry action when source is valid and transport remains available. Explicitly disabling live refresh remains a valid host choice. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held older reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
+| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. Later edits can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. An unchanged failed observed revision does not trigger repeated builds. |
 | Promise or callback survives UI replacement | Execute the original Lean continuation and its stale-result guard; never silently enter the successor program. | Browser and real-server shell lifetime suites. |
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
@@ -93,14 +93,14 @@ bytes and reusing compilation by a digest of those bytes. Compare transport cost
 and invalidation behavior before selecting one. Neither requires a project
 identity registry, general resolver, or additional ownership layer.
 
-For IR packages, evaluate using the `buildIRPackage` response as the authoritative
-snapshot and `statIRPackage` only to detect changes for live refresh. The build
-handler already derives its bytes and revision from one prepared snapshot input.
-That could eliminate the separate pre-build stat/equality gate, which rejects a
-valid build when an edit intervenes. Preserve request obsolescence, response/root
-validation and eventual selection of newer edits when refresh is enabled; prove
-the interleavings before removing the gate. This is a protocol proposal, not an
-implemented relaxation of the current checks.
+For IR packages, the `buildIRPackage` response is the authoritative snapshot;
+`statIRPackage` detects changes for live refresh. The build handler derives its
+bytes and revision from one prepared snapshot input. The shell no longer requires
+a separate pre-build stat to match, since an intervening edit can produce a valid
+newer build. Request obsolescence and response/root validation remain in place.
+Polling waits for a pending load to settle, then observes newer edits, even if
+the first load failed. A failed observed revision is not rebuilt until it changes;
+successful installation clears that failed-attempt state.
 
 There will be no Retry button. Ordinary edit/load races are protocol or lifecycle
 bugs to fix, rather than a recovery obligation for the document author or reader.

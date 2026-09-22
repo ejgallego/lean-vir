@@ -110,6 +110,7 @@ async function run() {
     root;
   let packageReplyDelayMs = 0;
   let invalidRootCall;
+  const expectedLivePackageFailures = new Set();
   const container = document.getElementById("app");
   const tick = () =>
     React.act(async () => {
@@ -225,6 +226,20 @@ async function run() {
         return ready;
       });
       return states.at(-1);
+    }
+    const liveEntry = "Vir.Fixtures.RpcShellLifetime.createEditableComponent";
+    const liveText = () =>
+      container.querySelector("#rpc-live-edit")?.textContent ?? null;
+    async function waitForLiveText(label, text) {
+      await waitFor(label, () =>
+        container.querySelector('[data-vir-infoview-state="ready"]') &&
+        liveText() === text,
+      );
+    }
+    async function editText(before, after) {
+      return React.act(async () =>
+        post("/edit", { replace: { before, after } }),
+      );
     }
     async function begin(state, session, kind, suffix, held = true) {
       const message = `${state.label}:${kind}:${suffix}`;
@@ -474,8 +489,8 @@ async function run() {
       check(
         phaseCalls("statIRPackage").filter((call) =>
           call.startedAt < packageCall.settledAt,
-        ).length === 1,
-        "only initial acquisition stats the package before reply delivery",
+        ).length === 0,
+        "initial package loading does not poll before reply delivery",
       );
       if (autoReloadMs > 0) {
         await waitFor("polling resumes after installation", () =>
@@ -487,7 +502,7 @@ async function run() {
         await React.act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 1100));
         });
-        check(phaseCalls("statIRPackage").length === 1, "disabled polling stays off");
+        check(phaseCalls("statIRPackage").length === 0, "disabled polling stays off");
       }
       check(states.at(-1) === state, "unchanged revision does not replace the runtime");
       check(phaseCalls("buildIRPackage").length === 1, "polling does not rebuild an unchanged package");
@@ -592,6 +607,96 @@ async function run() {
     check(states.at(-1) === tutorialState &&
       container.querySelector("#rpc-reference-view") === button && button.textContent.includes("local 1"),
       "edit refresh preserves runtime, native component, DOM and Lean hook state");
+
+    // Package the local factory from the open document. Changing its literal
+    // through textDocument/didChange must produce a new component generation.
+    packageReplyDelayMs = 0;
+    await renderWidget(a, config.a, [liveEntry], {
+      componentEntry: liveEntry,
+      autoReloadMs: 25,
+    });
+    await waitForLiveText("initial editable implementation", "implementation-v1");
+    const liveInitial = states.at(-1);
+    await editText('"implementation-v1"', '"implementation-v2"');
+    await waitForLiveText("first unsaved implementation edit", "implementation-v2");
+    check(states.at(-1) !== liveInitial, "an implementation edit installs a fresh generation");
+
+    // Hold the first package reply while a second edit arrives. The stale
+    // generation may finish, but polling must eventually select the latest
+    // valid source without a user retry.
+    packageReplyDelayMs = 2250;
+    const heldBuildStart = calls.length;
+    await editText('"implementation-v2"', '"implementation-v3"');
+    await waitFor("held implementation package reply", () =>
+      calls.slice(heldBuildStart).some((call) =>
+        call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
+        !call.settled,
+      ),
+    );
+    await editText('"implementation-v3"', '"implementation-v4"');
+    packageReplyDelayMs = 0;
+    await waitForLiveText("latest rapid implementation edit", "implementation-v4");
+    const heldBuild = calls.slice(heldBuildStart).find((call) =>
+      call.params.method === "Lean.Vir.Infoview.buildIRPackage",
+    );
+    await waitFor("older implementation reply settles", () => heldBuild?.settled);
+    check(heldBuild?.replyDelayMs >= 2200, "the older implementation reply was held");
+    check(liveText() === "implementation-v4", "late older implementation does not replace the latest widget");
+    const installedLiveRevision = calls.filter((call) =>
+      call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
+      call.params.params?.package?.roots?.includes(liveEntry) && call.value,
+    ).at(-1)?.value.revision;
+
+    // A broken edit keeps the last working component mounted. Once the source
+    // is repaired, the same mounted shell recovers automatically.
+    const workingLiveState = states.at(-1);
+    const brokenCallStart = calls.length;
+    await editText('"implementation-v4"', '"implementation-v4" ++ missingImplementation');
+    await waitFor("broken implementation status", () =>
+      container.querySelector('[data-vir-infoview-state="error"]'),
+    );
+    check(liveText() === "implementation-v4", "broken edit preserves the last working widget");
+    check(!workingLiveState.runtime.disposed, "broken edit keeps the working runtime live");
+    const repairCallStart = calls.length;
+    for (const call of calls.slice(brokenCallStart, repairCallStart)) {
+      if (call.params.method === "Lean.Vir.Infoview.buildIRPackage") {
+        expectedLivePackageFailures.add(call);
+      }
+    }
+    await editText('"implementation-v4" ++ missingImplementation', '"implementation-v4"');
+    await waitFor("repaired implementation stat", () => calls.slice(repairCallStart).some((call) =>
+      call.params.method === "Lean.Vir.Infoview.statIRPackage" &&
+      call.value?.revision === installedLiveRevision,
+    ));
+    await waitForLiveText("repaired implementation edit", "implementation-v4");
+    check(states.at(-1) === workingLiveState, "repair restores the working generation");
+
+    // Continue from the recovered source so the initial failure below also
+    // has a previously working implementation to restore.
+    await editText('"implementation-v4"', '"implementation-v5"');
+    await waitForLiveText("next implementation edit", "implementation-v5");
+
+    // Also cover a failed initial package. There is no old UI to preserve in
+    // this case, but a later valid edit must still recover through polling.
+    await unmountUI();
+    const initialBrokenCallStart = calls.length;
+    await editText('"implementation-v5"', '"implementation-v5" ++ missingInitialImplementation');
+    await renderWidget(a, config.a, [liveEntry], {
+      componentEntry: liveEntry,
+      autoReloadMs: 25,
+    });
+    await waitFor("broken initial implementation status", () =>
+      container.querySelector('[data-vir-infoview-state="error"]'),
+    );
+    check(liveText() === null, "broken initial source publishes no component");
+    const initialRepairCallStart = calls.length;
+    for (const call of calls.slice(initialBrokenCallStart, initialRepairCallStart)) {
+      if (call.params.method === "Lean.Vir.Infoview.buildIRPackage") {
+        expectedLivePackageFailures.add(call);
+      }
+    }
+    await editText('"implementation-v5" ++ missingInitialImplementation', '"implementation-v5"');
+    await waitForLiveText("repaired initial implementation", "implementation-v5");
     await unmountUI();
     check(subscriptions === 0 && notificationHandlers.size === 0 &&
       replacementSubscriptions === 0 && replacementHandlers.size === 0 &&
@@ -618,6 +723,11 @@ async function run() {
         events: obsoleteState.events,
       },
       allLeanEditRefresh: { requests: tutorialCalls().length, subscriptionsAfterUnmount: subscriptions },
+      liveImplementationEdits: {
+        initial: "implementation-v1",
+        final: "implementation-v5",
+        heldReplyDelayMs: heldBuild?.replyDelayMs ?? null,
+      },
       consoleDiagnostics,
     };
   }, [
@@ -678,6 +788,7 @@ async function run() {
           (call) =>
             call.error &&
             call !== invalidRootCall &&
+            !expectedLivePackageFailures.has(call) &&
             !(
               call.params.method === "RpcBrowserServer.create" &&
               deliberateFailures.has(call.params.params?.message) &&
