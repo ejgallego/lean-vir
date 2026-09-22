@@ -133,30 +133,26 @@ export default function VirInfoviewWidget(props) {
   }
 
   React.useEffect(() => {
-    let disposed = false;
-    setLoaded(null);
-    setStatus({ kind: "loading", message: "Loading VIR widget..." });
-    const generation = ++refreshGenerationRef.current;
-    refreshLoadedWidget(
-      () => disposed || generation !== refreshGenerationRef.current,
-    );
     return () => {
-      disposed = true;
-      // React owns the descendant UI. Release shell ownership, not the runtime:
-      // surviving callbacks and JSL still own their original generation.
+      // React owns the descendant UI. Release shell ownership, not the
+      // runtime: surviving callbacks and JSL keep their generation.
       loadedRef.current = null;
     };
-  }, [
-    props.wasmPath,
-    irPackageKey,
-    props.componentEntry,
-  ]);
+  }, [configurationKey]);
 
   React.useEffect(() => {
-    if (reloadRevision === null) {
+    const isRefresh = reloadRevision?.configurationKey === configurationKey;
+    if (!isRefresh && loadedRef.current?.configurationKey === configurationKey) {
+      // Clearing a completed refresh or returning to the installed revision
+      // does not start a second acquisition.
       return undefined;
     }
     let disposed = false;
+    if (!isRefresh) {
+      loadedRef.current = null;
+      setLoaded(null);
+      setStatus({ kind: "loading", message: "Loading VIR widget..." });
+    }
     const generation = ++refreshGenerationRef.current;
     refreshLoadedWidget(
       () => disposed || generation !== refreshGenerationRef.current,
@@ -198,9 +194,14 @@ export default function VirInfoviewWidget(props) {
                 setStatus((current) => current.kind === "ready" ? current
                   : { kind: "ready", message: config.componentEntry });
               } else {
-                // An unchanged failing generation needs another source edit,
-                // not a new build on every polling interval.
-                setReloadRevision(revision);
+                // Suppress another attempt for the same observed revision in
+                // this configuration until the source changes.
+                setReloadRevision((current) =>
+                  current?.configurationKey === configurationKey &&
+                  current.revision === revision
+                    ? current
+                    : { configurationKey, revision },
+                );
               }
             })
             .catch((error) => {

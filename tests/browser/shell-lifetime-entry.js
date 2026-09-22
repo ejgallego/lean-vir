@@ -21,6 +21,7 @@ const transport = {
   stats: 0,
   buildGate: null,
   statGate: null,
+  failNextBuild: false,
 };
 const failures = [];
 const boundaryErrors = [];
@@ -753,6 +754,77 @@ async function failedRefresh() {
   old.captured = null;
 }
 
+async function failedRefreshThenConfigurationChange() {
+  const shell = await mountShell({ autoReloadMs: 100 });
+  await shell.ready();
+  const old = states.at(-1);
+  runtimeFault = { invalidComponent: true };
+  transport.revision++;
+  await until(
+    () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
+    "refresh failure before configuration change",
+  );
+  const failed = states.at(-1);
+  check(failed !== old && failed.disposed === 1,
+    "failed refresh candidate hard-disposed once");
+  const builds = transport.builds;
+  await shell.update({ wasmPath: "after-failed-refresh.wasm" });
+  await shell.ready();
+  const fresh = states.at(-1);
+  check(
+    transport.builds === builds + 1,
+    "changed configuration starts exactly one acquisition after failed refresh",
+  );
+  check(
+    old.cleanups === 1 && old.disposed === 0 &&
+      failed.disposed === 1 && fresh.disposed === 0,
+    "configuration replacement retains old runtime and disposes only the failed candidate",
+  );
+  old.captured.success(undefined);
+  checkContinuation(old, "success", true);
+  old.captured = null;
+  failed.captured = null;
+  fresh.captured = null;
+  await shell.unmount();
+}
+
+async function temporaryBuildFailure() {
+  const shell = await mountShell({ autoReloadMs: 10 });
+  await shell.ready();
+  const old = states.at(-1);
+  transport.failNextBuild = true;
+  transport.revision++;
+  await until(
+    () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
+    "temporary package acquisition failure",
+  );
+  check(
+    states.at(-1) === old && old.cleanups === 0 && old.disposed === 0,
+    "temporary acquisition failure preserves installed component",
+  );
+  const failedBuilds = transport.builds;
+  const failedStats = transport.stats;
+  await until(() => transport.stats >= failedStats + 3,
+    "transport recovered while source stayed unchanged");
+  check(
+    transport.builds === failedBuilds &&
+      shell.container.querySelector('[data-vir-infoview-state="error"]') !== null,
+    "unchanged revision suppresses another build after temporary acquisition failure",
+  );
+  transport.revision++;
+  await until(
+    () => old.cleanups === 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "source edit after temporary failure recovers",
+  );
+  const fresh = states.at(-1);
+  check(fresh !== old && fresh.disposed === 0,
+    "new revision installs after temporary failure");
+  old.captured = null;
+  fresh.captured = null;
+  await shell.unmount();
+}
+
 async function singlePendingRefresh() {
   const shell = await mountShell({ autoReloadMs: 10 });
   await shell.ready();
@@ -807,8 +879,8 @@ async function obsoleteConfigurationCandidate() {
   check(
     current.disposed === 0 &&
       obsolete.disposed === 1 &&
-      harness.loadedRef.current !== null,
-    "changed props retain their live generation and hard-dispose the obsolete candidate",
+      harness.loadedRef.current?.service.runtime === current.runtime.deref(),
+    "newer configuration remains published after older request completes; obsolete candidate is disposed once",
   );
   current.captured = null;
   obsolete.captured = null;
@@ -834,6 +906,10 @@ function installMockRpc(wasmBase64, packageBase64) {
       if (method.endsWith("buildIRPackage")) {
         transport.builds++;
         const revision = transport.revision;
+        if (transport.failNextBuild) {
+          transport.failNextBuild = false;
+          throw new Error("temporary package transport sentinel");
+        }
         if (transport.buildGate) {
           const gate = transport.buildGate;
           transport.buildGate = null;
@@ -974,6 +1050,8 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
     await normalUnmountFailure();
     await failedCandidates();
     await failedRefresh();
+    await failedRefreshThenConfigurationChange();
+    await temporaryBuildFailure();
     await replacementCleanupFailure();
     await singlePendingRefresh();
     await obsoleteConfigurationCandidate();

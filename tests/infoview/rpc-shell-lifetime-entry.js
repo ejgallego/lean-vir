@@ -621,9 +621,9 @@ async function run() {
     await waitForLiveText("first unsaved implementation edit", "implementation-v2");
     check(states.at(-1) !== liveInitial, "an implementation edit installs a fresh generation");
 
-    // Hold the first package reply while a second edit arrives. The stale
-    // generation may finish, but polling must eventually select the latest
-    // valid source without a user retry.
+    // Hold one package reply while a second edit arrives. Polling pauses
+    // during acquisition, so an intermediate source may mount first. The
+    // assertion here is eventual convergence to the latest valid source.
     packageReplyDelayMs = 2250;
     const heldBuildStart = calls.length;
     await editText('"implementation-v2"', '"implementation-v3"');
@@ -641,7 +641,7 @@ async function run() {
     );
     await waitFor("older implementation reply settles", () => heldBuild?.settled);
     check(heldBuild?.replyDelayMs >= 2200, "the older implementation reply was held");
-    check(liveText() === "implementation-v4", "late older implementation does not replace the latest widget");
+    check(liveText() === "implementation-v4", "rapid edits converge to the latest valid implementation");
     const installedLiveRevision = calls.filter((call) =>
       call.params.method === "Lean.Vir.Infoview.buildIRPackage" &&
       call.params.params?.package?.roots?.includes(liveEntry) && call.value,
