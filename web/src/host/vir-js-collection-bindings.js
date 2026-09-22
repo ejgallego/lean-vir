@@ -12,11 +12,27 @@ function defineLiteralProperty(object, name, value) {
   });
 }
 
+// JSX compiler lowering only. Structural argument lifting already created
+// the fresh dense native array; publishing it must not make another copy.
+function arrayFromLiteralValues(values) {
+  return values;
+}
+
+function objectFromLiteralFields(fields) {
+  const object = {};
+  for (const { fst: name, snd: value } of fields) {
+    defineLiteralProperty(object, name, value);
+  }
+  return object;
+}
+
 export function createJsCollectionHostBindings() {
   return {
     "js.object.empty": () => ({}),
     "js.construction.field": defineLiteralProperty,
     "js.construction.element": (array, value) => defineLiteralProperty(array, array.length, value),
+    "js.construction.arrayFromValues": arrayFromLiteralValues,
+    "js.construction.objectFromFields": objectFromLiteralFields,
     "js.object.set": (object, name, value) => {
       object[name] = value;
       return undefined;

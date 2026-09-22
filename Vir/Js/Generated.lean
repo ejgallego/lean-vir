@@ -326,6 +326,39 @@ opaque element
     (value : @& Lean.Vir.Js α) :
     RuntimeM Unit
 
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.array-from-values`.
+
+Compiler-only JSX lowering: structural lifting creates a fresh dense native array from temporary Lean child values; the host publishes that exact array without copying it.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; values lean-owned/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.construction.arrayFromValues"]
+opaque arrayFromValues
+    {α : Type}
+    (values : @& _root_.Array (Lean.Vir.Js α)) :
+    RuntimeM (Lean.Vir.Js.Array α)
+
+/--
+Generated binding for reviewed VIR protocol `javascript.construction.object-from-fields`.
+
+Compiler-only JSX lowering: makes fresh native props with ordered own writable enumerable configurable data properties from temporary Lean field pairs.
+
+Binding contract: `generation.protocolOperations`.
+
+ABI profile `vir-javascript-protocol-v1` (bridge-handle retention): receiver none; fields lean-owned/borrowed/call; result js-resource/owned.
+
+This declaration is generated; edit the binding configuration.
+-/
+@[vir_js_explicit_conversion "js.construction.objectFromFields"]
+opaque objectFromFields
+    (fields : @& _root_.Array (String × Lean.Vir.Js.Any)) :
+    RuntimeM (Lean.Vir.Js.Object)
+
 end Js.Construction
 
 namespace Js.Function

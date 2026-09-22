@@ -1522,14 +1522,17 @@ export class ObjectValueRuntime {
         throw new Error(`${label}[${index}] is unavailable`);
       }
       try {
-        values.push(
-          this.liftObjectValue(
-            elementType,
-            element,
-            `${label}[${index}]`,
-            selfType,
-          ),
+        const value = this.liftObjectValue(
+          elementType,
+          element,
+          `${label}[${index}]`,
+          selfType,
         );
+        // Structural arrays are dense like literals: `push` could invoke an
+        // inherited numeric setter and leave a hole instead of an own value.
+        Object.defineProperty(values, index, {
+          __proto__: null, value, writable: true, enumerable: true, configurable: true,
+        });
       } finally {
         this.exports.vir_obj_dec(element);
       }

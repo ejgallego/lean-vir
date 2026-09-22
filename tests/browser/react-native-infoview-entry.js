@@ -40,6 +40,8 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   };
   const setProperty = hostBindings["js.construction.field"];
   let literalWrites = 0;
+  let loweredObjects = 0;
+  let loweredArrays = 0;
   const withInheritedSetter = (object, name, value, write) => {
     const original = Object.getPrototypeOf(object);
     const inherited = Object.create(original);
@@ -63,6 +65,31 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
   hostBindings["js.construction.element"] = (array, value) => traceConstruction
     ? withInheritedSetter(array, String(array.length), value, () => appendElement(array, value))
     : appendElement(array, value);
+  const objectFromFields = hostBindings["js.construction.objectFromFields"];
+  hostBindings["js.construction.objectFromFields"] = fields => {
+    const result = objectFromFields(fields);
+    if (traceConstruction) {
+      loweredObjects++;
+      for (const { fst: name, snd: value } of fields) {
+        trace.push(name);
+        const descriptor = Object.getOwnPropertyDescriptor(result, name);
+        check(descriptor?.value === value && descriptor.writable && descriptor.enumerable &&
+          descriptor.configurable, "batched JSX props are own data properties");
+      }
+    }
+    return result;
+  };
+  const arrayFromValues = hostBindings["js.construction.arrayFromValues"];
+  hostBindings["js.construction.arrayFromValues"] = values => {
+    const result = arrayFromValues(values);
+    if (traceConstruction) {
+      loweredArrays++;
+      check(result === values && values.every((value, index) =>
+        Object.getOwnPropertyDescriptor(values, index)?.value === value),
+      "batched JSX children retain their own dense native array");
+    }
+    return result;
+  };
   check(!Object.hasOwn(hostBindings, "react.node.text") &&
     !Object.hasOwn(hostBindings, "react.elementType.tag"),
   "native text and tag views need no host providers");
@@ -168,7 +195,8 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       typed.props.payload === payload && typed.props.onClick === callback &&
       typed.props.values.length === 2 && typed.props.values.every(value => value === label),
     "typed native props preserve exact inputs");
-    check(literalWrites > 10, "own-property regression exercises object, array and typed JSX lowering");
+    check(literalWrites > 5 && loweredObjects >= 2 && loweredArrays >= 2,
+      "own-property regression exercises literal and batched JSX lowering");
     let reads = 0;
     check(runtime.call("ProofWidgetsJsxSubset.nativeTypedLabel", {
       get label() { reads++; return label; },

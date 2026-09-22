@@ -486,6 +486,24 @@
         "result": { "type": { "lean": "Unit", "representation": "immediate" } }
       },
       {
+        "id": "javascript.construction.array-from-values", "group": "construction", "target": "js.construction.arrayFromValues",
+        "lean": "Lean.Vir.Js.Construction.arrayFromValues", "marker": "vir_js_explicit_conversion",
+        "reason": "Compiler-only JSX lowering: structural lifting creates a fresh dense native array from temporary Lean child values; the host publishes that exact array without copying it.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "typeParameters": ["α"], "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "values", "type": { "lean": "_root_.Array (Lean.Vir.Js α)", "representation": "lean-owned" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Array α", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Array.Value α" } }
+      },
+      {
+        "id": "javascript.construction.object-from-fields", "group": "construction", "target": "js.construction.objectFromFields",
+        "lean": "Lean.Vir.Js.Construction.objectFromFields", "marker": "vir_js_explicit_conversion",
+        "reason": "Compiler-only JSX lowering: makes fresh native props with ordered own writable enumerable configurable data properties from temporary Lean field pairs.",
+        "upstreamRelation": { "kind": "vir-owned" },
+        "effect": { "id": "runtime", "lean": "RuntimeM" },
+        "arguments": [{ "name": "fields", "type": { "lean": "_root_.Array (String × Lean.Vir.Js.Any)", "representation": "lean-owned" } }],
+        "result": { "type": { "lean": "Lean.Vir.Js.Object", "representation": "js-resource", "resourceInner": "Lean.Vir.Js.Object.Value" } }
+      },
+      {
         "id": "javascript.object.set", "group": "object", "target": "js.object.set",
         "lean": "Lean.Vir.Js.Object.set", "marker": "vir_js",
         "reason": "Assigns the exact JavaScript value to the exact property name on an ordinary JavaScript object.",
