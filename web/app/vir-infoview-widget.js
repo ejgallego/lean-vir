@@ -88,7 +88,7 @@ export default function VirInfoviewWidget(props) {
         config,
       });
       if (obsolete()) {
-        disposeRuntimeService(service);
+        service.runtime.dispose();
         return;
       }
       const componentEntry = validateWidgetComponentEntry(
@@ -115,7 +115,7 @@ export default function VirInfoviewWidget(props) {
     } catch (error) {
       const errors = [error];
       if (service !== null) {
-        collectCleanupError(errors, () => disposeRuntimeService(service));
+        collectCleanupError(errors, () => service.runtime.dispose());
       }
       const failure = widgetCleanupError(errors, "VIR widget loading failed");
       if (!obsolete()) {
@@ -252,11 +252,10 @@ function stopInfoviewEvent(event) {
 }
 
 export function validateWidgetComponentEntry(runtime, entryName) {
-  const entry = requireWidgetManifestEntry(
-    runtime,
-    entryName,
-    "component entry",
-  );
+  const entry = runtime.findManifestEntry(entryName);
+  if (entry === null || entry === undefined) {
+    throw new Error(`VIR widget component entry not found: ${entryName}`);
+  }
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 0 ||
@@ -265,21 +264,6 @@ export function validateWidgetComponentEntry(runtime, entryName) {
     throw new Error(
       `VIR widget component entry ${entryName} must be an effectful () -> Component entry`,
     );
-  }
-  return entry;
-}
-
-function requireWidgetManifestEntry(runtime, entryName, label) {
-  const entry =
-    runtime.findManifestEntry?.(entryName) ??
-    runtime.interfaceManifest?.exports?.find(
-      (candidate) =>
-        candidate.entry === entryName ||
-        candidate.id === entryName ||
-        candidate.jsName === entryName,
-    );
-  if (entry === null || entry === undefined) {
-    throw new Error(`VIR widget ${label} not found: ${entryName}`);
   }
   return entry;
 }
@@ -358,36 +342,36 @@ function optionalNonNegativeInteger(value, label) {
 }
 
 export async function loadRuntimeService({ rpcSession, config }) {
-  const sources = await resolveRuntimeSources(rpcSession, config);
-  return createRuntimeService({ rpcSession, sources });
-}
-
-async function createRuntimeService({ rpcSession, sources }) {
-  const runtimeOptions = await loadRuntimeOptionsFromSources({
-    rpcSession,
-    sources,
-  });
-  runtimeOptions.defaultHostBindings = () =>
-    createBrowserHostBindings({
+  const { wasmPath, irPackage, position } = config;
+  requiredString(wasmPath, "wasmPath");
+  if (irPackage === null || irPackage === undefined) {
+    throw new Error("VIR widget irPackage must be set");
+  }
+  if (position === null || position === undefined) {
+    throw new Error("VIR widget irPackage requires an infoview position");
+  }
+  const wasmInfo = await statAsset(rpcSession, wasmPath);
+  const packageInfo = await statIRPackage(rpcSession, irPackage, position);
+  const wasmModule = await loadWasmModule(rpcSession, wasmPath, wasmInfo.revision);
+  const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
+  if (builtPackage.revision !== packageInfo.revision) {
+    throw new Error(
+      "VIR IR package changed while loading; retrying with the latest Lean snapshot",
+    );
+  }
+  const runtime = await createBundledVirRuntime({
+    wasmModule,
+    irPackageSet: [decodeBase64Bytes(builtPackage.dataBase64)],
+    defaultHostBindings: () => createBrowserHostBindings({
       infoviewEditorContext: EditorContext,
       infoviewPositionToTdpp: DocumentPosition.toTdpp,
       reactHostBindings: createBrowserReactHostBindings,
       infoviewUseClientNotificationEffect: useClientNotificationEffect,
       infoviewUseRpcSession: useRpcSession,
       infoviewStripTags: TaggedText_stripTags,
-    });
-  return {
-    packageRevision: sources.packageSource.revision ?? "",
-    disposed: false,
-    runtime: await createBundledVirRuntime(runtimeOptions),
-  };
-}
-
-function disposeRuntimeService(service) {
-  if (!service.disposed) {
-    service.disposed = true;
-    service.runtime.dispose?.();
-  }
+    }),
+  });
+  return { runtime, packageRevision: builtPackage.revision };
 }
 
 export async function shouldReloadIRPackage({
@@ -400,114 +384,21 @@ export async function shouldReloadIRPackage({
   return info.revision !== currentRevision;
 }
 
-export async function loadRuntimeOptions({
-  rpcSession,
-  wasmPath,
-  irPackage,
-  position,
-}) {
-  const sources = await resolveRuntimeSources(rpcSession, {
-    wasmPath,
-    irPackage,
-    position,
-  });
-  return loadRuntimeOptionsFromSources({ rpcSession, sources });
-}
-
-async function resolveRuntimeSources(rpcSession, config) {
-  const wasmSource = wasmAssetSource(config);
-  const packageSource = irPackageSource(config);
-  return {
-    wasmSource: await resolveAssetSource(rpcSession, wasmSource),
-    packageSource: await resolveAssetSource(rpcSession, packageSource),
-  };
-}
-
-async function resolveAssetSource(rpcSession, source) {
-  if (source.kind === "irPackage") {
-    const info = await statIRPackage(
-      rpcSession,
-      source.package,
-      source.position,
+export async function loadWasmModule(rpcSession, path, revision) {
+  let cached = wasmModuleCache.get(path);
+  if (cached === undefined || cached.revision !== revision) {
+    const module = loadAssetBytes(rpcSession, path).then((bytes) =>
+      WebAssembly.compile(bytes),
     );
-    return { ...source, revision: info.revision, source: info.source };
-  }
-  const info = await statAsset(rpcSession, source.value);
-  return { ...source, revision: info.revision };
-}
-
-async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
-  const { wasmSource, packageSource } = sources;
-  const options = {};
-  options.wasmModule = await loadWasmModule(rpcSession, wasmSource);
-  const irPackage = await buildIRPackage(
-    rpcSession,
-    packageSource.package,
-    packageSource.position,
-  );
-  if (
-    (packageSource.revision ?? "") !== "" &&
-    irPackage.revision !== packageSource.revision
-  ) {
-    throw new Error(
-      "VIR IR package changed while loading; retrying with the latest Lean snapshot",
-    );
-  }
-  options.irPackageSet = [decodeBase64Bytes(irPackage.dataBase64)];
-  return options;
-}
-
-export async function loadWasmModule(rpcSession, source) {
-  const sourceKey = `${source.kind}:${source.value}`;
-  const key = assetSourceCacheKey(source);
-  let cached = wasmModuleCache.get(sourceKey);
-  if (cached?.key !== key) {
-    const module = compileWasmModule(rpcSession, source);
-    cached = { key, module };
-    wasmModuleCache.set(sourceKey, cached);
+    cached = { revision, module };
+    wasmModuleCache.set(path, cached);
     module.catch(() => {
-      if (wasmModuleCache.get(sourceKey) === cached) {
-        wasmModuleCache.delete(sourceKey);
+      if (wasmModuleCache.get(path) === cached) {
+        wasmModuleCache.delete(path);
       }
     });
   }
   return cached.module;
-}
-
-async function compileWasmModule(rpcSession, source) {
-  const bytes = await loadAssetBytes(rpcSession, source.value);
-  return WebAssembly.compile(bytes);
-}
-
-function assetSourceCacheKey(source) {
-  const revision = source.revision ?? "";
-  return revision.length === 0
-    ? `${source.kind}:${source.value}`
-    : `${source.kind}:${source.value}:${revision}`;
-}
-
-function wasmAssetSource(config) {
-  const wasmPath = config.wasmPath ?? "";
-  if (wasmPath.length === 0) {
-    throw new Error("VIR widget wasmPath must be a non-empty string");
-  }
-  return { kind: "path", value: wasmPath };
-}
-
-function irPackageSource(config) {
-  const irPackage = config.irPackage ?? null;
-  if (irPackage === null) {
-    throw new Error("VIR widget irPackage must be set");
-  }
-  if (config.position === null || config.position === undefined) {
-    throw new Error("VIR widget irPackage requires an infoview position");
-  }
-  return {
-    kind: "irPackage",
-    package: irPackage,
-    roots: irPackage.roots,
-    position: config.position,
-  };
 }
 
 export async function loadAssetBytes(rpcSession, path) {

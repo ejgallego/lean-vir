@@ -40,8 +40,7 @@ const widgetSource = await readFile(
 const smokeWidgetSource =
   widgetSource
     .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
-    .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"') +
-  "\nexport { disposeRuntimeService as disposeRuntimeServiceForTests };\n";
+    .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
 await writeFile(
   new URL("vir-infoview-widget-smoke.mjs", buildDir),
   smokeWidgetSource,
@@ -49,9 +48,7 @@ await writeFile(
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
-  disposeRuntimeServiceForTests,
   loadAssetBytes,
-  loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
   shouldReloadIRPackage,
@@ -178,27 +175,6 @@ await assert.rejects(
     ),
   /path mismatch/,
 );
-const runtimeOptions = await loadRuntimeOptions({
-  rpcSession,
-  wasmPath: "web/public/vir-upstream.wasm",
-  irPackage: {
-    roots: [
-      "VirNativeInfoview.createComponent",
-    ],
-  },
-  position: { line: 0, character: 0 },
-});
-assert.ok(runtimeOptions.wasmModule instanceof WebAssembly.Module);
-assert.equal(runtimeOptions.irPackageSet.length, 1);
-assert.equal(runtimeOptions.irPackageSet[0].length, packageBytes.length);
-assert.equal(
-  await loadWasmModule(rpcSession, {
-    kind: "path",
-    value: "web/public/vir-upstream.wasm",
-    revision: assetRevisions.get("web/public/vir-upstream.wasm"),
-  }),
-  runtimeOptions.wasmModule,
-);
 const reloadIRPackage = {
   roots: [
     "VirNativeInfoview.createComponent",
@@ -266,6 +242,54 @@ assert.equal(
   ],
   "function",
 );
+assert.equal(irPackageFirstService.packageRevision, "ir-package-v1");
+const firstWasmModule = irPackageFirstService.runtime.module;
+assert.ok(firstWasmModule instanceof WebAssembly.Module);
+const readsBeforeCacheHit = assetReadCount;
+assert.equal(
+  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-v1"),
+  firstWasmModule,
+);
+assert.equal(assetReadCount, readsBeforeCacheHit, "same revision reuses compiled Wasm");
+assert.notEqual(
+  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-v2"),
+  firstWasmModule,
+  "new asset revision recompiles Wasm",
+);
+let failAssetRead = true;
+const retrySession = {
+  call(method, params) {
+    if (method.endsWith("readAsset") && failAssetRead) {
+      failAssetRead = false;
+      throw new Error("temporary asset read failure");
+    }
+    return rpcSession.call(method, params);
+  },
+};
+await assert.rejects(
+  loadWasmModule(retrySession, irPackageServiceConfig.wasmPath, "wasm-retry"),
+  /temporary asset read failure/,
+);
+assert.ok(
+  await loadWasmModule(retrySession, irPackageServiceConfig.wasmPath, "wasm-retry")
+    instanceof WebAssembly.Module,
+  "failed cache entries permit retry",
+);
+await assert.rejects(
+  loadRuntimeService({
+    rpcSession: {
+      async call(method, params) {
+        const response = await rpcSession.call(method, params);
+        return method.endsWith("buildIRPackage")
+          ? { ...response, revision: "different-snapshot" }
+          : response;
+      },
+    },
+    config: irPackageServiceConfig,
+  }),
+  /IR package changed while loading/,
+  "a package from a different snapshot cannot create a runtime",
+);
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({
@@ -286,14 +310,14 @@ const irPackageThirdService = await loadRuntimeService({
 });
 assert.notEqual(irPackageThirdService, irPackageFirstService);
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-disposeRuntimeServiceForTests(irPackageFirstService);
-disposeRuntimeServiceForTests(irPackageSecondService);
-disposeRuntimeServiceForTests(irPackageThirdService);
-disposeRuntimeServiceForTests(irPackageThirdService);
+irPackageFirstService.runtime.dispose();
+irPackageSecondService.runtime.dispose();
+irPackageThirdService.runtime.dispose();
+irPackageThirdService.runtime.dispose();
 assert.equal(
-  irPackageThirdService.disposed,
+  irPackageThirdService.runtime.disposed,
   true,
-  "runtime service disposal must be idempotent",
+  "runtime disposal must be idempotent",
 );
 
 runtime.dispose();
