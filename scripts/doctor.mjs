@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
@@ -62,19 +61,10 @@ async function checkPath(name, path, help, mode = fsConstants.R_OK) {
   }
 }
 
-async function expectedLeanSourceCommit() {
-  const source = await readFile("scripts/fetch-lean-source.sh", "utf8");
-  const match = source.match(/\bgit\s+-C\s+third_party\/lean4-src\s+checkout\s+([0-9a-f]{40})\b/);
-  if (!match) {
-    return null;
-  }
-  return match[1];
-}
-
 async function checkLeanSourceCommit() {
-  const expected = await expectedLeanSourceCommit();
-  if (!expected) {
-    record("warn", "Lean source commit", "could not find pinned checkout commit in scripts/fetch-lean-source.sh");
+  const expected = commandOutput("lean", ["--githash"]);
+  if (!expected.ok) {
+    record("fail", "Lean source commit", expected.detail);
     return;
   }
   const actual = commandOutput("git", ["-C", "third_party/lean4-src", "rev-parse", "HEAD"]);
@@ -82,13 +72,13 @@ async function checkLeanSourceCommit() {
     record("fail", "Lean source commit", actual.detail);
     return;
   }
-  if (actual.detail === expected) {
+  if (actual.detail === expected.detail) {
     record("ok", "Lean source commit", actual.detail);
   } else {
     record(
       "fail",
       "Lean source commit",
-      `${actual.detail}; expected ${expected}; run npm run fetch:lean`,
+      `${actual.detail}; expected ${expected.detail}; run npm run fetch:lean`,
     );
   }
 }
