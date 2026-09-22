@@ -62,6 +62,10 @@ is inferred from source reduction.
 Acceptance reuses `tests/infoview/widget.mjs`,
 `tests/browser/shell-lifetime.mjs` and `tests/infoview/rpc-shell-lifetime.mjs`:
 cache reuse/retry, revision mismatch, out-of-order replies, failed refreshes,
-removal during loading, inherited context, prop updates, real-server edits and
-old native Promise continuations after replacement. Live editor testing and
-arbitrary state migration are not established by those automated checks.
+removal during loading, inherited context, prop updates and old native Promise
+continuations after replacement. The real-server edit case appends a comment
+and checks notification/RPC refresh without replacing the runtime. Generation
+replacement is exercised separately by the browser suite. These checks do not
+establish changed-implementation replacement in a live editor or arbitrary state
+migration. Snapshot mismatch errors request an explicit widget reload; the
+initial-load path has no automatic retry or retry control.

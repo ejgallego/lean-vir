@@ -117,7 +117,9 @@ export default function VirInfoviewWidget(props) {
       if (service !== null) {
         collectCleanupError(errors, () => service.runtime.dispose());
       }
-      const failure = widgetCleanupError(errors, "VIR widget loading failed");
+      const failure = errors.length === 1
+        ? error
+        : new AggregateError(errors, "VIR widget loading failed");
       if (!obsolete()) {
         setStatus({ kind: "error", message: errorMessage(failure, setupHint) });
       } else {
@@ -356,7 +358,7 @@ export async function loadRuntimeService({ rpcSession, config }) {
   const builtPackage = await buildIRPackage(rpcSession, irPackage, position);
   if (builtPackage.revision !== packageInfo.revision) {
     throw new Error(
-      "VIR IR package changed while loading; retrying with the latest Lean snapshot",
+      "VIR IR package changed while loading; reload the widget to use the latest Lean snapshot",
     );
   }
   const runtime = await createBundledVirRuntime({
@@ -493,8 +495,4 @@ export function decodeBase64Bytes(base64) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function widgetCleanupError(errors, message) {
-  return errors.length === 1 ? errors[0] : new AggregateError(errors, message);
 }

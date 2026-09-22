@@ -243,6 +243,29 @@ assert.equal(
   "function",
 );
 assert.equal(irPackageFirstService.packageRevision, "ir-package-v1");
+const firstIRPackageBuildCount = irPackageBuildCount;
+const firstIRPackageStatCount = irPackageStatCount;
+const irPackageSecondService = await loadRuntimeService({
+  rpcSession,
+  config: irPackageServiceConfig,
+});
+assert.notEqual(
+  irPackageSecondService.runtime,
+  irPackageFirstService.runtime,
+  "each widget consumer owns a distinct runtime",
+);
+assert.equal(
+  irPackageSecondService.runtime.module,
+  irPackageFirstService.runtime.module,
+  "independent runtimes share the compiled module",
+);
+assert.notEqual(
+  irPackageSecondService.runtime.hostState.defaultBindings,
+  irPackageFirstService.runtime.hostState.defaultBindings,
+  "independent runtimes own separate browser bindings",
+);
+assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
+assert.ok(irPackageStatCount > firstIRPackageStatCount);
 const firstWasmModule = irPackageFirstService.runtime.module;
 assert.ok(firstWasmModule instanceof WebAssembly.Module);
 const readsBeforeCacheHit = assetReadCount;
@@ -275,6 +298,22 @@ assert.ok(
     instanceof WebAssembly.Module,
   "failed cache entries permit retry",
 );
+// Failure of a superseded read must not evict the newer cached module.
+const staleRead = Promise.withResolvers();
+const staleModule = loadWasmModule({ call: () => staleRead.promise },
+  irPackageServiceConfig.wasmPath, "wasm-stale");
+const staleFailure = assert.rejects(staleModule, /superseded asset read/);
+const currentModule = await loadWasmModule(
+  rpcSession, irPackageServiceConfig.wasmPath, "wasm-current",
+);
+staleRead.reject(new Error("superseded asset read"));
+await staleFailure;
+const readsBeforeStaleRetry = assetReadCount;
+assert.equal(
+  await loadWasmModule(rpcSession, irPackageServiceConfig.wasmPath, "wasm-current"),
+  currentModule,
+);
+assert.equal(assetReadCount, readsBeforeStaleRetry, "stale failure preserves newer cache entry");
 await assert.rejects(
   loadRuntimeService({
     rpcSession: {
@@ -290,25 +329,13 @@ await assert.rejects(
   /IR package changed while loading/,
   "a package from a different snapshot cannot create a runtime",
 );
-const firstIRPackageBuildCount = irPackageBuildCount;
-const firstIRPackageStatCount = irPackageStatCount;
-const irPackageSecondService = await loadRuntimeService({
-  rpcSession,
-  config: irPackageServiceConfig,
-});
-assert.notEqual(
-  irPackageSecondService,
-  irPackageFirstService,
-  "stateful runtime services must remain local to one widget consumer",
-);
-assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
-assert.ok(irPackageStatCount > firstIRPackageStatCount);
 irPackageRevision = "ir-package-v2";
 const irPackageThirdService = await loadRuntimeService({
   rpcSession,
   config: irPackageServiceConfig,
 });
-assert.notEqual(irPackageThirdService, irPackageFirstService);
+assert.notEqual(irPackageThirdService.runtime, irPackageSecondService.runtime);
+assert.equal(irPackageThirdService.packageRevision, "ir-package-v2");
 assert.ok(irPackageBuildCount > firstIRPackageBuildCount);
 irPackageFirstService.runtime.dispose();
 irPackageSecondService.runtime.dispose();
