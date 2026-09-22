@@ -71,6 +71,23 @@ test("one-call JSX constructors publish exact dense arrays and fresh own-data pr
   assert.equal(Object.hasOwn(second, "name"), false);
 });
 
+test("batched JSX props do not consult a mutable array iterator", () => {
+  const construct = createJsCollectionHostBindings()["js.construction.objectFromFields"];
+  const iterate = Array.prototype[Symbol.iterator];
+  let props;
+  try {
+    Array.prototype[Symbol.iterator] = function* () {
+      if (this[0]?.fst === "title") return;
+      yield* iterate.call(this);
+    };
+    props = construct([{ fst: "title", snd: "expected" }]);
+  } finally {
+    Array.prototype[Symbol.iterator] = iterate;
+  }
+  assert.equal(props.title, "expected",
+    "compiler-owned fields must be visited by index, as object literals do not use array iteration");
+});
+
 test("structural array lifting creates dense own elements and releases borrowed fields on failure", () => {
   const released = [];
   const pointers = new Map([[1, [11, 12, 13]]]);
@@ -110,6 +127,22 @@ test("structural array lifting creates dense own elements and releases borrowed 
       error => error === sentinel);
     assert.deepEqual(released, [11, 12, 13, 11, 12],
       "the failing field is released once; later fields are not read");
+    const defineProperty = Object.defineProperty;
+    const definitionFailure = new Error("structural array definition failed");
+    runtime.liftObjectValue = (_type, pointer) => pointer;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (target !== released && Array.isArray(target) && name === 1 && descriptor.value === 12)
+          throw definitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      assert.throws(() => runtime.liftObjectArrayValue(type, 1, "test"),
+        error => error === definitionFailure);
+    } finally {
+      Object.defineProperty = defineProperty;
+    }
+    assert.deepEqual(released, [11, 12, 13, 11, 12, 11, 12],
+      "the failed definition releases its borrowed element once; later elements are not read");
     assert.equal(setterCalls, 0);
   } finally {
     runtime.liftObjectValue = originalLift;

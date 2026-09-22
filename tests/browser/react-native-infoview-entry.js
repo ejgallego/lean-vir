@@ -82,7 +82,9 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
     return result;
   };
   const arrayFromValues = hostBindings["js.construction.arrayFromValues"];
+  let arrayCallCount = 0;
   hostBindings["js.construction.arrayFromValues"] = values => {
+    arrayCallCount++;
     const result = arrayFromValues(values);
     if (traceConstruction) {
       loweredArrays++;
@@ -233,6 +235,41 @@ globalThis.runProofWidgetsNativeChildren = async (wasm, pkg) => {
       JSON.stringify(order.slice(-2)) === JSON.stringify(["first", "second"]) &&
       objectCallCount === beforeDefinitionFailure + 1,
     "definition failure follows all attribute effects but prevents child effects");
+    const childEntry = "ProofWidgetsJsxSubset.nativeChildConstructionOrder";
+    const childOrder = [];
+    const twoChildren = runtime.call(childEntry, value => childOrder.push(value), "first", "second");
+    check(JSON.stringify(childOrder) === JSON.stringify(["first", "second"]) &&
+      JSON.stringify(twoChildren.props.children) === JSON.stringify(["first", "second"]),
+    "JSX evaluates two child actions once and preserves their order");
+    const beforeChildExpressionFailure = arrayCallCount;
+    const childExpressionFailure = new Error("JSX child evaluation failed");
+    caught = undefined;
+    try {
+      runtime.call(childEntry, value => {
+        childOrder.push(value);
+        if (value === "first") throw childExpressionFailure;
+      }, "first", "second");
+    } catch (error) { caught = error; }
+    check(caught === childExpressionFailure && childOrder.at(-1) === "first" &&
+      arrayCallCount === beforeChildExpressionFailure,
+    "a failing first child prevents later child effects and array publication");
+    const childDefinitionFailure = new Error("JSX child array definition failed");
+    const beforeChildDefinitionFailure = arrayCallCount;
+    try {
+      Object.defineProperty = (target, name, descriptor) => {
+        if (Array.isArray(target) && name === 0 && descriptor.value === "first")
+          throw childDefinitionFailure;
+        return defineProperty(target, name, descriptor);
+      };
+      caught = undefined;
+      try {
+        runtime.call(childEntry, value => childOrder.push(value), "first", "second");
+      } catch (error) { caught = error; }
+    } finally { Object.defineProperty = defineProperty; }
+    check(caught === childDefinitionFailure &&
+      JSON.stringify(childOrder.slice(-2)) === JSON.stringify(["first", "second"]) &&
+      arrayCallCount === beforeChildDefinitionFailure,
+    "array definition failure follows both child effects and prevents publication");
     check(literalWrites > 5 && loweredObjects >= 2 && loweredArrays >= 2,
       "own-property regression exercises literal and batched JSX lowering");
     let reads = 0;

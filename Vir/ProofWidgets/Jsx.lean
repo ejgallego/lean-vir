@@ -228,8 +228,9 @@ private meta def transformTag
       if name == "__proto__" then
         Macro.throwErrorAt attr "JSX attributes do not support `__proto__`; use explicit property operations for prototype semantics"
       fields := fields.push (← `(term| ($(quote name), Lean.Vir.Js.erase $value)))
-    -- Evaluate attribute expressions first, then define fields on one fresh
-    -- native props object. Children are evaluated only after that succeeds.
+    -- One host call batches construction, but changes failure ordering:
+    -- all attribute effects run before any field is defined. If definition
+    -- fails, later attribute effects have already run; children have not.
     writes := writes.push <| ← `(doElem|
       let $propsId ← Lean.Vir.Js.Construction.objectFromFields #[$[$fields],*])
   let mut childValues : Array Term := #[]
@@ -250,6 +251,9 @@ private meta def transformTag
         Macro.throwErrorAt childToken "JSX child spread has been removed; insert a native array of supported React child values with {children}"
       | stx => Macro.throwErrorAt stx "unknown JSX child syntax"
     childValues := childValues.push (← `(← ($action)))
+  -- Likewise, all child effects run before structural lifting defines any
+  -- child-array index. A lifting failure can follow later child effects than
+  -- the former per-child path. Keep this policy explicit in JSX tests.
   writes := writes.push <| ← `(doElem|
     let $childrenId ← Lean.Vir.Js.Construction.arrayFromValues #[$[$childValues],*])
   let result ← if openingName.front.isUpper then

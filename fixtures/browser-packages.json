@@ -175,6 +175,7 @@
             "ProofWidgetsJsxSubset.mountDefault",
             "ProofWidgetsJsxSubset.nativeConstruction",
             "ProofWidgetsJsxSubset.nativeConstructionOrder",
+            "ProofWidgetsJsxSubset.nativeChildConstructionOrder",
             "ProofWidgetsJsxSubset.nativeTypedConstruction",
             "ProofWidgetsJsxSubset.nativeTypedLabel",
             "ProofWidgetsJsxSubset.nativeKeyedChildren",
