@@ -204,6 +204,33 @@ separate `native-infoview.irpkg` entry in the existing browser package catalog;
 `build:demo-package` builds both packages. This keeps the runtime format unchanged
 and tests the same module-sized packaging used by the infoview host.
 
+### API refinement candidates from the port
+
+These are authoring-surface follow-ups, not prerequisites for this example:
+
+1. **Native indexed iteration.** Every read-only native array loop currently
+   converts `Js.Array.length` from a JS number to a Lean `Nat`, then each index
+   back to a JS number before `Js.Array.get`. A checked native-index loop should
+   retain number semantics and avoid this repeated ceremony without staging the
+   array as a Lean collection.
+2. **Typed tagged-union narrowing and nullable fields.** `CodeWithInfos` must
+   probe `text`, `append` and `tag` in sequence, then use `Js.Object.get` for tag
+   metadata. Popup documentation needs an additional `null` check because the
+   live server can return `null` despite its optional-string declaration. A
+   zero-copy narrowing surface and a declared nullable/optional field shape
+   would keep these cases typed without coercing the original objects.
+3. **Keyed exact props and dynamic child arrays.** Native `{children}` and
+   `js#[]` work well, but each dynamic child still needs a manual `Js.Array.push`.
+   `@props={props}` must appear alone, so keyed component lists currently set
+   `key` on the props object separately. Small construction notation for native
+   arrays and an explicit keyed exact-props form would remove the remaining
+   boilerplate while keeping React's key semantics visible.
+4. **Generic callback and literal ergonomics.** Browser event/effect bodies
+   repeatedly use `Browser.DomM.toRuntime`, and style objects repeat `← js#` for
+   static strings. A general DOM-callback lowering helper and context-aware
+   literal insertion could shorten this code without restoring the former
+   React-specific state/callback wrappers or hiding effect ownership.
+
 ## Validation
 
 After the normal dependency/runtime setup:
@@ -217,7 +244,7 @@ npm run test:infoview
 ```
 
 The focused command builds the Lean component and generates fresh IR, then runs
-the actual interpreter with official React in Chromium. Its 116 behavior checks cover:
+the actual interpreter with official React in Chromium. Its 122 behavior checks cover:
 filters, copying, state isolation/reconciliation, native identity, expected-type
 transitions, tagged text/diffs, popup interaction, cancellation, errors and null
 fields, including pinned-popup identity and request lifetime across sibling text
