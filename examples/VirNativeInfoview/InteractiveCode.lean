@@ -61,38 +61,49 @@ private structure PopupState where
   reply : Option (Js InfoPopup) := none
   status : String := "Loading…"
 
-private def separator : Html := do
-  <hr style={(← js%{ "margin" := (← js#"4px 0"), "border" := (← js#"0"),
+private def separator (key : Js String) : Html := do
+  <hr key={key} style={(← js%{ "margin" := (← js#"4px 0"), "border" := (← js#"0"),
     "borderTop" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)") })}/>
+
+private def keyed (key : Js String) (child : Html) : Html := do
+  let props ← Js.Object.empty
+  Js.Object.set props (← js#"key") key
+  Node.fragment props (← js#[← child])
 
 private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
   FunctionComponent.ofLean fun nativeProps => do
     let props : TagProps ← LeanRef.fromJSL (← Props.WithData.data nativeProps)
     let (hover, current) ← Hover.useControl props.parent
-    let response ← StateTuple.toState (← Hooks.useState (← LeanRef.toJSL ({} : PopupState)))
+    js#let (response, responseSetter) ← Hooks.useState (← LeanRef.toJSL ({} : PopupState))
     let popupId ← Hooks.useId
     let anchorId ← Hooks.useId
     Hover.usePosition current.visible anchorId popupId
-    let over ← Callback.ofUnary (Hover.over hover)
-    let leave ← Callback.ofUnary (Hover.out hover)
-    let focus ← Callback.ofUnary (Hover.focus hover)
-    let toggle ← Callback.ofUnary fun (event : Js Browser.Event) => do
+    let over ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
+      Hover.over hover event
+    let leave ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
+      Hover.out hover event
+    let focus ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
+      Hover.focus hover event
+    let toggle ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
       Browser.Event.stopPropagation event
       Browser.Event.preventDefault event
       Hover.toggle hover
-    let close ← Callback.ofUnary fun (event : Js Browser.Event) => do
+    let close ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
       Browser.Event.stopPropagation event
       Hover.close hover
-    let popupEnter ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.enterPopup hover
-    let popupLeave ← Callback.ofUnary fun (_ : Js Browser.Event) => Hover.leavePopup hover
-    let popupOver ← Callback.ofUnary fun (event : Js Browser.Event) => Browser.Event.stopPropagation event
+    let popupEnter ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => Browser.DomM.toRuntime do
+      Hover.enterPopup hover
+    let popupLeave ← Js.Function.ofLeanVoid fun (_ : Js Browser.Event) => Browser.DomM.toRuntime do
+      Hover.leavePopup hover
+    let popupOver ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
+      Browser.Event.stopPropagation event
     -- Portal keys must not reach the term's activation handler. Let native
     -- buttons handle Enter/Space themselves; Escape dismisses the popup.
-    let popupKeyboard ← Callback.ofUnary fun (event : Js Browser.Event) => do
+    let popupKeyboard ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
       Browser.Event.stopPropagation event
       if (← optionalString (← Js.Object.get event (← js#"key"))) == "Escape" then
         Hover.close hover
-    let keyboard ← Callback.ofUnary fun (event : Js Browser.Event) => do
+    let keyboard ← Js.Function.ofLeanVoid fun (event : Js Browser.Event) => Browser.DomM.toRuntime do
       let key ← optionalString (← Js.Object.get event (← js#"key"))
       if key == "Escape" then
         Browser.Event.stopPropagation event
@@ -101,63 +112,65 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
         Browser.Event.preventDefault event
         Browser.Event.stopPropagation event
         Hover.toggle hover
-    let effect ← EffectCallback.ofLean {
-      setup := do
-        let active ← RuntimeRef.new true
-        let abort ← Browser.AbortController.create
-        if current.visible then
-          State.set response (← LeanRef.toJSL ({} : PopupState))
-          let options ← ClientRequestOptions.empty
-          ClientRequestOptions.setAbortSignal options (← Browser.AbortController.getSignal abort)
-          let pending : Js.Promise InfoPopup ← RpcSession.callWithOptions props.session
-            (← js#"Lean.Widget.InteractiveDiagnostics.infoToInteractive") props.info options
-          let succeed ← Js.Function.ofLeanVoid fun (reply : Js InfoPopup) => do
-            if ← active.get then
-              State.set response (← LeanRef.toJSL ({ reply := some reply, status := "" } : PopupState))
-          let fail ← Js.Function.ofLeanVoid fun (_ : Js.Any) => do
-            if ← active.get then
-              State.set response (← LeanRef.toJSL ({ status := "Unable to load type information" } : PopupState))
-          let handled ← Js.Promise.thenVoid pending succeed
-          let ignore ← Js.Function.ofLeanVoid fun (_ : Js.Undefined) => pure ()
-          let _ ← Js.Promise.thenVoidWithRejection handled ignore fail
-          pure ()
-        LeanRef.toJSL (active, abort)
-      cleanup := fun resource => do
-        let (active, abort) : RuntimeRef Bool × Js Browser.AbortController ← LeanRef.fromJSL resource
+    let effect ← Js.Function.ofLean0 <| Browser.DomM.toRuntime do
+      let active ← RuntimeRef.new true
+      let abort ← Browser.AbortController.create
+      if current.visible then
+        Js.Function.callVoid responseSetter (SetStateAction.ofValue (← LeanRef.toJSL ({} : PopupState)))
+        let options ← ClientRequestOptions.empty
+        ClientRequestOptions.setAbortSignal options (← Browser.AbortController.getSignal abort)
+        let pending : Js.Promise InfoPopup ← RpcSession.callWithOptions props.session
+          (← js#"Lean.Widget.InteractiveDiagnostics.infoToInteractive") props.info options
+        let succeed ← Js.Function.ofLeanVoid fun (reply : Js InfoPopup) => do
+          if ← active.get then
+            Js.Function.callVoid responseSetter (SetStateAction.ofValue
+              (← LeanRef.toJSL ({ reply := some reply, status := "" } : PopupState)))
+        let fail ← Js.Function.ofLeanVoid fun (_ : Js.Any) => do
+          if ← active.get then
+            Js.Function.callVoid responseSetter (SetStateAction.ofValue
+              (← LeanRef.toJSL ({ status := "Unable to load type information" } : PopupState)))
+        let handled ← Js.Promise.thenVoid pending succeed
+        let ignore ← Js.Function.ofLeanVoid fun (_ : Js.Undefined) => pure ()
+        let _ ← Js.Promise.thenVoidWithRejection handled ignore fail
+        pure ()
+      let cleanup ← Js.Function.ofLean0Void <| Browser.DomM.toRuntime do
         active.set false
         Browser.AbortController.abort abort
-    }
+      pure (Js.UndefinedOr.ofJs cleanup)
     Hooks.useEffect effect (Js.UndefinedOr.ofJs (← js#[Js.erase props.session, props.info,
       Js.erase (← JsValue.ofBool current.visible)]))
-    let state : PopupState ← LeanRef.fromJSL response.value
+    let state : PopupState ← LeanRef.fromJSL response
     -- Keep two child slots even while hidden. Switching a sole unkeyed fragment
     -- to an array when its popup opens would remount the nested term components.
     let mut popup : Html := Node.text (← js#"")
     if current.visible then
-      let mut contents : Array Html := #[]
+      let mut contents ← Js.Array.empty (α := Node)
       if let some reply := state.reply then
         if let some expr ← popupField (← InfoPopup.exprExplicit reply) then
-          contents := contents.push (props.render (Hover.asParent hover) expr)
-        contents := contents.push (Html.text " : ")
+          let _ ← Js.Array.push contents (← keyed (← js#"expr")
+            (props.render (Hover.asParent hover) expr))
+        let _ ← Js.Array.push contents (← Html.text " : ")
         if let some type ← popupField (← InfoPopup.type reply) then
-          contents := contents.push (props.render (Hover.asParent hover) type)
+          let _ ← Js.Array.push contents (← keyed (← js#"type")
+            (props.render (Hover.asParent hover) type))
         let code := contents
-        contents := #[(do
-          <div className="font-code tl pre-wrap" style={(← js%{
+        let wrapped ←
+          <div key="code" className="font-code tl pre-wrap" style={(← js%{
             "whiteSpace" := (← js#"pre-wrap"),
-            "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") })}>{...code}</div>)]
+            "fontFamily" := (← js#"var(--vscode-editor-font-family, monospace)") })}>{code}</div>
+        contents ← Js.Array.empty
+        let _ ← Js.Array.push contents wrapped
         if let some value ← popupField (Js.UndefinedOr.ofJs (← Js.Object.get reply (← js#"doc"))) then
           let doc ← Js.String.fromAny value
           if (← JsValue.toFloat (← Js.String.length doc)) != 0 then
-            contents := contents.push separator
-            contents := contents.push (do
-              <span className="vir-native-infoview-doc" style={(← js%{
+            let _ ← Js.Array.push contents (← separator (← js#"doc-separator"))
+            let _ ← Js.Array.push contents (← <span key="doc" className="vir-native-infoview-doc" style={(← js%{
                 "display" := (← js#"block"), "whiteSpace" := (← js#"pre-wrap") })}>{Node.text doc}</span>)
         if !props.diff.isEmpty then
-          contents := contents.push separator
-          contents := contents.push (do
-            <div className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</div>)
-      else contents := #[Html.text state.status]
+          let _ ← Js.Array.push contents (← separator (← js#"diff-separator"))
+          let _ ← Js.Array.push contents (← <div key="diff" className="vir-native-infoview-diff-description">{Html.text (diffDescription props.diff)}</div>)
+      else
+        let _ ← Js.Array.push contents (← Html.text state.status)
       popup := do
         let node ← <div id={popupId} role="tooltip" className="vir-native-infoview-type-popup tooltip"
             onPointerEnter={popupEnter} onPointerLeave={popupLeave}
@@ -177,7 +190,7 @@ private def Tag : RuntimeM (FunctionComponent (Props.WithData TagProps)) :=
               "boxShadow" := (← js#"1px 1px 5px var(--vscode-widget-shadow, #0003)"),
               "border" := (← js#"1px solid var(--vscode-editorHoverWidget-border, #888)"),
               "background" := (← js#"var(--vscode-editorHoverWidget-background, #eee)") })}>
-          <div className="tooltip-code-content">{...contents}</div>
+          <div className="tooltip-code-content">{contents}</div>
           <button type="button" className="vir-native-infoview-pin link pointer dim"
             aria-label="Pin type information" aria-pressed={(← JsValue.ofBool current.pinned)}
             title={(← JsValue.ofString (if current.pinned then "Pinned — click to unpin and close" else "Pin type information"))}
@@ -215,7 +228,8 @@ private partial def renderTaggedText (TagComponent : FunctionComponent (Props.Wi
     let size := (← JsValue.toFloat (← Js.Array.length append)).toUInt64.toNat
     for index in [:size] do
       let child ← Js.Array.get append (← JsValue.ofFloat index.toFloat)
-      let _ ← Js.Array.push children (← renderTaggedText TagComponent session parent child)
+      let _ ← Js.Array.push children (← keyed (← JsValue.ofString (toString index))
+        (renderTaggedText TagComponent session parent child))
     return ← Node.fragment (← Js.Object.empty) children
   if let some tag ← Js.UndefinedOr.toOption (← CodeWithInfos.tag fmt) then
     let data ← Js.Tuple2.first tag

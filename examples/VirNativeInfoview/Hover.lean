@@ -26,7 +26,7 @@ structure Parent where
   pin : Browser.DomM Unit := pure ()
 
 structure Control where
-  state : React.State (JSL State)
+  setter : Js (StateSetter (LeanRef.Handle State))
   value : RuntimeRef State
   timer : RuntimeRef (Option (Js Browser.Timeout))
   live : RuntimeRef Bool
@@ -38,7 +38,7 @@ def change (control : Control) (f : State → State) : RuntimeM Unit := do
   let next := f previous
   if previous != next then
     control.value.set next
-    React.State.set control.state (← LeanRef.toJSL next)
+    Js.Function.callVoid control.setter (React.SetStateAction.ofValue (← LeanRef.toJSL next))
 
 def cancel (control : Control) : Browser.DomM Unit := do
   if let some timer ← control.timer.get then
@@ -101,29 +101,26 @@ def focus (control : Control) (event : Js Browser.Event) : Browser.DomM Unit := 
 /-- Refs retain timer ownership and current state across renders; effect replay
 re-enables the same control, and cleanup cancels pending work before unmount. -/
 def useControl (parent : Parent) : ReactM (Control × State) := do
-  let state ← StateTuple.toState (← Hooks.useState (← LeanRef.toJSL ({} : State)))
+  js#let (state, setter) ← Hooks.useState (← LeanRef.toJSL ({} : State))
   let slot ← Hooks.useRef (← Js.UndefinedOr.undefined (α := LeanRef.Handle Control))
   let control ← match ← Js.UndefinedOr.toOption (← Ref.get slot) with
     | some value => LeanRef.fromJSL value
     | none => do
       let control : Control := {
-        state, parent
+        setter, parent
         value := ← RuntimeRef.new {}
         timer := ← RuntimeRef.new none
         live := ← RuntimeRef.new true }
       Ref.set slot (Js.UndefinedOr.ofJs (← LeanRef.toJSL control))
       pure control
-  let lifetime ← EffectCallback.ofLean {
-    setup := do
-      control.live.set true
-      LeanRef.toJSL control
-    cleanup := fun value => do
-      let control : Control ← LeanRef.fromJSL value
+  let lifetime ← Js.Function.ofLean0 <| Browser.DomM.toRuntime do
+    control.live.set true
+    let cleanup ← Js.Function.ofLean0Void <| Browser.DomM.toRuntime do
       control.live.set false
       cancel control
-  }
+    pure (Js.UndefinedOr.ofJs cleanup)
   Hooks.useEffect lifetime (Js.UndefinedOr.ofJs (← Js.Array.empty))
-  return (control, ← LeanRef.fromJSL state.value)
+  return (control, ← LeanRef.fromJSL state)
 
 private def byId (id : Js String) : Browser.DomM (Option (Js Browser.Element)) := do
   let document ← Browser.Document.current
@@ -153,21 +150,19 @@ def position (anchorId popupId : Js String) : Browser.DomM Unit := do
         Browser.CSSStyleDeclaration.setProperty style (← js#"visibility") (← Js.Nullable.ofJs (← js#"visible"))
 
 def usePosition (visible : Bool) (anchorId popupId : Js String) : ReactM Unit := do
-  let effect ← EffectCallback.ofLean {
-    setup := do
-      let mut cleanup : Option (Js.Function1 Js.Any Unit) := none
-      if visible then
-        if let some anchor ← byId anchorId then
-          if let some popup ← byId popupId then
+  let effect ← Js.Function.ofLean0 <| Browser.DomM.toRuntime do
+    let mut cleanup : Option (Js.Function1 Js.Any Unit) := none
+    if visible then
+      if let some anchor ← byId anchorId then
+        if let some popup ← byId popupId then
+          position anchorId popupId
+          let callback ← Js.Function.ofLeanVoid fun (_ : Js.Any) => Browser.DomM.toRuntime do
             position anchorId popupId
-            let callback ← Callback.ofUnary fun (_ : Js.Any) => position anchorId popupId
-            cleanup := some (← HoverDom.observe anchor popup callback)
-      LeanRef.toJSL cleanup
-    cleanup := fun resource => do
-      let cleanup : Option (Js.Function1 Js.Any Unit) ← LeanRef.fromJSL resource
+          cleanup := some (← HoverDom.observe anchor popup callback)
+    let dispose ← Js.Function.ofLean0Void <| Browser.DomM.toRuntime do
       if let some cleanup := cleanup then
         Js.Function.callVoid cleanup (Js.erase (← Js.UndefinedOr.undefined (α := Unit)))
-  }
+    pure (Js.UndefinedOr.ofJs dispose)
   Hooks.useEffect effect (← Js.UndefinedOr.undefined)
 
 end VirNativeInfoview.Hover
