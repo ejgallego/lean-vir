@@ -207,8 +207,8 @@ After that, distinguish releasing UI ownership from shutting down the interprete
 
 Normal shell cleanup detaches its loaded reference; React owns descendant
 unmount and cleanup errors. Unmount stops shell polling; auto-refresh keeps its polling
-effect. Obsolete load results cannot install UI. Refreshed services use fresh
-factories and browser/React lifecycles, reusing compiled Wasm.
+effect. Obsolete load results cannot install UI. Each refreshed generation uses
+a fresh runtime and browser/React bindings, reusing compiled Wasm.
 Components read the current native editor connection through React context;
 there is no mutable command-dispatch proxy between the component and editor.
 The widget participates in the infoview's existing React tree, inheriting its

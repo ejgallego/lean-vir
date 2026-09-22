@@ -44,6 +44,8 @@ Start with the [quickstart](../README.md) to use VIR, or the
 The [upstream proposal](design/IR_DECLARATION_LOOKUP.md) explains the declaration-provider
 API request and the experiment behind it.
 
+- [Runtime simplification](development/RUNTIME_SIMPLIFICATION.md) separates the
+  Infoview loader cleanup from proposed runtime ownership and reload changes.
 - [Environment lookup](design/ENVIRONMENT_LOOKUP_PERFORMANCE.md) and
   [object conversion](design/OBJECT_CONVERSION_PERFORMANCE.md) record measured design
   decisions. Their timings belong to the recorded workloads and versions,

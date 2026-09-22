@@ -28,13 +28,13 @@ RuntimeM (React.FunctionComponent Infoview.PanelWidgetProps)
 ```
 
 `WidgetProps` identifies the Wasm asset, `IRPackage` and component factory.
-The default shell creates a private runtime/binding factory and one native
-function component per loaded service. React calls that function in the
-infoview's existing tree and passes its native `PanelWidgetProps` without a
-VIR clone or decode. The binding preserves nested field values; it does not
+For each package generation, the default shell loads a fresh runtime with its
+own browser bindings and calls the Lean factory to obtain a native function
+component. React renders that component in the infoview's existing tree and
+passes its native `PanelWidgetProps` without a VIR clone or decode. The binding preserves nested field values; it does not
 promise a stable top-level props-object identity across React renders. All
 surrounding contexts are inherited without a provider bridge. Prop updates reuse
-the component; configuration or package revision changes replace the service and
+the component; configuration or package revision changes replace the component and
 remount its subtree. Rendering follows ordinary React render rules and error
 boundaries.
 
