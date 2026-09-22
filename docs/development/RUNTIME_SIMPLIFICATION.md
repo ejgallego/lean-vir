@@ -2,6 +2,9 @@
 
 The design target is two concrete execution paths. Inventory clusters are
 reasoning labels, not a proposed set of layers.
+The [use-case contracts](../design/VIR_USE_CASES.md) specify required behavior,
+map existing test evidence, and identify compatibility decisions for the proposed
+one-runtime-per-generation API.
 
 - **Document:** document build selects the Lean entry and emits package assets
   and a small bootstrap; the page loads its required package set once, invokes
@@ -67,5 +70,6 @@ continuations after replacement. The real-server edit case appends a comment
 and checks notification/RPC refresh without replacing the runtime. Generation
 replacement is exercised separately by the browser suite. These checks do not
 establish changed-implementation replacement in a live editor or arbitrary state
-migration. Snapshot mismatch errors request an explicit widget reload; the
-initial-load path has no automatic retry or retry control.
+migration. The current mismatch diagnostic asks for a widget reload, but the
+intended acquisition contract must handle ordinary edit races without that user
+action. A Retry button is explicitly excluded; repair the protocol/lifecycle.
