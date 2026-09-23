@@ -17,7 +17,7 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview
 open Lean.Vir.ProofWidgets
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 namespace Style
 
@@ -163,11 +163,11 @@ def HypothesisRow : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.P
     let valueNode : ReactM (Js.Nullable Lean.Vir.React.Node) := match value with
       | none => Js.Nullable.null
       | some value => do
-          Js.Nullable.ofJs (← <span className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {value}</span>)
-    return ← <li id={(← JsValue.ofString ("vir-native-infoview-hyp-" ++ id))}
+          Js.Nullable.ofJs (← jsx%{<span className="vir-native-infoview-hyp-value" style={(← Style.value)}> := {value}</span>})
+    jsx%{<li id={(← JsValue.ofString ("vir-native-infoview-hyp-" ++ id))}
         className="vir-native-infoview-hypothesis" role="listitem" style={(← Style.hypothesis)}><span
           className="vir-native-infoview-hyp-name" style={(← Style.binder)}>{JsValue.ofString names}</span><span aria-hidden={(← JsValue.ofBool true)}>:</span><code
-          className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{hypothesisType}</code>{valueNode}</li>
+          className="vir-native-infoview-hyp-type" style={(← Style.hypothesisType)}>{hypothesisType}</code>{valueNode}</li>}
 
 structure TacticGoalCardProps where
   goal : Js InteractiveGoal
@@ -237,38 +237,38 @@ def GoalCardBody
       (← Lean.Vir.LeanRef.toJSL { hypothesis, goalIndex := index, index := hypothesisIndex })
     Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps props) (← js#"key")
       (← JsValue.ofString s!"{goalId}-{hypothesisIndex}")
-    return ← <HypothesisRowComponent @props={props}/>
+    jsx%{<HypothesisRowComponent @props={props}/>}
   let hypothesisNodes ← hypotheses.map renderHypothesis
   let context : Html := if hypothesisCount == 0 then
-    <p key="context" className="vir-native-infoview-no-hypotheses" style={(← Style.empty)}>No local hypotheses.</p>
+    jsx%{<p key="context" className="vir-native-infoview-no-hypotheses" style={(← Style.empty)}>No local hypotheses.</p>}
   else
-    <ul key="context" id={(← JsValue.ofString detailsId)} className="vir-native-infoview-context" role="list"
-        aria-label="Local hypotheses" style={(← Style.context)}>{hypothesisNodes}</ul>
+    jsx%{<ul key="context" id={(← JsValue.ofString detailsId)} className="vir-native-infoview-context" role="list"
+        aria-label="Local hypotheses" style={(← Style.context)}>{hypothesisNodes}</ul>}
   let targetText ← plainCode target
-  let target : Html := <div key="target" className="vir-native-infoview-target" style={(← Style.target)}><span
+  let target : Html := jsx%{<div key="target" className="vir-native-infoview-target" style={(← Style.target)}><span
       className="vir-native-infoview-turnstile" aria-hidden={(← JsValue.ofBool true)}
       style={(← Style.turnstile)}>⊢</span><code id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-target")}
-      className="vir-native-infoview-target-code" style={(← Style.targetCode)}>{targetText}</code></div>
+      className="vir-native-infoview-target-code" style={(← Style.targetCode)}>{targetText}</code></div>}
   let details : ReactM (Js.Array Lean.Vir.React.Node) := do
     if collapsed then Js.Array.empty else js#[← context, ← target]
-  let heading : Html := <h3 className="vir-native-infoview-goal-heading" style={(← Style.goalHeading)}>
+  let heading : Html := jsx%{<h3 className="vir-native-infoview-goal-heading" style={(← Style.goalHeading)}>
     {JsValue.ofString title}
-  </h3>
-  let collapseButton : Html := <button id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-collapse")}
+  </h3>}
+  let collapseButton : Html := jsx%{<button id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}-collapse")}
       className="vir-native-infoview-collapse" type="button"
       title={(← JsValue.ofString (if collapsed then "Expand goal" else "Collapse goal"))}
       aria-label={(← JsValue.ofString (if collapsed then "Expand goal" else "Collapse goal"))}
       aria-expanded={(← JsValue.ofBool (!collapsed))} aria-controls={(← JsValue.ofString detailsId)}
       onClick={toggle} style={(← Style.collapseButton)}>
     {JsValue.ofString (if collapsed then "+" else "−")}
-  </button>
-  let header : Html := <header className="vir-native-infoview-goal-header" style={(← Style.goalHeader)}>
+  </button>}
+  let header : Html := jsx%{<header className="vir-native-infoview-goal-header" style={(← Style.goalHeader)}>
     {heading}{collapseButton}
-  </header>
-  return ← <article id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}")}
+  </header>}
+  jsx%{<article id={(← JsValue.ofString s!"vir-native-infoview-goal-{goalId}")}
       className="vir-native-infoview-goal" data-goal-id={(← JsValue.ofString goalId)}
       data-goal-key={(← JsValue.ofString goalKey)} data-goal-status={(← JsValue.ofString status)}
-      style={(← Style.goalCard)}>{header}{details}</article>
+      style={(← Style.goalCard)}>{header}{details}</article>}
 
 def TacticGoalCard : RuntimeM (Lean.Vir.React.FunctionComponent (Lean.Vir.React.Props.WithData TacticGoalCardProps)) := do
   let HypothesisRowComponent ← HypothesisRow
@@ -307,34 +307,34 @@ def View : RuntimeM (Lean.Vir.React.FunctionComponent PanelWidgetProps) := do
         (← Lean.Vir.LeanRef.toJSL { goal, index, key })
       Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps cardProps) (← js#"key")
         (← JsValue.ofString key)
-      return ← <TacticGoalCardComponent @props={cardProps}/>
+      jsx%{<TacticGoalCardComponent @props={cardProps}/>}
     let goals ← tacticGoals.map renderGoal
     if let some goal := termGoal? then
       let cardProps ← Lean.Vir.React.Props.WithData.make
         (← Lean.Vir.LeanRef.toJSL { goal, index := tacticGoalCount })
       Lean.Vir.Js.Object.set (Lean.Vir.React.Props.WithData.asProps cardProps) (← js#"key")
         (← JsValue.ofString s!"term-{tacticGoalCount}")
-      let _ ← Js.Array.push goals (← <TermGoalCardComponent @props={cardProps}/>)
+      let _ ← Js.Array.push goals (← jsx%{<TermGoalCardComponent @props={cardProps}/>})
     let goalCount := (← JsValue.toFloat (← Js.Array.length goals)).toUInt64.toNat
     let body : Html := if goalCount == 0 then
-      <p id="vir-native-infoview-empty" className="vir-native-infoview-empty" style={(← Style.empty)}>
+      jsx%{<p id="vir-native-infoview-empty" className="vir-native-infoview-empty" style={(← Style.empty)}>
         {JsValue.ofString ("No goals at " ++ captionPosition ++ ".")}
-      </p>
+      </p>}
     else
-      <div id="vir-native-infoview-goals" className="vir-native-infoview-goals" style={(← Style.goalList)}>
+      jsx%{<div id="vir-native-infoview-goals" className="vir-native-infoview-goals" style={(← Style.goalList)}>
         {goals}
-      </div>
-    let heading : Html := <h2 className="vir-native-infoview-title" style={(← Style.title)}>Goals</h2>
-    let summary : Html := <p id="vir-native-infoview-summary" className="vir-native-infoview-summary"
+      </div>}
+    let heading : Html := jsx%{<h2 className="vir-native-infoview-title" style={(← Style.title)}>Goals</h2>}
+    let summary : Html := jsx%{<p id="vir-native-infoview-summary" className="vir-native-infoview-summary"
         style={(← Style.summary)}>
       {JsValue.ofString
         (s!"{goalCount} " ++ plural goalCount "goal" "goals" ++ " · " ++ captionPosition)}
-    </p>
-    let toolbar : Html := <header className="vir-native-infoview-toolbar" style={(← Style.toolbar)}>
+    </p>}
+    let toolbar : Html := jsx%{<header className="vir-native-infoview-toolbar" style={(← Style.toolbar)}>
       {heading}{summary}
-    </header>
-    return ← <section id="vir-native-infoview" className="vir-native-infoview" role="region"
-        aria-label="VIR native Lean goals" style={(← Style.shell)}>{toolbar}{body}</section>
+    </header>}
+    jsx%{<section id="vir-native-infoview" className="vir-native-infoview" role="region"
+        aria-label="VIR native Lean goals" style={(← Style.shell)}>{toolbar}{body}</section>}
 
 vir_proof_widget View
 
