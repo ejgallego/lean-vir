@@ -15,17 +15,17 @@ namespace ReactInput
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 /-- Uses native IDs without converting them to Lean strings or constructing IDs locally. -/
 def useIdField (caption : String) : ReactM (Js Node) := do
   let inputId ← Hooks.useId
   let hintId ← Hooks.useId
-  return ← <div>
+  jsx%{<div>
     <label htmlFor={inputId}>{Node.text (← JsValue.ofString caption)}</label>
     <input id={inputId} aria-describedby={hintId} />
     <p id={hintId}>Enter a value</p>
-  </div>
+  </div>}
 
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
@@ -48,11 +48,11 @@ def inputComponent : RuntimeM (FunctionComponent Props) :=
       | some input => do
         Js.Function.callVoid nameSetter
           (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getValue input))
-    return ← <div id="react-input-widget">
+    jsx%{<div id="react-input-widget">
       <label htmlFor="react-name-input">name:</label>
       <input id="react-name-input" type="text" value={nameValue} placeholder="name" onInput={change} />
       <span id="react-name-output">{Node.text nameValue}</span>
-    </div>
+    </div>}
 
 def changeInputComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
@@ -74,12 +74,12 @@ def changeInputComponent : RuntimeM (FunctionComponent Props) :=
     let submit ← Js.Function.ofLeanVoid fun (event : Js SyntheticEvent) => do
       SyntheticEvent.preventDefault event
       SyntheticEvent.stopPropagation event
-    return ← <form id="react-change-widget" onSubmit={submit}>
+    jsx%{<form id="react-change-widget" onSubmit={submit}>
       <label htmlFor="react-change-input">change:</label>
       <input id="react-change-input" name="change" type="text" value={valueValue}
         placeholder="change" onChange={change} />
       <span id="react-change-output">{Node.text valueValue}</span>
-    </form>
+    </form>}
 
 def checkboxComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
@@ -97,12 +97,12 @@ def checkboxComponent : RuntimeM (FunctionComponent Props) :=
       | some input => do
         Js.Function.callVoid checkedSetter
           (React.SetStateAction.ofValue (← Browser.HTMLInputElement.getChecked input))
-    return ← <div id="react-checkbox-widget">
+    jsx%{<div id="react-checkbox-widget">
       <input id="react-checkbox-input" type="checkbox" checked={checkedValue} onChange={change} />
       <label id="react-checkbox-output" htmlFor="react-checkbox-input">
         {Node.text (← JsValue.ofString (checkedLabel checkedLabelValue))}
       </label>
-    </div>
+    </div>}
 
 def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
   FunctionComponent.ofLean fun _ => do
@@ -123,7 +123,7 @@ def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
       | none => pure ()
       | some next => Js.Function.callVoid flavorSetter (React.SetStateAction.ofValue next)
     let label := selectTextareaLabel (← JsValue.toString noteValue) (← JsValue.toString flavorValue)
-    return ← <main id="react-select-textarea-widget">
+    jsx%{<main id="react-select-textarea-widget">
       <nav id="react-select-textarea-nav" aria-label="React textarea fixture">
         <span className="react-select-textarea-section">fields</span>
         <span className="react-select-textarea-choice">{Node.text flavorValue}</span>
@@ -139,19 +139,19 @@ def selectTextareaComponent : RuntimeM (FunctionComponent Props) :=
         <option key="strawberry" value="strawberry">strawberry</option>
       </select>
       <span id="react-select-textarea-output">{Node.text (← JsValue.ofString label)}</span>
-    </main>
+    </main>}
 
 def renderAttributesInto (root : Js Root) : DomM Unit := do
   let node ← ReactM.run do
     let style ← js%{ "color" := (← js#"rgb(1, 2, 3)"), "marginTop" := (← js#"4px") }
-    return ← <div id="react-attributes-widget" role="group" aria-label="React attribute fixture"
+    jsx%{<div id="react-attributes-widget" role="group" aria-label="React attribute fixture"
       data-case="attributes" data-testid="react-attributes" tabIndex={← JsValue.ofFloat 3}
       className="react-attributes is-mounted" style={style}>
       <label key="attributes-label" id="react-attributes-label" htmlFor="react-attributes-input">attrs:</label>
       <input key="attributes-input" id="react-attributes-input" name="attributes"
         type="checkbox" checked={← JsValue.ofBool true} disabled={← JsValue.ofBool true} />
       <span key="attributes-output" id="react-attributes-output" title="attribute output">attrs</span>
-    </div>
+    </div>}
   Root.render root node
 
 def mountInput (selector : String) : DomM Bool := do

@@ -23,7 +23,7 @@ namespace ReactCounterTutorial
 open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 def Counter : RuntimeM (FunctionComponent Props) := do
   let initial ← JsValue.ofNat 0
@@ -33,7 +33,7 @@ def Counter : RuntimeM (FunctionComponent Props) := do
     js#let (value, setter) ← Hooks.useState (α := Nat) initial
     let increment ← Js.Function.ofLeanVoid fun (_ : Js Lean.Vir.React.SyntheticEvent) =>
       Js.Function.callVoid setter (React.SetStateAction.ofUpdater update)
-    return ← <button type="button" onClick={increment}>Count: {value}</button>
+    jsx%{<button type="button" onClick={increment}>Count: {value}</button>}
 
 def mount (selector : String) : DomM Bool := do
   let component ← Counter

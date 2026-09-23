@@ -21,7 +21,7 @@ public section
 namespace ReactProofWidgetHello
 
 open Lean.Vir Lean.Vir.React Lean.Vir.Infoview
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
   FunctionComponent.ofLean fun props => do
@@ -31,14 +31,14 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) :=
   let zero ← JsValue.ofFloat 0
   let isEmpty ← Js.Number.equal (← Js.Array.length goals) zero
   let target : ReactM (Js Node) := if ← JsValue.toBool isEmpty then
-      <pre>Move the cursor into a proof to see its first goal.</pre>
+      jsx%{<pre>Move the cursor into a proof to see its first goal.</pre>}
     else do
       let goal ← Js.Array.get goals zero
-      return ← <pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>
-  return ← <section id="react-proof-hello">
+      jsx%{<pre>⊢ {← CodeWithInfos.stripTags (← InteractiveGoal.type goal)}</pre>}
+  jsx%{<section id="react-proof-hello">
     <h3>{← js#!"Hello from {uri}"}</h3>
     {target}
-  </section>
+  </section>}
 
 -- Derive the standard native-props factory and widget configuration.
 vir_proof_widget View

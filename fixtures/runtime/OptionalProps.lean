@@ -35,26 +35,26 @@ structure OptionalNullableProps where
 attribute [js_optional] OptionalNullableProps.title
 
 def omitted (Component : React.FunctionComponent OptionalProps) : React.ReactM (Js React.Node) :=
-  <Component/>
+  jsx%{<Component/>}
 
 def present (Component : React.FunctionComponent OptionalProps) (title : Js String) :
     React.ReactM (Js React.Node) :=
-  <Component title={title}/>
+  jsx%{<Component title={title}/>}
 
 def readTitle (props : Js OptionalProps) : RuntimeM (Js.UndefinedOr String) :=
   js_field% props "title"
 
 def requiredUndefined (Component : React.FunctionComponent RequiredUndefinedProps)
     (title : Js.UndefinedOr String) : React.ReactM (Js React.Node) :=
-  <Component title={title}/>
+  jsx%{<Component title={title}/>}
 
 def optionalUndefined (Component : React.FunctionComponent OptionalUndefinedProps)
     (title : Js.UndefinedOr String) : React.ReactM (Js React.Node) :=
-  <Component title={title}/>
+  jsx%{<Component title={title}/>}
 
 def omittedUndefined (Component : React.FunctionComponent OptionalUndefinedProps) :
     React.ReactM (Js React.Node) :=
-  <Component/>
+  jsx%{<Component/>}
 
 def readUndefinedTitle (props : Js OptionalUndefinedProps) : RuntimeM (Js.UndefinedOr String) :=
   js_field% props "title"
@@ -71,11 +71,11 @@ example (props : Js AliasedUndefinedProps) : RuntimeM (Js.UndefinedOr String) :=
 
 def nullable (Component : React.FunctionComponent OptionalNullableProps) (title : Js.Nullable String) :
     React.ReactM (Js React.Node) :=
-  <Component title={title}/>
+  jsx%{<Component title={title}/>}
 
 def omittedNullable (Component : React.FunctionComponent OptionalNullableProps) :
     React.ReactM (Js React.Node) :=
-  <Component/>
+  jsx%{<Component/>}
 
 def readNullableTitle (props : Js OptionalNullableProps) :
     RuntimeM (Js.UndefinedOr (Js.Nullable.Value String)) :=
@@ -84,53 +84,53 @@ def readNullableTitle (props : Js OptionalNullableProps) :
 def component : RuntimeM (React.FunctionComponent OptionalProps) :=
   Js.Function.ofLean fun props => do
     let title ← readTitle props
-    return ← <span>{title}</span>
+    jsx%{<span>{title}</span>}
 
 -- Literal construction and native fields retain the same present-value checks.
 example (Component : React.FunctionComponent OptionalProps) : React.ReactM (Js React.Node) :=
-  <Component title="present"/>
+  jsx%{<Component title="present"/>}
 
 example (Component : React.FunctionComponent OptionalProps) : React.ReactM (Js React.Node) :=
-  <Component title={js#"present"}/>
+  jsx%{<Component title={js#"present"}/>}
 
 example (Component : React.FunctionComponent OptionalProps) (name : Js String) :
     React.ReactM (Js React.Node) :=
-  <Component title={js#!"Hello {name}"}/>
+  jsx%{<Component title={js#!"Hello {name}"}/>}
 
 example (props : Js OptionalProps) (Component : React.FunctionComponent OptionalProps) :
     React.ReactM (Js React.Node) :=
-  <Component @props={props}/>
+  jsx%{<Component @props={props}/>}
 
 example (Component : React.FunctionComponent OptionalProps) (absent : Js.Undefined)
     (maybeTitle : Js.UndefinedOr String) (nullableTitle : Js.Nullable String)
     (wrong : Js Float) (props : Js OptionalProps) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={absent}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={maybeTitle}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={nullableTitle}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={wrong}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title="a" title="b"/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component unknown="a"/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={absent}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={maybeTitle}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={nullableTitle}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={wrong}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title="a" title="b"/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component unknown="a"/>}
   fail_if_success have _ : RuntimeM (Js String) := js_field% props "title"
   trivial
 
 example (Component : React.FunctionComponent RequiredUndefinedProps) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component/>}
   trivial
 
 example (Component : React.FunctionComponent RequiredUndefinedProps) (title : Js String) :
     React.ReactM (Js React.Node) :=
-  <Component title={Js.UndefinedOr.ofJs title}/>
+  jsx%{<Component title={Js.UndefinedOr.ofJs title}/>}
 
 example (Component : React.FunctionComponent OptionalUndefinedProps) (title : Js String) :
     React.ReactM (Js React.Node) :=
-  <Component title={Js.UndefinedOr.ofJs title}/>
+  jsx%{<Component title={Js.UndefinedOr.ofJs title}/>}
 
 example (Component : React.FunctionComponent OptionalUndefinedProps) (title : Js.Nullable String) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={title}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={title}/>}
   trivial
 
 example (Component : React.FunctionComponent OptionalNullableProps) (title : Js.UndefinedOr String) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={title}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={title}/>}
   trivial
 
 structure MixedProps where
@@ -140,11 +140,11 @@ structure MixedProps where
 attribute [js_optional] MixedProps.title
 
 example (Component : React.FunctionComponent MixedProps) : React.ReactM (Js React.Node) :=
-  <Component requiredTitle="required"/>
+  jsx%{<Component requiredTitle="required"/>}
 
 example (Component : React.FunctionComponent MixedProps) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title="present"/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title="present"/>}
   trivial
 
 -- Tagging metadata cannot bypass the existing bounded schema checks.
@@ -154,7 +154,7 @@ structure NonNativeProps where
 attribute [js_optional] NonNativeProps.title
 
 example (Component : React.FunctionComponent NonNativeProps) (props : Js NonNativeProps) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component/>}
   fail_if_success have _ : RuntimeM (Js.UndefinedOr String) := js_field% props "title"
   trivial
 

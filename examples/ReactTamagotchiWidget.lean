@@ -18,7 +18,7 @@ namespace ReactTamagotchiWidget
 open Lean.Vir
 open Lean.Vir.React
 open Lean.Vir.Infoview
-open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+open scoped Lean.Vir.Js
 
 def shellStyle : RuntimeM Js.Object := js%{
   "display" := js#"grid", "gap" := js#"10px", "minWidth" := js#"0"
@@ -39,7 +39,7 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
       "id" := js#"react-tamagotchi-widget-caption",
       "style" := (← captionStyle)
     }
-    let caption ← <p @props={captionProps}>{captionText}</p>
+    let caption ← jsx%{<p @props={captionProps}>{captionText}</p>}
     let pet ← Node.functionComponent petComponent (← Js.Object.empty) (← Js.Array.empty)
     let shellProps ← js%{
       "id" := js#"react-tamagotchi-proof-widget",
@@ -47,7 +47,7 @@ def View : Lean.Vir.RuntimeM (FunctionComponent PanelWidgetProps) := do
       "aria-label" := js#"Lean React Tamagotchi proof widget",
       "style" := (← shellStyle)
     }
-    return ← <section @props={shellProps}>{caption}{pet}</section>
+    jsx%{<section @props={shellProps}>{caption}{pet}</section>}
 
 vir_proof_widget View
 

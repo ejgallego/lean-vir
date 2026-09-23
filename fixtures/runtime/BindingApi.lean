@@ -132,7 +132,7 @@ example (_void : Js.Function0 Unit) (_unary : Js.Function1 (Js String) (Js Strin
 example : React.ReactM (Js React.Node) := do
   let values : Js.Array React.Node ← Js.Array.empty
   let state ← React.Hooks.useState (React.Initial.ofValue values)
-  return ← <div>{← Js.Tuple2.first state}</div>
+  jsx%{<div>{← Js.Tuple2.first state}</div>}
 
 -- Host-import proofs are checked in their telescope and excluded from JS args.
 private noncomputable opaque proofPrefixSignature {α : Type} [React.Node.Shape α] (_h : True)
@@ -215,7 +215,7 @@ example (value : Js String) : RuntimeM Js.Object :=
 
 -- Only explicit string literals are lifted in construction positions.
 example : RuntimeM Js.Object := js%{ "value" := js#"native" }
-example : React.ReactM (Js React.Node) := <span title={js#"native"}/>
+example : React.ReactM (Js React.Node) := jsx%{<span title={js#"native"}/>}
 example : RuntimeM (Js String) := js#"still an action"
 example (action : RuntimeM (Js String)) : RuntimeM Js.Object :=
   js%{ "value" := (← action) }
@@ -223,20 +223,20 @@ example (action : RuntimeM (Js String)) : RuntimeM Js.Object :=
 example (action : RuntimeM (Js String)) :
     (js%{ "first" := js#"a", "middle" := (← action), "last" := js#"b" }) =
     (js%{ "first" := (← js#"a"), "middle" := (← action), "last" := (← js#"b") }) := rfl
-example : (<span title={js#"native"}/> : React.ReactM (Js React.Node)) =
-    <span title={(← js#"native")}/> := rfl
+example : (jsx%{<span title={js#"native"}/>} : React.ReactM (Js React.Node)) =
+    jsx%{<span title={(← js#"native")}/>} := rfl
 example (_action : RuntimeM (Js String)) : True := by
   fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := _action }
-  fail_if_success have _ : React.ReactM (Js React.Node) := <span title={_action}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<span title={_action}/>}
   trivial
 
 -- Literal construction must not invoke Object.prototype's legacy setter.
 example (_value : Js.Object) (Component : React.FunctionComponent React.Props) : True := by
   let _ := Component
   fail_if_success have _ : RuntimeM Js.Object := js%{ "__proto__" := _value }
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div __proto__={_value}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div __proto__={_value}></div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component __proto__={_value}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div __proto__={_value}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div __proto__={_value}></div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component __proto__={_value}/>}
   trivial
 
 -- Other names remain ordinary properties; general assignment is still available.
@@ -252,7 +252,7 @@ example (first second : Js String) : RuntimeM (Js.Array String) :=
 example (text : Js String) : RuntimeM (Js Float) := Js.String.length text
 
 example (value : Js String) : React.ReactM (Js React.Node) :=
-  <span title={value}>{React.Node.text value}</span>
+  jsx%{<span title={value}>{React.Node.text value}</span>}
 
 -- Native children are inserted unchanged, not converted to Lean collections.
 example [React.Node.Shape α] (value : Js α) : Js React.Node := React.Node.ofJs value
@@ -305,90 +305,90 @@ example : True := by
   trivial
 
 example (node : Js React.Node) (text : Js String) (nodes : Js.Array React.Node) :
-    React.ReactM (Js React.Node) := <div>{node}{text}{nodes}</div>
+    React.ReactM (Js React.Node) := jsx%{<div>{node}{text}{nodes}</div>}
 
 example (node : Js React.Node) :
-    (<div>{node}</div> : React.ReactM (Js React.Node)) =
-      <div>{React.Node.ofJs node}</div> := rfl
+    (jsx%{<div>{node}</div>} : React.ReactM (Js React.Node)) =
+      jsx%{<div>{React.Node.ofJs node}</div>} := rfl
 
 example (text : Js String) :
-    (<div>{text}</div> : React.ReactM (Js React.Node)) =
-      <div>{React.Node.ofJs text}</div> := rfl
+    (jsx%{<div>{text}</div>} : React.ReactM (Js React.Node)) =
+      jsx%{<div>{React.Node.ofJs text}</div>} := rfl
 
 example [React.Node.Shape α] (value : Js α) : React.ReactM (Js React.Node) :=
-  <div>{value}</div>
+  jsx%{<div>{value}</div>}
 
 example (action : RuntimeM (Js React.Node)) : React.ReactM (Js React.Node) :=
-  <div>{action}</div>
+  jsx%{<div>{action}</div>}
 
 example (values : Js.Array String) (render : Js.Function1 (Js String) (Js React.Node)) :
-    React.ReactM (Js React.Node) := <div>{values.map (β := React.Node) render}</div>
+    React.ReactM (Js React.Node) := jsx%{<div>{values.map (β := React.Node) render}</div>}
 
 example (text : RuntimeM (Js String)) (nodes : React.ReactM (Js.Array React.Node)) :
-    React.ReactM (Js React.Node) := <div>{text}{nodes}</div>
+    React.ReactM (Js React.Node) := jsx%{<div>{text}{nodes}</div>}
 
-example : React.ReactM (Js React.Node) := <div>{js#"native text"}</div>
+example : React.ReactM (Js React.Node) := jsx%{<div>{js#"native text"}</div>}
 
 example (nullable : Js.Nullable React.Node) (optional : Js.UndefinedOr String)
     (absent : Js.Undefined) (flag : Js Bool) (number : Js Float) (bigint : Js Nat)
     (nested : Js.Array (Js.Nullable.Value String)) : React.ReactM (Js React.Node) :=
-  <div>{nullable}{optional}{absent}{flag}{number}{bigint}{nested}</div>
+  jsx%{<div>{nullable}{optional}{absent}{flag}{number}{bigint}{nested}</div>}
 
 example (values : Js.Array String) : RuntimeM (Js React.Node) := do
   let render ← Js.Function.ofLean3 fun (text : Js String) (_ : Js Float)
-      (_ : Js.Array String) => <span>{text}</span>
-  return ← <div>{values.map render}</div>
+      (_ : Js.Array String) => jsx%{<span>{text}</span>}
+  jsx%{<div>{values.map render}</div>}
 
 example : RuntimeM (Js.Function1 (Js String) (Js React.Node)) :=
-  Js.Function.ofLean fun (text : Js String) => <span>{text}</span>
+  Js.Function.ofLean fun (text : Js String) => jsx%{<span>{text}</span>}
 
 example : RuntimeM (Js.Array String) := js#[js#"a", (js#"b"), ((js#"c"))]
 
 example : RuntimeM Js.Object := js%{ "value" := ((js#"native")) }
 
-example : React.ReactM (Js React.Node) := <span title={((js#"native"))}/>
+example : React.ReactM (Js React.Node) := jsx%{<span title={((js#"native"))}/>}
 
 example (_nullable : Js.Nullable Js.Object.Value) (_any : Js.Any)
     (_values : Js.Array Js.Any.Value) (_action : RuntimeM (Js.Array Js.Object.Value)) : True := by
-  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_nullable}</div>
-  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_any}</div>
-  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_values}</div>
-  fail_if_success have _ : RuntimeM (Js React.Node) := <div>{_action}</div>
+  fail_if_success have _ : RuntimeM (Js React.Node) := jsx%{<div>{_nullable}</div>}
+  fail_if_success have _ : RuntimeM (Js React.Node) := jsx%{<div>{_any}</div>}
+  fail_if_success have _ : RuntimeM (Js React.Node) := jsx%{<div>{_values}</div>}
+  fail_if_success have _ : RuntimeM (Js React.Node) := jsx%{<div>{_action}</div>}
   trivial
 
 example (_action : RuntimeM (Js String)) : True := by
   fail_if_success have _ : RuntimeM (Js.Array String) := js#[_action]
   fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := (_action) }
-  fail_if_success have _ : RuntimeM (Js React.Node) := <span title={(_action)}/>
+  fail_if_success have _ : RuntimeM (Js React.Node) := jsx%{<span title={(_action)}/>}
   trivial
 
 example (_raw : Js.Object) (_nodes : Array (Js React.Node))
     (_actions : Js.Array (RuntimeM (Js React.Node)))
     (_leanActions : Array (React.ReactM (Js React.Node)))
     (_arrayAction : RuntimeM (Array (Js React.Node))) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_raw}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_nodes}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_actions}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_leanActions}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{_arrayAction}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{..._nodes}</div>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <div>{..._leanActions}</div>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{_raw}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{_nodes}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{_actions}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{_leanActions}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{_arrayAction}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{..._nodes}</div>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<div>{..._leanActions}</div>}
   trivial
 
 #guard_msgs in
 example (Component : React.FunctionComponent (React.Props.WithData String))
     (props : Js (React.Props.WithData String)) : React.ReactM (Js React.Node) :=
-  <Component @props={props} />
+  jsx%{<Component @props={props} />}
 
 #guard_msgs in
 example (Component : React.FunctionComponent React.Props)
     (props : Js React.Props) : React.ReactM (Js React.Node) :=
-  <Component @props={props}></Component>
+  jsx%{<Component @props={props}></Component>}
 
 -- Exact props are not object spread, and cannot be mixed with field writes.
 example (_props : Js React.Props) : True := by
-  fail_if_success have _ : React.ReactM (Js React.Node) := <span {..._props}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <span @props={_props} id="mixed"/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<span {..._props}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<span @props={_props} id="mixed"/>}
   trivial
 
 -- A schema describes native properties, not an allocated Lean record.
@@ -400,12 +400,12 @@ structure NativeProps where
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any)
     (key : Js String) (number : Js Float) (bigint : Js Nat)
     (optional : Js.UndefinedOr String) (nullable : Js.Nullable String) : RuntimeM Unit := do
-  let _ ← <Component key={key} title="x" values={(← Js.Array.empty)} ref={ref}/>
-  let _ ← <Component key={number} title="x" values={(← Js.Array.empty)} ref={ref}/>
-  let _ ← <Component key={bigint} title="x" values={(← Js.Array.empty)} ref={ref}/>
-  let _ ← <Component key={optional} title="x" values={(← Js.Array.empty)} ref={ref}/>
-  let _ ← <Component key={nullable} title="x" values={(← Js.Array.empty)} ref={ref}/>
-  let _ ← <Component key={js#"literal"} title="x" values={(← Js.Array.empty)} ref={ref}/>
+  let _ ← jsx%{<Component key={key} title="x" values={(← Js.Array.empty)} ref={ref}/>}
+  let _ ← jsx%{<Component key={number} title="x" values={(← Js.Array.empty)} ref={ref}/>}
+  let _ ← jsx%{<Component key={bigint} title="x" values={(← Js.Array.empty)} ref={ref}/>}
+  let _ ← jsx%{<Component key={optional} title="x" values={(← Js.Array.empty)} ref={ref}/>}
+  let _ ← jsx%{<Component key={nullable} title="x" values={(← Js.Array.empty)} ref={ref}/>}
+  let _ ← jsx%{<Component key={js#"literal"} title="x" values={(← Js.Array.empty)} ref={ref}/>}
   pure ()
 
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any)
@@ -413,13 +413,13 @@ example (Component : React.FunctionComponent NativeProps) (ref : Js.Any)
   let _ := Component
   let _ := ref
   fail_if_success have _ : React.ReactM (Js React.Node) :=
-    <Component key={_key} title="x" values={(← Js.Array.empty)} ref={ref}/>
+    jsx%{<Component key={_key} title="x" values={(← Js.Array.empty)} ref={ref}/>}
   fail_if_success have _ : React.ReactM (Js React.Node) :=
-    <Component key={_object} title="x" values={(← Js.Array.empty)} ref={ref}/>
+    jsx%{<Component key={_object} title="x" values={(← Js.Array.empty)} ref={ref}/>}
   fail_if_success have _ : React.ReactM (Js React.Node) :=
-    <Component key={_any} title="x" values={(← Js.Array.empty)} ref={ref}/>
+    jsx%{<Component key={_any} title="x" values={(← Js.Array.empty)} ref={ref}/>}
   fail_if_success have _ : React.ReactM (Js React.Node) :=
-    <Component key="a" key="b" title="x" values={(← Js.Array.empty)} ref={ref}/>
+    jsx%{<Component key="a" key="b" title="x" values={(← Js.Array.empty)} ref={ref}/>}
   trivial
 
 example (_text : Js String) (_number : Js Float) : True := by
@@ -429,29 +429,29 @@ example (_text : Js String) (_number : Js Float) : True := by
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
-  <Component title="native" values={(← Js.Array.empty)} ref={ref}></Component>
+  jsx%{<Component title="native" values={(← Js.Array.empty)} ref={ref}></Component>}
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
-  <Component title="native" values={(← Js.Array.empty)} ref={ref}/>
+  jsx%{<Component title="native" values={(← Js.Array.empty)} ref={ref}/>}
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) : React.ReactM (Js React.Node) :=
-  <Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/>
+  jsx%{<Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/>}
 
 example (Component : React.FunctionComponent NativeProps) (ref : Js.Any) :
-    (<Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/> : React.ReactM (Js React.Node)) =
-    <Component title={(← js#"native")} values={(← Js.Array.empty)} ref={ref}/> := rfl
+    (jsx%{<Component title={js#"native"} values={(← Js.Array.empty)} ref={ref}/>} : React.ReactM (Js React.Node)) =
+    jsx%{<Component title={(← js#"native")} values={(← Js.Array.empty)} ref={ref}/>} := rfl
 
 example (Component : React.FunctionComponent NativeProps) (_ref : Js.Any) : True := by
   let _ := Component
   fail_if_success have _ : React.ReactM (Js React.Node) :=
-    <Component title={js#"native"} values={js#"not an array"} ref={_ref}/>
+    jsx%{<Component title={js#"native"} values={js#"not an array"} ref={_ref}/>}
   trivial
 
 #guard_msgs in
 example (Component : React.FunctionComponent NativeProps) (props : Js NativeProps) : React.ReactM (Js React.Node) :=
-  <Component @props={props}/>
+  jsx%{<Component @props={props}/>}
 
 #guard_msgs in
 example (props : Js NativeProps) : RuntimeM (Js String) := js_field% props "title"
@@ -459,11 +459,11 @@ example (props : Js NativeProps) : RuntimeM (Js String) := js_field% props "titl
 example (component : React.FunctionComponent NativeProps) (_title : Js String)
     (_values : Js.Array String) (_ref : Js.Any) (_wrong : Js Float) (_raw : Js.Object) : True := by
   let Component := component
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={_title} ref={_ref}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={_wrong} values={_values} ref={_ref}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title="a" title="b" values={_values} ref={_ref}/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component title={_title} values={_values} ref={_ref} extra="x"/>
-  fail_if_success have _ : React.ReactM (Js React.Node) := <Component @props={_raw}/>
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={_title} ref={_ref}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={_wrong} values={_values} ref={_ref}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title="a" title="b" values={_values} ref={_ref}/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component title={_title} values={_values} ref={_ref} extra="x"/>}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<Component @props={_raw}/>}
   fail_if_success have _ : RuntimeM (Js String) := js_field% _raw "title"
   trivial
 
@@ -502,8 +502,8 @@ example (_value : String) (_callback : DomM Unit)
     (_props : Js (React.Props.WithData Nat)) : True := by
   fail_if_success have _ : RuntimeM Js.Object := js%{ "value" := _value }
   fail_if_success have _ : RuntimeM (Js.Array String) := js#[_value]
-  fail_if_success have _ : React.ReactM (Js React.Node) := <span title={_value} />
-  fail_if_success have _ : React.ReactM (Js React.Node) := <button onClick={_callback} />
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<span title={_value} />}
+  fail_if_success have _ : React.ReactM (Js React.Node) := jsx%{<button onClick={_callback} />}
   fail_if_success have _ := React.Node.functionComponent _component _props
   trivial
 
