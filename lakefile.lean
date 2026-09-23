@@ -221,14 +221,15 @@ private def virPackageSetComplete
 private def buildVirPackageSetFacet
     (mod : Module) : FetchM (Job System.FilePath) := do
   let generatorJob ← vir_irpkg.fetch
-  -- Lean 4.33's importAllArts facet returns exportInfo.arts, not allArts,
+  -- Lake's importAllArts facet returns metaExportInfo.arts, not allArts,
   -- despite using allArtsTrace. Extract both explicitly so private artifact
   -- groups reach the generator as well as participating in invalidation.
-  let moduleJob ← mod.exportInfo.fetch
+  -- Since Lean 4.36 (lean4#14906), only metaExportInfo carries IR and allArts.
+  let moduleJob ← mod.metaExportInfo.fetch
   let importsJob ← mod.transImports.fetch
   let importArtsJob ← importsJob.bindM fun imports => do
     let jobs ← imports.mapM fun imported => do
-      (← imported.exportInfo.fetch).mapM fun info => do
+      (← imported.metaExportInfo.fetch).mapM fun info => do
         addTrace info.allArtsTrace
         return (imported.name, info.allArts)
     return Job.collectArray jobs "VIR imported module IR"
