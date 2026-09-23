@@ -34,7 +34,7 @@ component. React renders that component in the infoview's existing tree and
 passes its native `PanelWidgetProps` without a VIR clone or decode. The binding preserves nested field values; it does not
 promise a stable top-level props-object identity across React renders. All
 surrounding contexts are inherited without a provider bridge. Prop updates reuse
-the component; configuration or package revision changes replace the component and
+the component; configuration or package byte changes replace the component and
 remount its subtree. Rendering follows ordinary React render rules and error
 boundaries.
 
@@ -42,20 +42,41 @@ The [cleanup contract](../reference/HOST_BINDINGS.md#ui-cleanup-versus-runtime-d
 distinguishes normal UI release from hard disposal and failed setup.
 
 Packages use the authoritative active Lean module snapshot, including unsaved
-widget code. Revision checks cover its declaration closure and local source
-ranges; imported changes become visible when the snapshot contains them. See
-[module inputs](../reference/GENERATE_PACKAGE.md) for acquisition and visibility rules.
-`autoReloadMs` controls stat/revision polling: zero disables it, `vir_proof_widget`
-defaults to 1000 ms, and manually constructed `WidgetProps` defaults to zero.
-Cursor movement alone does not request package replacement.
+widget code. Imported changes become visible when that snapshot contains them. Notifications
+for other files are ignored: a changed import also needs a current-document edit,
+snapshot-position/session change, or integration token to request a new package.
+See [module inputs](../reference/GENERATE_PACKAGE.md) for visibility rules.
 
-The package build response supplies both bytes and their revision. Loading does
-not require a preceding stat result to match; an intervening edit can legitimately
-produce a newer build. Polling observes subsequent changes once loading settles.
-A failed refresh leaves the last working widget mounted; a later valid edit can
-recover automatically, including after an initial failure with no mounted widget.
-An unchanged failed generation is not rebuilt on every polling interval. Restoring
-the installed source clears the failed edit's error without replacing the component.
+By default, the shell requests a package on mount and on the current document's
+`textDocument/didChange` notifications. It uses the document version as an
+invalidation signal; it does not poll. Configuration, package snapshot position and official RPC session
+changes also request a package. Because upstream sessions are position-specific,
+cursor movement can cause acquisition, but does not itself reset the component.
+Goal and context updates with the same session and configuration do not acquire.
+
+An integration can supply `WidgetProps.updateToken : Option String` instead of
+following document notifications. Change that token whenever its code inputs may
+have changed; `none` selects the default edit-driven behavior. A fixed token
+suppresses edit-triggered acquisition, while configuration/position/session changes still
+acquire. This replaces `autoReloadMs`: remove the old field for automatic updates,
+or supply a fixed token where edit-triggered refresh is intentionally disabled.
+A source-text hash alone is insufficient because imported implementation changes
+can affect a package without changing that source text.
+
+The token only requests work. The shell compares a SHA-256 digest of the complete
+returned package bytes and the compiled Wasm module before replacing a runtime.
+Unrelated edits or source movement that leave the artifact unchanged preserve the
+component, DOM and React state. This comparison includes interface metadata;
+the server's existing revision is not used as complete artifact identity.
+Package preparation runs in the server's existing dedicated request task, after
+the required snapshot becomes available; it does not move into widget registration.
+Each invalidation still builds and transfers a package before this comparison.
+
+A newer acquisition supersedes pending older work. Obsolete candidates cannot
+publish, and unpublished runtimes are disposed. A failed refresh leaves the last
+working widget mounted and presents the error. A subsequent edit, token or session
+change requests again, including after a failed initial load. Restoring identical
+package bytes clears the error without remounting. There is no periodic retry.
 
 Build the optional widget module with `lake build VirInfoview`; see
 [setup](../HARNESS.md#setup) for prerequisites. Restart the Lean server or reopen

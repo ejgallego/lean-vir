@@ -49,8 +49,8 @@ automatic transfer of React state or internal Lean values between generations.
 | --- | --- | --- |
 | Document with two Lean-authored DOM interactions | One page package set may serve both elements; events reuse its runtime, ordinary DOM objects and independent element state. No required React or handwritten per-element bootstrap. | Proposed Verso baseline: still to be built. Existing browser providers alone do not prove this integration. |
 | Infoview props, goals, position or context update | Reuse the component/runtime when code and configuration are unchanged; inherit upstream React context and preserve ordinary hook state. | `tests/infoview/rpc-shell-lifetime-entry.js` checks context and notification-driven RPC updates. |
-| Infoview implementation edit | With live refresh enabled, prepare fresh code and eventually converge to the latest valid source once edits and loading settle; an intermediate version may mount during a slow load. React state may reset. Explicitly disabling live refresh remains a valid host choice. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
-| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. Later edits can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. The browser suite controls completion order for an obsolete configuration request. An unchanged revision suppresses another build after any failed attempt, including a temporary transport failure. |
+| Infoview implementation edit | Document edits (or an integration token) request a package. A newer request immediately makes older work obsolete. Changed package bytes replace the component; identical bytes preserve React state. A fixed integration token suppresses edit-triggered acquisition. | `tests/infoview/rpc-shell-lifetime-entry.js` exercises unsaved implementation changes, a held reply followed by another edit, and broken/fixed source through the actual Lean server and Chromium. An actual editor window is not exercised. |
+| Slow, failed or obsolete load | Keep usable old UI on refresh failure; dispose unpublished candidates; removal prevents late publication. Later edits can recover a failed initial load. A failure of an older cache promise must not erase a newer entry. | Browser and real-server lifetime suites plus `tests/infoview/widget.mjs`. Both suites control late replies. A new edit, token or session requests again after failure; there is no periodic retry. |
 | Promise or callback survives UI replacement | Execute the original Lean continuation and its stale-result guard; never silently enter the successor program. | Browser and real-server shell lifetime suites. |
 | Headless/browser caller runs multiple entries | Keep interpreter state and initialized constants within a generation; calls and callbacks do not instantiate fresh interpreters. | `tests/runtime/interpreter-constant-cache-smoke.mjs`, CLI and module-package tests. |
 | Multi-module package set | Preserve member ordering, identity checks, initialization and startup semantics. A complete set is one generation, not one runtime per member. | `tests/runtime/module-package-set-smoke.mjs` and descriptor tests. |
@@ -93,18 +93,28 @@ bytes and reusing compilation by a digest of those bytes. Compare transport cost
 and invalidation behavior before selecting one. Neither requires a project
 identity registry, general resolver, or additional ownership layer.
 
-For IR packages, the `buildIRPackage` response is the authoritative snapshot;
-`statIRPackage` detects changes for live refresh. The build handler derives its
-bytes and revision from one prepared snapshot input. The shell no longer requires
-a separate pre-build stat to match, since an intervening edit can produce a valid
-newer build. Request obsolescence and response/root validation remain in place.
-Polling waits for a pending load to settle, then observes newer edits, even if
-the first load failed. The shell suppresses another attempt for the same observed
-configuration and revision after any failure. This is failed-attempt suppression,
-not evidence that the source is intrinsically invalid: temporary asset or RPC
-failures are also suppressed if transport recovers without a source edit. A new
-revision permits another attempt; successful installation clears the attempt
-state. Returning to the installed revision clears the error without remounting.
+For IR packages, the `buildIRPackage` response supplies the authoritative bytes.
+The shell uses document edit notifications by default, or an integration-supplied
+`updateToken`. Configuration, package snapshot position and official RPC session changes also acquire. The
+upstream session is position-specific: cursor movement can request a package.
+No shell timer or `statIRPackage` request is needed. The stat RPC remains available
+to other callers; its revision is not treated as full package identity.
+
+An invalidation token need not identify exact code. After building, the shell
+compares the SHA-256 of the complete package bytes and the compiled Wasm module
+against its installed generation. Equal artifacts preserve that generation and
+React state, even when a document version or server revision differs. Changed
+interface metadata also requires replacement, even if the server revision agrees.
+Package construction remains in the server's existing dedicated task. Building
+and transferring on each invalidation is the deliberate cost of this simple
+protocol; no environment fingerprint or server cache has been introduced.
+
+New requests invalidate older candidates immediately, including during initial
+loading. UI removal also prevents publication. Errors remain visible until a
+successful acquisition; a later edit, token or session can recover. Restoring the
+installed bytes clears an error without remounting. A fixed token disables edit
+notifications, not configuration, position or session changes. Snapshot visibility remains
+a server responsibility; a token does not make unavailable imported code visible.
 
 There will be no Retry button. Ordinary edit/load races are protocol or lifecycle
 bugs to fix, rather than a recovery obligation for the document author or reader.

@@ -29,7 +29,10 @@ structure WidgetProps where
   wasmPath : String := ""
   irPackage : IRPackage
   componentEntry : String
-  autoReloadMs : Nat := 0
+  /-- An integration-supplied invalidation token. Without one, the shell follows
+  document edit notifications. A fixed token disables edit-triggered refresh;
+  configuration, snapshot position and RPC session changes still acquire. -/
+  updateToken : Option String := none
   setupHint : String := ""
   deriving Server.RpcEncodable
 
@@ -66,7 +69,6 @@ private meta def expandReactWidgetCommand
         wasmPath := Lean.Vir.Infoview.WidgetProps.defaultWasmPath
         irPackage := $irPackageIdent
         componentEntry := $componentName
-        autoReloadMs := 1000
         setupHint := Lean.Vir.Infoview.WidgetProps.defaultSetupHint
     )
 

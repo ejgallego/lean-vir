@@ -287,7 +287,7 @@ unsafe def rejectNonModuleSnapshot : IO Unit := do
   expectRootsError #["VirNativeInfoview."]
   expect "authoring widget component entry"
     (widgetProps.componentEntry == "SmokeInfoviewLean.createComponent")
-  expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
+  expect "authoring widget follows document edits" (widgetProps.updateToken.isNone)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.WidgetProps.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage
   expect "IR decl hash tracks body literals" <|

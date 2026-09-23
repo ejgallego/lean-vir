@@ -19,8 +19,9 @@ const transport = {
   revision: 1,
   builds: 0,
   stats: 0,
+  buildRevisions: [],
+  packageBase64: null,
   buildGate: null,
-  statGate: null,
   failNextBuild: false,
 };
 const failures = [];
@@ -284,6 +285,7 @@ async function mountShell(props = {}, { onRemovalLayoutCleanup = null } = {}) {
     },
     componentEntry: prefix + "createComponent",
     pos: { uri: "file:///ShellLifetime.lean", line: 0, character: 0 },
+    updateToken: "initial",
     ...props,
   };
   await React.act(async () =>
@@ -366,7 +368,7 @@ function checkContinuation(state, kind, stale) {
 }
 
 async function normalUnmount() {
-  const shell = await mountShell({ autoReloadMs: 10 });
+  const shell = await mountShell();
   await shell.ready();
   const state = states.at(-1);
   check(
@@ -375,7 +377,6 @@ async function normalUnmount() {
   );
   const success = pending(state),
     rejection = pending(state);
-  await until(() => transport.stats > 1, "polling ran");
   await shell.unmount();
   check(
     harness.loadedRef.current === null,
@@ -385,10 +386,10 @@ async function normalUnmount() {
     state.cleanups === 1 && state.disposed === 0,
     "normal cleanup runs the Lean effect once without shutdown",
   );
-  check(shellIntervalCount === 0, "shell-owned polling stopped");
-  const stats = transport.stats;
+  check(transport.stats === 0, "ordinary shell lifetime makes no package stat calls");
+  check(shellIntervalCount === 0, "shell owns no polling interval");
   await tick();
-  check(transport.stats === stats, "no later poll after shell cleanup");
+  check(transport.stats === 0, "shell cleanup does not start package polling");
   success.resolve("late success");
   rejection.reject("late rejection");
   await Promise.all([success.completion, rejection.completion]);
@@ -415,18 +416,47 @@ async function normalUnmount() {
 }
 
 async function mountedRefresh() {
-  const shell = await mountShell({ autoReloadMs: 10 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "initial" });
   await shell.ready();
   const old = states.at(-1);
-  const late = pending(old);
+
+  const ordinaryBuilds = transport.builds;
+  await shell.update({ setupHint: "ordinary prop update" });
+  await tick();
+  check(
+    transport.builds === ordinaryBuilds && states.at(-1) === old,
+    "ordinary prop changes with an unchanged token do not acquire",
+  );
+
   transport.revision++;
+  const revisionOnly = transport.revision;
+  await shell.update({ updateToken: "revision-only" });
   await until(
     () =>
-      states.at(-1) !== old &&
+      transport.builds === ordinaryBuilds + 1 &&
+      shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "same-byte token refresh completes",
+  );
+  check(
+    states.at(-1) === old && old.cleanups === 0 &&
+      transport.buildRevisions.at(-1) === String(revisionOnly),
+    "a changed server revision with identical bytes preserves the runtime",
+  );
+
+  const late = pending(old);
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "manifest-only" });
+  await until(
+    () => states.at(-1) !== old &&
       shell.container.textContent.includes(states.at(-1).label),
     "G2 mounted refresh",
   );
   const fresh = states.at(-1);
+  check(
+    transport.buildRevisions.at(-1) === String(revisionOnly),
+    "manifest-only bytes replace the runtime without a server revision change",
+  );
   check(
     old.cleanups === 1 && old.disposed === 0,
     "refresh cleans up G1 once without shutdown",
@@ -467,10 +497,11 @@ async function mountedRefresh() {
     () => !old.runtime.deref() && !fresh.runtime.deref(),
     "refreshed shell generations released",
   );
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
 async function applicationListenerRetention() {
-  const shell = await mountShell({ autoReloadMs: 10 });
+  const shell = await mountShell();
   await shell.ready();
   const state = states.at(-1);
   const target = new EventTarget();
@@ -485,7 +516,7 @@ async function applicationListenerRetention() {
     state.runtime.deref() !== undefined &&
       state.disposed === 0 &&
       shellIntervalCount === 0,
-    "caller-owned listener survives owned UI/polling cleanup",
+    "caller-owned listener survives owned UI cleanup",
   );
   target.dispatchEvent(new Event("late"));
   check(
@@ -617,12 +648,14 @@ function effectCount(state, event) {
 }
 
 async function replacementCleanupFailure() {
-  const shell = await mountShell({ autoReloadMs: 100 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "cleanup-initial" });
   await shell.ready();
   const old = states.at(-1);
   old.throwCleanup = true;
   allowConsoleDiagnostic("normal cleanup sentinel", 2);
-  transport.revision++;
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "cleanup-refresh" });
   await until(
     () =>
       shell.container.querySelector('[data-shell-error-boundary="true"]'),
@@ -660,13 +693,16 @@ async function replacementCleanupFailure() {
   old.captured = null;
   successor.captured = null;
   await shell.unmount();
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
-async function obsoleteCandidateAndPoll() {
+async function obsoleteCandidateAndTokenUpdate() {
+  runtimeFault = { throwDispose: true };
+  allowConsoleDiagnostic("candidate disposal sentinel", 1);
   const buildGate = deferred();
   transport.buildGate = buildGate;
   const before = states.length;
-  const shell = await mountShell({ autoReloadMs: 10 });
+  const shell = await mountShell();
   await until(() => transport.buildGate === null, "candidate build pending");
   await shell.unmount();
   buildGate.resolve();
@@ -674,48 +710,93 @@ async function obsoleteCandidateAndPoll() {
   const obsolete = states.at(-1);
   check(
     obsolete.disposed === 1,
-    "obsolete never-installed candidate hard-disposed",
+    "obsolete candidate disposal attempted once even when cleanup throws",
   );
   check(
-    harness.loadedRef.current === null && shellIntervalCount === 0,
-    "obsolete result installs no UI or polling",
+    harness.loadedRef.current === null && shellIntervalCount === 0 &&
+      transport.stats === 0,
+    "obsolete result installs no UI or package polling",
   );
 
-  for (const rejectPoll of [false, true]) {
-    const mounted = await mountShell({ autoReloadMs: 10 });
+  {
+    const mounted = await mountShell();
     await mounted.ready();
     const state = states.at(-1);
-    const pollGate = deferred();
-    transport.statGate = pollGate;
-    await until(() => transport.statGate === null, "poll request in flight");
-    await mounted.unmount();
+    const tokenGate = deferred();
+    const beforeBuild = states.length;
     const builds = transport.builds;
-    transport.revision++;
-    if (rejectPoll) pollGate.reject(new Error("obsolete poll sentinel"));
-    else pollGate.resolve();
+    transport.buildGate = tokenGate;
+    await mounted.update({ updateToken: "obsolete-same-bytes" });
+    await until(() => transport.buildGate === null, "same-byte token build in flight");
+    await mounted.unmount();
+    tokenGate.resolve();
     await tick();
     await tick();
     check(
-      transport.builds === builds &&
+      transport.builds === builds + 1 &&
+        states.length === beforeBuild &&
+        state.disposed === 0 &&
         shellIntervalCount === 0 &&
         harness.loadedRef.current === null,
-      "late poll cannot install or trigger reload",
+      "obsolete same-byte token reuses its runtime without creating a candidate",
     );
     state.captured = null;
+  }
+
+  for (const rejectBuild of [false, true]) {
+    const mounted = await mountShell();
+    await mounted.ready();
+    const state = states.at(-1);
+    const tokenGate = deferred();
+    const beforeBuild = states.length;
+    const builds = transport.builds;
+    transport.packageBase64 = transport.manifestPackageBase64;
+    transport.buildGate = tokenGate;
+    await mounted.update({ updateToken: `obsolete-${rejectBuild}` });
+    await until(() => transport.buildGate === null, "token build in flight");
+    await mounted.unmount();
+    if (rejectBuild) {
+      allowConsoleDiagnostic("obsolete token sentinel", 1);
+      tokenGate.reject(new Error("obsolete token sentinel"));
+    } else {
+      tokenGate.resolve();
+    }
+    await tick();
+    await tick();
+    check(
+      transport.builds === builds + 1 &&
+        shellIntervalCount === 0 &&
+        harness.loadedRef.current === null,
+      "late token acquisition cannot install after removal",
+    );
+    if (rejectBuild) {
+      check(states.length === beforeBuild, "failed obsolete token creates no runtime");
+    } else {
+      await until(() => states.length === beforeBuild + 1,
+        "obsolete token candidate finishes");
+      check(states.at(-1).disposed === 1,
+        "obsolete token candidate is hard-disposed");
+      states.at(-1).captured = null;
+    }
+    state.captured = null;
+    transport.packageBase64 = transport.basePackageBase64;
   }
 }
 
 async function failedRefresh() {
-  const shell = await mountShell({ autoReloadMs: 100 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "failure-initial" });
   await shell.ready();
   const old = states.at(-1);
+  transport.packageBase64 = transport.manifestPackageBase64;
   runtimeFault = { invalidComponent: true };
-  transport.revision++;
+  await shell.update({ updateToken: "failed-refresh" });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "failed refresh status",
   );
   const candidate = states.at(-1);
+  const failedStateCount = states.length;
   check(
     candidate !== old &&
       candidate.disposed === 1,
@@ -730,17 +811,22 @@ async function failedRefresh() {
   old.captured.success(undefined);
   checkContinuation(old, "success", false);
   const failedBuilds = transport.builds;
-  const failedStats = transport.stats;
-  await until(() => transport.stats >= failedStats + 3, "polling after failed refresh");
-  check(transport.builds === failedBuilds, "unchanged failed generation is not rebuilt");
-  transport.revision--;
+  await shell.update({ setupHint: "ordinary update after failure" });
+  await tick();
+  check(transport.builds === failedBuilds,
+    "ordinary props do not retry a failed token acquisition");
+  transport.packageBase64 = transport.basePackageBase64;
+  await shell.update({ updateToken: "restore-installed" });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="ready"]'),
     "restoring installed source clears failed build status",
   );
-  check(transport.builds === failedBuilds && old.cleanups === 0,
+  check(transport.builds === failedBuilds + 1 && old.cleanups === 0 &&
+      states.length === failedStateCount &&
+      harness.loadedRef.current?.service.runtime === old.runtime.deref(),
     "restoring installed source preserves its component");
-  transport.revision++;
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "source-edit" });
   await until(
     () => old.cleanups === 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
@@ -752,14 +838,17 @@ async function failedRefresh() {
   fresh.captured = null;
   candidate.captured = null;
   old.captured = null;
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
 async function failedRefreshThenConfigurationChange() {
-  const shell = await mountShell({ autoReloadMs: 100 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "configuration-failure-initial" });
   await shell.ready();
   const old = states.at(-1);
+  transport.packageBase64 = transport.manifestPackageBase64;
   runtimeFault = { invalidComponent: true };
-  transport.revision++;
+  await shell.update({ updateToken: "configuration-failure" });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "refresh failure before configuration change",
@@ -786,14 +875,17 @@ async function failedRefreshThenConfigurationChange() {
   failed.captured = null;
   fresh.captured = null;
   await shell.unmount();
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
 async function temporaryBuildFailure() {
-  const shell = await mountShell({ autoReloadMs: 10 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "temporary-failure-initial" });
   await shell.ready();
   const old = states.at(-1);
   transport.failNextBuild = true;
-  transport.revision++;
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "temporary-failure" });
   await until(
     () => shell.container.querySelector('[data-vir-infoview-state="error"]'),
     "temporary package acquisition failure",
@@ -803,15 +895,23 @@ async function temporaryBuildFailure() {
     "temporary acquisition failure preserves installed component",
   );
   const failedBuilds = transport.builds;
-  const failedStats = transport.stats;
-  await until(() => transport.stats >= failedStats + 3,
-    "transport recovered while source stayed unchanged");
+  await shell.update({ setupHint: "ordinary update while failed" });
+  await tick();
   check(
     transport.builds === failedBuilds &&
       shell.container.querySelector('[data-vir-infoview-state="error"]') !== null,
-    "unchanged revision suppresses another build after temporary acquisition failure",
+    "unchanged token suppresses another build after temporary acquisition failure",
   );
-  transport.revision++;
+  transport.packageBase64 = transport.basePackageBase64;
+  await shell.update({ updateToken: "temporary-recovery-same-bytes" });
+  await until(
+    () => shell.container.querySelector('[data-vir-infoview-state="ready"]'),
+    "same bytes recover temporary failure",
+  );
+  check(states.at(-1) === old && old.cleanups === 0,
+    "same bytes recover without replacing the installed component");
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "temporary-recovery-new-bytes" });
   await until(
     () => old.cleanups === 1 &&
       shell.container.querySelector('[data-vir-infoview-state="ready"]'),
@@ -823,21 +923,24 @@ async function temporaryBuildFailure() {
   old.captured = null;
   fresh.captured = null;
   await shell.unmount();
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
 async function singlePendingRefresh() {
-  const shell = await mountShell({ autoReloadMs: 10 });
+  transport.packageBase64 = transport.basePackageBase64;
+  const shell = await mountShell({ updateToken: "pending-initial" });
   await shell.ready();
   const old = states.at(-1);
   const builds = transport.builds;
   const gate = deferred();
   transport.buildGate = gate;
-  transport.revision++;
+  transport.packageBase64 = transport.manifestPackageBase64;
+  await shell.update({ updateToken: "pending-refresh" });
   await until(() => transport.buildGate === null, "refresh build pending");
   for (let i = 0; i < 5; i++) await tick();
   check(
     transport.builds === builds + 1,
-    "polling admits only one refresh while its package build is pending",
+    "one token admits only one refresh while its package build is pending",
   );
   gate.resolve();
   await until(
@@ -854,13 +957,14 @@ async function singlePendingRefresh() {
   old.captured = null;
   fresh.captured = null;
   await shell.unmount();
+  transport.packageBase64 = transport.basePackageBase64;
 }
 
 async function obsoleteConfigurationCandidate() {
   const gate = deferred();
   const before = states.length;
   transport.buildGate = gate;
-  const shell = await mountShell({ autoReloadMs: 0 });
+  const shell = await mountShell();
   await until(() => transport.buildGate === null, "initial configuration build pending");
   await shell.update({ wasmPath: "reconfigured-shell.wasm" });
   await until(
@@ -887,25 +991,20 @@ async function obsoleteConfigurationCandidate() {
   await shell.unmount();
 }
 
-function installMockRpc(wasmBase64, packageBase64) {
+function installMockRpc(wasmBase64, packageBase64, manifestPackageBase64) {
+  transport.basePackageBase64 = packageBase64;
+  transport.packageBase64 = packageBase64;
+  transport.manifestPackageBase64 = manifestPackageBase64;
   harness.rpc = {
     async call(method, params) {
       if (method.endsWith("statIRPackage")) {
         transport.stats++;
-        if (transport.statGate) {
-          const gate = transport.statGate;
-          transport.statGate = null;
-          await gate.promise;
-        }
-        return {
-          source: "fixtures/runtime/ShellLifetime.lean",
-          roots: params.package.roots,
-          revision: String(transport.revision),
-        };
+        throw new Error("statIRPackage is obsolete under explicit updateToken");
       }
       if (method.endsWith("buildIRPackage")) {
         transport.builds++;
         const revision = transport.revision;
+        transport.buildRevisions.push(String(revision));
         if (transport.failNextBuild) {
           transport.failNextBuild = false;
           throw new Error("temporary package transport sentinel");
@@ -919,8 +1018,8 @@ function installMockRpc(wasmBase64, packageBase64) {
           source: "fixtures/runtime/ShellLifetime.lean",
           roots: params.package.roots,
           revision: String(revision),
-          byteSize: String(atob(packageBase64).length),
-          dataBase64: packageBase64,
+          byteSize: String(atob(transport.packageBase64).length),
+          dataBase64: transport.packageBase64,
         };
       }
       check(
@@ -1024,7 +1123,11 @@ async function pendingCandidateAfterCommittedRemoval(wasmBase64, packageBase64) 
 
 globalThis.runPendingCandidateAfterCommittedRemoval = pendingCandidateAfterCommittedRemoval;
 
-globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
+globalThis.runShellLifetime = async (
+  wasmBase64,
+  packageBase64,
+  manifestPackageBase64,
+) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const finishDiagnostics = observeDiagnostics();
   const setIntervalOriginal = globalThis.setInterval,
@@ -1041,7 +1144,7 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
     shellIntervalCount = intervals.size;
     return clearIntervalOriginal(id);
   };
-  installMockRpc(wasmBase64, packageBase64);
+  installMockRpc(wasmBase64, packageBase64, manifestPackageBase64);
   try {
     await normalUnmount();
     await mountedRefresh();
@@ -1055,7 +1158,7 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
     await replacementCleanupFailure();
     await singlePendingRefresh();
     await obsoleteConfigurationCandidate();
-    await obsoleteCandidateAndPoll();
+    await obsoleteCandidateAndTokenUpdate();
     await tick();
     check(
       failures.every((failure) => failure.includes("normal cleanup sentinel")),
@@ -1076,7 +1179,7 @@ globalThis.runShellLifetime = async (wasmBase64, packageBase64) => {
       singlePendingRefresh: true,
       obsoleteConfigurationCandidate: true,
       consoleDiagnostics: consoleMessages.length,
-      obsoleteLoadAndPoll: true,
+      obsoleteLoadAndTokenUpdate: true,
       unhandled: unhandled.length,
     };
   } finally {
