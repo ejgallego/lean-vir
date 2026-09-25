@@ -76,7 +76,15 @@ metadata. It uses Lean's non-cryptographic hashing as a local change detector,
 like native widget module hashes; collisions are possible and it is not an
 authenticity check. At acquisition,
 the browser also compares the complete package SHA-256 and compiled Wasm module
-against the installed runtime to avoid an unnecessary remount.
+against the installed runtime to avoid an unnecessary remount. Each acquisition
+reads the selected Wasm bytes and reuses compilation by their SHA-256. Relative
+paths and file timestamps/sizes are not cache identities. Identical bytes can share
+compilation across projects; different bytes at the same path cannot. This costs a
+Wasm transfer on actual code acquisition, including recovery attempts, but healthy
+proof/context updates still perform no asset requests. Successful compilations
+remain cached for the page lifetime, one entry per distinct Wasm content; repeated
+Wasm rebuilds can therefore grow the cache. Concurrent acquisitions share
+compilation but each reads and hashes its bytes.
 
 `IRPackage.fingerprint` is required. The roots-only build mode, `updateToken`,
 `autoReloadMs`, and `statIRPackage` are removed. The old roots array and separate
