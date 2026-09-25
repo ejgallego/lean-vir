@@ -9,6 +9,7 @@ import test from "node:test";
 import { typeScriptDiagnostics } from "../support/typescript-probe.mjs";
 
 import { createInfoviewPanelBindings } from "../../web/src/host/vir-infoview-panel-bindings.js";
+import { createBrowserReactHostBindings } from "../../web/src/vir-react-host-bindings.js";
 
 test("hover primitives preserve DOM values and disconnect geometry observers", () => {
   const bindings = createInfoviewPanelBindings();
@@ -57,7 +58,7 @@ test("hover primitives preserve DOM values and disconnect geometry observers", (
   Object.defineProperty(globalThis, "document", { configurable: true, value: { body } });
   try {
     const children = ["exact", " nodes"];
-    const portal = bindings["infoview.hover.portal"](children);
+    const portal = createBrowserReactHostBindings({})["infoview.hover.portal"](children);
     assert.equal(portal.children, children);
     assert.equal(portal.containerInfo, body);
   } finally {

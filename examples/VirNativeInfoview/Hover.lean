@@ -134,6 +134,8 @@ def position (anchorId popupId : Js String) : Browser.DomM Unit := do
     if let some popup ← byId popupId then
       let bounds ← HoverDom.rect anchor
       let size ← HoverDom.rect popup
+      let anchorWidth ← JsValue.toFloat (← js_field% bounds "width")
+      let anchorHeight ← JsValue.toFloat (← js_field% bounds "height")
       let left ← JsValue.toFloat (← js_field% bounds "left")
       let top ← JsValue.toFloat (← js_field% bounds "top")
       let bottom ← JsValue.toFloat (← js_field% bounds "bottom")
@@ -141,6 +143,11 @@ def position (anchorId popupId : Js String) : Browser.DomM Unit := do
       let height ← JsValue.toFloat (← js_field% size "height")
       if let some inlineStyle ← Browser.ElementCSSInlineStyle.fromElement popup then
         let style ← Browser.ElementCSSInlineStyle.getStyle inlineStyle
+        -- A collapsed goal keeps its React subtree mounted, including portals.
+        -- Hide the popup until its anchor has a rendered rectangle again.
+        if anchorWidth <= 0 || anchorHeight <= 0 then
+          Browser.CSSStyleDeclaration.setProperty style (← js#"visibility") (← Js.Nullable.ofJs (← js#"hidden"))
+          return
         let above := top - height - 8
         let y := if above < (10 : Float) then bottom + 8 else above
         Browser.CSSStyleDeclaration.setProperty style (← js#"left")

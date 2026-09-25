@@ -126,6 +126,7 @@ globalThis.setupNativeHoverPanel = async (wasm, pkg) => {
         highlighted: node.classList.contains("highlight"), rect: rect(node),
       }));
       return { requests: requests.length, refs: requests.map(request => request.ref), warnings, popup: Boolean(tip),
+        popupVisibility: tipStyle?.visibility,
         highlighted: tags.filter(value => value.highlighted).map(value => value.id), tags,
         prefixRect: textRect("prefix"), suffixRect: textRect("suffix"), tag: rect(element),
         popupRect: rect(tip),

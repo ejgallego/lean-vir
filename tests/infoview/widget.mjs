@@ -32,7 +32,8 @@ await writeFile(
 );
 await writeFile(
   new URL("infoview-react-dom-stub.mjs", buildDir),
-  "export { createRoot } from 'react-dom/client';\n",
+  "export { createRoot } from 'react-dom/client';\n" +
+    "export function createPortal() { throw new Error('unexpected smoke portal render'); }\n",
 );
 const widgetSource = await readFile(
   new URL("build/generated/infoview/vir-infoview-widget.js", repoRoot),
@@ -41,7 +42,7 @@ const widgetSource = await readFile(
 const smokeWidgetSource =
   widgetSource
     .replace('from "@leanprover/infoview"', 'from "./infoview-api-stub.mjs"')
-    .replace('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
+    .replaceAll('from "react-dom"', 'from "./infoview-react-dom-stub.mjs"');
 await writeFile(
   new URL("vir-infoview-widget-smoke.mjs", buildDir),
   smokeWidgetSource,
